@@ -33,7 +33,7 @@ Designers earn tokens upon completion → withdraw via admin approval.
 
 ## 📊 Roadmap
 See all open tasks and milestones in  
-➡️ [View Full Roadmap →](https://github.com/brandbite/brandbite/projects/1)
+➡️ [View Full Roadmap →](https://github.com/users/brandbite/projects/1)
 
 ---
 
