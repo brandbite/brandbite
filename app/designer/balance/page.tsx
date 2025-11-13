@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // @file: app/designer/balance/page.tsx
 // @purpose: Designer balance dashboard page (tokens + recent ledger entries)
-// @version: v1.1.0
+// @version: v1.1.1
 // @lastUpdate: 2025-11-13
 // -----------------------------------------------------------------------------
 
@@ -79,7 +79,7 @@ export default function DesignerBalancePage() {
   return (
     <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
       <div className="mx-auto max-w-6xl px-6 py-10">
-        {/* Top navigation placeholder (to feel like Brandbite UI) */}
+        {/* Top navigation placeholder */}
         <header className="mb-8 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f15b2b] text-sm font-semibold text-white">
@@ -154,7 +154,7 @@ export default function DesignerBalancePage() {
                 </div>
 
                 <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-                  <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-[#9a9892]}>
+                  <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-[#9a9892]">
                     Current balance
                   </h2>
                   <p className="mt-3 text-3xl font-semibold text-[#f15b2b]">

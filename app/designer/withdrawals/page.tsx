@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // @file: app/designer/withdrawals/page.tsx
 // @purpose: Designer withdrawals dashboard (list + create withdrawal requests)
-// @version: v1.1.0
+// @version: v1.1.1
 // @lastUpdate: 2025-11-13
 // -----------------------------------------------------------------------------
 
@@ -299,7 +299,9 @@ export default function DesignerWithdrawalsPage() {
                     <table className="min-w-full text-left text-sm">
                       <thead className="border-b border-[#eceae5] bg-[#faf8f5] text-xs uppercase text-[#9a9892]">
                         <tr>
-                          <th className="px-4 py-3 font-medium">Requested at</th>
+                          <th className="px-4 py-3 font-medium">
+                            Requested at
+                          </th>
                           <th className="px-4 py-3 font-medium">Amount</th>
                           <th className="px-4 py-3 font-medium">Status</th>
                           <th className="px-4 py-3 font-medium">Notes</th>
