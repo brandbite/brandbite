@@ -1,66 +1,19 @@
-import Image from "next/image";
-import styles from "./page.module.css";
-
-export default function Home() {
+export default function HomePage() {
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+    <main className="main-shell">
+      <div className="rounded-2xl bg-[color:var(--bb-surface)] px-8 py-6 shadow-xl border border-white/5 max-w-xl w-full">
+        <p className="text-sm uppercase tracking-[0.2em] text-slate-400 mb-2">
+          Brandbite v2025
+        </p>
+        <h1 className="text-3xl font-semibold mb-3">
+          Design subscription portal is under construction
+        </h1>
+        <p className="text-sm text-slate-300">
+          Şu anda çekirdek yapıyı kuruyoruz: Next.js + Tailwind 4 + Prisma +
+          BetterAuth. Bir sonraki adımda admin, designer ve customer
+          dashboard&rsquo;larını ekleyeceğiz.
+        </p>
+      </div>
+    </main>
+  )
 }
