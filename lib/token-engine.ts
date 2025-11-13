@@ -1,25 +1,15 @@
 // -----------------------------------------------------------------------------
 // @file: lib/token-engine.ts
 // @purpose: Token accounting helpers for Brandbite (companies & designers)
-// @version: v1.0.0
+// @version: v1.1.0
 // @lastUpdate: 2025-11-13
 // -----------------------------------------------------------------------------
 
-import { PrismaClient, Prisma, LedgerDirection } from "@prisma/client";
-
-/**
- * NOTE:
- * Eğer projede halihazırda tekil bir Prisma client'in varsa (ör: "@/lib/prisma"),
- * aşağıdaki satırı yorum satırına alıp, kendi client'ini import edebilirsin.
- *
- * Örn:
- * import { prisma } from "@/lib/prisma";
- */
-const prisma = new PrismaClient();
+import { LedgerDirection, Prisma } from "@prisma/client";
+import { prisma } from "./prisma";
 
 /**
  * Token hareketleri için daha okunabilir reason kodları.
- * Buradakiler sadece öneri; istersen string olarak farklı değerler de kullanabilirsin.
  */
 export type TokenReason =
   | "PLAN_PURCHASE"
@@ -72,12 +62,6 @@ export interface ApplyCompanyLedgerInput {
  * Şirketin (company) token bakiyesini günceller ve ilgili TokenLedger kaydını oluşturur.
  * - amount: pozitif integer
  * - direction: CREDIT => bakiye artar, DEBIT => bakiye azalır
- *
- * İşlem:
- * 1. Company.tokenBalance okunur
- * 2. balanceBefore / balanceAfter hesaplanır
- * 3. TokenLedger kaydı yazılır (companyId + optional ticketId)
- * 4. Company.tokenBalance yeni değere güncellenir
  */
 export async function applyCompanyLedgerEntry(
   input: ApplyCompanyLedgerInput
@@ -132,8 +116,6 @@ export async function applyCompanyLedgerEntry(
  * Güvenlik/repair fonksiyonu:
  * - Verilen şirket için tüm ledger kayıtlarını okuyup gerçek bakiyeyi hesaplar.
  * - Company.tokenBalance alanını bu değere set eder.
- *
- * Not: direction alanını dikkate alır (CREDIT - DEBIT).
  */
 export async function recalculateCompanyTokenBalance(companyId: string) {
   return prisma.$transaction(async (tx) => {
@@ -182,17 +164,18 @@ export interface ApplyUserLedgerInput {
  * Designer (UserAccount) için token ledger kaydı oluşturur.
  * Şu an için UserAccount üzerinde ayrı bir tokenBalance alanımız yok;
  * bu yüzden balanceBefore / balanceAfter değerlerini ledger üzerinden hesaplıyoruz.
- *
- * Özet:
- * 1. Bu kullanıcıya ait geçmiş ledger kayıtları üzerinden mevcut bakiye hesaplanır.
- * 2. Yeni hareket için balanceBefore / balanceAfter hesaplanır.
- * 3. TokenLedger kaydı yazılır.
- *
- * Bu fonksiyon designer odaklı "kazandığı tokenlar" ile withdraw sistemini besleyecek.
  */
 export async function applyUserLedgerEntry(input: ApplyUserLedgerInput) {
-  const { userId, companyId, ticketId, amount, direction, reason, notes, metadata } =
-    input;
+  const {
+    userId,
+    companyId,
+    ticketId,
+    amount,
+    direction,
+    reason,
+    notes,
+    metadata,
+  } = input;
 
   const { signedAmount, rawAmount } = computeSignedAmount(amount, direction);
 
@@ -238,7 +221,8 @@ export async function applyUserLedgerEntry(input: ApplyUserLedgerInput) {
 
 /**
  * Mevcut user ledger'ına göre designer token bakiyesini hesaplar.
- * Bu fonksiyon, örneğin withdraw talebi öncesi "ne kadar token çekebilir?" sorusuna cevap olmak için kullanılabilir.
+ * Bu fonksiyon, örneğin withdraw talebi öncesi "ne kadar token çekebilir?" sorusuna
+ * cevap olmak için kullanılabilir.
  */
 export async function getUserTokenBalance(userId: string) {
   const [credits, debits] = await Promise.all([
