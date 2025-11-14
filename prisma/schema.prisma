@@ -1,7 +1,9 @@
 // -----------------------------------------------------------------------------
+// @file: prisma/schema.prisma
 // @purpose: Brandbite core database schema (roles, tickets, tokens, ledger)
+// @version: v1.2.0
 // @status: active
-// @lastUpdate: 2025-11-13
+// @lastUpdate: 2025-11-14
 // -----------------------------------------------------------------------------
 
 generator client {
@@ -48,6 +50,22 @@ enum WithdrawalStatus {
   PAID
 }
 
+// Şirket içi rol (tenant-level)
+enum CompanyRole {
+  OWNER    // company owner
+  PM       // company-wide project manager
+  BILLING  // accountant / finance
+  MEMBER   // regular member (default)
+}
+
+// Proje içi rol (project-level)
+enum ProjectRole {
+  OWNER       // project owner (genelde company owner / lead)
+  PM          // project manager
+  CONTRIBUTOR // aktif çalışan
+  VIEWER      // read-only
+}
+
 // --- Core Models -------------------------------------------------------------
 
 model UserAccount {
@@ -55,11 +73,14 @@ model UserAccount {
   authUserId String   @unique // BetterAuth / auth provider ID
   email      String   @unique
   name       String?
-  role       UserRole @default(CUSTOMER)
+  role       UserRole
 
   companies       CompanyMember[]
   designerTickets Ticket[]        @relation("DesignerTickets")
   customerTickets Ticket[]        @relation("CustomerTickets")
+
+  // yeni: proje bazlı üyelikler
+  projectMemberships ProjectMember[]
 
   ledgerEntries TokenLedger[] @relation("UserLedger")
   withdrawals   Withdrawal[]
@@ -96,8 +117,12 @@ model CompanyMember {
   userId String
   user   UserAccount @relation(fields: [userId], references: [id])
 
-  // company içi rol (ör: COMPANY_ADMIN, MEMBER vs. ileride enum’a çevirebiliriz)
-  roleInCompany String?
+  /// company içi rol:
+  /// - OWNER  : şirket sahibi (plan, billing, üyeler)
+  /// - PM     : şirket genelinde proje / ticket yönetimi
+  /// - BILLING: muhasebe / fatura (ileride kullanılacak)
+  /// - MEMBER : normal üye (default)
+  roleInCompany CompanyRole @default(MEMBER)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -115,8 +140,29 @@ model Project {
 
   tickets Ticket[]
 
+  // yeni: proje bazlı üyelikler (PM, contributor, viewer vs.)
+  members ProjectMember[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Proje bazlı üyelik tablosu (CompanyMember'dan bağımsız)
+model ProjectMember {
+  id String @id @default(cuid())
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
+
+  userId String
+  user   UserAccount @relation(fields: [userId], references: [id])
+
+  role ProjectRole @default(CONTRIBUTOR)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([projectId, userId])
 }
 
 // --- Plan & Job Types --------------------------------------------------------
@@ -201,23 +247,20 @@ model TokenLedger {
   user   UserAccount? @relation("UserLedger", fields: [userId], references: [id])
 
   direction LedgerDirection
-  amount    Int        // + / - token miktarı
-  reason    String?    // kısa kod: PLAN_PURCHASE, JOB_PAYMENT gibi
+  amount    Int         // + / - token miktarı
+  reason    String?     // teknik sebep (SYSTEM_BILLING, JOB_COMPLETED vs.)
+  notes     String?     // insan tarafından yazılan açıklama
+  metadata  Json?       // serbest alan (JSON) - referans id'leri vb.
 
-  // Açıklama alanları
-  notes        String? // insan okunur açıklama
-  metadata     Json?   // structured JSON: { "provider": "stripe", "chargeId": "..." }
-
-  // Bakiye snapshot'ları (opsiyonel ama çok faydalı)
+  // Opsiyonel: bu işlem öncesi ve sonrası bakiye
   balanceBefore Int?
   balanceAfter  Int?
 
   createdAt DateTime @default(now())
 
-  @@index([companyId])
-  @@index([userId])
-  @@index([ticketId])
-  @@index([createdAt])
+  @@index([companyId, createdAt])
+  @@index([userId, createdAt])
+  @@index([ticketId, createdAt])
 }
 
 model Withdrawal {
@@ -232,10 +275,10 @@ model Withdrawal {
   notes    String?
   metadata Json?
 
-  createdAt  DateTime  @default(now()) // request zamanı
-  approvedAt DateTime?                // admin onay zamanı
-  paidAt     DateTime?                // gerçek ödeme zamanı
+  createdAt  DateTime  @default(now())
+  approvedAt DateTime?
+  paidAt     DateTime?
 
-  @@index([designerId])
-  @@index([status])
+  @@index([designerId, createdAt])
+  @@index([status, createdAt])
 }
