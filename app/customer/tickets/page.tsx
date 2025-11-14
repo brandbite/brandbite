@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/tickets/page.tsx
-// @purpose: Customer-facing tickets list for a single company
-// @version: v1.0.0
+// @purpose: Customer-facing tickets list for a single company (session-based)
+// @version: v1.1.0
 // @status: active
 // @lastUpdate: 2025-11-14
 // -----------------------------------------------------------------------------
@@ -51,13 +51,16 @@ const PRIORITY_BADGE: Record<TicketPriority, string> = {
 };
 
 export default function CustomerTicketsPage() {
-  const [company, setCompany] = useState<CustomerTicketsResponse["company"]>();
+  const [company, setCompany] =
+    useState<CustomerTicketsResponse["company"]>();
   const [tickets, setTickets] = useState<CustomerTicket[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   const [search, setSearch] = useState<string>("");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | TicketStatus>("ALL");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | TicketStatus>(
+    "ALL",
+  );
   const [projectFilter, setProjectFilter] = useState<string>("ALL");
 
   useEffect(() => {
@@ -68,22 +71,25 @@ export default function CustomerTicketsPage() {
       setError(null);
 
       try {
-        // NOTE: companySlug is hard-coded for now (demo data).
-        // Once auth is in place, this will use the user's active company.
-        const res = await fetch("/api/customer/tickets?companySlug=acme-studio");
+        const res = await fetch("/api/customer/tickets");
+        const json = await res.json().catch(() => null);
+
         if (!res.ok) {
-          throw new Error(`Request failed with ${res.status}`);
+          const msg =
+            json?.error || `Request failed with status ${res.status}`;
+          throw new Error(msg);
         }
 
-        const json: CustomerTicketsResponse = await res.json();
+        const data = json as CustomerTicketsResponse;
+
         if (!cancelled) {
-          setCompany(json.company);
-          setTickets(json.tickets);
+          setCompany(data.company);
+          setTickets(data.tickets);
         }
       } catch (err: any) {
         console.error("Customer tickets fetch error:", err);
         if (!cancelled) {
-          setError(err.message || "Unknown error");
+          setError(err?.message || "Failed to load tickets.");
         }
       } finally {
         if (!cancelled) {
@@ -101,7 +107,7 @@ export default function CustomerTicketsPage() {
 
   const projects = useMemo(() => {
     const names = Array.from(
-      new Set(tickets.map((t) => t.projectName).filter(Boolean))
+      new Set(tickets.map((t) => t.projectName).filter(Boolean)),
     ) as string[];
     return names;
   }, [tickets]);
@@ -148,9 +154,21 @@ export default function CustomerTicketsPage() {
             </span>
           </div>
           <nav className="hidden items-center gap-6 text-sm text-[#7a7a7a] md:flex">
-            <button className="font-medium text-[#7a7a7a]">Board</button>
-            <button className="font-medium text-[#424143]">My tickets</button>
-            <button className="font-medium text-[#7a7a7a]">Tokens</button>
+            <button className="font-medium text-[#424143]">
+              My tickets
+            </button>
+            <button
+              className="font-medium text-[#7a7a7a]"
+              onClick={() => (window.location.href = "/customer/tickets/new")}
+            >
+              New ticket
+            </button>
+            <button
+              className="font-medium text-[#7a7a7a]"
+              onClick={() => (window.location.href = "/customer/tokens")}
+            >
+              Tokens
+            </button>
           </nav>
         </header>
 

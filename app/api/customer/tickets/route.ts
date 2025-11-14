@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/customer/tickets/route.ts
-// @purpose: Customer-facing ticket list & creation API (company-scoped)
-// @version: v1.1.1
+// @purpose: Customer-facing ticket list & creation API (session-based company)
+// @version: v1.3.0
 // @status: active
 // @lastUpdate: 2025-11-14
 // -----------------------------------------------------------------------------
@@ -12,30 +12,39 @@ import {
   TicketStatus,
   TicketPriority,
   CompanyRole,
+  LedgerDirection,
 } from "@prisma/client";
-
-// For now we use a fixed demo slug. Once auth is in place, this will come
-// from the current user's active company context.
-const DEFAULT_COMPANY_SLUG = "acme-studio";
+import { getCurrentUserOrThrow } from "@/lib/auth";
 
 // -----------------------------------------------------------------------------
-// GET: list tickets for a company
+// GET: list tickets for the current customer's active company
 // -----------------------------------------------------------------------------
 
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
+    const user = await getCurrentUserOrThrow();
 
-    const companySlug =
-      searchParams.get("companySlug") ?? DEFAULT_COMPANY_SLUG;
+    if (user.role !== "CUSTOMER") {
+      return NextResponse.json(
+        { error: "Only customers can access customer tickets" },
+        { status: 403 },
+      );
+    }
+
+    if (!user.activeCompanyId) {
+      return NextResponse.json(
+        { error: "User has no active company" },
+        { status: 400 },
+      );
+    }
 
     const company = await prisma.company.findUnique({
-      where: { slug: companySlug },
+      where: { id: user.activeCompanyId },
     });
 
     if (!company) {
       return NextResponse.json(
-        { error: "Company not found" },
+        { error: "Company not found for current user" },
         { status: 404 },
       );
     }
@@ -103,7 +112,14 @@ export async function GET(req: NextRequest) {
       },
       tickets: payload,
     });
-  } catch (error) {
+  } catch (error: any) {
+    if ((error as any)?.code === "UNAUTHENTICATED") {
+      return NextResponse.json(
+        { error: "Unauthenticated" },
+        { status: 401 },
+      );
+    }
+
     console.error("[customer.tickets] GET error", error);
     return NextResponse.json(
       { error: "Failed to load customer tickets" },
@@ -113,22 +129,34 @@ export async function GET(req: NextRequest) {
 }
 
 // -----------------------------------------------------------------------------
-// POST: create new ticket for a company
+// POST: create new ticket for current customer's company + debit tokens
 // -----------------------------------------------------------------------------
 
 export async function POST(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const companySlug =
-      searchParams.get("companySlug") ?? DEFAULT_COMPANY_SLUG;
+    const user = await getCurrentUserOrThrow();
+
+    if (user.role !== "CUSTOMER") {
+      return NextResponse.json(
+        { error: "Only customers can create tickets" },
+        { status: 403 },
+      );
+    }
+
+    if (!user.activeCompanyId) {
+      return NextResponse.json(
+        { error: "User has no active company" },
+        { status: 400 },
+      );
+    }
 
     const company = await prisma.company.findUnique({
-      where: { slug: companySlug },
+      where: { id: user.activeCompanyId },
     });
 
     if (!company) {
       return NextResponse.json(
-        { error: "Company not found" },
+        { error: "Company not found for current user" },
         { status: 404 },
       );
     }
@@ -142,16 +170,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const title = String(body.title ?? "").trim();
+    const title = String((body as any).title ?? "").trim();
     const description =
-      typeof body.description === "string" ? body.description.trim() : "";
+      typeof (body as any).description === "string"
+        ? (body as any).description.trim()
+        : "";
     const projectId =
-      typeof body.projectId === "string" && body.projectId.length > 0
-        ? body.projectId
+      typeof (body as any).projectId === "string" &&
+      (body as any).projectId.length > 0
+        ? (body as any).projectId
         : null;
     const jobTypeId =
-      typeof body.jobTypeId === "string" && body.jobTypeId.length > 0
-        ? body.jobTypeId
+      typeof (body as any).jobTypeId === "string" &&
+      (body as any).jobTypeId.length > 0
+        ? (body as any).jobTypeId
         : null;
 
     if (!title) {
@@ -162,7 +194,8 @@ export async function POST(req: NextRequest) {
     }
 
     // For now, pick a default "requester" from company members:
-    // Prefer PM, otherwise OWNER. When auth is ready, this will be the current user.
+    // Prefer PM, otherwise OWNER. When auth is ready for real,
+    // we may switch this to "current user".
     const requesterMember = await prisma.companyMember.findFirst({
       where: {
         companyId: company.id,
@@ -199,12 +232,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Optional: validate jobType exists
-    let jobType: { id: string } | null = null;
+    // Optional: validate jobType exists (and grab tokenCost)
+    let jobType: { id: string; tokenCost: number } | null = null;
     if (jobTypeId) {
       jobType = await prisma.jobType.findUnique({
         where: { id: jobTypeId },
-        select: { id: true },
+        select: { id: true, tokenCost: true },
       });
 
       if (!jobType) {
@@ -215,36 +248,79 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Compute next company ticket number (simple max+1 strategy)
-    const lastTicket = await prisma.ticket.findFirst({
-      where: { companyId: company.id },
-      orderBy: { companyTicketNumber: "desc" },
-      select: { companyTicketNumber: true },
-    });
+    // If there is a job type, make sure the company has enough tokens
+    if (jobType && company.tokenBalance < jobType.tokenCost) {
+      return NextResponse.json(
+        { error: "Not enough tokens for this job type" },
+        { status: 400 },
+      );
+    }
 
-    const nextCompanyTicketNumber =
-      (lastTicket?.companyTicketNumber ?? 100) + 1;
+    // Single transaction: create ticket + (optional) debit tokens + ledger entry
+    const ticket = await prisma.$transaction(async (tx) => {
+      const lastTicket = await tx.ticket.findFirst({
+        where: { companyId: company.id },
+        orderBy: { companyTicketNumber: "desc" },
+        select: { companyTicketNumber: true },
+      });
 
-    const ticket = await prisma.ticket.create({
-      data: {
-        title,
-        description: description || null,
-        status: TicketStatus.TODO,
-        priority: TicketPriority.MEDIUM,
-        companyId: company.id,
-        projectId: project?.id ?? null,
-        createdById: requesterMember.userId,
-        jobTypeId: jobType?.id ?? null,
-        companyTicketNumber: nextCompanyTicketNumber,
-      },
-      include: {
-        project: {
-          select: { id: true, name: true, code: true },
+      const nextCompanyTicketNumber =
+        (lastTicket?.companyTicketNumber ?? 100) + 1;
+
+      const createdTicket = await tx.ticket.create({
+        data: {
+          title,
+          description: description || null,
+          status: TicketStatus.TODO,
+          priority: TicketPriority.MEDIUM,
+          companyId: company.id,
+          projectId: project?.id ?? null,
+          createdById: requesterMember.userId,
+          jobTypeId: jobType?.id ?? null,
+          companyTicketNumber: nextCompanyTicketNumber,
         },
-        jobType: {
-          select: { id: true, name: true },
+        include: {
+          project: {
+            select: { id: true, name: true, code: true },
+          },
+          jobType: {
+            select: { id: true, name: true },
+          },
         },
-      },
+      });
+
+      // If there is a job type, debit company tokens and create ledger entry
+      if (jobType) {
+        const balanceBefore = company.tokenBalance;
+        const balanceAfter = balanceBefore - jobType.tokenCost;
+
+        await tx.company.update({
+          where: { id: company.id },
+          data: {
+            tokenBalance: balanceAfter,
+          },
+        });
+
+        await tx.tokenLedger.create({
+          data: {
+            companyId: company.id,
+            ticketId: createdTicket.id,
+            direction: LedgerDirection.DEBIT,
+            amount: jobType.tokenCost,
+            reason: "JOB_REQUEST_CREATED",
+            notes: `New ticket created: ${createdTicket.title}`,
+            metadata: {
+              jobTypeId: jobType.id,
+              companyTicketNumber: createdTicket.companyTicketNumber,
+              createdByUserId: requesterMember.userId,
+            },
+            balanceBefore,
+            balanceAfter,
+          },
+        });
+      }
+
+      return createdTicket;
     });
 
     const code =
@@ -270,7 +346,14 @@ export async function POST(req: NextRequest) {
       },
       { status: 201 },
     );
-  } catch (error) {
+  } catch (error: any) {
+    if ((error as any)?.code === "UNAUTHENTICATED") {
+      return NextResponse.json(
+        { error: "Unauthenticated" },
+        { status: 401 },
+      );
+    }
+
     console.error("[customer.tickets] POST error", error);
     return NextResponse.json(
       { error: "Failed to create ticket" },
