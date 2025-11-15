@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/members/page.tsx
-// @purpose: Customer-facing company members & roles overview + invite form
-// @version: v1.2.0
+// @purpose: Customer-facing company members & roles overview + invite form + pending invites
+// @version: v1.3.0
 // @status: active
 // @lastUpdate: 2025-11-16
 // -----------------------------------------------------------------------------
@@ -9,6 +9,8 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+
+type CompanyRoleString = "OWNER" | "PM" | "BILLING" | "MEMBER";
 
 type CompanyMembersResponse = {
   company: {
@@ -25,14 +27,21 @@ type CompanyMembersResponse = {
     roleInCompany: CompanyRoleString;
     joinedAt: string;
   }[];
+  pendingInvites: {
+    id: string;
+    email: string;
+    roleInCompany: CompanyRoleString;
+    status: "PENDING" | "ACCEPTED" | "EXPIRED" | "CANCELLED";
+    createdAt: string;
+    invitedByName: string | null;
+    invitedByEmail: string | null;
+  }[];
 };
 
 type ViewState =
   | { status: "loading" }
   | { status: "error"; message: string }
   | { status: "ready"; data: CompanyMembersResponse };
-
-type CompanyRoleString = "OWNER" | "PM" | "BILLING" | "MEMBER";
 
 export default function CustomerMembersPage() {
   const [state, setState] = useState<ViewState>({ status: "loading" });
@@ -45,6 +54,10 @@ export default function CustomerMembersPage() {
     useState<"idle" | "submitting">("idle");
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
+
+  // Cancel invite state
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [cancelingId, setCancelingId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,6 +113,7 @@ export default function CustomerMembersPage() {
   const data = state.status === "ready" ? state.data : null;
   const company = data?.company ?? null;
   const members = data?.members ?? [];
+  const pendingInvites = data?.pendingInvites ?? [];
   const currentUserId = data?.currentUserId ?? "";
 
   const sortedMembers = useMemo(() => {
@@ -111,6 +125,13 @@ export default function CustomerMembersPage() {
     });
   }, [members]);
 
+  const sortedInvites = useMemo(() => {
+    if (!pendingInvites.length) return [];
+    return [...pendingInvites].sort((a, b) =>
+      a.createdAt.localeCompare(b.createdAt),
+    );
+  }, [pendingInvites]);
+
   // ---------------------------------------------------------------------------
   // Invite form handler
   // ---------------------------------------------------------------------------
@@ -119,6 +140,7 @@ export default function CustomerMembersPage() {
     e.preventDefault();
     setInviteError(null);
     setInviteSuccess(null);
+    setCancelError(null);
 
     const email = inviteEmail.trim();
     if (!email) {
@@ -154,6 +176,9 @@ export default function CustomerMembersPage() {
       );
       setInviteEmail("");
       setInviteRole("MEMBER");
+
+      // Refresh members + invites after successful invite
+      await refreshMembers();
     } catch (error) {
       console.error("Invite submit error:", error);
       setInviteError("Unexpected error while creating the invitation.");
@@ -162,7 +187,69 @@ export default function CustomerMembersPage() {
     }
   };
 
-  // Skeleton early return (HOOK'lardan sonra)
+  // ---------------------------------------------------------------------------
+  // Cancel invite handler
+  // ---------------------------------------------------------------------------
+
+  const handleCancelInvite = async (inviteId: string) => {
+    setCancelError(null);
+    setCancelingId(inviteId);
+
+    try {
+      const res = await fetch(
+        `/api/customer/members/invite/${inviteId}`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        const msg =
+          json?.error || `Request failed with status ${res.status}`;
+        setCancelError(msg);
+        return;
+      }
+
+      // Refresh after cancelling
+      await refreshMembers();
+    } catch (error) {
+      console.error("Cancel invite error:", error);
+      setCancelError("Unexpected error while cancelling the invite.");
+    } finally {
+      setCancelingId(null);
+    }
+  };
+
+  // Helper to refresh members & invites without breaking hooks
+  const refreshMembers = async () => {
+    try {
+      const res = await fetch("/api/customer/members", {
+        method: "GET",
+        cache: "no-store",
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        const msg =
+          json?.error || `Request failed with status ${res.status}`;
+        setState({ status: "error", message: msg });
+        return;
+      }
+      setState({
+        status: "ready",
+        data: json as CompanyMembersResponse,
+      });
+    } catch (error) {
+      console.error("Refresh members error:", error);
+      setState({
+        status: "error",
+        message: "Unexpected error while refreshing company members",
+      });
+    }
+  };
+
+  // Skeleton early return (HOOk'lardan sonra)
   if (state.status === "loading") {
     return <CustomerMembersSkeleton />;
   }
@@ -261,6 +348,12 @@ export default function CustomerMembersPage() {
             </div>
           )}
 
+          {cancelError && (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-[#fffaf2] px-3 py-2 text-xs text-amber-800">
+              {cancelError}
+            </div>
+          )}
+
           <form
             onSubmit={handleInviteSubmit}
             className="mt-3 flex flex-col gap-3 md:flex-row md:items-end"
@@ -310,8 +403,68 @@ export default function CustomerMembersPage() {
           </form>
         </section>
 
+        {/* Pending invites */}
+        <section className="mt-6">
+          <h2 className="mb-2 text-sm font-semibold text-[#424143]">
+            Pending invites
+          </h2>
+          <p className="mb-3 text-xs text-[#7a7a7a]">
+            These people have been invited but have not joined yet.
+          </p>
+
+          {sortedInvites.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-[#d5cec0] bg-white/60 px-4 py-4 text-xs text-[#7a7a7a]">
+              No pending invites. When you invite someone, they will appear
+              here until they join.
+            </div>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2">
+              {sortedInvites.map((invite) => {
+                const isCanceling = cancelingId === invite.id;
+                return (
+                  <article
+                    key={invite.id}
+                    className="flex items-center justify-between rounded-2xl border border-[#ece5d8] bg-white px-4 py-3 text-sm shadow-sm"
+                  >
+                    <div>
+                      <p className="font-semibold text-[#424143]">
+                        {invite.email}
+                      </p>
+                      <p className="text-[11px] text-[#7a7a7a]">
+                        {formatCompanyRole(invite.roleInCompany)} • invited{" "}
+                        {new Date(
+                          invite.createdAt,
+                        ).toLocaleDateString(undefined, {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </p>
+                      {invite.invitedByEmail && (
+                        <p className="mt-1 text-[11px] text-[#9a9892]">
+                          Invited by{" "}
+                          {invite.invitedByName ||
+                            invite.invitedByEmail}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isCanceling}
+                      onClick={() => handleCancelInvite(invite.id)}
+                      className="rounded-full border border-[#f5d1c4] px-3 py-1 text-[11px] font-medium text-[#c5431a] hover:bg-[#fff4f0] disabled:opacity-60"
+                    >
+                      {isCanceling ? "Cancelling…" : "Cancel"}
+                    </button>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
         {/* Members list */}
-        <section className="mt-6 grid gap-4 md:grid-cols-2">
+        <section className="mt-8 grid gap-4 md:grid-cols-2">
           {sortedMembers.map((member) => {
             const isYou = member.userId === currentUserId;
             return (
@@ -355,7 +508,7 @@ export default function CustomerMembersPage() {
           })}
 
           {sortedMembers.length === 0 && !error && (
-            <div className="rounded-2xl border border-dashed border-[#d5cec0] bg-white/60 px-4 py-6 text-sm text-[#7a7a7a]">
+            <div className="rounded-2xl border border-dashed border-[#d5cec0] bg:white/60 px-4 py-6 text-sm text-[#7a7a7a]">
               No members found for this company yet.
             </div>
           )}

@@ -1,13 +1,13 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/customer/members/route.ts
-// @purpose: Customer API for viewing company members & roles
-// @version: v1.0.0
+// @purpose: Customer API for viewing company members & roles + pending invites
+// @version: v1.1.0
 // @status: active
 // @lastUpdate: 2025-11-16
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
-import { CompanyRole } from "@prisma/client";
+import { CompanyRole, InviteStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 
@@ -31,7 +31,10 @@ export async function GET(_req: NextRequest) {
       );
     }
 
-    if (!user.companyRole || !ALLOWED_COMPANY_ROLES.includes(user.companyRole)) {
+    if (
+      !user.companyRole ||
+      !ALLOWED_COMPANY_ROLES.includes(user.companyRole as CompanyRole)
+    ) {
       return NextResponse.json(
         {
           error:
@@ -50,6 +53,17 @@ export async function GET(_req: NextRequest) {
           },
           orderBy: {
             createdAt: "asc",
+          },
+        },
+        invites: {
+          where: {
+            status: InviteStatus.PENDING,
+          },
+          include: {
+            invitedByUser: true,
+          },
+          orderBy: {
+            createdAt: "desc",
           },
         },
       },
@@ -71,6 +85,16 @@ export async function GET(_req: NextRequest) {
       joinedAt: m.createdAt.toISOString(),
     }));
 
+    const pendingInvites = company.invites.map((inv) => ({
+      id: inv.id,
+      email: inv.email,
+      roleInCompany: inv.roleInCompany,
+      status: inv.status,
+      createdAt: inv.createdAt.toISOString(),
+      invitedByName: inv.invitedByUser?.name ?? null,
+      invitedByEmail: inv.invitedByUser?.email ?? null,
+    }));
+
     return NextResponse.json(
       {
         company: {
@@ -80,6 +104,7 @@ export async function GET(_req: NextRequest) {
         },
         currentUserId: user.id,
         members,
+        pendingInvites,
       },
       { status: 200 },
     );
