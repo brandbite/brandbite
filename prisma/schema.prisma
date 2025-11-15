@@ -58,6 +58,13 @@ enum CompanyRole {
   MEMBER   // regular member (default)
 }
 
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  CANCELLED
+}
+
 // Proje içi rol (project-level)
 enum ProjectRole {
   OWNER       // project owner (genelde company owner / lead)
@@ -82,6 +89,8 @@ model UserAccount {
   // yeni: proje bazlı üyelikler
   projectMemberships ProjectMember[]
 
+  companyInvitesSent CompanyInvite[]
+
   ledgerEntries TokenLedger[] @relation("UserLedger")
   withdrawals   Withdrawal[]
 
@@ -100,6 +109,7 @@ model Company {
   projects Project[]
   members  CompanyMember[]
   tickets  Ticket[]
+  invites  CompanyInvite[]
 
   tokenBalance Int           @default(0)
   tokenLedgers TokenLedger[]
@@ -128,6 +138,31 @@ model CompanyMember {
   updatedAt DateTime @updatedAt
 
   @@unique([companyId, userId])
+}
+
+model CompanyInvite {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  /// Email invited (user may or may not exist yet)
+  email String
+
+  /// Role the invited user will have in the company
+  roleInCompany CompanyRole @default(MEMBER)
+
+  invitedByUserId String?
+  invitedByUser   UserAccount? @relation(fields: [invitedByUserId], references: [id])
+
+  token  String       @unique
+  status InviteStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([email])
 }
 
 model Project {

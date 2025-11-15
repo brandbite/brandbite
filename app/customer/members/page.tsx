@@ -1,14 +1,14 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/members/page.tsx
-// @purpose: Customer-facing company members & roles overview
-// @version: v1.1.0
+// @purpose: Customer-facing company members & roles overview + invite form
+// @version: v1.2.0
 // @status: active
 // @lastUpdate: 2025-11-16
 // -----------------------------------------------------------------------------
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type CompanyMembersResponse = {
   company: {
@@ -22,7 +22,7 @@ type CompanyMembersResponse = {
     userId: string;
     name: string | null;
     email: string;
-    roleInCompany: "OWNER" | "PM" | "BILLING" | "MEMBER";
+    roleInCompany: CompanyRoleString;
     joinedAt: string;
   }[];
 };
@@ -32,8 +32,19 @@ type ViewState =
   | { status: "error"; message: string }
   | { status: "ready"; data: CompanyMembersResponse };
 
+type CompanyRoleString = "OWNER" | "PM" | "BILLING" | "MEMBER";
+
 export default function CustomerMembersPage() {
   const [state, setState] = useState<ViewState>({ status: "loading" });
+
+  // Invite form state
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] =
+    useState<CompanyRoleString>("MEMBER");
+  const [inviteStatus, setInviteStatus] =
+    useState<"idle" | "submitting">("idle");
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -83,8 +94,7 @@ export default function CustomerMembersPage() {
   }, []);
 
   // ---------------------------------------------------------------------------
-  // Hooks MUST always run in the same order on every render.
-  // So we derive data & sortedMembers BEFORE any early return.
+  // Derived data + sorting
   // ---------------------------------------------------------------------------
 
   const data = state.status === "ready" ? state.data : null;
@@ -101,7 +111,58 @@ export default function CustomerMembersPage() {
     });
   }, [members]);
 
-  // Skeleton için erken dönüş artık HOOK'lardan sonra geliyor
+  // ---------------------------------------------------------------------------
+  // Invite form handler
+  // ---------------------------------------------------------------------------
+
+  const handleInviteSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setInviteError(null);
+    setInviteSuccess(null);
+
+    const email = inviteEmail.trim();
+    if (!email) {
+      setInviteError("Please enter an email address.");
+      return;
+    }
+
+    setInviteStatus("submitting");
+
+    try {
+      const res = await fetch("/api/customer/members/invite", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          roleInCompany: inviteRole,
+        }),
+      });
+
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        const msg =
+          json?.error || `Request failed with status ${res.status}`;
+        setInviteError(msg);
+        return;
+      }
+
+      setInviteSuccess(
+        "Invitation created. In a future step, this will be used to onboard the member.",
+      );
+      setInviteEmail("");
+      setInviteRole("MEMBER");
+    } catch (error) {
+      console.error("Invite submit error:", error);
+      setInviteError("Unexpected error while creating the invitation.");
+    } finally {
+      setInviteStatus("idle");
+    }
+  };
+
+  // Skeleton early return (HOOK'lardan sonra)
   if (state.status === "loading") {
     return <CustomerMembersSkeleton />;
   }
@@ -178,8 +239,79 @@ export default function CustomerMembersPage() {
           </div>
         )}
 
+        {/* Invite form */}
+        <section className="mt-4 rounded-2xl border border-[#ece5d8] bg-white px-4 py-4 shadow-sm">
+          <h2 className="text-sm font-semibold text-[#424143]">
+            Invite a new member
+          </h2>
+          <p className="mt-1 text-xs text-[#7a7a7a]">
+            Send an invite to someone on your team. They will join with the
+            selected role once they accept the invitation.
+          </p>
+
+          {inviteError && (
+            <div className="mt-3 rounded-lg border border-red-200 bg-[#fff7f7] px-3 py-2 text-xs text-red-700">
+              {inviteError}
+            </div>
+          )}
+
+          {inviteSuccess && (
+            <div className="mt-3 rounded-lg border border-emerald-200 bg-[#f0fbf4] px-3 py-2 text-xs text-emerald-700">
+              {inviteSuccess}
+            </div>
+          )}
+
+          <form
+            onSubmit={handleInviteSubmit}
+            className="mt-3 flex flex-col gap-3 md:flex-row md:items-end"
+          >
+            <div className="flex-1">
+              <label className="text-[11px] font-medium text-[#7a7a7a]">
+                Email
+              </label>
+              <input
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-[#d5cec0] bg-[#fdfaf5] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]/40"
+                placeholder="designer@yourcompany.com"
+                required
+              />
+            </div>
+
+            <div className="w-full md:w-44">
+              <label className="text-[11px] font-medium text-[#7a7a7a]">
+                Role
+              </label>
+              <select
+                className="mt-1 w-full rounded-lg border border-[#d5cec0] bg-[#fdfaf5] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]/40"
+                value={inviteRole}
+                onChange={(e) =>
+                  setInviteRole(e.target.value as CompanyRoleString)
+                }
+              >
+                <option value="MEMBER">Member</option>
+                <option value="PM">Project manager</option>
+                <option value="BILLING">Billing</option>
+              </select>
+            </div>
+
+            <div className="flex w-full md:w-auto">
+              <button
+                type="submit"
+                disabled={inviteStatus === "submitting"}
+                className="mt-2 w-full rounded-lg bg-[#f15b2b] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[#e44f20] disabled:opacity-70 md:mt-[22px]"
+              >
+                {inviteStatus === "submitting"
+                  ? "Sending…"
+                  : "Send invite"}
+              </button>
+            </div>
+          </form>
+        </section>
+
         {/* Members list */}
-        <section className="mt-4 grid gap-4 md:grid-cols-2">
+        <section className="mt-6 grid gap-4 md:grid-cols-2">
           {sortedMembers.map((member) => {
             const isYou = member.userId === currentUserId;
             return (
@@ -290,8 +422,6 @@ function roleWeight(role: CompanyRoleString): number {
       return 1;
   }
 }
-
-type CompanyRoleString = "OWNER" | "PM" | "BILLING" | "MEMBER";
 
 function formatCompanyRole(role: CompanyRoleString): string {
   switch (role) {
