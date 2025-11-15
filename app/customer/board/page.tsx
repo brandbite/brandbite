@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/board/page.tsx
 // @purpose: Customer-facing board view of company tickets (kanban-style)
-// @version: v1.0.0
+// @version: v1.1.0
 // @status: active
-// @lastUpdate: 2025-11-15
+// @lastUpdate: 2025-11-16
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -179,6 +179,8 @@ export default function CustomerBoardPage() {
       return map;
     }, [filteredTickets]);
 
+  const stats = data?.stats ?? null;
+
   const formatStatusLabel = (status: TicketStatus) => {
     switch (status) {
       case "TODO":
@@ -224,11 +226,14 @@ export default function CustomerBoardPage() {
     return d.toLocaleDateString();
   };
 
+  const activeProjectTitle =
+    projectFilter === "ALL" ? "All projects" : projectFilter;
+
   return (
     <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
-      <div className="mx-auto max-w-6xl px-6 py-10">
+      <div className="mx-auto max-w-6xl px-6 py-8">
         {/* Top navigation */}
-        <header className="mb-6 flex items-center justify-between">
+        <header className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f15b2b] text-sm font-semibold text-white">
               B
@@ -252,175 +257,260 @@ export default function CustomerBoardPage() {
             >
               Tickets
             </button>
-            <button className="font-medium text-[#424143]">
+            <button className="font-semibold text-[#424143]">
               Board
             </button>
           </nav>
         </header>
 
-        {/* Page header */}
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Ticket board
-            </h1>
-            <p className="mt-1 text-sm text-[#7a7a7a]">
-              A kanban-style view of all tickets for your company,
-              grouped by status.
-            </p>
-          </div>
-        </div>
-
-        {/* Error */}
-        {error && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-white px-4 py-3 text-sm text-red-700">
-            <p className="font-medium">Error</p>
-            <p className="mt-1">{error}</p>
-          </div>
-        )}
-
-        {/* Filters */}
-        <section className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-          <div className="flex flex-1 min-w-[160px] items-center gap-2">
-            <label className="text-xs font-medium text-[#424143]">
-              Project
-            </label>
-            <select
-              value={projectFilter}
-              onChange={(e) => setProjectFilter(e.target.value)}
-              className="flex-1 rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+        <div className="mt-4 flex flex-col gap-4 md:flex-row">
+          {/* Projects sidebar (desktop) */}
+          <aside className="hidden w-60 flex-shrink-0 flex-col rounded-3xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm md:flex">
+            <div className="mb-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
+                Projects
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setProjectFilter("ALL")}
+              className={`mb-2 flex items-center justify-between rounded-2xl px-3 py-2 text-sm ${
+                projectFilter === "ALL"
+                  ? "bg-[#f15b2b] text-white"
+                  : "text-[#424143] hover:bg-[#f5f3f0]"
+              }`}
             >
-              <option value="ALL">All projects</option>
-              {projects.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          </div>
+              <span>All projects</span>
+              {stats && (
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[11px] ${
+                    projectFilter === "ALL"
+                      ? "bg-white/20"
+                      : "bg-[#f0ede6] text-[#7a7a7a]"
+                  }`}
+                >
+                  {stats.total}
+                </span>
+              )}
+            </button>
 
-          <div className="flex flex-1 min-w-[200px] items-center gap-2">
-            <label className="text-xs font-medium text-[#424143]">
-              Search
-            </label>
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by ticket, project, designer..."
-              className="flex-1 rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
-            />
-          </div>
-        </section>
-
-        {/* Board grid */}
-        <section className="rounded-2xl border border-[#e3e1dc] bg-white px-3 py-3 shadow-sm">
-          {loading ? (
-            <div className="py-6 text-center text-sm text-[#7a7a7a]">
-              Loading board…
-            </div>
-          ) : (
-            <div className="grid gap-3 md:grid-cols-4">
-              {STATUS_ORDER.map((status) => {
-                const columnTickets = ticketsByStatus[status] || [];
-                const columnTitle = formatStatusLabel(status);
-
-                return (
-                  <div
-                    key={status}
-                    className="flex flex-col rounded-xl bg-[#faf8f5] p-2"
-                  >
-                    <div className="mb-2 flex items-center justify-between">
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#9a9892]">
-                          {columnTitle}
-                        </span>
-                        <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-[#7a7a7a]">
-                          {columnTickets.length}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div
-                      className={`flex-1 space-y-2 rounded-lg ${statusColumnClass(
-                        status,
-                      )} bg-opacity-60 p-2`}
+            <div className="mt-1 space-y-1">
+              {projects.length === 0 ? (
+                <p className="px-1 py-2 text-xs text-[#9a9892]">
+                  No projects yet. Tickets will appear here once created.
+                </p>
+              ) : (
+                projects.map((projectName) => {
+                  const isActive = projectFilter === projectName;
+                  return (
+                    <button
+                      key={projectName}
+                      type="button"
+                      onClick={() => setProjectFilter(projectName)}
+                      className={`flex w-full items-center justify-between rounded-2xl px-3 py-2 text-sm ${
+                        isActive
+                          ? "bg-[#f5f3f0] text-[#424143]"
+                          : "text-[#424143] hover:bg-[#f7f5f0]"
+                      }`}
                     >
-                      {columnTickets.length === 0 ? (
-                        <p className="py-4 text-center text-[11px] text-[#9a9892]">
-                          No tickets in this column.
-                        </p>
-                      ) : (
-                        columnTickets.map((t) => {
-                          const ticketCode =
-                            t.project?.code &&
-                            t.companyTicketNumber != null
-                              ? `${t.project.code}-${t.companyTicketNumber}`
-                              : t.companyTicketNumber != null
-                              ? `#${t.companyTicketNumber}`
-                              : t.id;
-
-                          const payoutTokens =
-                            t.jobType?.tokenCost ?? null;
-
-                          return (
-                            <div
-                              key={t.id}
-                              className="rounded-xl bg-white p-3 shadow-sm"
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="text-[11px] font-semibold text-[#424143]">
-                                  {ticketCode}
-                                </div>
-                                <span
-                                  className={`ml-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${priorityBadgeClass(
-                                    t.priority,
-                                  )}`}
-                                >
-                                  {t.priority}
-                                </span>
-                              </div>
-                              <p className="mt-1 text-[11px] font-medium text-[#424143]">
-                                {t.title}
-                              </p>
-                              {t.project && (
-                                <p className="mt-1 text-[10px] text-[#7a7a7a]">
-                                  {t.project.name}
-                                </p>
-                              )}
-                              <div className="mt-2 flex flex-wrap items-center justify-between gap-1 text-[10px] text-[#9a9892]">
-                                <div className="flex flex-col">
-                                  <span className="font-medium text-[#7a7a7a]">
-                                    {t.designer
-                                      ? t.designer.name ||
-                                        t.designer.email
-                                      : "Unassigned"}
-                                  </span>
-                                  {t.jobType && (
-                                    <span>
-                                      {t.jobType.name}
-                                      {payoutTokens
-                                        ? ` • ${payoutTokens} tokens`
-                                        : ""}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="text-right">
-                                  <span className="block">
-                                    Due: {formatDate(t.dueDate)}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+                      <span className="truncate">{projectName}</span>
+                    </button>
+                  );
+                })
+              )}
             </div>
-          )}
-        </section>
+          </aside>
+
+          {/* Main board area */}
+          <main className="flex-1 rounded-3xl border border-[#e3e1dc] bg-white/80 px-4 py-5 shadow-sm">
+            {/* Page header */}
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
+                  Board
+                </p>
+                <h1 className="mt-1 text-xl font-semibold tracking-tight">
+                  {activeProjectTitle}
+                </h1>
+                <p className="mt-1 text-xs text-[#7a7a7a]">
+                  A kanban-style view of your tickets, grouped by status.
+                </p>
+
+                {/* Project selector for mobile (since sidebar is hidden) */}
+                {projects.length > 0 && (
+                  <div className="mt-3 flex items-center gap-2 text-xs md:hidden">
+                    <span className="text-[#7a7a7a]">Project</span>
+                    <select
+                      value={projectFilter}
+                      onChange={(e) =>
+                        setProjectFilter(e.target.value)
+                      }
+                      className="rounded-xl border border-[#d4d2cc] bg-[#fbfaf8] px-2 py-1 text-xs text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+                    >
+                      <option value="ALL">All projects</option>
+                      {projects.map((p) => (
+                        <option key={p} value={p}>
+                          {p}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* Simple stats pills */}
+              {stats && (
+                <div className="flex flex-wrap justify-end gap-2 text-[11px]">
+                  <div className="rounded-full bg-[#f5f3f0] px-3 py-1 font-medium text-[#424143]">
+                    Total: {stats.total}
+                  </div>
+                  {STATUS_ORDER.map((s) => (
+                    <div
+                      key={s}
+                      className="rounded-full bg-[#f5f3f0] px-3 py-1 text-[#7a7a7a]"
+                    >
+                      {formatStatusLabel(s)}:{" "}
+                      {stats.byStatus?.[s] ?? 0}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Error */}
+            {error && (
+              <div className="mb-4 rounded-xl border border-red-200 bg-[#fff7f7] px-4 py-3 text-xs text-red-700">
+                <p className="font-medium">Error</p>
+                <p className="mt-1">{error}</p>
+              </div>
+            )}
+
+            {/* Search bar */}
+            <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
+              <div className="relative flex-1">
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search by ticket, project, designer..."
+                  className="w-full rounded-full border border-[#d4d2cc] bg-[#fbfaf8] px-4 py-2.5 pr-9 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+                />
+                <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-xs text-[#b1afa9]">
+                  🔍
+                </span>
+              </div>
+            </div>
+
+            {/* Board grid */}
+            <section className="rounded-2xl bg-[#f7f5f0] p-2">
+              {loading ? (
+                <div className="py-6 text-center text-sm text-[#7a7a7a]">
+                  Loading board…
+                </div>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-4">
+                  {STATUS_ORDER.map((status) => {
+                    const columnTickets = ticketsByStatus[status] || [];
+                    const columnTitle = formatStatusLabel(status);
+
+                    return (
+                      <div
+                        key={status}
+                        className="flex flex-col rounded-2xl bg-white/60 p-2"
+                      >
+                        <div className="mb-2 flex items-center justify-between">
+                          <div className="flex items-center gap-1">
+                            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#9a9892]">
+                              {columnTitle}
+                            </span>
+                            <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[11px] font-semibold text-[#7a7a7a]">
+                              {columnTickets.length}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div
+                          className={`flex-1 space-y-2 rounded-xl ${statusColumnClass(
+                            status,
+                          )} bg-opacity-70 p-2`}
+                        >
+                          {columnTickets.length === 0 ? (
+                            <p className="py-4 text-center text-[11px] text-[#9a9892]">
+                              No tickets in this column.
+                            </p>
+                          ) : (
+                            columnTickets.map((t) => {
+                              const ticketCode =
+                                t.project?.code &&
+                                t.companyTicketNumber != null
+                                  ? `${t.project.code}-${t.companyTicketNumber}`
+                                  : t.companyTicketNumber != null
+                                  ? `#${t.companyTicketNumber}`
+                                  : t.id;
+
+                              const payoutTokens =
+                                t.jobType?.tokenCost ?? null;
+
+                              return (
+                                <div
+                                  key={t.id}
+                                  className="rounded-xl bg-white p-3 shadow-sm"
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div className="text-[11px] font-semibold text-[#424143]">
+                                      {ticketCode}
+                                    </div>
+                                    <span
+                                      className={`ml-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${priorityBadgeClass(
+                                        t.priority,
+                                      )}`}
+                                    >
+                                      {t.priority}
+                                    </span>
+                                  </div>
+                                  <p className="mt-1 text-[11px] font-medium text-[#424143]">
+                                    {t.title}
+                                  </p>
+                                  {t.project && (
+                                    <p className="mt-1 text-[10px] text-[#7a7a7a]">
+                                      {t.project.name}
+                                    </p>
+                                  )}
+                                  <div className="mt-2 flex flex-wrap items-center justify-between gap-1 text-[10px] text-[#9a9892]">
+                                    <div className="flex flex-col">
+                                      <span className="font-medium text-[#7a7a7a]">
+                                        {t.designer
+                                          ? t.designer.name ||
+                                            t.designer.email
+                                          : "Unassigned"}
+                                      </span>
+                                      {t.jobType && (
+                                        <span>
+                                          {t.jobType.name}
+                                          {payoutTokens
+                                            ? ` • ${payoutTokens} tokens`
+                                            : ""}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="text-right">
+                                      <span className="block">
+                                        Due: {formatDate(t.dueDate)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          </main>
+        </div>
       </div>
     </div>
   );
