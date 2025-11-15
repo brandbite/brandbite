@@ -1,14 +1,14 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/tokens/page.tsx
 // @purpose: Customer-facing token balance & ledger view (session-based)
-// @version: v1.1.0
+// @version: v1.2.0
 // @status: active
-// @lastUpdate: 2025-11-14
+// @lastUpdate: 2025-11-15
 // -----------------------------------------------------------------------------
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type LedgerDirection = "CREDIT" | "DEBIT";
 
@@ -41,6 +41,10 @@ export default function CustomerTokensPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [directionFilter, setDirectionFilter] = useState<
+    "ALL" | LedgerDirection
+  >("ALL");
+
   useEffect(() => {
     let cancelled = false;
 
@@ -49,7 +53,9 @@ export default function CustomerTokensPage() {
       setError(null);
 
       try {
-        const res = await fetch("/api/customer/tokens");
+        const res = await fetch("/api/customer/tokens", {
+          cache: "no-store",
+        });
         const json = await res.json().catch(() => null);
 
         if (!res.ok) {
@@ -83,6 +89,29 @@ export default function CustomerTokensPage() {
   const company = data?.company;
   const ledger = data?.ledger ?? [];
 
+  const filteredLedger = useMemo(
+    () =>
+      ledger.filter((entry) => {
+        if (directionFilter !== "ALL" && entry.direction !== directionFilter) {
+          return false;
+        }
+        return true;
+      }),
+    [ledger, directionFilter],
+  );
+
+  const directionBadgeClass = (direction: LedgerDirection) => {
+    const base =
+      "inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold";
+    if (direction === "CREDIT") {
+      return `${base} bg-[#f0fff6] text-[#137a3a]`;
+    }
+    return `${base} bg-[#fde8e7] text-[#b13832]`;
+  };
+
+  const directionLabel = (direction: LedgerDirection) =>
+    direction === "CREDIT" ? "Credit" : "Debit";
+
   return (
     <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
       <div className="mx-auto max-w-6xl px-6 py-10">
@@ -97,19 +126,19 @@ export default function CustomerTokensPage() {
             </span>
           </div>
           <nav className="hidden items-center gap-6 text-sm text-[#7a7a7a] md:flex">
+            <button className="font-medium text-[#424143]">Tokens</button>
             <button
               className="font-medium text-[#7a7a7a]"
               onClick={() => (window.location.href = "/customer/tickets")}
             >
-              My tickets
+              Tickets
             </button>
             <button
               className="font-medium text-[#7a7a7a]"
-              onClick={() => (window.location.href = "/customer/tickets/new")}
+              onClick={() => (window.location.href = "/customer/board")}
             >
-              New ticket
+              Board
             </button>
-            <button className="font-medium text-[#424143]">Tokens</button>
           </nav>
         </header>
 
@@ -150,11 +179,7 @@ export default function CustomerTokensPage() {
               Current balance
             </p>
             <p className="mt-2 text-3xl font-semibold text-[#f15b2b]">
-              {loading
-                ? "—"
-                : data
-                ? data.company.tokenBalance
-                : "0"}
+              {loading ? "—" : data ? data.company.tokenBalance : "0"}
               <span className="ml-1 text-base font-normal text-[#7a7a7a]">
                 tokens
               </span>
@@ -189,6 +214,29 @@ export default function CustomerTokensPage() {
           </div>
         </section>
 
+        {/* Ledger filters */}
+        <section className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[#e3e1dc] bg-white px-5 py-3 shadow-sm">
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium text-[#424143]">
+              Direction
+            </label>
+            <select
+              value={directionFilter}
+              onChange={(e) =>
+                setDirectionFilter(e.target.value as "ALL" | LedgerDirection)
+              }
+              className="rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+            >
+              <option value="ALL">All</option>
+              <option value="CREDIT">Credits</option>
+              <option value="DEBIT">Debits</option>
+            </select>
+          </div>
+          <p className="text-xs text-[#9a9892]">
+            Showing {filteredLedger.length} of {ledger.length} entries.
+          </p>
+        </section>
+
         {/* Ledger table */}
         <section className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
@@ -204,7 +252,7 @@ export default function CustomerTokensPage() {
             <div className="py-6 text-center text-sm text-[#7a7a7a]">
               Loading token ledger…
             </div>
-          ) : ledger.length === 0 ? (
+          ) : filteredLedger.length === 0 ? (
             <div className="py-6 text-center text-sm text-[#9a9892]">
               No token movements yet.
             </div>
@@ -223,7 +271,7 @@ export default function CustomerTokensPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {ledger.map((entry) => {
+                  {filteredLedger.map((entry) => {
                     const created = new Date(entry.createdAt);
                     const isCredit = entry.direction === "CREDIT";
 
@@ -240,14 +288,8 @@ export default function CustomerTokensPage() {
                           })}
                         </td>
                         <td className="px-2 py-2 align-top">
-                          <span
-                            className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                              isCredit
-                                ? "bg-[#f0fff6] text-[#137a3a]"
-                                : "bg-[#fde8e7] text-[#b13832]"
-                            }`}
-                          >
-                            {isCredit ? "Credit" : "Debit"}
+                          <span className={directionBadgeClass(entry.direction)}>
+                            {directionLabel(entry.direction)}
                           </span>
                         </td>
                         <td className="px-2 py-2 align-top text-[11px] text-[#424143]">
