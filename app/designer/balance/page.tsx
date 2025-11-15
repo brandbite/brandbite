@@ -1,86 +1,110 @@
 // -----------------------------------------------------------------------------
 // @file: app/designer/balance/page.tsx
-// @purpose: Designer balance dashboard page (tokens + recent ledger entries)
-// @version: v1.1.1
-// @lastUpdate: 2025-11-13
+// @purpose: Designer-facing token balance & ledger view (session-based)
+// @version: v1.3.1
+// @status: active
+// @lastUpdate: 2025-11-15
 // -----------------------------------------------------------------------------
 
 "use client";
 
-import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
-type DesignerInfo = {
-  id: string;
-  email: string;
-  name: string | null;
-  role: string;
-};
+type LedgerDirection = "CREDIT" | "DEBIT";
 
-type LedgerEntry = {
-  id: string;
-  direction: "CREDIT" | "DEBIT";
-  amount: number;
-  reason: string | null;
-  notes: string | null;
-  metadata: any | null;
-  balanceBefore: number | null;
-  balanceAfter: number | null;
-  createdAt: string;
-  ticketId: string | null;
-  companyId?: string | null;
-};
-
-type BalanceResponse = {
-  user: DesignerInfo;
+type DesignerBalanceResponse = {
+  user: {
+    id: string;
+    email: string;
+    name: string | null;
+    role: string;
+  };
   balance: number;
-  ledger: LedgerEntry[];
+  ledger: {
+    id: string;
+    createdAt: string;
+    direction: LedgerDirection;
+    amount: number;
+    reason: string | null;
+    notes: string | null;
+    metadata: unknown;
+    balanceBefore: number | null;
+    balanceAfter: number | null;
+    ticketId: string | null;
+    companyId: string | null;
+  }[];
 };
 
 export default function DesignerBalancePage() {
-  const searchParams = useSearchParams();
-  const userId = searchParams.get("userId");
-
-  const [data, setData] = useState<BalanceResponse | null>(null);
-  const [loading, setLoading] = useState<boolean>(!!userId);
+  const [data, setData] = useState<DesignerBalanceResponse | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!userId) {
-      setLoading(false);
+    let cancelled = false;
+
+    const load = async () => {
+      setLoading(true);
       setError(null);
-      setData(null);
-      return;
-    }
 
-    setLoading(true);
-    setError(null);
+      try {
+        const res = await fetch("/api/designer/balance");
+        const json = await res.json().catch(() => null);
 
-    fetch(`/api/designer/balance?userId=${encodeURIComponent(userId)}`)
-      .then(async (res) => {
         if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error(body.error || `Request failed with ${res.status}`);
+          const msg =
+            json?.error || `Request failed with status ${res.status}`;
+          throw new Error(msg);
         }
-        return res.json();
-      })
-      .then((json: BalanceResponse) => {
-        setData(json);
-      })
-      .catch((err: any) => {
+
+        if (!cancelled) {
+          setData(json as DesignerBalanceResponse);
+        }
+      } catch (err: any) {
         console.error("Designer balance fetch error:", err);
-        setError(err.message || "Unknown error");
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [userId]);
+        if (!cancelled) {
+          setError(err?.message || "Failed to load designer balance.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const designer = data?.user;
+  const ledger = data?.ledger ?? [];
+
+  const totalCredits = useMemo(
+    () =>
+      ledger
+        .filter((l) => l.direction === "CREDIT")
+        .reduce((sum, l) => sum + l.amount, 0),
+    [ledger],
+  );
+
+  const totalDebits = useMemo(
+    () =>
+      ledger
+        .filter((l) => l.direction === "DEBIT")
+        .reduce((sum, l) => sum + l.amount, 0),
+    [ledger],
+  );
+
+  const netBalance = data?.balance ?? totalCredits - totalDebits;
 
   return (
     <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
-      <div className="mx-auto max-w-6xl px-6 py-10">
-        {/* Top navigation placeholder */}
-        <header className="mb-8 flex items-center justify-between">
+      <div className="mx-auto max-w-5xl px-6 py-10">
+        {/* Top navigation */}
+        <header className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f15b2b] text-sm font-semibold text-white">
               B
@@ -90,177 +114,171 @@ export default function DesignerBalancePage() {
             </span>
           </div>
           <nav className="hidden items-center gap-6 text-sm text-[#7a7a7a] md:flex">
-            <button className="font-medium text-[#424143]">Dashboard</button>
-            <button className="font-medium text-[#424143]">Board</button>
-            <button className="font-medium text-[#424143]">Plans</button>
+            <button className="font-medium text-[#424143]">
+              Balance
+            </button>
+            <button
+              className="font-medium text-[#7a7a7a]"
+              onClick={() => (window.location.href = "/designer/withdrawals")}
+            >
+              Withdrawals
+            </button>
           </nav>
         </header>
 
-        <main className="space-y-6">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight">
-                Designer balance
-              </h1>
-              <p className="mt-1 text-sm text-[#7a7a7a]">
-                View your current token balance and the latest token movements.
-                For now the designer is selected via{" "}
-                <code className="rounded bg-white px-1 py-0.5 text-xs">
-                  ?userId=&lt;id&gt;
-                </code>{" "}
-                in the URL.
+        {/* Page header */}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              My token balance
+            </h1>
+            <p className="mt-1 text-sm text-[#7a7a7a]">
+              Tokens you have earned from completed jobs and other adjustments.
+            </p>
+            {designer && (
+              <p className="mt-1 text-xs text-[#9a9892]">
+                Signed in as{" "}
+                <span className="font-medium text-[#424143]">
+                  {designer.name || designer.email}
+                </span>
               </p>
-            </div>
+            )}
+          </div>
+        </div>
+
+        {/* Error state */}
+        {error && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-white px-4 py-3 text-sm text-red-700">
+            <p className="font-medium">Error</p>
+            <p className="mt-1">{error}</p>
+          </div>
+        )}
+
+        {/* Summary cards */}
+        <section className="mb-6 grid gap-4 md:grid-cols-3">
+          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+              Available balance
+            </p>
+            <p className="mt-2 text-3xl font-semibold text-[#f15b2b]">
+              {loading ? "—" : netBalance}
+              <span className="ml-1 text-base font-normal text-[#7a7a7a]">
+                tokens
+              </span>
+            </p>
+            <p className="mt-1 text-xs text-[#9a9892]">
+              This is your net balance after all credits and debits.
+            </p>
           </div>
 
-          {!userId && (
-            <div className="rounded-xl border border-[#f2d4c7] bg-white px-4 py-3 text-sm text-[#8a3b16]">
-              <p className="font-medium">Missing userId parameter</p>
-              <p className="mt-1">
-                Example:{" "}
-                <code className="rounded bg-[#f5f3f0] px-2 py-1 text-xs">
-                  /designer/balance?userId=DESIGNER_ID
-                </code>
-              </p>
+          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+              Total credits
+            </p>
+            <p className="mt-2 text-2xl font-semibold text-[#424143]">
+              {loading ? "—" : totalCredits}
+            </p>
+            <p className="mt-1 text-xs text-[#9a9892]">
+              Tokens you have earned from jobs and adjustments.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+              Total debits
+            </p>
+            <p className="mt-2 text-2xl font-semibold text-[#424143]">
+              {loading ? "—" : totalDebits}
+            </p>
+            <p className="mt-1 text-xs text-[#9a9892]">
+              Tokens deducted due to corrections or withdrawals.
+            </p>
+          </div>
+        </section>
+
+        {/* Ledger table */}
+        <section className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold tracking-tight">
+              Recent token activity
+            </h2>
+            <p className="text-xs text-[#9a9892]">
+              Showing the 50 most recent movements.
+            </p>
+          </div>
+
+          {loading ? (
+            <div className="py-6 text-center text-sm text-[#7a7a7a]">
+              Loading token ledger…
+            </div>
+          ) : ledger.length === 0 ? (
+            <div className="py-6 text-center text-sm text-[#9a9892]">
+              No token movements yet.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-[#e3e1dc] text-xs uppercase tracking-[0.08em] text-[#9a9892]">
+                    <th className="px-2 py-2">When</th>
+                    <th className="px-2 py-2">Direction</th>
+                    <th className="px-2 py-2">Amount</th>
+                    <th className="px-2 py-2">Reason</th>
+                    <th className="px-2 py-2">Notes</th>
+                    <th className="px-2 py-2">Balance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ledger.map((entry) => {
+                    const created = new Date(entry.createdAt);
+                    const isCredit = entry.direction === "CREDIT";
+
+                    return (
+                      <tr
+                        key={entry.id}
+                        className="border-b border-[#f0eeea] text-xs last:border-b-0"
+                      >
+                        <td className="px-2 py-2 align-top text-[11px] text-[#7a7a7a]">
+                          {created.toLocaleDateString()}{" "}
+                          {created.toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </td>
+                        <td className="px-2 py-2 align-top">
+                          <span
+                            className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                              isCredit
+                                ? "bg-[#f0fff6] text-[#137a3a]"
+                                : "bg-[#fde8e7] text-[#b13832]"
+                            }`}
+                          >
+                            {isCredit ? "Credit" : "Debit"}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2 align-top text-[11px] text-[#424143]">
+                          {isCredit ? "+" : "-"}
+                          {entry.amount}
+                        </td>
+                        <td className="px-2 py-2 align-top text-[11px] text-[#424143]">
+                          {entry.reason ?? "—"}
+                        </td>
+                        <td className="px-2 py-2 align-top text-[11px] text-[#7a7a7a]">
+                          {entry.notes ?? "—"}
+                        </td>
+                        <td className="px-2 py-2 align-top text-[11px] text-[#9a9892]">
+                          {entry.balanceAfter != null
+                            ? entry.balanceAfter
+                            : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
-
-          {userId && loading && (
-            <div className="text-sm text-[#7a7a7a]">Loading designer data…</div>
-          )}
-
-          {userId && error && !loading && (
-            <div className="rounded-xl border border-red-200 bg-white px-4 py-3 text-sm text-red-700">
-              <p className="font-medium">Error</p>
-              <p className="mt-1">{error}</p>
-            </div>
-          )}
-
-          {userId && data && !loading && !error && (
-            <div className="grid gap-6 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-              {/* Left column: designer + balance */}
-              <section className="space-y-4">
-                <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-                  <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-[#9a9892]">
-                    Designer
-                  </h2>
-                  <p className="mt-3 text-lg font-semibold">
-                    {data.user.name || "Unnamed designer"}
-                  </p>
-                  <p className="text-sm text-[#7a7a7a]">{data.user.email}</p>
-                  <p className="mt-3 inline-flex rounded-full bg-[#f2f1ed] px-3 py-1 text-xs font-medium uppercase tracking-wide text-[#424143]">
-                    {data.user.role}
-                  </p>
-                </div>
-
-                <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-                  <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-[#9a9892]">
-                    Current balance
-                  </h2>
-                  <p className="mt-3 text-3xl font-semibold text-[#f15b2b]">
-                    {data.balance}
-                    <span className="ml-1 text-base font-normal text-[#7a7a7a]">
-                      tokens
-                    </span>
-                  </p>
-                  <p className="mt-2 text-sm text-[#7a7a7a]">
-                    This value is calculated from all CREDIT and DEBIT entries
-                    for this designer.
-                  </p>
-                </div>
-              </section>
-
-              {/* Right column: ledger table */}
-              <section className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-[#9a9892]">
-                    Recent activity
-                  </h2>
-                </div>
-
-                {data.ledger.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-[#e3e1dc] bg-white px-5 py-6 text-sm text-[#7a7a7a]">
-                    No token movements yet for this designer.
-                  </div>
-                ) : (
-                  <div className="overflow-hidden rounded-2xl border border-[#e3e1dc] bg-white shadow-sm">
-                    <table className="min-w-full text-left text-sm">
-                      <thead className="border-b border-[#eceae5] bg-[#faf8f5] text-xs uppercase text-[#9a9892]">
-                        <tr>
-                          <th className="px-4 py-3 font-medium">Date</th>
-                          <th className="px-4 py-3 font-medium">Direction</th>
-                          <th className="px-4 py-3 font-medium">Amount</th>
-                          <th className="px-4 py-3 font-medium">Reason</th>
-                          <th className="px-4 py-3 font-medium">Ticket</th>
-                          <th className="px-4 py-3 font-medium">Balance</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {data.ledger.map((entry) => {
-                          const date = new Date(entry.createdAt);
-                          const isCredit = entry.direction === "CREDIT";
-                          const sign = isCredit ? "+" : "-";
-
-                          return (
-                            <tr
-                              key={entry.id}
-                              className="border-t border-[#f1efea] text-xs text-[#424143]"
-                            >
-                              <td className="px-4 py-3 align-top text-[11px] text-[#7a7a7a]">
-                                {date.toLocaleString()}
-                              </td>
-                              <td className="px-4 py-3 align-top text-[11px]">
-                                <span
-                                  className={`inline-flex rounded-full px-2 py-0.5 font-semibold ${
-                                    isCredit
-                                      ? "bg-[#e8f7f0] text-[#1a7f4b]"
-                                      : "bg-[#fde8e7] text-[#b13832]"
-                                  }`}
-                                >
-                                  {entry.direction}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 align-top text-[11px]">
-                                <span className="font-mono">
-                                  {sign}
-                                  {entry.amount}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 align-top text-[11px]">
-                                <div className="max-w-[220px]">
-                                  <div className="font-mono text-[11px] text-[#424143]">
-                                    {entry.reason || "—"}
-                                  </div>
-                                  {entry.notes && (
-                                    <div className="mt-1 text-[11px] text-[#7a7a7a]">
-                                      {entry.notes}
-                                    </div>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="px-4 py-3 align-top text-[11px] text-[#7a7a7a]">
-                                {entry.ticketId || "—"}
-                              </td>
-                              <td className="px-4 py-3 align-top text-[11px]">
-                                {entry.balanceAfter != null ? (
-                                  <span className="font-mono">
-                                    {entry.balanceAfter}
-                                  </span>
-                                ) : (
-                                  <span className="text-[#b8b6b1]">—</span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </section>
-            </div>
-          )}
-        </main>
+        </section>
       </div>
     </div>
   );

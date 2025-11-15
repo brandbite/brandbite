@@ -1,33 +1,37 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/designer/balance/route.ts
 // @purpose: Returns designer token balance and recent ledger entries
-// @version: v1.0.0
-// @lastUpdate: 2025-11-13
+// @version: v1.1.0
+// @lastUpdate: 2025-11-15
 // -----------------------------------------------------------------------------
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUserTokenBalance } from "@/lib/token-engine";
+import { getCurrentUserOrThrow } from "@/lib/auth";
 
 const MAX_ENTRIES = 50;
 
 /**
- * Geçici tasarım:
- * - userId şimdilik query param üzerinden geliyor: /api/designer/balance?userId=...
- * - BetterAuth entegre olduktan sonra userId'yi session'dan alacağız.
+ * Tasarım (v1.1.0):
+ * - userId artık query param üzerinden gelmiyor.
+ * - Aktif designer, demo auth (bb-demo-user) + gelecekte BetterAuth üzerinden
+ *   getCurrentUserOrThrow() ile belirleniyor.
+ * - Sadece role === DESIGNER olan kullanıcılar bu endpoint'e erişebiliyor.
  */
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const userId = searchParams.get("userId");
-
-  if (!userId) {
-    return NextResponse.json(
-      { error: "Missing userId query parameter" },
-      { status: 400 }
-    );
-  }
-
+export async function GET(_request: Request) {
   try {
+    const currentUser = await getCurrentUserOrThrow();
+
+    if (currentUser.role !== "DESIGNER") {
+      return NextResponse.json(
+        { error: "Only designers can access designer balance" },
+        { status: 403 },
+      );
+    }
+
+    const userId = currentUser.id;
+
     const [user, balance, ledger] = await Promise.all([
       prisma.userAccount.findUnique({
         where: { id: userId },
@@ -68,11 +72,18 @@ export async function GET(request: Request) {
       balance,
       ledger,
     });
-  } catch (error) {
+  } catch (error: any) {
+    if ((error as any)?.code === "UNAUTHENTICATED") {
+      return NextResponse.json(
+        { error: "Unauthenticated" },
+        { status: 401 },
+      );
+    }
+
     console.error("[GET /api/designer/balance] error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
