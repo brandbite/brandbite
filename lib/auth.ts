@@ -1,14 +1,18 @@
 // -----------------------------------------------------------------------------
 // @file: lib/auth.ts
 // @purpose: Auth integration boundary for Brandbite (demo session + future BetterAuth)
-// @version: v0.2.1
+// @version: v0.3.0
 // @status: active
-// @lastUpdate: 2025-11-14
+// @lastUpdate: 2025-11-15
 // -----------------------------------------------------------------------------
 
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import type { SessionUser } from "./roles";
+import {
+  getEmailForDemoPersona,
+  isValidDemoPersona,
+} from "./demo-personas";
 
 /**
  * NOTE (2025-11-14):
@@ -16,7 +20,7 @@ import type { SessionUser } from "./roles";
  * This file currently implements a "demo auth layer" based on a simple cookie:
  *
  *   - Cookie name: bb-demo-user
- *   - Value: one of the demo personas (see DEMO_PERSONA_TO_EMAIL)
+ *   - Value: one of the demo personas (see lib/demo-personas.ts)
  *   - We look up UserAccount by email, then infer activeCompanyId and companyRole
  *     from the first CompanyMember record.
  *
@@ -25,20 +29,6 @@ import type { SessionUser } from "./roles";
  * The rest of the app should keep using the SessionUser shape defined
  * in lib/roles.ts.
  */
-
-const DEMO_PERSONA_TO_EMAIL: Record<string, string> = {
-  // platform-level
-  "site-owner": "owner@brandbite-demo.com",
-  "site-admin": "admin@brandbite-demo.com",
-
-  // designers
-  "designer-ada": "ada.designer@demo.com",
-  "designer-liam": "liam.designer@demo.com",
-
-  // customer company (Acme Studio)
-  "customer-owner": "owner@acme-demo.com",
-  "customer-pm": "pm@acme-demo.com",
-};
 
 /**
  * Resolve the current user from the demo cookie and database.
@@ -53,11 +43,11 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   const cookieStore = await cookies();
   const persona = cookieStore.get("bb-demo-user")?.value;
 
-  if (!persona) {
+  if (!persona || !isValidDemoPersona(persona)) {
     return null;
   }
 
-  const email = DEMO_PERSONA_TO_EMAIL[persona];
+  const email = getEmailForDemoPersona(persona);
   if (!email) {
     return null;
   }

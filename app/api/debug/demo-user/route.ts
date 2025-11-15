@@ -1,21 +1,13 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/debug/demo-user/route.ts
 // @purpose: Set demo auth persona via cookie (bb-demo-user) - JSON based
-// @version: v1.1.0
+// @version: v1.2.0
 // @status: active
-// @lastUpdate: 2025-11-14
+// @lastUpdate: 2025-11-15
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
-
-const VALID_PERSONAS = new Set<string>([
-  "site-owner",
-  "site-admin",
-  "designer-ada",
-  "designer-liam",
-  "customer-owner",
-  "customer-pm",
-]);
+import { isValidDemoPersona } from "@/lib/demo-personas";
 
 export async function POST(req: NextRequest) {
   try {
@@ -34,7 +26,7 @@ export async function POST(req: NextRequest) {
         ? (body as any).redirectTo
         : "/";
 
-    if (!VALID_PERSONAS.has(persona)) {
+    if (!isValidDemoPersona(persona)) {
       return NextResponse.json(
         { error: "Unknown demo persona" },
         { status: 400 },
