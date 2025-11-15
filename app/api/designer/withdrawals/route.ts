@@ -1,150 +1,132 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/designer/withdrawals/route.ts
-// @purpose: Designer withdrawal requests (list and create)
-// @version: v1.0.0
-// @lastUpdate: 2025-11-13
+// @purpose: Designer API for requesting and listing withdrawals
+// @version: v1.1.0
+// @status: active
+// @lastUpdate: 2025-11-15
 // -----------------------------------------------------------------------------
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUserOrThrow } from "@/lib/auth";
 import { getUserTokenBalance } from "@/lib/token-engine";
-import { WithdrawalStatus } from "@prisma/client";
 
-const MIN_WITHDRAW_TOKENS = 20; // TODO: Configurable via admin panel
-const DEFAULT_PAGE_SIZE = 20;
-const MAX_PAGE_SIZE = 100;
+const MIN_WITHDRAWAL_TOKENS = 20; // TODO: make configurable via admin settings later
 
-// GET /api/designer/withdrawals?userId=...
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const userId = searchParams.get("userId");
+// -----------------------------------------------------------------------------
+// GET: list withdrawals for current designer + basic stats
+// -----------------------------------------------------------------------------
 
-  if (!userId) {
-    return NextResponse.json(
-      { error: "Missing userId query parameter" },
-      { status: 400 },
-    );
-  }
-
-  const pageParam = searchParams.get("page") ?? "1";
-  const pageSizeParam = searchParams.get("pageSize") ?? `${DEFAULT_PAGE_SIZE}`;
-
-  const page = Math.max(1, Number(pageParam) || 1);
-  const rawPageSize = Number(pageSizeParam) || DEFAULT_PAGE_SIZE;
-  const pageSize = Math.min(Math.max(rawPageSize, 1), MAX_PAGE_SIZE);
-  const skip = (page - 1) * pageSize;
-
+export async function GET(_req: NextRequest) {
   try {
-    const [user, balance, totalCount, withdrawals] = await Promise.all([
-      prisma.userAccount.findUnique({
-        where: { id: userId },
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          role: true,
-        },
-      }),
-      getUserTokenBalance(userId),
-      prisma.withdrawal.count({
-        where: { designerId: userId },
-      }),
+    const user = await getCurrentUserOrThrow();
+
+    if (user.role !== "DESIGNER") {
+      return NextResponse.json(
+        { error: "Only designers can access their withdrawals" },
+        { status: 403 },
+      );
+    }
+
+    const [balance, withdrawals] = await Promise.all([
+      getUserTokenBalance(user.id),
       prisma.withdrawal.findMany({
-        where: { designerId: userId },
+        where: { designerId: user.id },
         orderBy: { createdAt: "desc" },
-        skip,
-        take: pageSize,
       }),
     ]);
 
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
+    const totalRequested = withdrawals.reduce(
+      (sum, w) => sum + w.amountTokens,
+      0,
+    );
+    const pendingCount = withdrawals.filter(
+      (w) => w.status === "PENDING",
+    ).length;
 
-    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    const items = withdrawals.map((w) => ({
+      id: w.id,
+      amountTokens: w.amountTokens,
+      status: w.status,
+      createdAt: w.createdAt.toISOString(),
+      approvedAt: w.approvedAt ? w.approvedAt.toISOString() : null,
+    }));
 
     return NextResponse.json({
-      user,
-      balance,
-      pagination: {
-        page,
-        pageSize,
-        totalCount,
-        totalPages,
+      stats: {
+        availableBalance: balance,
+        totalRequested,
+        pendingCount,
+        withdrawalsCount: items.length,
       },
-      withdrawals,
+      withdrawals: items,
     });
-  } catch (error) {
-    console.error("[GET /api/designer/withdrawals] error:", error);
+  } catch (error: any) {
+    if ((error as any)?.code === "UNAUTHENTICATED") {
+      return NextResponse.json(
+        { error: "Unauthenticated" },
+        { status: 401 },
+      );
+    }
+
+    console.error("[designer.withdrawals] GET error", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Failed to load designer withdrawals" },
       { status: 500 },
     );
   }
 }
 
-// POST /api/designer/withdrawals?userId=...
-// Body: { "amountTokens": number, "notes"?: string }
-export async function POST(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const userId = searchParams.get("userId");
+// -----------------------------------------------------------------------------
+// POST: create a new withdrawal request for current designer
+// -----------------------------------------------------------------------------
 
-  if (!userId) {
-    return NextResponse.json(
-      { error: "Missing userId query parameter" },
-      { status: 400 },
-    );
-  }
-
-  let body: { amountTokens?: number; notes?: string };
+export async function POST(req: NextRequest) {
   try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json(
-      { error: "Invalid JSON body" },
-      { status: 400 },
-    );
-  }
+    const user = await getCurrentUserOrThrow();
 
-  const amountTokens = Number(body.amountTokens ?? 0);
-  const notes = body.notes ?? null;
-
-  if (!Number.isFinite(amountTokens) || amountTokens <= 0) {
-    return NextResponse.json(
-      { error: "amountTokens must be a positive number" },
-      { status: 400 },
-    );
-  }
-
-  if (amountTokens < MIN_WITHDRAW_TOKENS) {
-    return NextResponse.json(
-      {
-        error: `Minimum withdrawal is ${MIN_WITHDRAW_TOKENS} tokens`,
-        minWithdrawTokens: MIN_WITHDRAW_TOKENS,
-      },
-      { status: 400 },
-    );
-  }
-
-  try {
-    const [user, balance] = await Promise.all([
-      prisma.userAccount.findUnique({
-        where: { id: userId },
-        select: { id: true, email: true, name: true },
-      }),
-      getUserTokenBalance(userId),
-    ]);
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    if (user.role !== "DESIGNER") {
+      return NextResponse.json(
+        { error: "Only designers can create withdrawals" },
+        { status: 403 },
+      );
     }
+
+    const body = await req.json().catch(() => null);
+    const amountTokensRaw = body?.amountTokens;
+
+    const amountTokens =
+      typeof amountTokensRaw === "string"
+        ? parseInt(amountTokensRaw, 10)
+        : amountTokensRaw;
+
+    if (
+      typeof amountTokens !== "number" ||
+      !Number.isFinite(amountTokens) ||
+      amountTokens <= 0
+    ) {
+      return NextResponse.json(
+        { error: "Invalid amountTokens value" },
+        { status: 400 },
+      );
+    }
+
+    if (amountTokens < MIN_WITHDRAWAL_TOKENS) {
+      return NextResponse.json(
+        {
+          error: `Minimum withdrawal amount is ${MIN_WITHDRAWAL_TOKENS} tokens.`,
+        },
+        { status: 400 },
+      );
+    }
+
+    const balance = await getUserTokenBalance(user.id);
 
     if (amountTokens > balance) {
       return NextResponse.json(
         {
-          error: "Insufficient balance for withdrawal",
-          availableBalance: balance,
-          requestedAmount: amountTokens,
+          error:
+            "Requested amount exceeds your current token balance.",
         },
         { status: 400 },
       );
@@ -152,27 +134,37 @@ export async function POST(request: Request) {
 
     const withdrawal = await prisma.withdrawal.create({
       data: {
-        designerId: userId,
+        designerId: user.id,
         amountTokens,
-        status: WithdrawalStatus.PENDING,
-        notes,
-        metadata: {
-          requestedBalanceAtTime: balance,
-        },
+        status: "PENDING",
       },
     });
 
     return NextResponse.json(
       {
-        message: "Withdrawal request created",
-        withdrawal,
+        withdrawal: {
+          id: withdrawal.id,
+          amountTokens: withdrawal.amountTokens,
+          status: withdrawal.status,
+          createdAt: withdrawal.createdAt.toISOString(),
+          approvedAt: withdrawal.approvedAt
+            ? withdrawal.approvedAt.toISOString()
+            : null,
+        },
       },
       { status: 201 },
     );
-  } catch (error) {
-    console.error("[POST /api/designer/withdrawals] error:", error);
+  } catch (error: any) {
+    if ((error as any)?.code === "UNAUTHENTICATED") {
+      return NextResponse.json(
+        { error: "Unauthenticated" },
+        { status: 401 },
+      );
+    }
+
+    console.error("[designer.withdrawals] POST error", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Failed to create withdrawal" },
       { status: 500 },
     );
   }

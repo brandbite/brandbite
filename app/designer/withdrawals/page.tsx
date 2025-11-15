@@ -1,107 +1,150 @@
 // -----------------------------------------------------------------------------
 // @file: app/designer/withdrawals/page.tsx
-// @purpose: Designer withdrawals dashboard (list + create withdrawal requests)
-// @version: v1.1.1
-// @lastUpdate: 2025-11-13
+// @purpose: Designer-facing withdrawals overview and request form
+// @version: v1.2.1
+// @status: active
+// @lastUpdate: 2025-11-15
 // -----------------------------------------------------------------------------
 
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 type WithdrawalStatus = "PENDING" | "APPROVED" | "REJECTED" | "PAID";
 
-type DesignerInfo = {
+type DesignerWithdrawal = {
   id: string;
-  email: string;
-  name: string | null;
-  role: string;
-};
-
-type Withdrawal = {
-  id: string;
-  designerId: string;
   amountTokens: number;
   status: WithdrawalStatus;
-  notes: string | null;
-  metadata: any | null;
   createdAt: string;
   approvedAt: string | null;
-  paidAt: string | null;
 };
 
-type GetResponse = {
-  user: DesignerInfo;
-  balance: number;
-  pagination: {
-    page: number;
-    pageSize: number;
-    totalCount: number;
-    totalPages: number;
+type DesignerWithdrawalsResponse = {
+  stats: {
+    availableBalance: number;
+    totalRequested: number;
+    pendingCount: number;
+    withdrawalsCount: number;
   };
-  withdrawals: Withdrawal[];
+  withdrawals: DesignerWithdrawal[];
 };
 
 export default function DesignerWithdrawalsPage() {
-  const searchParams = useSearchParams();
-  const userId = searchParams.get("userId");
-
-  const [data, setData] = useState<GetResponse | null>(null);
-  const [loading, setLoading] = useState<boolean>(!!userId);
+  const [data, setData] = useState<DesignerWithdrawalsResponse | null>(
+    null,
+  );
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [amountTokens, setAmountTokens] = useState<string>("");
-  const [notes, setNotes] = useState<string>("");
-  const [submitting, setSubmitting] = useState<boolean>(false);
+  const [amount, setAmount] = useState<string>("");
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState<string | null>(
+    null,
+  );
+  const [submitting, setSubmitting] = useState<boolean>(false);
 
-  const fetchData = () => {
-    if (!userId) {
-      setLoading(false);
-      setError(null);
-      setData(null);
-      return;
-    }
-
+  const load = async () => {
     setLoading(true);
     setError(null);
 
-    fetch(`/api/designer/withdrawals?userId=${encodeURIComponent(userId)}`)
-      .then(async (res) => {
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error(body.error || `Request failed with ${res.status}`);
-        }
-        return res.json();
-      })
-      .then((json: GetResponse) => {
-        setData(json);
-      })
-      .catch((err: any) => {
-        console.error("Designer withdrawals fetch error:", err);
-        setError(err.message || "Unknown error");
-      })
-      .finally(() => {
-        setLoading(false);
+    try {
+      const res = await fetch("/api/designer/withdrawals", {
+        cache: "no-store",
       });
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        if (res.status === 401) {
+          throw new Error(
+            "You must be signed in as a designer to view this page.",
+          );
+        }
+        if (res.status === 403) {
+          throw new Error(
+            "You do not have permission to view designer withdrawals.",
+          );
+        }
+        const msg =
+          json?.error || `Request failed with status ${res.status}`;
+        throw new Error(msg);
+      }
+
+      setData(json as DesignerWithdrawalsResponse);
+    } catch (err: any) {
+      console.error("Designer withdrawals fetch error:", err);
+      setError(err?.message || "Failed to load withdrawals.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+    let cancelled = false;
 
-  const handleSubmit = async (e: FormEvent) => {
+    const initialLoad = async () => {
+      if (cancelled) return;
+      await load();
+    };
+
+    initialLoad();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const withdrawals = data?.withdrawals ?? [];
+  const stats = data?.stats;
+
+  const formatDateTime = (iso: string | null) => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    })}`;
+  };
+
+  const renderStatusBadge = (status: WithdrawalStatus) => {
+    const base =
+      "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold";
+    switch (status) {
+      case "PENDING":
+        return (
+          <span className={`${base} bg-[#fff7e0] text-[#8a6b1f]`}>
+            Pending
+          </span>
+        );
+      case "APPROVED":
+        return (
+          <span className={`${base} bg-[#f0fff6] text-[#137a3a]`}>
+            Approved
+          </span>
+        );
+      case "REJECTED":
+        return (
+          <span className={`${base} bg-[#fde8e7] text-[#b13832]`}>
+            Rejected
+          </span>
+        );
+      case "PAID":
+        return (
+          <span className={`${base} bg-[#e7f0ff] text-[#214f9c]`}>
+            Paid
+          </span>
+        );
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
     setSubmitSuccess(null);
 
-    if (!userId) return;
-
-    const amount = Number(amountTokens);
-    if (!Number.isFinite(amount) || amount <= 0) {
+    const parsed = parseInt(amount, 10);
+    if (Number.isNaN(parsed) || parsed <= 0) {
       setSubmitError("Please enter a valid token amount.");
       return;
     }
@@ -109,31 +152,30 @@ export default function DesignerWithdrawalsPage() {
     setSubmitting(true);
 
     try {
-      const res = await fetch(
-        `/api/designer/withdrawals?userId=${encodeURIComponent(userId)}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            amountTokens: amount,
-            notes: notes || undefined,
-          }),
-        }
-      );
+      const res = await fetch("/api/designer/withdrawals", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ amountTokens: parsed }),
+      });
 
-      const body = await res.json().catch(() => ({}));
+      const json = await res.json().catch(() => null);
 
       if (!res.ok) {
-        throw new Error(body.error || `Request failed with ${res.status}`);
+        const msg =
+          json?.error || `Request failed with status ${res.status}`;
+        throw new Error(msg);
       }
 
-      setSubmitSuccess("Withdrawal request created.");
-      setAmountTokens("");
-      setNotes("");
-      fetchData();
+      setSubmitSuccess("Withdrawal request created successfully.");
+      setAmount("");
+      await load();
     } catch (err: any) {
-      console.error("Withdraw create error:", err);
-      setSubmitError(err.message || "Unknown error");
+      console.error("Designer withdrawal submit error:", err);
+      setSubmitError(
+        err?.message || "Failed to create withdrawal request.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -141,9 +183,9 @@ export default function DesignerWithdrawalsPage() {
 
   return (
     <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
-      <div className="mx-auto max-w-6xl px-6 py-10">
-        {/* Top navigation placeholder */}
-        <header className="mb-8 flex items-center justify-between">
+      <div className="mx-auto max-w-5xl px-6 py-10">
+        {/* Top navigation */}
+        <header className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f15b2b] text-sm font-semibold text-white">
               B
@@ -153,221 +195,209 @@ export default function DesignerWithdrawalsPage() {
             </span>
           </div>
           <nav className="hidden items-center gap-6 text-sm text-[#7a7a7a] md:flex">
-            <button className="font-medium text-[#424143]">Dashboard</button>
-            <button className="font-medium text-[#424143]">Board</button>
-            <button className="font-medium text-[#424143]">Plans</button>
+            <button
+              className="font-medium text-[#7a7a7a]"
+              onClick={() => (window.location.href = "/designer/balance")}
+            >
+              Balance
+            </button>
+            <button className="font-medium text-[#424143]">
+              Withdrawals
+            </button>
           </nav>
         </header>
 
-        <main className="space-y-6">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight">
-                Designer withdrawals
-              </h1>
-              <p className="mt-1 text-sm text-[#7a7a7a]">
-                Review your withdrawal history and request a new payout. For
-                now, the designer is selected with{" "}
-                <code className="rounded bg-white px-1 py-0.5 text-xs">
-                  ?userId=&lt;id&gt;
-                </code>{" "}
-                in the URL.
+        {/* Page header */}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              My withdrawals
+            </h1>
+            <p className="mt-1 text-sm text-[#7a7a7a]">
+              Request payouts from your token balance and track their
+              status.
+            </p>
+          </div>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-white px-4 py-3 text-sm text-red-700">
+            <p className="font-medium">Error</p>
+            <p className="mt-1">{error}</p>
+          </div>
+        )}
+
+        {/* Summary + form */}
+        <section className="mb-6 grid gap-4 md:grid-cols-[2fr,3fr]">
+          {/* Summary cards */}
+          <div className="space-y-3">
+            <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
+              <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+                Available balance
               </p>
+              <p className="mt-2 text-3xl font-semibold text-[#f15b2b]">
+                {loading
+                  ? "—"
+                  : stats
+                  ? stats.availableBalance
+                  : 0}
+                <span className="ml-1 text-base font-normal text-[#7a7a7a]">
+                  tokens
+                </span>
+              </p>
+              <p className="mt-1 text-xs text-[#9a9892]">
+                This is your current token balance before new withdrawals.
+              </p>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
+                <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+                  Total requested
+                </p>
+                <p className="mt-2 text-2xl font-semibold text-[#424143]">
+                  {loading
+                    ? "—"
+                    : stats
+                    ? stats.totalRequested
+                    : 0}
+                </p>
+                <p className="mt-1 text-xs text-[#9a9892]">
+                  Sum of all your withdrawal requests.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
+                <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+                  Pending requests
+                </p>
+                <p className="mt-2 text-2xl font-semibold text-[#424143]">
+                  {loading
+                    ? "—"
+                    : stats
+                    ? stats.pendingCount
+                    : 0}
+                </p>
+                <p className="mt-1 text-xs text-[#9a9892]">
+                  Waiting for approval from admin.
+                </p>
+              </div>
             </div>
           </div>
 
-          {!userId && (
-            <div className="rounded-xl border border-[#f2d4c7] bg-white px-4 py-3 text-sm text-[#8a3b16]">
-              <p className="font-medium">Missing userId parameter</p>
-              <p className="mt-1">
-                Example:{" "}
-                <code className="rounded bg-[#f5f3f0] px-2 py-1 text-xs">
-                  /designer/withdrawals?userId=DESIGNER_ID
-                </code>
-              </p>
+          {/* Request form */}
+          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
+            <h2 className="text-sm font-semibold tracking-tight">
+              Request a withdrawal
+            </h2>
+            <p className="mt-1 text-xs text-[#7a7a7a]">
+              Enter the amount of tokens you would like to withdraw.
+              Minimum withdrawal amount applies.
+            </p>
+
+            {submitError && (
+              <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                {submitError}
+              </div>
+            )}
+
+            {submitSuccess && (
+              <div className="mt-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-700">
+                {submitSuccess}
+              </div>
+            )}
+
+            <form className="mt-4 space-y-3" onSubmit={handleSubmit}>
+              <div className="flex flex-col gap-1">
+                <label
+                  htmlFor="amount"
+                  className="text-xs font-medium text-[#424143]"
+                >
+                  Amount (tokens)
+                </label>
+                <input
+                  id="amount"
+                  type="number"
+                  min={1}
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="w-full rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+                  placeholder="e.g. 50"
+                />
+                <p className="text-[11px] text-[#9a9892]">
+                  You can only request up to your available balance.
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="inline-flex items-center justify-center rounded-full bg-[#f15b2b] px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:opacity-60"
+              >
+                {submitting
+                  ? "Submitting…"
+                  : "Submit withdrawal request"}
+              </button>
+            </form>
+          </div>
+        </section>
+
+        {/* Withdrawals table */}
+        <section className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold tracking-tight">
+              My withdrawal history
+            </h2>
+            <p className="text-xs text-[#9a9892]">
+              Showing {withdrawals.length} requests.
+            </p>
+          </div>
+
+          {loading ? (
+            <div className="py-6 text-center text-sm text-[#7a7a7a]">
+              Loading withdrawals…
             </div>
-          )}
-
-          {userId && loading && (
-            <div className="text-sm text-[#7a7a7a]">
-              Loading withdrawal data…
+          ) : withdrawals.length === 0 ? (
+            <div className="py-6 text-center text-sm text-[#9a9892]">
+              You have not requested any withdrawals yet.
             </div>
-          )}
-
-          {userId && error && !loading && (
-            <div className="rounded-xl border border-red-200 bg-white px-4 py-3 text-sm text-red-700">
-              <p className="font-medium">Error</p>
-              <p className="mt-1">{error}</p>
-            </div>
-          )}
-
-          {userId && data && !loading && !error && (
-            <div className="grid gap-6 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-              {/* Left column: summary + form */}
-              <section className="space-y-4">
-                <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-                  <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-[#9a9892]">
-                    Designer
-                  </h2>
-                  <p className="mt-3 text-lg font-semibold">
-                    {data.user.name || "Unnamed designer"}
-                  </p>
-                  <p className="text-sm text-[#7a7a7a]">{data.user.email}</p>
-                  <p className="mt-3 inline-flex rounded-full bg-[#f2f1ed] px-3 py-1 text-xs font-medium uppercase tracking-wide text-[#424143]">
-                    {data.user.role}
-                  </p>
-
-                  <div className="mt-4">
-                    <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-[#9a9892]">
-                      Current balance
-                    </h3>
-                    <p className="mt-2 text-2xl font-semibold text-[#f15b2b]">
-                      {data.balance}
-                      <span className="ml-1 text-sm font-normal text-[#7a7a7a]">
-                        tokens
-                      </span>
-                    </p>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-                  <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-[#9a9892]">
-                    New withdrawal request
-                  </h2>
-
-                  <form onSubmit={handleSubmit} className="mt-3 space-y-3">
-                    <div>
-                      <label className="block text-xs font-medium text-[#424143]">
-                        Amount (tokens)
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        step={1}
-                        value={amountTokens}
-                        onChange={(e) => setAmountTokens(e.target.value)}
-                        className="mt-1 w-full rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
-                        placeholder="e.g. 50"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-[#424143]">
-                        Notes (optional)
-                      </label>
-                      <textarea
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        rows={3}
-                        className="mt-1 w-full rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
-                        placeholder="Bank details, payout notes, etc."
-                      />
-                    </div>
-
-                    {submitError && (
-                      <p className="text-xs text-red-600">{submitError}</p>
-                    )}
-                    {submitSuccess && (
-                      <p className="text-xs text-[#1a7f4b]">
-                        {submitSuccess}
-                      </p>
-                    )}
-
-                    <button
-                      type="submit"
-                      disabled={submitting}
-                      className="inline-flex items-center justify-center rounded-full bg-[#f15b2b] px-5 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-[#e24f21] disabled:opacity-60"
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-[#e3e1dc] text-xs uppercase tracking-[0.08em] text-[#9a9892]">
+                    <th className="px-2 py-2">Created</th>
+                    <th className="px-2 py-2">Amount</th>
+                    <th className="px-2 py-2">Status</th>
+                    <th className="px-2 py-2">Approved at</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {withdrawals.map((w) => (
+                    <tr
+                      key={w.id}
+                      className="border-b border-[#f0eeea] text-xs last:border-b-0"
                     >
-                      {submitting ? "Submitting…" : "Create withdrawal request"}
-                    </button>
-                  </form>
-                </div>
-              </section>
-
-              {/* Right column: withdrawals list */}
-              <section className="space-y-3">
-                <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-[#9a9892]">
-                  Withdrawal history
-                </h2>
-
-                {data.withdrawals.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-[#e3e1dc] bg-white px-5 py-6 text-sm text-[#7a7a7a]">
-                    No withdrawal requests yet.
-                  </div>
-                ) : (
-                  <div className="overflow-hidden rounded-2xl border border-[#e3e1dc] bg-white shadow-sm">
-                    <table className="min-w-full text-left text-sm">
-                      <thead className="border-b border-[#eceae5] bg-[#faf8f5] text-xs uppercase text-[#9a9892]">
-                        <tr>
-                          <th className="px-4 py-3 font-medium">
-                            Requested at
-                          </th>
-                          <th className="px-4 py-3 font-medium">Amount</th>
-                          <th className="px-4 py-3 font-medium">Status</th>
-                          <th className="px-4 py-3 font-medium">Notes</th>
-                          <th className="px-4 py-3 font-medium">Approved</th>
-                          <th className="px-4 py-3 font-medium">Paid</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {data.withdrawals.map((w) => {
-                          const created = new Date(w.createdAt);
-                          const approved = w.approvedAt
-                            ? new Date(w.approvedAt)
-                            : null;
-                          const paid = w.paidAt ? new Date(w.paidAt) : null;
-
-                          const statusColor =
-                            w.status === "PENDING"
-                              ? "bg-[#fff5dd] text-[#8a6000]"
-                              : w.status === "APPROVED"
-                              ? "bg-[#e1f0ff] text-[#245c9b]"
-                              : w.status === "PAID"
-                              ? "bg-[#e8f7f0] text-[#1a7f4b]"
-                              : "bg-[#fde8e7] text-[#b13832]";
-
-                          return (
-                            <tr
-                              key={w.id}
-                              className="border-t border-[#f1efea] text-xs text-[#424143]"
-                            >
-                              <td className="px-4 py-3 align-top text-[11px] text-[#7a7a7a]">
-                                {created.toLocaleString()}
-                              </td>
-                              <td className="px-4 py-3 align-top text-[11px]">
-                                <span className="font-mono">
-                                  {w.amountTokens}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 align-top text-[11px]">
-                                <span
-                                  className={`inline-flex rounded-full px-2 py-0.5 font-semibold ${statusColor}`}
-                                >
-                                  {w.status}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 align-top text-[11px]">
-                                <div className="max-w-[220px] text-[11px] text-[#7a7a7a]">
-                                  {w.notes || "—"}
-                                </div>
-                              </td>
-                              <td className="px-4 py-3 align-top text-[11px] text-[#7a7a7a]">
-                                {approved ? approved.toLocaleString() : "—"}
-                              </td>
-                              <td className="px-4 py-3 align-top text-[11px] text-[#7a7a7a]">
-                                {paid ? paid.toLocaleString() : "—"}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </section>
+                      <td className="px-2 py-2 align-top text-[11px] text-[#7a7a7a]">
+                        {formatDateTime(w.createdAt)}
+                      </td>
+                      <td className="px-2 py-2 align-top text-[11px] text-[#424143]">
+                        {w.amountTokens} tokens
+                      </td>
+                      <td className="px-2 py-2 align-top text-[11px]">
+                        {renderStatusBadge(w.status)}
+                      </td>
+                      <td className="px-2 py-2 align-top text-[11px] text-[#7a7a7a]">
+                        {formatDateTime(w.approvedAt)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
-        </main>
+        </section>
       </div>
     </div>
   );
