@@ -1,138 +1,126 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/customer/tokens/route.ts
-// @purpose: Returns company token balance and paginated ledger entries for customer
-// @version: v1.1.0
-// @lastUpdate: 2025-11-13
+// @purpose: Customer token balance & ledger API (session-based company)
+// @version: v1.2.0
+// @status: active
+// @lastUpdate: 2025-11-14
 // -----------------------------------------------------------------------------
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { LedgerDirection } from "@prisma/client";
+import { getCurrentUserOrThrow } from "@/lib/auth";
 
-const DEFAULT_PAGE_SIZE = 20;
-const MAX_PAGE_SIZE = 100;
+// -----------------------------------------------------------------------------
+// GET: token balance + recent ledger entries for current customer's company
+// -----------------------------------------------------------------------------
 
-/**
- * Geçici tasarım:
- * - companyId şimdilik query param üzerinden geliyor: /api/customer/tokens?companyId=...
- * - BetterAuth entegre olduktan sonra companyId'yi session / user context'ten alacağız.
- *
- * Desteklenen query param'lar:
- * - companyId (zorunlu)
- * - page (opsiyonel, varsayılan 1)
- * - pageSize (opsiyonel, varsayılan 20, max 100)
- * - from (opsiyonel, ISO tarih – createdAt >= from)
- * - to (opsiyonel, ISO tarih – createdAt <= to)
- */
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const companyId = searchParams.get("companyId");
-
-  if (!companyId) {
-    return NextResponse.json(
-      { error: "Missing companyId query parameter" },
-      { status: 400 },
-    );
-  }
-
-  // Pagination
-  const pageParam = searchParams.get("page") ?? "1";
-  const pageSizeParam = searchParams.get("pageSize") ?? `${DEFAULT_PAGE_SIZE}`;
-
-  const page = Math.max(1, Number(pageParam) || 1);
-  const rawPageSize = Number(pageSizeParam) || DEFAULT_PAGE_SIZE;
-  const pageSize = Math.min(Math.max(rawPageSize, 1), MAX_PAGE_SIZE);
-  const skip = (page - 1) * pageSize;
-
-  // Tarih filtreleri
-  const fromParam = searchParams.get("from");
-  const toParam = searchParams.get("to");
-
-  let createdAtFilter: { gte?: Date; lte?: Date } | undefined;
-
-  if (fromParam || toParam) {
-    createdAtFilter = {};
-    if (fromParam) {
-      const fromDate = new Date(fromParam);
-      if (!isNaN(fromDate.getTime())) {
-        createdAtFilter.gte = fromDate;
-      }
-    }
-    if (toParam) {
-      const toDate = new Date(toParam);
-      if (!isNaN(toDate.getTime())) {
-        createdAtFilter.lte = toDate;
-      }
-    }
-  }
-
+export async function GET(_req: NextRequest) {
   try {
+    const user = await getCurrentUserOrThrow();
+
+    if (user.role !== "CUSTOMER") {
+      return NextResponse.json(
+        { error: "Only customers can access token balance" },
+        { status: 403 },
+      );
+    }
+
+    if (!user.activeCompanyId) {
+      return NextResponse.json(
+        { error: "User has no active company" },
+        { status: 400 },
+      );
+    }
+
     const company = await prisma.company.findUnique({
-      where: { id: companyId },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        tokenBalance: true,
-      },
+      where: { id: user.activeCompanyId },
     });
 
     if (!company) {
       return NextResponse.json(
-        { error: "Company not found" },
+        { error: "Company not found for current user" },
         { status: 404 },
       );
     }
 
-    const whereClause: Parameters<typeof prisma.tokenLedger.findMany>[0]["where"] =
-      {
-        companyId,
-        ...(createdAtFilter ? { createdAt: createdAtFilter } : {}),
-      };
-
-    const [totalCount, ledger] = await Promise.all([
-      prisma.tokenLedger.count({
-        where: whereClause,
-      }),
-      prisma.tokenLedger.findMany({
-        where: whereClause,
-        orderBy: { createdAt: "desc" },
-        skip,
-        take: pageSize,
-        select: {
-          id: true,
-          direction: true,
-          amount: true,
-          reason: true,
-          notes: true,
-          metadata: true,
-          balanceBefore: true,
-          balanceAfter: true,
-          createdAt: true,
-          ticketId: true,
+    const ledger = await prisma.tokenLedger.findMany({
+      where: {
+        companyId: company.id,
+      },
+      include: {
+        ticket: {
+          select: {
+            id: true,
+            companyTicketNumber: true,
+            project: {
+              select: {
+                code: true,
+              },
+            },
+          },
         },
-      }),
-    ]);
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: 50,
+    });
 
-    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    const entries = ledger.map((entry) => {
+      const ticket = entry.ticket;
+      const ticketCode =
+        ticket?.project?.code && ticket?.companyTicketNumber != null
+          ? `${ticket.project.code}-${ticket.companyTicketNumber}`
+          : ticket?.companyTicketNumber != null
+          ? `#${ticket.companyTicketNumber}`
+          : ticket?.id ?? null;
+
+      return {
+        id: entry.id,
+        createdAt: entry.createdAt.toISOString(),
+        direction: entry.direction,
+        amount: entry.amount,
+        reason: entry.reason,
+        notes: entry.notes,
+        ticketCode,
+        balanceBefore: entry.balanceBefore,
+        balanceAfter: entry.balanceAfter,
+      };
+    });
+
+    const totalCredits = ledger
+      .filter((l) => l.direction === LedgerDirection.CREDIT)
+      .reduce((sum, l) => sum + l.amount, 0);
+
+    const totalDebits = ledger
+      .filter((l) => l.direction === LedgerDirection.DEBIT)
+      .reduce((sum, l) => sum + l.amount, 0);
 
     return NextResponse.json({
-      company,
-      pagination: {
-        page,
-        pageSize,
-        totalCount,
-        totalPages,
+      company: {
+        id: company.id,
+        name: company.name,
+        slug: company.slug,
+        tokenBalance: company.tokenBalance,
       },
-      filters: {
-        from: createdAtFilter?.gte ?? null,
-        to: createdAtFilter?.lte ?? null,
+      stats: {
+        totalCredits,
+        totalDebits,
       },
-      ledger,
+      ledger: entries,
     });
-  } catch (error) {
-    console.error("[GET /api/customer/tokens] error:", error);
+  } catch (error: any) {
+    if ((error as any)?.code === "UNAUTHENTICATED") {
+      return NextResponse.json(
+        { error: "Unauthenticated" },
+        { status: 401 },
+      );
+    }
+
+    console.error("[customer.tokens] GET error", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Failed to load customer tokens" },
       { status: 500 },
     );
   }
