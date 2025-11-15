@@ -1,14 +1,14 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/board/page.tsx
-// @purpose: Customer-facing board view of company tickets (kanban-style)
-// @version: v1.1.0
+// @purpose: Customer-facing board view of company tickets (kanban-style + drag & drop)
+// @version: v1.2.0
 // @status: active
 // @lastUpdate: 2025-11-16
 // -----------------------------------------------------------------------------
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -41,11 +41,13 @@ type CustomerBoardTicket = {
   } | null;
 };
 
+type BoardStats = {
+  byStatus: Record<TicketStatus, number>;
+  total: number;
+};
+
 type CustomerBoardResponse = {
-  stats: {
-    byStatus: Record<TicketStatus, number>;
-    total: number;
-  };
+  stats: BoardStats;
   tickets: CustomerBoardTicket[];
 };
 
@@ -56,6 +58,22 @@ const STATUS_ORDER: TicketStatus[] = [
   "DONE",
 ];
 
+const computeStats = (tickets: CustomerBoardTicket[]): BoardStats => {
+  const base: Record<TicketStatus, number> = {
+    TODO: 0,
+    IN_PROGRESS: 0,
+    IN_REVIEW: 0,
+    DONE: 0,
+  };
+  for (const t of tickets) {
+    base[t.status] = (base[t.status] ?? 0) + 1;
+  }
+  return {
+    byStatus: base,
+    total: tickets.length,
+  };
+};
+
 export default function CustomerBoardPage() {
   const [data, setData] = useState<CustomerBoardResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -63,6 +81,17 @@ export default function CustomerBoardPage() {
 
   const [projectFilter, setProjectFilter] = useState<string>("ALL");
   const [search, setSearch] = useState<string>("");
+
+  // drag & drop state
+  const [draggingTicketId, setDraggingTicketId] = useState<string | null>(
+    null,
+  );
+  const [dragOverStatus, setDragOverStatus] =
+    useState<TicketStatus | null>(null);
+  const [mutationError, setMutationError] = useState<string | null>(null);
+  const [updatingTicketId, setUpdatingTicketId] = useState<string | null>(
+    null,
+  );
 
   const load = async () => {
     setLoading(true);
@@ -90,7 +119,13 @@ export default function CustomerBoardPage() {
         throw new Error(msg);
       }
 
-      setData(json as CustomerBoardResponse);
+      const payload = json as CustomerBoardResponse;
+      const normalized: CustomerBoardResponse = {
+        tickets: payload.tickets,
+        stats: computeStats(payload.tickets),
+      };
+
+      setData(normalized);
     } catch (err: any) {
       console.error("Customer board fetch error:", err);
       setError(err?.message || "Failed to load customer board.");
@@ -112,7 +147,6 @@ export default function CustomerBoardPage() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const tickets = data?.tickets ?? [];
@@ -179,7 +213,7 @@ export default function CustomerBoardPage() {
       return map;
     }, [filteredTickets]);
 
-  const stats = data?.stats ?? null;
+  const stats = data?.stats ?? computeStats(tickets);
 
   const formatStatusLabel = (status: TicketStatus) => {
     switch (status) {
@@ -228,6 +262,109 @@ export default function CustomerBoardPage() {
 
   const activeProjectTitle =
     projectFilter === "ALL" ? "All projects" : projectFilter;
+
+  // ---------------------------------------------------------------------------
+  // Drag & drop helpers
+  // ---------------------------------------------------------------------------
+
+  const updateTicketStatusLocal = (
+    ticketId: string,
+    newStatus: TicketStatus,
+  ) => {
+    setData((prev) => {
+      if (!prev) return prev;
+      const updatedTickets = prev.tickets.map((t) =>
+        t.id === ticketId ? { ...t, status: newStatus } : t,
+      );
+      return {
+        tickets: updatedTickets,
+        stats: computeStats(updatedTickets),
+      };
+    });
+  };
+
+  const persistTicketStatus = async (
+    ticketId: string,
+    newStatus: TicketStatus,
+  ) => {
+    setMutationError(null);
+    setUpdatingTicketId(ticketId);
+
+    // optimistic update
+    updateTicketStatusLocal(ticketId, newStatus);
+
+    try {
+      const res = await fetch("/api/customer/tickets/status", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ticketId,
+          status: newStatus,
+        }),
+      });
+
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        const msg =
+          json?.error ||
+          `Failed to update ticket status (status ${res.status})`;
+        throw new Error(msg);
+      }
+    } catch (err: any) {
+      console.error("Update ticket status error:", err);
+      setMutationError(
+        err?.message || "Failed to update ticket status. Please try again.",
+      );
+      // reload from server to be safe
+      await load();
+    } finally {
+      setUpdatingTicketId(null);
+    }
+  };
+
+  const handleDragStart = (
+    event: React.DragEvent<HTMLDivElement>,
+    ticketId: string,
+  ) => {
+    setDraggingTicketId(ticketId);
+    setMutationError(null);
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", ticketId);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggingTicketId(null);
+    setDragOverStatus(null);
+  };
+
+  const handleColumnDragOver = (
+    event: React.DragEvent<HTMLDivElement>,
+    status: TicketStatus,
+  ) => {
+    event.preventDefault();
+    if (dragOverStatus !== status) {
+      setDragOverStatus(status);
+    }
+  };
+
+  const handleColumnDrop = async (
+    event: React.DragEvent<HTMLDivElement>,
+    status: TicketStatus,
+  ) => {
+    event.preventDefault();
+    if (!draggingTicketId) return;
+    const ticketId = draggingTicketId;
+    setDraggingTicketId(null);
+    setDragOverStatus(null);
+    await persistTicketStatus(ticketId, status);
+  };
+
+  // ---------------------------------------------------------------------------
 
   return (
     <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
@@ -333,7 +470,7 @@ export default function CustomerBoardPage() {
                   {activeProjectTitle}
                 </h1>
                 <p className="mt-1 text-xs text-[#7a7a7a]">
-                  A kanban-style view of your tickets, grouped by status.
+                  Drag cards between columns to update their status.
                 </p>
 
                 {/* Project selector for mobile (since sidebar is hidden) */}
@@ -385,6 +522,13 @@ export default function CustomerBoardPage() {
               </div>
             )}
 
+            {/* Mutation error */}
+            {mutationError && (
+              <div className="mb-4 rounded-xl border border-amber-200 bg-[#fffaf2] px-4 py-3 text-xs text-amber-800">
+                {mutationError}
+              </div>
+            )}
+
             {/* Search bar */}
             <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
               <div className="relative flex-1">
@@ -411,11 +555,23 @@ export default function CustomerBoardPage() {
                   {STATUS_ORDER.map((status) => {
                     const columnTickets = ticketsByStatus[status] || [];
                     const columnTitle = formatStatusLabel(status);
+                    const isActiveDrop =
+                      dragOverStatus === status && !!draggingTicketId;
 
                     return (
                       <div
                         key={status}
-                        className="flex flex-col rounded-2xl bg-white/60 p-2"
+                        className={`flex flex-col rounded-2xl bg-white/60 p-2 ${
+                          isActiveDrop
+                            ? "ring-2 ring-[#f15b2b]"
+                            : "ring-0"
+                        }`}
+                        onDragOver={(event) =>
+                          handleColumnDragOver(event, status)
+                        }
+                        onDrop={(event) =>
+                          handleColumnDrop(event, status)
+                        }
                       >
                         <div className="mb-2 flex items-center justify-between">
                           <div className="flex items-center gap-1">
@@ -450,10 +606,20 @@ export default function CustomerBoardPage() {
                               const payoutTokens =
                                 t.jobType?.tokenCost ?? null;
 
+                              const isUpdating =
+                                updatingTicketId === t.id;
+
                               return (
                                 <div
                                   key={t.id}
-                                  className="rounded-xl bg-white p-3 shadow-sm"
+                                  className={`rounded-xl bg-white p-3 shadow-sm ${
+                                    isUpdating ? "opacity-60" : ""
+                                  }`}
+                                  draggable={!isUpdating}
+                                  onDragStart={(event) =>
+                                    handleDragStart(event, t.id)
+                                  }
+                                  onDragEnd={handleDragEnd}
                                 >
                                   <div className="flex items-center justify-between">
                                     <div className="text-[11px] font-semibold text-[#424143]">
