@@ -1,0 +1,427 @@
+// -----------------------------------------------------------------------------
+// @file: app/customer/board/page.tsx
+// @purpose: Customer-facing board view of company tickets (kanban-style)
+// @version: v1.0.0
+// @status: active
+// @lastUpdate: 2025-11-15
+// -----------------------------------------------------------------------------
+
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+
+type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
+type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+
+type CustomerBoardTicket = {
+  id: string;
+  title: string;
+  description: string | null;
+  status: TicketStatus;
+  priority: TicketPriority;
+  dueDate: string | null;
+  companyTicketNumber: number | null;
+  createdAt: string;
+  updatedAt: string;
+  project: {
+    id: string;
+    name: string;
+    code: string | null;
+  } | null;
+  designer: {
+    id: string;
+    name: string | null;
+    email: string;
+  } | null;
+  jobType: {
+    id: string;
+    name: string;
+    tokenCost: number;
+    designerPayoutTokens: number;
+  } | null;
+};
+
+type CustomerBoardResponse = {
+  stats: {
+    byStatus: Record<TicketStatus, number>;
+    total: number;
+  };
+  tickets: CustomerBoardTicket[];
+};
+
+const STATUS_ORDER: TicketStatus[] = [
+  "TODO",
+  "IN_PROGRESS",
+  "IN_REVIEW",
+  "DONE",
+];
+
+export default function CustomerBoardPage() {
+  const [data, setData] = useState<CustomerBoardResponse | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [projectFilter, setProjectFilter] = useState<string>("ALL");
+  const [search, setSearch] = useState<string>("");
+
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/customer/board", {
+        cache: "no-store",
+      });
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        if (res.status === 401) {
+          throw new Error(
+            "You must be signed in as a customer to view this page.",
+          );
+        }
+        if (res.status === 403) {
+          throw new Error(
+            "You do not have permission to view the customer board.",
+          );
+        }
+        const msg =
+          json?.error || `Request failed with status ${res.status}`;
+        throw new Error(msg);
+      }
+
+      setData(json as CustomerBoardResponse);
+    } catch (err: any) {
+      console.error("Customer board fetch error:", err);
+      setError(err?.message || "Failed to load customer board.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const initialLoad = async () => {
+      if (cancelled) return;
+      await load();
+    };
+
+    initialLoad();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const tickets = data?.tickets ?? [];
+
+  const projects = useMemo(() => {
+    const list = Array.from(
+      new Set(
+        tickets
+          .map((t) => t.project?.name)
+          .filter((p): p is string => !!p),
+      ),
+    );
+    return list;
+  }, [tickets]);
+
+  const filteredTickets = useMemo(() => {
+    return tickets.filter((t) => {
+      if (
+        projectFilter !== "ALL" &&
+        t.project?.name !== projectFilter
+      ) {
+        return false;
+      }
+
+      const q = search.trim().toLowerCase();
+      if (q) {
+        const code =
+          t.project?.code && t.companyTicketNumber != null
+            ? `${t.project.code}-${t.companyTicketNumber}`
+            : t.companyTicketNumber != null
+            ? `#${t.companyTicketNumber}`
+            : t.id;
+        const haystack = [
+          code,
+          t.title,
+          t.description ?? "",
+          t.project?.name ?? "",
+          t.designer?.name ?? "",
+          t.designer?.email ?? "",
+          t.jobType?.name ?? "",
+        ]
+          .join(" ")
+          .toLowerCase();
+        if (!haystack.includes(q)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [tickets, projectFilter, search]);
+
+  const ticketsByStatus: Record<TicketStatus, CustomerBoardTicket[]> =
+    useMemo(() => {
+      const map: Record<TicketStatus, CustomerBoardTicket[]> = {
+        TODO: [],
+        IN_PROGRESS: [],
+        IN_REVIEW: [],
+        DONE: [],
+      };
+      for (const t of filteredTickets) {
+        map[t.status].push(t);
+      }
+      return map;
+    }, [filteredTickets]);
+
+  const formatStatusLabel = (status: TicketStatus) => {
+    switch (status) {
+      case "TODO":
+        return "To do";
+      case "IN_PROGRESS":
+        return "In progress";
+      case "IN_REVIEW":
+        return "In review";
+      case "DONE":
+        return "Done";
+    }
+  };
+
+  const statusColumnClass = (status: TicketStatus) => {
+    switch (status) {
+      case "TODO":
+        return "bg-[#f7f5ff]";
+      case "IN_PROGRESS":
+        return "bg-[#e9f6ff]";
+      case "IN_REVIEW":
+        return "bg-[#fff7e0]";
+      case "DONE":
+        return "bg-[#f0fff6]";
+    }
+  };
+
+  const priorityBadgeClass = (priority: TicketPriority) => {
+    switch (priority) {
+      case "LOW":
+        return "bg-[#eef4ff] text-[#274690]";
+      case "MEDIUM":
+        return "bg-[#eaf4ff] text-[#1d72b8]";
+      case "HIGH":
+        return "bg-[#fff7e0] text-[#8a6b1f]";
+      case "URGENT":
+        return "bg-[#fde8e7] text-[#b13832]";
+    }
+  };
+
+  const formatDate = (iso: string | null) => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    return d.toLocaleDateString();
+  };
+
+  return (
+    <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
+      <div className="mx-auto max-w-6xl px-6 py-10">
+        {/* Top navigation */}
+        <header className="mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f15b2b] text-sm font-semibold text-white">
+              B
+            </div>
+            <span className="text-lg font-semibold tracking-tight">
+              Brandbite
+            </span>
+          </div>
+          <nav className="hidden items-center gap-6 text-sm text-[#7a7a7a] md:flex">
+            <button
+              className="font-medium text-[#7a7a7a]"
+              onClick={() => (window.location.href = "/customer/tokens")}
+            >
+              Tokens
+            </button>
+            <button
+              className="font-medium text-[#7a7a7a]"
+              onClick={() =>
+                (window.location.href = "/customer/tickets")
+              }
+            >
+              Tickets
+            </button>
+            <button className="font-medium text-[#424143]">
+              Board
+            </button>
+          </nav>
+        </header>
+
+        {/* Page header */}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              Ticket board
+            </h1>
+            <p className="mt-1 text-sm text-[#7a7a7a]">
+              A kanban-style view of all tickets for your company,
+              grouped by status.
+            </p>
+          </div>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-white px-4 py-3 text-sm text-red-700">
+            <p className="font-medium">Error</p>
+            <p className="mt-1">{error}</p>
+          </div>
+        )}
+
+        {/* Filters */}
+        <section className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
+          <div className="flex flex-1 min-w-[160px] items-center gap-2">
+            <label className="text-xs font-medium text-[#424143]">
+              Project
+            </label>
+            <select
+              value={projectFilter}
+              onChange={(e) => setProjectFilter(e.target.value)}
+              className="flex-1 rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+            >
+              <option value="ALL">All projects</option>
+              {projects.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-1 min-w-[200px] items-center gap-2">
+            <label className="text-xs font-medium text-[#424143]">
+              Search
+            </label>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by ticket, project, designer..."
+              className="flex-1 rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+            />
+          </div>
+        </section>
+
+        {/* Board grid */}
+        <section className="rounded-2xl border border-[#e3e1dc] bg-white px-3 py-3 shadow-sm">
+          {loading ? (
+            <div className="py-6 text-center text-sm text-[#7a7a7a]">
+              Loading board…
+            </div>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-4">
+              {STATUS_ORDER.map((status) => {
+                const columnTickets = ticketsByStatus[status] || [];
+                const columnTitle = formatStatusLabel(status);
+
+                return (
+                  <div
+                    key={status}
+                    className="flex flex-col rounded-xl bg-[#faf8f5] p-2"
+                  >
+                    <div className="mb-2 flex items-center justify-between">
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#9a9892]">
+                          {columnTitle}
+                        </span>
+                        <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-[#7a7a7a]">
+                          {columnTickets.length}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div
+                      className={`flex-1 space-y-2 rounded-lg ${statusColumnClass(
+                        status,
+                      )} bg-opacity-60 p-2`}
+                    >
+                      {columnTickets.length === 0 ? (
+                        <p className="py-4 text-center text-[11px] text-[#9a9892]">
+                          No tickets in this column.
+                        </p>
+                      ) : (
+                        columnTickets.map((t) => {
+                          const ticketCode =
+                            t.project?.code &&
+                            t.companyTicketNumber != null
+                              ? `${t.project.code}-${t.companyTicketNumber}`
+                              : t.companyTicketNumber != null
+                              ? `#${t.companyTicketNumber}`
+                              : t.id;
+
+                          const payoutTokens =
+                            t.jobType?.tokenCost ?? null;
+
+                          return (
+                            <div
+                              key={t.id}
+                              className="rounded-xl bg-white p-3 shadow-sm"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="text-[11px] font-semibold text-[#424143]">
+                                  {ticketCode}
+                                </div>
+                                <span
+                                  className={`ml-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${priorityBadgeClass(
+                                    t.priority,
+                                  )}`}
+                                >
+                                  {t.priority}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-[11px] font-medium text-[#424143]">
+                                {t.title}
+                              </p>
+                              {t.project && (
+                                <p className="mt-1 text-[10px] text-[#7a7a7a]">
+                                  {t.project.name}
+                                </p>
+                              )}
+                              <div className="mt-2 flex flex-wrap items-center justify-between gap-1 text-[10px] text-[#9a9892]">
+                                <div className="flex flex-col">
+                                  <span className="font-medium text-[#7a7a7a]">
+                                    {t.designer
+                                      ? t.designer.name ||
+                                        t.designer.email
+                                      : "Unassigned"}
+                                  </span>
+                                  {t.jobType && (
+                                    <span>
+                                      {t.jobType.name}
+                                      {payoutTokens
+                                        ? ` • ${payoutTokens} tokens`
+                                        : ""}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-right">
+                                  <span className="block">
+                                    Due: {formatDate(t.dueDate)}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
