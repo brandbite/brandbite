@@ -1,144 +1,154 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/admin/ledger/route.ts
-// @purpose: Admin view for token ledger with filters, pagination and summary
-// @version: v1.0.0
-// @lastUpdate: 2025-11-13
+// @purpose: Admin view over global token ledger (all companies & users)
+// @version: v1.1.0
+// @status: active
+// @lastUpdate: 2025-11-15
 // -----------------------------------------------------------------------------
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { LedgerDirection, Prisma } from "@prisma/client";
-
-const DEFAULT_PAGE_SIZE = 50;
-const MAX_PAGE_SIZE = 200;
+import { LedgerDirection } from "@prisma/client";
+import { getCurrentUserOrThrow } from "@/lib/auth";
+import { isSiteAdminRole } from "@/lib/roles";
 
 /**
- * Geçici tasarım:
- * - Auth kontrolü yok; BetterAuth entegrasyonu sonrası sadece SiteOwner/SiteAdmin erişebilecek.
+ * Admin ledger endpoint
  *
- * Desteklenen query param'lar:
- * - companyId (opsiyonel)
- * - userId (opsiyonel)
- * - direction (opsiyonel, "CREDIT" veya "DEBIT")
- * - from (opsiyonel, ISO tarih – createdAt >= from)
- * - to (opsiyonel, ISO tarih – createdAt <= to)
- * - page (opsiyonel, varsayılan 1)
- * - pageSize (opsiyonel, varsayılan 50, max 200)
+ * - Only SITE_OWNER / SITE_ADMIN can access.
+ * - Returns recent TokenLedger entries across all companies.
+ * - Includes basic joins to company, ticket, project and user.
  */
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-
-  const companyId = searchParams.get("companyId");
-  const userId = searchParams.get("userId");
-  const directionParam = searchParams.get("direction");
-
-  let direction: LedgerDirection | undefined;
-  if (directionParam === "CREDIT" || directionParam === "DEBIT") {
-    direction = directionParam;
-  }
-
-  // Pagination
-  const pageParam = searchParams.get("page") ?? "1";
-  const pageSizeParam = searchParams.get("pageSize") ?? `${DEFAULT_PAGE_SIZE}`;
-
-  const page = Math.max(1, Number(pageParam) || 1);
-  const rawPageSize = Number(pageSizeParam) || DEFAULT_PAGE_SIZE;
-  const pageSize = Math.min(Math.max(rawPageSize, 1), MAX_PAGE_SIZE);
-  const skip = (page - 1) * pageSize;
-
-  // Tarih filtreleri
-  const fromParam = searchParams.get("from");
-  const toParam = searchParams.get("to");
-
-  let createdAtFilter: { gte?: Date; lte?: Date } | undefined;
-
-  if (fromParam || toParam) {
-    createdAtFilter = {};
-    if (fromParam) {
-      const fromDate = new Date(fromParam);
-      if (!isNaN(fromDate.getTime())) {
-        createdAtFilter.gte = fromDate;
-      }
-    }
-    if (toParam) {
-      const toDate = new Date(toParam);
-      if (!isNaN(toDate.getTime())) {
-        createdAtFilter.lte = toDate;
-      }
-    }
-  }
-
+export async function GET(_req: NextRequest) {
   try {
-    const where: Prisma.TokenLedgerWhereInput = {
-      ...(companyId ? { companyId } : {}),
-      ...(userId ? { userId } : {}),
-      ...(direction ? { direction } : {}),
-      ...(createdAtFilter ? { createdAt: createdAtFilter } : {}),
-    };
+    const user = await getCurrentUserOrThrow();
 
-    const [totalCount, ledger, creditAgg, debitAgg] = await Promise.all([
-      prisma.tokenLedger.count({ where }),
-      prisma.tokenLedger.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        skip,
-        take: pageSize,
-        select: {
-          id: true,
-          companyId: true,
-          userId: true,
-          ticketId: true,
-          direction: true,
-          amount: true,
-          reason: true,
-          notes: true,
-          metadata: true,
-          balanceBefore: true,
-          balanceAfter: true,
-          createdAt: true,
+    if (!isSiteAdminRole(user.role)) {
+      return NextResponse.json(
+        { error: "Only site admins can access the admin ledger" },
+        { status: 403 },
+      );
+    }
+
+    const ledger = await prisma.tokenLedger.findMany({
+      include: {
+        company: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
         },
-      }),
-      prisma.tokenLedger.aggregate({
-        where: { ...where, direction: "CREDIT" },
-        _sum: { amount: true },
-      }),
-      prisma.tokenLedger.aggregate({
-        where: { ...where, direction: "DEBIT" },
-        _sum: { amount: true },
-      }),
-    ]);
+        ticket: {
+          select: {
+            id: true,
+            title: true,
+            companyTicketNumber: true,
+            project: {
+              select: {
+                id: true,
+                name: true,
+                code: true,
+              },
+            },
+          },
+        },
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            role: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: 200,
+    });
 
-    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    const entries = ledger.map((entry) => {
+      const ticket = entry.ticket;
+      const project = ticket?.project;
+      const company = entry.company;
+      const actor = entry.user;
 
-    const totalCredit = creditAgg._sum.amount ?? 0;
-    const totalDebit = debitAgg._sum.amount ?? 0;
-    const net = totalCredit - totalDebit;
+      const ticketCode =
+        project?.code && ticket?.companyTicketNumber != null
+          ? `${project.code}-${ticket.companyTicketNumber}`
+          : ticket?.companyTicketNumber != null
+          ? `#${ticket.companyTicketNumber}`
+          : ticket?.id ?? null;
+
+      const directionLabel =
+        entry.direction === LedgerDirection.CREDIT ? "CREDIT" : "DEBIT";
+
+      return {
+        id: entry.id,
+        createdAt: entry.createdAt.toISOString(),
+        direction: directionLabel,
+        amount: entry.amount,
+        reason: entry.reason,
+        notes: entry.notes,
+        company: company
+          ? {
+              id: company.id,
+              name: company.name,
+              slug: company.slug,
+            }
+          : null,
+        ticket: ticket
+          ? {
+              id: ticket.id,
+              title: ticket.title,
+              code: ticketCode,
+              projectName: project?.name ?? null,
+              projectCode: project?.code ?? null,
+            }
+          : null,
+        user: actor
+          ? {
+              id: actor.id,
+              email: actor.email,
+              name: actor.name,
+              role: actor.role,
+            }
+          : null,
+        balanceBefore: entry.balanceBefore,
+        balanceAfter: entry.balanceAfter,
+        metadata: entry.metadata,
+      };
+    });
+
+    const totalCredits = ledger
+      .filter((e) => e.direction === LedgerDirection.CREDIT)
+      .reduce((sum, e) => sum + e.amount, 0);
+
+    const totalDebits = ledger
+      .filter((e) => e.direction === LedgerDirection.DEBIT)
+      .reduce((sum, e) => sum + e.amount, 0);
 
     return NextResponse.json({
-      filters: {
-        companyId: companyId ?? null,
-        userId: userId ?? null,
-        direction: direction ?? null,
-        from: createdAtFilter?.gte ?? null,
-        to: createdAtFilter?.lte ?? null,
+      stats: {
+        totalCredits,
+        totalDebits,
+        netTokens: totalCredits - totalDebits,
+        entriesCount: entries.length,
       },
-      pagination: {
-        page,
-        pageSize,
-        totalCount,
-        totalPages,
-      },
-      summary: {
-        totalCredit,
-        totalDebit,
-        net,
-      },
-      ledger,
+      entries,
     });
-  } catch (error) {
-    console.error("[GET /api/admin/ledger] error:", error);
+  } catch (error: any) {
+    if ((error as any)?.code === "UNAUTHENTICATED") {
+      return NextResponse.json(
+        { error: "Unauthenticated" },
+        { status: 401 },
+      );
+    }
+
+    console.error("[admin.ledger] GET error", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Failed to load admin ledger" },
       { status: 500 },
     );
   }
