@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/board/page.tsx
-// @purpose: Customer-facing board view of company tickets (kanban-style + drag & drop)
-// @version: v1.2.0
+// @purpose: Customer-facing board view of company tickets (kanban-style + drag & drop + detail modal)
+// @version: v1.4.0
 // @status: active
 // @lastUpdate: 2025-11-16
 // -----------------------------------------------------------------------------
@@ -92,6 +92,17 @@ export default function CustomerBoardPage() {
   const [updatingTicketId, setUpdatingTicketId] = useState<string | null>(
     null,
   );
+
+  // detail modal state
+  const [detailTicketId, setDetailTicketId] = useState<string | null>(null);
+
+  // click vs drag algısı için mousedown bilgisi
+  const [mouseDownInfo, setMouseDownInfo] = useState<{
+    ticketId: string;
+    x: number;
+    y: number;
+    time: number;
+  } | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -215,56 +226,11 @@ export default function CustomerBoardPage() {
 
   const stats = data?.stats ?? computeStats(tickets);
 
-  const formatStatusLabel = (status: TicketStatus) => {
-    switch (status) {
-      case "TODO":
-        return "To do";
-      case "IN_PROGRESS":
-        return "In progress";
-      case "IN_REVIEW":
-        return "In review";
-      case "DONE":
-        return "Done";
-    }
-  };
-
-  const statusColumnClass = (status: TicketStatus) => {
-    switch (status) {
-      case "TODO":
-        return "bg-[#f7f5ff]";
-      case "IN_PROGRESS":
-        return "bg-[#e9f6ff]";
-      case "IN_REVIEW":
-        return "bg-[#fff7e0]";
-      case "DONE":
-        return "bg-[#f0fff6]";
-    }
-  };
-
-  const priorityBadgeClass = (priority: TicketPriority) => {
-    switch (priority) {
-      case "LOW":
-        return "bg-[#eef4ff] text-[#274690]";
-      case "MEDIUM":
-        return "bg-[#eaf4ff] text-[#1d72b8]";
-      case "HIGH":
-        return "bg-[#fff7e0] text-[#8a6b1f]";
-      case "URGENT":
-        return "bg-[#fde8e7] text-[#b13832]";
-    }
-  };
-
-  const formatDate = (iso: string | null) => {
-    if (!iso) return "—";
-    const d = new Date(iso);
-    return d.toLocaleDateString();
-  };
-
   const activeProjectTitle =
     projectFilter === "ALL" ? "All projects" : projectFilter;
 
   // ---------------------------------------------------------------------------
-  // Drag & drop helpers
+  // Drag & drop + status update helpers
   // ---------------------------------------------------------------------------
 
   const updateTicketStatusLocal = (
@@ -331,6 +297,7 @@ export default function CustomerBoardPage() {
   ) => {
     setDraggingTicketId(ticketId);
     setMutationError(null);
+    setMouseDownInfo(null); // drag başladıysa click saymayalım
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = "move";
       event.dataTransfer.setData("text/plain", ticketId);
@@ -362,6 +329,23 @@ export default function CustomerBoardPage() {
     setDraggingTicketId(null);
     setDragOverStatus(null);
     await persistTicketStatus(ticketId, status);
+  };
+
+  // ---------------------------------------------------------------------------
+  // Detail modal helpers
+  // ---------------------------------------------------------------------------
+
+  const detailTicket = useMemo(() => {
+    if (!detailTicketId) return null;
+    return tickets.find((t) => t.id === detailTicketId) ?? null;
+  }, [detailTicketId, tickets]);
+
+  const openTicketDetails = (ticketId: string) => {
+    setDetailTicketId(ticketId);
+  };
+
+  const closeTicketDetails = () => {
+    setDetailTicketId(null);
   };
 
   // ---------------------------------------------------------------------------
@@ -470,7 +454,8 @@ export default function CustomerBoardPage() {
                   {activeProjectTitle}
                 </h1>
                 <p className="mt-1 text-xs text-[#7a7a7a]">
-                  Drag cards between columns to update their status.
+                  Drag cards between columns to update their status, or click a
+                  card to see full details.
                 </p>
 
                 {/* Project selector for mobile (since sidebar is hidden) */}
@@ -612,7 +597,7 @@ export default function CustomerBoardPage() {
                               return (
                                 <div
                                   key={t.id}
-                                  className={`rounded-xl bg-white p-3 shadow-sm ${
+                                  className={`cursor-pointer rounded-xl bg-white p-3 shadow-sm ${
                                     isUpdating ? "opacity-60" : ""
                                   }`}
                                   draggable={!isUpdating}
@@ -620,6 +605,46 @@ export default function CustomerBoardPage() {
                                     handleDragStart(event, t.id)
                                   }
                                   onDragEnd={handleDragEnd}
+                                  onMouseDown={(e) =>
+                                    setMouseDownInfo({
+                                      ticketId: t.id,
+                                      x: e.clientX,
+                                      y: e.clientY,
+                                      time:
+                                        typeof performance !== "undefined"
+                                          ? performance.now()
+                                          : Date.now(),
+                                    })
+                                  }
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (
+                                      !mouseDownInfo ||
+                                      mouseDownInfo.ticketId !== t.id
+                                    ) {
+                                      return;
+                                    }
+                                    const dx =
+                                      e.clientX - mouseDownInfo.x;
+                                    const dy =
+                                      e.clientY - mouseDownInfo.y;
+                                    const dt =
+                                      (typeof performance !==
+                                      "undefined"
+                                        ? performance.now()
+                                        : Date.now()) -
+                                      mouseDownInfo.time;
+                                    setMouseDownInfo(null);
+                                    const distance =
+                                      Math.sqrt(dx * dx + dy * dy);
+                                    if (
+                                      distance < 5 &&
+                                      dt < 400 &&
+                                      !draggingTicketId
+                                    ) {
+                                      openTicketDetails(t.id);
+                                    }
+                                  }}
                                 >
                                   <div className="flex items-center justify-between">
                                     <div className="text-[11px] font-semibold text-[#424143]">
@@ -678,6 +703,215 @@ export default function CustomerBoardPage() {
           </main>
         </div>
       </div>
+
+      {/* Detail modal */}
+      {detailTicket && (
+        <TicketDetailModal
+          ticket={detailTicket}
+          onClose={closeTicketDetails}
+          onChangeStatus={(status) =>
+            persistTicketStatus(detailTicket.id, status)
+          }
+          isUpdating={updatingTicketId === detailTicket.id}
+        />
+      )}
     </div>
   );
 }
+
+// -----------------------------------------------------------------------------
+// Ticket detail modal component (no hooks)
+// -----------------------------------------------------------------------------
+
+function TicketDetailModal({
+  ticket,
+  onClose,
+  onChangeStatus,
+  isUpdating,
+}: {
+  ticket: CustomerBoardTicket;
+  onClose: () => void;
+  onChangeStatus: (status: TicketStatus) => void;
+  isUpdating: boolean;
+}) {
+  const ticketCode =
+    ticket.project?.code && ticket.companyTicketNumber != null
+      ? `${ticket.project.code}-${ticket.companyTicketNumber}`
+      : ticket.companyTicketNumber != null
+      ? `#${ticket.companyTicketNumber}`
+      : ticket.id;
+
+  const handleOverlayClick = () => {
+    onClose();
+  };
+
+  const handleInnerClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 px-4"
+      onClick={handleOverlayClick}
+    >
+      <div
+        onClick={handleInnerClick}
+        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white px-6 py-5 shadow-lg shadow-[#d7d2c8]"
+      >
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
+              Ticket
+            </p>
+            <h2 className="mt-1 text-lg font-semibold tracking-tight text-[#424143]">
+              {ticket.title}
+            </h2>
+            <p className="mt-1 text-[11px] text-[#7a7a7a]">
+              {ticketCode}
+              {ticket.project && ` • ${ticket.project.name}`}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#f5f3f0] text-xs text-[#7a7a7a] hover:bg-[#ebe7df]"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Status & priority */}
+        <div className="mb-4 flex flex-wrap items-center gap-2 text-[11px]">
+          <div className="flex items-center gap-1 rounded-full bg-[#f5f3f0] px-2 py-1">
+            <span className="text-[#7a7a7a]">Status</span>
+            <select
+              disabled={isUpdating}
+              value={ticket.status}
+              onChange={(e) =>
+                onChangeStatus(e.target.value as TicketStatus)
+              }
+              className="rounded-full border border-transparent bg-white px-2 py-0.5 text-[11px] text-[#424143] outline-none focus:border-[#f15b2b]"
+            >
+              {STATUS_ORDER.map((s) => (
+                <option key={s} value={s}>
+                  {formatStatusLabel(s)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <span
+            className={`inline-flex items-center rounded-full px-2 py-1 text-[10px] font-semibold ${priorityBadgeClass(
+              ticket.priority,
+            )}`}
+          >
+            Priority: {ticket.priority}
+          </span>
+          {isUpdating && (
+            <span className="text-[10px] text-[#9a9892]">
+              Saving changes…
+            </span>
+          )}
+        </div>
+
+        {/* Description */}
+        <section className="mb-4">
+          <h3 className="text-xs font-semibold text-[#424143]">
+            Description
+          </h3>
+          <p className="mt-1 whitespace-pre-wrap text-xs text-[#7a7a7a]">
+            {ticket.description && ticket.description.trim().length > 0
+              ? ticket.description
+              : "No description was provided for this ticket."}
+          </p>
+        </section>
+
+        {/* Meta info */}
+        <section className="mb-4 grid grid-cols-1 gap-3 text-xs text-[#7a7a7a] md:grid-cols-2">
+          <div className="space-y-1">
+            <p className="font-semibold text-[#424143]">Assignee</p>
+            <p>
+              {ticket.designer
+                ? ticket.designer.name ||
+                  ticket.designer.email
+                : "Unassigned"}
+            </p>
+            {ticket.jobType && (
+              <p className="text-[11px] text-[#9a9892]">
+                Job type: {ticket.jobType.name}{" "}
+                {ticket.jobType.tokenCost
+                  ? `• ${ticket.jobType.tokenCost} tokens`
+                  : ""}
+              </p>
+            )}
+          </div>
+          <div className="space-y-1">
+            <p className="font-semibold text-[#424143]">Dates</p>
+            <p>Created: {formatDate(ticket.createdAt)}</p>
+            <p>Updated: {formatDate(ticket.updatedAt)}</p>
+            <p>Due: {formatDate(ticket.dueDate)}</p>
+          </div>
+        </section>
+
+        <div className="mt-2 flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-[#ece5d8] px-4 py-1.5 text-[11px] font-medium text-[#7a7a7a] hover:bg-[#f5f3f0]"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Small helpers reused in modal
+// -----------------------------------------------------------------------------
+
+function formatStatusLabel(status: TicketStatus): string {
+  switch (status) {
+    case "TODO":
+      return "To do";
+    case "IN_PROGRESS":
+      return "In progress";
+    case "IN_REVIEW":
+      return "In review";
+    case "DONE":
+      return "Done";
+  }
+}
+
+function statusColumnClass(status: TicketStatus): string {
+  switch (status) {
+    case "TODO":
+      return "bg-[#f7f5ff]";
+    case "IN_PROGRESS":
+      return "bg-[#e9f6ff]";
+    case "IN_REVIEW":
+      return "bg-[#fff7e0]";
+    case "DONE":
+      return "bg-[#f0fff6]";
+  }
+}
+
+function priorityBadgeClass(priority: TicketPriority): string {
+  switch (priority) {
+    case "LOW":
+      return "bg-[#eef4ff] text-[#274690]";
+    case "MEDIUM":
+      return "bg-[#eaf4ff] text-[#1d72b8]";
+    case "HIGH":
+      return "bg-[#fff7e0] text-[#8a6b1f]";
+    case "URGENT":
+      return "bg-[#fde8e7] text-[#b13832]";
+  }
+}
+
+function formatDate(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return d.toLocaleDateString();
+}
+
