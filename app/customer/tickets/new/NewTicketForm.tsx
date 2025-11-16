@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/tickets/new/NewTicketForm.tsx
 // @purpose: Client-side form for creating a new design ticket (role-aware)
-// @version: v1.1.0
+// @version: v1.2.0
 // @status: active
 // @lastUpdate: 2025-11-16
 // -----------------------------------------------------------------------------
@@ -14,8 +14,12 @@ import {
   type FormEvent,
 } from "react";
 import { useRouter } from "next/navigation";
-
-type CompanyRoleString = "OWNER" | "PM" | "BILLING" | "MEMBER";
+import {
+  CompanyRole,
+  normalizeCompanyRole,
+  canCreateTickets,
+  isBillingReadOnly,
+} from "@/lib/permissions/companyRoles";
 
 type ProjectOption = {
   id: string;
@@ -49,15 +53,18 @@ export default function NewTicketForm({
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(
+    null,
+  );
 
   // ---------------------------------------------------------------------------
   // Company role (for limited access / billing-only users)
   // ---------------------------------------------------------------------------
 
   const [companyRole, setCompanyRole] =
-    useState<CompanyRoleString | null>(null);
-  const [companyRoleLoading, setCompanyRoleLoading] = useState<boolean>(true);
+    useState<CompanyRole | null>(null);
+  const [companyRoleLoading, setCompanyRoleLoading] =
+    useState<boolean>(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -74,17 +81,10 @@ export default function NewTicketForm({
         }
 
         if (!cancelled) {
-          const role = json?.user?.companyRole ?? null;
-          if (
-            role === "OWNER" ||
-            role === "PM" ||
-            role === "BILLING" ||
-            role === "MEMBER"
-          ) {
-            setCompanyRole(role);
-          } else {
-            setCompanyRole(null);
-          }
+          const role = normalizeCompanyRole(
+            json?.user?.companyRole ?? null,
+          );
+          setCompanyRole(role);
         }
       } catch (err) {
         console.error(
@@ -105,7 +105,8 @@ export default function NewTicketForm({
     };
   }, []);
 
-  const isLimitedAccess = companyRole === "BILLING";
+  const isLimitedAccess =
+    companyRole !== null && isBillingReadOnly(companyRole);
 
   // ---------------------------------------------------------------------------
   // Submit handler
@@ -116,7 +117,7 @@ export default function NewTicketForm({
     setError(null);
     setSuccessMessage(null);
 
-    // Billing-only users: UI-level guard (API tarafında da ayrıca kilitleyebiliriz)
+    // Billing-only users: UI-level guard (API tarafında da ayrıca kilit var)
     if (isLimitedAccess) {
       setError(
         "You don't have permission to create tickets. Please ask your company owner or project manager.",
@@ -126,6 +127,20 @@ export default function NewTicketForm({
 
     if (!title.trim()) {
       setError("Please enter a title for your request.");
+      return;
+    }
+
+    // Güvenlik olarak rolesi henüz yüklenmediyse create'e izin vermeyelim
+    if (companyRoleLoading) {
+      setError("We are still loading your permissions. Please wait a moment.");
+      return;
+    }
+
+    // İleride MEMBER'ı kısıtlamak istersek tek yerden değiştirebiliriz
+    if (companyRole !== null && !canCreateTickets(companyRole)) {
+      setError(
+        "You don't have permission to create tickets. Please ask your company owner or project manager.",
+      );
       return;
     }
 

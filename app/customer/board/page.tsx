@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/board/page.tsx
 // @purpose: Customer-facing board view of company tickets (kanban-style + drag & drop + detail modal)
-// @version: v1.5.0
+// @version: v1.6.0
 // @status: active
 // @lastUpdate: 2025-11-16
 // -----------------------------------------------------------------------------
@@ -9,10 +9,14 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import {
+  CompanyRole,
+  normalizeCompanyRole,
+  canMoveTicketsOnBoard,
+} from "@/lib/permissions/companyRoles";
 
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
-type CompanyRole = "OWNER" | "PM" | "BILLING" | "MEMBER";
 
 type CustomerBoardTicket = {
   id: string;
@@ -99,8 +103,10 @@ export default function CustomerBoardPage() {
   const [data, setData] = useState<CustomerBoardResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
   const [companyRole, setCompanyRole] = useState<CompanyRole | null>(null);
-  const [companyRoleLoading, setCompanyRoleLoading] = useState<boolean>(true);
+  const [companyRoleLoading, setCompanyRoleLoading] =
+    useState<boolean>(true);
 
   const [projectFilter, setProjectFilter] = useState<string>("ALL");
   const [search, setSearch] = useState<string>("");
@@ -127,7 +133,14 @@ export default function CustomerBoardPage() {
     time: number;
   } | null>(null);
 
-  const isLimitedAccess = companyRole === "BILLING";
+  // Role’den derive edilen izinler
+  const canMoveOnBoard =
+    companyRole != null ? canMoveTicketsOnBoard(companyRole) : true;
+  const isLimitedAccess = companyRole != null && !canMoveOnBoard;
+
+  // ---------------------------------------------------------------------------
+  // Data load
+  // ---------------------------------------------------------------------------
 
   const load = async () => {
     setLoading(true);
@@ -203,7 +216,7 @@ export default function CustomerBoardPage() {
         throw new Error(msg);
       }
 
-      // optimistic update: update local data
+      // optimistic update
       setData((prev) => {
         if (!prev) return prev;
         const nextTickets = prev.tickets.map((t) =>
@@ -219,12 +232,15 @@ export default function CustomerBoardPage() {
       setMutationError(
         err?.message || "Failed to update ticket status. Please try again.",
       );
-      // reload from server to be safe
       await load();
     } finally {
       setUpdatingTicketId(null);
     }
   };
+
+  // ---------------------------------------------------------------------------
+  // Drag & drop handlers
+  // ---------------------------------------------------------------------------
 
   const handleDragStart = (
     event: React.DragEvent<HTMLDivElement>,
@@ -291,6 +307,8 @@ export default function CustomerBoardPage() {
   };
 
   // ---------------------------------------------------------------------------
+  // Effects
+  // ---------------------------------------------------------------------------
 
   useEffect(() => {
     let cancelled = false;
@@ -322,17 +340,10 @@ export default function CustomerBoardPage() {
         }
 
         if (!cancelled) {
-          const role = json?.user?.companyRole ?? null;
-          if (
-            role === "OWNER" ||
-            role === "PM" ||
-            role === "BILLING" ||
-            role === "MEMBER"
-          ) {
-            setCompanyRole(role);
-          } else {
-            setCompanyRole(null);
-          }
+          const role = normalizeCompanyRole(
+            json?.user?.companyRole ?? null,
+          );
+          setCompanyRole(role);
         }
       } catch (err) {
         console.error(
@@ -353,6 +364,10 @@ export default function CustomerBoardPage() {
     };
   }, []);
 
+  // ---------------------------------------------------------------------------
+  // Derived values
+  // ---------------------------------------------------------------------------
+
   const tickets = data?.tickets ?? [];
 
   const projects = useMemo(() => {
@@ -369,10 +384,7 @@ export default function CustomerBoardPage() {
 
   const filteredTickets = useMemo(() => {
     return tickets.filter((t) => {
-      if (
-        projectFilter !== "ALL" &&
-        t.project?.name !== projectFilter
-      ) {
+      if (projectFilter !== "ALL" && t.project?.name !== projectFilter) {
         return false;
       }
 
@@ -466,6 +478,8 @@ export default function CustomerBoardPage() {
   };
 
   // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
 
   return (
     <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
@@ -487,9 +501,7 @@ export default function CustomerBoardPage() {
             >
               Tokens
             </button>
-            <button className="font-medium text-[#424143]">
-              Board
-            </button>
+            <button className="font-medium text-[#424143]">Board</button>
             <button
               className="font-medium text-[#7a7a7a]"
               onClick={() => (window.location.href = "/customer/tickets")}
@@ -605,7 +617,7 @@ export default function CustomerBoardPage() {
                   card to see full details.
                 </p>
 
-                {/* Project selector for mobile (since sidebar is hidden) */}
+                {/* Project selector for mobile */}
                 {projects.length > 0 && (
                   <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-[#e3e1dc] bg-[#f5f3f0] px-3 py-1 text-[11px] text-[#7a7a7a] md:hidden">
                     <span>Project:</span>
@@ -633,19 +645,17 @@ export default function CustomerBoardPage() {
             </div>
 
             {/* Limited access */}
-            {!error &&
-              !companyRoleLoading &&
-              isLimitedAccess && (
-                <div className="mb-4 rounded-xl border border-[#f6c89f] bg-[#fff4e6] px-4 py-3 text-xs text-[#7a7a7a]">
-                  <p className="text-[11px] font-medium text-[#9a5b2b]">
-                    Limited access
-                  </p>
-                  <p className="mt-1">
-                    You can review tickets on the board, but only your company
-                    owner or project manager can move them between statuses.
-                  </p>
-                </div>
-              )}
+            {!error && !companyRoleLoading && isLimitedAccess && (
+              <div className="mb-4 rounded-xl border border-[#f6c89f] bg-[#fff4e6] px-4 py-3 text-xs text-[#7a7a7a]">
+                <p className="text-[11px] font-medium text-[#9a5b2b]">
+                  Limited access
+                </p>
+                <p className="mt-1">
+                  You can review tickets on the board, but only your company
+                  owner or project manager can move them between statuses.
+                </p>
+              </div>
+            )}
 
             {/* Error */}
             {error && (
@@ -687,16 +697,10 @@ export default function CustomerBoardPage() {
                   <div
                     key={status}
                     className={`flex flex-col rounded-2xl bg-white/60 p-2 ${
-                      isActiveDrop
-                        ? "ring-2 ring-[#f15b2b]"
-                        : "ring-0"
+                      isActiveDrop ? "ring-2 ring-[#f15b2b]" : "ring-0"
                     }`}
-                    onDragOver={(event) =>
-                      handleColumnDragOver(event, status)
-                    }
-                    onDrop={(event) =>
-                      handleColumnDrop(event, status)
-                    }
+                    onDragOver={(event) => handleColumnDragOver(event, status)}
+                    onDrop={(event) => handleColumnDrop(event, status)}
                   >
                     <div className="mb-2 flex items-center justify-between">
                       <div className="flex items-center gap-1">
@@ -721,8 +725,7 @@ export default function CustomerBoardPage() {
                       ) : (
                         columnTickets.map((t) => {
                           const ticketCode =
-                            t.project?.code &&
-                            t.companyTicketNumber != null
+                            t.project?.code && t.companyTicketNumber != null
                               ? `${t.project.code}-${t.companyTicketNumber}`
                               : t.companyTicketNumber != null
                               ? `#${t.companyTicketNumber}`
@@ -733,8 +736,7 @@ export default function CustomerBoardPage() {
                             t.jobType?.tokenCost ??
                             null;
 
-                          const isUpdating =
-                            updatingTicketId === t.id;
+                          const isUpdating = updatingTicketId === t.id;
 
                           return (
                             <div
@@ -742,9 +744,7 @@ export default function CustomerBoardPage() {
                               className={`cursor-pointer rounded-xl bg-white p-3 shadow-sm ${
                                 isUpdating ? "opacity-60" : ""
                               }`}
-                              draggable={
-                                !isUpdating && !isLimitedAccess
-                              }
+                              draggable={!isUpdating && !isLimitedAccess}
                               onDragStart={(event) =>
                                 handleDragStart(event, t.id)
                               }
@@ -759,16 +759,11 @@ export default function CustomerBoardPage() {
                               }
                               onMouseUp={(e) => {
                                 if (!mouseDownInfo) return;
-                                const dx =
-                                  e.clientX - mouseDownInfo.x;
-                                const dy =
-                                  e.clientY - mouseDownInfo.y;
-                                const dt =
-                                  Date.now() -
-                                  mouseDownInfo.time;
+                                const dx = e.clientX - mouseDownInfo.x;
+                                const dy = e.clientY - mouseDownInfo.y;
+                                const dt = Date.now() - mouseDownInfo.time;
                                 setMouseDownInfo(null);
-                                const distance =
-                                  Math.sqrt(dx * dx + dy * dy);
+                                const distance = Math.sqrt(dx * dx + dy * dy);
                                 if (
                                   distance < 5 &&
                                   dt < 400 &&
@@ -800,14 +795,11 @@ export default function CustomerBoardPage() {
                                     t.priority,
                                   )}`}
                                 >
-                                  {formatPriorityLabel(
-                                    t.priority,
-                                  )}
+                                  {formatPriorityLabel(t.priority)}
                                 </span>
                                 {t.designer && (
                                   <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[10px] text-[#7a7a7a]">
-                                    {t.designer.name ||
-                                      t.designer.email}
+                                    {t.designer.name || t.designer.email}
                                   </span>
                                 )}
                                 {payoutTokens != null && (
@@ -817,12 +809,8 @@ export default function CustomerBoardPage() {
                                 )}
                               </div>
                               <div className="mt-2 flex items-center justify-between text-[10px] text-[#9a9892]">
-                                <span>
-                                  Created {formatDate(t.createdAt)}
-                                </span>
-                                <span>
-                                  Updated {formatDate(t.updatedAt)}
-                                </span>
+                                <span>Created {formatDate(t.createdAt)}</span>
+                                <span>Updated {formatDate(t.updatedAt)}</span>
                               </div>
                             </div>
                           );
@@ -873,9 +861,7 @@ export default function CustomerBoardPage() {
 
             <div className="grid gap-3 text-[11px] text-[#7a7a7a] md:grid-cols-2">
               <div>
-                <p className="font-semibold text-[#424143]">
-                  Meta
-                </p>
+                <p className="font-semibold text-[#424143]">Meta</p>
                 <div className="mt-1 space-y-1">
                   <p>
                     Priority:{" "}
@@ -898,9 +884,7 @@ export default function CustomerBoardPage() {
                 </div>
               </div>
               <div>
-                <p className="font-semibold text-[#424143]">
-                  People
-                </p>
+                <p className="font-semibold text-[#424143]">People</p>
                 <div className="mt-1 space-y-1">
                   <p>
                     Designer:{" "}
@@ -916,9 +900,7 @@ export default function CustomerBoardPage() {
 
             <div className="mt-3 grid gap-3 text-[11px] text-[#7a7a7a] md:grid-cols-2">
               <div>
-                <p className="font-semibold text-[#424143]">
-                  Dates
-                </p>
+                <p className="font-semibold text-[#424143]">Dates</p>
                 <div className="mt-1 space-y-1">
                   <p>
                     Created:{" "}
