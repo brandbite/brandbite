@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/customer/tickets/status/route.ts
 // @purpose: Update ticket status for customer board (kanban)
-// @version: v1.0.0
+// @version: v1.1.0
 // @status: active
 // @lastUpdate: 2025-11-16
 // -----------------------------------------------------------------------------
@@ -17,7 +17,10 @@ export async function PATCH(req: NextRequest) {
 
     if (user.role !== "CUSTOMER") {
       return NextResponse.json(
-        { error: "Only customer accounts can update tickets from the board" },
+        {
+          error:
+            "Only customer accounts can update tickets from the board",
+        },
         { status: 403 },
       );
     }
@@ -26,6 +29,17 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json(
         { error: "User has no active company" },
         { status: 400 },
+      );
+    }
+
+    // NEW: Billing users are read-only for ticket status updates
+    if (user.companyRole === "BILLING") {
+      return NextResponse.json(
+        {
+          error:
+            "You don't have permission to change ticket status for this company. Please ask your company owner or project manager.",
+        },
+        { status: 403 },
       );
     }
 
