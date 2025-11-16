@@ -1,67 +1,87 @@
 // -----------------------------------------------------------------------------
 // @file: lib/permissions/companyRoles.ts
-// @purpose: Centralized helpers for company-level roles and permissions (customer space)
-// @version: v1.1.0
+// @purpose: Permission helpers for company-level roles (OWNER / PM / BILLING / MEMBER)
+// @version: v1.2.0
 // @status: active
 // @lastUpdate: 2025-11-16
 // -----------------------------------------------------------------------------
 
-/**
- * Company-level role for a user inside a Brandbite customer workspace.
- *
- * OWNER   - Owns the workspace, full access (billing + tickets + settings).
- * PM      - Manages tickets and workflow, but not billing.
- * BILLING - Handles billing, read-only for most ticket workflows.
- * MEMBER  - Regular contributor who can create and manage tickets.
- */
-export type CompanyRole = "OWNER" | "PM" | "BILLING" | "MEMBER";
+import type { CompanyRole as PrismaCompanyRole } from "@prisma/client";
 
 /**
- * Best-effort normalization for any incoming value to a CompanyRole or null.
- * Useful when reading from session objects or untyped sources.
+ * Re-export Prisma CompanyRole as our canonical type for UI + API helpers.
+ *
+ * Values: "OWNER" | "PM" | "BILLING" | "MEMBER"
  */
-export function normalizeCompanyRole(
-  role: unknown,
-): CompanyRole | null {
-  if (role === "OWNER" || role === "PM" || role === "BILLING" || role === "MEMBER") {
+export type CompanyRole = PrismaCompanyRole;
+
+/**
+ * Best-effort normalization from any unknown value to a CompanyRole (or null).
+ * Useful when reading from JSON payloads / session data.
+ */
+export function normalizeCompanyRole(role: unknown): CompanyRole | null {
+  if (
+    role === "OWNER" ||
+    role === "PM" ||
+    role === "BILLING" ||
+    role === "MEMBER"
+  ) {
     return role;
   }
   return null;
 }
 
 /**
- * Who can manage subscription plan / billing settings.
- * Current rule: OWNER + BILLING.
+ * Company-level "admin" access: OWNER + PM.
  */
-export function canManagePlan(
+export function isCompanyAdminRole(
   role: CompanyRole | null | undefined,
 ): boolean {
+  if (!role) return false;
+  return role === "OWNER" || role === "PM";
+}
+
+/**
+ * Plan / subscription management: OWNER + BILLING.
+ */
+export function canManagePlan(role: CompanyRole | null | undefined): boolean {
+  if (!role) return false;
   return role === "OWNER" || role === "BILLING";
 }
 
 /**
- * Generic billing management permission.
- * Kept separate from canManagePlan in case we diverge later.
+ * Billing management convenience helper (same as plan for now).
  */
 export function canManageBilling(
   role: CompanyRole | null | undefined,
 ): boolean {
+  if (!role) return false;
   return role === "OWNER" || role === "BILLING";
 }
 
 /**
- * Who can create new tickets.
- * Current rule: everyone except BILLING (OWNER + PM + MEMBER).
+ * Board visibility: anyone who is actually a member of the company.
+ */
+export function canViewBoard(role: CompanyRole | null | undefined): boolean {
+  return !!role;
+}
+
+/**
+ * Who can create new tickets on the customer side.
+ *
+ * - OWNER, PM, MEMBER: can create
+ * - BILLING: cannot create (read-only for tickets)
  */
 export function canCreateTickets(
   role: CompanyRole | null | undefined,
 ): boolean {
+  if (!role) return false;
   return role === "OWNER" || role === "PM" || role === "MEMBER";
 }
 
 /**
- * Who can move tickets on the kanban board.
- * For now this mirrors canCreateTickets.
+ * Who can move tickets on the board (kanban).
+ * For now we mirror canCreateTickets, so BILLING is read-only.
  */
 export function canMoveTicketsOnBoard(
   role: CompanyRole | null | undefined,
@@ -70,17 +90,15 @@ export function canMoveTicketsOnBoard(
 }
 
 /**
- * Who can see tokens overview.
- * For now: all roles can see company usage.
+ * Tokens overview visibility: everyone inside the workspace for now.
  */
-export function canViewTokens(
-  _role: CompanyRole | null | undefined,
-): boolean {
+export function canViewTokens(_role: CompanyRole | null | undefined): boolean {
   return true;
 }
 
 /**
- * Convenience helper for "read-only because billing role" checks in UI.
+ * Convenience helper for UI copy: "is this user read-only because they
+ * are only marked as BILLING for the company?"
  */
 export function isBillingReadOnly(
   role: CompanyRole | null | undefined,

@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/customer/tickets/route.ts
 // @purpose: Customer-facing ticket list & creation API (session-based company)
-// @version: v1.3.0
+// @version: v1.4.0
 // @status: active
-// @lastUpdate: 2025-11-14
+// @lastUpdate: 2025-11-16
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
@@ -15,6 +15,7 @@ import {
   LedgerDirection,
 } from "@prisma/client";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { canCreateTickets } from "@/lib/permissions/companyRoles";
 
 // -----------------------------------------------------------------------------
 // GET: list tickets for the current customer's active company
@@ -160,9 +161,9 @@ export async function POST(req: NextRequest) {
         { status: 404 },
       );
     }
-    
-    // NEW: Billing-only company members cannot create tickets
-    if (user.companyRole === "BILLING") {
+
+    // Company-level permission check: who can create tickets
+    if (!canCreateTickets(user.companyRole ?? null)) {
       return NextResponse.json(
         {
           error:
@@ -367,7 +368,7 @@ export async function POST(req: NextRequest) {
 
     console.error("[customer.tickets] POST error", error);
     return NextResponse.json(
-      { error: "Failed to create ticket" },
+      { error: "Failed to create customer ticket" },
       { status: 500 },
     );
   }

@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/customer/tickets/status/route.ts
 // @purpose: Update ticket status for customer board (kanban)
-// @version: v1.1.0
+// @version: v1.2.0
 // @status: active
 // @lastUpdate: 2025-11-16
 // -----------------------------------------------------------------------------
@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { TicketStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { canMoveTicketsOnBoard } from "@/lib/permissions/companyRoles";
 
 export async function PATCH(req: NextRequest) {
   try {
@@ -17,10 +18,7 @@ export async function PATCH(req: NextRequest) {
 
     if (user.role !== "CUSTOMER") {
       return NextResponse.json(
-        {
-          error:
-            "Only customer accounts can update tickets from the board",
-        },
+        { error: "Only customer accounts can update tickets from the board" },
         { status: 403 },
       );
     }
@@ -32,12 +30,12 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    // NEW: Billing users are read-only for ticket status updates
-    if (user.companyRole === "BILLING") {
+    // Company-level permission check: who can move tickets on the board
+    if (!canMoveTicketsOnBoard(user.companyRole ?? null)) {
       return NextResponse.json(
         {
           error:
-            "You don't have permission to change ticket status for this company. Please ask your company owner or project manager.",
+            "You don't have permission to update ticket status for this company. Please ask your company owner or project manager.",
         },
         { status: 403 },
       );
@@ -74,7 +72,7 @@ export async function PATCH(req: NextRequest) {
     if (!allowedStatuses.includes(rawStatus)) {
       return NextResponse.json(
         {
-          error: `Invalid status value. Allowed: ${allowedStatuses.join(
+          error: `Invalid status value: ${rawStatus}. Allowed values: ${allowedStatuses.join(
             ", ",
           )}`,
         },
@@ -92,6 +90,8 @@ export async function PATCH(req: NextRequest) {
       },
       select: {
         id: true,
+        status: true,
+        companyId: true,
       },
     });
 
@@ -102,11 +102,22 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
+    if (ticket.status === nextStatus) {
+      // No-op, but return OK for idempotency
+      return NextResponse.json(
+        {
+          ticket: {
+            id: ticket.id,
+            status: ticket.status,
+          },
+        },
+        { status: 200 },
+      );
+    }
+
     const updated = await prisma.ticket.update({
       where: { id: ticket.id },
-      data: {
-        status: nextStatus,
-      },
+      data: { status: nextStatus },
       select: {
         id: true,
         status: true,
@@ -126,7 +137,10 @@ export async function PATCH(req: NextRequest) {
     );
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
-      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Unauthenticated" },
+        { status: 401 },
+      );
     }
 
     console.error("[PATCH /api/customer/tickets/status] error", error);
