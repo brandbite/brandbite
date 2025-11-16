@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/tokens/page.tsx
 // @purpose: Customer-facing token balance & ledger view (session-based)
-// @version: v1.2.0
+// @version: v1.3.0
 // @status: active
-// @lastUpdate: 2025-11-15
+// @lastUpdate: 2025-11-16
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -11,6 +11,8 @@
 import { useEffect, useMemo, useState } from "react";
 
 type LedgerDirection = "CREDIT" | "DEBIT";
+
+type CompanyRole = "OWNER" | "PM" | "BILLING" | "MEMBER";
 
 type CustomerTokensResponse = {
   company: {
@@ -40,6 +42,7 @@ export default function CustomerTokensPage() {
   const [data, setData] = useState<CustomerTokensResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [companyRole, setCompanyRole] = useState<CompanyRole | null>(null);
 
   const [directionFilter, setDirectionFilter] = useState<
     "ALL" | LedgerDirection
@@ -66,6 +69,33 @@ export default function CustomerTokensPage() {
 
         if (!cancelled) {
           setData(json as CustomerTokensResponse);
+        }
+
+        // Fetch company role in the background; failures here should not
+        // block the main tokens view.
+        try {
+          const settingsRes = await fetch("/api/customer/settings", {
+            cache: "no-store",
+          });
+          const settingsJson = await settingsRes.json().catch(() => null);
+
+          if (settingsRes.ok && !cancelled) {
+            const role = settingsJson?.user?.companyRole ?? null;
+            if (
+              role === "OWNER" ||
+              role === "PM" ||
+              role === "BILLING" ||
+              role === "MEMBER" ||
+              role === null
+            ) {
+              setCompanyRole(role);
+            }
+          }
+        } catch (settingsError) {
+          console.error(
+            "Customer settings fetch error (companyRole only):",
+            settingsError,
+          );
         }
       } catch (err: any) {
         console.error("Customer tokens fetch error:", err);
@@ -100,9 +130,17 @@ export default function CustomerTokensPage() {
     [ledger, directionFilter],
   );
 
-  const directionBadgeClass = (direction: LedgerDirection) => {
+  const formatDateTime = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleString();
+  };
+
+  const formatAmount = (amount: number) =>
+    `${amount.toLocaleString("en-US")} tokens`;
+
+  const pillClasses = (direction: LedgerDirection) => {
     const base =
-      "inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold";
+      "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium";
     if (direction === "CREDIT") {
       return `${base} bg-[#f0fff6] text-[#137a3a]`;
     }
@@ -164,6 +202,23 @@ export default function CustomerTokensPage() {
           </div>
         </div>
 
+        {/* Limited access info for non-billing roles */}
+        {!error &&
+          companyRole &&
+          companyRole !== "OWNER" &&
+          companyRole !== "BILLING" && (
+            <div className="mb-4 rounded-xl border border-[#f6c89f] bg-[#fff4e6] px-4 py-3 text-xs text-[#7a7a7a]">
+              <p className="text-[11px] font-medium text-[#9a5b2b]">
+                Limited access
+              </p>
+              <p className="mt-1">
+                You can see your company&apos;s token balance and history, but
+                only the owner or billing manager can request top-ups or
+                billing changes.
+              </p>
+            </div>
+          )}
+
         {/* Error state */}
         {error && (
           <div className="mb-4 rounded-xl border border-red-200 bg-white px-4 py-3 text-sm text-red-700">
@@ -209,32 +264,60 @@ export default function CustomerTokensPage() {
               {loading ? "—" : data ? data.stats.totalDebits : "0"}
             </p>
             <p className="mt-1 text-xs text-[#9a9892]">
-              Tokens spent on design jobs and requests.
+              Tokens consumed by ticket work and other debits.
             </p>
           </div>
         </section>
 
         {/* Ledger filters */}
-        <section className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[#e3e1dc] bg-white px-5 py-3 shadow-sm">
-          <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-[#424143]">
-              Direction
-            </label>
-            <select
-              value={directionFilter}
-              onChange={(e) =>
-                setDirectionFilter(e.target.value as "ALL" | LedgerDirection)
-              }
-              className="rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
-            >
-              <option value="ALL">All</option>
-              <option value="CREDIT">Credits</option>
-              <option value="DEBIT">Debits</option>
-            </select>
+        <section className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold tracking-tight">
+              Token ledger
+            </h2>
+            <p className="mt-1 text-xs text-[#9a9892]">
+              A chronological view of how tokens have moved in or out of your
+              balance.
+            </p>
           </div>
-          <p className="text-xs text-[#9a9892]">
-            Showing {filteredLedger.length} of {ledger.length} entries.
-          </p>
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-[#7a7a7a]">Filter:</span>
+            <div className="inline-flex overflow-hidden rounded-full border border-[#e3e1dc] bg-white">
+              <button
+                type="button"
+                className={`px-3 py-1 text-xs ${
+                  directionFilter === "ALL"
+                    ? "bg-[#f5f3f0] font-medium text-[#424143]"
+                    : "text-[#7a7a7a]"
+                }`}
+                onClick={() => setDirectionFilter("ALL")}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                className={`border-l border-[#e3e1dc] px-3 py-1 text-xs ${
+                  directionFilter === "CREDIT"
+                    ? "bg-[#f5f3f0] font-medium text-[#424143]"
+                    : "text-[#7a7a7a]"
+                }`}
+                onClick={() => setDirectionFilter("CREDIT")}
+              >
+                Credits
+              </button>
+              <button
+                type="button"
+                className={`border-l border-[#e3e1dc] px-3 py-1 text-xs ${
+                  directionFilter === "DEBIT"
+                    ? "bg-[#f5f3f0] font-medium text-[#424143]"
+                    : "text-[#7a7a7a]"
+                }`}
+                onClick={() => setDirectionFilter("DEBIT")}
+              >
+                Debits
+              </button>
+            </div>
+          </div>
         </section>
 
         {/* Ledger table */}
@@ -258,61 +341,58 @@ export default function CustomerTokensPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
+              <table className="min-w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-[#e3e1dc] text-xs uppercase tracking-[0.08em] text-[#9a9892]">
-                    <th className="px-2 py-2">When</th>
-                    <th className="px-2 py-2">Direction</th>
-                    <th className="px-2 py-2">Amount</th>
-                    <th className="px-2 py-2">Ticket</th>
-                    <th className="px-2 py-2">Reason</th>
-                    <th className="px-2 py-2">Notes</th>
-                    <th className="px-2 py-2">Balance</th>
+                  <tr className="border-b border-[#ebe7df] text-[11px] uppercase tracking-[0.12em] text-[#9a9892]">
+                    <th className="py-2 pr-4">Date</th>
+                    <th className="py-2 pr-4">Direction</th>
+                    <th className="py-2 pr-4">Amount</th>
+                    <th className="py-2 pr-4">Reason</th>
+                    <th className="py-2 pr-4">Ticket</th>
+                    <th className="py-2 pr-4">Balance before</th>
+                    <th className="py-2 pr-4">Balance after</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredLedger.map((entry) => {
-                    const created = new Date(entry.createdAt);
-                    const isCredit = entry.direction === "CREDIT";
-
-                    return (
-                      <tr
-                        key={entry.id}
-                        className="border-b border-[#f0eeea] text-xs last:border-b-0"
-                      >
-                        <td className="px-2 py-2 align-top text-[11px] text-[#7a7a7a]">
-                          {created.toLocaleDateString()}{" "}
-                          {created.toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </td>
-                        <td className="px-2 py-2 align-top">
-                          <span className={directionBadgeClass(entry.direction)}>
-                            {directionLabel(entry.direction)}
+                  {filteredLedger.map((entry) => (
+                    <tr
+                      key={entry.id}
+                      className="border-b border-[#f1eee8] last:border-none"
+                    >
+                      <td className="py-2 pr-4 align-top text-[11px] text-[#7a7a7a]">
+                        {formatDateTime(entry.createdAt)}
+                      </td>
+                      <td className="py-2 pr-4 align-top">
+                        <span className={pillClasses(entry.direction)}>
+                          {directionLabel(entry.direction)}
+                        </span>
+                      </td>
+                      <td className="py-2 pr-4 align-top text-[11px] text-[#424143]">
+                        {formatAmount(entry.amount)}
+                      </td>
+                      <td className="py-2 pr-4 align-top text-[11px] text-[#7a7a7a]">
+                        {entry.reason || "—"}
+                        {entry.notes ? (
+                          <span className="ml-1 text-[#9a9892]">
+                            ({entry.notes})
                           </span>
-                        </td>
-                        <td className="px-2 py-2 align-top text-[11px] text-[#424143]">
-                          {isCredit ? "+" : "-"}
-                          {entry.amount}
-                        </td>
-                        <td className="px-2 py-2 align-top text-[11px] text-[#424143]">
-                          {entry.ticketCode ?? "—"}
-                        </td>
-                        <td className="px-2 py-2 align-top text-[11px] text-[#424143]">
-                          {entry.reason ?? "—"}
-                        </td>
-                        <td className="px-2 py-2 align-top text-[11px] text-[#7a7a7a]">
-                          {entry.notes ?? "—"}
-                        </td>
-                        <td className="px-2 py-2 align-top text-[11px] text-[#9a9892]">
-                          {entry.balanceAfter != null
-                            ? entry.balanceAfter
-                            : "—"}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                        ) : null}
+                      </td>
+                      <td className="py-2 pr-4 align-top text-[11px] text-[#7a7a7a]">
+                        {entry.ticketCode || "—"}
+                      </td>
+                      <td className="py-2 pr-4 align-top text-[11px] text-[#7a7a7a]">
+                        {entry.balanceBefore != null
+                          ? entry.balanceBefore
+                          : "—"}
+                      </td>
+                      <td className="py-2 pr-4 align-top text-[11px] text-[#7a7a7a]">
+                        {entry.balanceAfter != null
+                          ? entry.balanceAfter
+                          : "—"}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
