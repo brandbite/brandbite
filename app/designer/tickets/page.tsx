@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/designer/tickets/page.tsx
-// @purpose: Designer-facing ticket board (list + status updates + payout trigger on DONE)
-// @version: v1.0.0
+// @purpose: Designer-facing ticket board (list + status updates, clients mark DONE)
+// @version: v1.1.0
 // @status: active
-// @lastUpdate: 2025-11-15
+// @lastUpdate: 2025-11-16
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -267,8 +267,13 @@ export default function DesignerTicketsPage() {
               My tickets
             </h1>
             <p className="mt-1 text-sm text-[#7a7a7a]">
-              Tickets assigned to you, across all customer projects.
-              Completing a ticket can trigger a payout.
+              Tickets assigned to you, across all customer projects. You can
+              move tickets between{" "}
+              <span className="font-medium">To do</span>,{" "}
+              <span className="font-medium">In progress</span> and{" "}
+              <span className="font-medium">In review</span>. Clients mark
+              tickets as <span className="font-medium">Done</span> to trigger
+              payouts.
             </p>
           </div>
         </div>
@@ -470,7 +475,7 @@ export default function DesignerTicketsPage() {
                                     .value as TicketStatus,
                                 )
                               }
-                              disabled={isUpdating(t.id)}
+                              disabled={isUpdating(t.id) || t.status === "DONE"}
                               className="rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-2 py-1 text-[11px] text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
                             >
                               <option value="TODO">
@@ -482,11 +487,16 @@ export default function DesignerTicketsPage() {
                               <option value="IN_REVIEW">
                                 In review
                               </option>
-                              <option value="DONE">Done</option>
+                              {/* Designers cannot set DONE; clients close tickets */}
                             </select>
                             {isUpdating(t.id) && (
                               <span className="text-[10px] text-[#9a9892]">
                                 Updating status…
+                              </span>
+                            )}
+                            {t.status === "DONE" && (
+                              <span className="text-[10px] text-[#9a9892]">
+                                Ticket is done. Only the client can reopen it.
                               </span>
                             )}
                           </div>

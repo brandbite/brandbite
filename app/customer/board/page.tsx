@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/board/page.tsx
 // @purpose: Customer-facing board view of company tickets (kanban-style + drag & drop + detail modal)
-// @version: v1.6.0
+// @version: v1.7.0
 // @status: active
 // @lastUpdate: 2025-11-16
 // -----------------------------------------------------------------------------
@@ -136,7 +136,14 @@ export default function CustomerBoardPage() {
   // Role’den derive edilen izinler
   const canMoveOnBoard =
     companyRole != null ? canMoveTicketsOnBoard(companyRole) : true;
+
   const isLimitedAccess = companyRole != null && !canMoveOnBoard;
+
+  // DONE özel izni: sadece OWNER + PM (site adminler bu view'u normalde kullanmıyor)
+  const canMarkDoneOnBoard =
+    companyRole != null
+      ? companyRole === "OWNER" || companyRole === "PM"
+      : true;
 
   // ---------------------------------------------------------------------------
   // Data load
@@ -272,6 +279,13 @@ export default function CustomerBoardPage() {
       event.preventDefault();
       return;
     }
+
+    // DONE sütunu için ek izin kontrolü
+    if (status === "DONE" && !canMarkDoneOnBoard) {
+      event.preventDefault();
+      return;
+    }
+
     event.preventDefault();
     if (dragOverStatus !== status) {
       setDragOverStatus(status);
@@ -290,6 +304,15 @@ export default function CustomerBoardPage() {
     const ticketId = draggingTicketId;
     setDraggingTicketId(null);
     setDragOverStatus(null);
+
+    // DONE'a drop için ek izin kontrolü
+    if (status === "DONE" && !canMarkDoneOnBoard) {
+      setMutationError(
+        "You don't have permission to mark tickets as done. Please ask your company owner or project manager.",
+      );
+      return;
+    }
+
     await persistTicketStatus(ticketId, status);
   };
 
@@ -614,7 +637,8 @@ export default function CustomerBoardPage() {
                 </h1>
                 <p className="mt-1 text-xs text-[#7a7a7a]">
                   Drag cards between columns to update their status, or click a
-                  card to see full details.
+                  card to see full details. Only your company owner or project
+                  manager can mark tickets as done.
                 </p>
 
                 {/* Project selector for mobile */}
