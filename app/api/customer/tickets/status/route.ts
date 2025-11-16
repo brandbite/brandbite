@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/customer/tickets/status/route.ts
 // @purpose: Update ticket status for customer board (kanban)
-// @version: v1.2.0
+// @version: v1.3.0
 // @status: active
 // @lastUpdate: 2025-11-16
 // -----------------------------------------------------------------------------
@@ -10,84 +10,81 @@ import { NextRequest, NextResponse } from "next/server";
 import { TicketStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
-import { canMoveTicketsOnBoard } from "@/lib/permissions/companyRoles";
+import {
+  canMoveTicketsOnBoard,
+  canMarkTicketsDoneForCompany,
+  normalizeCompanyRole,
+} from "@/lib/permissions/companyRoles";
+
+type PatchPayload = {
+  ticketId?: string;
+  status?: string;
+};
+
+function isValidTicketStatus(value: unknown): value is TicketStatus {
+  if (typeof value !== "string") return false;
+  return (
+    value === "TODO" ||
+    value === "IN_PROGRESS" ||
+    value === "IN_REVIEW" ||
+    value === "DONE"
+  );
+}
 
 export async function PATCH(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
 
-    if (user.role !== "CUSTOMER") {
-      return NextResponse.json(
-        { error: "Only customer accounts can update tickets from the board" },
-        { status: 403 },
-      );
-    }
+    // Only customers + site admins can use this endpoint
+    const isSiteAdmin =
+      user.role === "SITE_OWNER" || user.role === "SITE_ADMIN";
 
-    if (!user.activeCompanyId) {
-      return NextResponse.json(
-        { error: "User has no active company" },
-        { status: 400 },
-      );
-    }
-
-    // Company-level permission check: who can move tickets on the board
-    if (!canMoveTicketsOnBoard(user.companyRole ?? null)) {
+    if (!isSiteAdmin && user.role !== "CUSTOMER") {
       return NextResponse.json(
         {
           error:
-            "You don't have permission to update ticket status for this company. Please ask your company owner or project manager.",
+            "Only customers or site administrators can update ticket status from this endpoint.",
         },
         { status: 403 },
       );
     }
 
-    const body = await req.json().catch(() => null);
+    const body = (await req.json()) as PatchPayload;
+    const ticketId = body.ticketId;
+    const requestedStatus = body.status;
 
-    if (!body || typeof body !== "object") {
+    if (!ticketId || !requestedStatus) {
       return NextResponse.json(
-        { error: "Invalid request body" },
+        { error: "Both ticketId and status are required." },
         { status: 400 },
       );
     }
 
-    const ticketId = String((body as any).ticketId ?? "").trim();
-    const rawStatus = String((body as any).status ?? "").trim();
-
-    if (!ticketId) {
+    if (!isValidTicketStatus(requestedStatus)) {
       return NextResponse.json(
-        { error: "ticketId is required" },
+        { error: "Invalid ticket status." },
         { status: 400 },
       );
     }
 
-    if (!rawStatus) {
-      return NextResponse.json(
-        { error: "status is required" },
-        { status: 400 },
-      );
-    }
+    const nextStatus = requestedStatus as TicketStatus;
 
-    const allowedStatuses = Object.values(TicketStatus) as string[];
+    // -------------------------------------------------------------------------
+    // Load ticket with proper scoping
+    // -------------------------------------------------------------------------
 
-    if (!allowedStatuses.includes(rawStatus)) {
-      return NextResponse.json(
-        {
-          error: `Invalid status value: ${rawStatus}. Allowed values: ${allowedStatuses.join(
-            ", ",
-          )}`,
-        },
-        { status: 400 },
-      );
-    }
+    const where =
+      user.role === "CUSTOMER" && user.activeCompanyId
+        ? {
+            id: ticketId,
+            companyId: user.activeCompanyId,
+          }
+        : {
+            id: ticketId,
+          };
 
-    const nextStatus = rawStatus as TicketStatus;
-
-    // Ensure ticket belongs to the active company of this customer
     const ticket = await prisma.ticket.findFirst({
-      where: {
-        id: ticketId,
-        companyId: user.activeCompanyId,
-      },
+      where,
       select: {
         id: true,
         status: true,
@@ -97,27 +94,72 @@ export async function PATCH(req: NextRequest) {
 
     if (!ticket) {
       return NextResponse.json(
-        { error: "Ticket not found for this company" },
+        { error: "Ticket not found." },
         { status: 404 },
       );
     }
 
-    if (ticket.status === nextStatus) {
-      // No-op, but return OK for idempotency
-      return NextResponse.json(
-        {
-          ticket: {
-            id: ticket.id,
-            status: ticket.status,
+    // -------------------------------------------------------------------------
+    // Board-level permission: can this user move tickets at all?
+    // - Site admins: always yes
+    // - Customers: based on companyRole
+    // -------------------------------------------------------------------------
+
+    const normalizedCompanyRole = normalizeCompanyRole(
+      user.companyRole ?? null,
+    );
+
+    if (!isSiteAdmin) {
+      if (!canMoveTicketsOnBoard(normalizedCompanyRole)) {
+        return NextResponse.json(
+          {
+            error:
+              "You don't have permission to move tickets on the board for this company.",
           },
-        },
-        { status: 200 },
-      );
+          { status: 403 },
+        );
+      }
     }
+
+    // -------------------------------------------------------------------------
+    // DONE transition: special permission rule
+    // -------------------------------------------------------------------------
+
+    const isDoneTransition =
+      ticket.status !== TicketStatus.DONE &&
+      nextStatus === TicketStatus.DONE;
+
+    if (isDoneTransition) {
+      const canMarkDone = canMarkTicketsDoneForCompany(
+        user.role,
+        normalizedCompanyRole,
+      );
+
+      if (!canMarkDone) {
+        return NextResponse.json(
+          {
+            error:
+              "You don't have permission to mark this ticket as DONE. Please ask your company owner or project manager.",
+          },
+          { status: 403 },
+        );
+      }
+
+      // NOTE:
+      // Burada şimdilik sadece status güncelliyoruz.
+      // Designer payout / company token DEBIT mantığını ileride
+      // merkezi bir "complete ticket" endpoint'i ile bağlayacağız.
+    }
+
+    // -------------------------------------------------------------------------
+    // Normal status update
+    // -------------------------------------------------------------------------
 
     const updated = await prisma.ticket.update({
       where: { id: ticket.id },
-      data: { status: nextStatus },
+      data: {
+        status: nextStatus,
+      },
       select: {
         id: true,
         status: true,
@@ -125,16 +167,7 @@ export async function PATCH(req: NextRequest) {
       },
     });
 
-    return NextResponse.json(
-      {
-        ticket: {
-          id: updated.id,
-          status: updated.status,
-          updatedAt: updated.updatedAt.toISOString(),
-        },
-      },
-      { status: 200 },
-    );
+    return NextResponse.json(updated, { status: 200 });
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
       return NextResponse.json(
@@ -143,7 +176,10 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    console.error("[PATCH /api/customer/tickets/status] error", error);
+    console.error(
+      "[PATCH /api/customer/tickets/status] error",
+      error,
+    );
     return NextResponse.json(
       { error: "Failed to update ticket status" },
       { status: 500 },

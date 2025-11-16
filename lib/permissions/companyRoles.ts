@@ -105,3 +105,24 @@ export function isBillingReadOnly(
 ): boolean {
   return role === "BILLING";
 }
+
+export function canMarkTicketsDoneForCompany(
+  globalRole: string | null | undefined,
+  companyRole: CompanyRole | null | undefined,
+): boolean {
+  if (!globalRole) return false;
+
+  // Site-level admins can always force-close tickets
+  if (globalRole === "SITE_OWNER" || globalRole === "SITE_ADMIN") {
+    return true;
+  }
+
+  // Only customers can use companyRole-based rules
+  if (globalRole !== "CUSTOMER") {
+    return false;
+  }
+
+  // Within a company, only OWNER + PM can mark tickets as DONE
+  return companyRole === "OWNER" || companyRole === "PM";
+}
+
