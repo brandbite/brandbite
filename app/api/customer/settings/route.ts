@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/customer/settings/route.ts
 // @purpose: Customer API for account, company and plan overview
-// @version: v1.0.0
+// @version: v1.1.0
 // @status: active
-// @lastUpdate: 2025-11-15
+// @lastUpdate: 2025-11-16
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
@@ -56,6 +56,8 @@ export async function GET(_req: NextRequest) {
         email: user.email,
         name: user.name,
         role: user.role,
+        // IMPORTANT: expose company role for customer settings UI
+        companyRole: membership.roleInCompany,
       },
       company: {
         id: company.id,
