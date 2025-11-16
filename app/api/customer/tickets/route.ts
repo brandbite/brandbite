@@ -160,6 +160,17 @@ export async function POST(req: NextRequest) {
         { status: 404 },
       );
     }
+    
+    // NEW: Billing-only company members cannot create tickets
+    if (user.companyRole === "BILLING") {
+      return NextResponse.json(
+        {
+          error:
+            "You don't have permission to create tickets for this company. Please ask your company owner or project manager.",
+        },
+        { status: 403 },
+      );
+    }
 
     const body = await req.json().catch(() => null);
 
