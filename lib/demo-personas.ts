@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: lib/demo-personas.ts
 // @purpose: Central demo personas config (ids, labels, emails, redirects)
-// @version: v1.0.0
+// @version: v1.1.0
 // @status: active
-// @lastUpdate: 2025-11-15
+// @lastUpdate: 2025-11-16
 // -----------------------------------------------------------------------------
 
 import type { AppUserRole } from "./roles";
@@ -13,6 +13,7 @@ export type DemoPersonaId =
   | "site-admin"
   | "customer-owner"
   | "customer-pm"
+  | "customer-billing"
   | "designer-ada"
   | "designer-liam";
 
@@ -56,6 +57,14 @@ export const DEMO_PERSONAS: DemoPersona[] = [
     description: "PM for Acme Studio projects.",
     redirectTo: "/customer/tickets",
     email: "pm@acme-demo.com",
+    role: "CUSTOMER",
+  },
+  {
+    id: "customer-billing",
+    label: "Customer • Billing",
+    description: "Billing contact for Acme Studio (demo).",
+    redirectTo: "/customer/settings",
+    email: "billing@acme-demo.com",
     role: "CUSTOMER",
   },
   {

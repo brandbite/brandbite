@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/members/page.tsx
 // @purpose: Customer-facing company members & roles overview + invite form + pending invites
-// @version: v1.3.0
+// @version: v1.4.0
 // @status: active
 // @lastUpdate: 2025-11-16
 // -----------------------------------------------------------------------------
@@ -9,8 +9,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-
-type CompanyRoleString = "OWNER" | "PM" | "BILLING" | "MEMBER";
+import type { CompanyRole as CompanyRoleString } from "@/lib/permissions/companyRoles";
 
 type CompanyMembersResponse = {
   company: {
@@ -93,7 +92,8 @@ export default function CustomerMembersPage() {
         if (!cancelled) {
           setState({
             status: "error",
-            message: "Unexpected error while loading company members",
+            message:
+              "Unexpected error while loading company members",
           });
         }
       }
@@ -116,10 +116,18 @@ export default function CustomerMembersPage() {
   const pendingInvites = data?.pendingInvites ?? [];
   const currentUserId = data?.currentUserId ?? "";
 
+  const currentMember = useMemo(
+    () =>
+      members.find((m) => m.userId === currentUserId) ?? null,
+    [members, currentUserId],
+  );
+  const currentUserRole = currentMember?.roleInCompany ?? null;
+
   const sortedMembers = useMemo(() => {
     if (!members.length) return [];
     return [...members].sort((a, b) => {
-      const order = roleWeight(b.roleInCompany) - roleWeight(a.roleInCompany);
+      const order =
+        roleWeight(b.roleInCompany) - roleWeight(a.roleInCompany);
       if (order !== 0) return order;
       return a.joinedAt.localeCompare(b.joinedAt);
     });
@@ -181,7 +189,9 @@ export default function CustomerMembersPage() {
       await refreshMembers();
     } catch (error) {
       console.error("Invite submit error:", error);
-      setInviteError("Unexpected error while creating the invitation.");
+      setInviteError(
+        "Unexpected error while creating the invitation.",
+      );
     } finally {
       setInviteStatus("idle");
     }
@@ -216,7 +226,9 @@ export default function CustomerMembersPage() {
       await refreshMembers();
     } catch (error) {
       console.error("Cancel invite error:", error);
-      setCancelError("Unexpected error while cancelling the invite.");
+      setCancelError(
+        "Unexpected error while cancelling the invite.",
+      );
     } finally {
       setCancelingId(null);
     }
@@ -244,17 +256,23 @@ export default function CustomerMembersPage() {
       console.error("Refresh members error:", error);
       setState({
         status: "error",
-        message: "Unexpected error while refreshing company members",
+        message:
+          "Unexpected error while refreshing company members",
       });
     }
   };
 
-  // Skeleton early return (HOOk'lardan sonra)
+  // Skeleton early return (HOOK'lardan sonra)
   if (state.status === "loading") {
     return <CustomerMembersSkeleton />;
   }
 
   const error = state.status === "error" ? state.message : null;
+  const isPermissionError =
+    !!error &&
+    error
+      .toLowerCase()
+      .includes("only company owners or project managers");
 
   return (
     <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
@@ -272,25 +290,33 @@ export default function CustomerMembersPage() {
           <nav className="hidden items-center gap-6 text-sm text-[#7a7a7a] md:flex">
             <button
               className="font-medium text-[#7a7a7a]"
-              onClick={() => (window.location.href = "/customer/tokens")}
+              onClick={() =>
+                (window.location.href = "/customer/tokens")
+              }
             >
               Tokens
             </button>
             <button
               className="font-medium text-[#7a7a7a]"
-              onClick={() => (window.location.href = "/customer/tickets")}
+              onClick={() =>
+                (window.location.href = "/customer/tickets")
+              }
             >
               Tickets
             </button>
             <button
               className="font-medium text-[#7a7a7a]"
-              onClick={() => (window.location.href = "/customer/board")}
+              onClick={() =>
+                (window.location.href = "/customer/board")
+              }
             >
               Board
             </button>
             <button
               className="font-semibold text-[#424143]"
-              onClick={() => (window.location.href = "/customer/members")}
+              onClick={() =>
+                (window.location.href = "/customer/members")
+              }
             >
               Members
             </button>
@@ -304,7 +330,8 @@ export default function CustomerMembersPage() {
               Company members
             </h1>
             <p className="mt-1 text-sm text-[#7a7a7a]">
-              See who is part of your Brandbite workspace and what they can do.
+              See who is part of your Brandbite workspace and what they
+              can do.
             </p>
             {company && (
               <p className="mt-1 text-xs text-[#9a9892]">
@@ -315,204 +342,241 @@ export default function CustomerMembersPage() {
                 ({company.slug})
               </p>
             )}
+            {currentUserRole && (
+              <p className="mt-1 text-xs text-[#9a9892]">
+                You are browsing as{" "}
+                <span className="font-medium text-[#424143]">
+                  {formatCompanyRole(currentUserRole)}
+                </span>
+                .
+              </p>
+            )}
           </div>
         </div>
 
         {/* Error state */}
         {error && (
           <div className="mb-4 rounded-xl border border-red-200 bg-white px-4 py-3 text-sm text-red-700">
-            <p className="font-medium">Error</p>
+            <p className="font-medium">
+              {isPermissionError
+                ? "You don’t have access to manage members"
+                : "Error"}
+            </p>
             <p className="mt-1">{error}</p>
+            {isPermissionError && (
+              <p className="mt-2 text-xs text-[#7a7a7a]">
+                Only company owners and project managers can view and
+                manage the members list and invites for this workspace.
+              </p>
+            )}
           </div>
         )}
 
-        {/* Invite form */}
-        <section className="mt-4 rounded-2xl border border-[#ece5d8] bg-white px-4 py-4 shadow-sm">
-          <h2 className="text-sm font-semibold text-[#424143]">
-            Invite a new member
-          </h2>
-          <p className="mt-1 text-xs text-[#7a7a7a]">
-            Send an invite to someone on your team. They will join with the
-            selected role once they accept the invitation.
-          </p>
+        {/* Invite + lists only if we have data (no error) */}
+        {!error && (
+          <>
+            {/* Invite form */}
+            <section className="mt-4 rounded-2xl border border-[#ece5d8] bg-white px-4 py-4 shadow-sm">
+              <h2 className="text-sm font-semibold text-[#424143]">
+                Invite a new member
+              </h2>
+              <p className="mt-1 text-xs text-[#7a7a7a]">
+                Send an invite to someone on your team. They will join
+                with the selected role once they accept the invitation.
+              </p>
 
-          {inviteError && (
-            <div className="mt-3 rounded-lg border border-red-200 bg-[#fff7f7] px-3 py-2 text-xs text-red-700">
-              {inviteError}
-            </div>
-          )}
+              {inviteError && (
+                <div className="mt-3 rounded-lg border border-red-200 bg-[#fff7f7] px-3 py-2 text-xs text-red-700">
+                  {inviteError}
+                </div>
+              )}
 
-          {inviteSuccess && (
-            <div className="mt-3 rounded-lg border border-emerald-200 bg-[#f0fbf4] px-3 py-2 text-xs text-emerald-700">
-              {inviteSuccess}
-            </div>
-          )}
+              {inviteSuccess && (
+                <div className="mt-3 rounded-lg border border-emerald-200 bg-[#f0fbf4] px-3 py-2 text-xs text-emerald-700">
+                  {inviteSuccess}
+                </div>
+              )}
 
-          {cancelError && (
-            <div className="mt-3 rounded-lg border border-amber-200 bg-[#fffaf2] px-3 py-2 text-xs text-amber-800">
-              {cancelError}
-            </div>
-          )}
+              {cancelError && (
+                <div className="mt-3 rounded-lg border border-amber-200 bg-[#fffaf2] px-3 py-2 text-xs text-amber-800">
+                  {cancelError}
+                </div>
+              )}
 
-          <form
-            onSubmit={handleInviteSubmit}
-            className="mt-3 flex flex-col gap-3 md:flex-row md:items-end"
-          >
-            <div className="flex-1">
-              <label className="text-[11px] font-medium text-[#7a7a7a]">
-                Email
-              </label>
-              <input
-                type="email"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-[#d5cec0] bg-[#fdfaf5] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]/40"
-                placeholder="designer@yourcompany.com"
-                required
-              />
-            </div>
-
-            <div className="w-full md:w-44">
-              <label className="text-[11px] font-medium text-[#7a7a7a]">
-                Role
-              </label>
-              <select
-                className="mt-1 w-full rounded-lg border border-[#d5cec0] bg-[#fdfaf5] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]/40"
-                value={inviteRole}
-                onChange={(e) =>
-                  setInviteRole(e.target.value as CompanyRoleString)
-                }
+              <form
+                onSubmit={handleInviteSubmit}
+                className="mt-3 flex flex-col gap-3 md:flex-row md:items-end"
               >
-                <option value="MEMBER">Member</option>
-                <option value="PM">Project manager</option>
-                <option value="BILLING">Billing</option>
-              </select>
-            </div>
+                <div className="flex-1">
+                  <label className="text-[11px] font-medium text-[#7a7a7a]">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(e) =>
+                      setInviteEmail(e.target.value)
+                    }
+                    className="mt-1 w-full rounded-lg border border-[#d5cec0] bg-[#fdfaf5] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]/40"
+                    placeholder="designer@yourcompany.com"
+                    required
+                  />
+                </div>
 
-            <div className="flex w-full md:w-auto">
-              <button
-                type="submit"
-                disabled={inviteStatus === "submitting"}
-                className="mt-2 w-full rounded-lg bg-[#f15b2b] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[#e44f20] disabled:opacity-70 md:mt-[22px]"
-              >
-                {inviteStatus === "submitting"
-                  ? "Sending…"
-                  : "Send invite"}
-              </button>
-            </div>
-          </form>
-        </section>
+                <div className="w-full md:w-44">
+                  <label className="text-[11px] font-medium text-[#7a7a7a]">
+                    Role
+                  </label>
+                  <select
+                    className="mt-1 w-full rounded-lg border border-[#d5cec0] bg-[#fdfaf5] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]/40"
+                    value={inviteRole}
+                    onChange={(e) =>
+                      setInviteRole(
+                        e.target.value as CompanyRoleString,
+                      )
+                    }
+                  >
+                    <option value="MEMBER">Member</option>
+                    <option value="PM">Project manager</option>
+                    <option value="BILLING">Billing</option>
+                  </select>
+                </div>
 
-        {/* Pending invites */}
-        <section className="mt-6">
-          <h2 className="mb-2 text-sm font-semibold text-[#424143]">
-            Pending invites
-          </h2>
-          <p className="mb-3 text-xs text-[#7a7a7a]">
-            These people have been invited but have not joined yet.
-          </p>
+                <div className="flex w-full md:w-auto">
+                  <button
+                    type="submit"
+                    disabled={inviteStatus === "submitting"}
+                    className="mt-2 w-full rounded-lg bg-[#f15b2b] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[#e44f20] disabled:opacity-70 md:mt-[22px]"
+                  >
+                    {inviteStatus === "submitting"
+                      ? "Sending…"
+                      : "Send invite"}
+                  </button>
+                </div>
+              </form>
+            </section>
 
-          {sortedInvites.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[#d5cec0] bg-white/60 px-4 py-4 text-xs text-[#7a7a7a]">
-              No pending invites. When you invite someone, they will appear
-              here until they join.
-            </div>
-          ) : (
-            <div className="grid gap-3 md:grid-cols-2">
-              {sortedInvites.map((invite) => {
-                const isCanceling = cancelingId === invite.id;
+            {/* Pending invites */}
+            <section className="mt-6">
+              <h2 className="mb-2 text-sm font-semibold text-[#424143]">
+                Pending invites
+              </h2>
+              <p className="mb-3 text-xs text-[#7a7a7a]">
+                These people have been invited but have not joined yet.
+              </p>
+
+              {sortedInvites.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-[#d5cec0] bg-white/60 px-4 py-4 text-xs text-[#7a7a7a]">
+                  No pending invites. When you invite someone, they will
+                  appear here until they join.
+                </div>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-2">
+                  {sortedInvites.map((invite) => {
+                    const isCanceling = cancelingId === invite.id;
+                    return (
+                      <article
+                        key={invite.id}
+                        className="flex items-center justify-between rounded-2xl border border-[#ece5d8] bg-white px-4 py-3 text-sm shadow-sm"
+                      >
+                        <div>
+                          <p className="font-semibold text-[#424143]">
+                            {invite.email}
+                          </p>
+                          <p className="text-[11px] text-[#7a7a7a]">
+                            {formatCompanyRole(
+                              invite.roleInCompany,
+                            )}{" "}
+                            • invited{" "}
+                            {new Date(
+                              invite.createdAt,
+                            ).toLocaleDateString(undefined, {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </p>
+                          {invite.invitedByEmail && (
+                            <p className="mt-1 text-[11px] text-[#9a9892]">
+                              Invited by{" "}
+                              {invite.invitedByName ||
+                                invite.invitedByEmail}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          disabled={isCanceling}
+                          onClick={() =>
+                            handleCancelInvite(invite.id)
+                          }
+                          className="rounded-full border border-[#f5d1c4] px-3 py-1 text-[11px] font-medium text-[#c5431a] hover:bg-[#fff4f0] disabled:opacity-60"
+                        >
+                          {isCanceling ? "Cancelling…" : "Cancel"}
+                        </button>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+
+            {/* Members list */}
+            <section className="mt-8 grid gap-4 md:grid-cols-2">
+              {sortedMembers.map((member) => {
+                const isYou = member.userId === currentUserId;
                 return (
                   <article
-                    key={invite.id}
-                    className="flex items-center justify-between rounded-2xl border border-[#ece5d8] bg-white px-4 py-3 text-sm shadow-sm"
+                    key={member.id}
+                    className="flex flex-col rounded-2xl border border-[#ece5d8] bg-white px-4 py-3 shadow-sm"
                   >
-                    <div>
-                      <p className="font-semibold text-[#424143]">
-                        {invite.email}
-                      </p>
-                      <p className="text-[11px] text-[#7a7a7a]">
-                        {formatCompanyRole(invite.roleInCompany)} • invited{" "}
-                        {new Date(
-                          invite.createdAt,
-                        ).toLocaleDateString(undefined, {
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </p>
-                      {invite.invitedByEmail && (
-                        <p className="mt-1 text-[11px] text-[#9a9892]">
-                          Invited by{" "}
-                          {invite.invitedByName ||
-                            invite.invitedByEmail}
-                        </p>
-                      )}
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f15b2b]/10 text-sm font-semibold text-[#f15b2b]">
+                          {initialsForName(
+                            member.name ?? member.email,
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-[#424143]">
+                            {member.name || "Unnamed member"}
+                            {isYou && (
+                              <span className="ml-1 text-[11px] font-medium text-[#f15b2b]">
+                                (You)
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-xs text-[#7a7a7a]">
+                            {member.email}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[11px] font-medium text-[#7a7a7a]">
+                        {formatCompanyRole(member.roleInCompany)}
+                      </span>
                     </div>
-                    <button
-                      type="button"
-                      disabled={isCanceling}
-                      onClick={() => handleCancelInvite(invite.id)}
-                      className="rounded-full border border-[#f5d1c4] px-3 py-1 text-[11px] font-medium text-[#c5431a] hover:bg-[#fff4f0] disabled:opacity-60"
-                    >
-                      {isCanceling ? "Cancelling…" : "Cancel"}
-                    </button>
+                    <p className="mt-1 text-xs text-[#9a9892]">
+                      Joined{" "}
+                      {new Date(
+                        member.joinedAt,
+                      ).toLocaleDateString(undefined, {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </p>
                   </article>
                 );
               })}
-            </div>
-          )}
-        </section>
 
-        {/* Members list */}
-        <section className="mt-8 grid gap-4 md:grid-cols-2">
-          {sortedMembers.map((member) => {
-            const isYou = member.userId === currentUserId;
-            return (
-              <article
-                key={member.id}
-                className="flex flex-col rounded-2xl border border-[#ece5d8] bg-white px-4 py-3 shadow-sm"
-              >
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f15b2b]/10 text-sm font-semibold text-[#f15b2b]">
-                      {initialsForName(member.name ?? member.email)}
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-[#424143]">
-                        {member.name || "Unnamed member"}
-                        {isYou && (
-                          <span className="ml-1 text-[11px] font-medium text-[#f15b2b]">
-                            (You)
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-xs text-[#7a7a7a]">
-                        {member.email}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[11px] font-medium text-[#7a7a7a]">
-                    {formatCompanyRole(member.roleInCompany)}
-                  </span>
+              {sortedMembers.length === 0 && !error && (
+                <div className="rounded-2xl border border-dashed border-[#d5cec0] bg:white/60 px-4 py-6 text-sm text-[#7a7a7a]">
+                  No members found for this company yet.
                 </div>
-                <p className="mt-1 text-xs text-[#9a9892]">
-                  Joined{" "}
-                  {new Date(member.joinedAt).toLocaleDateString(undefined, {
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                  })}
-                </p>
-              </article>
-            );
-          })}
-
-          {sortedMembers.length === 0 && !error && (
-            <div className="rounded-2xl border border-dashed border-[#d5cec0] bg:white/60 px-4 py-6 text-sm text-[#7a7a7a]">
-              No members found for this company yet.
-            </div>
-          )}
-        </section>
+              )}
+            </section>
+          </>
+        )}
       </div>
     </div>
   );

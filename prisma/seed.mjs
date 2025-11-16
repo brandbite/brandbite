@@ -1,8 +1,8 @@
 // -----------------------------------------------------------------------------
 // @file: prisma/seed.mjs
 // @purpose: Seed script for Brandbite demo data (companies, projects, tickets, tokens)
-// @version: v1.0.0
-// @lastUpdate: 2025-11-14
+// @version: v1.1.1
+// @lastUpdate: 2025-11-16
 // -----------------------------------------------------------------------------
 
 import {
@@ -33,6 +33,7 @@ async function main() {
   await prisma.projectMember.deleteMany({});
   await prisma.project.deleteMany({});
   await prisma.companyMember.deleteMany({});
+  await prisma.companyInvite.deleteMany({});
   await prisma.company.deleteMany({});
   await prisma.plan.deleteMany({});
   await prisma.jobType.deleteMany({});
@@ -98,6 +99,15 @@ async function main() {
     },
   });
 
+  const customerBilling = await prisma.userAccount.create({
+    data: {
+      authUserId: "demo-customer-billing",
+      email: "billing@acme-demo.com",
+      name: "Acme Billing",
+      role: UserRole.CUSTOMER,
+    },
+  });
+
   console.log("✅ Users created.");
 
   // ---------------------------------------------------------------------------
@@ -150,6 +160,14 @@ async function main() {
       companyId: company.id,
       userId: customerPM.id,
       roleInCompany: CompanyRole.PM,
+    },
+  });
+
+  const companyBillingMember = await prisma.companyMember.create({
+    data: {
+      companyId: company.id,
+      userId: customerBilling.id,
+      roleInCompany: CompanyRole.BILLING,
     },
   });
 
@@ -220,7 +238,8 @@ async function main() {
   const jobLandingHero = await prisma.jobType.create({
     data: {
       name: "Landing hero redesign",
-      description: "Hero section redesign for main marketing page.",
+      description:
+        "Hero section redesign for main marketing page.",
       tokenCost: 8,
       designerPayoutTokens: 5,
     },
@@ -253,7 +272,8 @@ async function main() {
   const ticket1 = await prisma.ticket.create({
     data: {
       title: "Landing hero redesign",
-      description: "Update hero section to match new brand colours and layout.",
+      description:
+        "Update hero section to match new brand colours and layout.",
       status: TicketStatus.IN_PROGRESS,
       priority: TicketPriority.HIGH,
       companyId: company.id,
@@ -268,7 +288,8 @@ async function main() {
   const ticket2 = await prisma.ticket.create({
     data: {
       title: "Pricing page illustration",
-      description: "Create a hero illustration for the pricing page header.",
+      description:
+        "Create a hero illustration for the pricing page header.",
       status: TicketStatus.TODO,
       priority: TicketPriority.MEDIUM,
       companyId: company.id,
@@ -283,7 +304,8 @@ async function main() {
   const ticket3 = await prisma.ticket.create({
     data: {
       title: "Onboarding flow visuals",
-      description: "Design illustrations for each step in the onboarding flow.",
+      description:
+        "Design illustrations for each step in the onboarding flow.",
       status: TicketStatus.IN_REVIEW,
       priority: TicketPriority.HIGH,
       companyId: company.id,
@@ -298,7 +320,8 @@ async function main() {
   const ticket4 = await prisma.ticket.create({
     data: {
       title: "Blog cover illustration",
-      description: "Cover illustration for upcoming product blog post.",
+      description:
+        "Cover illustration for upcoming product blog post.",
       status: TicketStatus.TODO,
       priority: TicketPriority.LOW,
       companyId: company.id,
@@ -368,7 +391,8 @@ async function main() {
         direction: LedgerDirection.CREDIT,
         amount: jobOnboarding.designerPayoutTokens,
         reason: "JOB_IN_REVIEW",
-        notes: "Partial payout for onboarding visuals (in review).",
+        notes:
+          "Partial payout for onboarding visuals (in review).",
         metadata: {
           ticketId: ticket3.id,
         },
