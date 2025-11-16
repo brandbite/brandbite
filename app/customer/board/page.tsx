@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/board/page.tsx
 // @purpose: Customer-facing board view of company tickets (kanban-style + drag & drop + detail modal)
-// @version: v1.7.0
+// @version: v1.7.1
 // @status: active
 // @lastUpdate: 2025-11-16
 // -----------------------------------------------------------------------------
@@ -180,9 +180,13 @@ export default function CustomerBoardPage() {
       };
 
       setData(normalized);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Customer board fetch error:", err);
-      setError(err?.message || "Failed to load customer board.");
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Failed to load customer board.";
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -234,13 +238,16 @@ export default function CustomerBoardPage() {
           stats: computeStats(nextTickets),
         };
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Update ticket status error:", err);
-      setMutationError(
-        err?.message || "Failed to update ticket status. Please try again.",
-      );
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Failed to update ticket status. Please try again.";
+      setMutationError(message);
       await load();
     } finally {
+
       setUpdatingTicketId(null);
     }
   };

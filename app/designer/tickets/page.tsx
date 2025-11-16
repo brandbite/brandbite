@@ -89,11 +89,13 @@ export default function DesignerTicketsPage() {
       }
 
       setData(json as DesignerTicketsResponse);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Designer tickets fetch error:", err);
-      setError(
-        err?.message || "Failed to load designer tickets.",
-      );
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Failed to load designer tickets.";
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -168,12 +170,13 @@ export default function DesignerTicketsPage() {
       }
 
       await load();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Designer ticket update error:", err);
-      setError(
-        err?.message ||
-          "Failed to update ticket. Please try again.",
-      );
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Failed to update ticket. Please try again.";
+      setError(message);
     } finally {
       setUpdatingId(null);
     }
