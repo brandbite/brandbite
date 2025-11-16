@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/settings/page.tsx
 // @purpose: Customer-facing settings page (account + company + plan overview)
-// @version: v1.0.0
+// @version: v1.1.0
 // @status: active
-// @lastUpdate: 2025-11-15
+// @lastUpdate: 2025-11-16
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -11,6 +11,7 @@
 import { useEffect, useState } from "react";
 
 type UserRole = "SITE_OWNER" | "SITE_ADMIN" | "DESIGNER" | "CUSTOMER";
+type CompanyRole = "OWNER" | "PM" | "BILLING" | "MEMBER";
 
 type CustomerSettingsResponse = {
   user: {
@@ -18,6 +19,7 @@ type CustomerSettingsResponse = {
     email: string;
     name: string | null;
     role: UserRole;
+    companyRole: CompanyRole | null;
   };
   company: {
     id: string;
@@ -40,6 +42,25 @@ type CustomerSettingsResponse = {
     isActive: boolean;
   } | null;
 };
+
+function hasPlanManagementAccess(role: CompanyRole | null | undefined): boolean {
+  return role === "OWNER" || role === "BILLING";
+}
+
+function prettyCompanyRole(role: CompanyRole | null | undefined): string {
+  switch (role) {
+    case "OWNER":
+      return "Owner";
+    case "PM":
+      return "Project manager";
+    case "BILLING":
+      return "Billing manager";
+    case "MEMBER":
+      return "Member";
+    default:
+      return "—";
+  }
+}
 
 export default function CustomerSettingsPage() {
   const [data, setData] = useState<CustomerSettingsResponse | null>(null);
@@ -118,6 +139,8 @@ export default function CustomerSettingsPage() {
         return role;
     }
   };
+
+  const canManagePlan = hasPlanManagementAccess(user?.companyRole ?? null);
 
   return (
     <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
@@ -220,6 +243,14 @@ export default function CustomerSettingsPage() {
                     {user ? prettyRole(user.role) : "—"}
                   </p>
                 </div>
+                <div>
+                  <p className="text-[11px] font-medium text-[#9a9892]">
+                    Company role
+                  </p>
+                  <p className="mt-0.5">
+                    {prettyCompanyRole(user?.companyRole ?? null)}
+                  </p>
+                </div>
               </div>
             </section>
 
@@ -293,6 +324,18 @@ export default function CustomerSettingsPage() {
 
               {plan ? (
                 <div className="mt-3 space-y-2 text-xs text-[#424143]">
+                  {!canManagePlan && (
+                    <div className="rounded-lg border border-[#f6c89f] bg-[#fff4e6] px-3 py-2 text-[11px] text-[#7a7a7a]">
+                      <p className="text-[11px] font-medium text-[#9a5b2b]">
+                        Limited access
+                      </p>
+                      <p className="mt-1">
+                        You don't have permission to manage billing for this company.
+                        You can see the current plan, but only the owner or billing
+                        manager can request changes.
+                      </p>
+                    </div>
+                  )}
                   <div>
                     <p className="text-[11px] font-medium text-[#9a9892]">
                       Plan name
@@ -324,9 +367,18 @@ export default function CustomerSettingsPage() {
                     </p>
                   </div>
                   <div className="mt-2 rounded-lg bg-[#fbfaf8] px-3 py-2 text-[11px] text-[#7a7a7a]">
-                    Changes to your plan are currently handled by the
-                    Brandbite team. Reach out to support if you want to
-                    switch plans.
+                    {canManagePlan ? (
+                      <>
+                        Changes to your plan are currently handled by the
+                        Brandbite team. Reach out to support if you want to
+                        switch plans.
+                      </>
+                    ) : (
+                      <>
+                        Need to change something? Ask your company owner or
+                        billing manager to contact support.
+                      </>
+                    )}
                   </div>
                 </div>
               ) : (
