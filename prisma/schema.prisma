@@ -73,6 +73,12 @@ enum ProjectRole {
   VIEWER      // read-only
 }
 
+enum BillingStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
 // --- Core Models -------------------------------------------------------------
 
 model UserAccount {
@@ -113,6 +119,11 @@ model Company {
 
   tokenBalance Int           @default(0)
   tokenLedgers TokenLedger[]
+
+  // Stripe billing mapping
+  stripeCustomerId     String?       @unique
+  stripeSubscriptionId String?       @unique
+  billingStatus        BillingStatus?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
