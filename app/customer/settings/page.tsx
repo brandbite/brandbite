@@ -1,14 +1,15 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/settings/page.tsx
 // @purpose: Customer-facing settings page (account + company + plan overview)
-// @version: v1.1.0
+// @version: v1.2.0
 // @status: active
-// @lastUpdate: 2025-11-16
+// @lastUpdate: 2025-11-17
 // -----------------------------------------------------------------------------
 
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 type UserRole = "SITE_OWNER" | "SITE_ADMIN" | "DESIGNER" | "CUSTOMER";
 type CompanyRole = "OWNER" | "PM" | "BILLING" | "MEMBER";
@@ -66,6 +67,12 @@ export default function CustomerSettingsPage() {
   const [data, setData] = useState<CustomerSettingsResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [billingError, setBillingError] = useState<string | null>(null);
+  const [billingLoading, setBillingLoading] = useState<boolean>(false);
+
+  const searchParams = useSearchParams();
+  const billingStatus = searchParams.get("billing");
 
   useEffect(() => {
     let cancelled = false;
@@ -142,6 +149,40 @@ export default function CustomerSettingsPage() {
 
   const canManagePlan = hasPlanManagementAccess(user?.companyRole ?? null);
 
+  const handleStartBillingCheckout = async () => {
+    if (!plan?.id) return;
+    setBillingLoading(true);
+    setBillingError(null);
+
+    try {
+      const res = await fetch("/api/billing/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ planId: plan.id }),
+      });
+
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok || !json?.url) {
+        const msg =
+          json?.error || `Request failed with status ${res.status}`;
+        throw new Error(msg);
+      }
+
+      // Redirect user to Stripe Checkout
+      window.location.href = json.url as string;
+    } catch (err: any) {
+      console.error("Billing checkout error:", err);
+      setBillingError(
+        err?.message || "Failed to start billing checkout.",
+      );
+    } finally {
+      setBillingLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
       <div className="mx-auto max-w-6xl px-6 py-10">
@@ -197,6 +238,27 @@ export default function CustomerSettingsPage() {
           <div className="mb-4 rounded-xl border border-red-200 bg-white px-4 py-3 text-sm text-red-700">
             <p className="font-medium">Error</p>
             <p className="mt-1">{error}</p>
+          </div>
+        )}
+
+        {/* Billing status banner (after Stripe redirect) */}
+        {!loading && billingStatus === "success" && (
+          <div className="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+            <p className="font-medium">Billing updated</p>
+            <p className="mt-1">
+              Your subscription has been updated successfully. If the changes are not
+              reflected immediately, they will appear after the next refresh.
+            </p>
+          </div>
+        )}
+
+        {!loading && billingStatus === "cancelled" && (
+          <div className="mb-4 rounded-xl border border-[#f6c89f] bg-[#fff4e6] px-4 py-3 text-sm text-[#9a5b2b]">
+            <p className="font-medium">Checkout cancelled</p>
+            <p className="mt-1">
+              You cancelled the Stripe checkout. No changes were made to your
+              current subscription.
+            </p>
           </div>
         )}
 
@@ -366,18 +428,37 @@ export default function CustomerSettingsPage() {
                       {plan.isActive ? "Active" : "Inactive"}
                     </p>
                   </div>
-                  <div className="mt-2 rounded-lg bg-[#fbfaf8] px-3 py-2 text-[11px] text-[#7a7a7a]">
-                    {canManagePlan ? (
-                      <>
-                        Changes to your plan are currently handled by the
-                        Brandbite team. Reach out to support if you want to
-                        switch plans.
-                      </>
-                    ) : (
-                      <>
-                        Need to change something? Ask your company owner or
-                        billing manager to contact support.
-                      </>
+
+                  {billingError && (
+                    <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
+                      {billingError}
+                    </div>
+                  )}
+
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <div className="rounded-lg bg-[#fbfaf8] px-3 py-2 text-[11px] text-[#7a7a7a]">
+                      {canManagePlan ? (
+                        <>
+                          Use the button on the right to manage your subscription and
+                          billing details through Stripe.
+                        </>
+                      ) : (
+                        <>
+                          Need to change something? Ask your company owner or
+                          billing manager to manage the subscription.
+                        </>
+                      )}
+                    </div>
+
+                    {canManagePlan && (
+                      <button
+                        type="button"
+                        onClick={handleStartBillingCheckout}
+                        disabled={billingLoading || !plan.isActive}
+                        className="inline-flex flex-shrink-0 items-center justify-center rounded-full bg-[#f15b2b] px-3 py-2 text-[11px] font-semibold text-white shadow-sm disabled:opacity-60"
+                      >
+                        {billingLoading ? "Redirecting…" : "Manage billing"}
+                      </button>
                     )}
                   </div>
                 </div>

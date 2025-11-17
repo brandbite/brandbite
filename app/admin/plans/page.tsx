@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/admin/plans/page.tsx
 // @purpose: Admin-facing management of subscription plans
-// @version: v1.0.0
+// @version: v1.1.0
 // @status: active
-// @lastUpdate: 2025-11-15
+// @lastUpdate: 2025-11-17
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -16,6 +16,10 @@ type Plan = {
   monthlyTokens: number;
   priceCents: number | null;
   isActive: boolean;
+  // Stripe mapping fields
+  stripeProductId: string | null;
+  stripePriceId: string | null;
+
   attachedCompanies: number;
   createdAt: string;
   updatedAt: string;
@@ -35,6 +39,8 @@ export default function AdminPlansPage() {
   const [monthlyTokens, setMonthlyTokens] = useState("");
   const [priceCents, setPriceCents] = useState("");
   const [isActive, setIsActive] = useState(true);
+  const [stripeProductId, setStripeProductId] = useState("");
+  const [stripePriceId, setStripePriceId] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -57,6 +63,8 @@ export default function AdminPlansPage() {
     setMonthlyTokens("");
     setPriceCents("");
     setIsActive(true);
+    setStripeProductId("");
+    setStripePriceId("");
     setSaveError(null);
     setSaveSuccess(null);
   };
@@ -69,6 +77,8 @@ export default function AdminPlansPage() {
       plan.priceCents != null ? String(plan.priceCents) : "",
     );
     setIsActive(plan.isActive);
+    setStripeProductId(plan.stripeProductId ?? "");
+    setStripePriceId(plan.stripePriceId ?? "");
     setSaveError(null);
     setSaveSuccess(null);
   };
@@ -162,6 +172,12 @@ export default function AdminPlansPage() {
       } else {
         payload.priceCents = null;
       }
+
+      // Stripe IDs (optional)
+      const productId = stripeProductId.trim();
+      const priceId = stripePriceId.trim();
+      payload.stripeProductId = productId !== "" ? productId : null;
+      payload.stripePriceId = priceId !== "" ? priceId : null;
 
       const isEditing = !!selected;
 
@@ -280,7 +296,7 @@ export default function AdminPlansPage() {
               Plans
             </h1>
             <p className="mt-1 text-sm text-[#7a7a7a]">
-              Configure subscription plans with monthly tokens and pricing.
+              Configure subscription plans with monthly tokens, pricing and Stripe mapping.
             </p>
           </div>
           <button
@@ -373,6 +389,9 @@ export default function AdminPlansPage() {
                       <th className="px-2 py-2 text-center">
                         Status
                       </th>
+                      <th className="px-2 py-2 text-left">
+                        Stripe IDs
+                      </th>
                       <th className="px-2 py-2 text-right">
                         Companies
                       </th>
@@ -413,6 +432,14 @@ export default function AdminPlansPage() {
                           >
                             {p.isActive ? "Active" : "Inactive"}
                           </span>
+                        </td>
+                        <td className="px-2 py-2 align-top text-left text-[11px]">
+                          <div className="text-[#424143]">
+                            {p.stripeProductId || "—"}
+                          </div>
+                          <div className="mt-0.5 text-[10px] text-[#9a9892]">
+                            {p.stripePriceId || "—"}
+                          </div>
                         </td>
                         <td className="px-2 py-2 align-top text-right text-[11px] text-[#424143]">
                           {p.attachedCompanies}
@@ -503,6 +530,40 @@ export default function AdminPlansPage() {
                   onChange={(e) => setPriceCents(e.target.value)}
                   className="w-full rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
                   placeholder="e.g. 4900 for €49.00"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label
+                  htmlFor="plan-stripe-product-id"
+                  className="text-xs font-medium text-[#424143]"
+                >
+                  Stripe product ID (optional)
+                </label>
+                <input
+                  id="plan-stripe-product-id"
+                  type="text"
+                  value={stripeProductId}
+                  onChange={(e) => setStripeProductId(e.target.value)}
+                  className="w-full rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+                  placeholder="e.g. prod_123..."
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label
+                  htmlFor="plan-stripe-price-id"
+                  className="text-xs font-medium text-[#424143]"
+                >
+                  Stripe price ID (optional)
+                </label>
+                <input
+                  id="plan-stripe-price-id"
+                  type="text"
+                  value={stripePriceId}
+                  onChange={(e) => setStripePriceId(e.target.value)}
+                  className="w-full rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+                  placeholder="e.g. price_123..."
                 />
               </div>
 
