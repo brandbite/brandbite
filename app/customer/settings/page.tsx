@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/settings/page.tsx
 // @purpose: Customer-facing settings page (account + company + plan overview)
-// @version: v1.2.0
+// @version: v1.3.0
 // @status: active
 // @lastUpdate: 2025-11-17
 // -----------------------------------------------------------------------------
@@ -13,6 +13,7 @@ import { useSearchParams } from "next/navigation";
 
 type UserRole = "SITE_OWNER" | "SITE_ADMIN" | "DESIGNER" | "CUSTOMER";
 type CompanyRole = "OWNER" | "PM" | "BILLING" | "MEMBER";
+type BillingStatus = "ACTIVE" | "PAST_DUE" | "CANCELED";
 
 type CustomerSettingsResponse = {
   user: {
@@ -27,6 +28,7 @@ type CustomerSettingsResponse = {
     name: string;
     slug: string;
     tokenBalance: number;
+    billingStatus: BillingStatus | null;
     createdAt: string;
     updatedAt: string;
     counts: {
@@ -44,11 +46,15 @@ type CustomerSettingsResponse = {
   } | null;
 };
 
-function hasPlanManagementAccess(role: CompanyRole | null | undefined): boolean {
+function hasPlanManagementAccess(
+  role: CompanyRole | null | undefined,
+): boolean {
   return role === "OWNER" || role === "BILLING";
 }
 
-function prettyCompanyRole(role: CompanyRole | null | undefined): string {
+function prettyCompanyRole(
+  role: CompanyRole | null | undefined,
+): string {
   switch (role) {
     case "OWNER":
       return "Owner";
@@ -63,16 +69,50 @@ function prettyCompanyRole(role: CompanyRole | null | undefined): string {
   }
 }
 
+function prettyBillingStatus(
+  status: BillingStatus | null | undefined,
+): string {
+  switch (status) {
+    case "ACTIVE":
+      return "Active";
+    case "PAST_DUE":
+      return "Past due";
+    case "CANCELED":
+      return "Canceled";
+    default:
+      return "Not set";
+  }
+}
+
+function billingStatusClassName(
+  status: BillingStatus | null | undefined,
+): string {
+  switch (status) {
+    case "ACTIVE":
+      return "bg-[#f0fff6] text-[#137a3a]";
+    case "PAST_DUE":
+      return "bg-[#fff4e6] text-[#9a5b2b]";
+    case "CANCELED":
+      return "bg-[#f5f3f0] text-[#9a9892]";
+    default:
+      return "bg-[#f5f3f0] text-[#9a9892]";
+  }
+}
+
 export default function CustomerSettingsPage() {
-  const [data, setData] = useState<CustomerSettingsResponse | null>(null);
+  const [data, setData] =
+    useState<CustomerSettingsResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [billingError, setBillingError] = useState<string | null>(null);
-  const [billingLoading, setBillingLoading] = useState<boolean>(false);
+  const [billingError, setBillingError] = useState<string | null>(
+    null,
+  );
+  const [billingLoading, setBillingLoading] =
+    useState<boolean>(false);
 
   const searchParams = useSearchParams();
-  const billingStatus = searchParams.get("billing");
+  const billingStatusParam = searchParams.get("billing");
 
   useEffect(() => {
     let cancelled = false;
@@ -147,7 +187,9 @@ export default function CustomerSettingsPage() {
     }
   };
 
-  const canManagePlan = hasPlanManagementAccess(user?.companyRole ?? null);
+  const canManagePlan = hasPlanManagementAccess(
+    user?.companyRole ?? null,
+  );
 
   const handleStartBillingCheckout = async () => {
     if (!plan?.id) return;
@@ -199,19 +241,25 @@ export default function CustomerSettingsPage() {
           <nav className="hidden items-center gap-6 text-sm text-[#7a7a7a] md:flex">
             <button
               className="font-medium text-[#7a7a7a]"
-              onClick={() => (window.location.href = "/customer/board")}
+              onClick={() =>
+                (window.location.href = "/customer/board")
+              }
             >
               Board
             </button>
             <button
               className="font-medium text-[#7a7a7a]"
-              onClick={() => (window.location.href = "/customer/tickets")}
+              onClick={() =>
+                (window.location.href = "/customer/tickets")
+              }
             >
               Tickets
             </button>
             <button
               className="font-medium text-[#7a7a7a]"
-              onClick={() => (window.location.href = "/customer/tokens")}
+              onClick={() =>
+                (window.location.href = "/customer/tokens")
+              }
             >
               Tokens
             </button>
@@ -242,22 +290,23 @@ export default function CustomerSettingsPage() {
         )}
 
         {/* Billing status banner (after Stripe redirect) */}
-        {!loading && billingStatus === "success" && (
+        {!loading && billingStatusParam === "success" && (
           <div className="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
             <p className="font-medium">Billing updated</p>
             <p className="mt-1">
-              Your subscription has been updated successfully. If the changes are not
-              reflected immediately, they will appear after the next refresh.
+              Your subscription has been updated successfully. If the
+              changes are not reflected immediately, they will appear
+              after the next refresh.
             </p>
           </div>
         )}
 
-        {!loading && billingStatus === "cancelled" && (
+        {!loading && billingStatusParam === "cancelled" && (
           <div className="mb-4 rounded-xl border border-[#f6c89f] bg-[#fff4e6] px-4 py-3 text-sm text-[#9a5b2b]">
             <p className="font-medium">Checkout cancelled</p>
             <p className="mt-1">
-              You cancelled the Stripe checkout. No changes were made to your
-              current subscription.
+              You cancelled the Stripe checkout. No changes were made to
+              your current subscription.
             </p>
           </div>
         )}
@@ -369,7 +418,9 @@ export default function CustomerSettingsPage() {
                     Created at
                   </p>
                   <p className="mt-0.5">
-                    {company ? formatDate(company.createdAt) : "—"}
+                    {company
+                      ? formatDate(company.createdAt)
+                      : "—"}
                   </p>
                 </div>
               </div>
@@ -392,9 +443,10 @@ export default function CustomerSettingsPage() {
                         Limited access
                       </p>
                       <p className="mt-1">
-                        You don't have permission to manage billing for this company.
-                        You can see the current plan, but only the owner or billing
-                        manager can request changes.
+                        You don't have permission to manage billing for
+                        this company. You can see the current plan, but
+                        only the owner or billing manager can request
+                        changes.
                       </p>
                     </div>
                   )}
@@ -420,13 +472,26 @@ export default function CustomerSettingsPage() {
                       {formatPrice(plan.priceCents)}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-[11px] font-medium text-[#9a9892]">
-                      Status
-                    </p>
-                    <p className="mt-0.5">
-                      {plan.isActive ? "Active" : "Inactive"}
-                    </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-[11px] font-medium text-[#9a9892]">
+                        Subscription status
+                      </p>
+                      <div className="mt-1">
+                        <span
+                          className={
+                            "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold " +
+                            billingStatusClassName(
+                              company?.billingStatus ?? null,
+                            )
+                          }
+                        >
+                          {prettyBillingStatus(
+                            company?.billingStatus ?? null,
+                          )}
+                        </span>
+                      </div>
+                    </div>
                   </div>
 
                   {billingError && (
@@ -439,13 +504,15 @@ export default function CustomerSettingsPage() {
                     <div className="rounded-lg bg-[#fbfaf8] px-3 py-2 text-[11px] text-[#7a7a7a]">
                       {canManagePlan ? (
                         <>
-                          Use the button on the right to manage your subscription and
-                          billing details through Stripe.
+                          Use the button on the right to manage your
+                          subscription and billing details through
+                          Stripe.
                         </>
                       ) : (
                         <>
-                          Need to change something? Ask your company owner or
-                          billing manager to manage the subscription.
+                          Need to change something? Ask your company
+                          owner or billing manager to manage the
+                          subscription.
                         </>
                       )}
                     </div>
@@ -457,7 +524,9 @@ export default function CustomerSettingsPage() {
                         disabled={billingLoading || !plan.isActive}
                         className="inline-flex flex-shrink-0 items-center justify-center rounded-full bg-[#f15b2b] px-3 py-2 text-[11px] font-semibold text-white shadow-sm disabled:opacity-60"
                       >
-                        {billingLoading ? "Redirecting…" : "Manage billing"}
+                        {billingLoading
+                          ? "Redirecting…"
+                          : "Manage billing"}
                       </button>
                     )}
                   </div>

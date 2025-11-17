@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: lib/permissions/companyRoles.ts
 // @purpose: Permission helpers for company-level roles (OWNER / PM / BILLING / MEMBER)
-// @version: v1.2.0
+// @version: v1.3.0
 // @status: active
-// @lastUpdate: 2025-11-16
+// @lastUpdate: 2025-11-17
 // -----------------------------------------------------------------------------
 
 import type { CompanyRole as PrismaCompanyRole } from "@prisma/client";
@@ -42,9 +42,22 @@ export function isCompanyAdminRole(
 }
 
 /**
+ * NEW: Who can manage company members (list, invites, roles).
+ *
+ * For now this mirrors "company admin": OWNER + PM.
+ */
+export function canManageMembers(
+  role: CompanyRole | null | undefined,
+): boolean {
+  return isCompanyAdminRole(role);
+}
+
+/**
  * Plan / subscription management: OWNER + BILLING.
  */
-export function canManagePlan(role: CompanyRole | null | undefined): boolean {
+export function canManagePlan(
+  role: CompanyRole | null | undefined,
+): boolean {
   if (!role) return false;
   return role === "OWNER" || role === "BILLING";
 }
@@ -62,7 +75,9 @@ export function canManageBilling(
 /**
  * Board visibility: anyone who is actually a member of the company.
  */
-export function canViewBoard(role: CompanyRole | null | undefined): boolean {
+export function canViewBoard(
+  role: CompanyRole | null | undefined,
+): boolean {
   return !!role;
 }
 
@@ -92,7 +107,9 @@ export function canMoveTicketsOnBoard(
 /**
  * Tokens overview visibility: everyone inside the workspace for now.
  */
-export function canViewTokens(_role: CompanyRole | null | undefined): boolean {
+export function canViewTokens(
+  _role: CompanyRole | null | undefined,
+): boolean {
   return true;
 }
 
@@ -106,6 +123,13 @@ export function isBillingReadOnly(
   return role === "BILLING";
 }
 
+/**
+ * Who can mark tickets as DONE for a given company.
+ *
+ * - SITE_OWNER / SITE_ADMIN: always allowed
+ * - Other global roles: only CUSTOMER is eligible for companyRole-based rules
+ * - Within a company: only OWNER + PM can mark as DONE
+ */
 export function canMarkTicketsDoneForCompany(
   globalRole: string | null | undefined,
   companyRole: CompanyRole | null | undefined,
@@ -125,4 +149,3 @@ export function canMarkTicketsDoneForCompany(
   // Within a company, only OWNER + PM can mark tickets as DONE
   return companyRole === "OWNER" || companyRole === "PM";
 }
-

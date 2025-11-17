@@ -1,18 +1,21 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/customer/members/invite/route.ts
 // @purpose: Create a company invite (email + role) for current customer's company
-// @version: v1.0.0
+// @version: v1.1.0
 // @status: active
-// @lastUpdate: 2025-11-16
+// @lastUpdate: 2025-11-17
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { CompanyRole, InviteStatus } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import {
+  canManageMembers,
+  normalizeCompanyRole,
+} from "@/lib/permissions/companyRoles";
 import { randomUUID } from "crypto";
 
-const ALLOWED_INVITER_ROLES: CompanyRole[] = ["OWNER", "PM"];
 const ALLOWED_ASSIGNED_ROLES: CompanyRole[] = ["MEMBER", "PM", "BILLING"];
 
 export async function POST(req: NextRequest) {
@@ -21,26 +24,24 @@ export async function POST(req: NextRequest) {
 
     if (user.role !== "CUSTOMER") {
       return NextResponse.json(
-        { error: "Only customers can create company invites" },
+        { error: "Only customer users can send invites." },
         { status: 403 },
       );
     }
 
     if (!user.activeCompanyId) {
       return NextResponse.json(
-        { error: "User has no active company" },
+        { error: "No active company selected." },
         { status: 400 },
       );
     }
 
-    if (
-      !user.companyRole ||
-      !ALLOWED_INVITER_ROLES.includes(user.companyRole as CompanyRole)
-    ) {
+    const companyRole = normalizeCompanyRole(user.companyRole);
+    if (!canManageMembers(companyRole)) {
       return NextResponse.json(
         {
           error:
-            "Only company owners or project managers can invite new members",
+            "Only company owners or project managers can send invites.",
         },
         { status: 403 },
       );
@@ -48,73 +49,62 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json().catch(() => null);
 
-    if (!body || typeof body !== "object") {
+    const rawEmail = body?.email;
+    const rawRole = body?.roleInCompany as CompanyRole | undefined;
+
+    if (!rawEmail || typeof rawEmail !== "string") {
       return NextResponse.json(
-        { error: "Invalid request body" },
+        { error: "Email is required." },
         { status: 400 },
       );
     }
 
-    const rawEmail = String((body as any).email ?? "").trim().toLowerCase();
-    const rawRole = String((body as any).roleInCompany ?? "").trim();
+    const email = rawEmail.trim().toLowerCase();
 
-    if (!rawEmail) {
-      return NextResponse.json(
-        { error: "Email is required" },
-        { status: 400 },
-      );
-    }
-
-    // basit bir email check (regex manyaklığına gerek yok)
-    if (!rawEmail.includes("@") || !rawEmail.includes(".")) {
-      return NextResponse.json(
-        { error: "Please provide a valid email address" },
-        { status: 400 },
-      );
-    }
-
-    const roleInCompany: CompanyRole = ALLOWED_ASSIGNED_ROLES.includes(
-      rawRole as CompanyRole,
-    )
-      ? (rawRole as CompanyRole)
-      : "MEMBER";
-
-    // 1) eğer user zaten varsa ve aynı company'ye üyeyse, invite gerek yok
-    const existingUser = await prisma.userAccount.findUnique({
-      where: { email: rawEmail },
-      select: { id: true },
-    });
-
-    if (existingUser) {
-      const existingMember = await prisma.companyMember.findUnique({
-        where: {
-          companyId_userId: {
-            companyId: user.activeCompanyId,
-            userId: existingUser.id,
-          },
-        },
-      });
-
-      if (existingMember) {
+    // Validate assigned role (default MEMBER)
+    let roleInCompany: CompanyRole = "MEMBER";
+    if (rawRole) {
+      if (!ALLOWED_ASSIGNED_ROLES.includes(rawRole)) {
         return NextResponse.json(
-          { error: "This user is already a member of your company" },
+          { error: "Invalid role for invited member." },
           { status: 400 },
         );
       }
+      roleInCompany = rawRole;
     }
 
-    // 2) aynı email için PENDING invite var mı?
+    // Already a member?
+    const existingMember = await prisma.companyMember.findFirst({
+      where: {
+        companyId: user.activeCompanyId,
+        user: {
+          email,
+        },
+      },
+      include: {
+        user: true,
+      },
+    });
+
+    if (existingMember) {
+      return NextResponse.json(
+        { error: "This user is already a member of your company." },
+        { status: 400 },
+      );
+    }
+
+    // Already pending invite?
     const existingInvite = await prisma.companyInvite.findFirst({
       where: {
         companyId: user.activeCompanyId,
-        email: rawEmail,
+        email,
         status: InviteStatus.PENDING,
       },
     });
 
     if (existingInvite) {
       return NextResponse.json(
-        { error: "There is already a pending invite for this email" },
+        { error: "An invite already exists for this email." },
         { status: 400 },
       );
     }
@@ -124,7 +114,7 @@ export async function POST(req: NextRequest) {
     const invite = await prisma.companyInvite.create({
       data: {
         companyId: user.activeCompanyId,
-        email: rawEmail,
+        email,
         roleInCompany,
         invitedByUserId: user.id,
         token,
@@ -132,6 +122,8 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // Frontend şu anda sadece "ok" olup olmadığıyla ilgileniyor
+    // ama ileride kullanmak üzere invite'ı da geri döndürüyoruz.
     return NextResponse.json(
       {
         invite: {
@@ -146,10 +138,13 @@ export async function POST(req: NextRequest) {
     );
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
-      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Unauthenticated" },
+        { status: 401 },
+      );
     }
 
-    console.error("[POST /api/customer/members/invite] error:", error);
+    console.error("[POST /api/customer/members/invite] error", error);
     return NextResponse.json(
       { error: "Failed to create invite" },
       { status: 500 },
