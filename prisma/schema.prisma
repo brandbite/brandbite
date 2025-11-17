@@ -209,6 +209,10 @@ model Plan {
   priceCents    Int?    // opsiyonel: fiyat bilgisi
   isActive      Boolean @default(true)
 
+  // Stripe entegrasyonu için opsiyonel mapping alanları
+  stripeProductId String? // Stripe Product ID (plan grouping)
+  stripePriceId   String? // Stripe Price ID (recurring price for subscription)
+
   companies Company[]
 
   createdAt DateTime @default(now())
