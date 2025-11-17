@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/customer/members/invite/[inviteId]/route.ts
 // @purpose: Cancel a pending company invite
-// @version: v1.1.0
+// @version: v1.2.0
 // @status: active
 // @lastUpdate: 2025-11-17
 // -----------------------------------------------------------------------------
@@ -16,12 +16,13 @@ import {
 } from "@/lib/permissions/companyRoles";
 
 type RouteParams = {
-  params: {
-    inviteId: string;
+  params?: {
+    inviteId?: string;
+    id?: string; // fallback: in case the folder is named [id]
   };
 };
 
-export async function DELETE(_req: NextRequest, { params }: RouteParams) {
+export async function DELETE(req: NextRequest, context: RouteParams) {
   try {
     const user = await getCurrentUserOrThrow();
 
@@ -50,7 +51,22 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const inviteId = params.inviteId;
+    // -----------------------------------------------------------------------
+    // Param güvenli okuma
+    // -----------------------------------------------------------------------
+    const params = context.params ?? {};
+    const inviteId =
+      params.inviteId ??
+      params.id ??
+      new URL(req.url).pathname.split("/").pop() ??
+      null;
+
+    if (!inviteId) {
+      return NextResponse.json(
+        { error: "Invalid invite id." },
+        { status: 400 },
+      );
+    }
 
     const invite = await prisma.companyInvite.findUnique({
       where: { id: inviteId },
