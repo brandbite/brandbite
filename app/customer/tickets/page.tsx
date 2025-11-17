@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/tickets/page.tsx
 // @purpose: Customer-facing tickets list for a single company (session-based)
-// @version: v1.2.0
+// @version: v1.2.1
 // @status: active
-// @lastUpdate: 2025-11-16
+// @lastUpdate: 2025-11-18
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -415,6 +415,17 @@ export default function CustomerTicketsPage() {
                         <div className="text-[11px] text-[#7a7a7a]">
                           {t.title}
                         </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            (window.location.href =
+                              `/customer/tickets/${t.id}`)
+                          }
+                          className="mt-1 inline-flex items-center gap-1 text-[11px] text-[#f15b2b] hover:underline"
+                        >
+                          <span>View details</span>
+                          <span aria-hidden>↗</span>
+                        </button>
                       </td>
                       <td className="px-2 py-2 align-top">
                         <div className="text-[11px] font-medium text-[#424143]">
