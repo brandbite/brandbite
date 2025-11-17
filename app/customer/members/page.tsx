@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/members/page.tsx
 // @purpose: Customer-facing company members & roles overview + invite form + pending invites
-// @version: v1.4.0
+// @version: v1.5.0
 // @status: active
-// @lastUpdate: 2025-11-16
+// @lastUpdate: 2025-11-17
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -57,6 +57,14 @@ export default function CustomerMembersPage() {
   // Cancel invite state
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [cancelingId, setCancelingId] = useState<string | null>(null);
+
+  // Member actions (role change / remove)
+  const [memberActionError, setMemberActionError] =
+    useState<string | null>(null);
+  const [updatingMemberId, setUpdatingMemberId] =
+    useState<string | null>(null);
+  const [removingMemberId, setRemovingMemberId] =
+    useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -123,6 +131,9 @@ export default function CustomerMembersPage() {
   );
   const currentUserRole = currentMember?.roleInCompany ?? null;
 
+  const canManageMembersUI =
+    currentUserRole === "OWNER" || currentUserRole === "PM";
+
   const sortedMembers = useMemo(() => {
     if (!members.length) return [];
     return [...members].sort((a, b) => {
@@ -149,6 +160,7 @@ export default function CustomerMembersPage() {
     setInviteError(null);
     setInviteSuccess(null);
     setCancelError(null);
+    setMemberActionError(null);
 
     const email = inviteEmail.trim();
     if (!email) {
@@ -203,6 +215,7 @@ export default function CustomerMembersPage() {
 
   const handleCancelInvite = async (inviteId: string) => {
     setCancelError(null);
+    setMemberActionError(null);
     setCancelingId(inviteId);
 
     try {
@@ -231,6 +244,85 @@ export default function CustomerMembersPage() {
       );
     } finally {
       setCancelingId(null);
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Member role change handler
+  // ---------------------------------------------------------------------------
+
+  const handleMemberRoleChange = async (
+    memberId: string,
+    newRole: CompanyRoleString,
+  ) => {
+    setMemberActionError(null);
+    setUpdatingMemberId(memberId);
+
+    try {
+      const res = await fetch(
+        `/api/customer/members/${memberId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ roleInCompany: newRole }),
+        },
+      );
+
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        const msg =
+          json?.error || `Request failed with status ${res.status}`;
+        setMemberActionError(msg);
+        return;
+      }
+
+      await refreshMembers();
+    } catch (error) {
+      console.error("Member role update error:", error);
+      setMemberActionError(
+        "Unexpected error while updating the member role.",
+      );
+    } finally {
+      setUpdatingMemberId(null);
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Member removal handler
+  // ---------------------------------------------------------------------------
+
+  const handleRemoveMember = async (memberId: string) => {
+    setMemberActionError(null);
+    setRemovingMemberId(memberId);
+
+    try {
+      const res = await fetch(
+        `/api/customer/members/${memberId}`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        const msg =
+          json?.error || `Request failed with status ${res.status}`;
+        setMemberActionError(msg);
+        return;
+      }
+
+      await refreshMembers();
+    } catch (error) {
+      console.error("Member removal error:", error);
+      setMemberActionError(
+        "Unexpected error while removing the member.",
+      );
+    } finally {
+      setRemovingMemberId(null);
     }
   };
 
@@ -369,6 +461,13 @@ export default function CustomerMembersPage() {
                 manage the members list and invites for this workspace.
               </p>
             )}
+          </div>
+        )}
+
+        {/* Member action errors */}
+        {memberActionError && !error && (
+          <div className="mb-4 rounded-xl border border-amber-200 bg-[#fffaf2] px-4 py-3 text-xs text-amber-800">
+            {memberActionError}
           </div>
         )}
 
@@ -525,6 +624,18 @@ export default function CustomerMembersPage() {
             <section className="mt-8 grid gap-4 md:grid-cols-2">
               {sortedMembers.map((member) => {
                 const isYou = member.userId === currentUserId;
+                const isTargetOwner =
+                  member.roleInCompany === "OWNER";
+                const isActorOwner = currentUserRole === "OWNER";
+
+                const canEditThisMember =
+                  canManageMembersUI &&
+                  (!isTargetOwner || isActorOwner);
+                const canRemoveThisMember = canEditThisMember;
+
+                const isUpdating = updatingMemberId === member.id;
+                const isRemoving = removingMemberId === member.id;
+
                 return (
                   <article
                     key={member.id}
@@ -551,20 +662,56 @@ export default function CustomerMembersPage() {
                           </p>
                         </div>
                       </div>
-                      <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[11px] font-medium text-[#7a7a7a]">
-                        {formatCompanyRole(member.roleInCompany)}
-                      </span>
+
+                      {canEditThisMember ? (
+                        <select
+                          className="rounded-full border border-[#e1d9cc] bg-[#f5f3f0] px-2 py-0.5 text-[11px] font-medium text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]/40"
+                          value={member.roleInCompany}
+                          disabled={isUpdating || isRemoving}
+                          onChange={(e) =>
+                            handleMemberRoleChange(
+                              member.id,
+                              e.target.value as CompanyRoleString,
+                            )
+                          }
+                        >
+                          <option value="OWNER">Owner</option>
+                          <option value="PM">Project manager</option>
+                          <option value="MEMBER">Member</option>
+                          <option value="BILLING">Billing</option>
+                        </select>
+                      ) : (
+                        <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[11px] font-medium text-[#7a7a7a]">
+                          {formatCompanyRole(member.roleInCompany)}
+                        </span>
+                      )}
                     </div>
-                    <p className="mt-1 text-xs text-[#9a9892]">
-                      Joined{" "}
-                      {new Date(
-                        member.joinedAt,
-                      ).toLocaleDateString(undefined, {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </p>
+
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                      <p className="text-xs text-[#9a9892]">
+                        Joined{" "}
+                        {new Date(
+                          member.joinedAt,
+                        ).toLocaleDateString(undefined, {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </p>
+
+                      {canRemoveThisMember && !isYou && (
+                        <button
+                          type="button"
+                          disabled={isRemoving || isUpdating}
+                          onClick={() =>
+                            handleRemoveMember(member.id)
+                          }
+                          className="text-[11px] font-medium text-[#c5431a] hover:text-[#a83a16]"
+                        >
+                          {isRemoving ? "Removing…" : "Remove"}
+                        </button>
+                      )}
+                    </div>
                   </article>
                 );
               })}
