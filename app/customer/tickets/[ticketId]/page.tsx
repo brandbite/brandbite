@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/tickets/[ticketId]/page.tsx
 // @purpose: Customer-facing ticket detail page for a single company ticket
-// @version: v1.0.3
+// @version: v1.1.0
 // @status: active
 // @lastUpdate: 2025-11-18
 // -----------------------------------------------------------------------------
@@ -59,6 +59,18 @@ type ViewState =
   | { status: "error"; message: string }
   | { status: "ready"; data: TicketDetailResponse };
 
+type TicketComment = {
+  id: string;
+  body: string;
+  createdAt: string;
+  author: {
+    id: string;
+    name: string | null;
+    email: string;
+    role: string;
+  };
+};
+
 const STATUS_LABELS: Record<TicketStatus, string> = {
   TODO: "To do",
   IN_PROGRESS: "In progress",
@@ -79,6 +91,13 @@ export default function CustomerTicketDetailPage() {
   const ticketIdFromParams = params?.ticketId;
 
   const [state, setState] = useState<ViewState>({ status: "loading" });
+
+  // comments state
+  const [comments, setComments] = useState<TicketComment[] | null>(null);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentsError, setCommentsError] = useState<string | null>(null);
+  const [newComment, setNewComment] = useState("");
+  const [submittingComment, setSubmittingComment] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -144,6 +163,61 @@ export default function CustomerTicketDetailPage() {
     };
   }, [ticketIdFromParams]);
 
+  // comments loader – ticket id belli olduktan sonra
+  const ticketIdFromData =
+    state.status === "ready" ? state.data.ticket.id : null;
+
+  useEffect(() => {
+    if (!ticketIdFromData) return;
+
+    let cancelled = false;
+
+    const loadComments = async () => {
+      setCommentsLoading(true);
+      setCommentsError(null);
+
+      try {
+        const res = await fetch(
+          `/api/customer/tickets/${ticketIdFromData}/comments`,
+          {
+            cache: "no-store",
+          },
+        );
+        const json = await res.json().catch(() => null);
+
+        if (!res.ok) {
+          const msg =
+            json?.error || `Request failed with status ${res.status}`;
+          if (!cancelled) {
+            setCommentsError(msg);
+          }
+          return;
+        }
+
+        if (!cancelled) {
+          setComments((json?.comments as TicketComment[]) ?? []);
+        }
+      } catch (err) {
+        console.error("Ticket comments fetch error:", err);
+        if (!cancelled) {
+          setCommentsError(
+            "Unexpected error while loading comments.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setCommentsLoading(false);
+        }
+      }
+    };
+
+    loadComments();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ticketIdFromData]);
+
   // ---------------------------------------------------------------------------
   // HOOK sonrası derived state
   // ---------------------------------------------------------------------------
@@ -189,6 +263,45 @@ export default function CustomerTicketDetailPage() {
         return "High";
       case "URGENT":
         return "Urgent";
+    }
+  };
+
+  const handleSubmitComment = async () => {
+    if (!ticketIdFromData) return;
+    const trimmed = newComment.trim();
+    if (!trimmed) return;
+
+    setSubmittingComment(true);
+    setCommentsError(null);
+
+    try {
+      const res = await fetch(
+        `/api/customer/tickets/${ticketIdFromData}/comments`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ body: trimmed }),
+        },
+      );
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        const msg =
+          json?.error || `Request failed with status ${res.status}`;
+        setCommentsError(msg);
+        return;
+      }
+
+      const created = json?.comment as TicketComment | undefined;
+      if (created) {
+        setComments((prev) => ([...(prev ?? []), created]));
+        setNewComment("");
+      }
+    } catch (err) {
+      console.error("Add comment error:", err);
+      setCommentsError("Failed to add comment. Please try again.");
+    } finally {
+      setSubmittingComment(false);
     }
   };
 
@@ -373,8 +486,95 @@ export default function CustomerTicketDetailPage() {
               </div>
             </section>
 
-            {/* Right: people / summary */}
+            {/* Right: comments / people / helper */}
             <section className="space-y-4">
+              {/* Comments card */}
+              <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-3 shadow-sm">
+                <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
+                  Comments
+                </h3>
+
+                {commentsError && (
+                  <div className="mt-2 rounded-md border border-red-200 bg-[#fff7f7] px-3 py-2 text-[11px] text-red-700">
+                    {commentsError}
+                  </div>
+                )}
+
+                <div className="mt-2 max-h-60 space-y-2 overflow-y-auto pr-1">
+                  {commentsLoading && (
+                    <p className="text-[11px] text-[#9a9892]">
+                      Loading comments…
+                    </p>
+                  )}
+                  {!commentsLoading &&
+                    !commentsError &&
+                    (comments?.length ?? 0) === 0 && (
+                      <p className="text-[11px] text-[#9a9892]">
+                        No comments yet. Use the form below to start a
+                        thread with your team and the designer.
+                      </p>
+                    )}
+                  {!commentsLoading &&
+                    !commentsError &&
+                    (comments?.length ?? 0) > 0 &&
+                    comments!.map((c) => (
+                      <div
+                        key={c.id}
+                        className="rounded-lg bg-[#f5f3f0] px-3 py-2 text-[11px]"
+                      >
+                        <div className="mb-1 flex items-center justify-between">
+                          <span className="font-semibold text-[#424143]">
+                            {c.author.name || c.author.email}
+                          </span>
+                          <span className="text-[10px] text-[#9a9892]">
+                            {formatDateTime(c.createdAt)}
+                          </span>
+                        </div>
+                        <p className="whitespace-pre-wrap text-[#424143]">
+                          {c.body}
+                        </p>
+                      </div>
+                    ))}
+                </div>
+
+                {/* Add comment form */}
+                <div className="mt-3 border-t border-[#ebe7df] pt-3">
+                  <label className="mb-1 block text-[11px] font-medium text-[#424143]">
+                    Add a comment
+                  </label>
+                  <textarea
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    rows={3}
+                    placeholder="Share feedback, clarifications, or next steps for this ticket."
+                    className="w-full rounded-md border border-[#d4d2cc] bg-[#fbf8f4] px-3 py-2 text-[11px] text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+                  />
+                  <div className="mt-2 flex items-center justify-between">
+                    <p className="text-[10px] text-[#9a9892]">
+                      Comments are visible to your team and Brandbite
+                      designers.
+                    </p>
+                    <button
+                      type="button"
+                      disabled={
+                        submittingComment ||
+                        !newComment.trim() ||
+                        !ticketIdFromData
+                      }
+                      onClick={handleSubmitComment}
+                      className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-medium ${
+                        submittingComment || !newComment.trim()
+                          ? "cursor-not-allowed bg-[#e3ded4] text-[#9a9892]"
+                          : "bg-[#f15b2b] text-white hover:bg-[#e44f22]"
+                      }`}
+                    >
+                      {submittingComment ? "Sending…" : "Add comment"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* People card */}
               <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-3 shadow-sm">
                 <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
                   People
@@ -401,17 +601,6 @@ export default function CustomerTicketDetailPage() {
                     </p>
                   </div>
                 </div>
-              </div>
-
-              <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-3 text-xs text-[#7a7a7a] shadow-sm">
-                <p className="font-semibold text-[#424143]">
-                  What’s next?
-                </p>
-                <p className="mt-2">
-                  In future iterations, this view will show comments,
-                  revision rounds, and design links shared between your
-                  team and the designer.
-                </p>
               </div>
             </section>
           </div>
@@ -450,8 +639,8 @@ function TicketDetailSkeleton() {
             </div>
           </div>
           <div className="space-y-4">
+            <div className="h-40 rounded-2xl bg-white" />
             <div className="h-32 rounded-2xl bg-white" />
-            <div className="h-24 rounded-2xl bg-white" />
           </div>
         </div>
       </div>

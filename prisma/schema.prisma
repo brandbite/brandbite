@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: prisma/schema.prisma
 // @purpose: Brandbite core database schema (roles, tickets, tokens, ledger)
-// @version: v1.2.0
+// @version: v1.3.0
 // @status: active
-// @lastUpdate: 2025-11-14
+// @lastUpdate: 2025-11-18
 // -----------------------------------------------------------------------------
 
 generator client {
@@ -97,8 +97,9 @@ model UserAccount {
 
   companyInvitesSent CompanyInvite[]
 
-  ledgerEntries TokenLedger[] @relation("UserLedger")
-  withdrawals   Withdrawal[]
+  ledgerEntries   TokenLedger[] @relation("UserLedger")
+  withdrawals     Withdrawal[]
+  ticketComments  TicketComment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -277,9 +278,27 @@ model Ticket {
   companyTicketNumber Int?
 
   ledgerEntries TokenLedger[]
+  comments      TicketComment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model TicketComment {
+  id String @id @default(cuid())
+
+  ticketId String
+  ticket   Ticket @relation(fields: [ticketId], references: [id])
+
+  authorId String
+  author   UserAccount @relation(fields: [authorId], references: [id])
+
+  body String
+
+  createdAt DateTime @default(now())
+
+  @@index([ticketId])
+  @@index([authorId])
 }
 
 // --- Tokens & Withdrawals ----------------------------------------------------
