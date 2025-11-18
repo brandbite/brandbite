@@ -1,14 +1,15 @@
 // -----------------------------------------------------------------------------
 // @file: app/designer/tickets/page.tsx
 // @purpose: Designer-facing ticket board (list + status updates, clients mark DONE)
-// @version: v1.1.0
+// @version: v1.2.0
 // @status: active
-// @lastUpdate: 2025-11-16
+// @lastUpdate: 2025-11-18
 // -----------------------------------------------------------------------------
 
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -50,6 +51,8 @@ type DesignerTicketsResponse = {
 };
 
 export default function DesignerTicketsPage() {
+  const router = useRouter();
+
   const [data, setData] = useState<DesignerTicketsResponse | null>(
     null,
   );
@@ -245,15 +248,13 @@ export default function DesignerTicketsPage() {
           <nav className="hidden items-center gap-6 text-sm text-[#7a7a7a] md:flex">
             <button
               className="font-medium text-[#7a7a7a]"
-              onClick={() => (window.location.href = "/designer/balance")}
+              onClick={() => router.push("/designer/balance")}
             >
               Balance
             </button>
             <button
               className="font-medium text-[#7a7a7a]"
-              onClick={() =>
-                (window.location.href = "/designer/withdrawals")
-              }
+              onClick={() => router.push("/designer/withdrawals")}
             >
               Withdrawals
             </button>
@@ -502,6 +503,18 @@ export default function DesignerTicketsPage() {
                                 Ticket is done. Only the client can reopen it.
                               </span>
                             )}
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                router.push(
+                                  `/designer/tickets/${t.id}`,
+                                )
+                              }
+                              className="inline-flex items-center text-[11px] font-medium text-[#1d72b8] hover:underline"
+                            >
+                              View details ↗
+                            </button>
                           </div>
                         </td>
                       </tr>
