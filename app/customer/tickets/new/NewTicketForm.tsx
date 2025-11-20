@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/tickets/new/NewTicketForm.tsx
 // @purpose: Client-side form for creating a new design ticket (role-aware)
-// @version: v1.2.0
+// @version: v1.3.0
 // @status: active
-// @lastUpdate: 2025-11-16
+// @lastUpdate: 2025-11-19
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -39,6 +39,35 @@ type Props = {
   jobTypes: JobTypeOption[];
 };
 
+type TicketPriorityValue = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+
+const PRIORITY_OPTIONS: {
+  value: TicketPriorityValue;
+  label: string;
+  helper: string;
+}[] = [
+  {
+    value: "LOW",
+    label: "Low",
+    helper: "Nice to have, flexible timing.",
+  },
+  {
+    value: "MEDIUM",
+    label: "Medium",
+    helper: "Normal priority, default for most requests.",
+  },
+  {
+    value: "HIGH",
+    label: "High",
+    helper: "Important, should be picked up soon.",
+  },
+  {
+    value: "URGENT",
+    label: "Urgent",
+    helper: "Time-sensitive, jumps to the front of the queue.",
+  },
+];
+
 export default function NewTicketForm({
   companySlug,
   projects,
@@ -50,6 +79,7 @@ export default function NewTicketForm({
   const [description, setDescription] = useState("");
   const [projectId, setProjectId] = useState<string>("");
   const [jobTypeId, setJobTypeId] = useState<string>("");
+  const [priority, setPriority] = useState<TicketPriorityValue>("MEDIUM");
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -151,6 +181,7 @@ export default function NewTicketForm({
         `/api/customer/tickets?companySlug=${encodeURIComponent(
           companySlug,
         )}`,
+
         {
           method: "POST",
           headers: {
@@ -161,6 +192,7 @@ export default function NewTicketForm({
             description,
             projectId: projectId || null,
             jobTypeId: jobTypeId || null,
+            priority,
           }),
         },
       );
@@ -260,6 +292,29 @@ export default function NewTicketForm({
         />
         <p className="text-[11px] text-[#9a9892]">
           You can always add more context later from the ticket view.
+        </p>
+      </div>
+
+      {/* Priority */}
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-[#424143]">
+          Priority
+        </label>
+        <select
+          value={priority}
+          onChange={(e) =>
+            setPriority(e.target.value as TicketPriorityValue)
+          }
+          className="w-full rounded-md border border-[#d4d2cc] bg-white px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+        >
+          {PRIORITY_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        <p className="text-[11px] text-[#9a9892]">
+          Higher priority requests are more likely to be picked up first.
         </p>
       </div>
 

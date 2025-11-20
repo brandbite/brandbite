@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/designer/page.tsx
 // @purpose: Designer-facing overview dashboard (tokens + tickets + withdrawals)
-// @version: v1.0.0
+// @version: v1.1.0
 // @status: active
-// @lastUpdate: 2025-11-16
+// @lastUpdate: 2025-11-20
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -71,6 +71,9 @@ type DesignerTicketsResponse = {
   stats: {
     byStatus: Record<TicketStatus, number>;
     total: number;
+    openTotal: number;
+    byPriority: Record<TicketPriority, number>;
+    loadScore: number;
   };
   tickets: DesignerTicket[];
 };
@@ -229,8 +232,17 @@ export default function DesignerDashboardPage() {
   const ticketStats = ticketsData?.stats ?? null;
   const totalTickets = ticketStats?.total ?? 0;
   const doneTickets = ticketStats?.byStatus.DONE ?? 0;
+
+  // API'den gelen openTotal'ı tercih et, ama geriye dönük güvenlik için fallback bırak
   const openTickets =
-    totalTickets > 0 ? totalTickets - doneTickets : 0;
+    ticketStats?.openTotal != null
+      ? ticketStats.openTotal
+      : totalTickets > 0
+      ? totalTickets - doneTickets
+      : 0;
+
+  const loadScore = ticketStats?.loadScore ?? 0;
+  const priorityStats = ticketStats?.byPriority ?? null;
 
   const withdrawalsStats = withdrawalsData?.stats ?? null;
   const latestWithdrawal =
@@ -378,7 +390,7 @@ export default function DesignerDashboardPage() {
                 </button>
               </div>
               <p className="mt-1 text-[11px] text-[#7a7a7a]">
-                Snapshot of tickets currently assigned to you.
+                Snapshot of tickets currently assigned to you and your load.
               </p>
 
               {ticketStats ? (
@@ -391,6 +403,11 @@ export default function DesignerDashboardPage() {
                     Open tickets (not done):{" "}
                     <span className="font-semibold">{openTickets}</span>
                   </p>
+                  <p>
+                    Current load score:{" "}
+                    <span className="font-semibold">{loadScore}</span>
+                  </p>
+
                   <div className="mt-2 grid grid-cols-2 gap-1">
                     {(Object.entries(ticketStats.byStatus) as [
                       TicketStatus,
@@ -404,6 +421,27 @@ export default function DesignerDashboardPage() {
                       </p>
                     ))}
                   </div>
+
+                  {priorityStats && (
+                    <p className="mt-2 text-[11px] text-[#9a9892]">
+                      By priority (open):{" "}
+                      <span className="font-medium text-[#424143]">
+                        Urgent {priorityStats.URGENT ?? 0}
+                      </span>
+                      {" · "}
+                      <span className="font-medium text-[#424143]">
+                        High {priorityStats.HIGH ?? 0}
+                      </span>
+                      {" · "}
+                      <span className="font-medium text-[#424143]">
+                        Medium {priorityStats.MEDIUM ?? 0}
+                      </span>
+                      {" · "}
+                      <span className="font-medium text-[#424143]">
+                        Low {priorityStats.LOW ?? 0}
+                      </span>
+                    </p>
+                  )}
                 </div>
               ) : (
                 <p className="mt-3 text-[11px] text-[#9a9892]">

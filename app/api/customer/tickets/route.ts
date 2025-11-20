@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/customer/tickets/route.ts
 // @purpose: Customer-facing ticket list & creation API (session-based company)
-// @version: v1.4.0
+// @version: v1.7.0
 // @status: active
-// @lastUpdate: 2025-11-16
+// @lastUpdate: 2025-11-20
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
@@ -13,6 +13,7 @@ import {
   TicketPriority,
   CompanyRole,
   LedgerDirection,
+  UserRole,
 } from "@prisma/client";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { canCreateTickets } from "@/lib/permissions/companyRoles";
@@ -21,7 +22,7 @@ import { canCreateTickets } from "@/lib/permissions/companyRoles";
 // GET: list tickets for the current customer's active company
 // -----------------------------------------------------------------------------
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
 
@@ -98,10 +99,10 @@ export async function GET(req: NextRequest) {
         priority: t.priority,
         projectName: t.project?.name ?? null,
         projectCode: t.project?.code ?? null,
-        designerName: t.designer?.name ?? t.designer?.email ?? null,
+        designerName: t.designer?.name ?? null,
         jobTypeName: t.jobType?.name ?? null,
         createdAt: t.createdAt.toISOString(),
-        dueDate: t.dueDate?.toISOString() ?? null,
+        dueDate: t.dueDate ? t.dueDate.toISOString() : null,
       };
     });
 
@@ -182,21 +183,41 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const title = String((body as any).title ?? "").trim();
+    const raw = body as Record<string, unknown>;
+
+    const title = String(raw.title ?? "").trim();
     const description =
-      typeof (body as any).description === "string"
-        ? (body as any).description.trim()
-        : "";
+      typeof raw.description === "string" ? raw.description.trim() : "";
     const projectId =
-      typeof (body as any).projectId === "string" &&
-      (body as any).projectId.length > 0
-        ? (body as any).projectId
+      typeof raw.projectId === "string" && raw.projectId.length > 0
+        ? (raw.projectId as string)
         : null;
     const jobTypeId =
-      typeof (body as any).jobTypeId === "string" &&
-      (body as any).jobTypeId.length > 0
-        ? (body as any).jobTypeId
+      typeof raw.jobTypeId === "string" && raw.jobTypeId.length > 0
+        ? (raw.jobTypeId as string)
         : null;
+
+    const priorityRaw =
+      typeof raw.priority === "string"
+        ? raw.priority.toUpperCase()
+        : "MEDIUM";
+
+    let selectedPriority: TicketPriority;
+    switch (priorityRaw) {
+      case "LOW":
+        selectedPriority = TicketPriority.LOW;
+        break;
+      case "HIGH":
+        selectedPriority = TicketPriority.HIGH;
+        break;
+      case "URGENT":
+        selectedPriority = TicketPriority.URGENT;
+        break;
+      case "MEDIUM":
+      default:
+        selectedPriority = TicketPriority.MEDIUM;
+        break;
+    }
 
     if (!title) {
       return NextResponse.json(
@@ -206,8 +227,7 @@ export async function POST(req: NextRequest) {
     }
 
     // For now, pick a default "requester" from company members:
-    // Prefer PM, otherwise OWNER. When auth is ready for real,
-    // we may switch this to "current user".
+    // Prefer PM, otherwise OWNER.
     const requesterMember = await prisma.companyMember.findFirst({
       where: {
         companyId: company.id,
@@ -268,8 +288,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Single transaction: create ticket + (optional) debit tokens + ledger entry
+    // -------------------------------------------------------------------------
+    // Transaction:
+    //  - Compute next companyTicketNumber
+    //  - Auto-assign designer (priority + tokenCost weighted load) OR fallback
+    //  - Create ticket
+    //  - (Optional) debit tokens + ledger
+    //  - (Optional) write TicketAssignmentLog (AUTO_ASSIGN / FALLBACK)
+    // -------------------------------------------------------------------------
     const ticket = await prisma.$transaction(async (tx) => {
+      // 1) Next company ticket number
       const lastTicket = await tx.ticket.findFirst({
         where: { companyId: company.id },
         orderBy: { companyTicketNumber: "desc" },
@@ -279,17 +307,98 @@ export async function POST(req: NextRequest) {
       const nextCompanyTicketNumber =
         (lastTicket?.companyTicketNumber ?? 100) + 1;
 
+      // 2) Auto-assign v2: priority & token cost weighted load
+      const designers = await tx.userAccount.findMany({
+        where: { role: UserRole.DESIGNER },
+        select: { id: true },
+      });
+
+      let assignedDesignerId: string | null = null;
+      let assignmentReason: "AUTO_ASSIGN" | "FALLBACK" | null = null;
+
+      if (designers.length > 0) {
+        const designerIds = designers.map((d) => d.id);
+
+        // Current open tickets per designer with jobType + priority
+        const openTickets = await tx.ticket.findMany({
+          where: {
+            designerId: { in: designerIds },
+            status: {
+              in: [
+                TicketStatus.TODO,
+                TicketStatus.IN_PROGRESS,
+                TicketStatus.IN_REVIEW,
+              ],
+            },
+          },
+          select: {
+            id: true,
+            designerId: true,
+            priority: true,
+            jobType: {
+              select: { tokenCost: true },
+            },
+          },
+        });
+
+        // priority weights
+        const priorityWeights: Record<TicketPriority, number> = {
+          LOW: 1,
+          MEDIUM: 2,
+          HIGH: 3,
+          URGENT: 4,
+        };
+
+        const loadByDesigner = new Map<string, number>();
+        for (const id of designerIds) {
+          loadByDesigner.set(id, 0);
+        }
+
+        for (const t of openTickets) {
+          if (!t.designerId) continue;
+          if (!loadByDesigner.has(t.designerId)) continue;
+
+          const weight = priorityWeights[t.priority as TicketPriority];
+          const tokenCost = t.jobType?.tokenCost ?? 1;
+          const delta = weight * tokenCost;
+
+          loadByDesigner.set(
+            t.designerId,
+            (loadByDesigner.get(t.designerId) ?? 0) + delta,
+          );
+        }
+
+        assignedDesignerId = designerIds.reduce(
+          (bestId: string | null, currentId: string) => {
+            if (!bestId) return currentId;
+            const bestLoad = loadByDesigner.get(bestId) ?? 0;
+            const currentLoad = loadByDesigner.get(currentId) ?? 0;
+            if (currentLoad < bestLoad) return currentId;
+            return bestId;
+          },
+          null as string | null,
+        );
+
+        assignmentReason = "AUTO_ASSIGN";
+      } else {
+        // No designers available in the pool → fallback
+        assignedDesignerId = null;
+        assignmentReason = "FALLBACK";
+      }
+
+      // 3) Create ticket
       const createdTicket = await tx.ticket.create({
         data: {
           title,
           description: description || null,
           status: TicketStatus.TODO,
-          priority: TicketPriority.MEDIUM,
+          priority: selectedPriority,
           companyId: company.id,
           projectId: project?.id ?? null,
           createdById: requesterMember.userId,
           jobTypeId: jobType?.id ?? null,
           companyTicketNumber: nextCompanyTicketNumber,
+          designerId: assignedDesignerId,
         },
         include: {
           project: {
@@ -301,7 +410,7 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      // If there is a job type, debit company tokens and create ledger entry
+      // 4) If there is a job type, debit company tokens and create ledger entry
       if (jobType) {
         const balanceBefore = company.tokenBalance;
         const balanceAfter = balanceBefore - jobType.tokenCost;
@@ -328,6 +437,33 @@ export async function POST(req: NextRequest) {
             },
             balanceBefore,
             balanceAfter,
+          },
+        });
+      }
+
+      // 5) TicketAssignmentLog (AUTO_ASSIGN or FALLBACK)
+      if (assignmentReason === "AUTO_ASSIGN" && createdTicket.designerId) {
+        await tx.ticketAssignmentLog.create({
+          data: {
+            ticketId: createdTicket.id,
+            designerId: createdTicket.designerId,
+            reason: "AUTO_ASSIGN",
+            metadata: {
+              algorithm: "v2-priority-weighted-token-cost",
+              source: "customer-ticket-create",
+            },
+          },
+        });
+      } else if (assignmentReason === "FALLBACK") {
+        await tx.ticketAssignmentLog.create({
+          data: {
+            ticketId: createdTicket.id,
+            designerId: null,
+            reason: "FALLBACK",
+            metadata: {
+              note: "No active designers available in pool at assignment time.",
+              source: "customer-ticket-create",
+            },
           },
         });
       }

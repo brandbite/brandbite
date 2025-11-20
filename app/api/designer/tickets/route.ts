@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/designer/tickets/route.ts
 // @purpose: Designer API for listing and updating assigned tickets (status, no DONE)
-// @version: v1.1.0
+// @version: v1.2.1
 // @status: active
-// @lastUpdate: 2025-11-16
+// @lastUpdate: 2025-11-20
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
@@ -48,6 +48,9 @@ type DesignerTicketsResponse = {
   stats: {
     byStatus: Record<TicketStatusString, number>;
     total: number;
+    openTotal: number;
+    byPriority: Record<TicketPriority, number>;
+    loadScore: number;
   };
   tickets: DesignerTicket[];
 };
@@ -135,15 +138,49 @@ export async function GET() {
       DONE: 0,
     };
 
+    const byPriority: Record<TicketPriority, number> = {
+      LOW: 0,
+      MEDIUM: 0,
+      HIGH: 0,
+      URGENT: 0,
+    };
+
+    const priorityWeights: Record<TicketPriority, number> = {
+      LOW: 1,
+      MEDIUM: 2,
+      HIGH: 3,
+      URGENT: 4,
+    };
+
+    let openTotal = 0;
+    let loadScore = 0;
+
     for (const t of tickets) {
-      const key = toTicketStatusString(t.status);
-      byStatus[key] = (byStatus[key] ?? 0) + 1;
+      const statusKey = toTicketStatusString(t.status);
+
+      // status dağılımı
+      byStatus[statusKey] = (byStatus[statusKey] ?? 0) + 1;
+
+      // priority dağılımı
+      byPriority[t.priority] = (byPriority[t.priority] ?? 0) + 1;
+
+      // sadece açık (DONE olmayan) ticket'lar load'a girsin
+      if (t.status !== TicketStatus.DONE) {
+        openTotal += 1;
+
+        const weight = priorityWeights[t.priority];
+        const tokenCost = t.jobType?.tokenCost ?? 1;
+        loadScore += weight * tokenCost;
+      }
     }
 
     const response: DesignerTicketsResponse = {
       stats: {
         byStatus,
         total: tickets.length,
+        openTotal,
+        byPriority,
+        loadScore,
       },
       tickets: tickets.map((t) => ({
         id: t.id,
