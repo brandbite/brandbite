@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: prisma/schema.prisma
 // @purpose: Brandbite core database schema (roles, tickets, tokens, ledger)
-// @version: v1.3.0
+// @version: v1.4.0
 // @status: active
-// @lastUpdate: 2025-11-18
+// @lastUpdate: 2025-11-20
 // -----------------------------------------------------------------------------
 
 generator client {
@@ -39,23 +39,22 @@ enum TicketPriority {
 }
 
 enum LedgerDirection {
-  CREDIT // token ekleme
-  DEBIT  // token düşme
+  CREDIT
+  DEBIT
 }
 
 enum WithdrawalStatus {
   PENDING
   APPROVED
-  REJECTED
   PAID
+  REJECTED
 }
 
-// Şirket içi rol (tenant-level)
 enum CompanyRole {
-  OWNER    // company owner
-  PM       // company-wide project manager
-  BILLING  // accountant / finance
-  MEMBER   // regular member (default)
+  OWNER // company owner
+  PM // company-wide project manager
+  BILLING // accountant / finance
+  MEMBER // regular member (default)
 }
 
 enum InviteStatus {
@@ -67,10 +66,16 @@ enum InviteStatus {
 
 // Proje içi rol (project-level)
 enum ProjectRole {
-  OWNER       // project owner (genelde company owner / lead)
-  PM          // project manager
+  OWNER // project owner (genelde company owner / lead)
+  PM // project manager
   CONTRIBUTOR // aktif çalışan
-  VIEWER      // read-only
+  VIEWER // read-only
+}
+
+enum AutoAssignMode {
+  INHERIT
+  ON
+  OFF
 }
 
 enum BillingStatus {
@@ -83,23 +88,25 @@ enum BillingStatus {
 
 model UserAccount {
   id         String   @id @default(cuid())
-  authUserId String   @unique // BetterAuth / auth provider ID
+  authUserId String   @unique
   email      String   @unique
   name       String?
   role       UserRole
 
+  // Relations
   companies       CompanyMember[]
   designerTickets Ticket[]        @relation("DesignerTickets")
   customerTickets Ticket[]        @relation("CustomerTickets")
 
-  // yeni: proje bazlı üyelikler
   projectMemberships ProjectMember[]
 
   companyInvitesSent CompanyInvite[]
 
-  ledgerEntries   TokenLedger[] @relation("UserLedger")
-  withdrawals     Withdrawal[]
-  ticketComments  TicketComment[]
+  ledgerEntries  TokenLedger[]   @relation("UserLedger")
+  withdrawals    Withdrawal[]
+  ticketComments TicketComment[]
+
+  assignmentLogs TicketAssignmentLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -118,12 +125,13 @@ model Company {
   tickets  Ticket[]
   invites  CompanyInvite[]
 
-  tokenBalance Int           @default(0)
-  tokenLedgers TokenLedger[]
+  tokenBalance             Int           @default(0)
+  autoAssignDefaultEnabled Boolean       @default(false)
+  tokenLedgers             TokenLedger[]
 
-  // Stripe billing mapping
-  stripeCustomerId     String?       @unique
-  stripeSubscriptionId String?       @unique
+  // Stripe billing mapping (ileride kullanılacak)
+  stripeCustomerId     String?        @unique
+  stripeSubscriptionId String?        @unique
   billingStatus        BillingStatus?
 
   createdAt DateTime @default(now())
@@ -142,7 +150,7 @@ model CompanyMember {
   /// company içi rol:
   /// - OWNER  : şirket sahibi (plan, billing, üyeler)
   /// - PM     : şirket genelinde proje / ticket yönetimi
-  /// - BILLING: muhasebe / fatura (ileride kullanılacak)
+  /// - BILLING: muhasebe / fatura
   /// - MEMBER : normal üye (default)
   roleInCompany CompanyRole @default(MEMBER)
 
@@ -185,16 +193,16 @@ model Project {
   name String
   code String? @unique
 
+  autoAssignMode AutoAssignMode @default(INHERIT)
+
   tickets Ticket[]
 
-  // yeni: proje bazlı üyelikler (PM, contributor, viewer vs.)
   members ProjectMember[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-// Proje bazlı üyelik tablosu (CompanyMember'dan bağımsız)
 model ProjectMember {
   id String @id @default(cuid())
 
@@ -212,18 +220,19 @@ model ProjectMember {
   @@unique([projectId, userId])
 }
 
-// --- Plan & Job Types --------------------------------------------------------
-
 model Plan {
-  id            String  @id @default(cuid())
-  name          String  @unique // Basic / Pro / Full
-  monthlyTokens Int     // 100 / 200 / 400 gibi
-  priceCents    Int?    // opsiyonel: fiyat bilgisi
-  isActive      Boolean @default(true)
+  id   String @id @default(cuid())
+  name String
 
-  // Stripe entegrasyonu için opsiyonel mapping alanları
-  stripeProductId String? // Stripe Product ID (plan grouping)
-  stripePriceId   String? // Stripe Price ID (recurring price for subscription)
+  description String?
+
+  stripeProductId String? @unique
+  stripePriceId   String? @unique
+
+  monthlyTokens Int
+  priceCents    Int // seed.mjs ile uyumlu
+
+  isActive Boolean @default(true)
 
   companies Company[]
 
@@ -232,20 +241,20 @@ model Plan {
 }
 
 model JobType {
-  id                   String  @id @default(cuid())
-  name                 String  @unique
+  id String @id @default(cuid())
+
+  name                 String
   description          String?
-  tokenCost            Int     // müşteriden düşülecek token
-  designerPayoutTokens Int     // designer’a eklenecek token
-  isActive             Boolean @default(true)
+  tokenCost            Int
+  designerPayoutTokens Int // seed.mjs ile uyumlu
+
+  isActive Boolean @default(true)
 
   tickets Ticket[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
-
-// --- Tickets -----------------------------------------------------------------
 
 model Ticket {
   id String @id @default(cuid())
@@ -274,11 +283,13 @@ model Ticket {
   jobTypeId String?
   jobType   JobType? @relation(fields: [jobTypeId], references: [id])
 
-  // Şirket içi ticket numarası (opsiyonel – ileride doldurulabilir)
+  // Şirket içi ticket numarası
   companyTicketNumber Int?
 
   ledgerEntries TokenLedger[]
   comments      TicketComment[]
+
+  assignmentLogs TicketAssignmentLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -301,7 +312,7 @@ model TicketComment {
   @@index([authorId])
 }
 
-// --- Tokens & Withdrawals ----------------------------------------------------
+// --- Tokens & Ledger ---------------------------------------------------------
 
 model TokenLedger {
   id String @id @default(cuid())
@@ -316,12 +327,11 @@ model TokenLedger {
   user   UserAccount? @relation("UserLedger", fields: [userId], references: [id])
 
   direction LedgerDirection
-  amount    Int         // + / - token miktarı
-  reason    String?     // teknik sebep (SYSTEM_BILLING, JOB_COMPLETED vs.)
-  notes     String?     // insan tarafından yazılan açıklama
-  metadata  Json?       // serbest alan (JSON) - referans id'leri vb.
+  amount    Int
+  reason    String?
+  notes     String?
+  metadata  Json?
 
-  // Opsiyonel: bu işlem öncesi ve sonrası bakiye
   balanceBefore Int?
   balanceAfter  Int?
 
@@ -350,4 +360,33 @@ model Withdrawal {
 
   @@index([designerId, createdAt])
   @@index([status, createdAt])
+}
+
+// --- Ticket Assignment Logs ---------------------------------------------------
+
+model TicketAssignmentLog {
+  id String @id @default(cuid())
+
+  ticketId String
+  ticket   Ticket @relation(fields: [ticketId], references: [id])
+
+  // Ticket hangi designera atanmış?
+  designerId String?
+  designer   UserAccount? @relation(fields: [designerId], references: [id])
+
+  /// reason örnekleri:
+  /// - AUTO_ASSIGN
+  /// - MANUAL
+  /// - FALLBACK
+  /// - REBALANCE
+  /// - SYSTEM_MIGRATION
+  reason   String
+  notes    String?
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([ticketId, createdAt])
+  @@index([designerId, createdAt])
+  @@index([reason, createdAt])
 }

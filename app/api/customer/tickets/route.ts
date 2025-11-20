@@ -1,7 +1,8 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/customer/tickets/route.ts
-// @purpose: Customer-facing ticket list & creation API (session-based company)
-// @version: v1.7.0
+// @purpose: Customer-facing ticket list & creation API (session-based company,
+//           with company/project-based auto-assign configuration)
+// @version: v1.8.0
 // @status: active
 // @lastUpdate: 2025-11-20
 // -----------------------------------------------------------------------------
@@ -14,9 +15,26 @@ import {
   CompanyRole,
   LedgerDirection,
   UserRole,
+  AutoAssignMode,
 } from "@prisma/client";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { canCreateTickets } from "@/lib/permissions/companyRoles";
+
+// -----------------------------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------------------------
+
+function isAutoAssignEnabled(
+  companyDefault: boolean,
+  projectMode?: AutoAssignMode | null,
+): boolean {
+  if (!projectMode || projectMode === AutoAssignMode.INHERIT) {
+    return companyDefault;
+  }
+  if (projectMode === AutoAssignMode.ON) return true;
+  if (projectMode === AutoAssignMode.OFF) return false;
+  return companyDefault;
+}
 
 // -----------------------------------------------------------------------------
 // GET: list tickets for the current customer's active company
@@ -245,15 +263,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Optional: validate project belongs to company
-    let project: { id: string } | null = null;
+    // Optional: validate project belongs to company (and read autoAssignMode)
+    let project: { id: string; autoAssignMode: AutoAssignMode } | null =
+      null;
+
     if (projectId) {
       project = await prisma.project.findFirst({
         where: {
           id: projectId,
           companyId: company.id,
         },
-        select: { id: true },
+        select: {
+          id: true,
+          autoAssignMode: true,
+        },
       });
 
       if (!project) {
@@ -289,13 +312,25 @@ export async function POST(req: NextRequest) {
     }
 
     // -------------------------------------------------------------------------
+    // Auto-assign effective flag (company + project)
+    // -------------------------------------------------------------------------
+    const companyAutoAssignDefault =
+      company.autoAssignDefaultEnabled ?? false;
+    const projectAutoAssignMode = project?.autoAssignMode ?? null;
+
+    const autoAssignEffective = isAutoAssignEnabled(
+      companyAutoAssignDefault,
+      projectAutoAssignMode,
+    );
+
+    // -------------------------------------------------------------------------
     // Transaction:
     //  - Compute next companyTicketNumber
-    //  - Auto-assign designer (priority + tokenCost weighted load) OR fallback
+    //  - Auto-assign designer based on effective flag (or fallback/unassigned)
     //  - Create ticket
     //  - (Optional) debit tokens + ledger
     //  - (Optional) write TicketAssignmentLog (AUTO_ASSIGN / FALLBACK)
-    // -------------------------------------------------------------------------
+// -------------------------------------------------------------------------
     const ticket = await prisma.$transaction(async (tx) => {
       // 1) Next company ticket number
       const lastTicket = await tx.ticket.findFirst({
@@ -307,83 +342,92 @@ export async function POST(req: NextRequest) {
       const nextCompanyTicketNumber =
         (lastTicket?.companyTicketNumber ?? 100) + 1;
 
-      // 2) Auto-assign v2: priority & token cost weighted load
-      const designers = await tx.userAccount.findMany({
-        where: { role: UserRole.DESIGNER },
-        select: { id: true },
-      });
-
+      // 2) Decide designer assignment based on settings
       let assignedDesignerId: string | null = null;
       let assignmentReason: "AUTO_ASSIGN" | "FALLBACK" | null = null;
+      let fallbackMode: "settings_disabled" | "no_designers" | null = null;
 
-      if (designers.length > 0) {
-        const designerIds = designers.map((d) => d.id);
-
-        // Current open tickets per designer with jobType + priority
-        const openTickets = await tx.ticket.findMany({
-          where: {
-            designerId: { in: designerIds },
-            status: {
-              in: [
-                TicketStatus.TODO,
-                TicketStatus.IN_PROGRESS,
-                TicketStatus.IN_REVIEW,
-              ],
-            },
-          },
-          select: {
-            id: true,
-            designerId: true,
-            priority: true,
-            jobType: {
-              select: { tokenCost: true },
-            },
-          },
+      if (autoAssignEffective) {
+        // auto-assign açık: load-based algoritma
+        const designers = await tx.userAccount.findMany({
+          where: { role: UserRole.DESIGNER },
+          select: { id: true },
         });
 
-        // priority weights
-        const priorityWeights: Record<TicketPriority, number> = {
-          LOW: 1,
-          MEDIUM: 2,
-          HIGH: 3,
-          URGENT: 4,
-        };
+        if (designers.length > 0) {
+          const designerIds = designers.map((d) => d.id);
 
-        const loadByDesigner = new Map<string, number>();
-        for (const id of designerIds) {
-          loadByDesigner.set(id, 0);
-        }
+          // Current open tickets per designer with jobType + priority
+          const openTickets = await tx.ticket.findMany({
+            where: {
+              designerId: { in: designerIds },
+              status: {
+                in: [
+                  TicketStatus.TODO,
+                  TicketStatus.IN_PROGRESS,
+                  TicketStatus.IN_REVIEW,
+                ],
+              },
+            },
+            select: {
+              id: true,
+              designerId: true,
+              priority: true,
+              jobType: {
+                select: { tokenCost: true },
+              },
+            },
+          });
 
-        for (const t of openTickets) {
-          if (!t.designerId) continue;
-          if (!loadByDesigner.has(t.designerId)) continue;
+          const priorityWeights: Record<TicketPriority, number> = {
+            LOW: 1,
+            MEDIUM: 2,
+            HIGH: 3,
+            URGENT: 4,
+          };
 
-          const weight = priorityWeights[t.priority as TicketPriority];
-          const tokenCost = t.jobType?.tokenCost ?? 1;
-          const delta = weight * tokenCost;
+          const loadByDesigner = new Map<string, number>();
+          for (const id of designerIds) {
+            loadByDesigner.set(id, 0);
+          }
 
-          loadByDesigner.set(
-            t.designerId,
-            (loadByDesigner.get(t.designerId) ?? 0) + delta,
+          for (const t of openTickets) {
+            if (!t.designerId) continue;
+            if (!loadByDesigner.has(t.designerId)) continue;
+
+            const weight = priorityWeights[t.priority as TicketPriority];
+            const tokenCost = t.jobType?.tokenCost ?? 1;
+            const delta = weight * tokenCost;
+
+            loadByDesigner.set(
+              t.designerId,
+              (loadByDesigner.get(t.designerId) ?? 0) + delta,
+            );
+          }
+
+          assignedDesignerId = designerIds.reduce(
+            (bestId: string | null, currentId: string) => {
+              if (!bestId) return currentId;
+              const bestLoad = loadByDesigner.get(bestId) ?? 0;
+              const currentLoad = loadByDesigner.get(currentId) ?? 0;
+              if (currentLoad < bestLoad) return currentId;
+              return bestId;
+            },
+            null as string | null,
           );
+
+          assignmentReason = "AUTO_ASSIGN";
+        } else {
+          // Auto-assign açık ama hiç designer yok → fallback
+          assignedDesignerId = null;
+          assignmentReason = "FALLBACK";
+          fallbackMode = "no_designers";
         }
-
-        assignedDesignerId = designerIds.reduce(
-          (bestId: string | null, currentId: string) => {
-            if (!bestId) return currentId;
-            const bestLoad = loadByDesigner.get(bestId) ?? 0;
-            const currentLoad = loadByDesigner.get(currentId) ?? 0;
-            if (currentLoad < bestLoad) return currentId;
-            return bestId;
-          },
-          null as string | null,
-        );
-
-        assignmentReason = "AUTO_ASSIGN";
       } else {
-        // No designers available in the pool → fallback
+        // Auto-assign ayarlardan kapalı → fallback/unassigned
         assignedDesignerId = null;
         assignmentReason = "FALLBACK";
+        fallbackMode = "settings_disabled";
       }
 
       // 3) Create ticket
@@ -451,6 +495,9 @@ export async function POST(req: NextRequest) {
             metadata: {
               algorithm: "v2-priority-weighted-token-cost",
               source: "customer-ticket-create",
+              autoAssignEffective: true,
+              companyAutoAssignDefault,
+              projectAutoAssignMode: projectAutoAssignMode ?? "INHERIT",
             },
           },
         });
@@ -458,11 +505,18 @@ export async function POST(req: NextRequest) {
         await tx.ticketAssignmentLog.create({
           data: {
             ticketId: createdTicket.id,
-            designerId: null,
+            designerId: createdTicket.designerId ?? null,
             reason: "FALLBACK",
             metadata: {
-              note: "No active designers available in pool at assignment time.",
               source: "customer-ticket-create",
+              autoAssignEffective,
+              companyAutoAssignDefault,
+              projectAutoAssignMode: projectAutoAssignMode ?? "INHERIT",
+              fallbackMode,
+              note:
+                fallbackMode === "settings_disabled"
+                  ? "Auto-assign disabled by company/project settings."
+                  : "No active designers available in pool at assignment time.",
             },
           },
         });

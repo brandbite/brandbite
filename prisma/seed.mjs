@@ -1,8 +1,8 @@
 // -----------------------------------------------------------------------------
 // @file: prisma/seed.mjs
 // @purpose: Seed script for Brandbite demo data (companies, projects, tickets, tokens)
-// @version: v1.1.1
-// @lastUpdate: 2025-11-16
+// @version: v1.2.0
+// @lastUpdate: 2025-11-20
 // -----------------------------------------------------------------------------
 
 import {
@@ -27,8 +27,13 @@ async function main() {
   // Not: Bu kısım dev DB için. Tüm kayıtlari siliyor.
   // Production’da kullanılmamalı.
 
+  // Ticket ile ilişkili child tablolari önce temizle
+  await prisma.ticketAssignmentLog.deleteMany({});
+  await prisma.ticketComment.deleteMany({});
   await prisma.tokenLedger.deleteMany({});
   await prisma.withdrawal.deleteMany({});
+
+  // Sonra ticket ve diğer üst seviye kayıtlar
   await prisma.ticket.deleteMany({});
   await prisma.projectMember.deleteMany({});
   await prisma.project.deleteMany({});
@@ -144,6 +149,7 @@ async function main() {
       slug: "acme-studio",
       planId: proPlan.id,
       tokenBalance: 120, // demo amaçlı başlangıç bakiye
+      autoAssignDefaultEnabled: true, // Demo company: auto-assign ON by default
     },
   });
 
@@ -172,6 +178,46 @@ async function main() {
   });
 
   console.log("✅ Company & members created.");
+
+  // 3b) SECOND DEMO COMPANY (auto-assign OFF by default)
+  // ---------------------------------------------------------------------------
+
+  const company2 = await prisma.company.create({
+    data: {
+      name: "Acme Studio (Manual Assign)",
+      slug: "acme-studio-manual",
+      planId: proPlan.id,
+      tokenBalance: 80, // biraz daha düşük demo bakiye
+      autoAssignDefaultEnabled: false, // burada auto-assign kapalı
+    },
+  });
+
+  // Aynı demo customer kullanıcılarını ikinci şirkete de üye yapıyoruz
+  const company2OwnerMember = await prisma.companyMember.create({
+    data: {
+      companyId: company2.id,
+      userId: customerOwner.id,
+      roleInCompany: CompanyRole.OWNER,
+    },
+  });
+
+  const company2PmMember = await prisma.companyMember.create({
+    data: {
+      companyId: company2.id,
+      userId: customerPM.id,
+      roleInCompany: CompanyRole.PM,
+    },
+  });
+
+  const company2BillingMember = await prisma.companyMember.create({
+    data: {
+      companyId: company2.id,
+      userId: customerBilling.id,
+      roleInCompany: CompanyRole.BILLING,
+    },
+  });
+
+  console.log("✅ Second demo company (manual assign) created.");
 
   // ---------------------------------------------------------------------------
   // 4) PROJECTS + PROJECT MEMBERS
