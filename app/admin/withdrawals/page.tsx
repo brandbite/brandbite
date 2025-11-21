@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/admin/withdrawals/page.tsx
 // @purpose: Admin-facing overview & controls for designer withdrawals
-// @version: v1.1.0
+// @version: v1.2.0
 // @status: active
-// @lastUpdate: 2025-11-15
+// @lastUpdate: 2025-11-21
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -18,6 +18,8 @@ type AdminWithdrawal = {
   status: WithdrawalStatus;
   createdAt: string;
   approvedAt: string | null;
+  paidAt: string | null;
+  adminRejectReason?: string | null;
   designer: {
     id: string;
     email: string;
@@ -79,7 +81,8 @@ export default function AdminWithdrawalsPage() {
             );
           }
           const msg =
-            json?.error || `Request failed with status ${res.status}`;
+            (json as any)?.error ||
+            `Request failed with status ${res.status}`;
           throw new Error(msg);
         }
 
@@ -89,7 +92,9 @@ export default function AdminWithdrawalsPage() {
       } catch (err: any) {
         console.error("Admin withdrawals fetch error:", err);
         if (!cancelled) {
-          setError(err?.message || "Failed to load admin withdrawals.");
+          setError(
+            err?.message || "Failed to load admin withdrawals.",
+          );
         }
       } finally {
         if (!cancelled) {
@@ -154,12 +159,12 @@ export default function AdminWithdrawalsPage() {
 
       if (!res.ok) {
         const msg =
-          json?.error ||
+          (json as any)?.error ||
           `Failed to update withdrawal (status ${res.status})`;
         throw new Error(msg);
       }
 
-      const updated = json
+      const updated = (json as any)
         .withdrawal as AdminWithdrawal | undefined;
 
       if (updated) {
@@ -393,6 +398,7 @@ export default function AdminWithdrawalsPage() {
                     <th className="px-2 py-2">Amount</th>
                     <th className="px-2 py-2">Status</th>
                     <th className="px-2 py-2">Approved at</th>
+                    <th className="px-2 py-2">Paid at</th>
                     <th className="px-2 py-2">Actions</th>
                   </tr>
                 </thead>
@@ -425,10 +431,21 @@ export default function AdminWithdrawalsPage() {
                           {w.amountTokens} tokens
                         </td>
                         <td className="px-2 py-2 align-top text-[11px]">
-                          {renderStatusBadge(w.status)}
+                          <div className="space-y-1">
+                            {renderStatusBadge(w.status)}
+                            {w.status === "REJECTED" &&
+                              w.adminRejectReason && (
+                                <p className="text-[10px] text-[#b13832]">
+                                  {w.adminRejectReason}
+                                </p>
+                              )}
+                          </div>
                         </td>
                         <td className="px-2 py-2 align-top text-[11px] text-[#7a7a7a]">
                           {formatDateTime(w.approvedAt)}
+                        </td>
+                        <td className="px-2 py-2 align-top text-[11px] text-[#7a7a7a]">
+                          {formatDateTime(w.paidAt)}
                         </td>
                         <td className="px-2 py-2 align-top text-[11px]">
                           <div className="flex flex-wrap gap-2">
