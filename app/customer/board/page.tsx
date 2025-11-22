@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/board/page.tsx
 // @purpose: Customer-facing board view of company tickets (kanban-style + drag & drop + detail modal)
-// @version: v1.9.0
+// @version: v1.6.0
 // @status: active
-// @lastUpdate: 2025-11-22
+// @lastUpdate: 2025-11-23
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -258,130 +258,6 @@ export default function CustomerBoardPage() {
   };
 
   // ---------------------------------------------------------------------------
-  // Drag & drop handlers
-  // ---------------------------------------------------------------------------
-
-  const handleDragStart = (
-    event: React.DragEvent<HTMLDivElement>,
-    ticketId: string,
-  ) => {
-    if (isLimitedAccess) {
-      event.preventDefault();
-      return;
-    }
-    setDraggingTicketId(ticketId);
-    setMutationError(null);
-    setMouseDownInfo(null); // drag başladıysa click saymayalım
-    if (event.dataTransfer) {
-      event.dataTransfer.effectAllowed = "move";
-      event.dataTransfer.setData("text/plain", ticketId);
-    }
-  };
-
-  const handleDragEnd = () => {
-    setDraggingTicketId(null);
-    setDragOverStatus(null);
-  };
-
-  const handleColumnDragOver = (
-    event: React.DragEvent<HTMLDivElement>,
-    status: TicketStatus,
-  ) => {
-    if (isLimitedAccess) {
-      event.preventDefault();
-      return;
-    }
-
-    // IN_PROGRESS sütununa müşteri tarafından drop tamamen kapalı.
-    // Designer tarafındaki akış bu statüyü kontrol ediyor.
-    if (status === "IN_PROGRESS") {
-      return;
-    }
-
-    // DONE sütunu için ek izin kontrolü
-    if (status === "DONE" && !canMarkDoneOnBoard) {
-      event.preventDefault();
-      return;
-    }
-
-    event.preventDefault();
-    if (dragOverStatus !== status) {
-      setDragOverStatus(status);
-    }
-  };
-
-  const handleColumnDrop = async (
-    event: React.DragEvent<HTMLDivElement>,
-    status: TicketStatus,
-  ) => {
-    event.preventDefault();
-    if (isLimitedAccess) {
-      return;
-    }
-    if (!draggingTicketId) return;
-    const ticketId = draggingTicketId;
-    setDraggingTicketId(null);
-    setDragOverStatus(null);
-
-    // IN_PROGRESS sütununa drop'u engelle (backend de zaten blokluyor)
-    if (status === "IN_PROGRESS") {
-      setMutationError(
-        "Tickets can only be moved into In progress by your designer.",
-      );
-      return;
-    }
-
-    // DONE'a drop için ek izin kontrolü
-    if (status === "DONE" && !canMarkDoneOnBoard) {
-      setMutationError(
-        "You don't have permission to mark tickets as done. Please ask your company owner or project manager.",
-      );
-      return;
-    }
-
-    // DONE → önce confirmation modalı göster
-    if (status === "DONE") {
-      setPendingDoneTicketId(ticketId);
-      return;
-    }
-
-    // Diğer statüler için direkt update
-    await persistTicketStatus(ticketId, status);
-  };
-
-  // ---------------------------------------------------------------------------
-  // Detail & DONE-confirmation helpers
-  // ---------------------------------------------------------------------------
-
-  const detailTicket = useMemo(() => {
-    if (!detailTicketId) return null;
-    return (data?.tickets ?? []).find((t) => t.id === detailTicketId) ?? null;
-  }, [detailTicketId, data?.tickets]);
-
-  const pendingDoneTicket = useMemo(() => {
-    if (!pendingDoneTicketId) return null;
-    return (
-      (data?.tickets ?? []).find((t) => t.id === pendingDoneTicketId) ??
-      null
-    );
-  }, [pendingDoneTicketId, data?.tickets]);
-
-  const closeTicketDetails = () => {
-    setDetailTicketId(null);
-  };
-
-  const handleConfirmDone = async () => {
-    if (!pendingDoneTicketId) return;
-    const ticketId = pendingDoneTicketId;
-    setPendingDoneTicketId(null);
-    await persistTicketStatus(ticketId, "DONE");
-  };
-
-  const handleCancelDone = () => {
-    setPendingDoneTicketId(null);
-  };
-
-  // ---------------------------------------------------------------------------
   // Effects
   // ---------------------------------------------------------------------------
 
@@ -513,6 +389,216 @@ export default function CustomerBoardPage() {
       ? projectFilter
       : "Board";
 
+  const detailTicket = useMemo(() => {
+    if (!detailTicketId) return null;
+    return tickets.find((t) => t.id === detailTicketId) ?? null;
+  }, [detailTicketId, tickets]);
+
+  const pendingDoneTicket = useMemo(() => {
+    if (!pendingDoneTicketId) return null;
+    return (
+      tickets.find((t) => t.id === pendingDoneTicketId) ?? null
+    );
+  }, [pendingDoneTicketId, tickets]);
+
+  // ---------------------------------------------------------------------------
+  // Drag & drop helpers – hibrit akış
+  //
+  // Kurallar:
+  // - Sadece TODO ve IN_REVIEW kartları sürüklenebilir.
+  // - Status değişimi:
+  //     * IN_REVIEW → DONE (onay)
+  //     * IN_REVIEW → IN_PROGRESS (revize, tasarımcıya geri)
+  // - Diğer tüm status değişimleri reddedilir (frontend + backend).
+  // ---------------------------------------------------------------------------
+
+  type DropDecision = {
+    allowed: boolean;
+    reason?: string;
+    willMarkDone?: boolean;
+    willSendBackToInProgress?: boolean;
+  };
+
+  const canDropTicketToStatus = (
+    ticket: CustomerBoardTicket,
+    targetStatus: TicketStatus,
+  ): DropDecision => {
+    // Aynı kolona bırakmak serbest (no-op)
+    if (targetStatus === ticket.status) {
+      return { allowed: true };
+    }
+
+    // IN_REVIEW'ten iki anlamlı hareket var: DONE veya IN_PROGRESS
+    if (ticket.status === "IN_REVIEW") {
+      if (targetStatus === "DONE") {
+        return { allowed: true, willMarkDone: true };
+      }
+      if (targetStatus === "IN_PROGRESS") {
+        return { allowed: true, willSendBackToInProgress: true };
+      }
+      return {
+        allowed: false,
+        reason:
+          "From review you can either mark the ticket as done or send it back to your designer.",
+      };
+    }
+
+    // TODO → IN_PROGRESS gibi hareketler designer'a ait
+    if (ticket.status === "TODO") {
+      return {
+        allowed: false,
+        reason:
+          "To start work on a ticket, your designer needs to pick it up into In progress.",
+      };
+    }
+
+    // IN_PROGRESS kolonunu sadece designer yönetir
+    if (ticket.status === "IN_PROGRESS") {
+      return {
+        allowed: false,
+        reason:
+          "Only your designer can move tickets that are currently in progress.",
+      };
+    }
+
+    // DONE kolonu artık tamamlanmış işler için
+    if (ticket.status === "DONE") {
+      return {
+        allowed: false,
+        reason: "Completed tickets can't be moved on the board.",
+      };
+    }
+
+    return {
+      allowed: false,
+      reason: "This move is not allowed for your role.",
+    };
+  };
+
+  const handleDragStart = (
+    event: React.DragEvent<HTMLDivElement>,
+    ticketId: string,
+    ticketStatus: TicketStatus,
+  ) => {
+    if (isLimitedAccess) {
+      event.preventDefault();
+      return;
+    }
+
+    // Sadece TODO ve IN_REVIEW kartları sürüklenebilir
+    if (ticketStatus !== "TODO" && ticketStatus !== "IN_REVIEW") {
+      event.preventDefault();
+      return;
+    }
+
+    setDraggingTicketId(ticketId);
+    setMutationError(null);
+    setMouseDownInfo(null); // drag başladıysa click saymayalım
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", ticketId);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggingTicketId(null);
+    setDragOverStatus(null);
+  };
+
+  const handleColumnDragOver = (
+    event: React.DragEvent<HTMLDivElement>,
+    status: TicketStatus,
+  ) => {
+    if (isLimitedAccess || !draggingTicketId) {
+      return;
+    }
+
+    const ticket = tickets.find((t) => t.id === draggingTicketId);
+    if (!ticket) return;
+
+    const decision = canDropTicketToStatus(ticket, status);
+    if (!decision.allowed) {
+      return;
+    }
+
+    event.preventDefault();
+    if (dragOverStatus !== status) {
+      setDragOverStatus(status);
+    }
+  };
+
+  const handleColumnDrop = async (
+    event: React.DragEvent<HTMLDivElement>,
+    status: TicketStatus,
+  ) => {
+    event.preventDefault();
+    if (isLimitedAccess || !draggingTicketId) {
+      setDraggingTicketId(null);
+      setDragOverStatus(null);
+      return;
+    }
+
+    const ticket = tickets.find((t) => t.id === draggingTicketId);
+    setDraggingTicketId(null);
+    setDragOverStatus(null);
+
+    if (!ticket) return;
+
+    const decision = canDropTicketToStatus(ticket, status);
+
+    if (!decision.allowed) {
+      if (decision.reason) {
+        setMutationError(decision.reason);
+      }
+      return;
+    }
+
+    // Aynı kolona bırakma → no-op
+    if (status === ticket.status) {
+      return;
+    }
+
+    // IN_REVIEW → DONE → confirm modal
+    if (decision.willMarkDone && status === "DONE") {
+      if (!canMarkDoneOnBoard) {
+        setMutationError(
+          "You don't have permission to mark tickets as done. Please ask your company owner or project manager.",
+        );
+        return;
+      }
+      setPendingDoneTicketId(ticket.id);
+      return;
+    }
+
+    // IN_REVIEW → IN_PROGRESS → revize (plan limiti backend'de)
+    if (decision.willSendBackToInProgress && status === "IN_PROGRESS") {
+      await persistTicketStatus(ticket.id, "IN_PROGRESS");
+      return;
+    }
+
+    // Teorik olarak buraya düşmemeli ama güvenlik için
+    await persistTicketStatus(ticket.id, status);
+  };
+
+  // ---------------------------------------------------------------------------
+  // Detail & DONE-confirmation helpers
+  // ---------------------------------------------------------------------------
+
+  const closeTicketDetails = () => {
+    setDetailTicketId(null);
+  };
+
+  const handleConfirmDone = async () => {
+    if (!pendingDoneTicketId) return;
+    const ticketId = pendingDoneTicketId;
+    setPendingDoneTicketId(null);
+    await persistTicketStatus(ticketId, "DONE");
+  };
+
+  const handleCancelDone = () => {
+    setPendingDoneTicketId(null);
+  };
+
   // ---------------------------------------------------------------------------
   // Rendering helpers
   // ---------------------------------------------------------------------------
@@ -635,7 +721,7 @@ export default function CustomerBoardPage() {
                           key={projectName}
                           type="button"
                           onClick={() => setProjectFilter(projectName)}
-                          className={`flex w-full items-center justify-between rounded-2xl px-3 py-2 text-sm ${
+                          className={`flex w-full items_center justify-between rounded-2xl px-3 py-2 text-sm ${
                             isActive
                               ? "bg-[#f5f3f0] text-[#424143]"
                               : "text-[#424143] hover:bg-[#f7f5f0]"
@@ -663,11 +749,12 @@ export default function CustomerBoardPage() {
                   {activeProjectTitle}
                 </h1>
                 <p className="mt-1 text-xs text-[#7a7a7a]">
-                  Drag cards between columns to update their status, or click a
-                  card to see full details. Only your company owner or project
-                  manager can mark tickets as done. Your designer controls when
-                  a ticket moves into{" "}
-                  <span className="font-semibold">In progress</span>.
+                  Use this board to track your requests as they move from
+                  backlog to design and review. Your designer controls{" "}
+                  <span className="font-semibold">In progress</span> and{" "}
+                  <span className="font-semibold">In review</span>. From
+                  review, you can either mark a ticket as done or send it back
+                  for further work.
                 </p>
 
                 {/* Project selector for mobile */}
@@ -746,25 +833,38 @@ export default function CustomerBoardPage() {
                 const isActiveDrop =
                   dragOverStatus === status && !!draggingTicketId;
 
-                // IN_PROGRESS sütunu hâlâ görünüyor ama drop almıyor (handleColumnDragOver + handleColumnDrop)
+                const isDesignerManagedColumn =
+                  status === "IN_PROGRESS" || status === "IN_REVIEW";
+
                 return (
                   <div
                     key={status}
                     className={`flex flex-col rounded-2xl bg-white/60 p-2 ${
                       isActiveDrop ? "ring-2 ring-[#f15b2b]" : "ring-0"
                     }`}
-                    onDragOver={(event) => handleColumnDragOver(event, status)}
+                    onDragOver={(event) =>
+                      handleColumnDragOver(event, status)
+                    }
                     onDrop={(event) => handleColumnDrop(event, status)}
                   >
-                    <div className="mb-2 flex items-center justify-between">
-                      <div className="flex items-center gap-1">
-                        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9a9892]">
-                          {columnTitle}
-                        </span>
-                        <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[11px] font-semibold text-[#7a7a7a]">
-                          {columnTickets.length}
-                        </span>
+                    <div className="mb-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1">
+                          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9a9892]">
+                            {columnTitle}
+                          </span>
+                          <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[11px] font-semibold text-[#7a7a7a]">
+                            {columnTickets.length}
+                          </span>
+                        </div>
                       </div>
+                      {isDesignerManagedColumn && (
+                        <p className="mt-1 text-[10px] text-[#b1afa9]">
+                          {status === "IN_PROGRESS"
+                            ? "Managed by your designer – they pick work into this column."
+                            : "Sent by your designer when a ticket is ready for your review."}
+                        </p>
+                      )}
                     </div>
 
                     <div
@@ -792,15 +892,21 @@ export default function CustomerBoardPage() {
 
                           const isUpdating = updatingTicketId === t.id;
 
+                          const canDragThisCard =
+                            !isUpdating &&
+                            !isLimitedAccess &&
+                            (t.status === "TODO" ||
+                              t.status === "IN_REVIEW");
+
                           return (
                             <div
                               key={t.id}
-                              className={`cursor-pointer rounded-xl bg-white p-3 shadow-sm ${
+                              className={`cursor-pointer rounded-xl bg_white p-3 shadow-sm ${
                                 isUpdating ? "opacity-60" : ""
                               }`}
-                              draggable={!isUpdating && !isLimitedAccess}
+                              draggable={canDragThisCard}
                               onDragStart={(event) =>
-                                handleDragStart(event, t.id)
+                                handleDragStart(event, t.id, t.status)
                               }
                               onDragEnd={handleDragEnd}
                               onMouseDown={(e) =>
@@ -829,7 +935,7 @@ export default function CustomerBoardPage() {
                                 }
                               }}
                             >
-                              <div className="flex items-center justify_between">
+                              <div className="flex items-center justify-between">
                                 <div className="text-[11px] font-semibold text-[#424143]">
                                   {ticketCode}
                                 </div>
@@ -845,7 +951,7 @@ export default function CustomerBoardPage() {
                                   {t.description}
                                 </p>
                               )}
-                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                              <div className="mt-2 flex flex_wrap items-center gap-2">
                                 <span
                                   className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${priorityPillClass(
                                     t.priority,
@@ -884,7 +990,7 @@ export default function CustomerBoardPage() {
       {/* Detail modal */}
       {detailTicket && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 px-4 py-8">
-          <div className="max-h-[90vh] w_full max-w-xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
+          <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
@@ -933,7 +1039,6 @@ export default function CustomerBoardPage() {
                   </p>
                   <p>
                     Job type:{" "}
-
                     <span className="font-semibold">
                       {detailTicket.jobType?.name || "—"}
                     </span>

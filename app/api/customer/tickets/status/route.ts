@@ -1,13 +1,13 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/customer/tickets/status/route.ts
 // @purpose: Update ticket status for customer board (kanban)
-// @version: v1.5.0
+// @version: v1.6.0
 // @status: active
-// @lastUpdate: 2025-11-22
+// @lastUpdate: 2025-11-23
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
-import { TicketStatus } from "@prisma/client";
+import { TicketStatus, LedgerDirection } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import {
@@ -35,10 +35,13 @@ export async function PATCH(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
 
+    // -------------------------------------------------------------------------
+    // Only customers + site admins can use this endpoint
+    // -------------------------------------------------------------------------
+
     const isSiteAdmin =
       user.role === "SITE_OWNER" || user.role === "SITE_ADMIN";
 
-    // Only customers + site admins can use this endpoint
     if (!isSiteAdmin && user.role !== "CUSTOMER") {
       return NextResponse.json(
         {
@@ -70,25 +73,7 @@ export async function PATCH(req: NextRequest) {
     const nextStatus = requestedStatus as TicketStatus;
 
     // -------------------------------------------------------------------------
-    // Guard: this endpoint CANNOT move tickets into IN_PROGRESS
-    // For everyone (customers AND admins).
-    //
-    // IN_PROGRESS is controlled only via the designer workflow API,
-    // which enforces plan.maxConcurrentInProgressTickets.
-    // -------------------------------------------------------------------------
-
-    if (nextStatus === TicketStatus.IN_PROGRESS) {
-      return NextResponse.json(
-        {
-          error:
-            "Tickets cannot be moved into In progress from this board. Your designer will move tickets into In progress when they start working on them.",
-        },
-        { status: 400 },
-      );
-    }
-
-    // -------------------------------------------------------------------------
-    // Load ticket with proper scoping
+    // Scope ticket by company for customers
     // -------------------------------------------------------------------------
 
     const where =
@@ -111,6 +96,7 @@ export async function PATCH(req: NextRequest) {
         jobType: {
           select: {
             id: true,
+            name: true,
             designerPayoutTokens: true,
           },
         },
@@ -124,10 +110,23 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
+    const currentStatus = ticket.status;
+
+    // Short-circuit: nothing to do
+    if (currentStatus === nextStatus) {
+      return NextResponse.json(
+        {
+          id: ticket.id,
+          status: ticket.status,
+          // Simple updatedAt dummy; real value comes from DB when frontend refetches
+          updatedAt: new Date().toISOString(),
+        },
+        { status: 200 },
+      );
+    }
+
     // -------------------------------------------------------------------------
     // Board-level permission: can this user move tickets at all?
-    // - Site admins: always yes (except IN_PROGRESS guard above)
-    // - Customers: based on companyRole
     // -------------------------------------------------------------------------
 
     const normalizedCompanyRole = normalizeCompanyRole(
@@ -147,20 +146,65 @@ export async function PATCH(req: NextRequest) {
     }
 
     // -------------------------------------------------------------------------
-    // DONE transition: special permission rule + designer payout
+    // New rules for customer board transitions (hibrit yapı)
+    //
+    // - Customer ticket oluşturur → TODO
+    // - IN_PROGRESS → sadece designer (customer buraya geçiremez)
+    // - IN_REVIEW → designer alır (işi review’a gönderir)
+    // - Customer:
+    //     * IN_REVIEW → DONE  (işi onaylar)
+    //     * IN_REVIEW → IN_PROGRESS (revize ister, ticket geri açılır)
     // -------------------------------------------------------------------------
 
+    // 1) Customer hiçbir şekilde REVIEW'a taşıyamaz
+    if (nextStatus === TicketStatus.IN_REVIEW) {
+      return NextResponse.json(
+        {
+          error:
+            "Only your design team can move tickets into review. Ask your designer to send the ticket for review.",
+        },
+        { status: 400 },
+      );
+    }
+
+    // 2) IN_REVIEW → IN_PROGRESS revize path'i
+    const isReviewToInProgress =
+      currentStatus === TicketStatus.IN_REVIEW &&
+      nextStatus === TicketStatus.IN_PROGRESS;
+
+    if (nextStatus === TicketStatus.IN_PROGRESS && !isReviewToInProgress) {
+      return NextResponse.json(
+        {
+          error:
+            "Tickets can only be moved back into In progress from review. To start work on a ticket, your designer needs to pick it up.",
+        },
+        { status: 400 },
+      );
+    }
+
+    // 3) DONE transition: sadece IN_REVIEW → DONE
     const isDoneTransition =
-      ticket.status !== TicketStatus.DONE &&
+      currentStatus !== TicketStatus.DONE &&
       nextStatus === TicketStatus.DONE;
 
+    if (isDoneTransition && currentStatus !== TicketStatus.IN_REVIEW) {
+      return NextResponse.json(
+        {
+          error:
+            "This ticket must be in review before you can mark it as done.",
+        },
+        { status: 400 },
+      );
+    }
+
+    // DONE için ek yetki kontrolü (Owner / PM vs.)
     if (isDoneTransition) {
       const canMarkDone = canMarkTicketsDoneForCompany(
         user.role,
         normalizedCompanyRole,
       );
 
-      if (!canMarkDone) {
+      if (!canMarkDone && !isSiteAdmin) {
         return NextResponse.json(
           {
             error:
@@ -169,58 +213,113 @@ export async function PATCH(req: NextRequest) {
           { status: 403 },
         );
       }
+    }
 
-      // Designer payout on DONE (idempotent)
-      const hasDesigner = !!ticket.designerId;
-      const payoutTokens = ticket.jobType?.designerPayoutTokens ?? 0;
+    // -------------------------------------------------------------------------
+    // Plan limiti: IN_REVIEW → IN_PROGRESS revize'de de kontrol et
+    // -------------------------------------------------------------------------
 
-      if (hasDesigner && payoutTokens > 0) {
-        // Aynı ticket için daha önce payout yazılmış mı?
-        const existingPayout = await prisma.tokenLedger.findFirst({
+    if (isReviewToInProgress) {
+      const company = await prisma.company.findUnique({
+        where: { id: ticket.companyId },
+        select: {
+          id: true,
+          name: true,
+          plan: {
+            select: {
+              id: true,
+              name: true,
+              maxConcurrentInProgressTickets: true,
+            },
+          },
+        },
+      });
+
+      const plan = company?.plan;
+
+      if (plan && plan.maxConcurrentInProgressTickets > 0) {
+        const currentInProgressCount = await prisma.ticket.count({
           where: {
-            userId: ticket.designerId!,
             companyId: ticket.companyId,
-            reason: "DESIGNER_JOB_PAYOUT",
-            metadata: {
-              path: ["ticketId"],
-              equals: ticket.id,
-            } as any,
+            status: TicketStatus.IN_PROGRESS,
           },
         });
 
-        if (!existingPayout) {
-          await prisma.tokenLedger.create({
-            data: {
-              userId: ticket.designerId!,
-              companyId: ticket.companyId,
-              direction: "CREDIT",
-              amount: payoutTokens,
-              reason: "DESIGNER_JOB_PAYOUT",
-              metadata: {
-                ticketId: ticket.id,
-                jobTypeId: ticket.jobType?.id ?? null,
-                source: "CUSTOMER_DONE",
+        if (
+          currentInProgressCount >= plan.maxConcurrentInProgressTickets
+        ) {
+          return NextResponse.json(
+            {
+              error:
+                "This company has reached its limit for active tickets in progress.",
+              details: {
+                plan: plan.name,
+                maxConcurrentInProgress:
+                  plan.maxConcurrentInProgressTickets,
+                currentInProgress: currentInProgressCount,
               },
             },
-          });
+            { status: 400 },
+          );
         }
       }
     }
 
     // -------------------------------------------------------------------------
-    // Normal status update (TODO / IN_REVIEW / DONE)
+    // Status update + (opsiyonel) designer payout (DONE’da)
     // -------------------------------------------------------------------------
 
-    const updated = await prisma.ticket.update({
-      where: { id: ticket.id },
-      data: {
-        status: nextStatus,
-      },
-      select: {
-        id: true,
-        status: true,
-        updatedAt: true,
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      // 1) Designer payout (DONE olduğunda)
+      if (isDoneTransition) {
+        const hasDesigner =
+          !!ticket.designerId && !!ticket.jobType?.designerPayoutTokens;
+
+        if (
+          hasDesigner &&
+          ticket.jobType!.designerPayoutTokens > 0 &&
+          ticket.designerId
+        ) {
+          const existingPayout = await tx.tokenLedger.findFirst({
+            where: {
+              ticketId: ticket.id,
+              userId: ticket.designerId,
+              direction: LedgerDirection.CREDIT,
+              reason: "DESIGNER_JOB_PAYOUT",
+            },
+            select: { id: true },
+          });
+
+          if (!existingPayout) {
+            await tx.tokenLedger.create({
+              data: {
+                companyId: ticket.companyId,
+                ticketId: ticket.id,
+                userId: ticket.designerId,
+                direction: LedgerDirection.CREDIT,
+                amount: ticket.jobType!.designerPayoutTokens,
+                reason: "DESIGNER_JOB_PAYOUT",
+                notes: `Automatic payout for completed ticket`,
+              },
+            });
+          }
+        }
+      }
+
+      // 2) Ticket status update
+      const updatedTicket = await tx.ticket.update({
+        where: { id: ticket.id },
+        data: {
+          status: nextStatus,
+        },
+        select: {
+          id: true,
+          status: true,
+          updatedAt: true,
+        },
+      });
+
+      return updatedTicket;
     });
 
     return NextResponse.json(updated, { status: 200 });
