@@ -1,14 +1,15 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/tokens/page.tsx
 // @purpose: Customer-facing token balance & ledger view (session-based)
-// @version: v1.3.0
+// @version: v1.4.0
 // @status: active
-// @lastUpdate: 2025-11-16
+// @lastUpdate: 2025-11-22
 // -----------------------------------------------------------------------------
 
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { CustomerNav } from "@/components/navigation/customer-nav";
 
 type LedgerDirection = "CREDIT" | "DEBIT";
 
@@ -154,34 +155,10 @@ export default function CustomerTokensPage() {
     <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
       <div className="mx-auto max-w-6xl px-6 py-10">
         {/* Top navigation */}
-        <header className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f15b2b] text-sm font-semibold text-white">
-              B
-            </div>
-            <span className="text-lg font-semibold tracking-tight">
-              Brandbite
-            </span>
-          </div>
-          <nav className="hidden items-center gap-6 text-sm text-[#7a7a7a] md:flex">
-            <button className="font-medium text-[#424143]">Tokens</button>
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() => (window.location.href = "/customer/tickets")}
-            >
-              Tickets
-            </button>
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() => (window.location.href = "/customer/board")}
-            >
-              Board
-            </button>
-          </nav>
-        </header>
+        <CustomerNav />
 
         {/* Page header */}
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+        <div className="mb-4 mt-2 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">
               Tokens overview

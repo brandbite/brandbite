@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/page.tsx
 // @purpose: Customer-facing workspace overview dashboard (tokens + tickets + plan)
-// @version: v1.0.0
+// @version: v1.1.0
 // @status: active
-// @lastUpdate: 2025-11-16
+// @lastUpdate: 2025-11-22
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -14,6 +14,7 @@ import {
   normalizeCompanyRole,
   canManagePlan,
 } from "@/lib/permissions/companyRoles";
+import { CustomerNav } from "@/components/navigation/customer-nav";
 
 type UserRole = "SITE_OWNER" | "SITE_ADMIN" | "DESIGNER" | "CUSTOMER";
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
@@ -232,39 +233,7 @@ export default function CustomerDashboardPage() {
     <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
       <div className="mx-auto max-w-6xl px-6 py-10">
         {/* Top navigation */}
-        <header className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f15b2b] text-sm font-semibold text-white">
-              B
-            </div>
-            <span className="text-lg font-semibold tracking-tight">
-              Brandbite
-            </span>
-          </div>
-          <nav className="hidden items-center gap-6 text-sm text-[#7a7a7a] md:flex">
-            <button className="font-medium text-[#424143]">
-              Overview
-            </button>
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() => (window.location.href = "/customer/tokens")}
-            >
-              Tokens
-            </button>
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() => (window.location.href = "/customer/tickets")}
-            >
-              Tickets
-            </button>
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() => (window.location.href = "/customer/board")}
-            >
-              Board
-            </button>
-          </nav>
-        </header>
+        <CustomerNav />
 
         {/* Header */}
         <div className="mb-6 flex flex-wrap items-start justify-between gap-4">

@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/board/page.tsx
 // @purpose: Customer-facing board view of company tickets (kanban-style + drag & drop + detail modal)
-// @version: v1.7.1
+// @version: v1.9.0
 // @status: active
-// @lastUpdate: 2025-11-16
+// @lastUpdate: 2025-11-22
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -14,6 +14,7 @@ import {
   normalizeCompanyRole,
   canMoveTicketsOnBoard,
 } from "@/lib/permissions/companyRoles";
+import { CustomerNav } from "@/components/navigation/customer-nav";
 
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -124,6 +125,11 @@ export default function CustomerBoardPage() {
 
   // detail modal state
   const [detailTicketId, setDetailTicketId] = useState<string | null>(null);
+
+  // DONE confirmation modal state
+  const [pendingDoneTicketId, setPendingDoneTicketId] = useState<
+    string | null
+  >(null);
 
   // click vs drag algısı için mousedown bilgisi
   const [mouseDownInfo, setMouseDownInfo] = useState<{
@@ -247,7 +253,6 @@ export default function CustomerBoardPage() {
       setMutationError(message);
       await load();
     } finally {
-
       setUpdatingTicketId(null);
     }
   };
@@ -287,6 +292,12 @@ export default function CustomerBoardPage() {
       return;
     }
 
+    // IN_PROGRESS sütununa müşteri tarafından drop tamamen kapalı.
+    // Designer tarafındaki akış bu statüyü kontrol ediyor.
+    if (status === "IN_PROGRESS") {
+      return;
+    }
+
     // DONE sütunu için ek izin kontrolü
     if (status === "DONE" && !canMarkDoneOnBoard) {
       event.preventDefault();
@@ -312,6 +323,14 @@ export default function CustomerBoardPage() {
     setDraggingTicketId(null);
     setDragOverStatus(null);
 
+    // IN_PROGRESS sütununa drop'u engelle (backend de zaten blokluyor)
+    if (status === "IN_PROGRESS") {
+      setMutationError(
+        "Tickets can only be moved into In progress by your designer.",
+      );
+      return;
+    }
+
     // DONE'a drop için ek izin kontrolü
     if (status === "DONE" && !canMarkDoneOnBoard) {
       setMutationError(
@@ -320,11 +339,18 @@ export default function CustomerBoardPage() {
       return;
     }
 
+    // DONE → önce confirmation modalı göster
+    if (status === "DONE") {
+      setPendingDoneTicketId(ticketId);
+      return;
+    }
+
+    // Diğer statüler için direkt update
     await persistTicketStatus(ticketId, status);
   };
 
   // ---------------------------------------------------------------------------
-  // Detail modal helpers
+  // Detail & DONE-confirmation helpers
   // ---------------------------------------------------------------------------
 
   const detailTicket = useMemo(() => {
@@ -332,8 +358,27 @@ export default function CustomerBoardPage() {
     return (data?.tickets ?? []).find((t) => t.id === detailTicketId) ?? null;
   }, [detailTicketId, data?.tickets]);
 
+  const pendingDoneTicket = useMemo(() => {
+    if (!pendingDoneTicketId) return null;
+    return (
+      (data?.tickets ?? []).find((t) => t.id === pendingDoneTicketId) ??
+      null
+    );
+  }, [pendingDoneTicketId, data?.tickets]);
+
   const closeTicketDetails = () => {
     setDetailTicketId(null);
+  };
+
+  const handleConfirmDone = async () => {
+    if (!pendingDoneTicketId) return;
+    const ticketId = pendingDoneTicketId;
+    setPendingDoneTicketId(null);
+    await persistTicketStatus(ticketId, "DONE");
+  };
+
+  const handleCancelDone = () => {
+    setPendingDoneTicketId(null);
   };
 
   // ---------------------------------------------------------------------------
@@ -514,32 +559,7 @@ export default function CustomerBoardPage() {
   return (
     <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
       <div className="mx-auto max-w-6xl px-6 py-8">
-        {/* Top navigation */}
-        <header className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f15b2b] text-sm font-semibold text-white">
-              B
-            </div>
-            <span className="text-lg font-semibold tracking-tight">
-              Brandbite
-            </span>
-          </div>
-          <nav className="hidden items-center gap-6 text-sm text-[#7a7a7a] md:flex">
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() => (window.location.href = "/customer/tokens")}
-            >
-              Tokens
-            </button>
-            <button className="font-medium text-[#424143]">Board</button>
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() => (window.location.href = "/customer/tickets")}
-            >
-              Tickets
-            </button>
-          </nav>
-        </header>
+        <CustomerNav />
 
         <div className="flex gap-4">
           {/* Sidebar: stats + project filters */}
@@ -645,7 +665,9 @@ export default function CustomerBoardPage() {
                 <p className="mt-1 text-xs text-[#7a7a7a]">
                   Drag cards between columns to update their status, or click a
                   card to see full details. Only your company owner or project
-                  manager can mark tickets as done.
+                  manager can mark tickets as done. Your designer controls when
+                  a ticket moves into{" "}
+                  <span className="font-semibold">In progress</span>.
                 </p>
 
                 {/* Project selector for mobile */}
@@ -724,6 +746,7 @@ export default function CustomerBoardPage() {
                 const isActiveDrop =
                   dragOverStatus === status && !!draggingTicketId;
 
+                // IN_PROGRESS sütunu hâlâ görünüyor ama drop almıyor (handleColumnDragOver + handleColumnDrop)
                 return (
                   <div
                     key={status}
@@ -735,7 +758,7 @@ export default function CustomerBoardPage() {
                   >
                     <div className="mb-2 flex items-center justify-between">
                       <div className="flex items-center gap-1">
-                        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#9a9892]">
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9a9892]">
                           {columnTitle}
                         </span>
                         <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[11px] font-semibold text-[#7a7a7a]">
@@ -794,7 +817,9 @@ export default function CustomerBoardPage() {
                                 const dy = e.clientY - mouseDownInfo.y;
                                 const dt = Date.now() - mouseDownInfo.time;
                                 setMouseDownInfo(null);
-                                const distance = Math.sqrt(dx * dx + dy * dy);
+                                const distance = Math.sqrt(
+                                  dx * dx + dy * dy,
+                                );
                                 if (
                                   distance < 5 &&
                                   dt < 400 &&
@@ -804,7 +829,7 @@ export default function CustomerBoardPage() {
                                 }
                               }}
                             >
-                              <div className="flex items-center justify-between">
+                              <div className="flex items-center justify_between">
                                 <div className="text-[11px] font-semibold text-[#424143]">
                                   {ticketCode}
                                 </div>
@@ -859,7 +884,7 @@ export default function CustomerBoardPage() {
       {/* Detail modal */}
       {detailTicket && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 px-4 py-8">
-          <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
+          <div className="max-h-[90vh] w_full max-w-xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
@@ -908,6 +933,7 @@ export default function CustomerBoardPage() {
                   </p>
                   <p>
                     Job type:{" "}
+
                     <span className="font-semibold">
                       {detailTicket.jobType?.name || "—"}
                     </span>
@@ -953,6 +979,41 @@ export default function CustomerBoardPage() {
                   </p>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DONE confirmation modal */}
+      {pendingDoneTicket && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-8">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+            <h2 className="text-sm font-semibold text-[#424143]">
+              Mark this request as done?
+            </h2>
+            <p className="mt-2 text-[11px] text-[#7a7a7a]">
+              Are you sure you want to mark{" "}
+              <span className="font-semibold">
+                {pendingDoneTicket.title}
+              </span>{" "}
+              as done? This will close the request and count as a completed job
+              for your designer.
+            </p>
+            <div className="mt-4 flex items-center justify-end gap-2 text-[11px]">
+              <button
+                type="button"
+                onClick={handleCancelDone}
+                className="rounded-full border border-[#e3e1dc] bg-white px-3 py-1 text-[#424143] hover:bg-[#f5f3f0]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDone}
+                className="rounded-full bg-[#f15b2b] px-3 py-1 font-medium text-white hover:bg-[#e14e22]"
+              >
+                Mark as done
+              </button>
             </div>
           </div>
         </div>

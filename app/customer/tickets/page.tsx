@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/tickets/page.tsx
 // @purpose: Customer-facing tickets list for a single company (session-based)
-// @version: v1.2.1
+// @version: v1.3.0
 // @status: active
-// @lastUpdate: 2025-11-18
+// @lastUpdate: 2025-11-22
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -11,6 +11,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CompanyRole as CompanyRoleString } from "@/lib/permissions/companyRoles";
 import { canCreateTickets } from "@/lib/permissions/companyRoles";
+import { CustomerNav } from "@/components/navigation/customer-nav";
 
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -228,45 +229,10 @@ export default function CustomerTicketsPage() {
     <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
       <div className="mx-auto max-w-6xl px-6 py-10">
         {/* Top navigation */}
-        <header className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f15b2b] text-sm font-semibold text-white">
-              B
-            </div>
-            <span className="text-lg font-semibold tracking-tight">
-              Brandbite
-            </span>
-          </div>
-          <nav className="hidden items-center gap-6 text-sm text-[#7a7a7a] md:flex">
-            <button className="font-medium text-[#424143]">
-              My tickets
-            </button>
-            <button
-              type="button"
-              disabled={!canCreateNewTicket}
-              className={`font-medium ${
-                canCreateNewTicket
-                  ? "text-[#7a7a7a]"
-                  : "cursor-not-allowed text-[#b8b7b1]"
-              }`}
-              onClick={() => {
-                if (!canCreateNewTicket) return;
-                window.location.href = "/customer/tickets/new";
-              }}
-            >
-              New ticket
-            </button>
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() => (window.location.href = "/customer/tokens")}
-            >
-              Tokens
-            </button>
-          </nav>
-        </header>
+        <CustomerNav />
 
         {/* Page header */}
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+        <div className="mb-4 mt-2 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">
               My tickets
@@ -285,12 +251,31 @@ export default function CustomerTicketsPage() {
               </p>
             )}
           </div>
-          {!loading && (
-            <div className="rounded-full bg-[#f5f3f0] px-3 py-1 text-xs text-[#7a7a7a]">
-              {filteredTickets.length} ticket
-              {filteredTickets.length === 1 ? "" : "s"} shown
-            </div>
-          )}
+
+          <div className="flex flex-col items-end gap-2">
+            <button
+              type="button"
+              disabled={!canCreateNewTicket}
+              className={`inline-flex items-center justify-center rounded-full px-4 py-1.5 text-[11px] font-medium ${
+                canCreateNewTicket
+                  ? "bg-[#f15b2b] text-white hover:bg-[#e14e22]"
+                  : "cursor-not-allowed bg-[#f0eee9] text-[#b8b7b1]"
+              }`}
+              onClick={() => {
+                if (!canCreateNewTicket) return;
+                window.location.href = "/customer/tickets/new";
+              }}
+            >
+              New ticket
+            </button>
+
+            {!loading && (
+              <div className="rounded-full bg-[#f5f3f0] px-3 py-1 text-xs text-[#7a7a7a]">
+                {filteredTickets.length} ticket
+                {filteredTickets.length === 1 ? "" : "s"} shown
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Limited access for billing role */}

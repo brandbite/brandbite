@@ -1,13 +1,14 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/tickets/new/page.tsx
 // @purpose: New ticket creation page (customer-facing)
-// @version: v1.0.0
+// @version: v1.1.0
 // @status: active
-// @lastUpdate: 2025-11-14
+// @lastUpdate: 2025-11-22
 // -----------------------------------------------------------------------------
 
 import { prisma } from "@/lib/prisma";
 import NewTicketForm from "./NewTicketForm";
+import { CustomerNav } from "@/components/navigation/customer-nav";
 
 const DEFAULT_COMPANY_SLUG = "acme-studio";
 
@@ -64,28 +65,10 @@ export default async function CustomerNewTicketPage() {
   return (
     <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
       <div className="mx-auto max-w-3xl px-6 py-10">
-        {/* Top navigation (Brandbite style) */}
-        <header className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f15b2b] text-sm font-semibold text-white">
-              B
-            </div>
-            <span className="text-lg font-semibold tracking-tight">
-              Brandbite
-            </span>
-          </div>
-          <nav className="hidden items-center gap-6 text-sm text-[#7a7a7a] md:flex">
-            <button className="font-medium text-[#7a7a7a]">
-              My tickets
-            </button>
-            <button className="font-medium text-[#424143]">
-              New ticket
-            </button>
-            <button className="font-medium text-[#7a7a7a]">Tokens</button>
-          </nav>
-        </header>
+        {/* Top navigation */}
+        <CustomerNav />
 
-        <main className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-6 shadow-sm">
+        <main className="mt-4 rounded-2xl border border-[#e3e1dc] bg-white px-5 py-6 shadow-sm">
           <div className="mb-4">
             <h1 className="text-xl font-semibold tracking-tight">
               Create a new design request
