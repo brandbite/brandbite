@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: prisma/schema.prisma
 // @purpose: Brandbite core database schema (roles, tickets, tokens, ledger)
-// @version: v1.4.0
+// @version: v1.5.0
 // @status: active
-// @lastUpdate: 2025-11-20
+// @lastUpdate: 2025-11-21
 // -----------------------------------------------------------------------------
 
 generator client {
@@ -233,6 +233,9 @@ model Plan {
   priceCents    Int // seed.mjs ile uyumlu
 
   isActive Boolean @default(true)
+
+  // Plan bazlı maksimum eşzamanlı IN_PROGRESS ticket sayısı
+  maxConcurrentInProgressTickets Int @default(1)
 
   companies Company[]
 

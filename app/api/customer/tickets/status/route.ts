@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/customer/tickets/status/route.ts
 // @purpose: Update ticket status for customer board (kanban)
-// @version: v1.3.0
+// @version: v1.5.0
 // @status: active
-// @lastUpdate: 2025-11-16
+// @lastUpdate: 2025-11-22
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
@@ -35,10 +35,10 @@ export async function PATCH(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
 
-    // Only customers + site admins can use this endpoint
     const isSiteAdmin =
       user.role === "SITE_OWNER" || user.role === "SITE_ADMIN";
 
+    // Only customers + site admins can use this endpoint
     if (!isSiteAdmin && user.role !== "CUSTOMER") {
       return NextResponse.json(
         {
@@ -70,6 +70,24 @@ export async function PATCH(req: NextRequest) {
     const nextStatus = requestedStatus as TicketStatus;
 
     // -------------------------------------------------------------------------
+    // Guard: this endpoint CANNOT move tickets into IN_PROGRESS
+    // For everyone (customers AND admins).
+    //
+    // IN_PROGRESS is controlled only via the designer workflow API,
+    // which enforces plan.maxConcurrentInProgressTickets.
+    // -------------------------------------------------------------------------
+
+    if (nextStatus === TicketStatus.IN_PROGRESS) {
+      return NextResponse.json(
+        {
+          error:
+            "Tickets cannot be moved into In progress from this board. Your designer will move tickets into In progress when they start working on them.",
+        },
+        { status: 400 },
+      );
+    }
+
+    // -------------------------------------------------------------------------
     // Load ticket with proper scoping
     // -------------------------------------------------------------------------
 
@@ -89,6 +107,13 @@ export async function PATCH(req: NextRequest) {
         id: true,
         status: true,
         companyId: true,
+        designerId: true,
+        jobType: {
+          select: {
+            id: true,
+            designerPayoutTokens: true,
+          },
+        },
       },
     });
 
@@ -101,7 +126,7 @@ export async function PATCH(req: NextRequest) {
 
     // -------------------------------------------------------------------------
     // Board-level permission: can this user move tickets at all?
-    // - Site admins: always yes
+    // - Site admins: always yes (except IN_PROGRESS guard above)
     // - Customers: based on companyRole
     // -------------------------------------------------------------------------
 
@@ -122,7 +147,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     // -------------------------------------------------------------------------
-    // DONE transition: special permission rule
+    // DONE transition: special permission rule + designer payout
     // -------------------------------------------------------------------------
 
     const isDoneTransition =
@@ -145,14 +170,45 @@ export async function PATCH(req: NextRequest) {
         );
       }
 
-      // NOTE:
-      // Burada şimdilik sadece status güncelliyoruz.
-      // Designer payout / company token DEBIT mantığını ileride
-      // merkezi bir "complete ticket" endpoint'i ile bağlayacağız.
+      // Designer payout on DONE (idempotent)
+      const hasDesigner = !!ticket.designerId;
+      const payoutTokens = ticket.jobType?.designerPayoutTokens ?? 0;
+
+      if (hasDesigner && payoutTokens > 0) {
+        // Aynı ticket için daha önce payout yazılmış mı?
+        const existingPayout = await prisma.tokenLedger.findFirst({
+          where: {
+            userId: ticket.designerId!,
+            companyId: ticket.companyId,
+            reason: "DESIGNER_JOB_PAYOUT",
+            metadata: {
+              path: ["ticketId"],
+              equals: ticket.id,
+            } as any,
+          },
+        });
+
+        if (!existingPayout) {
+          await prisma.tokenLedger.create({
+            data: {
+              userId: ticket.designerId!,
+              companyId: ticket.companyId,
+              direction: "CREDIT",
+              amount: payoutTokens,
+              reason: "DESIGNER_JOB_PAYOUT",
+              metadata: {
+                ticketId: ticket.id,
+                jobTypeId: ticket.jobType?.id ?? null,
+                source: "CUSTOMER_DONE",
+              },
+            },
+          });
+        }
+      }
     }
 
     // -------------------------------------------------------------------------
-    // Normal status update
+    // Normal status update (TODO / IN_REVIEW / DONE)
     // -------------------------------------------------------------------------
 
     const updated = await prisma.ticket.update({

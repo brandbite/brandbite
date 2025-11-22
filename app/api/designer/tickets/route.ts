@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/designer/tickets/route.ts
 // @purpose: Designer API for listing and updating assigned tickets (status, no DONE)
-// @version: v1.2.1
+// @version: v1.3.1
 // @status: active
-// @lastUpdate: 2025-11-20
+// @lastUpdate: 2025-11-21
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
@@ -237,6 +237,13 @@ export async function GET() {
 // -----------------------------------------------------------------------------
 // PATCH: update ticket status (designers cannot mark DONE)
 // -----------------------------------------------------------------------------
+//
+// Plan bazlı concurrency kuralı:
+// - Plan.maxConcurrentInProgressTickets değeri,
+//   aynı company için eşzamanlı IN_PROGRESS ticket sayısının üst sınırıdır.
+// - Sadece IN_PROGRESS'e geçişte kontrol edilir.
+// - TODO / IN_REVIEW geçişleri bu limitten etkilenmez.
+// -----------------------------------------------------------------------------
 
 export async function PATCH(req: NextRequest) {
   try {
@@ -288,6 +295,7 @@ export async function PATCH(req: NextRequest) {
       select: {
         id: true,
         status: true,
+        companyId: true,
       },
     });
 
@@ -307,6 +315,68 @@ export async function PATCH(req: NextRequest) {
         },
         { status: 403 },
       );
+    }
+
+    // -------------------------------------------------------------------------
+    // Plan-based concurrency check for IN_PROGRESS
+    // -------------------------------------------------------------------------
+    //
+    // Sadece şu durumda limit kontrolü yapıyoruz:
+    // - nextStatus === IN_PROGRESS
+    // - ticket şu anda IN_PROGRESS değil (yani gerçekten yeni bir "active" işe geçiliyor)
+    // -------------------------------------------------------------------------
+    if (
+      nextStatus === TicketStatus.IN_PROGRESS &&
+      ticket.status !== TicketStatus.IN_PROGRESS
+    ) {
+      // İlgili company'nin plan bilgisini çek
+      const companyWithPlan = await prisma.company.findUnique({
+        where: { id: ticket.companyId },
+        select: {
+          plan: true,
+        },
+      });
+
+      const planData = companyWithPlan?.plan as
+        | {
+            name?: string | null;
+            maxConcurrentInProgressTickets?: number | null;
+          }
+        | null
+        | undefined;
+
+      const maxConcurrent =
+        typeof planData?.maxConcurrentInProgressTickets === "number"
+          ? planData.maxConcurrentInProgressTickets
+          : 1;
+
+      // Aynı company'deki mevcut IN_PROGRESS ticket sayısını say
+      const currentInProgressCount = await prisma.ticket.count({
+        where: {
+          companyId: ticket.companyId,
+          status: TicketStatus.IN_PROGRESS,
+        },
+      });
+
+      if (currentInProgressCount >= maxConcurrent) {
+        const planLabel =
+          typeof planData?.name === "string"
+            ? planData.name
+            : "current plan";
+
+        return NextResponse.json(
+          {
+            error:
+              "This company has reached its limit for active tickets in progress.",
+            details: {
+              plan: planLabel,
+              maxConcurrentInProgress: maxConcurrent,
+              currentInProgress: currentInProgressCount,
+            },
+          },
+          { status: 400 },
+        );
+      }
     }
 
     const updated = await prisma.ticket.update({

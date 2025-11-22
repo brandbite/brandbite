@@ -1,8 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: prisma/seed.mjs
 // @purpose: Seed script for Brandbite demo data (companies, projects, tickets, tokens)
-// @version: v1.2.0
-// @lastUpdate: 2025-11-20
+// @version: v1.3.0
+// @status: active
+// @lastUpdate: 2025-11-21
 // -----------------------------------------------------------------------------
 
 import {
@@ -125,6 +126,7 @@ async function main() {
       monthlyTokens: 100,
       priceCents: 4900,
       isActive: true,
+      maxConcurrentInProgressTickets: 1,
     },
   });
 
@@ -134,6 +136,17 @@ async function main() {
       monthlyTokens: 200,
       priceCents: 8900,
       isActive: true,
+      maxConcurrentInProgressTickets: 1,
+    },
+  });
+
+  const fullPlan = await prisma.plan.create({
+    data: {
+      name: "Full",
+      monthlyTokens: 400,
+      priceCents: 14900,
+      isActive: true,
+      maxConcurrentInProgressTickets: 2,
     },
   });
 
@@ -143,11 +156,12 @@ async function main() {
   // 3) COMPANY + MEMBERS
   // ---------------------------------------------------------------------------
 
+  // Company 1: Full plan (2 concurrent IN_PROGRESS)
   const company = await prisma.company.create({
     data: {
       name: "Acme Studio",
       slug: "acme-studio",
-      planId: proPlan.id,
+      planId: fullPlan.id,
       tokenBalance: 120, // demo amaçlı başlangıç bakiye
       autoAssignDefaultEnabled: true, // Demo company: auto-assign ON by default
     },
@@ -179,14 +193,14 @@ async function main() {
 
   console.log("✅ Company & members created.");
 
-  // 3b) SECOND DEMO COMPANY (auto-assign OFF by default)
+  // 3b) SECOND DEMO COMPANY (auto-assign OFF by default, Basic plan)
   // ---------------------------------------------------------------------------
 
   const company2 = await prisma.company.create({
     data: {
       name: "Acme Studio (Manual Assign)",
       slug: "acme-studio-manual",
-      planId: proPlan.id,
+      planId: basicPlan.id,
       tokenBalance: 80, // biraz daha düşük demo bakiye
       autoAssignDefaultEnabled: false, // burada auto-assign kapalı
     },
