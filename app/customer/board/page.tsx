@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/board/page.tsx
 // @purpose: Customer-facing board view of company tickets (kanban-style + drag & drop + detail modal)
-// @version: v1.6.0
+// @version: v1.7.0
 // @status: active
 // @lastUpdate: 2025-11-23
 // -----------------------------------------------------------------------------
@@ -664,25 +664,25 @@ export default function CustomerBoardPage() {
               <div className="mt-3 space-y-1 text-[11px] text-[#7a7a7a]">
                 <p>
                   Backlog:{" "}
-                  <span className="font-semibold">
+                    <span className="font-semibold">
                     {loading ? "—" : stats.byStatus.TODO}
                   </span>
                 </p>
                 <p>
                   In progress:{" "}
-                  <span className="font-semibold">
+                    <span className="font-semibold">
                     {loading ? "—" : stats.byStatus.IN_PROGRESS}
                   </span>
                 </p>
                 <p>
                   In review:{" "}
-                  <span className="font-semibold">
+                    <span className="font-semibold">
                     {loading ? "—" : stats.byStatus.IN_REVIEW}
                   </span>
                 </p>
                 <p>
                   Done:{" "}
-                  <span className="font-semibold">
+                    <span className="font-semibold">
                     {loading ? "—" : stats.byStatus.DONE}
                   </span>
                 </p>
@@ -721,7 +721,7 @@ export default function CustomerBoardPage() {
                           key={projectName}
                           type="button"
                           onClick={() => setProjectFilter(projectName)}
-                          className={`flex w-full items_center justify-between rounded-2xl px-3 py-2 text-sm ${
+                          className={`flex w-full items-center justify-between rounded-2xl px-3 py-2 text-sm ${
                             isActive
                               ? "bg-[#f5f3f0] text-[#424143]"
                               : "text-[#424143] hover:bg-[#f7f5f0]"
@@ -740,7 +740,7 @@ export default function CustomerBoardPage() {
           {/* Main board area */}
           <main className="flex-1 rounded-3xl border border-[#e3e1dc] bg-white/80 px-4 py-5 shadow-sm">
             {/* Page header */}
-            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div className="mb-4 flex flex-wrap items-start justify_between gap-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
                   Board
@@ -836,6 +836,14 @@ export default function CustomerBoardPage() {
                 const isDesignerManagedColumn =
                   status === "IN_PROGRESS" || status === "IN_REVIEW";
 
+                const isDoneColumn = status === "DONE";
+                const previewTickets = isDoneColumn
+                  ? columnTickets.slice(0, 5)
+                  : columnTickets;
+                const olderDoneCount = isDoneColumn
+                  ? Math.max(0, columnTickets.length - previewTickets.length)
+                  : 0;
+
                 return (
                   <div
                     key={status}
@@ -865,6 +873,16 @@ export default function CustomerBoardPage() {
                             : "Sent by your designer when a ticket is ready for your review."}
                         </p>
                       )}
+                      {isDoneColumn && (
+                        <p className="mt-1 text-[10px] text-[#b1afa9]">
+                          Recently completed requests appear here. Older
+                          completed work lives in{" "}
+                          <span className="font-medium">
+                            My tickets → Done
+                          </span>
+                          .
+                        </p>
+                      )}
                     </div>
 
                     <div
@@ -877,106 +895,136 @@ export default function CustomerBoardPage() {
                           No tickets in this column.
                         </p>
                       ) : (
-                        columnTickets.map((t) => {
-                          const ticketCode =
-                            t.project?.code && t.companyTicketNumber != null
-                              ? `${t.project.code}-${t.companyTicketNumber}`
-                              : t.companyTicketNumber != null
-                              ? `#${t.companyTicketNumber}`
-                              : t.id;
+                        <>
+                          {previewTickets.map((t) => {
+                            const ticketCode =
+                              t.project?.code &&
+                              t.companyTicketNumber != null
+                                ? `${t.project.code}-${t.companyTicketNumber}`
+                                : t.companyTicketNumber != null
+                                ? `#${t.companyTicketNumber}`
+                                : t.id;
 
-                          const payoutTokens =
-                            t.jobType?.designerPayoutTokens ??
-                            t.jobType?.tokenCost ??
-                            null;
+                            const payoutTokens =
+                              t.jobType?.designerPayoutTokens ??
+                              t.jobType?.tokenCost ??
+                              null;
 
-                          const isUpdating = updatingTicketId === t.id;
+                            const isUpdating = updatingTicketId === t.id;
 
-                          const canDragThisCard =
-                            !isUpdating &&
-                            !isLimitedAccess &&
-                            (t.status === "TODO" ||
-                              t.status === "IN_REVIEW");
+                            const canDragThisCard =
+                              !isUpdating &&
+                              !isLimitedAccess &&
+                              (t.status === "TODO" ||
+                                t.status === "IN_REVIEW");
 
-                          return (
-                            <div
-                              key={t.id}
-                              className={`cursor-pointer rounded-xl bg_white p-3 shadow-sm ${
-                                isUpdating ? "opacity-60" : ""
-                              }`}
-                              draggable={canDragThisCard}
-                              onDragStart={(event) =>
-                                handleDragStart(event, t.id, t.status)
-                              }
-                              onDragEnd={handleDragEnd}
-                              onMouseDown={(e) =>
-                                setMouseDownInfo({
-                                  ticketId: t.id,
-                                  x: e.clientX,
-                                  y: e.clientY,
-                                  time: Date.now(),
-                                })
-                              }
-                              onMouseUp={(e) => {
-                                if (!mouseDownInfo) return;
-                                const dx = e.clientX - mouseDownInfo.x;
-                                const dy = e.clientY - mouseDownInfo.y;
-                                const dt = Date.now() - mouseDownInfo.time;
-                                setMouseDownInfo(null);
-                                const distance = Math.sqrt(
-                                  dx * dx + dy * dy,
-                                );
-                                if (
-                                  distance < 5 &&
-                                  dt < 400 &&
-                                  !draggingTicketId
-                                ) {
-                                  setDetailTicketId(t.id);
+                            return (
+                              <div
+                                key={t.id}
+                                className={`cursor-pointer rounded-xl bg-white p-3 shadow-sm ${
+                                  isUpdating ? "opacity-60" : ""
+                                }`}
+                                draggable={canDragThisCard}
+                                onDragStart={(event) =>
+                                  handleDragStart(event, t.id, t.status)
                                 }
-                              }}
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="text-[11px] font-semibold text-[#424143]">
-                                  {ticketCode}
+                                onDragEnd={handleDragEnd}
+                                onMouseDown={(e) =>
+                                  setMouseDownInfo({
+                                    ticketId: t.id,
+                                    x: e.clientX,
+                                    y: e.clientY,
+                                    time: Date.now(),
+                                  })
+                                }
+                                onMouseUp={(e) => {
+                                  if (!mouseDownInfo) return;
+                                  const dx = e.clientX - mouseDownInfo.x;
+                                  const dy = e.clientY - mouseDownInfo.y;
+                                  const dt = Date.now() - mouseDownInfo.time;
+                                  setMouseDownInfo(null);
+                                  const distance = Math.sqrt(
+                                    dx * dx + dy * dy,
+                                  );
+                                  if (
+                                    distance < 5 &&
+                                    dt < 400 &&
+                                    !draggingTicketId
+                                  ) {
+                                    setDetailTicketId(t.id);
+                                  }
+                                }}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="text-[11px] font-semibold text-[#424143]">
+                                    {ticketCode}
+                                  </div>
+                                  <div className="text-[10px] text-[#9a9892]">
+                                    {t.project?.name || "—"}
+                                  </div>
                                 </div>
-                                <div className="text-[10px] text-[#9a9892]">
-                                  {t.project?.name || "—"}
+                                <div className="mt-1 text-[13px] font-semibold text-[#424143]">
+                                  {t.title}
+                                </div>
+                                {t.description && (
+                                  <p className="mt-1 line-clamp-3 text-[11px] text-[#7a7a7a]">
+                                    {t.description}
+                                  </p>
+                                )}
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                  <span
+                                    className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${priorityPillClass(
+                                      t.priority,
+                                    )}`}
+                                  >
+                                    {formatPriorityLabel(t.priority)}
+                                  </span>
+                                  {t.designer && (
+                                    <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[10px] text-[#7a7a7a]">
+                                      {t.designer.name ||
+                                        t.designer.email}
+                                    </span>
+                                  )}
+                                  {payoutTokens != null && (
+                                    <span className="rounded-full bg-[#f0fff6] px-2 py-0.5 text-[10px] text-[#137a3a]">
+                                      {payoutTokens} tokens
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="mt-2 flex items-center justify-between text-[10px] text-[#9a9892]">
+                                  <span>
+                                    Created {formatDate(t.createdAt)}
+                                  </span>
+                                  <span>
+                                    Updated {formatDate(t.updatedAt)}
+                                  </span>
                                 </div>
                               </div>
-                              <div className="mt-1 text-[13px] font-semibold text-[#424143]">
-                                {t.title}
-                              </div>
-                              {t.description && (
-                                <p className="mt-1 line-clamp-3 text-[11px] text-[#7a7a7a]">
-                                  {t.description}
-                                </p>
-                              )}
-                              <div className="mt-2 flex flex_wrap items-center gap-2">
-                                <span
-                                  className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${priorityPillClass(
-                                    t.priority,
-                                  )}`}
-                                >
-                                  {formatPriorityLabel(t.priority)}
-                                </span>
-                                {t.designer && (
-                                  <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[10px] text-[#7a7a7a]">
-                                    {t.designer.name || t.designer.email}
-                                  </span>
-                                )}
-                                {payoutTokens != null && (
-                                  <span className="rounded-full bg-[#f0fff6] px-2 py-0.5 text-[10px] text-[#137a3a]">
-                                    {payoutTokens} tokens
-                                  </span>
-                                )}
-                              </div>
-                              <div className="mt-2 flex items-center justify-between text-[10px] text-[#9a9892]">
-                                <span>Created {formatDate(t.createdAt)}</span>
-                                <span>Updated {formatDate(t.updatedAt)}</span>
-                              </div>
+                            );
+                          })}
+
+                          {isDoneColumn && olderDoneCount > 0 && (
+                            <div className="mt-2 rounded-xl border border-dashed border-[#cfd3c9] bg-white/60 px-3 py-3 text-[11px] text-[#7a7a7a]">
+                              <p className="font-medium text-[#424143]">
+                                + {olderDoneCount} older completed tickets
+                              </p>
+                              <p className="mt-1">
+                                For a full history of completed work, use
+                                your tickets list.
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  (window.location.href =
+                                    "/customer/tickets")
+                                }
+                                className="mt-2 inline-flex items-center rounded-full bg-[#f5f3f0] px-3 py-1 text-[11px] font-medium text-[#424143] hover:bg-[#eeeae3]"
+                              >
+                                View all completed tickets
+                              </button>
                             </div>
-                          );
-                        })
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
