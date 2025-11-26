@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: prisma/schema.prisma
 // @purpose: Brandbite core database schema (roles, tickets, tokens, ledger)
-// @version: v1.5.0
+// @version: v1.6.0
 // @status: active
-// @lastUpdate: 2025-11-21
+// @lastUpdate: 2025-11-24
 // -----------------------------------------------------------------------------
 
 generator client {
@@ -15,7 +15,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// --- Enums -------------------------------------------------------------------
+// -----------------------------------------------------------------------------
+// Enums
+// -----------------------------------------------------------------------------
 
 enum UserRole {
   SITE_OWNER
@@ -46,13 +48,13 @@ enum LedgerDirection {
 enum WithdrawalStatus {
   PENDING
   APPROVED
-  PAID
   REJECTED
+  PAID
 }
 
 enum CompanyRole {
   OWNER // company owner
-  PM // company-wide project manager
+  PM // company-wide project management
   BILLING // accountant / finance
   MEMBER // regular member (default)
 }
@@ -64,9 +66,9 @@ enum InviteStatus {
   CANCELLED
 }
 
-// Proje içi rol (project-level)
+/// Project-level role
 enum ProjectRole {
-  OWNER // project owner (genelde company owner / lead)
+  OWNER // project owner (usually company owner / lead)
   PM // project manager
   CONTRIBUTOR // aktif çalışan
   VIEWER // read-only
@@ -84,7 +86,9 @@ enum BillingStatus {
   CANCELED
 }
 
-// --- Core Models -------------------------------------------------------------
+// -----------------------------------------------------------------------------
+// Core User & Auth
+// -----------------------------------------------------------------------------
 
 model UserAccount {
   id         String   @id @default(cuid())
@@ -108,31 +112,47 @@ model UserAccount {
 
   assignmentLogs TicketAssignmentLog[]
 
+  submittedRevisions TicketRevision[] @relation("TicketRevisionSubmittedBy")
+  feedbackRevisions  TicketRevision[] @relation("TicketRevisionFeedbackBy")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
+// -----------------------------------------------------------------------------
+// Company & Plans
+// -----------------------------------------------------------------------------
+
 model Company {
   id   String @id @default(cuid())
   name String
+
   slug String @unique
 
   planId String?
   plan   Plan?   @relation(fields: [planId], references: [id])
 
-  projects Project[]
-  members  CompanyMember[]
-  tickets  Ticket[]
-  invites  CompanyInvite[]
+  /// Şirket için default auto-assign davranışı:
+  /// - true: eğer proje "INHERIT" ise auto-assign açık kabul edilir.
+  /// - false: eğer proje "INHERIT" ise auto-assign kapalı kabul edilir.
+  autoAssignDefaultEnabled Boolean @default(false)
 
-  tokenBalance             Int           @default(0)
-  autoAssignDefaultEnabled Boolean       @default(false)
-  tokenLedgers             TokenLedger[]
+  members CompanyMember[]
+
+  projects Project[]
+
+  tickets Ticket[]
+
+  invites CompanyInvite[]
+
+  ledgerEntries TokenLedger[]
 
   // Stripe billing mapping (ileride kullanılacak)
   stripeCustomerId     String?        @unique
   stripeSubscriptionId String?        @unique
   billingStatus        BillingStatus?
+
+  tokenBalance Int @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -166,11 +186,7 @@ model CompanyInvite {
   companyId String
   company   Company @relation(fields: [companyId], references: [id])
 
-  /// Email invited (user may or may not exist yet)
   email String
-
-  /// Role the invited user will have in the company
-  roleInCompany CompanyRole @default(MEMBER)
 
   invitedByUserId String?
   invitedByUser   UserAccount? @relation(fields: [invitedByUserId], references: [id])
@@ -183,41 +199,6 @@ model CompanyInvite {
 
   @@index([companyId])
   @@index([email])
-}
-
-model Project {
-  id        String  @id @default(cuid())
-  companyId String
-  company   Company @relation(fields: [companyId], references: [id])
-
-  name String
-  code String? @unique
-
-  autoAssignMode AutoAssignMode @default(INHERIT)
-
-  tickets Ticket[]
-
-  members ProjectMember[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model ProjectMember {
-  id String @id @default(cuid())
-
-  projectId String
-  project   Project @relation(fields: [projectId], references: [id])
-
-  userId String
-  user   UserAccount @relation(fields: [userId], references: [id])
-
-  role ProjectRole @default(CONTRIBUTOR)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([projectId, userId])
 }
 
 model Plan {
@@ -243,6 +224,50 @@ model Plan {
   updatedAt DateTime @updatedAt
 }
 
+// -----------------------------------------------------------------------------
+// Projects & Membership
+// -----------------------------------------------------------------------------
+
+model Project {
+  id        String  @id
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  name String
+  code String? @unique
+
+  autoAssignMode AutoAssignMode @default(INHERIT)
+
+  members ProjectMember[]
+  tickets Ticket[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+}
+
+model ProjectMember {
+  id String @id @default(cuid())
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
+
+  userId String
+  user   UserAccount @relation(fields: [userId], references: [id])
+
+  role ProjectRole @default(CONTRIBUTOR)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([projectId, userId])
+}
+
+// -----------------------------------------------------------------------------
+// Job Types
+// -----------------------------------------------------------------------------
+
 model JobType {
   id String @id @default(cuid())
 
@@ -258,6 +283,10 @@ model JobType {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+// -----------------------------------------------------------------------------
+// Tickets & Comments
+// -----------------------------------------------------------------------------
 
 model Ticket {
   id String @id @default(cuid())
@@ -288,6 +317,8 @@ model Ticket {
 
   // Şirket içi ticket numarası
   companyTicketNumber Int?
+  revisionCount       Int              @default(0)
+  revisions           TicketRevision[]
 
   ledgerEntries TokenLedger[]
   comments      TicketComment[]
@@ -315,7 +346,37 @@ model TicketComment {
   @@index([authorId])
 }
 
-// --- Tokens & Ledger ---------------------------------------------------------
+model TicketRevision {
+  id String @id @default(cuid())
+
+  ticketId String
+  ticket   Ticket @relation(fields: [ticketId], references: [id])
+
+  /// Revision number for this ticket (v1, v2, v3, ...)
+  version Int
+
+  submittedByDesignerId String?
+  submittedByDesigner   UserAccount? @relation("TicketRevisionSubmittedBy", fields: [submittedByDesignerId], references: [id])
+
+  submittedAt DateTime @default(now())
+
+  feedbackByCustomerId String?
+  feedbackByCustomer   UserAccount? @relation("TicketRevisionFeedbackBy", fields: [feedbackByCustomerId], references: [id])
+
+  feedbackAt      DateTime?
+  feedbackMessage String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([ticketId, version])
+  @@index([ticketId, version])
+  @@index([submittedByDesignerId, submittedAt])
+  @@index([feedbackByCustomerId, feedbackAt])
+}
+
+// -----------------------------------------------------------------------------
+// Tokens & Ledger
+// -----------------------------------------------------------------------------
 
 model TokenLedger {
   id String @id @default(cuid())
@@ -345,6 +406,10 @@ model TokenLedger {
   @@index([ticketId, createdAt])
 }
 
+// -----------------------------------------------------------------------------
+// Withdrawals
+// -----------------------------------------------------------------------------
+
 model Withdrawal {
   id String @id @default(cuid())
 
@@ -365,7 +430,9 @@ model Withdrawal {
   @@index([status, createdAt])
 }
 
-// --- Ticket Assignment Logs ---------------------------------------------------
+// -----------------------------------------------------------------------------
+// Ticket Assignment Logs
+// -----------------------------------------------------------------------------
 
 model TicketAssignmentLog {
   id String @id @default(cuid())
