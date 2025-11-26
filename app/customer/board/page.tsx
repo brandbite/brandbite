@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/board/page.tsx
-// @purpose: Customer-facing board view of company tickets (kanban-style + drag & drop + detail modal)
-// @version: v1.7.0
+// @purpose: Customer-facing board view of company tickets (kanban-style + drag & drop + detail & revision modals)
+// @version: v1.9.0
 // @status: active
-// @lastUpdate: 2025-11-23
+// @lastUpdate: 2025-11-24
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -14,10 +14,20 @@ import {
   normalizeCompanyRole,
   canMoveTicketsOnBoard,
 } from "@/lib/permissions/companyRoles";
-import { CustomerNav } from "@/components/navigation/customer-nav";
+import { TicketStatus, TicketPriority } from "@prisma/client";
 
-type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
-type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+type TicketStatusLabel = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
+
+type TicketStatusConfig = {
+  label: TicketStatusLabel;
+  title: string;
+  description: string;
+};
+
+type TicketStatusDisplay = {
+  status: TicketStatus;
+  config: TicketStatusConfig;
+};
 
 type CustomerBoardTicket = {
   id: string;
@@ -25,31 +35,30 @@ type CustomerBoardTicket = {
   description: string | null;
   status: TicketStatus;
   priority: TicketPriority;
-  dueDate: string | null;
-  companyTicketNumber: number | null;
-  createdAt: string;
-  updatedAt: string;
   project: {
     id: string;
     name: string;
     code: string | null;
   } | null;
-  designer: {
-    id: string;
-    name: string | null;
-    email: string;
-  } | null;
   jobType: {
     id: string;
     name: string;
-    tokenCost: number;
-    designerPayoutTokens: number;
   } | null;
+  designer: {
+    id: string;
+    name: string | null;
+    email: string | null;
+  } | null;
+  companyTicketNumber: number | null;
+  createdAt: string;
+  updatedAt: string;
+  dueDate: string | null;
 };
 
 type BoardStats = {
-  byStatus: Record<TicketStatus, number>;
   total: number;
+  byStatus: Record<TicketStatus, number>;
+  byPriority: Record<TicketPriority, number>;
 };
 
 type CustomerBoardResponse = {
@@ -57,18 +66,117 @@ type CustomerBoardResponse = {
   tickets: CustomerBoardTicket[];
 };
 
-const STATUS_ORDER: TicketStatus[] = [
+type TicketRevisionEntry = {
+  version: number;
+  submittedAt: string | null;
+  feedbackAt: string | null;
+  feedbackMessage: string | null;
+};
+
+type CompanyRoleResponse = {
+  role: CompanyRole | null;
+};
+
+type UpdateStatusRequest = {
+  ticketId: string;
+  status: TicketStatus;
+  revisionMessage?: string | null;
+};
+
+type UpdateStatusResponse = {
+  success: boolean;
+  ticket: CustomerBoardTicket;
+  stats: BoardStats;
+};
+
+type TicketStatusColumnDefinition = {
+  status: TicketStatus;
+  title: string;
+  description: string;
+};
+
+const ticketStatusColumns: TicketStatusColumnDefinition[] = [
+  {
+    status: "TODO",
+    title: "To do",
+    description: "New and not yet started requests.",
+  },
+  {
+    status: "IN_PROGRESS",
+    title: "In progress",
+    description: "Your designer is actively working on these.",
+  },
+  {
+    status: "IN_REVIEW",
+    title: "In review",
+    description: "Waiting for your feedback or approval.",
+  },
+  {
+    status: "DONE",
+    title: "Done",
+    description: "Completed requests you approved as done.",
+  },
+];
+
+const statusOrder: TicketStatus[] = [
   "TODO",
   "IN_PROGRESS",
   "IN_REVIEW",
   "DONE",
 ];
 
-const STATUS_LABELS: Record<TicketStatus, string> = {
-  TODO: "Backlog",
-  IN_PROGRESS: "In progress",
-  IN_REVIEW: "In review",
-  DONE: "Done",
+const priorityOrder: TicketPriority[] = ["URGENT", "HIGH", "MEDIUM", "LOW"];
+
+const statusLabels: Record<TicketStatus, TicketStatusLabel> = {
+  TODO: "TODO",
+  IN_PROGRESS: "IN_PROGRESS",
+  IN_REVIEW: "IN_REVIEW",
+  DONE: "DONE",
+};
+
+const statusDisplayConfigs: Record<TicketStatus, TicketStatusConfig> = {
+  TODO: {
+    label: "TODO",
+    title: "To do",
+    description: "New and not yet started requests.",
+  },
+  IN_PROGRESS: {
+    label: "IN_PROGRESS",
+    title: "In progress",
+    description: "Your designer is actively working on these.",
+  },
+  IN_REVIEW: {
+    label: "IN_REVIEW",
+    title: "In review",
+    description: "Waiting for your feedback or approval.",
+  },
+  DONE: {
+    label: "DONE",
+    title: "Done",
+    description: "Completed requests you approved as done.",
+  },
+};
+
+const priorityLabelMap: Record<TicketPriority, string> = {
+  URGENT: "Urgent",
+  HIGH: "High",
+  MEDIUM: "Medium",
+  LOW: "Low",
+};
+
+const priorityBadgeClass: Record<TicketPriority, string> = {
+  URGENT:
+    "bg-[#fdecea] text-[#b13832] border border-[#f7c7c0] shadow-[0_1px_0_rgba(0,0,0,0.02)]",
+  HIGH: "bg-[#fff4e5] text-[#c76a18] border border-[#f7d0a9]",
+  MEDIUM: "bg-[#eef3ff] text-[#3259c7] border border-[#c7d1f7]",
+  LOW: "bg-[#f3f2f0] text-[#5a5953] border border-[#d4d2ce]",
+};
+
+const statusBadgeClass: Record<TicketStatus, string> = {
+  TODO: "bg-[#f5f3f0] text-[#5a5953] border border-[#d4d2ce]",
+  IN_PROGRESS: "bg-[#eaf4ff] text-[#3259c7] border border-[#c7d1f7]",
+  IN_REVIEW: "bg-[#fff7e0] text-[#c76a18] border border-[#f7d0a9]",
+  DONE: "bg-[#e8f6f0] text-[#287b5a] border border-[#b9e2cd]",
 };
 
 const statusColumnClass = (status: TicketStatus): string => {
@@ -81,57 +189,157 @@ const statusColumnClass = (status: TicketStatus): string => {
       return "bg-[#fff7e0]";
     case "DONE":
       return "bg-[#e8f6f0]";
+    default:
+      return "bg-[#f5f3f0]";
   }
 };
 
+const statusTagColor = (status: TicketStatus): string => {
+  switch (status) {
+    case "TODO":
+      return "bg-[#f5f3f0] text-[#5a5953]";
+    case "IN_PROGRESS":
+      return "bg-[#eaf4ff] text-[#3259c7]";
+    case "IN_REVIEW":
+      return "bg-[#fff7e0] text-[#c76a18]";
+    case "DONE":
+      return "bg-[#e8f6f0] text-[#287b5a]";
+    default:
+      return "bg-[#f5f3f0] text-[#5a5953]";
+  }
+};
+
+const statusIndicatorColor = (status: TicketStatus): string => {
+  switch (status) {
+    case "TODO":
+      return "bg-[#b1afa9]";
+    case "IN_PROGRESS":
+      return "bg-[#4c8ef7]";
+    case "IN_REVIEW":
+      return "bg-[#f5a623]";
+    case "DONE":
+      return "bg-[#32b37b]";
+    default:
+      return "bg-[#b1afa9]";
+  }
+};
+
+const formatDate = (iso: string | null): string => {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+};
+
+const formatTimeAgo = (iso: string | null): string => {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  if (diffMs < 0) return "just now";
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  if (diffMinutes < 1) return "just now";
+  if (diffMinutes < 60) return `${diffMinutes} min ago`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 30) return `${diffDays}d ago`;
+  const diffMonths = Math.floor(diffDays / 30);
+  if (diffMonths < 12) return `${diffMonths}mo ago`;
+  const diffYears = Math.floor(diffMonths / 12);
+  return `${diffYears}y ago`;
+};
+
 const computeStats = (tickets: CustomerBoardTicket[]): BoardStats => {
-  const base: Record<TicketStatus, number> = {
+  const byStatus: Record<TicketStatus, number> = {
     TODO: 0,
     IN_PROGRESS: 0,
     IN_REVIEW: 0,
     DONE: 0,
   };
-  for (const t of tickets) {
-    base[t.status] = (base[t.status] ?? 0) + 1;
-  }
-  return {
-    byStatus: base,
-    total: tickets.length,
+
+  const byPriority: Record<TicketPriority, number> = {
+    URGENT: 0,
+    HIGH: 0,
+    MEDIUM: 0,
+    LOW: 0,
   };
+
+  for (const t of tickets) {
+    byStatus[t.status] = (byStatus[t.status] ?? 0) + 1;
+    byPriority[t.priority] = (byPriority[t.priority] ?? 0) + 1;
+  }
+
+  return {
+    total: tickets.length,
+    byStatus,
+    byPriority,
+  };
+};
+
+const sortTicketsForColumn = (tickets: CustomerBoardTicket[]): CustomerBoardTicket[] => {
+  return [...tickets].sort((a, b) => {
+    const priorityIndexA = priorityOrder.indexOf(a.priority);
+    const priorityIndexB = priorityOrder.indexOf(b.priority);
+    if (priorityIndexA !== priorityIndexB) {
+      return priorityIndexA - priorityIndexB;
+    }
+    const dateA = new Date(a.createdAt).getTime();
+    const dateB = new Date(b.createdAt).getTime();
+    return dateA - dateB;
+  });
 };
 
 export default function CustomerBoardPage() {
   const [data, setData] = useState<CustomerBoardResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [companyRole, setCompanyRole] = useState<CompanyRole | null>(null);
-  const [companyRoleLoading, setCompanyRoleLoading] =
-    useState<boolean>(true);
+  const [companyRoleLoading, setCompanyRoleLoading] = useState<boolean>(true);
+  const [companyRoleError, setCompanyRoleError] = useState<string | null>(null);
 
   const [projectFilter, setProjectFilter] = useState<string>("ALL");
   const [search, setSearch] = useState<string>("");
 
-  // drag & drop state
-  const [draggingTicketId, setDraggingTicketId] = useState<string | null>(
-    null,
-  );
+  const [draggingTicketId, setDraggingTicketId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] =
     useState<TicketStatus | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
-  const [updatingTicketId, setUpdatingTicketId] = useState<string | null>(
-    null,
-  );
+  const [updatingTicketId, setUpdatingTicketId] = useState<string | null>(null);
 
   // detail modal state
   const [detailTicketId, setDetailTicketId] = useState<string | null>(null);
+
+  // detail modal – revision history state
+  const [detailRevisions, setDetailRevisions] = useState<
+    TicketRevisionEntry[] | null
+  >(null);
+  const [detailRevisionsLoading, setDetailRevisionsLoading] =
+    useState<boolean>(false);
+  const [detailRevisionsError, setDetailRevisionsError] = useState<
+    string | null
+  >(null);
 
   // DONE confirmation modal state
   const [pendingDoneTicketId, setPendingDoneTicketId] = useState<
     string | null
   >(null);
 
-  // click vs drag algısı için mousedown bilgisi
+  // Revision (IN_REVIEW -> IN_PROGRESS) modal state
+  const [pendingRevisionTicketId, setPendingRevisionTicketId] =
+    useState<string | null>(null);
+  const [revisionMessage, setRevisionMessage] = useState<string>("");
+  const [revisionMessageError, setRevisionMessageError] = useState<
+    string | null
+  >(null);
+
+  // click vs drag
   const [mouseDownInfo, setMouseDownInfo] = useState<{
     ticketId: string;
     x: number;
@@ -139,127 +347,67 @@ export default function CustomerBoardPage() {
     time: number;
   } | null>(null);
 
-  // Role’den derive edilen izinler
-  const canMoveOnBoard =
-    companyRole != null ? canMoveTicketsOnBoard(companyRole) : true;
-
-  const isLimitedAccess = companyRole != null && !canMoveOnBoard;
-
-  // DONE özel izni: sadece OWNER + PM (site adminler bu view'u normalde kullanmıyor)
-  const canMarkDoneOnBoard =
-    companyRole != null
-      ? companyRole === "OWNER" || companyRole === "PM"
-      : true;
-
-  // ---------------------------------------------------------------------------
-  // Data load
-  // ---------------------------------------------------------------------------
-
   const load = async () => {
     setLoading(true);
-    setError(null);
-
+    setLoadError(null);
     try {
-      const res = await fetch("/api/customer/board", {
+      const res = await fetch("/api/customer/tickets", {
         cache: "no-store",
       });
-      const json = await res.json().catch(() => null);
 
       if (!res.ok) {
-        if (res.status === 401) {
-          throw new Error("You need to sign in to view the board.");
-        }
-        if (res.status === 403) {
-          throw new Error(
-            "You do not have permission to view the customer board.",
-          );
-        }
-        const msg =
-          json?.error || `Request failed with status ${res.status}`;
-        throw new Error(msg);
+        const text = await res.text();
+        throw new Error(
+          text || `Failed to load tickets (status ${res.status}).`,
+        );
       }
 
-      const payload = json as CustomerBoardResponse;
-      const normalized: CustomerBoardResponse = {
-        tickets: payload.tickets,
-        stats: computeStats(payload.tickets),
-      };
-
-      setData(normalized);
+      const json = (await res.json()) as CustomerBoardResponse;
+      setData({
+        ...json,
+        stats: computeStats(json.tickets),
+      });
     } catch (err: unknown) {
-      console.error("Customer board fetch error:", err);
+      console.error("Load customer board data error:", err);
       const message =
         err instanceof Error
           ? err.message
-          : "Failed to load customer board.";
-      setError(message);
+          : "Failed to load your tickets. Please try again.";
+      setLoadError(message);
     } finally {
       setLoading(false);
     }
   };
 
-  const persistTicketStatus = async (
-    ticketId: string,
-    status: TicketStatus,
-  ) => {
-    setMutationError(null);
-    setUpdatingTicketId(ticketId);
+  const loadCompanyRole = async () => {
+    setCompanyRoleLoading(true);
+    setCompanyRoleError(null);
 
     try {
-      const res = await fetch("/api/customer/tickets/status", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ticketId,
-          status,
-        }),
+      const res = await fetch("/api/customer/company-role", {
+        cache: "no-store",
       });
-      const json = await res.json().catch(() => null);
 
       if (!res.ok) {
-        if (res.status === 401) {
-          throw new Error("You need to sign in to update tickets.");
-        }
-        if (res.status === 403) {
-          throw new Error(
-            json?.error ||
-              "You do not have permission to update tickets for this company.",
-          );
-        }
-        const msg =
-          json?.error || `Request failed with status ${res.status}`;
-        throw new Error(msg);
+        const text = await res.text();
+        throw new Error(
+          text || `Failed to load company permissions (status ${res.status}).`,
+        );
       }
 
-      // optimistic update
-      setData((prev) => {
-        if (!prev) return prev;
-        const nextTickets = prev.tickets.map((t) =>
-          t.id === ticketId ? { ...t, status } : t,
-        );
-        return {
-          tickets: nextTickets,
-          stats: computeStats(nextTickets),
-        };
-      });
+      const json = (await res.json()) as CompanyRoleResponse;
+      setCompanyRole(json.role ? normalizeCompanyRole(json.role) : null);
     } catch (err: unknown) {
-      console.error("Update ticket status error:", err);
+      console.error("Load company role error:", err);
       const message =
         err instanceof Error
           ? err.message
-          : "Failed to update ticket status. Please try again.";
-      setMutationError(message);
-      await load();
+          : "Failed to load your permissions. Please try again.";
+      setCompanyRoleError(message);
     } finally {
-      setUpdatingTicketId(null);
+      setCompanyRoleLoading(false);
     }
   };
-
-  // ---------------------------------------------------------------------------
-  // Effects
-  // ---------------------------------------------------------------------------
 
   useEffect(() => {
     let cancelled = false;
@@ -281,26 +429,9 @@ export default function CustomerBoardPage() {
 
     const loadRole = async () => {
       try {
-        const res = await fetch("/api/customer/settings", {
-          cache: "no-store",
-        });
-        const json = await res.json().catch(() => null);
-
-        if (!res.ok) {
-          return;
-        }
-
-        if (!cancelled) {
-          const role = normalizeCompanyRole(
-            json?.user?.companyRole ?? null,
-          );
-          setCompanyRole(role);
-        }
+        await loadCompanyRole();
       } catch (err) {
-        console.error(
-          "[CustomerBoardPage] Failed to load company role from settings endpoint",
-          err,
-        );
+        console.error("Company role load error:", err);
       } finally {
         if (!cancelled) {
           setCompanyRoleLoading(false);
@@ -314,6 +445,81 @@ export default function CustomerBoardPage() {
       cancelled = true;
     };
   }, []);
+
+  // ---------------------------------------------------------------------------
+  // Detail ticket revision history load
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (!detailTicketId) {
+      // Reset when modal is closed
+      setDetailRevisions(null);
+      setDetailRevisionsError(null);
+      setDetailRevisionsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadRevisions = async () => {
+      setDetailRevisionsLoading(true);
+      setDetailRevisionsError(null);
+
+      try {
+        const res = await fetch(
+          `/api/customer/tickets/${detailTicketId}/revisions`,
+          {
+            cache: "no-store",
+          },
+        );
+
+        const json = await res.json().catch(() => null);
+
+        if (!res.ok) {
+          const message =
+            (json &&
+              typeof json === "object" &&
+              "error" in json &&
+              (json as any).error) ||
+            `Failed to load revision history (status ${res.status}).`;
+          if (!cancelled) {
+            setDetailRevisionsError(
+              typeof message === "string"
+                ? message
+                : "Failed to load revision history.",
+            );
+          }
+          return;
+        }
+
+        const entries = ((json as any)?.revisions ?? []) as TicketRevisionEntry[];
+
+        if (!cancelled) {
+          setDetailRevisions(entries);
+        }
+      } catch (err) {
+        console.error(
+          "[CustomerBoardPage] Failed to load ticket revision history",
+          err,
+        );
+        if (!cancelled) {
+          setDetailRevisionsError(
+            "Failed to load revision history. Please try again later.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setDetailRevisionsLoading(false);
+        }
+      }
+    };
+
+    loadRevisions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [detailTicketId]);
 
   // ---------------------------------------------------------------------------
   // Derived values
@@ -342,23 +548,17 @@ export default function CustomerBoardPage() {
       const q = search.trim().toLowerCase();
       if (q) {
         const code =
-          t.project?.code && t.companyTicketNumber != null
-            ? `${t.project.code}-${t.companyTicketNumber}`
-            : t.companyTicketNumber != null
-            ? `#${t.companyTicketNumber}`
-            : t.id;
-        const haystack = [
-          code,
-          t.title,
-          t.description ?? "",
-          t.project?.name ?? "",
-          t.designer?.name ?? "",
-          t.designer?.email ?? "",
-          t.jobType?.name ?? "",
-        ]
-          .join(" ")
-          .toLowerCase();
-        if (!haystack.includes(q)) {
+          t.project?.code && t.companyTicketNumber
+            ? `${t.project.code}-${t.companyTicketNumber}`.toLowerCase()
+            : "";
+        const title = t.title.toLowerCase();
+        const description = (t.description ?? "").toLowerCase();
+
+        if (
+          !code.includes(q) &&
+          !title.includes(q) &&
+          !description.includes(q)
+        ) {
           return false;
         }
       }
@@ -377,17 +577,16 @@ export default function CustomerBoardPage() {
     for (const t of filteredTickets) {
       map[t.status].push(t);
     }
+    for (const status of statusOrder) {
+      map[status] = sortTicketsForColumn(map[status]);
+    }
     return map;
   }, [filteredTickets]);
 
-  const stats = data?.stats ?? computeStats(tickets);
-
-  const activeProjectTitle =
-    projectFilter === "ALL"
-      ? "All projects"
-      : projects.includes(projectFilter)
-      ? projectFilter
-      : "Board";
+  const canDragTicket = useMemo(() => {
+    if (!companyRole) return false;
+    return canMoveTicketsOnBoard(companyRole);
+  }, [companyRole]);
 
   const detailTicket = useMemo(() => {
     if (!detailTicketId) return null;
@@ -396,83 +595,138 @@ export default function CustomerBoardPage() {
 
   const pendingDoneTicket = useMemo(() => {
     if (!pendingDoneTicketId) return null;
-    return (
-      tickets.find((t) => t.id === pendingDoneTicketId) ?? null
-    );
+    return tickets.find((t) => t.id === pendingDoneTicketId) ?? null;
   }, [pendingDoneTicketId, tickets]);
 
-  // ---------------------------------------------------------------------------
-  // Drag & drop helpers – hibrit akış
-  //
-  // Kurallar:
-  // - Sadece TODO ve IN_REVIEW kartları sürüklenebilir.
-  // - Status değişimi:
-  //     * IN_REVIEW → DONE (onay)
-  //     * IN_REVIEW → IN_PROGRESS (revize, tasarımcıya geri)
-  // - Diğer tüm status değişimleri reddedilir (frontend + backend).
-  // ---------------------------------------------------------------------------
+  const pendingRevisionTicket = useMemo(() => {
+    if (!pendingRevisionTicketId) return null;
+    return tickets.find((t) => t.id === pendingRevisionTicketId) ?? null;
+  }, [pendingRevisionTicketId, tickets]);
 
-  type DropDecision = {
-    allowed: boolean;
-    reason?: string;
-    willMarkDone?: boolean;
-    willSendBackToInProgress?: boolean;
+  const updateTicketStatusInState = (
+    ticketId: string,
+    status: TicketStatus,
+  ) => {
+    setData((prev) => {
+      if (!prev) return prev;
+
+      const nextTickets = prev.tickets.map((t) =>
+        t.id === ticketId
+          ? {
+              ...t,
+              status,
+              updatedAt: new Date().toISOString(),
+            }
+          : t,
+      );
+
+      return {
+        tickets: nextTickets,
+        stats: computeStats(nextTickets),
+      };
+    });
   };
 
-  const canDropTicketToStatus = (
-    ticket: CustomerBoardTicket,
-    targetStatus: TicketStatus,
-  ): DropDecision => {
-    // Aynı kolona bırakmak serbest (no-op)
-    if (targetStatus === ticket.status) {
-      return { allowed: true };
-    }
-
-    // IN_REVIEW'ten iki anlamlı hareket var: DONE veya IN_PROGRESS
-    if (ticket.status === "IN_REVIEW") {
-      if (targetStatus === "DONE") {
-        return { allowed: true, willMarkDone: true };
+  const persistTicketStatus = async (
+    ticketId: string,
+    status: TicketStatus,
+    revisionMessage?: string | null,
+  ) => {
+    setMutationError(null);
+    setUpdatingTicketId(ticketId);
+    try {
+      const payload: UpdateStatusRequest = {
+        ticketId,
+        status,
+      };
+      if (revisionMessage && revisionMessage.trim()) {
+        payload.revisionMessage = revisionMessage.trim();
       }
-      if (targetStatus === "IN_PROGRESS") {
-        return { allowed: true, willSendBackToInProgress: true };
+
+      const res = await fetch("/api/customer/tickets/status", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const json = (await res.json()) as UpdateStatusResponse;
+
+      if (!res.ok || !json.success) {
+        const errorMessage =
+          (json as any)?.error ||
+          "We couldn't update this request. Please try again.";
+        throw new Error(errorMessage);
       }
-      return {
-        allowed: false,
-        reason:
-          "From review you can either mark the ticket as done or send it back to your designer.",
-      };
+
+      // Sunucudan tek güncellenmiş ticket + stats geliyor
+      setData((prev) => {
+        if (!prev) {
+          return {
+            tickets: [json.ticket],
+            stats: json.stats,
+          };
+        }
+
+        const nextTickets = prev.tickets.map((t) =>
+          t.id === json.ticket.id ? json.ticket : t,
+        );
+
+        return {
+          tickets: nextTickets,
+          stats: json.stats,
+        };
+      });
+    } catch (err: unknown) {
+      console.error("Update ticket status error:", err);
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Failed to update ticket status. Please try again.";
+      setMutationError(message);
+      await load();
+    } finally {
+      setUpdatingTicketId(null);
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Drag & drop handlers
+  // ---------------------------------------------------------------------------
+
+  const handleMouseDown = (
+    event: React.MouseEvent<HTMLDivElement>,
+    ticketId: string,
+  ) => {
+    setMouseDownInfo({
+      ticketId,
+      x: event.clientX,
+      y: event.clientY,
+      time: Date.now(),
+    });
+  };
+
+  const handleMouseUp = (
+    event: React.MouseEvent<HTMLDivElement>,
+    ticketId: string,
+  ) => {
+    if (!mouseDownInfo || mouseDownInfo.ticketId !== ticketId) {
+      return;
     }
 
-    // TODO → IN_PROGRESS gibi hareketler designer'a ait
-    if (ticket.status === "TODO") {
-      return {
-        allowed: false,
-        reason:
-          "To start work on a ticket, your designer needs to pick it up into In progress.",
-      };
+    const dx = Math.abs(event.clientX - mouseDownInfo.x);
+    const dy = Math.abs(event.clientY - mouseDownInfo.y);
+    const dt = Date.now() - mouseDownInfo.time;
+
+    const movementThreshold = 5;
+    const timeThreshold = 250;
+
+    if (dx < movementThreshold && dy < movementThreshold && dt < timeThreshold) {
+      setDetailTicketId(ticketId);
     }
 
-    // IN_PROGRESS kolonunu sadece designer yönetir
-    if (ticket.status === "IN_PROGRESS") {
-      return {
-        allowed: false,
-        reason:
-          "Only your designer can move tickets that are currently in progress.",
-      };
-    }
-
-    // DONE kolonu artık tamamlanmış işler için
-    if (ticket.status === "DONE") {
-      return {
-        allowed: false,
-        reason: "Completed tickets can't be moved on the board.",
-      };
-    }
-
-    return {
-      allowed: false,
-      reason: "This move is not allowed for your role.",
-    };
+    setMouseDownInfo(null);
   };
 
   const handleDragStart = (
@@ -480,7 +734,7 @@ export default function CustomerBoardPage() {
     ticketId: string,
     ticketStatus: TicketStatus,
   ) => {
-    if (isLimitedAccess) {
+    if (!canDragTicket) {
       event.preventDefault();
       return;
     }
@@ -496,7 +750,11 @@ export default function CustomerBoardPage() {
     setMouseDownInfo(null); // drag başladıysa click saymayalım
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = "move";
-      event.dataTransfer.setData("text/plain", ticketId);
+      try {
+        event.dataTransfer.setData("text/plain", ticketId);
+      } catch {
+        // bazı browser'lar setData çağrısını keyfi olarak limitliyor, görmezden geliyoruz
+      }
     }
   };
 
@@ -505,537 +763,409 @@ export default function CustomerBoardPage() {
     setDragOverStatus(null);
   };
 
-  const handleColumnDragOver = (
+  const handleDragOver = (
     event: React.DragEvent<HTMLDivElement>,
     status: TicketStatus,
   ) => {
-    if (isLimitedAccess || !draggingTicketId) {
-      return;
-    }
-
-    const ticket = tickets.find((t) => t.id === draggingTicketId);
-    if (!ticket) return;
-
-    const decision = canDropTicketToStatus(ticket, status);
-    if (!decision.allowed) {
-      return;
-    }
-
     event.preventDefault();
-    if (dragOverStatus !== status) {
-      setDragOverStatus(status);
-    }
+    if (!canDragTicket) return;
+    if (status !== "IN_REVIEW" && status !== "DONE") return;
+    setDragOverStatus(status);
   };
 
-  const handleColumnDrop = async (
+  const handleDrop = async (
     event: React.DragEvent<HTMLDivElement>,
-    status: TicketStatus,
+    targetStatus: TicketStatus,
   ) => {
     event.preventDefault();
-    if (isLimitedAccess || !draggingTicketId) {
-      setDraggingTicketId(null);
-      setDragOverStatus(null);
-      return;
-    }
-
-    const ticket = tickets.find((t) => t.id === draggingTicketId);
-    setDraggingTicketId(null);
     setDragOverStatus(null);
+    const ticketId = event.dataTransfer.getData("text/plain");
+    if (!ticketId) return;
 
+    const ticket = tickets.find((t) => t.id === ticketId);
     if (!ticket) return;
 
-    const decision = canDropTicketToStatus(ticket, status);
+    if (ticket.status === targetStatus) return;
 
-    if (!decision.allowed) {
-      if (decision.reason) {
-        setMutationError(decision.reason);
-      }
+    if (ticket.status === "IN_REVIEW" && targetStatus === "IN_PROGRESS") {
+      setPendingRevisionTicketId(ticket.id);
+      setRevisionMessage("");
+      setRevisionMessageError(null);
       return;
     }
 
-    // Aynı kolona bırakma → no-op
-    if (status === ticket.status) {
-      return;
-    }
-
-    // IN_REVIEW → DONE → confirm modal
-    if (decision.willMarkDone && status === "DONE") {
-      if (!canMarkDoneOnBoard) {
-        setMutationError(
-          "You don't have permission to mark tickets as done. Please ask your company owner or project manager.",
-        );
-        return;
-      }
+    if (ticket.status === "IN_REVIEW" && targetStatus === "DONE") {
       setPendingDoneTicketId(ticket.id);
       return;
     }
 
-    // IN_REVIEW → IN_PROGRESS → revize (plan limiti backend'de)
-    if (decision.willSendBackToInProgress && status === "IN_PROGRESS") {
-      await persistTicketStatus(ticket.id, "IN_PROGRESS");
+    if (
+      ticket.status === "TODO" &&
+      (targetStatus === "IN_PROGRESS" ||
+        targetStatus === "IN_REVIEW" ||
+        targetStatus === "DONE")
+    ) {
       return;
     }
 
-    // Teorik olarak buraya düşmemeli ama güvenlik için
-    await persistTicketStatus(ticket.id, status);
+    if (ticket.status === "IN_PROGRESS" && targetStatus === "IN_REVIEW") {
+      return;
+    }
+
+    if (targetStatus === "TODO") {
+      return;
+    }
+
+    await persistTicketStatus(ticket.id, targetStatus);
   };
 
   // ---------------------------------------------------------------------------
-  // Detail & DONE-confirmation helpers
+  // Detail, DONE-confirmation & revision-confirmation helpers
   // ---------------------------------------------------------------------------
 
   const closeTicketDetails = () => {
     setDetailTicketId(null);
+    setDetailRevisions(null);
+    setDetailRevisionsError(null);
+    setDetailRevisionsLoading(false);
   };
 
   const handleConfirmDone = async () => {
     if (!pendingDoneTicketId) return;
-    const ticketId = pendingDoneTicketId;
-    setPendingDoneTicketId(null);
-    await persistTicketStatus(ticketId, "DONE");
-  };
+    const ticket = tickets.find((t) => t.id === pendingDoneTicketId);
+    if (!ticket) return;
 
-  const handleCancelDone = () => {
+    await persistTicketStatus(ticket.id, "DONE");
     setPendingDoneTicketId(null);
   };
 
-  // ---------------------------------------------------------------------------
-  // Rendering helpers
-  // ---------------------------------------------------------------------------
+  const handleConfirmRevision = async () => {
+    if (!pendingRevisionTicketId) return;
 
-  const formatStatusLabel = (status: TicketStatus): string =>
-    STATUS_LABELS[status];
+    if (!revisionMessage.trim()) {
+      setRevisionMessageError("Please add a short message for your designer.");
+      return;
+    }
+
+    const ticket = tickets.find((t) => t.id === pendingRevisionTicketId);
+    if (!ticket) return;
+
+    await persistTicketStatus(
+      ticket.id,
+      "IN_PROGRESS",
+      revisionMessage.trim(),
+    );
+    setPendingRevisionTicketId(null);
+    setRevisionMessage("");
+    setRevisionMessageError(null);
+  };
+
+  const handleCancelRevision = () => {
+    setPendingRevisionTicketId(null);
+    setRevisionMessage("");
+    setRevisionMessageError(null);
+  };
+
+  const handleStatusBadgeClick = (status: TicketStatus) => {
+    const element = document.getElementById(`customer-board-column-${status}`);
+    if (!element) return;
+    element.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const handleProjectFilterChange = (
+    event: React.ChangeEvent<HTMLSelectElement>,
+  ) => {
+    setProjectFilter(event.target.value);
+  };
+
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearch(event.target.value);
+  };
+
+  const statusColumnsForRender: TicketStatusDisplay[] = statusOrder.map(
+    (status) => ({
+      status,
+      config: statusDisplayConfigs[status],
+    }),
+  );
+
+  const currentStats = data?.stats ?? computeStats([]);
+
+  const renderTicketCard = (ticket: CustomerBoardTicket) => {
+    const isDragging = draggingTicketId === ticket.id;
+    const isUpdating = updatingTicketId === ticket.id;
+
+    return (
+      <div
+        key={ticket.id}
+        className={`group cursor-pointer rounded-2xl border border-[#e4e0da] bg-white p-3 text-xs shadow-sm transition-shadow ${
+          isDragging ? "opacity-50 shadow-lg" : "hover:shadow-md"
+        }`}
+        draggable={canDragTicket}
+        onDragStart={(event) =>
+          handleDragStart(event, ticket.id, ticket.status)
+        }
+        onDragEnd={handleDragEnd}
+        onMouseDown={(event) => handleMouseDown(event, ticket.id)}
+        onMouseUp={(event) => handleMouseUp(event, ticket.id)}
+      >
+        <div className="mb-2 flex items-start justify-between gap-2">
+          <div>
+            <div className="flex items-center gap-2">
+              {ticket.project?.code && ticket.companyTicketNumber ? (
+                <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#7a7a7a]">
+                  {ticket.project.code}-{ticket.companyTicketNumber}
+                </span>
+              ) : null}
+              <span
+                className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusBadgeClass[ticket.status]}`}
+              >
+                <span
+                  className={`inline-block h-1.5 w-1.5 rounded-full ${statusIndicatorColor(
+                    ticket.status,
+                  )}`}
+                />
+                {statusLabels[ticket.status].replace("_", " ")}
+              </span>
+            </div>
+            <h3 className="mt-1 text-[13px] font-semibold text-[#424143]">
+              {ticket.title}
+            </h3>
+          </div>
+          <span
+            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${priorityBadgeClass[ticket.priority]}`}
+          >
+            {priorityLabelMap[ticket.priority]}
+          </span>
+        </div>
+
+        {ticket.description && (
+          <p className="mb-2 line-clamp-2 text-[11px] text-[#5a5953]">
+            {ticket.description}
+          </p>
+        )}
+
+        <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-[#9a9892]">
+          <div className="flex items-center gap-2">
+            {ticket.project?.name && (
+              <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5">
+                {ticket.project.name}
+              </span>
+            )}
+            {ticket.designer && (
+              <span className="flex items-center gap-1 rounded-full bg-[#f5f3f0] px-2 py-0.5">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#32b37b]" />
+                {ticket.designer.name || ticket.designer.email || "Designer"}
+              </span>
+            )}
+          </div>
+          <span className="whitespace-nowrap">
+            Updated {formatTimeAgo(ticket.updatedAt)}
+          </span>
+        </div>
+
+        {isUpdating && (
+          <div className="mt-2 text-[10px] text-[#9a9892]">
+            Updating status…
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const formatPriorityLabel = (priority: TicketPriority): string => {
-    switch (priority) {
-      case "LOW":
-        return "Low";
-      case "MEDIUM":
-        return "Medium";
-      case "HIGH":
-        return "High";
-      case "URGENT":
-        return "Urgent";
-    }
+    return priorityLabelMap[priority] ?? priority;
   };
-
-  const priorityPillClass = (priority: TicketPriority): string => {
-    switch (priority) {
-      case "LOW":
-        return "bg-[#f5f3f0] text-[#6b6a64]";
-      case "MEDIUM":
-        return "bg-[#eaf4ff] text-[#1d72b8]";
-      case "HIGH":
-        return "bg-[#fff7e0] text-[#8a6b1f]";
-      case "URGENT":
-        return "bg-[#fde8e7] text-[#b13832]";
-    }
-  };
-
-  const formatDate = (iso: string | null): string => {
-    if (!iso) return "—";
-    const d = new Date(iso);
-    return d.toLocaleDateString();
-  };
-
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
 
   return (
-    <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
-      <div className="mx-auto max-w-6xl px-6 py-8">
-        <CustomerNav />
-
-        <div className="flex gap-4">
-          {/* Sidebar: stats + project filters */}
-          <aside className="w-60 flex-shrink-0 rounded-3xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
-            <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
-              Overview
-            </h2>
-
-            <div className="mt-3 rounded-2xl bg-[#f5f3f0] px-3 py-3 text-xs">
-              <p className="text-[11px] font-medium text-[#7a7a7a]">
-                Tickets on board
-              </p>
-              <p className="mt-1 text-2xl font-semibold text-[#424143]">
-                {loading ? "—" : stats.total}
-              </p>
-              <div className="mt-3 space-y-1 text-[11px] text-[#7a7a7a]">
-                <p>
-                  Backlog:{" "}
-                    <span className="font-semibold">
-                    {loading ? "—" : stats.byStatus.TODO}
-                  </span>
-                </p>
-                <p>
-                  In progress:{" "}
-                    <span className="font-semibold">
-                    {loading ? "—" : stats.byStatus.IN_PROGRESS}
-                  </span>
-                </p>
-                <p>
-                  In review:{" "}
-                    <span className="font-semibold">
-                    {loading ? "—" : stats.byStatus.IN_REVIEW}
-                  </span>
-                </p>
-                <p>
-                  Done:{" "}
-                    <span className="font-semibold">
-                    {loading ? "—" : stats.byStatus.DONE}
-                  </span>
-                </p>
-              </div>
+    <div className="flex min-h-screen flex-col bg-[#f5f3f0]">
+      <div className="border-b border-[#e4e0da] bg-[#fdfcfb]">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
+              Customer board
+            </p>
+            <h1 className="mt-1 text-lg font-semibold text-[#424143]">
+              Design requests
+            </h1>
+          </div>
+          <div className="flex flex-col items-end gap-1 text-right text-[11px] text-[#7a7a7a]">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#f5f3f0] px-2 py-0.5">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#32b37b]" />
+                <span className="font-semibold text-[#424143]">
+                  {currentStats.total}
+                </span>
+                <span className="text-[#7a7a7a]">total requests</span>
+              </span>
             </div>
-
-            <div className="mt-5">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
-                Projects
-              </p>
-              <div className="mt-2 space-y-1 text-xs">
+            <div className="flex flex-wrap items-center justify-end gap-1">
+              {statusOrder.map((status) => (
                 <button
+                  key={status}
                   type="button"
-                  onClick={() => setProjectFilter("ALL")}
-                  className={`flex w-full items-center justify-between rounded-2xl px-3 py-2 text-sm ${
-                    projectFilter === "ALL"
-                      ? "bg-[#f5f3f0] text-[#424143]"
-                      : "text-[#424143] hover:bg-[#f7f5f0]"
-                  }`}
+                  onClick={() => handleStatusBadgeClick(status)}
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusBadgeClass[status]}`}
                 >
-                  <span>All projects</span>
-                  <span className="text-[11px] text-[#9a9892]">
-                    {projects.length}
+                  <span
+                    className={`inline-block h-1.5 w-1.5 rounded-full ${statusIndicatorColor(
+                      status,
+                    )}`}
+                  />
+                  {statusDisplayConfigs[status].title}
+                  <span className="rounded-full bg-black/5 px-1 text-[9px] font-bold">
+                    {currentStats.byStatus[status] ?? 0}
                   </span>
                 </button>
-                <div className="max-h-64 space-y-1 overflow-y-auto pr-1">
-                  {projects.length === 0 ? (
-                    <p className="py-2 text-[11px] text-[#9a9892]">
-                      No projects yet.
-                    </p>
-                  ) : (
-                    projects.map((projectName) => {
-                      const isActive = projectFilter === projectName;
-                      return (
-                        <button
-                          key={projectName}
-                          type="button"
-                          onClick={() => setProjectFilter(projectName)}
-                          className={`flex w-full items-center justify-between rounded-2xl px-3 py-2 text-sm ${
-                            isActive
-                              ? "bg-[#f5f3f0] text-[#424143]"
-                              : "text-[#424143] hover:bg-[#f7f5f0]"
-                          }`}
-                        >
-                          <span className="truncate">{projectName}</span>
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
+              ))}
             </div>
-          </aside>
+          </div>
+        </div>
+      </div>
 
-          {/* Main board area */}
-          <main className="flex-1 rounded-3xl border border-[#e3e1dc] bg-white/80 px-4 py-5 shadow-sm">
-            {/* Page header */}
-            <div className="mb-4 flex flex-wrap items-start justify_between gap-3">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
-                  Board
-                </p>
-                <h1 className="mt-1 text-xl font-semibold tracking-tight">
-                  {activeProjectTitle}
-                </h1>
-                <p className="mt-1 text-xs text-[#7a7a7a]">
-                  Use this board to track your requests as they move from
-                  backlog to design and review. Your designer controls{" "}
-                  <span className="font-semibold">In progress</span> and{" "}
-                  <span className="font-semibold">In review</span>. From
-                  review, you can either mark a ticket as done or send it back
-                  for further work.
-                </p>
+      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pb-6 pt-3">
+        {loadError && (
+          <div className="mb-3 rounded-xl border border-[#f7c7c0] bg-[#fdecea] px-4 py-3 text-xs text-[#b13832]">
+            {loadError}
+          </div>
+        )}
 
-                {/* Project selector for mobile */}
-                {projects.length > 0 && (
-                  <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-[#e3e1dc] bg-[#f5f3f0] px-3 py-1 text-[11px] text-[#7a7a7a] md:hidden">
-                    <span>Project:</span>
-                    <select
-                      className="bg-transparent text-[11px] outline-none"
-                      value={projectFilter}
-                      onChange={(e) => setProjectFilter(e.target.value)}
-                    >
-                      <option value="ALL">All projects</option>
-                      {projects.map((name) => (
-                        <option key={name} value={name}>
-                          {name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </div>
+        {companyRoleError && (
+          <div className="mb-3 rounded-xl border border-[#f7c7c0] bg-[#fdecea] px-4 py-3 text-xs text-[#b13832]">
+            {companyRoleError}
+          </div>
+        )}
 
-              {loading && (
-                <div className="rounded-full bg-[#f5f3f0] px-3 py-1 text-[11px] text-[#7a7a7a]">
-                  Loading board…
-                </div>
-              )}
-            </div>
-
-            {/* Limited access */}
-            {!error && !companyRoleLoading && isLimitedAccess && (
-              <div className="mb-4 rounded-xl border border-[#f6c89f] bg-[#fff4e6] px-4 py-3 text-xs text-[#7a7a7a]">
-                <p className="text-[11px] font-medium text-[#9a5b2b]">
-                  Limited access
-                </p>
-                <p className="mt-1">
-                  You can review tickets on the board, but only your company
-                  owner or project manager can move them between statuses.
-                </p>
-              </div>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-[#7a7a7a]">
+            <span className="font-semibold text-[#424143]">
+              Your role in this company:
+            </span>
+            {companyRoleLoading ? (
+              <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5">
+                Loading…
+              </span>
+            ) : companyRole ? (
+              <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 font-semibold text-[#424143]">
+                {companyRole}
+              </span>
+            ) : (
+              <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5">
+                Not set
+              </span>
             )}
+          </div>
+        </div>
 
-            {/* Error */}
-            {error && (
-              <div className="mb-4 rounded-xl border border-red-200 bg-[#fff7f7] px-4 py-3 text-xs text-red-700">
-                <p className="font-medium">Error</p>
-                <p className="mt-1">{error}</p>
-              </div>
-            )}
-
-            {/* Mutation error */}
+        <div className="flex flex-1 flex-col gap-4">
+          <div>
             {mutationError && (
               <div className="mb-4 rounded-xl border border-amber-200 bg-[#fffaf2] px-4 py-3 text-xs text-amber-800">
                 {mutationError}
               </div>
             )}
 
-            {/* Search bar */}
             <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
               <div className="relative flex-1">
                 <input
                   type="text"
-                  placeholder="Search by title, ticket code, project, designer or job type"
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full rounded-full border border-[#e3e1dc] bg-[#f7f5f0] px-4 py-2 text-xs text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+                  onChange={handleSearchChange}
+                  placeholder="Search by title, code or description"
+                  className="w-full rounded-2xl border border-[#e3dfd7] bg-white px-3 py-2 text-[13px] text-[#424143] shadow-sm outline-none placeholder:text-[#b1afa9] focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
                 />
+                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[11px] text-[#b1afa9]">
+                  ⌘K
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-[11px] text-[#7a7a7a]">
+                <span>Project:</span>
+                <select
+                  className="rounded-2xl border border-[#e3dfd7] bg-white px-2 py-1 text-[11px] text-[#424143] shadow-sm outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+                  value={projectFilter}
+                  onChange={handleProjectFilterChange}
+                >
+                  <option value="ALL">All projects</option>
+                  {projects.map((projectName) => (
+                    <option key={projectName} value={projectName}>
+                      {projectName}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
-            {/* Columns */}
-            <div className="grid gap-3 md:grid-cols-4">
-              {STATUS_ORDER.map((status) => {
-                const columnTickets = ticketsByStatus[status] || [];
-                const columnTitle = formatStatusLabel(status);
-                const isActiveDrop =
-                  dragOverStatus === status && !!draggingTicketId;
+            {loading ? (
+              <div className="flex flex-1 items-center justify-center py-16 text-[12px] text-[#7a7a7a]">
+                Loading your board…
+              </div>
+            ) : (
+              <div className="flex flex-1 flex-col gap-4 md:flex-row">
+                {statusOrder.map((status) => {
+                  const config = statusDisplayConfigs[status];
+                  const columnTickets = ticketsByStatus[status] ?? [];
+                  const isDropTargetActive = dragOverStatus === status;
 
-                const isDesignerManagedColumn =
-                  status === "IN_PROGRESS" || status === "IN_REVIEW";
-
-                const isDoneColumn = status === "DONE";
-                const previewTickets = isDoneColumn
-                  ? columnTickets.slice(0, 5)
-                  : columnTickets;
-                const olderDoneCount = isDoneColumn
-                  ? Math.max(0, columnTickets.length - previewTickets.length)
-                  : 0;
-
-                return (
-                  <div
-                    key={status}
-                    className={`flex flex-col rounded-2xl bg-white/60 p-2 ${
-                      isActiveDrop ? "ring-2 ring-[#f15b2b]" : "ring-0"
-                    }`}
-                    onDragOver={(event) =>
-                      handleColumnDragOver(event, status)
-                    }
-                    onDrop={(event) => handleColumnDrop(event, status)}
-                  >
-                    <div className="mb-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1">
-                          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9a9892]">
-                            {columnTitle}
-                          </span>
-                          <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[11px] font-semibold text-[#7a7a7a]">
-                            {columnTickets.length}
-                          </span>
-                        </div>
-                      </div>
-                      {isDesignerManagedColumn && (
-                        <p className="mt-1 text-[10px] text-[#b1afa9]">
-                          {status === "IN_PROGRESS"
-                            ? "Managed by your designer – they pick work into this column."
-                            : "Sent by your designer when a ticket is ready for your review."}
-                        </p>
-                      )}
-                      {isDoneColumn && (
-                        <p className="mt-1 text-[10px] text-[#b1afa9]">
-                          Recently completed requests appear here. Older
-                          completed work lives in{" "}
-                          <span className="font-medium">
-                            My tickets → Done
-                          </span>
-                          .
-                        </p>
-                      )}
-                    </div>
-
+                  return (
                     <div
-                      className={`flex-1 space-y-2 rounded-xl ${statusColumnClass(
-                        status,
-                      )} bg-opacity-70 p-2`}
+                      key={status}
+                      id={`customer-board-column-${status}`}
+                      className={`flex-1 rounded-3xl border border-[#e4e0da] p-3 ${
+                        statusColumnClass(status)
+                      }`}
+                      onDragOver={(event) => handleDragOver(event, status)}
+                      onDrop={(event) => handleDrop(event, status)}
                     >
-                      {columnTickets.length === 0 ? (
-                        <p className="py-4 text-center text-[11px] text-[#9a9892]">
-                          No tickets in this column.
-                        </p>
-                      ) : (
-                        <>
-                          {previewTickets.map((t) => {
-                            const ticketCode =
-                              t.project?.code &&
-                              t.companyTicketNumber != null
-                                ? `${t.project.code}-${t.companyTicketNumber}`
-                                : t.companyTicketNumber != null
-                                ? `#${t.companyTicketNumber}`
-                                : t.id;
-
-                            const payoutTokens =
-                              t.jobType?.designerPayoutTokens ??
-                              t.jobType?.tokenCost ??
-                              null;
-
-                            const isUpdating = updatingTicketId === t.id;
-
-                            const canDragThisCard =
-                              !isUpdating &&
-                              !isLimitedAccess &&
-                              (t.status === "TODO" ||
-                                t.status === "IN_REVIEW");
-
-                            return (
-                              <div
-                                key={t.id}
-                                className={`cursor-pointer rounded-xl bg-white p-3 shadow-sm ${
-                                  isUpdating ? "opacity-60" : ""
-                                }`}
-                                draggable={canDragThisCard}
-                                onDragStart={(event) =>
-                                  handleDragStart(event, t.id, t.status)
-                                }
-                                onDragEnd={handleDragEnd}
-                                onMouseDown={(e) =>
-                                  setMouseDownInfo({
-                                    ticketId: t.id,
-                                    x: e.clientX,
-                                    y: e.clientY,
-                                    time: Date.now(),
-                                  })
-                                }
-                                onMouseUp={(e) => {
-                                  if (!mouseDownInfo) return;
-                                  const dx = e.clientX - mouseDownInfo.x;
-                                  const dy = e.clientY - mouseDownInfo.y;
-                                  const dt = Date.now() - mouseDownInfo.time;
-                                  setMouseDownInfo(null);
-                                  const distance = Math.sqrt(
-                                    dx * dx + dy * dy,
-                                  );
-                                  if (
-                                    distance < 5 &&
-                                    dt < 400 &&
-                                    !draggingTicketId
-                                  ) {
-                                    setDetailTicketId(t.id);
-                                  }
-                                }}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <div className="text-[11px] font-semibold text-[#424143]">
-                                    {ticketCode}
-                                  </div>
-                                  <div className="text-[10px] text-[#9a9892]">
-                                    {t.project?.name || "—"}
-                                  </div>
-                                </div>
-                                <div className="mt-1 text-[13px] font-semibold text-[#424143]">
-                                  {t.title}
-                                </div>
-                                {t.description && (
-                                  <p className="mt-1 line-clamp-3 text-[11px] text-[#7a7a7a]">
-                                    {t.description}
-                                  </p>
-                                )}
-                                <div className="mt-2 flex flex-wrap items-center gap-2">
-                                  <span
-                                    className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${priorityPillClass(
-                                      t.priority,
-                                    )}`}
-                                  >
-                                    {formatPriorityLabel(t.priority)}
-                                  </span>
-                                  {t.designer && (
-                                    <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[10px] text-[#7a7a7a]">
-                                      {t.designer.name ||
-                                        t.designer.email}
-                                    </span>
-                                  )}
-                                  {payoutTokens != null && (
-                                    <span className="rounded-full bg-[#f0fff6] px-2 py-0.5 text-[10px] text-[#137a3a]">
-                                      {payoutTokens} tokens
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="mt-2 flex items-center justify-between text-[10px] text-[#9a9892]">
-                                  <span>
-                                    Created {formatDate(t.createdAt)}
-                                  </span>
-                                  <span>
-                                    Updated {formatDate(t.updatedAt)}
-                                  </span>
-                                </div>
-                              </div>
-                            );
-                          })}
-
-                          {isDoneColumn && olderDoneCount > 0 && (
-                            <div className="mt-2 rounded-xl border border-dashed border-[#cfd3c9] bg-white/60 px-3 py-3 text-[11px] text-[#7a7a7a]">
-                              <p className="font-medium text-[#424143]">
-                                + {olderDoneCount} older completed tickets
-                              </p>
-                              <p className="mt-1">
-                                For a full history of completed work, use
-                                your tickets list.
-                              </p>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  (window.location.href =
-                                    "/customer/tickets")
-                                }
-                                className="mt-2 inline-flex items-center rounded-full bg-[#f5f3f0] px-3 py-1 text-[11px] font-medium text-[#424143] hover:bg-[#eeeae3]"
-                              >
-                                View all completed tickets
-                              </button>
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className={`inline-flex items-center gap-1 rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-semibold ${statusTagColor(
+                                status,
+                              )}`}
+                            >
+                              <span
+                                className={`inline-block h-1.5 w-1.5 rounded-full ${statusIndicatorColor(
+                                  status,
+                                )}`}
+                              />
+                              {config.title}
                             </div>
-                          )}
-                        </>
-                      )}
+                            <span className="rounded-full bg-white/70 px-2 py-0.5 text-[10px] text-[#7a7a7a]">
+                              {config.description}
+                            </span>
+                          </div>
+                        </div>
+                        <span className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-semibold text-[#424143]">
+                          {columnTickets.length}{" "}
+                          {columnTickets.length === 1 ? "ticket" : "tickets"}
+                        </span>
+                      </div>
+
+                      <div
+                        className={`mt-2 flex min-h-[80px] flex-col gap-2 rounded-2xl border border-dashed border-transparent bg-white/50 p-1 transition-colors ${
+                          isDropTargetActive ? "border-[#f15b2b]" : ""
+                        }`}
+                      >
+                        {columnTickets.length === 0 ? (
+                          <div className="flex flex-1 items-center justify-center py-6 text-[11px] text-[#9a9892]">
+                            No tickets in this column yet.
+                          </div>
+                        ) : (
+                          columnTickets.map((ticket) =>
+                            renderTicketCard(ticket),
+                          )
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          </main>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Detail modal */}
       {detailTicket && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 px-4 py-8">
           <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
@@ -1047,17 +1177,35 @@ export default function CustomerBoardPage() {
                 <h2 className="mt-1 text-lg font-semibold text-[#424143]">
                   {detailTicket.title}
                 </h2>
-                <p className="mt-1 text-[11px] text-[#7a7a7a]">
-                  Status:{" "}
-                  <span className="font-semibold">
-                    {formatStatusLabel(detailTicket.status)}
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-[#7a7a7a]">
+                  {detailTicket.project?.code &&
+                    detailTicket.companyTicketNumber && (
+                      <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5">
+                        {detailTicket.project.code}-
+                        {detailTicket.companyTicketNumber}
+                      </span>
+                    )}
+                  <span
+                    className={`flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold ${statusBadgeClass[detailTicket.status]}`}
+                  >
+                    <span
+                      className={`inline-block h-1.5 w-1.5 rounded-full ${statusIndicatorColor(
+                        detailTicket.status,
+                      )}`}
+                    />
+                    {statusLabels[detailTicket.status].replace("_", " ")}
                   </span>
-                </p>
+                  <span
+                    className={`rounded-full px-2 py-0.5 font-semibold ${priorityBadgeClass[detailTicket.priority]}`}
+                  >
+                    {formatPriorityLabel(detailTicket.priority)}
+                  </span>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={closeTicketDetails}
-                className="rounded-full bg-[#f5f3f0] px-3 py-1 text-[11px] font-medium text-[#424143] hover:bg-[#eeeae3]"
+                className="rounded-full bg-[#f5f3f0] px-2 py-1 text-[11px] text-[#7a7a7a] hover:bg-[#e4e0da]"
               >
                 Close
               </button>
@@ -1132,40 +1280,167 @@ export default function CustomerBoardPage() {
                   </p>
                 </div>
               </div>
+
+              <div>
+                <p className="font-semibold text-[#424143]">Revision history</p>
+                <div className="mt-1 space-y-1">
+                  {detailRevisionsLoading && (
+                    <p className="text-[#9a9892]">Loading revision history…</p>
+                  )}
+
+                  {!detailRevisionsLoading && detailRevisionsError && (
+                    <p className="text-[#b13832]">{detailRevisionsError}</p>
+                  )}
+
+                  {!detailRevisionsLoading &&
+                    !detailRevisionsError &&
+                    (!detailRevisions || detailRevisions.length === 0) && (
+                      <p className="text-[#9a9892]">
+                        No revisions yet. Once your designer sends this ticket
+                        for review, you&apos;ll see each version and your
+                        feedback here.
+                      </p>
+                    )}
+
+                  {!detailRevisionsLoading &&
+                    !detailRevisionsError &&
+                    detailRevisions &&
+                    detailRevisions.length > 0 && (
+                      <div className="space-y-2">
+                        {detailRevisions.map((rev) => (
+                          <div
+                            key={rev.version}
+                            className="rounded-xl bg-[#f5f3f0] px-3 py-2"
+                          >
+                            <p className="text-[10px] font-semibold text-[#424143]">
+                              Version v{rev.version}
+                            </p>
+
+                            {rev.submittedAt && (
+                              <p className="mt-1">
+                                Sent for review on{" "}
+                                <span className="font-semibold">
+                                  {formatDate(rev.submittedAt)}
+                                </span>
+                                .
+                              </p>
+                            )}
+
+                            {rev.feedbackAt && (
+                              <p className="mt-1">
+                                Changes requested on{" "}
+                                <span className="font-semibold">
+                                  {formatDate(rev.feedbackAt)}
+                                </span>
+                                .
+                              </p>
+                            )}
+
+                            {rev.feedbackMessage && (
+                              <p className="mt-1 italic text-[#5a5953]">
+                                “{rev.feedbackMessage}”
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* DONE confirmation modal */}
-      {pendingDoneTicket && (
+      {pendingRevisionTicket && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-8">
           <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
             <h2 className="text-sm font-semibold text-[#424143]">
-              Mark this request as done?
+              Send this request back to your designer?
             </h2>
-            <p className="mt-2 text-[11px] text-[#7a7a7a]">
-              Are you sure you want to mark{" "}
-              <span className="font-semibold">
-                {pendingDoneTicket.title}
-              </span>{" "}
-              as done? This will close the request and count as a completed job
-              for your designer.
+            <p className="mt-1 text-[11px] text-[#7a7a7a]">
+              Your designer will see your message and continue working on this
+              request. The status will move back to{" "}
+              <span className="font-semibold">In progress</span>.
             </p>
-            <div className="mt-4 flex items-center justify-end gap-2 text-[11px]">
+
+            <div className="mt-3">
+              <label className="block text-[11px] font-semibold text-[#424143]">
+                Message for your designer
+              </label>
+              <textarea
+                value={revisionMessage}
+                onChange={(e) => {
+                  setRevisionMessage(e.target.value);
+                  if (revisionMessageError) {
+                    setRevisionMessageError(null);
+                  }
+                }}
+                placeholder="For example: Could we make the hero headline larger and try a version with a darker background?"
+                className="mt-1 h-28 w-full rounded-2xl border border-[#e3dfd7] bg_WHITE px-3 py-2 text-[12px] text-[#424143] shadow-sm outline-none placeholder:text-[#b1afa9] focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+              />
+              {revisionMessageError && (
+                <p className="mt-1 text-[11px] text-[#b13832]">
+                  {revisionMessageError}
+                </p>
+              )}
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2 text-[12px]">
               <button
                 type="button"
-                onClick={handleCancelDone}
-                className="rounded-full border border-[#e3e1dc] bg-white px-3 py-1 text-[#424143] hover:bg-[#f5f3f0]"
+                onClick={handleCancelRevision}
+                className="rounded-full border border-[#e3dfd7] px-3 py-1 text-[#7a7a7a] hover:bg-[#f5f3f0]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmRevision}
+                className="rounded-full bg-[#f15b2b] px-3 py-1 font-semibold text-white hover:bg-[#e04f22]"
+              >
+                Send back to designer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingDoneTicket && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg_BLACK/30 px-4 py-8">
+          <div className="w-full max-w-md rounded-2xl bg_WHITE p-5 shadow-xl">
+            <h2 className="text-sm font-semibold text-[#424143]">
+              Mark this request as done?
+            </h2>
+            <p className="mt-1 text-[11px] text-[#7a7a7a]">
+              Once you mark this request as done, your designer will get paid
+              for this job, and the ticket will move to{" "}
+              <span className="font-semibold">Done</span>.
+            </p>
+
+            <div className="mt-3 rounded-xl bg-[#f5f3f0] px-3 py-3 text-[11px] text-[#424143]">
+              <p className="font-semibold">{pendingDoneTicket.title}</p>
+              {pendingDoneTicket.project?.name && (
+                <p className="mt-1 text-[#7a7a7a]">
+                  Project: {pendingDoneTicket.project.name}
+                </p>
+              )}
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2 text-[12px]">
+              <button
+                type="button"
+                onClick={() => setPendingDoneTicketId(null)}
+                className="rounded-full border border-[#e3dfd7] px-3 py-1 text-[#7a7a7a] hover:bg-[#f5f3f0]"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleConfirmDone}
-                className="rounded-full bg-[#f15b2b] px-3 py-1 font-medium text-white hover:bg-[#e14e22]"
+                className="rounded-full bg-[#32b37b] px-3 py-1 font-semibold text-white hover:bg-[#2ba06a]"
               >
-                Mark as done
+                Yes, mark as done
               </button>
             </div>
           </div>
