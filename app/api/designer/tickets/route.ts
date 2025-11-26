@@ -1,16 +1,13 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/designer/tickets/route.ts
-// @purpose: Designer API for listing and updating assigned tickets (status, no DONE)
-// @version: v1.3.1
+// @purpose: Designer API for listing and updating assigned tickets (status, revisions, no DONE)
+// @version: v1.5.0
 // @status: active
-// @lastUpdate: 2025-11-21
+// @lastUpdate: 2025-11-24
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
-import {
-  TicketStatus,
-  TicketPriority,
-} from "@prisma/client";
+import { TicketStatus, TicketPriority } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 
@@ -42,6 +39,9 @@ type DesignerTicket = {
     tokenCost: number;
     designerPayoutTokens: number;
   } | null;
+  revisionCount: number;
+  latestRevisionHasFeedback: boolean;
+  latestRevisionFeedbackSnippet: string | null;
 };
 
 type DesignerTicketsResponse = {
@@ -128,6 +128,18 @@ export async function GET() {
             designerPayoutTokens: true,
           },
         },
+        revisionCount: true,
+        revisions: {
+          orderBy: {
+            version: "desc",
+          },
+          take: 1,
+          select: {
+            feedbackMessage: true,
+            feedbackAt: true,
+            feedbackByCustomerId: true,
+          },
+        },
       },
     });
 
@@ -182,39 +194,59 @@ export async function GET() {
         byPriority,
         loadScore,
       },
-      tickets: tickets.map((t) => ({
-        id: t.id,
-        title: t.title,
-        description: t.description,
-        status: toTicketStatusString(t.status),
-        priority: t.priority,
-        dueDate: t.dueDate ? t.dueDate.toISOString() : null,
-        companyTicketNumber: t.companyTicketNumber ?? null,
-        createdAt: t.createdAt.toISOString(),
-        updatedAt: t.updatedAt.toISOString(),
-        company: t.company
-          ? {
-              id: t.company.id,
-              name: t.company.name,
-              slug: t.company.slug,
-            }
-          : null,
-        project: t.project
-          ? {
-              id: t.project.id,
-              name: t.project.name,
-              code: t.project.code,
-            }
-          : null,
-        jobType: t.jobType
-          ? {
-              id: t.jobType.id,
-              name: t.jobType.name,
-              tokenCost: t.jobType.tokenCost,
-              designerPayoutTokens: t.jobType.designerPayoutTokens,
-            }
-          : null,
-      })),
+      tickets: tickets.map((t) => {
+        const latestRevision = t.revisions?.[0];
+
+        const latestRevisionHasFeedback = !!(
+          latestRevision &&
+          latestRevision.feedbackMessage &&
+          latestRevision.feedbackByCustomerId
+        );
+
+        let latestRevisionFeedbackSnippet: string | null = null;
+        if (latestRevision && latestRevision.feedbackMessage) {
+          const full = latestRevision.feedbackMessage;
+          latestRevisionFeedbackSnippet =
+            full.length > 180 ? full.slice(0, 177) + "..." : full;
+        }
+
+        return {
+          id: t.id,
+          title: t.title,
+          description: t.description,
+          status: toTicketStatusString(t.status),
+          priority: t.priority,
+          dueDate: t.dueDate ? t.dueDate.toISOString() : null,
+          companyTicketNumber: t.companyTicketNumber ?? null,
+          createdAt: t.createdAt.toISOString(),
+          updatedAt: t.updatedAt.toISOString(),
+          company: t.company
+            ? {
+                id: t.company.id,
+                name: t.company.name,
+                slug: t.company.slug,
+              }
+            : null,
+          project: t.project
+            ? {
+                id: t.project.id,
+                name: t.project.name,
+                code: t.project.code,
+              }
+            : null,
+          jobType: t.jobType
+            ? {
+                id: t.jobType.id,
+                name: t.jobType.name,
+                tokenCost: t.jobType.tokenCost,
+                designerPayoutTokens: t.jobType.designerPayoutTokens,
+              }
+            : null,
+          revisionCount: t.revisionCount ?? 0,
+          latestRevisionHasFeedback,
+          latestRevisionFeedbackSnippet,
+        };
+      }),
     };
 
     return NextResponse.json(response, { status: 200 });
@@ -235,7 +267,7 @@ export async function GET() {
 }
 
 // -----------------------------------------------------------------------------
-// PATCH: update ticket status (designers cannot mark DONE)
+// PATCH: update ticket status (designers cannot mark DONE, creates revisions)
 // -----------------------------------------------------------------------------
 //
 // Plan bazlı concurrency kuralı:
@@ -243,6 +275,11 @@ export async function GET() {
 //   aynı company için eşzamanlı IN_PROGRESS ticket sayısının üst sınırıdır.
 // - Sadece IN_PROGRESS'e geçişte kontrol edilir.
 // - TODO / IN_REVIEW geçişleri bu limitten etkilenmez.
+//
+// Revision kuralı:
+// - Designer tarafında IN_PROGRESS -> IN_REVIEW geçişinde:
+//   - Ticket.revisionCount +1
+//   - Aynı transaction içinde yeni bir TicketRevision kaydı oluşturulur.
 // -----------------------------------------------------------------------------
 
 export async function PATCH(req: NextRequest) {
@@ -320,16 +357,10 @@ export async function PATCH(req: NextRequest) {
     // -------------------------------------------------------------------------
     // Plan-based concurrency check for IN_PROGRESS
     // -------------------------------------------------------------------------
-    //
-    // Sadece şu durumda limit kontrolü yapıyoruz:
-    // - nextStatus === IN_PROGRESS
-    // - ticket şu anda IN_PROGRESS değil (yani gerçekten yeni bir "active" işe geçiliyor)
-    // -------------------------------------------------------------------------
     if (
       nextStatus === TicketStatus.IN_PROGRESS &&
       ticket.status !== TicketStatus.IN_PROGRESS
     ) {
-      // İlgili company'nin plan bilgisini çek
       const companyWithPlan = await prisma.company.findUnique({
         where: { id: ticket.companyId },
         select: {
@@ -350,7 +381,6 @@ export async function PATCH(req: NextRequest) {
           ? planData.maxConcurrentInProgressTickets
           : 1;
 
-      // Aynı company'deki mevcut IN_PROGRESS ticket sayısını say
       const currentInProgressCount = await prisma.ticket.count({
         where: {
           companyId: ticket.companyId,
@@ -379,17 +409,61 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
-    const updated = await prisma.ticket.update({
-      where: { id: ticket.id },
-      data: {
-        status: nextStatus,
-      },
-      select: {
-        id: true,
-        status: true,
-        updatedAt: true,
-      },
-    });
+    const isInProgressToInReview =
+      ticket.status === TicketStatus.IN_PROGRESS &&
+      nextStatus === TicketStatus.IN_REVIEW;
+
+    let updated: { id: string; status: TicketStatus; updatedAt: Date };
+
+    if (isInProgressToInReview) {
+      // IN_PROGRESS -> IN_REVIEW geçişinde revision kaydı + revisionCount artışı
+      updated = await prisma.$transaction(async (tx) => {
+        const updatedTicket = await tx.ticket.update({
+          where: { id: ticket.id },
+          data: {
+            status: nextStatus,
+            revisionCount: {
+              increment: 1,
+            },
+          },
+          select: {
+            id: true,
+            status: true,
+            updatedAt: true,
+            revisionCount: true,
+          },
+        });
+
+        await tx.ticketRevision.create({
+          data: {
+            ticketId: updatedTicket.id,
+            version: updatedTicket.revisionCount,
+            submittedByDesignerId: user.id,
+          },
+        });
+
+        return {
+          id: updatedTicket.id,
+          status: updatedTicket.status,
+          updatedAt: updatedTicket.updatedAt,
+        };
+      });
+    } else {
+      // Diğer tüm geçişlerde sadece status güncellenir
+      const result = await prisma.ticket.update({
+        where: { id: ticket.id },
+        data: {
+          status: nextStatus,
+        },
+        select: {
+          id: true,
+          status: true,
+          updatedAt: true,
+        },
+      });
+
+      updated = result;
+    }
 
     return NextResponse.json(
       {

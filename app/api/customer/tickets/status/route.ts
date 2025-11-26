@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/customer/tickets/status/route.ts
 // @purpose: Update ticket status for customer board (kanban)
-// @version: v1.6.0
+// @version: v1.7.0
 // @status: active
-// @lastUpdate: 2025-11-23
+// @lastUpdate: 2025-11-24
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
@@ -19,6 +19,11 @@ import {
 type PatchPayload = {
   ticketId?: string;
   status?: string;
+  /**
+   * Optional revision message when moving IN_REVIEW -> IN_PROGRESS.
+   * On the UI this will come from the "Request changes" modal.
+   */
+  revisionMessage?: string;
 };
 
 function isValidTicketStatus(value: unknown): value is TicketStatus {
@@ -182,6 +187,20 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
+    // IN_REVIEW → IN_PROGRESS geçişinde revizyon mesajı zorunlu
+    if (isReviewToInProgress) {
+      const msg = (body.revisionMessage ?? "").trim();
+      if (!msg) {
+        return NextResponse.json(
+          {
+            error:
+              "Please add a short message about what needs to be changed before sending this ticket back to In progress.",
+          },
+          { status: 400 },
+        );
+      }
+    }
+
     // 3) DONE transition: sadece IN_REVIEW → DONE
     const isDoneTransition =
       currentStatus !== TicketStatus.DONE &&
@@ -267,6 +286,7 @@ export async function PATCH(req: NextRequest) {
 
     // -------------------------------------------------------------------------
     // Status update + (opsiyonel) designer payout (DONE’da)
+    // + (yeni) revision feedback kaydı (IN_REVIEW → IN_PROGRESS)
     // -------------------------------------------------------------------------
 
     const updated = await prisma.$transaction(async (tx) => {
@@ -306,7 +326,34 @@ export async function PATCH(req: NextRequest) {
         }
       }
 
-      // 2) Ticket status update
+      // 2) IN_REVIEW → IN_PROGRESS ise, son TicketRevision'a feedback yaz
+      if (isReviewToInProgress) {
+        const msg = (body.revisionMessage ?? "").trim();
+
+        const lastRevision = await tx.ticketRevision.findFirst({
+          where: {
+            ticketId: ticket.id,
+          },
+          orderBy: {
+            version: "desc",
+          },
+        });
+
+        if (lastRevision) {
+          await tx.ticketRevision.update({
+            where: { id: lastRevision.id },
+            data: {
+              feedbackByCustomerId: user.id,
+              feedbackAt: new Date(),
+              feedbackMessage: msg,
+            },
+          });
+        }
+        // Eğer hiçbir revision yoksa (teorik edge case),
+        // sessizce geçiyoruz; ileride log eklenebilir.
+      }
+
+      // 3) Ticket status update
       const updatedTicket = await tx.ticket.update({
         where: { id: ticket.id },
         data: {
