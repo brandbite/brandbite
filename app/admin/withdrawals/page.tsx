@@ -1,14 +1,15 @@
 // -----------------------------------------------------------------------------
 // @file: app/admin/withdrawals/page.tsx
-// @purpose: Admin-facing overview & controls for designer withdrawals
-// @version: v1.2.0
+// @purpose: Admin-facing overview & controls for designer withdrawals (with toasts)
+// @version: v1.3.0
 // @status: active
-// @lastUpdate: 2025-11-21
+// @lastUpdate: 2025-11-29
 // -----------------------------------------------------------------------------
 
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useToast } from "@/components/ui/toast-provider";
 
 type WithdrawalStatus = "PENDING" | "APPROVED" | "REJECTED" | "PAID";
 
@@ -41,19 +42,17 @@ type AdminWithdrawalsResponse = {
 type AdminWithdrawalAction = "APPROVE" | "REJECT" | "MARK_PAID";
 
 export default function AdminWithdrawalsPage() {
-  const [data, setData] = useState<AdminWithdrawalsResponse | null>(
-    null,
-  );
+  const { showToast } = useToast();
+
+  const [data, setData] = useState<AdminWithdrawalsResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [statusFilter, setStatusFilter] = useState<
-    "ALL" | WithdrawalStatus
-  >("ALL");
-  const [designerFilter, setDesignerFilter] = useState<string>("ALL");
-  const [actionLoadingId, setActionLoadingId] = useState<string | null>(
-    null,
+  const [statusFilter, setStatusFilter] = useState<"ALL" | WithdrawalStatus>(
+    "ALL",
   );
+  const [designerFilter, setDesignerFilter] = useState<string>("ALL");
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -81,8 +80,7 @@ export default function AdminWithdrawalsPage() {
             );
           }
           const msg =
-            (json as any)?.error ||
-            `Request failed with status ${res.status}`;
+            (json as any)?.error || `Request failed with status ${res.status}`;
           throw new Error(msg);
         }
 
@@ -92,9 +90,16 @@ export default function AdminWithdrawalsPage() {
       } catch (err: any) {
         console.error("Admin withdrawals fetch error:", err);
         if (!cancelled) {
-          setError(
-            err?.message || "Failed to load admin withdrawals.",
-          );
+          const message =
+            err?.message || "Failed to load admin withdrawals.";
+
+          setError(message);
+
+          showToast({
+            type: "error",
+            title: "Could not load withdrawals",
+            description: message,
+          });
         }
       } finally {
         if (!cancelled) {
@@ -108,17 +113,13 @@ export default function AdminWithdrawalsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [showToast]);
 
   const withdrawals = data?.withdrawals ?? [];
 
   const designers = useMemo(() => {
     const list = Array.from(
-      new Set(
-        withdrawals.map(
-          (w) => w.designer.name || w.designer.email,
-        ),
-      ),
+      new Set(withdrawals.map((w) => w.designer.name || w.designer.email)),
     );
     return list;
   }, [withdrawals]);
@@ -129,20 +130,42 @@ export default function AdminWithdrawalsPage() {
         return false;
       }
       const designerLabel = w.designer.name || w.designer.email;
-      if (
-        designerFilter !== "ALL" &&
-        designerLabel !== designerFilter
-      ) {
+      if (designerFilter !== "ALL" && designerLabel !== designerFilter) {
         return false;
       }
       return true;
     });
   }, [withdrawals, statusFilter, designerFilter]);
 
-  const handleAction = async (
-    id: string,
-    action: AdminWithdrawalAction,
-  ) => {
+  const getActionSuccessCopy = (action: AdminWithdrawalAction) => {
+    switch (action) {
+      case "APPROVE":
+        return {
+          title: "Withdrawal approved",
+          description:
+            "This withdrawal has been approved. Remember to mark it as paid once the payment is sent.",
+        };
+      case "REJECT":
+        return {
+          title: "Withdrawal rejected",
+          description:
+            "This withdrawal has been rejected. The designer will see this in their history.",
+        };
+      case "MARK_PAID":
+        return {
+          title: "Withdrawal marked as paid",
+          description:
+            "This withdrawal is now marked as paid and the record has been updated.",
+        };
+      default:
+        return {
+          title: "Withdrawal updated",
+          description: "The withdrawal status has been updated.",
+        };
+    }
+  };
+
+  const handleAction = async (id: string, action: AdminWithdrawalAction) => {
     setActionLoadingId(`${id}:${action}`);
     setError(null);
 
@@ -164,26 +187,54 @@ export default function AdminWithdrawalsPage() {
         throw new Error(msg);
       }
 
-      const updated = (json as any)
-        .withdrawal as AdminWithdrawal | undefined;
+      const updated = (json as any).withdrawal as
+        | AdminWithdrawal
+        | undefined;
+      const updatedStats = (json as any).stats as
+        | AdminWithdrawalsResponse["stats"]
+        | undefined;
 
       if (updated) {
         setData((prev) =>
           prev
             ? {
-                ...prev,
+                stats: updatedStats ?? prev.stats,
                 withdrawals: prev.withdrawals.map((w) =>
                   w.id === updated.id ? updated : w,
                 ),
               }
             : prev,
         );
+      } else if (updatedStats) {
+        // Stats geldi ama tekil withdrawal yoksa, sadece stats'i güncelle
+        setData((prev) =>
+          prev
+            ? {
+                ...prev,
+                stats: updatedStats,
+              }
+            : prev,
+        );
       }
+
+      const copy = getActionSuccessCopy(action);
+      showToast({
+        type: "success",
+        title: copy.title,
+        description: copy.description,
+      });
     } catch (err: any) {
       console.error("Admin withdrawal action error:", err);
-      setError(
-        err?.message || "Failed to update withdrawal status.",
-      );
+      const message =
+        err?.message || "Failed to update withdrawal status.";
+
+      setError(message);
+
+      showToast({
+        type: "error",
+        title: "Could not update withdrawal",
+        description: message,
+      });
     } finally {
       setActionLoadingId(null);
     }
@@ -267,8 +318,7 @@ export default function AdminWithdrawalsPage() {
               Designer withdrawals
             </h1>
             <p className="mt-1 text-sm text-[#7a7a7a]">
-              Review, approve and mark designer withdrawal requests as
-              paid.
+              Review, approve and mark designer withdrawal requests as paid.
             </p>
           </div>
         </div>
@@ -288,11 +338,7 @@ export default function AdminWithdrawalsPage() {
               Total requested
             </p>
             <p className="mt-2 text-3xl font-semibold text-[#f15b2b]">
-              {loading
-                ? "—"
-                : stats
-                ? stats.totalRequested
-                : 0}
+              {loading ? "—" : stats ? stats.totalRequested : 0}
               <span className="ml-1 text-base font-normal text-[#7a7a7a]">
                 tokens
               </span>
@@ -336,9 +382,7 @@ export default function AdminWithdrawalsPage() {
             <select
               value={statusFilter}
               onChange={(e) =>
-                setStatusFilter(
-                  e.target.value as "ALL" | WithdrawalStatus,
-                )
+                setStatusFilter(e.target.value as "ALL" | WithdrawalStatus)
               }
               className="rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
             >
@@ -404,8 +448,7 @@ export default function AdminWithdrawalsPage() {
                 </thead>
                 <tbody>
                   {filteredWithdrawals.map((w) => {
-                    const designerLabel =
-                      w.designer.name || w.designer.email;
+                    const designerLabel = w.designer.name || w.designer.email;
 
                     const canApprove = w.status === "PENDING";
                     const canReject = w.status === "PENDING";
@@ -420,9 +463,7 @@ export default function AdminWithdrawalsPage() {
                           {formatDateTime(w.createdAt)}
                         </td>
                         <td className="px-2 py-2 align-top text-[11px] text-[#424143]">
-                          <div className="font-medium">
-                            {designerLabel}
-                          </div>
+                          <div className="font-medium">{designerLabel}</div>
                           <div className="text-[10px] text-[#9a9892]">
                             {w.designer.email}
                           </div>
@@ -433,12 +474,11 @@ export default function AdminWithdrawalsPage() {
                         <td className="px-2 py-2 align-top text-[11px]">
                           <div className="space-y-1">
                             {renderStatusBadge(w.status)}
-                            {w.status === "REJECTED" &&
-                              w.adminRejectReason && (
-                                <p className="text-[10px] text-[#b13832]">
-                                  {w.adminRejectReason}
-                                </p>
-                              )}
+                            {w.status === "REJECTED" && w.adminRejectReason && (
+                              <p className="text-[10px] text-[#b13832]">
+                                {w.adminRejectReason}
+                              </p>
+                            )}
                           </div>
                         </td>
                         <td className="px-2 py-2 align-top text-[11px] text-[#7a7a7a]">
@@ -451,12 +491,9 @@ export default function AdminWithdrawalsPage() {
                           <div className="flex flex-wrap gap-2">
                             <button
                               disabled={
-                                !canApprove ||
-                                isActionLoading(w.id, "APPROVE")
+                                !canApprove || isActionLoading(w.id, "APPROVE")
                               }
-                              onClick={() =>
-                                handleAction(w.id, "APPROVE")
-                              }
+                              onClick={() => handleAction(w.id, "APPROVE")}
                               className="rounded-full border border-[#e3e1dc] bg-[#fbfaf8] px-3 py-1 text-[11px] font-medium text-[#424143] disabled:opacity-50"
                             >
                               {isActionLoading(w.id, "APPROVE")
@@ -465,12 +502,9 @@ export default function AdminWithdrawalsPage() {
                             </button>
                             <button
                               disabled={
-                                !canReject ||
-                                isActionLoading(w.id, "REJECT")
+                                !canReject || isActionLoading(w.id, "REJECT")
                               }
-                              onClick={() =>
-                                handleAction(w.id, "REJECT")
-                              }
+                              onClick={() => handleAction(w.id, "REJECT")}
                               className="rounded-full border border-[#fde0de] bg-[#fff7f6] px-3 py-1 text-[11px] font-medium text-[#b13832] disabled:opacity-50"
                             >
                               {isActionLoading(w.id, "REJECT")
@@ -482,9 +516,7 @@ export default function AdminWithdrawalsPage() {
                                 !canMarkPaid ||
                                 isActionLoading(w.id, "MARK_PAID")
                               }
-                              onClick={() =>
-                                handleAction(w.id, "MARK_PAID")
-                              }
+                              onClick={() => handleAction(w.id, "MARK_PAID")}
                               className="rounded-full border border-[#d6e4ff] bg-[#f4f7ff] px-3 py-1 text-[11px] font-medium text-[#214f9c] disabled:opacity-50"
                             >
                               {isActionLoading(w.id, "MARK_PAID")
