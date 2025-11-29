@@ -1,15 +1,16 @@
 // -----------------------------------------------------------------------------
 // @file: app/designer/board/page.tsx
-// @purpose: Designer-facing kanban board for assigned tickets with revision indicators & filters
-// @version: v1.3.0
+// @purpose: Designer-facing kanban board for assigned tickets with revision indicators, filters and toasts
+// @version: v1.4.1
 // @status: experimental
-// @lastUpdate: 2025-11-26
+// @lastUpdate: 2025-11-29
 // -----------------------------------------------------------------------------
 
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
 import { DesignerNav } from "@/components/navigation/designer-nav";
+import { useToast } from "@/components/ui/toast-provider";
 
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -127,6 +128,8 @@ const priorityPillClass = (priority: TicketPriority): string => {
 };
 
 export default function DesignerBoardPage() {
+  const { showToast } = useToast();
+
   const [data, setData] = useState<DesignerTicketsResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -251,13 +254,22 @@ export default function DesignerBoardPage() {
               "error" in json &&
               (json as any).error) ||
             `Failed to load revision history (status ${res.status}).`;
+
+          const finalMessage =
+            typeof message === "string"
+              ? message
+              : "Failed to load revision history.";
+
           if (!cancelled) {
-            setDetailRevisionsError(
-              typeof message === "string"
-                ? message
-                : "Failed to load revision history.",
-            );
+            setDetailRevisionsError(finalMessage);
           }
+
+          showToast({
+            type: "error",
+            title: "Could not load revision history",
+            description: finalMessage,
+          });
+
           return;
         }
 
@@ -270,11 +282,20 @@ export default function DesignerBoardPage() {
           "[DesignerBoard] failed to load ticket revision history",
           err,
         );
+        const finalMessage =
+          err instanceof Error
+            ? err.message
+            : "Failed to load revision history. Please try again later.";
+
         if (!cancelled) {
-          setDetailRevisionsError(
-            "Failed to load revision history. Please try again later.",
-          );
+          setDetailRevisionsError(finalMessage);
         }
+
+        showToast({
+          type: "error",
+          title: "Could not load revision history",
+          description: finalMessage,
+        });
       } finally {
         if (!cancelled) {
           setDetailRevisionsLoading(false);
@@ -287,7 +308,7 @@ export default function DesignerBoardPage() {
     return () => {
       cancelled = true;
     };
-  }, [detailTicketId]);
+  }, [detailTicketId, showToast]);
 
   // ---------------------------------------------------------------------------
   // Persist status changes
@@ -328,6 +349,21 @@ export default function DesignerBoardPage() {
       openTotal,
       loadScore,
     };
+  };
+
+  const getStatusSuccessMessage = (status: TicketStatus): string => {
+    switch (status) {
+      case "IN_PROGRESS":
+        return "Ticket moved to In progress.";
+      case "IN_REVIEW":
+        return "Ticket sent to your customer for review.";
+      case "TODO":
+        return "Ticket moved back to backlog.";
+      case "DONE":
+        return "Ticket marked as done.";
+      default:
+        return "Ticket status updated.";
+    }
   };
 
   const persistTicketStatus = async (
@@ -375,6 +411,12 @@ export default function DesignerBoardPage() {
           stats: recomputeStats(nextTickets, prev.stats),
         };
       });
+
+      showToast({
+        type: "success",
+        title: "Ticket updated",
+        description: getStatusSuccessMessage(status),
+      });
     } catch (err: unknown) {
       console.error("[DesignerBoard] status update error", err);
       const message =
@@ -382,6 +424,13 @@ export default function DesignerBoardPage() {
           ? err.message
           : "Failed to update ticket status.";
       setMutationError(message);
+
+      showToast({
+        type: "error",
+        title: "Could not update ticket",
+        description: message,
+      });
+
       await load();
     } finally {
       setUpdatingTicketId(null);
@@ -576,10 +625,19 @@ export default function DesignerBoardPage() {
     const ticket = tickets.find((t) => t.id === draggingTicketId);
     if (!ticket) return;
 
-    const decision = canDropTicketToStatus(ticket, status);
-    if (!decision.allowed) return;
-
+    // Drop'un tetiklenebilmesi için her durumda preventDefault diyoruz.
     event.preventDefault();
+
+    const decision = canDropTicketToStatus(ticket, status);
+
+    // Sadece geçerli hareketler için kolonu highlight edelim
+    if (!decision.allowed) {
+      if (dragOverStatus !== null) {
+        setDragOverStatus(null);
+      }
+      return;
+    }
+
     if (dragOverStatus !== status) {
       setDragOverStatus(status);
     }
@@ -607,6 +665,12 @@ export default function DesignerBoardPage() {
     if (!decision.allowed) {
       if (decision.reason) {
         setMutationError(decision.reason);
+
+        showToast({
+          type: "warning",
+          title: "This move is not allowed",
+          description: decision.reason,
+        });
       }
       return;
     }
@@ -966,7 +1030,7 @@ export default function DesignerBoardPage() {
                     Job type:{" "}
                     <span className="font-semibold">
                       {detailTicket.jobType?.name || "—"}
-                  </span>
+                    </span>
                   </p>
                 </div>
               </div>
