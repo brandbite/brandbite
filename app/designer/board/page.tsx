@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/designer/board/page.tsx
-// @purpose: Designer-facing kanban board for assigned tickets
-// @version: v1.1.0
+// @purpose: Designer-facing kanban board for assigned tickets with revision indicators
+// @version: v1.2.0
 // @status: experimental
-// @lastUpdate: 2025-11-24
+// @lastUpdate: 2025-11-26
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -57,6 +57,13 @@ type DesignerTicketsStats = {
 type DesignerTicketsResponse = {
   stats: DesignerTicketsStats;
   tickets: DesignerTicket[];
+};
+
+type TicketRevisionEntry = {
+  version: number;
+  submittedAt: string | null;
+  feedbackAt: string | null;
+  feedbackMessage: string | null;
 };
 
 const STATUS_ORDER: TicketStatus[] = [
@@ -127,15 +134,11 @@ export default function DesignerBoardPage() {
   const [search, setSearch] = useState<string>("");
   const [projectFilter, setProjectFilter] = useState<string>("ALL");
 
-  const [draggingTicketId, setDraggingTicketId] = useState<string | null>(
-    null,
-  );
+  const [draggingTicketId, setDraggingTicketId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] =
     useState<TicketStatus | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
-  const [updatingTicketId, setUpdatingTicketId] = useState<string | null>(
-    null,
-  );
+  const [updatingTicketId, setUpdatingTicketId] = useState<string | null>(null);
 
   const [detailTicketId, setDetailTicketId] = useState<string | null>(null);
   const [mouseDownInfo, setMouseDownInfo] = useState<{
@@ -144,6 +147,16 @@ export default function DesignerBoardPage() {
     y: number;
     time: number;
   } | null>(null);
+
+  // detail modal – revision history state
+  const [detailRevisions, setDetailRevisions] = useState<
+    TicketRevisionEntry[] | null
+  >(null);
+  const [detailRevisionsLoading, setDetailRevisionsLoading] =
+    useState<boolean>(false);
+  const [detailRevisionsError, setDetailRevisionsError] = useState<
+    string | null
+  >(null);
 
   // ---------------------------------------------------------------------------
   // Data load
@@ -169,8 +182,7 @@ export default function DesignerBoardPage() {
               "You do not have access to designer tickets in this workspace.",
           );
         }
-        const msg =
-          json?.error || `Request failed with status ${res.status}`;
+        const msg = json?.error || `Request failed with status ${res.status}`;
         throw new Error(msg);
       }
 
@@ -201,6 +213,79 @@ export default function DesignerBoardPage() {
       cancelled = true;
     };
   }, []);
+
+  // ---------------------------------------------------------------------------
+  // Detail ticket revision history load
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (!detailTicketId) {
+      setDetailRevisions(null);
+      setDetailRevisionsError(null);
+      setDetailRevisionsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadRevisions = async () => {
+      setDetailRevisionsLoading(true);
+      setDetailRevisionsError(null);
+
+      try {
+        const res = await fetch(
+          `/api/designer/tickets/${detailTicketId}/revisions`,
+          {
+            cache: "no-store",
+          },
+        );
+
+        const json = await res.json().catch(() => null);
+
+        if (!res.ok) {
+          const message =
+            (json &&
+              typeof json === "object" &&
+              "error" in json &&
+              (json as any).error) ||
+            `Failed to load revision history (status ${res.status}).`;
+          if (!cancelled) {
+            setDetailRevisionsError(
+              typeof message === "string"
+                ? message
+                : "Failed to load revision history.",
+            );
+          }
+          return;
+        }
+
+        const entries = ((json as any)?.revisions ?? []) as TicketRevisionEntry[];
+        if (!cancelled) {
+          setDetailRevisions(entries);
+        }
+      } catch (err) {
+        console.error(
+          "[DesignerBoard] failed to load ticket revision history",
+          err,
+        );
+        if (!cancelled) {
+          setDetailRevisionsError(
+            "Failed to load revision history. Please try again later.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setDetailRevisionsLoading(false);
+        }
+      }
+    };
+
+    loadRevisions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [detailTicketId]);
 
   // ---------------------------------------------------------------------------
   // Persist status changes
@@ -272,8 +357,7 @@ export default function DesignerBoardPage() {
               "You do not have permission to update this ticket.",
           );
         }
-        const msg =
-          json?.error || `Request failed with status ${res.status}`;
+        const msg = json?.error || `Request failed with status ${res.status}`;
         throw new Error(msg);
       }
 
@@ -530,6 +614,9 @@ export default function DesignerBoardPage() {
 
   const closeTicketDetails = () => {
     setDetailTicketId(null);
+    setDetailRevisions(null);
+    setDetailRevisionsError(null);
+    setDetailRevisionsLoading(false);
   };
 
   // ---------------------------------------------------------------------------
@@ -555,12 +642,11 @@ export default function DesignerBoardPage() {
             <p className="mt-1 text-xs text-[#7a7a7a]">
               Drag tickets as you work. Move requests from{" "}
               <span className="font-semibold">Backlog</span> into{" "}
-              <span className="font-semibold">In progress</span>, then send
-              them to{" "}
-              <span className="font-semibold">In review</span> when you&apos;re
-              ready for your customer to take a look. When they send a ticket
-              back with changes, you&apos;ll see a revision badge and a short
-              note here.
+              <span className="font-semibold">In progress</span>, then send them
+              to <span className="font-semibold">In review</span> when
+              you&apos;re ready for your customer to take a look. When they send
+              a ticket back with changes, you&apos;ll see a revision badge and a
+              short note here.
             </p>
           </div>
           {loading && (
@@ -631,8 +717,7 @@ export default function DesignerBoardPage() {
           {STATUS_ORDER.map((status) => {
             const columnTickets = ticketsByStatus[status] ?? [];
             const columnTitle = STATUS_LABELS[status];
-            const isActiveDrop =
-              dragOverStatus === status && !!draggingTicketId;
+            const isActiveDrop = dragOverStatus === status && !!draggingTicketId;
 
             return (
               <div
@@ -640,9 +725,7 @@ export default function DesignerBoardPage() {
                 className={`flex flex-col rounded-2xl bg-white/60 p-2 ${
                   isActiveDrop ? "ring-2 ring-[#f15b2b]" : "ring-0"
                 }`}
-                onDragOver={(event) =>
-                  handleColumnDragOver(event, status)
-                }
+                onDragOver={(event) => handleColumnDragOver(event, status)}
                 onDrop={(event) => handleColumnDrop(event, status)}
               >
                 <div className="mb-2">
@@ -683,8 +766,7 @@ export default function DesignerBoardPage() {
                           : t.id;
 
                       const isUpdating = updatingTicketId === t.id;
-                      const canDrag =
-                        t.status !== "DONE" && !isUpdating;
+                      const canDrag = t.status !== "DONE" && !isUpdating;
 
                       const payoutTokens =
                         t.jobType?.designerPayoutTokens ??
@@ -692,8 +774,7 @@ export default function DesignerBoardPage() {
                         null;
 
                       const showRevisionBadge = t.revisionCount > 0;
-                      const showFeedbackBadge =
-                        t.latestRevisionHasFeedback;
+                      const showFeedbackBadge = t.latestRevisionHasFeedback;
 
                       return (
                         <div
@@ -720,9 +801,7 @@ export default function DesignerBoardPage() {
                             const dy = e.clientY - mouseDownInfo.y;
                             const dt = Date.now() - mouseDownInfo.time;
                             setMouseDownInfo(null);
-                            const distance = Math.sqrt(
-                              dx * dx + dy * dy,
-                            );
+                            const distance = Math.sqrt(dx * dx + dy * dy);
                             if (
                               distance < 5 &&
                               dt < 400 &&
@@ -786,12 +865,8 @@ export default function DesignerBoardPage() {
                               </p>
                             )}
                           <div className="mt-2 flex items-center justify-between text-[10px] text-[#9a9892]">
-                            <span>
-                              Created {formatDate(t.createdAt)}
-                            </span>
-                            <span>
-                              Updated {formatDate(t.updatedAt)}
-                            </span>
+                            <span>Created {formatDate(t.createdAt)}</span>
+                            <span>Updated {formatDate(t.updatedAt)}</span>
                           </div>
                         </div>
                       );
@@ -897,6 +972,73 @@ export default function DesignerBoardPage() {
                       {formatDate(detailTicket.dueDate)}
                     </span>
                   </p>
+                </div>
+              </div>
+
+              <div>
+                <p className="font-semibold text-[#424143]">Revision history</p>
+                <div className="mt-1 space-y-1">
+                  {detailRevisionsLoading && (
+                    <p className="text-[#9a9892]">Loading revision history…</p>
+                  )}
+
+                  {!detailRevisionsLoading && detailRevisionsError && (
+                    <p className="text-[#b13832]">{detailRevisionsError}</p>
+                  )}
+
+                  {!detailRevisionsLoading &&
+                    !detailRevisionsError &&
+                    (!detailRevisions || detailRevisions.length === 0) && (
+                      <p className="text-[#9a9892]">
+                        No revisions yet. Once you send this ticket for review
+                        and your customer requests changes, you&apos;ll see each
+                        version and their feedback here.
+                      </p>
+                    )}
+
+                  {!detailRevisionsLoading &&
+                    !detailRevisionsError &&
+                    detailRevisions &&
+                    detailRevisions.length > 0 && (
+                      <div className="space-y-2">
+                        {detailRevisions.map((rev) => (
+                          <div
+                            key={rev.version}
+                            className="rounded-xl bg-[#f5f3f0] px-3 py-2"
+                          >
+                            <p className="text-[10px] font-semibold text-[#424143]">
+                              Version v{rev.version}
+                            </p>
+
+                            {rev.submittedAt && (
+                              <p className="mt-1">
+                                Sent for review on{" "}
+                                <span className="font-semibold">
+                                  {formatDate(rev.submittedAt)}
+                                </span>
+                                .
+                              </p>
+                            )}
+
+                            {rev.feedbackAt && (
+                              <p className="mt-1">
+                                Customer requested changes on{" "}
+                                <span className="font-semibold">
+                                  {formatDate(rev.feedbackAt)}
+                                </span>
+                                .
+                              </p>
+                            )}
+
+                            {rev.feedbackMessage && (
+                              <p className="mt-1 italic text-[#5a5953]">
+                                “{rev.feedbackMessage}”
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                 </div>
               </div>
             </div>
