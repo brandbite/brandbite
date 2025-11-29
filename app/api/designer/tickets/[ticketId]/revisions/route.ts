@@ -1,6 +1,6 @@
 // -----------------------------------------------------------------------------
-// @file: app/api/customer/tickets/[ticketId]/revisions/route.ts
-// @purpose: Fetch revision history for a single ticket from the customer side
+// @file: app/api/designer/tickets/[ticketId]/revisions/route.ts
+// @purpose: Fetch revision history for a single ticket from the designer side
 // @version: v1.0.1
 // @status: active
 // @lastUpdate: 2025-11-26
@@ -20,9 +20,9 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (user.role !== "CUSTOMER") {
+  if (user.role !== "DESIGNER") {
     return NextResponse.json(
-      { error: "Only customers can view ticket revision history." },
+      { error: "Only designers can view this revision history." },
       { status: 403 },
     );
   }
@@ -36,25 +36,17 @@ export async function GET(
     );
   }
 
-  const activeCompanyId = user.activeCompanyId;
-  if (!activeCompanyId) {
-    return NextResponse.json(
-      { error: "You need an active company to view ticket revisions." },
-      { status: 400 },
-    );
-  }
-
   const ticket = await prisma.ticket.findFirst({
     where: {
       id: ticketId,
-      companyId: activeCompanyId,
+      designerId: user.id,
     },
     select: { id: true },
   });
 
   if (!ticket) {
     return NextResponse.json(
-      { error: "Ticket not found for your company." },
+      { error: "Ticket not found or not assigned to you." },
       { status: 404 },
     );
   }
