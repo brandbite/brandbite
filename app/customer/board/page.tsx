@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/board/page.tsx
-// @purpose: Customer-facing board view of company tickets (kanban-style + drag & drop + detail & revision modals)
-// @version: v1.9.0
+// @purpose: Customer-facing board view of company tickets (kanban + drag & drop + detail & revision modals + toasts)
+// @version: v2.0.4
 // @status: active
-// @lastUpdate: 2025-11-24
+// @lastUpdate: 2025-11-29
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -15,6 +15,7 @@ import {
   canMoveTicketsOnBoard,
 } from "@/lib/permissions/companyRoles";
 import { TicketStatus, TicketPriority } from "@prisma/client";
+import { useToast } from "@/components/ui/toast-provider";
 
 type TicketStatusLabel = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 
@@ -84,9 +85,9 @@ type UpdateStatusRequest = {
 };
 
 type UpdateStatusResponse = {
-  success: boolean;
-  ticket: CustomerBoardTicket;
-  stats: BoardStats;
+  success?: boolean;
+  ticket?: CustomerBoardTicket;
+  stats?: BoardStats;
 };
 
 type TicketStatusColumnDefinition = {
@@ -282,7 +283,9 @@ const computeStats = (tickets: CustomerBoardTicket[]): BoardStats => {
   };
 };
 
-const sortTicketsForColumn = (tickets: CustomerBoardTicket[]): CustomerBoardTicket[] => {
+const sortTicketsForColumn = (
+  tickets: CustomerBoardTicket[],
+): CustomerBoardTicket[] => {
   return [...tickets].sort((a, b) => {
     const priorityIndexA = priorityOrder.indexOf(a.priority);
     const priorityIndexB = priorityOrder.indexOf(b.priority);
@@ -295,7 +298,71 @@ const sortTicketsForColumn = (tickets: CustomerBoardTicket[]): CustomerBoardTick
   });
 };
 
+// Customer-side allowed moves helper (for messaging)
+type CustomerDropDecision = {
+  allowed: boolean;
+  reason?: string;
+};
+
+const canDropTicketToStatus = (
+  ticket: CustomerBoardTicket,
+  targetStatus: TicketStatus,
+): CustomerDropDecision => {
+  if (ticket.status === targetStatus) {
+    return { allowed: true };
+  }
+
+  if (ticket.status === "IN_REVIEW") {
+    if (targetStatus === "DONE") {
+      return { allowed: true };
+    }
+    if (targetStatus === "IN_PROGRESS") {
+      return { allowed: true };
+    }
+    return {
+      allowed: false,
+      reason:
+        "From In review you can either approve the request as Done or send it back to In progress.",
+    };
+  }
+
+  if (ticket.status === "TODO") {
+    return {
+      allowed: false,
+      reason:
+        "New requests in To do can only be picked up by your designer. You can approve or request changes once the ticket is In review.",
+    };
+  }
+
+  if (ticket.status === "IN_PROGRESS") {
+    return {
+      allowed: false,
+      reason:
+        "In progress requests are controlled by your designer. You can approve work once it reaches In review.",
+    };
+  }
+
+  if (ticket.status === "DONE") {
+    return {
+      allowed: false,
+      reason:
+        "This request is already marked as Done. If something is off, open a new ticket instead of reopening this one.",
+    };
+  }
+
+  return {
+    allowed: false,
+    reason: "This move is not allowed.",
+  };
+};
+
+const formatPriorityLabel = (priority: TicketPriority): string => {
+  return priorityLabelMap[priority] ?? priority;
+};
+
 export default function CustomerBoardPage() {
+  const { showToast } = useToast();
+
   const [data, setData] = useState<CustomerBoardResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -313,10 +380,8 @@ export default function CustomerBoardPage() {
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [updatingTicketId, setUpdatingTicketId] = useState<string | null>(null);
 
-  // detail modal state
   const [detailTicketId, setDetailTicketId] = useState<string | null>(null);
 
-  // detail modal – revision history state
   const [detailRevisions, setDetailRevisions] = useState<
     TicketRevisionEntry[] | null
   >(null);
@@ -326,12 +391,10 @@ export default function CustomerBoardPage() {
     string | null
   >(null);
 
-  // DONE confirmation modal state
   const [pendingDoneTicketId, setPendingDoneTicketId] = useState<
     string | null
   >(null);
 
-  // Revision (IN_REVIEW -> IN_PROGRESS) modal state
   const [pendingRevisionTicketId, setPendingRevisionTicketId] =
     useState<string | null>(null);
   const [revisionMessage, setRevisionMessage] = useState<string>("");
@@ -339,13 +402,16 @@ export default function CustomerBoardPage() {
     string | null
   >(null);
 
-  // click vs drag
   const [mouseDownInfo, setMouseDownInfo] = useState<{
     ticketId: string;
     x: number;
     y: number;
     time: number;
   } | null>(null);
+
+  // ---------------------------------------------------------------------------
+  // Load board data
+  // ---------------------------------------------------------------------------
 
   const load = async () => {
     setLoading(true);
@@ -373,7 +439,14 @@ export default function CustomerBoardPage() {
         err instanceof Error
           ? err.message
           : "Failed to load your tickets. Please try again.";
+
       setLoadError(message);
+
+      showToast({
+        type: "error",
+        title: "Could not load your board",
+        description: message,
+      });
     } finally {
       setLoading(false);
     }
@@ -403,7 +476,14 @@ export default function CustomerBoardPage() {
         err instanceof Error
           ? err.message
           : "Failed to load your permissions. Please try again.";
+
       setCompanyRoleError(message);
+
+      showToast({
+        type: "error",
+        title: "Could not load your permissions",
+        description: message,
+      });
     } finally {
       setCompanyRoleLoading(false);
     }
@@ -411,14 +491,11 @@ export default function CustomerBoardPage() {
 
   useEffect(() => {
     let cancelled = false;
-
     const initialLoad = async () => {
       if (cancelled) return;
       await load();
     };
-
     initialLoad();
-
     return () => {
       cancelled = true;
     };
@@ -426,7 +503,6 @@ export default function CustomerBoardPage() {
 
   useEffect(() => {
     let cancelled = false;
-
     const loadRole = async () => {
       try {
         await loadCompanyRole();
@@ -438,9 +514,7 @@ export default function CustomerBoardPage() {
         }
       }
     };
-
     loadRole();
-
     return () => {
       cancelled = true;
     };
@@ -452,7 +526,6 @@ export default function CustomerBoardPage() {
 
   useEffect(() => {
     if (!detailTicketId) {
-      // Reset when modal is closed
       setDetailRevisions(null);
       setDetailRevisionsError(null);
       setDetailRevisionsLoading(false);
@@ -468,9 +541,7 @@ export default function CustomerBoardPage() {
       try {
         const res = await fetch(
           `/api/customer/tickets/${detailTicketId}/revisions`,
-          {
-            cache: "no-store",
-          },
+          { cache: "no-store" },
         );
 
         const json = await res.json().catch(() => null);
@@ -603,28 +674,50 @@ export default function CustomerBoardPage() {
     return tickets.find((t) => t.id === pendingRevisionTicketId) ?? null;
   }, [pendingRevisionTicketId, tickets]);
 
-  const updateTicketStatusInState = (
-    ticketId: string,
+  const currentStats = data?.stats ?? computeStats([]);
+
+  // ---------------------------------------------------------------------------
+  // Status update helper
+  // ---------------------------------------------------------------------------
+
+  const getStatusSuccessMessage = (
     status: TicketStatus,
-  ) => {
-    setData((prev) => {
-      if (!prev) return prev;
-
-      const nextTickets = prev.tickets.map((t) =>
-        t.id === ticketId
-          ? {
-              ...t,
-              status,
-              updatedAt: new Date().toISOString(),
-            }
-          : t,
-      );
-
+    options?: { hasRevisionMessage?: boolean },
+  ): { title: string; description: string } => {
+    if (status === "DONE") {
       return {
-        tickets: nextTickets,
-        stats: computeStats(nextTickets),
+        title: "Request marked as done",
+        description:
+          "Your designer will be paid for this job and the ticket has moved to Done.",
       };
-    });
+    }
+
+    if (status === "IN_PROGRESS" && options?.hasRevisionMessage) {
+      return {
+        title: "Changes requested",
+        description:
+          "Your message has been sent to your designer and the ticket is back in progress.",
+      };
+    }
+
+    if (status === "IN_PROGRESS") {
+      return {
+        title: "Request moved back to In progress",
+        description: "This ticket is now open again for your designer.",
+      };
+    }
+
+    if (status === "IN_REVIEW") {
+      return {
+        title: "Request moved to In review",
+        description: "You can now review and approve or request changes.",
+      };
+    }
+
+    return {
+      title: "Request updated",
+      description: "The status of this request has been updated.",
+    };
   };
 
   const persistTicketStatus = async (
@@ -635,12 +728,15 @@ export default function CustomerBoardPage() {
     setMutationError(null);
     setUpdatingTicketId(ticketId);
     try {
+      const hasRevisionMessage =
+        !!revisionMessage && revisionMessage.trim().length > 0;
+
       const payload: UpdateStatusRequest = {
         ticketId,
         status,
       };
-      if (revisionMessage && revisionMessage.trim()) {
-        payload.revisionMessage = revisionMessage.trim();
+      if (hasRevisionMessage) {
+        payload.revisionMessage = revisionMessage!.trim();
       }
 
       const res = await fetch("/api/customer/tickets/status", {
@@ -651,32 +747,59 @@ export default function CustomerBoardPage() {
         body: JSON.stringify(payload),
       });
 
-      const json = (await res.json()) as UpdateStatusResponse;
-
-      if (!res.ok || !json.success) {
-        const errorMessage =
-          (json as any)?.error ||
-          "We couldn't update this request. Please try again.";
-        throw new Error(errorMessage);
+      let json: UpdateStatusResponse | any = null;
+      try {
+        json = await res.json();
+      } catch {
+        // JSON dönmeyebilir, problem değil
       }
 
-      // Sunucudan tek güncellenmiş ticket + stats geliyor
-      setData((prev) => {
-        if (!prev) {
+      const hasExplicitSuccessFlag =
+        json && typeof json.success === "boolean";
+
+      const successFlag = hasExplicitSuccessFlag ? json.success : true;
+
+      if (!res.ok || !successFlag) {
+        const errorMessage =
+          (json && (json.error || json.message)) ||
+          "We couldn't update this request. Please try again.";
+        throw new Error(
+          typeof errorMessage === "string"
+            ? errorMessage
+            : "We couldn't update this request. Please try again.",
+        );
+      }
+
+      // Response içinde ticket + stats varsa, lokal state'i hızlı güncelle
+      if (json && json.ticket && json.stats) {
+        setData((prev) => {
+          if (!prev) {
+            return {
+              tickets: [json.ticket],
+              stats: json.stats,
+            };
+          }
+
+          const nextTickets = prev.tickets.map((t) =>
+            t.id === json.ticket.id ? json.ticket : t,
+          );
+
           return {
-            tickets: [json.ticket],
+            tickets: nextTickets,
             stats: json.stats,
           };
-        }
+        });
+      } else {
+        // Response şekline güvenemiyorsak, tüm board'u yeniden yükle
+        await load();
+      }
 
-        const nextTickets = prev.tickets.map((t) =>
-          t.id === json.ticket.id ? json.ticket : t,
-        );
+      const successCopy = getStatusSuccessMessage(status, { hasRevisionMessage });
 
-        return {
-          tickets: nextTickets,
-          stats: json.stats,
-        };
+      showToast({
+        type: "success",
+        title: successCopy.title,
+        description: successCopy.description,
       });
     } catch (err: unknown) {
       console.error("Update ticket status error:", err);
@@ -684,7 +807,15 @@ export default function CustomerBoardPage() {
         err instanceof Error
           ? err.message
           : "Failed to update ticket status. Please try again.";
+
       setMutationError(message);
+
+      showToast({
+        type: "error",
+        title: "Could not update this request",
+        description: message,
+      });
+
       await load();
     } finally {
       setUpdatingTicketId(null);
@@ -739,21 +870,22 @@ export default function CustomerBoardPage() {
       return;
     }
 
-    // Sadece TODO ve IN_REVIEW kartları sürüklenebilir
-    if (ticketStatus !== "TODO" && ticketStatus !== "IN_REVIEW") {
+    // Customer sadece IN_REVIEW kartlarını sürükleyebilsin
+    if (ticketStatus !== "IN_REVIEW") {
       event.preventDefault();
       return;
     }
 
     setDraggingTicketId(ticketId);
     setMutationError(null);
-    setMouseDownInfo(null); // drag başladıysa click saymayalım
+    setMouseDownInfo(null);
+
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = "move";
       try {
         event.dataTransfer.setData("text/plain", ticketId);
       } catch {
-        // bazı browser'lar setData çağrısını keyfi olarak limitliyor, görmezden geliyoruz
+        // bazı browser'lar keyfi limit koyabilir, önemli değil
       }
     }
   };
@@ -767,10 +899,26 @@ export default function CustomerBoardPage() {
     event: React.DragEvent<HTMLDivElement>,
     status: TicketStatus,
   ) => {
+    if (!draggingTicketId || !canDragTicket) return;
+
+    const ticket = tickets.find((t) => t.id === draggingTicketId);
+    if (!ticket) return;
+
+    // drop'un gerçekleşebilmesi için her durumda preventDefault
     event.preventDefault();
-    if (!canDragTicket) return;
-    if (status !== "IN_REVIEW" && status !== "DONE") return;
-    setDragOverStatus(status);
+
+    const decision = canDropTicketToStatus(ticket, status);
+
+    if (!decision.allowed) {
+      if (dragOverStatus !== null) {
+        setDragOverStatus(null);
+      }
+      return;
+    }
+
+    if (dragOverStatus !== status) {
+      setDragOverStatus(status);
+    }
   };
 
   const handleDrop = async (
@@ -779,13 +927,43 @@ export default function CustomerBoardPage() {
   ) => {
     event.preventDefault();
     setDragOverStatus(null);
-    const ticketId = event.dataTransfer.getData("text/plain");
+
+    if (!canDragTicket) {
+      showToast({
+        type: "warning",
+        title: "You can't move requests",
+        description:
+          "Your current role does not allow changing ticket status on this board.",
+      });
+      return;
+    }
+
+    const ticketId =
+      event.dataTransfer.getData("text/plain") || draggingTicketId || "";
     if (!ticketId) return;
 
     const ticket = tickets.find((t) => t.id === ticketId);
+    setDraggingTicketId(null);
+
     if (!ticket) return;
 
-    if (ticket.status === targetStatus) return;
+    const decision = canDropTicketToStatus(ticket, targetStatus);
+
+    if (!decision.allowed) {
+      if (decision.reason) {
+        setMutationError(decision.reason);
+        showToast({
+          type: "warning",
+          title: "This move is not allowed",
+          description: decision.reason,
+        });
+      }
+      return;
+    }
+
+    if (ticket.status === targetStatus) {
+      return;
+    }
 
     if (ticket.status === "IN_REVIEW" && targetStatus === "IN_PROGRESS") {
       setPendingRevisionTicketId(ticket.id);
@@ -799,24 +977,11 @@ export default function CustomerBoardPage() {
       return;
     }
 
-    if (
-      ticket.status === "TODO" &&
-      (targetStatus === "IN_PROGRESS" ||
-        targetStatus === "IN_REVIEW" ||
-        targetStatus === "DONE")
-    ) {
-      return;
-    }
-
-    if (ticket.status === "IN_PROGRESS" && targetStatus === "IN_REVIEW") {
-      return;
-    }
-
-    if (targetStatus === "TODO") {
-      return;
-    }
-
-    await persistTicketStatus(ticket.id, targetStatus);
+    showToast({
+      type: "warning",
+      title: "This move is not allowed",
+      description: "This status change is not available from the board.",
+    });
   };
 
   // ---------------------------------------------------------------------------
@@ -843,7 +1008,15 @@ export default function CustomerBoardPage() {
     if (!pendingRevisionTicketId) return;
 
     if (!revisionMessage.trim()) {
-      setRevisionMessageError("Please add a short message for your designer.");
+      const msg = "Please add a short message for your designer.";
+      setRevisionMessageError(msg);
+
+      showToast({
+        type: "warning",
+        title: "Message required",
+        description: msg,
+      });
+
       return;
     }
 
@@ -889,7 +1062,9 @@ export default function CustomerBoardPage() {
     }),
   );
 
-  const currentStats = data?.stats ?? computeStats([]);
+  // ---------------------------------------------------------------------------
+  // Render helpers
+  // ---------------------------------------------------------------------------
 
   const renderTicketCard = (ticket: CustomerBoardTicket) => {
     const isDragging = draggingTicketId === ticket.id;
@@ -901,7 +1076,7 @@ export default function CustomerBoardPage() {
         className={`group cursor-pointer rounded-2xl border border-[#e4e0da] bg-white p-3 text-xs shadow-sm transition-shadow ${
           isDragging ? "opacity-50 shadow-lg" : "hover:shadow-md"
         }`}
-        draggable={canDragTicket}
+        draggable={canDragTicket && ticket.status === "IN_REVIEW"}
         onDragStart={(event) =>
           handleDragStart(event, ticket.id, ticket.status)
         }
@@ -912,11 +1087,11 @@ export default function CustomerBoardPage() {
         <div className="mb-2 flex items-start justify-between gap-2">
           <div>
             <div className="flex items-center gap-2">
-              {ticket.project?.code && ticket.companyTicketNumber ? (
+              {ticket.project?.code && ticket.companyTicketNumber && (
                 <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#7a7a7a]">
                   {ticket.project.code}-{ticket.companyTicketNumber}
                 </span>
-              ) : null}
+              )}
               <span
                 className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusBadgeClass[ticket.status]}`}
               >
@@ -973,12 +1148,13 @@ export default function CustomerBoardPage() {
     );
   };
 
-  const formatPriorityLabel = (priority: TicketPriority): string => {
-    return priorityLabelMap[priority] ?? priority;
-  };
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
 
   return (
     <div className="flex min-h-screen flex-col bg-[#f5f3f0]">
+      {/* Header */}
       <div className="border-b border-[#e4e0da] bg-[#fdfcfb]">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
           <div>
@@ -1023,6 +1199,7 @@ export default function CustomerBoardPage() {
         </div>
       </div>
 
+      {/* Content */}
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pb-6 pt-3">
         {loadError && (
           <div className="mb-3 rounded-xl border border-[#f7c7c0] bg-[#fdecea] px-4 py-3 text-xs text-[#b13832]">
@@ -1065,6 +1242,7 @@ export default function CustomerBoardPage() {
               </div>
             )}
 
+            {/* Filters */}
             <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
               <div className="relative flex-1">
                 <input
@@ -1095,14 +1273,14 @@ export default function CustomerBoardPage() {
               </div>
             </div>
 
+            {/* Columns */}
             {loading ? (
               <div className="flex flex-1 items-center justify-center py-16 text-[12px] text-[#7a7a7a]">
                 Loading your board…
               </div>
             ) : (
               <div className="flex flex-1 flex-col gap-4 md:flex-row">
-                {statusOrder.map((status) => {
-                  const config = statusDisplayConfigs[status];
+                {statusColumnsForRender.map(({ status, config }) => {
                   const columnTickets = ticketsByStatus[status] ?? [];
                   const isDropTargetActive = dragOverStatus === status;
 
@@ -1110,9 +1288,9 @@ export default function CustomerBoardPage() {
                     <div
                       key={status}
                       id={`customer-board-column-${status}`}
-                      className={`flex-1 rounded-3xl border border-[#e4e0da] p-3 ${
-                        statusColumnClass(status)
-                      }`}
+                      className={`flex-1 rounded-3xl border border-[#e4e0da] p-3 ${statusColumnClass(
+                        status,
+                      )}`}
                       onDragOver={(event) => handleDragOver(event, status)}
                       onDrop={(event) => handleDrop(event, status)}
                     >
@@ -1131,7 +1309,7 @@ export default function CustomerBoardPage() {
                               />
                               {config.title}
                             </div>
-                            <span className="rounded-full bg-white/70 px-2 py-0.5 text-[10px] text-[#7a7a7a]">
+                            <span className="rounded-full bg.white/70 px-2 py-0.5 text-[10px] text-[#7a7a7a]">
                               {config.description}
                             </span>
                           </div>
@@ -1166,6 +1344,7 @@ export default function CustomerBoardPage() {
         </div>
       </div>
 
+      {/* Ticket detail modal */}
       {detailTicket && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 px-4 py-8">
           <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
@@ -1352,6 +1531,7 @@ export default function CustomerBoardPage() {
         </div>
       )}
 
+      {/* Revision modal */}
       {pendingRevisionTicket && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-8">
           <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
@@ -1377,7 +1557,7 @@ export default function CustomerBoardPage() {
                   }
                 }}
                 placeholder="For example: Could we make the hero headline larger and try a version with a darker background?"
-                className="mt-1 h-28 w-full rounded-2xl border border-[#e3dfd7] bg_WHITE px-3 py-2 text-[12px] text-[#424143] shadow-sm outline-none placeholder:text-[#b1afa9] focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+                className="mt-1 h-28 w-full rounded-2xl border border-[#e3dfd7] bg-white px-3 py-2 text-[12px] text-[#424143] shadow-sm outline-none placeholder:text-[#b1afa9] focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
               />
               {revisionMessageError && (
                 <p className="mt-1 text-[11px] text-[#b13832]">
@@ -1406,9 +1586,10 @@ export default function CustomerBoardPage() {
         </div>
       )}
 
+      {/* Done confirmation modal */}
       {pendingDoneTicket && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg_BLACK/30 px-4 py-8">
-          <div className="w-full max-w-md rounded-2xl bg_WHITE p-5 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-8">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
             <h2 className="text-sm font-semibold text-[#424143]">
               Mark this request as done?
             </h2>
