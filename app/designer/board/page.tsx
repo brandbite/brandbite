@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // @file: app/designer/board/page.tsx
-// @purpose: Designer-facing kanban board for assigned tickets with revision indicators
-// @version: v1.2.0
+// @purpose: Designer-facing kanban board for assigned tickets with revision indicators & filters
+// @version: v1.3.0
 // @status: experimental
 // @lastUpdate: 2025-11-26
 // -----------------------------------------------------------------------------
@@ -133,6 +133,8 @@ export default function DesignerBoardPage() {
 
   const [search, setSearch] = useState<string>("");
   const [projectFilter, setProjectFilter] = useState<string>("ALL");
+  const [onlyChangesRequested, setOnlyChangesRequested] =
+    useState<boolean>(false);
 
   const [draggingTicketId, setDraggingTicketId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] =
@@ -393,6 +395,11 @@ export default function DesignerBoardPage() {
   const tickets = data?.tickets ?? [];
   const stats = data?.stats ?? null;
 
+  const changesRequestedCount = useMemo(
+    () => tickets.filter((t) => t.latestRevisionHasFeedback).length,
+    [tickets],
+  );
+
   const projects = useMemo(() => {
     const set = new Set<string>();
     tickets.forEach((t) => {
@@ -404,6 +411,10 @@ export default function DesignerBoardPage() {
   const filteredTickets = useMemo(() => {
     return tickets.filter((t) => {
       if (projectFilter !== "ALL" && t.project?.name !== projectFilter) {
+        return false;
+      }
+
+      if (onlyChangesRequested && !t.latestRevisionHasFeedback) {
         return false;
       }
 
@@ -432,7 +443,7 @@ export default function DesignerBoardPage() {
 
       return true;
     });
-  }, [tickets, projectFilter, search]);
+  }, [tickets, projectFilter, search, onlyChangesRequested]);
 
   const ticketsByStatus = useMemo(() => {
     const map: Record<TicketStatus, DesignerTicket[]> = {
@@ -646,7 +657,7 @@ export default function DesignerBoardPage() {
               to <span className="font-semibold">In review</span> when
               you&apos;re ready for your customer to take a look. When they send
               a ticket back with changes, you&apos;ll see a revision badge and a
-              short note here.
+              short note here or filter by those requests.
             </p>
           </div>
           {loading && (
@@ -669,17 +680,17 @@ export default function DesignerBoardPage() {
           </div>
         )}
 
-        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
+        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="relative flex-1">
             <input
               type="text"
               placeholder="Search by title, ticket code, project or company"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-full border border-[#e3e1dc] bg-[#f7f5f0] px-4 py-2 text-xs text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+              className="w-full rounded-full border border-[#e3e1dc] bg-[#f7f5f0] px-4 pb-2 pt-2 text-xs text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
             />
           </div>
-          <div className="flex items-center gap-2 text-[11px] text-[#7a7a7a]">
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-[#7a7a7a]">
             <span>Project:</span>
             <select
               className="rounded-full border border-[#e3e1dc] bg-[#f7f5f0] px-2 py-1 text-[11px] outline-none"
@@ -693,6 +704,24 @@ export default function DesignerBoardPage() {
                 </option>
               ))}
             </select>
+
+            <button
+              type="button"
+              onClick={() =>
+                setOnlyChangesRequested((prev: boolean) => !prev)
+              }
+              className={`flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] transition-colors ${
+                onlyChangesRequested
+                  ? "border-[#f15b2b] bg-[#fff0ea] text-[#d6471b]"
+                  : "border-[#e3e1dc] bg-[#f7f5f0] text-[#7a7a7a] hover:border-[#f15b2b]/60"
+              }`}
+            >
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#f5a623]" />
+              Changes requested
+              <span className="rounded-full bg-black/5 px-1 text-[10px] font-semibold">
+                {changesRequestedCount}
+              </span>
+            </button>
           </div>
         </div>
 
@@ -708,6 +737,10 @@ export default function DesignerBoardPage() {
             <div className="rounded-full bg-[#f5f3f0] px-3 py-1">
               Load score:{" "}
               <span className="font-semibold">{stats.loadScore}</span>
+            </div>
+            <div className="rounded-full bg-[#f5f3f0] px-3 py-1">
+              Changes requested:{" "}
+              <span className="font-semibold">{changesRequestedCount}</span>
             </div>
           </div>
         )}
@@ -933,7 +966,7 @@ export default function DesignerBoardPage() {
                     Job type:{" "}
                     <span className="font-semibold">
                       {detailTicket.jobType?.name || "—"}
-                    </span>
+                  </span>
                   </p>
                 </div>
               </div>
