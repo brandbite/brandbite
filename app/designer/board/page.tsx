@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/designer/board/page.tsx
 // @purpose: Designer-facing kanban board for assigned tickets with revision indicators, filters and toasts
-// @version: v1.4.1
-// @status: experimental
-// @lastUpdate: 2025-11-29
+// @version: v1.5.1
+// @status: active
+// @lastUpdate: 2025-11-30
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -41,7 +41,6 @@ type DesignerTicket = {
     tokenCost: number;
     designerPayoutTokens: number;
   } | null;
-  // revision info
   revisionCount: number;
   latestRevisionHasFeedback: boolean;
   latestRevisionFeedbackSnippet: string | null;
@@ -91,6 +90,8 @@ const statusColumnClass = (status: TicketStatus): string => {
       return "bg-[#fff7e0]";
     case "DONE":
       return "bg-[#e8f6f0]";
+    default:
+      return "bg-[#f5f3f0]";
   }
 };
 
@@ -153,7 +154,6 @@ export default function DesignerBoardPage() {
     time: number;
   } | null>(null);
 
-  // detail modal – revision history state
   const [detailRevisions, setDetailRevisions] = useState<
     TicketRevisionEntry[] | null
   >(null);
@@ -199,6 +199,12 @@ export default function DesignerBoardPage() {
           ? err.message
           : "Failed to load designer tickets.";
       setError(message);
+
+      showToast({
+        type: "error",
+        title: "Could not load your tickets",
+        description: message,
+      });
     } finally {
       setLoading(false);
     }
@@ -217,6 +223,7 @@ export default function DesignerBoardPage() {
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ---------------------------------------------------------------------------
@@ -273,7 +280,8 @@ export default function DesignerBoardPage() {
           return;
         }
 
-        const entries = ((json as any)?.revisions ?? []) as TicketRevisionEntry[];
+        const entries = ((json as any)?.revisions ??
+          []) as TicketRevisionEntry[];
         if (!cancelled) {
           setDetailRevisions(entries);
         }
@@ -338,8 +346,6 @@ export default function DesignerBoardPage() {
 
     const total = tickets.length;
     const openTotal = total - (byStatus.DONE ?? 0);
-
-    // loadScore’ı backend hesaplıyor; burada değiştirmiyoruz
     const loadScore = prevStats.loadScore;
 
     return {
@@ -399,7 +405,6 @@ export default function DesignerBoardPage() {
         throw new Error(msg);
       }
 
-      // optimistic update (revision bilgisi değişmeyecek; sadece status)
       setData((prev) => {
         if (!prev) return prev;
         const nextTickets = prev.tickets.map((t) =>
@@ -515,16 +520,7 @@ export default function DesignerBoardPage() {
   }, [detailTicketId, tickets]);
 
   // ---------------------------------------------------------------------------
-  // Drag & drop rules (designer akışı)
-  //
-  // Allowed transitions:
-  // - TODO → IN_PROGRESS
-  // - IN_PROGRESS → IN_REVIEW
-  // - IN_REVIEW → IN_PROGRESS
-  //
-  // Designer:
-  // - DONE'a geçiremez
-  // - DONE'dan taşıyamaz
+  // Drag & drop rules
   // ---------------------------------------------------------------------------
 
   type DropDecision = {
@@ -536,7 +532,6 @@ export default function DesignerBoardPage() {
     ticket: DesignerTicket,
     targetStatus: TicketStatus,
   ): DropDecision => {
-    // Aynı kolona bırakma → serbest (no-op)
     if (ticket.status === targetStatus) {
       return { allowed: true };
     }
@@ -595,7 +590,6 @@ export default function DesignerBoardPage() {
     ticketId: string,
     ticketStatus: TicketStatus,
   ) => {
-    // DONE kartları veya şu an update edilen kart draggable değil
     if (ticketStatus === "DONE" || updatingTicketId === ticketId) {
       event.preventDefault();
       return;
@@ -625,12 +619,10 @@ export default function DesignerBoardPage() {
     const ticket = tickets.find((t) => t.id === draggingTicketId);
     if (!ticket) return;
 
-    // Drop'un tetiklenebilmesi için her durumda preventDefault diyoruz.
     event.preventDefault();
 
     const decision = canDropTicketToStatus(ticket, status);
 
-    // Sadece geçerli hareketler için kolonu highlight edelim
     if (!decision.allowed) {
       if (dragOverStatus !== null) {
         setDragOverStatus(null);
@@ -675,7 +667,6 @@ export default function DesignerBoardPage() {
       return;
     }
 
-    // Aynı kolon → no-op
     if (ticket.status === status) {
       return;
     }
@@ -684,7 +675,7 @@ export default function DesignerBoardPage() {
   };
 
   // ---------------------------------------------------------------------------
-  // Detail modal
+  // Detail modal helpers
   // ---------------------------------------------------------------------------
 
   const closeTicketDetails = () => {
@@ -754,7 +745,7 @@ export default function DesignerBoardPage() {
               className="w-full rounded-full border border-[#e3e1dc] bg-[#f7f5f0] px-4 pb-2 pt-2 text-xs text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
             />
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-[11px] text-[#7a7a7a]">
+          <div className="flex flex-wrap items.center gap-2 text-[11px] text-[#7a7a7a]">
             <span>Project:</span>
             <select
               className="rounded-full border border-[#e3e1dc] bg-[#f7f5f0] px-2 py-1 text-[11px] outline-none"
@@ -789,7 +780,6 @@ export default function DesignerBoardPage() {
           </div>
         </div>
 
-        {/* Stats küçük header */}
         {stats && (
           <div className="mb-3 flex flex-wrap items-center gap-3 text-[11px] text-[#7a7a7a]">
             <div className="rounded-full bg-[#f5f3f0] px-3 py-1">
@@ -809,7 +799,6 @@ export default function DesignerBoardPage() {
           </div>
         )}
 
-        {/* Columns */}
         <div className="grid gap-3 md:grid-cols-4">
           {STATUS_ORDER.map((status) => {
             const columnTickets = ticketsByStatus[status] ?? [];
@@ -1108,8 +1097,8 @@ export default function DesignerBoardPage() {
                             </p>
 
                             {rev.submittedAt && (
-                              <p className="mt-1">
-                                Sent for review on{" "}
+                              <p className="mt-1 text-[10px] text-[#3259c7]">
+                                You sent this version for review on{" "}
                                 <span className="font-semibold">
                                   {formatDate(rev.submittedAt)}
                                 </span>
@@ -1118,7 +1107,7 @@ export default function DesignerBoardPage() {
                             )}
 
                             {rev.feedbackAt && (
-                              <p className="mt-1">
+                              <p className="mt-1 text-[10px] text-[#c76a18]">
                                 Customer requested changes on{" "}
                                 <span className="font-semibold">
                                   {formatDate(rev.feedbackAt)}
