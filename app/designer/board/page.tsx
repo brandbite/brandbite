@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/designer/board/page.tsx
 // @purpose: Designer-facing kanban board for assigned tickets with revision indicators, filters and toasts
-// @version: v1.5.1
+// @version: v1.6.0
 // @status: active
-// @lastUpdate: 2025-11-30
+// @lastUpdate: 2025-12-12
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -694,274 +694,335 @@ export default function DesignerBoardPage() {
 
   return (
     <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
-      <div className="mx-auto max-w-6xl px-6 py-8">
+      <div className="mx-auto max-w-6xl px-6 pb-10 pt-6">
         <DesignerNav />
 
-        <div className="mt-4 mb-4 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
-              Designer board
-            </p>
-            <h1 className="mt-1 text-xl font-semibold tracking-tight">
-              {activeProjectTitle}
-            </h1>
-            <p className="mt-1 text-xs text-[#7a7a7a]">
-              Drag tickets as you work. Move requests from{" "}
-              <span className="font-semibold">Backlog</span> into{" "}
-              <span className="font-semibold">In progress</span>, then send them
-              to <span className="font-semibold">In review</span> when
-              you&apos;re ready for your customer to take a look. When they send
-              a ticket back with changes, you&apos;ll see a revision badge and a
-              short note here or filter by those requests.
-            </p>
-          </div>
-          {loading && (
-            <div className="rounded-full bg-[#f5f3f0] px-3 py-1 text-[11px] text-[#7a7a7a]">
-              Loading tickets…
+        <div className="mt-4 grid gap-6 md:grid-cols-[240px,1fr] lg:grid-cols-[260px,1fr]">
+          {/* Left workspace rail (designer-specific) */}
+          <aside className="flex flex-col rounded-2xl bg-white/60 p-4">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
+                Workspace
+              </p>
+              <h2 className="mt-2 text-sm font-semibold text-[#424143]">
+                Your assigned work
+              </h2>
+              <p className="mt-1 text-[11px] text-[#7a7a7a]">
+                Tickets currently assigned to you across all customer projects.
+              </p>
             </div>
-          )}
-        </div>
 
-        {error && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-[#fff7f7] px-4 py-3 text-xs text-red-700">
-            <p className="font-medium">Something went wrong</p>
-            <p className="mt-1">{error}</p>
-          </div>
-        )}
-
-        {mutationError && (
-          <div className="mb-4 rounded-xl border border-amber-200 bg-[#fffaf2] px-4 py-3 text-xs text-amber-800">
-            {mutationError}
-          </div>
-        )}
-
-        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="relative flex-1">
-            <input
-              type="text"
-              placeholder="Search by title, ticket code, project or company"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-full border border-[#e3e1dc] bg-[#f7f5f0] px-4 pb-2 pt-2 text-xs text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
-            />
-          </div>
-          <div className="flex flex-wrap items.center gap-2 text-[11px] text-[#7a7a7a]">
-            <span>Project:</span>
-            <select
-              className="rounded-full border border-[#e3e1dc] bg-[#f7f5f0] px-2 py-1 text-[11px] outline-none"
-              value={projectFilter}
-              onChange={(e) => setProjectFilter(e.target.value)}
-            >
-              <option value="ALL">All</option>
-              {projects.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-
-            <button
-              type="button"
-              onClick={() =>
-                setOnlyChangesRequested((prev: boolean) => !prev)
-              }
-              className={`flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] transition-colors ${
-                onlyChangesRequested
-                  ? "border-[#f15b2b] bg-[#fff0ea] text-[#d6471b]"
-                  : "border-[#e3e1dc] bg-[#f7f5f0] text-[#7a7a7a] hover:border-[#f15b2b]/60"
-              }`}
-            >
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#f5a623]" />
-              Changes requested
-              <span className="rounded-full bg-black/5 px-1 text-[10px] font-semibold">
-                {changesRequestedCount}
-              </span>
-            </button>
-          </div>
-        </div>
-
-        {stats && (
-          <div className="mb-3 flex flex-wrap items-center gap-3 text-[11px] text-[#7a7a7a]">
-            <div className="rounded-full bg-[#f5f3f0] px-3 py-1">
-              Total: <span className="font-semibold">{stats.total}</span>
-            </div>
-            <div className="rounded-full bg-[#f5f3f0] px-3 py-1">
-              Open: <span className="font-semibold">{stats.openTotal}</span>
-            </div>
-            <div className="rounded-full bg-[#f5f3f0] px-3 py-1">
-              Load score:{" "}
-              <span className="font-semibold">{stats.loadScore}</span>
-            </div>
-            <div className="rounded-full bg-[#f5f3f0] px-3 py-1">
-              Changes requested:{" "}
-              <span className="font-semibold">{changesRequestedCount}</span>
-            </div>
-          </div>
-        )}
-
-        <div className="grid gap-3 md:grid-cols-4">
-          {STATUS_ORDER.map((status) => {
-            const columnTickets = ticketsByStatus[status] ?? [];
-            const columnTitle = STATUS_LABELS[status];
-            const isActiveDrop = dragOverStatus === status && !!draggingTicketId;
-
-            return (
-              <div
-                key={status}
-                className={`flex flex-col rounded-2xl bg-white/60 p-2 ${
-                  isActiveDrop ? "ring-2 ring-[#f15b2b]" : "ring-0"
-                }`}
-                onDragOver={(event) => handleColumnDragOver(event, status)}
-                onDrop={(event) => handleColumnDrop(event, status)}
-              >
-                <div className="mb-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1">
-                      <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9a9892]">
-                        {columnTitle}
-                      </span>
-                      <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[11px] font-semibold text-[#7a7a7a]">
-                        {columnTickets.length}
-                      </span>
-                    </div>
+            <div className="mt-4 space-y-2">
+              <div className="rounded-xl border border-[#ece9e1] bg-[#f7f5f0] p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-semibold text-[#424143]">
+                      All requests
+                    </p>
+                    <p className="mt-0.5 text-[10px] text-[#9a9892]">
+                      Board for your active designer workspace.
+                    </p>
                   </div>
-                  {status === "DONE" && (
-                    <p className="mt-1 text-[10px] text-[#b1afa9]">
-                      Completed by customer. You can&apos;t move Done tickets
-                      from here.
-                    </p>
-                  )}
-                </div>
-
-                <div
-                  className={`flex-1 space-y-2 rounded-xl ${statusColumnClass(
-                    status,
-                  )} bg-opacity-70 p-2`}
-                >
-                  {columnTickets.length === 0 ? (
-                    <p className="py-4 text-center text-[11px] text-[#9a9892]">
-                      No tickets in this column.
-                    </p>
-                  ) : (
-                    columnTickets.map((t) => {
-                      const ticketCode =
-                        t.project?.code && t.companyTicketNumber != null
-                          ? `${t.project.code}-${t.companyTicketNumber}`
-                          : t.companyTicketNumber != null
-                          ? `#${t.companyTicketNumber}`
-                          : t.id;
-
-                      const isUpdating = updatingTicketId === t.id;
-                      const canDrag = t.status !== "DONE" && !isUpdating;
-
-                      const payoutTokens =
-                        t.jobType?.designerPayoutTokens ??
-                        t.jobType?.tokenCost ??
-                        null;
-
-                      const showRevisionBadge = t.revisionCount > 0;
-                      const showFeedbackBadge = t.latestRevisionHasFeedback;
-
-                      return (
-                        <div
-                          key={t.id}
-                          className={`cursor-pointer rounded-xl bg-white p-3 shadow-sm ${
-                            isUpdating ? "opacity-60" : ""
-                          }`}
-                          draggable={canDrag}
-                          onDragStart={(event) =>
-                            handleDragStart(event, t.id, t.status)
-                          }
-                          onDragEnd={handleDragEnd}
-                          onMouseDown={(e) =>
-                            setMouseDownInfo({
-                              ticketId: t.id,
-                              x: e.clientX,
-                              y: e.clientY,
-                              time: Date.now(),
-                            })
-                          }
-                          onMouseUp={(e) => {
-                            if (!mouseDownInfo) return;
-                            const dx = e.clientX - mouseDownInfo.x;
-                            const dy = e.clientY - mouseDownInfo.y;
-                            const dt = Date.now() - mouseDownInfo.time;
-                            setMouseDownInfo(null);
-                            const distance = Math.sqrt(dx * dx + dy * dy);
-                            if (
-                              distance < 5 &&
-                              dt < 400 &&
-                              !draggingTicketId
-                            ) {
-                              setDetailTicketId(t.id);
-                            }
-                          }}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="text-[11px] font-semibold text-[#424143]">
-                              {ticketCode}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              {showRevisionBadge && (
-                                <span className="rounded-full bg-[#edf2ff] px-2 py-0.5 text-[10px] font-medium text-[#3b5bdb]">
-                                  v{t.revisionCount}
-                                </span>
-                              )}
-                              <div className="text-[10px] text-[#9a9892]">
-                                {t.company?.name || "—"}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="mt-1 text-[13px] font-semibold text-[#424143]">
-                            {t.title}
-                          </div>
-                          {t.description && (
-                            <p className="mt-1 line-clamp-3 text-[11px] text-[#7a7a7a]">
-                              {t.description}
-                            </p>
-                          )}
-                          <div className="mt-2 flex flex-wrap items-center gap-2">
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${priorityPillClass(
-                                t.priority,
-                              )}`}
-                            >
-                              {formatPriorityLabel(t.priority)}
-                            </span>
-                            {t.project && (
-                              <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[10px] text-[#7a7a7a]">
-                                {t.project.name}
-                              </span>
-                            )}
-                            {payoutTokens != null && (
-                              <span className="rounded-full bg-[#f0fff6] px-2 py-0.5 text-[10px] text-[#137a3a]">
-                                {payoutTokens} tokens
-                              </span>
-                            )}
-                            {showFeedbackBadge && (
-                              <span className="rounded-full bg-[#fff7e0] px-2 py-0.5 text-[10px] text-[#8a6b1f]">
-                                Changes requested
-                              </span>
-                            )}
-                          </div>
-                          {t.latestRevisionHasFeedback &&
-                            t.latestRevisionFeedbackSnippet && (
-                              <p className="mt-1 line-clamp-2 text-[10px] text-[#7a7a7a]">
-                                “{t.latestRevisionFeedbackSnippet}”
-                              </p>
-                            )}
-                          <div className="mt-2 flex items-center justify-between text-[10px] text-[#9a9892]">
-                            <span>Created {formatDate(t.createdAt)}</span>
-                            <span>Updated {formatDate(t.updatedAt)}</span>
-                          </div>
-                        </div>
-                      );
-                    })
+                  {stats && (
+                    <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-[#424143]">
+                      {stats.total}
+                    </span>
                   )}
                 </div>
               </div>
-            );
-          })}
+
+              <div className="rounded-xl bg-[#f5f3f0] px-3 py-2 text-[10px] text-[#7a7a7a]">
+                <p>
+                  Changes requested:{" "}
+                  <span className="font-semibold">
+                    {changesRequestedCount}
+                  </span>
+                </p>
+                <p className="mt-1">
+                  Use the filter on the right to focus only on tickets with
+                  customer feedback.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-auto pt-4 text-[10px] text-[#9a9892]">
+              <p>You&apos;re working in demo mode as a designer.</p>
+            </div>
+          </aside>
+
+          {/* Main board area */}
+          <main className="flex flex-col">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
+                  Designer board
+                </p>
+                <h1 className="mt-1 text-xl font-semibold tracking-tight">
+                  {activeProjectTitle}
+                </h1>
+                <p className="mt-1 text-xs text-[#7a7a7a]">
+                  Drag tickets as you work. Move requests from{" "}
+                  <span className="font-semibold">Backlog</span> into{" "}
+                  <span className="font-semibold">In progress</span>, then send
+                  them to <span className="font-semibold">In review</span> when
+                  you&apos;re ready for your customer to take a look. When they
+                  send a ticket back with changes, you&apos;ll see a revision
+                  badge and a short note here or filter by those requests.
+                </p>
+              </div>
+              {loading && (
+                <div className="rounded-full bg-[#f5f3f0] px-3 py-1 text-[11px] text-[#7a7a7a]">
+                  Loading tickets…
+                </div>
+              )}
+            </div>
+
+            {error && (
+              <div className="mb-4 rounded-xl border border-red-200 bg-[#fff7f7] px-4 py-3 text-xs text-red-700">
+                <p className="font-medium">Something went wrong</p>
+                <p className="mt-1">{error}</p>
+              </div>
+            )}
+
+            {mutationError && (
+              <div className="mb-4 rounded-xl border border-amber-200 bg-[#fffaf2] px-4 py-3 text-xs text-amber-800">
+                {mutationError}
+              </div>
+            )}
+
+            <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  placeholder="Search by title, ticket code, project or company"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full rounded-full border border-[#e3e1dc] bg-[#f7f5f0] px-4 pb-2 pt-2 text-xs text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+                />
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-[#7a7a7a]">
+                <span>Project:</span>
+                <select
+                  className="rounded-full border border-[#e3e1dc] bg-[#f7f5f0] px-2 py-1 text-[11px] outline-none"
+                  value={projectFilter}
+                  onChange={(e) => setProjectFilter(e.target.value)}
+                >
+                  <option value="ALL">All</option>
+                  {projects.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setOnlyChangesRequested((prev: boolean) => !prev)
+                  }
+                  className={`flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] transition-colors ${
+                    onlyChangesRequested
+                      ? "border-[#f15b2b] bg-[#fff0ea] text-[#d6471b]"
+                      : "border-[#e3e1dc] bg-[#f7f5f0] text-[#7a7a7a] hover:border-[#f15b2b]/60"
+                  }`}
+                >
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#f5a623]" />
+                  Changes requested
+                  <span className="rounded-full bg-black/5 px-1 text-[10px] font-semibold">
+                    {changesRequestedCount}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {stats && (
+              <div className="mb-3 flex flex-wrap items-center gap-3 text-[11px] text-[#7a7a7a]">
+                <div className="rounded-full bg-[#f5f3f0] px-3 py-1">
+                  Total: <span className="font-semibold">{stats.total}</span>
+                </div>
+                <div className="rounded-full bg-[#f5f3f0] px-3 py-1">
+                  Open:{" "}
+                  <span className="font-semibold">{stats.openTotal}</span>
+                </div>
+                <div className="rounded-full bg-[#f5f3f0] px-3 py-1">
+                  Load score:{" "}
+                  <span className="font-semibold">{stats.loadScore}</span>
+                </div>
+                <div className="rounded-full bg-[#f5f3f0] px-3 py-1">
+                  Changes requested:{" "}
+                  <span className="font-semibold">
+                    {changesRequestedCount}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <div className="grid gap-3 md:grid-cols-4">
+              {STATUS_ORDER.map((status) => {
+                const columnTickets = ticketsByStatus[status] ?? [];
+                const columnTitle = STATUS_LABELS[status];
+                const isActiveDrop =
+                  dragOverStatus === status && !!draggingTicketId;
+
+                return (
+                  <div
+                    key={status}
+                    className={`flex flex-col rounded-2xl bg-white/60 p-2 ${
+                      isActiveDrop ? "ring-2 ring-[#f15b2b]" : "ring-0"
+                    }`}
+                    onDragOver={(event) => handleColumnDragOver(event, status)}
+                    onDrop={(event) => handleColumnDrop(event, status)}
+                  >
+                    <div className="mb-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1">
+                          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9a9892]">
+                            {columnTitle}
+                          </span>
+                          <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[11px] font-semibold text-[#7a7a7a]">
+                            {columnTickets.length}
+                          </span>
+                        </div>
+                      </div>
+                      {status === "DONE" && (
+                        <p className="mt-1 text-[10px] text-[#b1afa9]">
+                          Completed by customer. You can&apos;t move Done
+                          tickets from here.
+                        </p>
+                      )}
+                    </div>
+
+                    <div
+                      className={`flex-1 space-y-2 rounded-xl ${statusColumnClass(
+                        status,
+                      )} bg-opacity-70 p-2`}
+                    >
+                      {columnTickets.length === 0 ? (
+                        <p className="py-4 text-center text-[11px] text-[#9a9892]">
+                          No tickets in this column.
+                        </p>
+                      ) : (
+                        columnTickets.map((t) => {
+                          const ticketCode =
+                            t.project?.code && t.companyTicketNumber != null
+                              ? `${t.project.code}-${t.companyTicketNumber}`
+                              : t.companyTicketNumber != null
+                              ? `#${t.companyTicketNumber}`
+                              : t.id;
+
+                          const isUpdating = updatingTicketId === t.id;
+                          const canDrag = t.status !== "DONE" && !isUpdating;
+
+                          const payoutTokens =
+                            t.jobType?.designerPayoutTokens ??
+                            t.jobType?.tokenCost ??
+                            null;
+
+                          const showRevisionBadge = t.revisionCount > 0;
+                          const showFeedbackBadge = t.latestRevisionHasFeedback;
+
+                          return (
+                            <div
+                              key={t.id}
+                              className={`cursor-pointer rounded-xl bg-white p-3 shadow-sm ${
+                                isUpdating ? "opacity-60" : ""
+                              }`}
+                              draggable={canDrag}
+                              onDragStart={(event) =>
+                                handleDragStart(event, t.id, t.status)
+                              }
+                              onDragEnd={handleDragEnd}
+                              onMouseDown={(e) =>
+                                setMouseDownInfo({
+                                  ticketId: t.id,
+                                  x: e.clientX,
+                                  y: e.clientY,
+                                  time: Date.now(),
+                                })
+                              }
+                              onMouseUp={(e) => {
+                                if (!mouseDownInfo) return;
+                                const dx = e.clientX - mouseDownInfo.x;
+                                const dy = e.clientY - mouseDownInfo.y;
+                                const dt = Date.now() - mouseDownInfo.time;
+                                setMouseDownInfo(null);
+                                const distance = Math.sqrt(dx * dx + dy * dy);
+                                if (
+                                  distance < 5 &&
+                                  dt < 400 &&
+                                  !draggingTicketId
+                                ) {
+                                  setDetailTicketId(t.id);
+                                }
+                              }}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="text-[11px] font-semibold text-[#424143]">
+                                  {ticketCode}
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  {showRevisionBadge && (
+                                    <span className="rounded-full bg-[#edf2ff] px-2 py-0.5 text-[10px] font-medium text-[#3b5bdb]">
+                                      v{t.revisionCount}
+                                    </span>
+                                  )}
+                                  <div className="text-[10px] text-[#9a9892]">
+                                    {t.company?.name || "—"}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="mt-1 text-[13px] font-semibold text-[#424143]">
+                                {t.title}
+                              </div>
+                              {t.description && (
+                                <p className="mt-1 line-clamp-3 text-[11px] text-[#7a7a7a]">
+                                  {t.description}
+                                </p>
+                              )}
+                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                                <span
+                                  className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${priorityPillClass(
+                                    t.priority,
+                                  )}`}
+                                >
+                                  {formatPriorityLabel(t.priority)}
+                                </span>
+                                {t.project && (
+                                  <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[10px] text-[#7a7a7a]">
+                                    {t.project.name}
+                                  </span>
+                                )}
+                                {payoutTokens != null && (
+                                  <span className="rounded-full bg-[#f0fff6] px-2 py-0.5 text-[10px] text-[#137a3a]">
+                                    {payoutTokens} tokens
+                                  </span>
+                                )}
+                                {showFeedbackBadge && (
+                                  <span className="rounded-full bg-[#fff7e0] px-2 py-0.5 text-[10px] text-[#8a6b1f]">
+                                    Changes requested
+                                  </span>
+                                )}
+                              </div>
+                              {t.latestRevisionHasFeedback &&
+                                t.latestRevisionFeedbackSnippet && (
+                                  <p className="mt-1 line-clamp-2 text-[10px] text-[#7a7a7a]">
+                                    “{t.latestRevisionFeedbackSnippet}”
+                                  </p>
+                                )}
+                              <div className="mt-2 flex items-center justify-between text-[10px] text-[#9a9892]">
+                                <span>Created {formatDate(t.createdAt)}</span>
+                                <span>Updated {formatDate(t.updatedAt)}</span>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </main>
         </div>
       </div>
 
@@ -1062,7 +1123,9 @@ export default function DesignerBoardPage() {
               </div>
 
               <div>
-                <p className="font-semibold text-[#424143]">Revision history</p>
+                <p className="font-semibold text-[#424143]">
+                  Revision history
+                </p>
                 <div className="mt-1 space-y-1">
                   {detailRevisionsLoading && (
                     <p className="text-[#9a9892]">Loading revision history…</p>

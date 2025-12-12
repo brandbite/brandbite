@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/board/page.tsx
 // @purpose: Customer-facing board view of company tickets (kanban + drag & drop + detail & revision modals + toasts)
-// @version: v2.0.4
+// @version: v2.1.1
 // @status: active
-// @lastUpdate: 2025-11-29
+// @lastUpdate: 2025-12-07
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -16,6 +16,7 @@ import {
 } from "@/lib/permissions/companyRoles";
 import { TicketStatus, TicketPriority } from "@prisma/client";
 import { useToast } from "@/components/ui/toast-provider";
+import {CustomerNav } from "@/components/navigation/customer-nav";
 
 type TicketStatusLabel = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 
@@ -171,6 +172,13 @@ const priorityBadgeClass: Record<TicketPriority, string> = {
   HIGH: "bg-[#fff4e5] text-[#c76a18] border border-[#f7d0a9]",
   MEDIUM: "bg-[#eef3ff] text-[#3259c7] border border-[#c7d1f7]",
   LOW: "bg-[#f3f2f0] text-[#5a5953] border border-[#d4d2ce]",
+};
+
+const priorityIconMap: Record<TicketPriority, string> = {
+  URGENT: "↑↑",
+  HIGH: "↑",
+  MEDIUM: "→",
+  LOW: "↓",
 };
 
 const statusBadgeClass: Record<TicketStatus, string> = {
@@ -794,7 +802,9 @@ export default function CustomerBoardPage() {
         await load();
       }
 
-      const successCopy = getStatusSuccessMessage(status, { hasRevisionMessage });
+      const successCopy = getStatusSuccessMessage(status, {
+        hasRevisionMessage,
+      });
 
       showToast({
         type: "success",
@@ -1088,7 +1098,7 @@ export default function CustomerBoardPage() {
           <div>
             <div className="flex items-center gap-2">
               {ticket.project?.code && ticket.companyTicketNumber && (
-                <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#7a7a7a]">
+                <span className="rounded-full bg-[#eef3ff] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#3259c7]">
                   {ticket.project.code}-{ticket.companyTicketNumber}
                 </span>
               )}
@@ -1108,8 +1118,11 @@ export default function CustomerBoardPage() {
             </h3>
           </div>
           <span
-            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${priorityBadgeClass[ticket.priority]}`}
+            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${priorityBadgeClass[ticket.priority]}`}
           >
+            <span className="text-[9px]">
+              {priorityIconMap[ticket.priority]}
+            </span>
             {priorityLabelMap[ticket.priority]}
           </span>
         </div>
@@ -1153,480 +1166,527 @@ export default function CustomerBoardPage() {
   // ---------------------------------------------------------------------------
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#f5f3f0]">
-      {/* Header */}
-      <div className="border-b border-[#e4e0da] bg-[#fdfcfb]">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+    <>
+      {/* Global customer navigation (logo + Dashboard / Board / Plans vs.) */}
+      <CustomerNav />
+
+      <div className="flex min-h-screen bg-[#f5f3f0]">
+        {/* Sidebar - projects / workspace context (desktop and up) */}
+        <aside className="hidden w-64 flex-col border-r border-[#e4e0da] bg-[#fbfaf8] px-4 py-4 md:flex lg:w-72">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
-              Customer board
+              Projects
             </p>
-            <h1 className="mt-1 text-lg font-semibold text-[#424143]">
-              Design requests
-            </h1>
-          </div>
-          <div className="flex flex-col items-end gap-1 text-right text-[11px] text-[#7a7a7a]">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 rounded-full bg-[#f5f3f0] px-2 py-0.5">
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#32b37b]" />
-                <span className="font-semibold text-[#424143]">
-                  {currentStats.total}
-                </span>
-                <span className="text-[#7a7a7a]">total requests</span>
-              </span>
-            </div>
-            <div className="flex flex-wrap items-center justify-end gap-1">
-              {statusOrder.map((status) => (
-                <button
-                  key={status}
-                  type="button"
-                  onClick={() => handleStatusBadgeClick(status)}
-                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusBadgeClass[status]}`}
-                >
-                  <span
-                    className={`inline-block h-1.5 w-1.5 rounded-full ${statusIndicatorColor(
-                      status,
-                    )}`}
-                  />
-                  {statusDisplayConfigs[status].title}
-                  <span className="rounded-full bg-black/5 px-1 text-[9px] font-bold">
-                    {currentStats.byStatus[status] ?? 0}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pb-6 pt-3">
-        {loadError && (
-          <div className="mb-3 rounded-xl border border-[#f7c7c0] bg-[#fdecea] px-4 py-3 text-xs text-[#b13832]">
-            {loadError}
-          </div>
-        )}
-
-        {companyRoleError && (
-          <div className="mb-3 rounded-xl border border-[#f7c7c0] bg-[#fdecea] px-4 py-3 text-xs text-[#b13832]">
-            {companyRoleError}
-          </div>
-        )}
-
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2 text-[11px] text-[#7a7a7a]">
-            <span className="font-semibold text-[#424143]">
-              Your role in this company:
-            </span>
-            {companyRoleLoading ? (
-              <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5">
-                Loading…
-              </span>
-            ) : companyRole ? (
-              <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 font-semibold text-[#424143]">
-                {companyRole}
-              </span>
-            ) : (
-              <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5">
-                Not set
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="flex flex-1 flex-col gap-4">
-          <div>
-            {mutationError && (
-              <div className="mb-4 rounded-xl border border-amber-200 bg-[#fffaf2] px-4 py-3 text-xs text-amber-800">
-                {mutationError}
+            <button
+              type="button"
+              className="mt-3 flex w-full items-center gap-3 rounded-2xl bg-white px-3 py-2 text-left text-[11px] text-[#424143] shadow-sm ring-1 ring-[#e4e0da] hover:shadow-md"
+            >
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#f15b2b] text-[12px] font-semibold text-white">
+                BB
               </div>
-            )}
-
-            {/* Filters */}
-            <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  value={search}
-                  onChange={handleSearchChange}
-                  placeholder="Search by title, code or description"
-                  className="w-full rounded-2xl border border-[#e3dfd7] bg-white px-3 py-2 text-[13px] text-[#424143] shadow-sm outline-none placeholder:text-[#b1afa9] focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
-                />
-                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[11px] text-[#b1afa9]">
-                  ⌘K
-                </span>
+              <div className="flex-1">
+                <p className="text-[12px] font-semibold text-[#424143]">
+                  All requests
+                </p>
+                <p className="text-[10px] text-[#7a7a7a]">
+                  Board for your active company
+                </p>
               </div>
-              <div className="flex items-center gap-2 text-[11px] text-[#7a7a7a]">
-                <span>Project:</span>
-                <select
-                  className="rounded-2xl border border-[#e3dfd7] bg-white px-2 py-1 text-[11px] text-[#424143] shadow-sm outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
-                  value={projectFilter}
-                  onChange={handleProjectFilterChange}
-                >
-                  <option value="ALL">All projects</option>
-                  {projects.map((projectName) => (
-                    <option key={projectName} value={projectName}>
-                      {projectName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Columns */}
-            {loading ? (
-              <div className="flex flex-1 items-center justify-center py-16 text-[12px] text-[#7a7a7a]">
-                Loading your board…
-              </div>
-            ) : (
-              <div className="flex flex-1 flex-col gap-4 md:flex-row">
-                {statusColumnsForRender.map(({ status, config }) => {
-                  const columnTickets = ticketsByStatus[status] ?? [];
-                  const isDropTargetActive = dragOverStatus === status;
-
-                  return (
-                    <div
-                      key={status}
-                      id={`customer-board-column-${status}`}
-                      className={`flex-1 rounded-3xl border border-[#e4e0da] p-3 ${statusColumnClass(
-                        status,
-                      )}`}
-                      onDragOver={(event) => handleDragOver(event, status)}
-                      onDrop={(event) => handleDrop(event, status)}
-                    >
-                      <div className="mb-2 flex items-center justify-between gap-2">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <div
-                              className={`inline-flex items-center gap-1 rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-semibold ${statusTagColor(
-                                status,
-                              )}`}
-                            >
-                              <span
-                                className={`inline-block h-1.5 w-1.5 rounded-full ${statusIndicatorColor(
-                                  status,
-                                )}`}
-                              />
-                              {config.title}
-                            </div>
-                            <span className="rounded-full bg.white/70 px-2 py-0.5 text-[10px] text-[#7a7a7a]">
-                              {config.description}
-                            </span>
-                          </div>
-                        </div>
-                        <span className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-semibold text-[#424143]">
-                          {columnTickets.length}{" "}
-                          {columnTickets.length === 1 ? "ticket" : "tickets"}
-                        </span>
-                      </div>
-
-                      <div
-                        className={`mt-2 flex min-h-[80px] flex-col gap-2 rounded-2xl border border-dashed border-transparent bg-white/50 p-1 transition-colors ${
-                          isDropTargetActive ? "border-[#f15b2b]" : ""
-                        }`}
-                      >
-                        {columnTickets.length === 0 ? (
-                          <div className="flex flex-1 items-center justify-center py-6 text-[11px] text-[#9a9892]">
-                            No tickets in this column yet.
-                          </div>
-                        ) : (
-                          columnTickets.map((ticket) =>
-                            renderTicketCard(ticket),
-                          )
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            </button>
           </div>
-        </div>
-      </div>
 
-      {/* Ticket detail modal */}
-      {detailTicket && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 px-4 py-8">
-          <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
-            <div className="mb-3 flex items-start justify-between gap-3">
+          <div className="mt-auto space-y-2 pt-4 text-[10px] text-[#9a9892]">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
+              Workspace
+            </p>
+            <p>
+              You&apos;re viewing design requests for your demo workspace. Plan
+              upgrades and limits will appear here later.
+            </p>
+          </div>
+        </aside>
+
+        {/* Main board area */}
+        <div className="flex min-h-screen flex-1 flex-col">
+          {/* Header */}
+          <div className="border-b border-[#e4e0da] bg-[#fdfcfb]">
+            <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
-                  Ticket
+                  Customer board
                 </p>
-                <h2 className="mt-1 text-lg font-semibold text-[#424143]">
-                  {detailTicket.title}
-                </h2>
-                <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-[#7a7a7a]">
-                  {detailTicket.project?.code &&
-                    detailTicket.companyTicketNumber && (
-                      <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5">
-                        {detailTicket.project.code}-
-                        {detailTicket.companyTicketNumber}
-                      </span>
-                    )}
-                  <span
-                    className={`flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold ${statusBadgeClass[detailTicket.status]}`}
-                  >
-                    <span
-                      className={`inline-block h-1.5 w-1.5 rounded-full ${statusIndicatorColor(
-                        detailTicket.status,
-                      )}`}
-                    />
-                    {statusLabels[detailTicket.status].replace("_", " ")}
-                  </span>
-                  <span
-                    className={`rounded-full px-2 py-0.5 font-semibold ${priorityBadgeClass[detailTicket.priority]}`}
-                  >
-                    {formatPriorityLabel(detailTicket.priority)}
+                <h1 className="mt-1 text-lg font-semibold text-[#424143]">
+                  Design requests
+                </h1>
+              </div>
+              <div className="flex flex-col items-end gap-1 text-right text-[11px] text-[#7a7a7a]">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[#f5f3f0] px-2 py-0.5">
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#32b37b]" />
+                    <span className="font-semibold text-[#424143]">
+                      {currentStats.total}
+                    </span>
+                    <span className="text-[#7a7a7a]">total requests</span>
                   </span>
                 </div>
+                <div className="flex flex-wrap items-center justify-end gap-1">
+                  {statusOrder.map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() => handleStatusBadgeClick(status)}
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusBadgeClass[status]}`}
+                    >
+                      <span
+                        className={`inline-block h-1.5 w-1.5 rounded-full ${statusIndicatorColor(
+                          status,
+                        )}`}
+                      />
+                      {statusDisplayConfigs[status].title}
+                      <span className="rounded-full bg-black/5 px-1 text-[9px] font-bold">
+                        {currentStats.byStatus[status] ?? 0}
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={closeTicketDetails}
-                className="rounded-full bg-[#f5f3f0] px-2 py-1 text-[11px] text-[#7a7a7a] hover:bg-[#e4e0da]"
-              >
-                Close
-              </button>
             </div>
+          </div>
 
-            {detailTicket.description && (
-              <div className="mb-3 rounded-xl bg-[#f5f3f0] px-3 py-3 text-[11px] text-[#424143]">
-                {detailTicket.description}
+          {/* Content */}
+          <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pb-6 pt-3">
+            {loadError && (
+              <div className="mb-3 rounded-xl border border-[#f7c7c0] bg-[#fdecea] px-4 py-3 text-xs text-[#b13832]">
+                {loadError}
               </div>
             )}
 
-            <div className="grid gap-3 text-[11px] text-[#7a7a7a] md:grid-cols-2">
-              <div>
-                <p className="font-semibold text-[#424143]">Meta</p>
-                <div className="mt-1 space-y-1">
-                  <p>
-                    Priority:{" "}
-                    <span className="font-semibold">
-                      {formatPriorityLabel(detailTicket.priority)}
-                    </span>
-                  </p>
-                  <p>
-                    Project:{" "}
-                    <span className="font-semibold">
-                      {detailTicket.project?.name || "—"}
-                    </span>
-                  </p>
-                  <p>
-                    Job type:{" "}
-                    <span className="font-semibold">
-                      {detailTicket.jobType?.name || "—"}
-                    </span>
-                  </p>
-                </div>
+            {companyRoleError && (
+              <div className="mb-3 rounded-xl border border-[#f7c7c0] bg-[#fdecea] px-4 py-3 text-xs text-[#b13832]">
+                {companyRoleError}
               </div>
-              <div>
-                <p className="font-semibold text-[#424143]">People</p>
-                <div className="mt-1 space-y-1">
-                  <p>
-                    Designer:{" "}
-                    <span className="font-semibold">
-                      {detailTicket.designer?.name ||
-                        detailTicket.designer?.email ||
-                        "—"}
-                    </span>
-                  </p>
-                </div>
+            )}
+
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-[#7a7a7a]">
+                <span className="font-semibold text-[#424143]">
+                  Your role in this company:
+                </span>
+                {companyRoleLoading ? (
+                  <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5">
+                    Loading…
+                  </span>
+                ) : companyRole ? (
+                  <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 font-semibold text-[#424143]">
+                    {companyRole}
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5">
+                    Not set
+                  </span>
+                )}
               </div>
             </div>
 
-            <div className="mt-3 grid gap-3 text-[11px] text-[#7a7a7a] md:grid-cols-2">
+            <div className="flex flex-1 flex-col gap-4">
               <div>
-                <p className="font-semibold text-[#424143]">Dates</p>
-                <div className="mt-1 space-y-1">
-                  <p>
-                    Created:{" "}
-                    <span className="font-semibold">
-                      {formatDate(detailTicket.createdAt)}
+                {mutationError && (
+                  <div className="mb-4 rounded-xl border border-amber-200 bg-[#fffaf2] px-4 py-3 text-xs text-amber-800">
+                    {mutationError}
+                  </div>
+                )}
+
+                {/* Filters */}
+                <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={search}
+                      onChange={handleSearchChange}
+                      placeholder="Search by title, code or description"
+                      className="w-full rounded-2xl border border-[#e3dfd7] bg-white px-3 py-2 text-[13px] text-[#424143] shadow-sm outline-none placeholder:text-[#b1afa9] focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+                    />
+                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[11px] text-[#b1afa9]">
+                      ⌘K
                     </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[11px] text-[#7a7a7a]">
+                    <span>Project:</span>
+                    <select
+                      className="rounded-2xl border border-[#e3dfd7] bg-white px-2 py-1 text-[11px] text-[#424143] shadow-sm outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+                      value={projectFilter}
+                      onChange={handleProjectFilterChange}
+                    >
+                      <option value="ALL">All projects</option>
+                      {projects.map((projectName) => (
+                        <option key={projectName} value={projectName}>
+                          {projectName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Columns */}
+                {loading ? (
+                  <div className="flex flex-1 items-center justify-center py-16 text-[12px] text-[#7a7a7a]">
+                    Loading your board…
+                  </div>
+                ) : (
+                  <div className="flex flex-1 flex-col gap-4 md:flex-row">
+                    {statusColumnsForRender.map(({ status, config }) => {
+                      const columnTickets = ticketsByStatus[status] ?? [];
+                      const isDropTargetActive = dragOverStatus === status;
+
+                      return (
+                        <div
+                          key={status}
+                          id={`customer-board-column-${status}`}
+                          className={`flex-1 rounded-3xl border border-[#e4e0da] p-3 ${statusColumnClass(
+                            status,
+                          )}`}
+                          onDragOver={(event) => handleDragOver(event, status)}
+                          onDrop={(event) => handleDrop(event, status)}
+                        >
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className={`inline-flex items-center gap-1 rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-semibold ${statusTagColor(
+                                    status,
+                                  )}`}
+                                >
+                                  <span
+                                    className={`inline-block h-1.5 w-1.5 rounded-full ${statusIndicatorColor(
+                                      status,
+                                    )}`}
+                                  />
+                                  {config.title}
+                                </div>
+                                <span className="rounded-full bg-white/70 px-2 py-0.5 text-[10px] text-[#7a7a7a]">
+                                  {config.description}
+                                </span>
+                              </div>
+                            </div>
+                            <span className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-semibold text-[#424143]">
+                              {columnTickets.length}{" "}
+                              {columnTickets.length === 1 ? "ticket" : "tickets"}
+                            </span>
+                          </div>
+
+                          <div
+                            className={`mt-2 flex min-h-[80px] flex-col gap-2 rounded-2xl border border-dashed border-transparent bg-white/50 p-1 transition-colors ${
+                              isDropTargetActive ? "border-[#f15b2b]" : ""
+                            }`}
+                          >
+                            {columnTickets.length === 0 ? (
+                              <div className="flex flex-1 items-center justify-center py-6 text-[11px] text-[#9a9892]">
+                                No tickets in this column yet.
+                              </div>
+                            ) : (
+                              columnTickets.map((ticket) =>
+                                renderTicketCard(ticket),
+                              )
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Ticket detail modal */}
+        {detailTicket && (
+          <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 px-4 py-8">
+            <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
+                    Ticket
                   </p>
-                  <p>
-                    Updated:{" "}
-                    <span className="font-semibold">
-                      {formatDate(detailTicket.updatedAt)}
+                  <h2 className="mt-1 text-lg font-semibold text-[#424143]">
+                    {detailTicket.title}
+                  </h2>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-[#7a7a7a]">
+                    {detailTicket.project?.code &&
+                      detailTicket.companyTicketNumber && (
+                        <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5">
+                          {detailTicket.project.code}-
+                          {detailTicket.companyTicketNumber}
+                        </span>
+                      )}
+                    <span
+                      className={`flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold ${statusBadgeClass[detailTicket.status]}`}
+                    >
+                      <span
+                        className={`inline-block h-1.5 w-1.5 rounded-full ${statusIndicatorColor(
+                          detailTicket.status,
+                        )}`}
+                      />
+                      {statusLabels[detailTicket.status].replace("_", " ")}
                     </span>
-                  </p>
-                  <p>
-                    Due date:{" "}
-                    <span className="font-semibold">
-                      {formatDate(detailTicket.dueDate)}
+                    <span
+                      className={`rounded-full px-2 py-0.5 font-semibold ${priorityBadgeClass[detailTicket.priority]}`}
+                    >
+                      {formatPriorityLabel(detailTicket.priority)}
                     </span>
-                  </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeTicketDetails}
+                  className="rounded-full bg-[#f5f3f0] px-2 py-1 text-[11px] text-[#7a7a7a] hover:bg-[#e4e0da]"
+                >
+                  Close
+                </button>
+              </div>
+
+              {detailTicket.description && (
+                <div className="mb-3 rounded-xl bg-[#f5f3f0] px-3 py-3 text-[11px] text-[#424143]">
+                  {detailTicket.description}
+                </div>
+              )}
+
+              <div className="grid gap-3 text-[11px] text-[#7a7a7a] md:grid-cols-2">
+                <div>
+                  <p className="font-semibold text-[#424143]">Meta</p>
+                  <div className="mt-1 space-y-1">
+                    <p>
+                      Priority:{" "}
+                      <span className="font-semibold">
+                        {formatPriorityLabel(detailTicket.priority)}
+                      </span>
+                    </p>
+                    <p>
+                      Project:{" "}
+                      <span className="font-semibold">
+                        {detailTicket.project?.name || "—"}
+                      </span>
+                    </p>
+                    <p>
+                      Job type:{" "}
+                      <span className="font-semibold">
+                        {detailTicket.jobType?.name || "—"}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <p className="font-semibold text-[#424143]">People</p>
+                  <div className="mt-1 space-y-1">
+                    <p>
+                      Designer:{" "}
+                      <span className="font-semibold">
+                        {detailTicket.designer?.name ||
+                          detailTicket.designer?.email ||
+                          "—"}
+                      </span>
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <p className="font-semibold text-[#424143]">Revision history</p>
-                <div className="mt-1 space-y-1">
-                  {detailRevisionsLoading && (
-                    <p className="text-[#9a9892]">Loading revision history…</p>
-                  )}
+              <div className="mt-3 grid gap-3 text-[11px] text-[#7a7a7a] md:grid-cols-2">
+                <div>
+                  <p className="font-semibold text-[#424143]">Dates</p>
+                  <div className="mt-1 space-y-1">
+                    <p>
+                      Created:{" "}
+                      <span className="font-semibold">
+                        {formatDate(detailTicket.createdAt)}
+                      </span>
+                    </p>
+                    <p>
+                      Updated:{" "}
+                      <span className="font-semibold">
+                        {formatDate(detailTicket.updatedAt)}
+                      </span>
+                    </p>
+                    <p>
+                      Due date:{" "}
+                      <span className="font-semibold">
+                        {formatDate(detailTicket.dueDate)}
+                      </span>
+                    </p>
+                  </div>
+                </div>
 
-                  {!detailRevisionsLoading && detailRevisionsError && (
-                    <p className="text-[#b13832]">{detailRevisionsError}</p>
-                  )}
-
-                  {!detailRevisionsLoading &&
-                    !detailRevisionsError &&
-                    (!detailRevisions || detailRevisions.length === 0) && (
+                <div>
+                  <p className="font-semibold text-[#424143]">
+                    Revision history
+                  </p>
+                  <div className="mt-1 space-y-1">
+                    {detailRevisionsLoading && (
                       <p className="text-[#9a9892]">
-                        No revisions yet. Once your designer sends this ticket
-                        for review, you&apos;ll see each version and your
-                        feedback here.
+                        Loading revision history…
                       </p>
                     )}
 
-                  {!detailRevisionsLoading &&
-                    !detailRevisionsError &&
-                    detailRevisions &&
-                    detailRevisions.length > 0 && (
-                      <div className="space-y-2">
-                        {detailRevisions.map((rev) => (
-                          <div
-                            key={rev.version}
-                            className="rounded-xl bg-[#f5f3f0] px-3 py-2"
-                          >
-                            <p className="text-[10px] font-semibold text-[#424143]">
-                              Version v{rev.version}
-                            </p>
-
-                            {rev.submittedAt && (
-                              <p className="mt-1">
-                                Sent for review on{" "}
-                                <span className="font-semibold">
-                                  {formatDate(rev.submittedAt)}
-                                </span>
-                                .
-                              </p>
-                            )}
-
-                            {rev.feedbackAt && (
-                              <p className="mt-1">
-                                Changes requested on{" "}
-                                <span className="font-semibold">
-                                  {formatDate(rev.feedbackAt)}
-                                </span>
-                                .
-                              </p>
-                            )}
-
-                            {rev.feedbackMessage && (
-                              <p className="mt-1 italic text-[#5a5953]">
-                                “{rev.feedbackMessage}”
-                              </p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
+                    {!detailRevisionsLoading && detailRevisionsError && (
+                      <p className="text-[#b13832]">{detailRevisionsError}</p>
                     )}
+
+                    {!detailRevisionsLoading &&
+                      !detailRevisionsError &&
+                      (!detailRevisions || detailRevisions.length === 0) && (
+                        <p className="text-[#9a9892]">
+                          No revisions yet. Once your designer sends this ticket
+                          for review, you&apos;ll see each version and your
+                          feedback here.
+                        </p>
+                      )}
+
+                    {!detailRevisionsLoading &&
+                      !detailRevisionsError &&
+                      detailRevisions &&
+                      detailRevisions.length > 0 && (
+                        <div className="space-y-2">
+                          {detailRevisions.map((rev) => (
+                            <div
+                              key={rev.version}
+                              className="rounded-xl bg-[#f5f3f0] px-3 py-2"
+                            >
+                              <p className="text-[10px] font-semibold text-[#424143]">
+                                Version v{rev.version}
+                              </p>
+
+                              {rev.submittedAt && (
+                                <p className="mt-1">
+                                  Sent for review on{" "}
+                                  <span className="font-semibold">
+                                    {formatDate(rev.submittedAt)}
+                                  </span>
+                                  .
+                                </p>
+                              )}
+
+                              {rev.feedbackAt && (
+                                <p className="mt-1">
+                                  Changes requested on{" "}
+                                  <span className="font-semibold">
+                                    {formatDate(rev.feedbackAt)}
+                                  </span>
+                                  .
+                                </p>
+                              )}
+
+                              {rev.feedbackMessage && (
+                                <p className="mt-1 italic text-[#5a5953]">
+                                  “{rev.feedbackMessage}”
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Revision modal */}
-      {pendingRevisionTicket && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-8">
-          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
-            <h2 className="text-sm font-semibold text-[#424143]">
-              Send this request back to your designer?
-            </h2>
-            <p className="mt-1 text-[11px] text-[#7a7a7a]">
-              Your designer will see your message and continue working on this
-              request. The status will move back to{" "}
-              <span className="font-semibold">In progress</span>.
-            </p>
+        {/* Revision modal */}
+        {pendingRevisionTicket && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-8">
+            <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+              <h2 className="text-sm font-semibold text-[#424143]">
+                Send this request back to your designer?
+              </h2>
+              <p className="mt-1 text-[11px] text-[#7a7a7a]">
+                Your designer will see your message and continue working on this
+                request. The status will move back to{" "}
+                <span className="font-semibold">In progress</span>.
+              </p>
 
-            <div className="mt-3">
-              <label className="block text-[11px] font-semibold text-[#424143]">
-                Message for your designer
-              </label>
-              <textarea
-                value={revisionMessage}
-                onChange={(e) => {
-                  setRevisionMessage(e.target.value);
-                  if (revisionMessageError) {
-                    setRevisionMessageError(null);
-                  }
-                }}
-                placeholder="For example: Could we make the hero headline larger and try a version with a darker background?"
-                className="mt-1 h-28 w-full rounded-2xl border border-[#e3dfd7] bg-white px-3 py-2 text-[12px] text-[#424143] shadow-sm outline-none placeholder:text-[#b1afa9] focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
-              />
-              {revisionMessageError && (
-                <p className="mt-1 text-[11px] text-[#b13832]">
-                  {revisionMessageError}
-                </p>
-              )}
-            </div>
+              <div className="mt-3">
+                <label className="block text-[11px] font-semibold text-[#424143]">
+                  Message for your designer
+                </label>
+                <textarea
+                  value={revisionMessage}
+                  onChange={(e) => {
+                    setRevisionMessage(e.target.value);
+                    if (revisionMessageError) {
+                      setRevisionMessageError(null);
+                    }
+                  }}
+                  placeholder="For example: Could we make the hero headline larger and try a version with a darker background?"
+                  className="mt-1 h-28 w-full rounded-2xl border border-[#e3dfd7] bg-white px-3 py-2 text-[12px] text-[#424143] shadow-sm outline-none placeholder:text-[#b1afa9] focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+                />
+                {revisionMessageError && (
+                  <p className="mt-1 text-[11px] text-[#b13832]">
+                    {revisionMessageError}
+                  </p>
+                )}
+              </div>
 
-            <div className="mt-4 flex justify-end gap-2 text-[12px]">
-              <button
-                type="button"
-                onClick={handleCancelRevision}
-                className="rounded-full border border-[#e3dfd7] px-3 py-1 text-[#7a7a7a] hover:bg-[#f5f3f0]"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmRevision}
-                className="rounded-full bg-[#f15b2b] px-3 py-1 font-semibold text-white hover:bg-[#e04f22]"
-              >
-                Send back to designer
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Done confirmation modal */}
-      {pendingDoneTicket && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-8">
-          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
-            <h2 className="text-sm font-semibold text-[#424143]">
-              Mark this request as done?
-            </h2>
-            <p className="mt-1 text-[11px] text-[#7a7a7a]">
-              Once you mark this request as done, your designer will get paid
-              for this job, and the ticket will move to{" "}
-              <span className="font-semibold">Done</span>.
-            </p>
-
-            <div className="mt-3 rounded-xl bg-[#f5f3f0] px-3 py-3 text-[11px] text-[#424143]">
-              <p className="font-semibold">{pendingDoneTicket.title}</p>
-              {pendingDoneTicket.project?.name && (
-                <p className="mt-1 text-[#7a7a7a]">
-                  Project: {pendingDoneTicket.project.name}
-                </p>
-              )}
-            </div>
-
-            <div className="mt-4 flex justify-end gap-2 text-[12px]">
-              <button
-                type="button"
-                onClick={() => setPendingDoneTicketId(null)}
-                className="rounded-full border border-[#e3dfd7] px-3 py-1 text-[#7a7a7a] hover:bg-[#f5f3f0]"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmDone}
-                className="rounded-full bg-[#32b37b] px-3 py-1 font-semibold text-white hover:bg-[#2ba06a]"
-              >
-                Yes, mark as done
-              </button>
+              <div className="mt-4 flex justify-end gap-2 text-[12px]">
+                <button
+                  type="button"
+                  onClick={handleCancelRevision}
+                  className="rounded-full border border-[#e3dfd7] px-3 py-1 text-[#7a7a7a] hover:bg-[#f5f3f0]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmRevision}
+                  className="rounded-full bg-[#f15b2b] px-3 py-1 font-semibold text-white hover:bg-[#e04f22]"
+                >
+                  Send back to designer
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+
+        {/* Done confirmation modal */}
+        {pendingDoneTicket && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-8">
+            <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+              <h2 className="text-sm font-semibold text-[#424143]">
+                Mark this request as done?
+              </h2>
+              <p className="mt-1 text-[11px] text-[#7a7a7a]">
+                Once you mark this request as done, your designer will get paid
+                for this job, and the ticket will move to{" "}
+                <span className="font-semibold">Done</span>.
+              </p>
+
+              <div className="mt-3 rounded-xl bg-[#f5f3f0] px-3 py-3 text-[11px] text-[#424143]">
+                <p className="font-semibold">{pendingDoneTicket.title}</p>
+                {pendingDoneTicket.project?.name && (
+                  <p className="mt-1 text-[#7a7a7a]">
+                    Project: {pendingDoneTicket.project.name}
+                  </p>
+                )}
+              </div>
+
+              <div className="mt-4 flex justify-end gap-2 text-[12px]">
+                <button
+                  type="button"
+                  onClick={() => setPendingDoneTicketId(null)}
+                  className="rounded-full border border-[#e3dfd7] px-3 py-1 text-[#7a7a7a] hover:bg-[#f5f3f0]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDone}
+                  className="rounded-full bg-[#32b37b] px-3 py-1 font-semibold text-white hover:bg-[#2ba06a]"
+                >
+                  Yes, mark as done
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
