@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/tickets/new/NewTicketForm.tsx
-// @purpose: Client-side form for creating a new design ticket (role-aware, with toasts)
-// @version: v1.4.0
+// @purpose: Client-side form for creating a new design ticket (role-aware)
+// @version: v1.5.0
 // @status: active
-// @lastUpdate: 2025-11-30
+// @lastUpdate: 2025-12-12
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -20,7 +20,6 @@ import {
   canCreateTickets,
   isBillingReadOnly,
 } from "@/lib/permissions/companyRoles";
-import { useToast } from "@/components/ui/toast-provider";
 
 type ProjectOption = {
   id: string;
@@ -38,6 +37,8 @@ type Props = {
   companySlug: string;
   projects: ProjectOption[];
   jobTypes: JobTypeOption[];
+  redirectTo?: string;
+  onCreated?: (ticket: { id: string; code?: string | null }) => void;
 };
 
 type TicketPriorityValue = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -73,9 +74,10 @@ export default function NewTicketForm({
   companySlug,
   projects,
   jobTypes,
+  redirectTo,
+  onCreated,
 }: Props) {
   const router = useRouter();
-  const { showToast } = useToast();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -151,51 +153,30 @@ export default function NewTicketForm({
 
     // Billing-only users: UI-level guard (API tarafında da ayrıca kilit var)
     if (isLimitedAccess) {
-      const msg =
-        "You don't have permission to create tickets. Please ask your company owner or project manager.";
-      setError(msg);
-      showToast({
-        type: "error",
-        title: "You can’t create tickets",
-        description: msg,
-      });
+      setError(
+        "You don't have permission to create tickets. Please ask your company owner or project manager.",
+      );
       return;
     }
 
     if (!title.trim()) {
-      const msg = "Please enter a title for your request.";
-      setError(msg);
-      showToast({
-        type: "warning",
-        title: "Missing title",
-        description: msg,
-      });
+      setError("Please enter a title for your request.");
       return;
     }
 
     // Güvenlik olarak rolesi henüz yüklenmediyse create'e izin vermeyelim
     if (companyRoleLoading) {
-      const msg =
-        "We are still loading your permissions. Please wait a moment.";
-      setError(msg);
-      showToast({
-        type: "warning",
-        title: "Permissions are still loading",
-        description: msg,
-      });
+      setError(
+        "We are still loading your permissions. Please wait a moment.",
+      );
       return;
     }
 
     // İleride MEMBER'ı kısıtlamak istersek tek yerden değiştirebiliriz
     if (companyRole !== null && !canCreateTickets(companyRole)) {
-      const msg =
-        "You don't have permission to create tickets. Please ask your company owner or project manager.";
-      setError(msg);
-      showToast({
-        type: "error",
-        title: "You can’t create tickets",
-        description: msg,
-      });
+      setError(
+        "You don't have permission to create tickets. Please ask your company owner or project manager.",
+      );
       return;
     }
 
@@ -206,6 +187,7 @@ export default function NewTicketForm({
         `/api/customer/tickets?companySlug=${encodeURIComponent(
           companySlug,
         )}`,
+
         {
           method: "POST",
           headers: {
@@ -224,58 +206,40 @@ export default function NewTicketForm({
       const json = await res.json().catch(() => null);
 
       if (!res.ok) {
-        const baseError =
-          (json &&
-            typeof json === "object" &&
-            "error" in json &&
-            typeof (json as any).error === "string" &&
-            (json as any).error) ||
-          (res.status === 403
-            ? "You don't have permission to create tickets. Please ask your company owner or project manager."
-            : "Failed to create ticket.");
-
-        setError(baseError);
-
-        showToast({
-          type: "error",
-          title: "We couldn't create your request",
-          description: baseError,
-        });
-
+        if (res.status === 403) {
+          // Permission-style error
+          setError(
+            json?.error ||
+              "You don't have permission to create tickets. Please ask your company owner or project manager.",
+          );
+        } else {
+          setError(json?.error || "Failed to create ticket.");
+        }
         return;
       }
 
-      const ticket = (json as any)?.ticket;
-      const ticketLabel =
-        ticket?.code ?? ticket?.id ?? "your new request";
+      const createdTicket = json?.ticket ?? null;
 
-      const successText = `Ticket ${ticketLabel} created successfully.`;
+      setSuccessMessage(
+        `Ticket ${
+          createdTicket?.code ?? createdTicket?.id ?? ""
+        } created successfully.`,
+      );
 
-      setSuccessMessage(successText);
-
-      showToast({
-        type: "success",
-        title: "Request created",
-        description: ticket?.code
-          ? `We created ${ticket.code} and routed it to your design team.`
-          : "Your request was created and routed to your design team.",
-      });
-
-      // Kısa bir an form üzerinde mesajı gösterip listeye dönelim
-      setTimeout(() => {
-        router.push("/customer/tickets");
-      }, 800);
+      if (onCreated && createdTicket?.id) {
+        onCreated({
+          id: createdTicket.id,
+          code: createdTicket.code ?? null,
+        });
+      } else {
+        const target = redirectTo ?? "/customer/tickets";
+        setTimeout(() => {
+          router.push(target);
+        }, 800);
+      }
     } catch (err) {
       console.error("New ticket submit error:", err);
-      const msg = "Unexpected error while creating ticket.";
-
-      setError(msg);
-
-      showToast({
-        type: "error",
-        title: "We couldn't create your request",
-        description: msg,
-      });
+      setError("Unexpected error while creating ticket.");
     } finally {
       setSubmitting(false);
     }
@@ -377,7 +341,7 @@ export default function NewTicketForm({
         <select
           value={projectId}
           onChange={(e) => setProjectId(e.target.value)}
-          className="w-full rounded-md border border-[#d4d2cc] bg.white px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+          className="w-full rounded-md border border-[#d4d2cc] bg-white px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
         >
           <option value="">No specific project</option>
           {projects.map((p) => (
@@ -399,7 +363,7 @@ export default function NewTicketForm({
         <select
           value={jobTypeId}
           onChange={(e) => setJobTypeId(e.target.value)}
-          className="w-full rounded-md border border-[#d4d2cc] bg.white px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+          className="w-full rounded-md border border-[#d4d2cc] bg-white px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
         >
           <option value="">Choose a job type</option>
           {jobTypes.map((jt) => (
@@ -419,7 +383,7 @@ export default function NewTicketForm({
       <div className="flex items-center justify-end gap-3 pt-2">
         <button
           type="button"
-          onClick={() => router.push("/customer/tickets")}
+          onClick={() => router.push(redirectTo ?? "/customer/tickets")}
           className="rounded-full border border-[#d4d2cc] px-4 py-2 text-xs font-medium text-[#424143] hover:bg-[#f7f4f0]"
         >
           Cancel
@@ -427,7 +391,7 @@ export default function NewTicketForm({
         <button
           type="submit"
           disabled={submitting || isLimitedAccess}
-          className="rounded-full bg-[#f15b2b] px-5 py-2 text-xs font-medium text.white shadow-sm transition-transform hover:-translate-y-0.5 hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
+          className="rounded-full bg-[#f15b2b] px-5 py-2 text-xs font-medium text-white shadow-sm transition-transform hover:-translate-y-0.5 hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
         >
           {submitting ? "Creating..." : "Create ticket"}
         </button>

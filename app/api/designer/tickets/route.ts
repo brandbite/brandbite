@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/designer/tickets/route.ts
-// @purpose: Designer API for listing and updating assigned tickets (status, revisions, no DONE)
-// @version: v1.5.0
+// @purpose: Designer API for listing and updating assigned tickets (status, revisions, notes; no DONE)
+// @version: v1.6.1
 // @status: active
-// @lastUpdate: 2025-11-24
+// @lastUpdate: 2025-12-25
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
@@ -58,6 +58,7 @@ type DesignerTicketsResponse = {
 type PatchPayload = {
   id?: string;
   status?: string;
+  designerMessage?: string | null;
 };
 
 function isValidTicketStatus(value: unknown): value is TicketStatus {
@@ -170,13 +171,9 @@ export async function GET() {
     for (const t of tickets) {
       const statusKey = toTicketStatusString(t.status);
 
-      // status dağılımı
       byStatus[statusKey] = (byStatus[statusKey] ?? 0) + 1;
-
-      // priority dağılımı
       byPriority[t.priority] = (byPriority[t.priority] ?? 0) + 1;
 
-      // sadece açık (DONE olmayan) ticket'lar load'a girsin
       if (t.status !== TicketStatus.DONE) {
         openTotal += 1;
 
@@ -268,7 +265,6 @@ export async function GET() {
 
 // -----------------------------------------------------------------------------
 // PATCH: update ticket status (designers cannot mark DONE, creates revisions)
-// -----------------------------------------------------------------------------
 //
 // Plan bazlı concurrency kuralı:
 // - Plan.maxConcurrentInProgressTickets değeri,
@@ -280,6 +276,12 @@ export async function GET() {
 // - Designer tarafında IN_PROGRESS -> IN_REVIEW geçişinde:
 //   - Ticket.revisionCount +1
 //   - Aynı transaction içinde yeni bir TicketRevision kaydı oluşturulur.
+//
+// Designer note kuralı:
+// - Admin tarafından designer için designerRevisionNotesEnabled = true ise,
+//   IN_PROGRESS -> IN_REVIEW geçişinde optional designerMessage alır ve
+//   TicketRevision.designerMessage alanına yazar.
+// - Flag false ise, gönderilen designerMessage görmezden gelinir.
 // -----------------------------------------------------------------------------
 
 export async function PATCH(req: NextRequest) {
@@ -313,7 +315,6 @@ export async function PATCH(req: NextRequest) {
 
     const nextStatus = requestedStatus as TicketStatus;
 
-    // Designers are never allowed to set DONE
     if (nextStatus === TicketStatus.DONE) {
       return NextResponse.json(
         {
@@ -321,6 +322,19 @@ export async function PATCH(req: NextRequest) {
             "Designers cannot mark tickets as DONE. Please ask the client to close the ticket.",
         },
         { status: 403 },
+      );
+    }
+
+    // Designer flag'i DB'den oku
+    const designer = await prisma.userAccount.findUnique({
+      where: { id: user.id },
+      select: { id: true, designerRevisionNotesEnabled: true },
+    });
+
+    if (!designer) {
+      return NextResponse.json(
+        { error: "Designer not found." },
+        { status: 401 },
       );
     }
 
@@ -343,7 +357,6 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    // If already DONE (for any reason), designers should not be able to change it
     if (ticket.status === TicketStatus.DONE) {
       return NextResponse.json(
         {
@@ -413,10 +426,19 @@ export async function PATCH(req: NextRequest) {
       ticket.status === TicketStatus.IN_PROGRESS &&
       nextStatus === TicketStatus.IN_REVIEW;
 
+    // Designer mesajını hazırlama
+    const rawDesignerMessage =
+      typeof body.designerMessage === "string"
+        ? body.designerMessage.trim()
+        : "";
+    const designerMessageToStore =
+      designer.designerRevisionNotesEnabled && rawDesignerMessage
+        ? rawDesignerMessage
+        : null;
+
     let updated: { id: string; status: TicketStatus; updatedAt: Date };
 
     if (isInProgressToInReview) {
-      // IN_PROGRESS -> IN_REVIEW geçişinde revision kaydı + revisionCount artışı
       updated = await prisma.$transaction(async (tx) => {
         const updatedTicket = await tx.ticket.update({
           where: { id: ticket.id },
@@ -439,6 +461,7 @@ export async function PATCH(req: NextRequest) {
             ticketId: updatedTicket.id,
             version: updatedTicket.revisionCount,
             submittedByDesignerId: user.id,
+            designerMessage: designerMessageToStore,
           },
         });
 
@@ -449,7 +472,6 @@ export async function PATCH(req: NextRequest) {
         };
       });
     } else {
-      // Diğer tüm geçişlerde sadece status güncellenir
       const result = await prisma.ticket.update({
         where: { id: ticket.id },
         data: {

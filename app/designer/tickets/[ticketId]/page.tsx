@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/designer/tickets/[ticketId]/page.tsx
-// @purpose: Designer-facing ticket detail with comments
-// @version: v1.0.0
+// @purpose: Designer-facing ticket detail with comments + revision history
+// @version: v1.1.0
 // @status: active
-// @lastUpdate: 2025-11-18
+// @lastUpdate: 2025-12-26
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -71,6 +71,14 @@ type TicketComment = {
   };
 };
 
+type TicketRevisionItem = {
+  version: number;
+  submittedAt: string | null;
+  feedbackAt: string | null;
+  feedbackMessage: string | null;
+  designerMessage: string | null;
+};
+
 const STATUS_LABELS: Record<TicketStatus, string> = {
   TODO: "To do",
   IN_PROGRESS: "In progress",
@@ -94,17 +102,23 @@ export default function DesignerTicketDetailPage() {
 
   const [state, setState] = useState<ViewState>({ status: "loading" });
 
-  const [comments, setComments] = useState<TicketComment[] | null>(
-    null,
-  );
+  const [comments, setComments] = useState<TicketComment[] | null>(null);
   const [commentsLoading, setCommentsLoading] = useState(false);
-  const [commentsError, setCommentsError] = useState<string | null>(
-    null,
-  );
+  const [commentsError, setCommentsError] = useState<string | null>(null);
   const [newComment, setNewComment] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
 
+  const [revisions, setRevisions] = useState<TicketRevisionItem[] | null>(
+    null,
+  );
+  const [revisionsLoading, setRevisionsLoading] = useState(false);
+  const [revisionsError, setRevisionsError] = useState<string | null>(
+    null,
+  );
+
+  // ---------------------------------------------------------------------------
   // Ticket detail load
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     let cancelled = false;
 
@@ -153,8 +167,7 @@ export default function DesignerTicketDetailPage() {
         if (!cancelled) {
           setState({
             status: "error",
-            message:
-              "Unexpected error while loading ticket detail.",
+            message: "Unexpected error while loading ticket detail.",
           });
         }
       }
@@ -170,7 +183,9 @@ export default function DesignerTicketDetailPage() {
   const ticketIdFromData =
     state.status === "ready" ? state.data.ticket.id : null;
 
+  // ---------------------------------------------------------------------------
   // Comments load
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!ticketIdFromData) return;
 
@@ -204,9 +219,7 @@ export default function DesignerTicketDetailPage() {
       } catch (err) {
         console.error("Designer ticket comments fetch error:", err);
         if (!cancelled) {
-          setCommentsError(
-            "Unexpected error while loading comments.",
-          );
+          setCommentsError("Unexpected error while loading comments.");
         }
       } finally {
         if (!cancelled) {
@@ -222,7 +235,68 @@ export default function DesignerTicketDetailPage() {
     };
   }, [ticketIdFromData]);
 
-  // Derived state (HOOK'lardan sonra)
+  // ---------------------------------------------------------------------------
+  // Revisions load (designerMessage + feedbackMessage)
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!ticketIdFromData) return;
+
+    let cancelled = false;
+
+    const loadRevisions = async () => {
+      setRevisionsLoading(true);
+      setRevisionsError(null);
+
+      try {
+        const res = await fetch(
+          `/api/designer/tickets/${ticketIdFromData}/revisions`,
+          {
+            cache: "no-store",
+          },
+        );
+        const json = await res.json().catch(() => null);
+
+        if (!res.ok) {
+          const msg =
+            json?.error || `Request failed with status ${res.status}`;
+          if (!cancelled) {
+            setRevisionsError(msg);
+          }
+          return;
+        }
+
+        if (!cancelled) {
+          setRevisions(
+            (json?.revisions as TicketRevisionItem[]) ?? [],
+          );
+        }
+      } catch (err) {
+        console.error(
+          "Designer ticket revisions fetch error:",
+          err,
+        );
+        if (!cancelled) {
+          setRevisionsError(
+            "Unexpected error while loading revision history.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setRevisionsLoading(false);
+        }
+      }
+    };
+
+    loadRevisions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ticketIdFromData]);
+
+  // ---------------------------------------------------------------------------
+  // Derived state
+  // ---------------------------------------------------------------------------
   const error = state.status === "error" ? state.message : null;
   const data = state.status === "ready" ? state.data : null;
   const company = data?.company ?? null;
@@ -306,6 +380,9 @@ export default function DesignerTicketDetailPage() {
     }
   };
 
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
   if (state.status === "loading") {
     return <TicketDetailSkeleton />;
   }
@@ -405,8 +482,9 @@ export default function DesignerTicketDetailPage() {
 
         {!error && ticket && (
           <div className="grid gap-4 md:grid-cols-3">
-            {/* Left: brief + job/meta */}
+            {/* Left: brief + job/meta + revisions */}
             <section className="md:col-span-2 space-y-4">
+              {/* Brief */}
               <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
                 <h2 className="text-sm font-semibold text-[#424143]">
                   Brief
@@ -422,6 +500,7 @@ export default function DesignerTicketDetailPage() {
                 )}
               </div>
 
+              {/* Meta */}
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-3 shadow-sm">
                   <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
@@ -482,6 +561,91 @@ export default function DesignerTicketDetailPage() {
                     </p>
                   </div>
                 </div>
+              </div>
+
+              {/* Revision history */}
+              <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
+                <h2 className="text-sm font-semibold text-[#424143]">
+                  Revision history
+                </h2>
+
+                {revisionsLoading && (
+                  <p className="mt-2 text-xs text-[#9a9892]">
+                    Loading revision history…
+                  </p>
+                )}
+
+                {!revisionsLoading && revisionsError && (
+                  <div className="mt-2 rounded-md border border-red-200 bg-[#fff7f7] px-3 py-2 text-[11px] text-red-700">
+                    {revisionsError}
+                  </div>
+                )}
+
+                {!revisionsLoading &&
+                  !revisionsError &&
+                  (!revisions || revisions.length === 0) && (
+                    <p className="mt-2 text-xs text-[#9a9892]">
+                      No revisions have been submitted for this ticket yet.
+                    </p>
+                  )}
+
+                {!revisionsLoading &&
+                  !revisionsError &&
+                  revisions &&
+                  revisions.length > 0 && (
+                    <div className="mt-3 space-y-3">
+                      {revisions.map((rev) => (
+                        <div
+                          key={rev.version}
+                          className="rounded-xl bg-[#f7f4ef] px-3 py-3 text-[11px]"
+                        >
+                          <p className="text-xs font-semibold text-[#424143]">
+                            Version v{rev.version}
+                          </p>
+                          {rev.submittedAt && (
+                            <p className="mt-1 text-[#7a7a7a]">
+                              You sent this version for review on{" "}
+                              <span className="font-semibold text-[#424143]">
+                                {formatDate(rev.submittedAt)}
+                              </span>
+                              .
+                            </p>
+                          )}
+                          {rev.feedbackAt && (
+                            <p className="text-[#7a7a7a]">
+                              Customer requested changes on{" "}
+                              <span className="font-semibold text-[#424143]">
+                                {formatDate(rev.feedbackAt)}
+                              </span>
+                              .
+                            </p>
+                          )}
+
+                          {rev.designerMessage && (
+                            <p className="mt-1 text-[#424143]">
+                              <span className="font-semibold">
+                                Your note:
+                              </span>{" "}
+                              <span className="italic">
+                                “{rev.designerMessage}”
+                              </span>
+                            </p>
+                          )}
+
+                          {rev.feedbackMessage && (
+                            <p className="mt-1 text-[#7a7a7a]">
+                              <span className="font-semibold">
+                                Customer feedback:
+                              </span>{" "}
+                              <span className="italic">
+                                “{rev.feedbackMessage}”
+                              </span>
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
               </div>
             </section>
 
@@ -633,6 +797,7 @@ function TicketDetailSkeleton() {
               <div className="h-32 rounded-2xl bg-white" />
               <div className="h-32 rounded-2xl bg-white" />
             </div>
+            <div className="h-40 rounded-2xl bg-white" />
           </div>
           <div className="space-y-4">
             <div className="h-40 rounded-2xl bg-white" />

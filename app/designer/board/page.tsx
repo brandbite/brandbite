@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/designer/board/page.tsx
-// @purpose: Designer-facing kanban board for assigned tickets with revision indicators, filters and toasts
-// @version: v1.6.0
+// @purpose: Designer-facing kanban board for assigned tickets with revision indicators, filters, notes and toasts
+// @version: v1.7.0
 // @status: active
-// @lastUpdate: 2025-12-12
+// @lastUpdate: 2025-12-25
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -64,6 +64,8 @@ type TicketRevisionEntry = {
   submittedAt: string | null;
   feedbackAt: string | null;
   feedbackMessage: string | null;
+  // ileride kullanmak için: designerMessage, API tarafı hazır
+  designerMessage?: string | null;
 };
 
 const STATUS_ORDER: TicketStatus[] = [
@@ -162,6 +164,13 @@ export default function DesignerBoardPage() {
   const [detailRevisionsError, setDetailRevisionsError] = useState<
     string | null
   >(null);
+
+  // IN_PROGRESS -> IN_REVIEW sırasında designer note modal state
+  const [reviewModal, setReviewModal] = useState<{
+    ticket: DesignerTicket;
+    targetStatus: TicketStatus;
+  } | null>(null);
+  const [designerNote, setDesignerNote] = useState<string>("");
 
   // ---------------------------------------------------------------------------
   // Data load
@@ -375,6 +384,7 @@ export default function DesignerBoardPage() {
   const persistTicketStatus = async (
     ticketId: string,
     status: TicketStatus,
+    options?: { designerMessage?: string | null },
   ) => {
     setMutationError(null);
     setUpdatingTicketId(ticketId);
@@ -387,6 +397,10 @@ export default function DesignerBoardPage() {
         body: JSON.stringify({
           id: ticketId,
           status,
+          designerMessage:
+            options && typeof options.designerMessage !== "undefined"
+              ? options.designerMessage
+              : null,
         }),
       });
       const json = await res.json().catch(() => null);
@@ -671,6 +685,14 @@ export default function DesignerBoardPage() {
       return;
     }
 
+    // IN_PROGRESS -> IN_REVIEW: önce modal aç, not al
+    if (ticket.status === "IN_PROGRESS" && status === "IN_REVIEW") {
+      setReviewModal({ ticket, targetStatus: status });
+      setDesignerNote("");
+      return;
+    }
+
+    // diğer geçişler: direkt persist
     await persistTicketStatus(ticket.id, status);
   };
 
@@ -683,6 +705,22 @@ export default function DesignerBoardPage() {
     setDetailRevisions(null);
     setDetailRevisionsError(null);
     setDetailRevisionsLoading(false);
+  };
+
+  const closeReviewModal = () => {
+    setReviewModal(null);
+    setDesignerNote("");
+  };
+
+  const handleConfirmReviewWithNote = async () => {
+    if (!reviewModal) return;
+    const { ticket, targetStatus } = reviewModal;
+
+    await persistTicketStatus(ticket.id, targetStatus, {
+      designerMessage: designerNote.trim() || null,
+    });
+
+    closeReviewModal();
   };
 
   // ---------------------------------------------------------------------------
@@ -1066,9 +1104,9 @@ export default function DesignerBoardPage() {
                 <div className="mt-1 space-y-1">
                   <p>
                     Priority:{" "}
-                    <span className="font-semibold">
-                      {formatPriorityLabel(detailTicket.priority)}
-                    </span>
+                      <span className="font-semibold">
+                        {formatPriorityLabel(detailTicket.priority)}
+                      </span>
                   </p>
                   <p>
                     Project:{" "}
@@ -1150,46 +1188,115 @@ export default function DesignerBoardPage() {
                     detailRevisions &&
                     detailRevisions.length > 0 && (
                       <div className="space-y-2">
-                        {detailRevisions.map((rev) => (
-                          <div
-                            key={rev.version}
-                            className="rounded-xl bg-[#f5f3f0] px-3 py-2"
-                          >
-                            <p className="text-[10px] font-semibold text-[#424143]">
-                              Version v{rev.version}
+                      {detailRevisions.map((rev) => (
+                        <div
+                          key={rev.version}
+                          className="rounded-xl bg-[#f5f3f0] px-3 py-2"
+                        >
+                          <p className="text-[10px] font-semibold text-[#424143]">
+                            Version v{rev.version}
+                          </p>
+
+                          {rev.submittedAt && (
+                            <p className="mt-1 text-[10px] text-[#3259c7]">
+                              You sent this version for review on{" "}
+                              <span className="font-semibold">
+                                {formatDate(rev.submittedAt)}
+                              </span>
+                              .
                             </p>
+                          )}
 
-                            {rev.submittedAt && (
-                              <p className="mt-1 text-[10px] text-[#3259c7]">
-                                You sent this version for review on{" "}
-                                <span className="font-semibold">
-                                  {formatDate(rev.submittedAt)}
-                                </span>
-                                .
+                          {rev.feedbackAt && (
+                            <p className="mt-1 text-[10px] text-[#c76a18]">
+                              Customer requested changes on{" "}
+                              <span className="font-semibold">
+                                {formatDate(rev.feedbackAt)}
+                              </span>
+                              .
+                            </p>
+                          )}
+
+                          {rev.feedbackMessage && (
+                            <p className="mt-1 italic text-[#5a5953]">
+                              “{rev.feedbackMessage}”
+                            </p>
+                          )}
+
+                          {typeof rev.designerMessage === "string" &&
+                            rev.designerMessage.trim().length > 0 && (
+                              <p className="mt-1 text-[10px] text-[#424143]">
+                                <span className="font-semibold">Your note:</span>{" "}
+                                {rev.designerMessage}
                               </p>
                             )}
+                        </div>
+                      ))}
 
-                            {rev.feedbackAt && (
-                              <p className="mt-1 text-[10px] text-[#c76a18]">
-                                Customer requested changes on{" "}
-                                <span className="font-semibold">
-                                  {formatDate(rev.feedbackAt)}
-                                </span>
-                                .
-                              </p>
-                            )}
-
-                            {rev.feedbackMessage && (
-                              <p className="mt-1 italic text-[#5a5953]">
-                                “{rev.feedbackMessage}”
-                              </p>
-                            )}
-                          </div>
-                        ))}
                       </div>
                     )}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Send for review modal (designer note) */}
+      {reviewModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-8">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
+                  Send for review
+                </p>
+                <h2 className="mt-1 text-sm font-semibold text-[#424143]">
+                  {reviewModal.ticket.title}
+                </h2>
+                <p className="mt-1 text-[11px] text-[#7a7a7a]">
+                  You&apos;re moving this ticket from{" "}
+                  <span className="font-semibold">In progress</span> to{" "}
+                  <span className="font-semibold">In review</span>. Optionally
+                  share a short note with your customer about what changed or
+                  what to look at.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[11px] font-medium text-[#424143]">
+                Note to your customer{" "}
+                <span className="font-normal text-[#9a9892]">(optional)</span>
+              </label>
+              <textarea
+                value={designerNote}
+                onChange={(e) => setDesignerNote(e.target.value)}
+                rows={4}
+                placeholder="Highlight what you changed, any open questions, or how they should review this version."
+                className="w-full rounded-lg border border-[#e3e1dc] bg-[#f7f5f0] px-3 py-2 text-[11px] text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+              />
+              <p className="text-[10px] text-[#9a9892]">
+                This message may only be stored and shared if your workspace
+                admin has enabled designer notes for your account.
+              </p>
+            </div>
+
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeReviewModal}
+                className="rounded-full border border-[#d4d2cc] px-4 py-1.5 text-[11px] font-medium text-[#424143] hover:bg-[#f7f4f0]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmReviewWithNote}
+                className="rounded-full bg-[#f15b2b] px-5 py-1.5 text-[11px] font-medium text-white shadow-sm transition-transform hover:-translate-y-0.5 hover:brightness-105"
+              >
+                Send for review
+              </button>
             </div>
           </div>
         </div>

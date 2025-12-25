@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: prisma/schema.prisma
 // @purpose: Brandbite core database schema (roles, tickets, tokens, ledger)
-// @version: v1.6.0
+// @version: v1.7.0
 // @status: active
-// @lastUpdate: 2025-11-24
+// @lastUpdate: 2025-12-25
 // -----------------------------------------------------------------------------
 
 generator client {
@@ -96,6 +96,9 @@ model UserAccount {
   email      String   @unique
   name       String?
   role       UserRole
+
+  /// Admin-controlled flag: whether this designer can send revision notes to clients
+  designerRevisionNotesEnabled Boolean @default(false)
 
   // Relations
   companies       CompanyMember[]
@@ -359,6 +362,7 @@ model TicketRevision {
   submittedByDesigner   UserAccount? @relation("TicketRevisionSubmittedBy", fields: [submittedByDesignerId], references: [id])
 
   submittedAt DateTime @default(now())
+  designerMessage String?
 
   feedbackByCustomerId String?
   feedbackByCustomer   UserAccount? @relation("TicketRevisionFeedbackBy", fields: [feedbackByCustomerId], references: [id])

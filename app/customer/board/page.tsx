@@ -1,9 +1,10 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/board/page.tsx
-// @purpose: Customer-facing board view of company tickets (kanban + drag & drop + detail & revision modals + toasts)
-// @version: v2.1.1
+// @purpose: Customer-facing board view of company tickets (kanban + drag & drop
+//           + detail & revision modals + inline new ticket modal + toasts)
+// @version: v2.3.0
 // @status: active
-// @lastUpdate: 2025-12-07
+// @lastUpdate: 2025-12-12
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -16,7 +17,8 @@ import {
 } from "@/lib/permissions/companyRoles";
 import { TicketStatus, TicketPriority } from "@prisma/client";
 import { useToast } from "@/components/ui/toast-provider";
-import {CustomerNav } from "@/components/navigation/customer-nav";
+import { CustomerNav } from "@/components/navigation/customer-nav";
+import NewTicketForm from "@/app/customer/tickets/new/NewTicketForm";
 
 type TicketStatusLabel = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 
@@ -95,6 +97,20 @@ type TicketStatusColumnDefinition = {
   status: TicketStatus;
   title: string;
   description: string;
+};
+
+type NewTicketMetadataResponse = {
+  companySlug: string;
+  projects: {
+    id: string;
+    name: string;
+    code: string | null;
+  }[];
+  jobTypes: {
+    id: string;
+    name: string;
+    description: string | null;
+  }[];
 };
 
 const ticketStatusColumns: TicketStatusColumnDefinition[] = [
@@ -417,6 +433,16 @@ export default function CustomerBoardPage() {
     time: number;
   } | null>(null);
 
+  const [newTicketModalOpen, setNewTicketModalOpen] =
+    useState<boolean>(false);
+  const [newTicketMeta, setNewTicketMeta] =
+    useState<NewTicketMetadataResponse | null>(null);
+  const [newTicketMetaLoading, setNewTicketMetaLoading] =
+    useState<boolean>(false);
+  const [newTicketMetaError, setNewTicketMetaError] = useState<string | null>(
+    null,
+  );
+
   // ---------------------------------------------------------------------------
   // Load board data
   // ---------------------------------------------------------------------------
@@ -497,6 +523,68 @@ export default function CustomerBoardPage() {
     }
   };
 
+  const loadNewTicketMetadata = async () => {
+    setNewTicketMetaLoading(true);
+    setNewTicketMetaError(null);
+
+  try {
+      const res = await fetch("/api/customer/tickets/new-metadata", {
+        cache: "no-store",
+      });
+
+      let json: any = null;
+      try {
+        json = await res.json();
+      } catch {
+        // ignore
+      }
+
+      if (!res.ok) {
+        const message =
+          (json && (json.error || json.message)) ||
+          `Failed to load data for new request (status ${res.status}).`;
+        throw new Error(
+          typeof message === "string"
+            ? message
+            : "Failed to load data for new request.",
+        );
+      }
+
+      setNewTicketMeta(json as NewTicketMetadataResponse);
+    } catch (err: unknown) {
+      console.error(
+        "[CustomerBoardPage] Failed to load new ticket metadata",
+        err,
+      );
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Failed to load data for new request.";
+
+      setNewTicketMetaError(message);
+
+      showToast({
+        type: "error",
+        title: "Could not open new request form",
+        description: message,
+      });
+    } finally {
+      setNewTicketMetaLoading(false);
+    }
+  };
+
+  const openNewTicketModal = async () => {
+    setNewTicketModalOpen(true);
+    if (!newTicketMeta && !newTicketMetaLoading) {
+      await loadNewTicketMetadata();
+    }
+  };
+
+  const closeNewTicketModal = () => {
+    setNewTicketModalOpen(false);
+    setNewTicketMetaError(null);
+  };
+
   useEffect(() => {
     let cancelled = false;
     const initialLoad = async () => {
@@ -571,7 +659,8 @@ export default function CustomerBoardPage() {
           return;
         }
 
-        const entries = ((json as any)?.revisions ?? []) as TicketRevisionEntry[];
+        const entries = ((json as any)?.revisions ??
+          []) as TicketRevisionEntry[];
 
         if (!cancelled) {
           setDetailRevisions(entries);
@@ -785,7 +874,7 @@ export default function CustomerBoardPage() {
             return {
               tickets: [json.ticket],
               stats: json.stats,
-            };
+            } as CustomerBoardResponse;
           }
 
           const nextTickets = prev.tickets.map((t) =>
@@ -1219,7 +1308,15 @@ export default function CustomerBoardPage() {
                   Design requests
                 </h1>
               </div>
-              <div className="flex flex-col items-end gap-1 text-right text-[11px] text-[#7a7a7a]">
+              <div className="flex flex-col items-end gap-2 text-right text-[11px] text-[#7a7a7a]">
+                <button
+                  type="button"
+                  onClick={openNewTicketModal}
+                  className="inline-flex items-center gap-1 rounded-full bg-[#f15b2b] px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition-transform hover:-translate-y-0.5 hover:bg-[#e04f22]"
+                >
+                  <span className="text-[13px]">＋</span>
+                  New request
+                </button>
                 <div className="flex items-center gap-2">
                   <span className="inline-flex items-center gap-1 rounded-full bg-[#f5f3f0] px-2 py-0.5">
                     <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#32b37b]" />
@@ -1398,6 +1495,64 @@ export default function CustomerBoardPage() {
             </div>
           </div>
         </div>
+
+        {/* New ticket modal */}
+        {newTicketModalOpen && (
+          <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 px-4 py-8">
+            <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
+                    New request
+                  </p>
+                  <h2 className="mt-1 text-lg font-semibold text-[#424143]">
+                    Create a new design request
+                  </h2>
+                  <p className="mt-1 text-[11px] text-[#7a7a7a]">
+                    This will be added to your board in the{" "}
+                    <span className="font-semibold">To do</span> column.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeNewTicketModal}
+                  className="rounded-full bg-[#f5f3f0] px-2 py-1 text-[11px] text-[#7a7a7a] hover:bg-[#e4e0da]"
+                >
+                  Close
+                </button>
+              </div>
+
+              {newTicketMetaError && (
+                <div className="mb-3 rounded-xl border border-[#f7c7c0] bg-[#fdecea] px-3 py-2 text-[11px] text-[#b13832]">
+                  {newTicketMetaError}
+                </div>
+              )}
+
+              {newTicketMetaLoading || !newTicketMeta ? (
+                <p className="text-[11px] text-[#7a7a7a]">
+                  Loading form…
+                </p>
+              ) : (
+                <NewTicketForm
+                  companySlug={newTicketMeta.companySlug}
+                  projects={newTicketMeta.projects}
+                  jobTypes={newTicketMeta.jobTypes}
+                  redirectTo="/customer/board"
+                  onCreated={() => {
+                    closeNewTicketModal();
+                    showToast({
+                      type: "success",
+                      title: "New request created",
+                      description:
+                        "Your request was added to the To do column.",
+                    });
+                    void load();
+                  }}
+                />
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Ticket detail modal */}
         {detailTicket && (
