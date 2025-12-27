@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: lib/roles.ts
 // @purpose: Brandbite role helpers and shared auth-related types
-// @version: v1.1.0
+// @version: v1.2.0
 // @status: active
-// @lastUpdate: 2025-11-14
+// @lastUpdate: 2025-12-27
 // -----------------------------------------------------------------------------
 
 import type { UserRole, CompanyRole } from "@prisma/client";
@@ -50,6 +50,24 @@ export function isDesignerRole(role: AppUserRole): boolean {
 
 export function isCustomerRole(role: AppUserRole): boolean {
   return CUSTOMER_ROLES.includes(role);
+}
+
+/**
+ * Returns true if user is operating inside a company context.
+ * Useful for routes that require company scoping.
+ */
+export function hasActiveCompany(user: SessionUser): boolean {
+  return Boolean(user.activeCompanyId);
+}
+
+/**
+ * Company-level permission helper.
+ * PM & OWNER can manage project/ticket workflows; others are more limited.
+ */
+export function isAtLeastCompanyPM(
+  companyRole: CompanyRole | null | undefined,
+): boolean {
+  return companyRole === "OWNER" || companyRole === "PM";
 }
 
 /**

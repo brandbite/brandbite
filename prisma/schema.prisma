@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: prisma/schema.prisma
 // @purpose: Brandbite core database schema (roles, tickets, tokens, ledger)
-// @version: v1.7.0
+// @version: v1.8.0
 // @status: active
-// @lastUpdate: 2025-12-25
+// @lastUpdate: 2025-12-26
 // -----------------------------------------------------------------------------
 
 generator client {
@@ -86,6 +86,18 @@ enum BillingStatus {
   CANCELED
 }
 
+// --- Assets & Annotations ---
+
+enum AssetKind {
+  BRIEF_INPUT
+  OUTPUT_IMAGE
+}
+
+enum PinStatus {
+  OPEN
+  RESOLVED
+}
+
 // -----------------------------------------------------------------------------
 // Core User & Auth
 // -----------------------------------------------------------------------------
@@ -118,6 +130,12 @@ model UserAccount {
   submittedRevisions TicketRevision[] @relation("TicketRevisionSubmittedBy")
   feedbackRevisions  TicketRevision[] @relation("TicketRevisionFeedbackBy")
 
+  // Assets & annotations
+  createdAssets       Asset[]
+  createdAssetPins    AssetPin[]        @relation("AssetPinCreatedBy")
+  resolvedAssetPins   AssetPin[]        @relation("AssetPinResolvedBy")
+  assetPinComments    AssetPinComment[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -149,6 +167,9 @@ model Company {
   invites CompanyInvite[]
 
   ledgerEntries TokenLedger[]
+
+  // Output presets (optional company overrides)
+  outputSizePresets OutputSizePreset[]
 
   // Stripe billing mapping (ileride kullanılacak)
   stripeCustomerId     String?        @unique
@@ -283,8 +304,64 @@ model JobType {
 
   tickets Ticket[]
 
+  // Output size presets (global presets live here; company overrides also relate here)
+  outputSizePresets OutputSizePreset[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// Output size presets & ticket output specs (quantity/sizes)
+// -----------------------------------------------------------------------------
+
+model OutputSizePreset {
+  id String @id @default(cuid())
+
+  // Optional company override; null means "global preset"
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id])
+
+  jobTypeId String
+  jobType   JobType @relation(fields: [jobTypeId], references: [id])
+
+  /// Stable identifier for code usage (e.g. "IG_POST_1080")
+  key   String
+  /// UI label (English)
+  label String
+
+  width Int
+  height Int
+  unit String @default("px")
+
+  sortOrder Int @default(0)
+  isActive  Boolean @default(true)
+
+  ticketSpecs TicketOutputSpec[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, jobTypeId, key])
+  @@index([jobTypeId, isActive, sortOrder])
+}
+
+model TicketOutputSpec {
+  id String @id @default(cuid())
+
+  ticketId String
+  ticket   Ticket @relation(fields: [ticketId], references: [id])
+
+  presetId String
+  preset   OutputSizePreset @relation(fields: [presetId], references: [id])
+
+  quantity Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([ticketId, presetId])
+  @@index([ticketId])
 }
 
 // -----------------------------------------------------------------------------
@@ -322,6 +399,12 @@ model Ticket {
   companyTicketNumber Int?
   revisionCount       Int              @default(0)
   revisions           TicketRevision[]
+
+  // Output specs (quantity/sizes)
+  outputSpecs TicketOutputSpec[]
+
+  // Assets (brief inputs + revision outputs)
+  assets Asset[]
 
   ledgerEntries TokenLedger[]
   comments      TicketComment[]
@@ -370,12 +453,103 @@ model TicketRevision {
   feedbackAt      DateTime?
   feedbackMessage String?
 
+  // Assets that belong to this revision (OUTPUT_IMAGE usually)
+  assets Asset[]
+
   createdAt DateTime @default(now())
 
   @@unique([ticketId, version])
   @@index([ticketId, version])
   @@index([submittedByDesignerId, submittedAt])
   @@index([feedbackByCustomerId, feedbackAt])
+}
+
+// -----------------------------------------------------------------------------
+// Assets & Pins (annotations)
+// -----------------------------------------------------------------------------
+
+model Asset {
+  id String @id @default(cuid())
+
+  ticketId String
+  ticket   Ticket @relation(fields: [ticketId], references: [id])
+
+  /// OUTPUT_IMAGE assets typically belong to a revision; BRIEF_INPUT can be null
+  revisionId String?
+  revision   TicketRevision? @relation(fields: [revisionId], references: [id])
+
+  kind AssetKind
+
+  /// Storage metadata (S3 key / UploadThing key / blob id)
+  storageKey String
+  url        String?
+  mimeType   String
+  bytes      Int
+
+  width        Int?
+  height       Int?
+  originalName String?
+
+  createdById String
+  createdBy   UserAccount @relation(fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  deletedAt DateTime?
+
+  pins AssetPin[]
+
+  @@index([ticketId, kind, createdAt])
+  @@index([revisionId])
+  @@index([createdById, createdAt])
+}
+
+model AssetPin {
+  id String @id @default(cuid())
+
+  assetId String
+  asset   Asset @relation(fields: [assetId], references: [id])
+
+  createdById String
+  createdBy   UserAccount @relation("AssetPinCreatedBy", fields: [createdById], references: [id])
+
+  /// Normalized coordinates (0..1)
+  x Float
+  y Float
+
+  /// UI order/number (1..N) per asset
+  order Int
+  label String?
+  status PinStatus @default(OPEN)
+
+  resolvedAt   DateTime?
+  resolvedById String?
+  resolvedBy   UserAccount? @relation("AssetPinResolvedBy", fields: [resolvedById], references: [id])
+
+  comments AssetPinComment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([assetId, order])
+  @@index([assetId, status])
+  @@index([createdById, createdAt])
+}
+
+model AssetPinComment {
+  id String @id @default(cuid())
+
+  pinId String
+  pin   AssetPin @relation(fields: [pinId], references: [id])
+
+  authorId String
+  author   UserAccount @relation(fields: [authorId], references: [id])
+
+  message String
+
+  createdAt DateTime @default(now())
+
+  @@index([pinId, createdAt])
+  @@index([authorId, createdAt])
 }
 
 // -----------------------------------------------------------------------------

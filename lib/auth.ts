@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: lib/auth.ts
 // @purpose: Auth integration boundary for Brandbite (demo session + future BetterAuth)
-// @version: v0.5.1
+// @version: v0.5.2
 // @status: active
-// @lastUpdate: 2025-11-16
+// @lastUpdate: 2025-12-27
 // -----------------------------------------------------------------------------
 
 import { cookies } from "next/headers";
@@ -97,4 +97,18 @@ export async function getCurrentUserOrThrow(): Promise<SessionUser> {
     throw error;
   }
   return user;
+}
+
+/**
+ * Helper that throws if the current user has no active company.
+ * Useful for API routes that are scoped to a company (tickets, assets, etc.).
+ */
+export async function getActiveCompanyIdOrThrow(): Promise<string> {
+  const user = await getCurrentUserOrThrow();
+  if (!user.activeCompanyId) {
+    const error: Error & { code?: string } = new Error("NO_ACTIVE_COMPANY");
+    error.code = "NO_ACTIVE_COMPANY";
+    throw error;
+  }
+  return user.activeCompanyId;
 }

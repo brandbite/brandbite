@@ -1,8 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: lib/prisma.ts
 // @purpose: Shared Prisma client instance for Brandbite app
-// @version: v1.0.0
-// @lastUpdate: 2025-11-14
+// @version: v1.0.1
+// @status: active
+// @lastUpdate: 2025-12-27
 // -----------------------------------------------------------------------------
 
 import { PrismaClient } from "@prisma/client";
