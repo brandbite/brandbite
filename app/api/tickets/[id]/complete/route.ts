@@ -7,6 +7,8 @@
 
 import { NextResponse } from "next/server";
 import { completeTicketAndApplyTokens } from "@/lib/token-engine";
+import { prisma } from "@/lib/prisma";
+import { createNotification } from "@/lib/notifications";
 
 /**
  * Geçici tasarım:
@@ -18,9 +20,9 @@ import { completeTicketAndApplyTokens } from "@/lib/token-engine";
  */
 export async function POST(
   _request: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
-  const ticketId = context.params.id;
+  const { id: ticketId } = await context.params;
 
   if (!ticketId) {
     return NextResponse.json(
@@ -41,6 +43,30 @@ export async function POST(
         },
         { status: 409 }
       );
+    }
+
+    // Fire notifications (fire-and-forget)
+    const ticketMeta = await prisma.ticket.findUnique({
+      where: { id: ticketId },
+      select: { title: true, createdById: true, designerId: true },
+    });
+    if (ticketMeta) {
+      if (ticketMeta.designerId) {
+        createNotification({
+          userId: ticketMeta.designerId,
+          type: "TICKET_COMPLETED",
+          title: "Ticket completed",
+          message: `"${ticketMeta.title}" has been marked as done`,
+          ticketId,
+        });
+      }
+      createNotification({
+        userId: ticketMeta.createdById,
+        type: "TICKET_COMPLETED",
+        title: "Ticket completed",
+        message: `"${ticketMeta.title}" has been marked as done`,
+        ticketId,
+      });
     }
 
     return NextResponse.json(

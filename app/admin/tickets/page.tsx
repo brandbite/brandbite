@@ -1,15 +1,20 @@
 // -----------------------------------------------------------------------------
 // @file: app/admin/tickets/page.tsx
-// @purpose: Admin-facing ticket list & designer assignment screen
-// @version: v0.2.0
+// @purpose: Admin-facing ticket list & designer assignment screen with token
+//           cost / payout override support
+// @version: v0.3.0
 // @status: experimental
-// @lastUpdate: 2025-11-22
+// @lastUpdate: 2025-12-27
 // -----------------------------------------------------------------------------
 
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { AdminNav } from "@/components/navigation/admin-nav";
+import { DataTable, THead, TH, TD } from "@/components/ui/data-table";
+import { InlineAlert } from "@/components/ui/inline-alert";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 
@@ -24,6 +29,9 @@ type AdminTicket = {
   title: string;
   status: TicketStatus;
   createdAt: string;
+  quantity: number;
+  tokenCostOverride: number | null;
+  designerPayoutOverride: number | null;
   company: {
     id: string;
     name: string;
@@ -34,6 +42,12 @@ type AdminTicket = {
     code: string | null;
   } | null;
   designer: AdminDesigner | null;
+  jobType: {
+    id: string;
+    name: string;
+    tokenCost: number;
+    designerPayoutTokens: number;
+  } | null;
 };
 
 type AdminTicketsResponse = {
@@ -41,12 +55,33 @@ type AdminTicketsResponse = {
   designers: AdminDesigner[];
 };
 
+// Local draft state for override editing
+type OverrideDraft = {
+  costOverride: string;
+  payoutOverride: string;
+};
+
+function getEffectiveCost(t: AdminTicket): number | null {
+  if (!t.jobType) return null;
+  return t.tokenCostOverride ?? t.jobType.tokenCost * (t.quantity ?? 1);
+}
+
+function getEffectivePayout(t: AdminTicket): number | null {
+  if (!t.jobType) return null;
+  return t.designerPayoutOverride ?? t.jobType.designerPayoutTokens * (t.quantity ?? 1);
+}
+
 export default function AdminTicketsPage() {
   const [tickets, setTickets] = useState<AdminTicket[]>([]);
   const [designers, setDesigners] = useState<AdminDesigner[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [savingTicketId, setSavingTicketId] = useState<string | null>(null);
+
+  // Override editing — keyed by ticket id
+  const [editingOverrides, setEditingOverrides] = useState<
+    Record<string, OverrideDraft>
+  >({});
 
   const load = async () => {
     setLoading(true);
@@ -153,28 +188,130 @@ export default function AdminTicketsPage() {
     }
   };
 
+  // -------------------------------------------------------------------------
+  // Override editing helpers
+  // -------------------------------------------------------------------------
+
+  const startEditingOverrides = (t: AdminTicket) => {
+    setEditingOverrides((prev) => ({
+      ...prev,
+      [t.id]: {
+        costOverride:
+          t.tokenCostOverride != null ? String(t.tokenCostOverride) : "",
+        payoutOverride:
+          t.designerPayoutOverride != null
+            ? String(t.designerPayoutOverride)
+            : "",
+      },
+    }));
+  };
+
+  const cancelEditingOverrides = (ticketId: string) => {
+    setEditingOverrides((prev) => {
+      const next = { ...prev };
+      delete next[ticketId];
+      return next;
+    });
+  };
+
+  const handleSaveOverrides = async (ticketId: string) => {
+    const draft = editingOverrides[ticketId];
+    if (!draft) return;
+
+    setError(null);
+    setSavingTicketId(ticketId);
+
+    try {
+      const costVal = draft.costOverride.trim();
+      const payoutVal = draft.payoutOverride.trim();
+
+      const payload: Record<string, unknown> = { ticketId };
+
+      // Empty string → clear override (null), number → set
+      payload.tokenCostOverride =
+        costVal === "" ? null : parseInt(costVal, 10);
+      payload.designerPayoutOverride =
+        payoutVal === "" ? null : parseInt(payoutVal, 10);
+
+      // Validate
+      if (
+        costVal !== "" &&
+        (isNaN(payload.tokenCostOverride as number) ||
+          (payload.tokenCostOverride as number) < 0)
+      ) {
+        setError("Cost override must be a non-negative number.");
+        return;
+      }
+      if (
+        payoutVal !== "" &&
+        (isNaN(payload.designerPayoutOverride as number) ||
+          (payload.designerPayoutOverride as number) < 0)
+      ) {
+        setError("Payout override must be a non-negative number.");
+        return;
+      }
+
+      const res = await fetch("/api/admin/tickets", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(
+          json?.error || `Request failed with status ${res.status}`,
+        );
+      }
+
+      // Update local state with response
+      setTickets((prev) =>
+        prev.map((t) =>
+          t.id === ticketId
+            ? {
+                ...t,
+                tokenCostOverride: json.tokenCostOverride ?? null,
+                designerPayoutOverride:
+                  json.designerPayoutOverride ?? null,
+                jobType: json.jobType ?? t.jobType,
+                designer: json.designer ?? t.designer,
+              }
+            : t,
+        ),
+      );
+
+      cancelEditingOverrides(ticketId);
+    } catch (err) {
+      console.error("[AdminTicketsPage] save overrides error", err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to save overrides. Please try again.",
+      );
+    } finally {
+      setSavingTicketId(null);
+    }
+  };
+
   const formatDateTime = (iso: string) => {
     const d = new Date(iso);
     return d.toLocaleString();
   };
 
   return (
-    <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
-      <div className="mx-auto max-w-6xl px-6 py-8">
-        {/* Top navigation */}
-        <AdminNav />
-
-        {/* Error / info */}
+    <>
+      {/* Error / info */}
         {error && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-[#fff7f7] px-4 py-3 text-xs text-red-700">
+          <InlineAlert variant="error" title="Something went wrong" className="mb-4">
             {error}
-          </div>
+          </InlineAlert>
         )}
 
         <div className="mb-4 flex items-center justify-between">
           <p className="text-xs text-[#7a7a7a]">
-            Assign designers to tickets. This is useful for testing or manual
-            overrides. Changes here update the ticket immediately.
+            Assign designers and manage token cost overrides. Changes update
+            immediately.
           </p>
           {loading && (
             <span className="rounded-full bg-[#f5f3f0] px-3 py-1 text-[11px] text-[#7a7a7a]">
@@ -184,98 +321,213 @@ export default function AdminTicketsPage() {
         </div>
 
         {/* Table */}
-        <div className="overflow-hidden rounded-3xl border border-[#e3e1dc] bg-white shadow-sm">
-          <div className="max-h-[520px] overflow-auto">
-            <table className="min-w-full text-left text-xs">
-              <thead className="bg-[#f7f5f0] text-[11px] uppercase tracking-[0.14em] text-[#9a9892]">
-                <tr>
-                  <th className="px-4 py-3 font-semibold">Created</th>
-                  <th className="px-4 py-3 font-semibold">Company</th>
-                  <th className="px-4 py-3 font-semibold">Project</th>
-                  <th className="px-4 py-3 font-semibold">Title</th>
-                  <th className="px-4 py-3 font-semibold">Status</th>
-                  <th className="px-4 py-3 font-semibold">Designer</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tickets.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="px-4 py-6 text-center text-[11px] text-[#9a9892]"
-                    >
-                      {loading
-                        ? "Loading tickets…"
-                        : "No tickets found."}
-                    </td>
-                  </tr>
-                ) : (
-                  tickets.map((t) => {
-                    const designerValue = t.designer?.id ?? "";
-                    const isSaving = savingTicketId === t.id;
+        <DataTable maxHeight="600px">
+          <THead>
+            <TH>Created</TH>
+            <TH>Company</TH>
+            <TH>Title</TH>
+            <TH>Status</TH>
+            <TH>Job Type</TH>
+            <TH>Tokens</TH>
+            <TH>Designer</TH>
+          </THead>
+          <tbody>
+            {tickets.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-3 py-4">
+                  {loading ? (
+                    <p className="text-center text-[11px] text-[#9a9892]">Loading tickets…</p>
+                  ) : (
+                    <EmptyState title="No tickets found." description="Once tickets are created, they will appear here for designer assignment." />
+                  )}
+                </td>
+              </tr>
+            ) : (
+              tickets.map((t) => {
+                const designerValue = t.designer?.id ?? "";
+                const isSaving = savingTicketId === t.id;
+                const isEditing = t.id in editingOverrides;
+                const draft = editingOverrides[t.id];
 
-                    return (
-                      <tr
-                        key={t.id}
-                        className="border-t border-[#f0eee9] text-[11px] text-[#424143]"
-                      >
-                        <td className="px-4 py-3 align-top">
-                          {formatDateTime(t.createdAt)}
-                        </td>
-                        <td className="px-4 py-3 align-top">
-                          {t.company?.name ?? "—"}
-                        </td>
-                        <td className="px-4 py-3 align-top">
-                          {t.project
-                            ? t.project.code
-                              ? `${t.project.code} – ${t.project.name}`
-                              : t.project.name
-                            : "—"}
-                        </td>
-                        <td className="px-4 py-3 align-top">
-                          <div className="max-w-xs truncate">
-                            {t.title}
+                const effectiveCost = getEffectiveCost(t);
+                const effectivePayout = getEffectivePayout(t);
+                const hasOverride =
+                  t.tokenCostOverride != null ||
+                  t.designerPayoutOverride != null;
+
+                return (
+                  <tr
+                    key={t.id}
+                    className="border-b border-[#f0eeea] last:border-b-0"
+                  >
+                    <TD>
+                      {formatDateTime(t.createdAt)}
+                    </TD>
+                    <TD>
+                      {t.company?.name ?? "—"}
+                    </TD>
+                    <TD>
+                      <div className="max-w-xs truncate">
+                        {t.title}
+                      </div>
+                    </TD>
+                    <TD>
+                      {t.status}
+                    </TD>
+                    <TD>
+                      {t.jobType ? (
+                        <div className="space-y-0.5">
+                          <div className="text-xs">{t.jobType.name}</div>
+                          {t.quantity > 1 && (
+                            <div className="text-[10px] text-[#9a9892]">
+                              ×{t.quantity}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-[#9a9892]">—</span>
+                      )}
+                    </TD>
+                    <TD>
+                      {t.jobType ? (
+                        isEditing && draft ? (
+                          <div className="space-y-1.5">
+                            <div className="flex items-center gap-1">
+                              <span className="w-12 text-[10px] text-[#9a9892]">Cost</span>
+                              <input
+                                type="number"
+                                min="0"
+                                className="w-16 rounded border border-[#d4d2cc] bg-white px-1.5 py-0.5 text-[11px] outline-none focus:border-[var(--bb-primary)]"
+                                placeholder={String(
+                                  t.jobType.tokenCost * (t.quantity ?? 1),
+                                )}
+                                value={draft.costOverride}
+                                onChange={(e) =>
+                                  setEditingOverrides((prev) => ({
+                                    ...prev,
+                                    [t.id]: {
+                                      ...prev[t.id],
+                                      costOverride: e.target.value,
+                                    },
+                                  }))
+                                }
+                                disabled={isSaving}
+                              />
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className="w-12 text-[10px] text-[#9a9892]">Payout</span>
+                              <input
+                                type="number"
+                                min="0"
+                                className="w-16 rounded border border-[#d4d2cc] bg-white px-1.5 py-0.5 text-[11px] outline-none focus:border-[var(--bb-primary)]"
+                                placeholder={String(
+                                  t.jobType.designerPayoutTokens *
+                                    (t.quantity ?? 1),
+                                )}
+                                value={draft.payoutOverride}
+                                onChange={(e) =>
+                                  setEditingOverrides((prev) => ({
+                                    ...prev,
+                                    [t.id]: {
+                                      ...prev[t.id],
+                                      payoutOverride: e.target.value,
+                                    },
+                                  }))
+                                }
+                                disabled={isSaving}
+                              />
+                            </div>
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="primary"
+                                onClick={() => handleSaveOverrides(t.id)}
+                                loading={isSaving}
+                                loadingText="Saving…"
+                              >
+                                Save
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => cancelEditingOverrides(t.id)}
+                                disabled={isSaving}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
                           </div>
-                        </td>
-                        <td className="px-4 py-3 align-top">
-                          {t.status}
-                        </td>
-                        <td className="px-4 py-3 align-top">
-                          <div className="inline-flex items-center gap-2">
-                            <select
-                              className="rounded-full border border-[#e3e1dc] bg-[#f7f5f0] px-2 py-1 text-[11px] text-[#424143] outline-none"
-                              value={designerValue}
-                              disabled={isSaving}
-                              onChange={(e) =>
-                                handleAssignDesigner(
-                                  t.id,
-                                  e.target.value || null,
-                                )
-                              }
-                            >
-                              <option value="">Unassigned</option>
-                              {designers.map((d) => (
-                                <option key={d.id} value={d.id}>
-                                  {d.name || d.email}
-                                </option>
-                              ))}
-                            </select>
-                            {isSaving && (
-                              <span className="text-[10px] text-[#9a9892]">
-                                Saving…
+                        ) : (
+                          <div className="space-y-0.5">
+                            <div className="text-[11px]">
+                              <span className="text-[#9a9892]">Cost:</span>{" "}
+                              <span className="font-medium text-[#424143]">
+                                {effectiveCost}
                               </span>
-                            )}
+                              {hasOverride && t.tokenCostOverride != null && (
+                                <Badge variant="warning" className="ml-1">
+                                  override
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="text-[11px]">
+                              <span className="text-[#9a9892]">Payout:</span>{" "}
+                              <span className="font-medium text-[#424143]">
+                                {effectivePayout}
+                              </span>
+                              {hasOverride &&
+                                t.designerPayoutOverride != null && (
+                                  <Badge variant="warning" className="ml-1">
+                                    override
+                                  </Badge>
+                                )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => startEditingOverrides(t)}
+                              className="mt-0.5 text-[10px] text-[var(--bb-primary)] hover:underline"
+                            >
+                              Edit overrides
+                            </button>
                           </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
+                        )
+                      ) : (
+                        <span className="text-[#9a9892]">—</span>
+                      )}
+                    </TD>
+                    <TD>
+                      <div className="inline-flex items-center gap-2">
+                        <select
+                          className="rounded-full border border-[#e3e1dc] bg-[#f7f5f0] px-2 py-1 text-[11px] text-[#424143] outline-none"
+                          value={designerValue}
+                          disabled={isSaving}
+                          onChange={(e) =>
+                            handleAssignDesigner(
+                              t.id,
+                              e.target.value || null,
+                            )
+                          }
+                        >
+                          <option value="">Unassigned</option>
+                          {designers.map((d) => (
+                            <option key={d.id} value={d.id}>
+                              {d.name || d.email}
+                            </option>
+                          ))}
+                        </select>
+                        {isSaving && !isEditing && (
+                          <span className="text-[10px] text-[#9a9892]">
+                            Saving…
+                          </span>
+                        )}
+                      </div>
+                    </TD>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </DataTable>
+    </>
   );
 }

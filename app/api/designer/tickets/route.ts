@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { TicketStatus, TicketPriority } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { createNotification } from "@/lib/notifications";
 
 type TicketStatusString = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 
@@ -345,8 +346,10 @@ export async function PATCH(req: NextRequest) {
       },
       select: {
         id: true,
+        title: true,
         status: true,
         companyId: true,
+        createdById: true,
       },
     });
 
@@ -436,7 +439,7 @@ export async function PATCH(req: NextRequest) {
         ? rawDesignerMessage
         : null;
 
-    let updated: { id: string; status: TicketStatus; updatedAt: Date };
+    let updated: { id: string; status: TicketStatus; updatedAt: Date; revisionId?: string };
 
     if (isInProgressToInReview) {
       updated = await prisma.$transaction(async (tx) => {
@@ -456,19 +459,21 @@ export async function PATCH(req: NextRequest) {
           },
         });
 
-        await tx.ticketRevision.create({
+        const revision = await tx.ticketRevision.create({
           data: {
             ticketId: updatedTicket.id,
             version: updatedTicket.revisionCount,
             submittedByDesignerId: user.id,
             designerMessage: designerMessageToStore,
           },
+          select: { id: true },
         });
 
         return {
           id: updatedTicket.id,
           status: updatedTicket.status,
           updatedAt: updatedTicket.updatedAt,
+          revisionId: revision.id,
         };
       });
     } else {
@@ -487,11 +492,33 @@ export async function PATCH(req: NextRequest) {
       updated = result;
     }
 
+    // Fire notifications (fire-and-forget, won't block the response)
+    if (isInProgressToInReview) {
+      createNotification({
+        userId: ticket.createdById,
+        type: "REVISION_SUBMITTED",
+        title: "New revision submitted",
+        message: `Your designer submitted a new version for "${ticket.title}"`,
+        ticketId: ticket.id,
+        actorId: user.id,
+      });
+    } else {
+      createNotification({
+        userId: ticket.createdById,
+        type: "TICKET_STATUS_CHANGED",
+        title: "Ticket status updated",
+        message: `"${ticket.title}" was moved to ${toTicketStatusString(updated.status).replace("_", " ").toLowerCase()}`,
+        ticketId: ticket.id,
+        actorId: user.id,
+      });
+    }
+
     return NextResponse.json(
       {
         ticketId: updated.id,
         status: toTicketStatusString(updated.status),
         updatedAt: updated.updatedAt.toISOString(),
+        ...(updated.revisionId ? { revisionId: updated.revisionId } : {}),
       },
       { status: 200 },
     );

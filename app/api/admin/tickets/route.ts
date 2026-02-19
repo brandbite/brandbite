@@ -10,10 +10,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import {
+  applyCompanyLedgerEntry,
+  getEffectiveTokenValues,
+} from "@/lib/token-engine";
 
-type AssignPayload = {
+type PatchPayload = {
   ticketId?: string;
   designerId?: string | null;
+  tokenCostOverride?: number | null;
+  designerPayoutOverride?: number | null;
 };
 
 export async function GET(_req: NextRequest) {
@@ -41,6 +47,9 @@ export async function GET(_req: NextRequest) {
           title: true,
           status: true,
           createdAt: true,
+          quantity: true,
+          tokenCostOverride: true,
+          designerPayoutOverride: true,
           company: {
             select: {
               id: true,
@@ -59,6 +68,14 @@ export async function GET(_req: NextRequest) {
               id: true,
               name: true,
               email: true,
+            },
+          },
+          jobType: {
+            select: {
+              id: true,
+              name: true,
+              tokenCost: true,
+              designerPayoutTokens: true,
             },
           },
         },
@@ -112,15 +129,14 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Only site owners or admins can assign designers.",
+            "Only site owners or admins can modify tickets.",
         },
         { status: 403 },
       );
     }
 
-    const body = (await req.json()) as AssignPayload;
+    const body = (await req.json()) as PatchPayload;
     const ticketId = body.ticketId;
-    const designerId = body.designerId ?? null;
 
     if (!ticketId) {
       return NextResponse.json(
@@ -131,7 +147,20 @@ export async function PATCH(req: NextRequest) {
 
     const ticket = await prisma.ticket.findUnique({
       where: { id: ticketId },
-      select: { id: true },
+      select: {
+        id: true,
+        companyId: true,
+        quantity: true,
+        tokenCostOverride: true,
+        designerPayoutOverride: true,
+        jobType: {
+          select: {
+            id: true,
+            tokenCost: true,
+            designerPayoutTokens: true,
+          },
+        },
+      },
     });
 
     if (!ticket) {
@@ -141,7 +170,13 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    if (designerId) {
+    // -----------------------------------------------------------------------
+    // Designer assignment (unchanged logic)
+    // -----------------------------------------------------------------------
+    const hasDesignerChange = "designerId" in body;
+    const designerId = body.designerId ?? null;
+
+    if (hasDesignerChange && designerId) {
       const designer = await prisma.userAccount.findFirst({
         where: {
           id: designerId,
@@ -163,13 +198,80 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
+    // -----------------------------------------------------------------------
+    // Token cost override with ledger reconciliation
+    // -----------------------------------------------------------------------
+    const hasCostOverrideChange = "tokenCostOverride" in body;
+    const hasPayoutOverrideChange = "designerPayoutOverride" in body;
+
+    // Parse override values: null means "clear override", number means "set"
+    const newCostOverride = hasCostOverrideChange
+      ? (typeof body.tokenCostOverride === "number" && body.tokenCostOverride >= 0
+          ? body.tokenCostOverride
+          : null)
+      : undefined; // undefined = no change
+
+    const newPayoutOverride = hasPayoutOverrideChange
+      ? (typeof body.designerPayoutOverride === "number" && body.designerPayoutOverride >= 0
+          ? body.designerPayoutOverride
+          : null)
+      : undefined;
+
+    // If cost override changed, reconcile the company ledger
+    if (hasCostOverrideChange && ticket.companyId && ticket.jobType) {
+      const oldValues = getEffectiveTokenValues({
+        quantity: ticket.quantity,
+        tokenCostOverride: ticket.tokenCostOverride,
+        designerPayoutOverride: ticket.designerPayoutOverride,
+        jobType: ticket.jobType,
+      });
+
+      const newValues = getEffectiveTokenValues({
+        quantity: ticket.quantity,
+        tokenCostOverride: newCostOverride ?? null,
+        designerPayoutOverride: ticket.designerPayoutOverride,
+        jobType: ticket.jobType,
+      });
+
+      const costDelta = newValues.effectiveCost - oldValues.effectiveCost;
+
+      if (costDelta !== 0) {
+        // Positive delta = cost increased → debit more from company
+        // Negative delta = cost decreased → credit back to company
+        await applyCompanyLedgerEntry({
+          companyId: ticket.companyId,
+          ticketId: ticket.id,
+          amount: Math.abs(costDelta),
+          direction: costDelta > 0 ? "DEBIT" : "CREDIT",
+          reason: "ADMIN_ADJUSTMENT",
+          notes: `Admin token cost override: ${oldValues.effectiveCost} → ${newValues.effectiveCost}`,
+          metadata: {
+            adminUserId: user.id,
+            oldEffectiveCost: oldValues.effectiveCost,
+            newEffectiveCost: newValues.effectiveCost,
+            oldOverride: ticket.tokenCostOverride,
+            newOverride: newCostOverride ?? null,
+          },
+        });
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Update ticket
+    // -----------------------------------------------------------------------
+    const updateData: Record<string, unknown> = {};
+    if (hasDesignerChange) updateData.designerId = designerId;
+    if (newCostOverride !== undefined) updateData.tokenCostOverride = newCostOverride;
+    if (newPayoutOverride !== undefined) updateData.designerPayoutOverride = newPayoutOverride;
+
     const updated = await prisma.ticket.update({
       where: { id: ticketId },
-      data: {
-        designerId: designerId,
-      },
+      data: updateData,
       select: {
         id: true,
+        quantity: true,
+        tokenCostOverride: true,
+        designerPayoutOverride: true,
         designer: {
           select: {
             id: true,
@@ -177,10 +279,16 @@ export async function PATCH(req: NextRequest) {
             email: true,
           },
         },
+        jobType: {
+          select: {
+            id: true,
+            name: true,
+            tokenCost: true,
+            designerPayoutTokens: true,
+          },
+        },
       },
     });
-
-    // İlerde istersen TicketAssignmentLog ile MANUAL log da ekleyebiliriz.
 
     return NextResponse.json(updated, { status: 200 });
   } catch (error: any) {
@@ -193,7 +301,7 @@ export async function PATCH(req: NextRequest) {
 
     console.error("[PATCH /api/admin/tickets] error", error);
     return NextResponse.json(
-      { error: "Failed to assign designer" },
+      { error: "Failed to update ticket" },
       { status: 500 },
     );
   }

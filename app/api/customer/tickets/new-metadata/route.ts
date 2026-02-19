@@ -33,6 +33,7 @@ export async function GET(_req: NextRequest) {
       select: {
         id: true,
         slug: true,
+        tokenBalance: true,
       },
     });
 
@@ -43,7 +44,7 @@ export async function GET(_req: NextRequest) {
       );
     }
 
-    const [projects, jobTypes] = await Promise.all([
+    const [projects, jobTypes, tags] = await Promise.all([
       prisma.project.findMany({
         where: { companyId: company.id },
         select: {
@@ -60,6 +61,18 @@ export async function GET(_req: NextRequest) {
           id: true,
           name: true,
           description: true,
+          tokenCost: true,
+        },
+        orderBy: {
+          name: "asc",
+        },
+      }),
+      prisma.ticketTag.findMany({
+        where: { companyId: company.id },
+        select: {
+          id: true,
+          name: true,
+          color: true,
         },
         orderBy: {
           name: "asc",
@@ -70,8 +83,10 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json(
       {
         companySlug: company.slug,
+        tokenBalance: company.tokenBalance,
         projects,
         jobTypes,
+        tags,
       },
       { status: 200 },
     );

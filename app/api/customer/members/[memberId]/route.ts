@@ -16,9 +16,9 @@ import {
 } from "@/lib/permissions/companyRoles";
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     memberId: string;
-  };
+  }>;
 };
 
 // ---------------------------------------------------------------------------
@@ -83,7 +83,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const memberId = params.memberId;
+    const { memberId } = await params;
     const targetMember = await getCompanyMemberOr404(
       memberId,
       user.activeCompanyId,
@@ -207,7 +207,7 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const memberId = params.memberId;
+    const { memberId } = await params;
     const targetMember = await getCompanyMemberOr404(
       memberId,
       user.activeCompanyId,

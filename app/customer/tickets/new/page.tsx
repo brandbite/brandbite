@@ -8,7 +8,8 @@
 
 import { prisma } from "@/lib/prisma";
 import NewTicketForm from "./NewTicketForm";
-import { CustomerNav } from "@/components/navigation/customer-nav";
+import type { TagOption } from "@/components/ui/tag-multi-select";
+
 
 const DEFAULT_COMPANY_SLUG = "acme-studio";
 
@@ -19,21 +20,20 @@ export default async function CustomerNewTicketPage() {
       id: true,
       name: true,
       slug: true,
+      tokenBalance: true,
     },
   });
 
   if (!company) {
     // Simple fallback; in a real app this would be a proper error page.
     return (
-      <div className="min-h-screen bg-[#f5f3f0] px-6 py-10 text-[#424143]">
-        <div className="mx-auto max-w-3xl">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Company not found
-          </h1>
-          <p className="mt-2 text-sm text-[#7a7a7a]">
-            Demo company with slug "{DEFAULT_COMPANY_SLUG}" was not found.
-          </p>
-        </div>
+      <div className="mx-auto max-w-3xl">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Company not found
+        </h1>
+        <p className="mt-2 text-sm text-[#7a7a7a]">
+          Demo company with slug "{DEFAULT_COMPANY_SLUG}" was not found.
+        </p>
       </div>
     );
   }
@@ -56,6 +56,19 @@ export default async function CustomerNewTicketPage() {
       id: true,
       name: true,
       description: true,
+      tokenCost: true,
+    },
+    orderBy: {
+      name: "asc",
+    },
+  });
+
+  const tags = await prisma.ticketTag.findMany({
+    where: { companyId: company.id },
+    select: {
+      id: true,
+      name: true,
+      color: true,
     },
     orderBy: {
       name: "asc",
@@ -63,14 +76,10 @@ export default async function CustomerNewTicketPage() {
   });
 
   return (
-    <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
-      <div className="mx-auto max-w-3xl px-6 py-10">
-        {/* Top navigation */}
-        <CustomerNav />
-
-        <main className="mt-4 rounded-2xl border border-[#e3e1dc] bg-white px-5 py-6 shadow-sm">
+    <div className="mx-auto max-w-3xl">
+      <main className="mt-4 rounded-2xl border border-[#e3e1dc] bg-white px-5 py-6 shadow-sm">
           <div className="mb-4">
-            <h1 className="text-xl font-semibold tracking-tight">
+            <h1 className="text-2xl font-semibold tracking-tight">
               Create a new design request
             </h1>
             <p className="mt-1 text-sm text-[#7a7a7a]">
@@ -90,9 +99,10 @@ export default async function CustomerNewTicketPage() {
             companySlug={company.slug}
             projects={projects}
             jobTypes={jobTypes}
+            tokenBalance={company.tokenBalance}
+            tags={tags as unknown as TagOption[]}
           />
         </main>
-      </div>
     </div>
   );
 }

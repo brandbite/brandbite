@@ -9,6 +9,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { DataTable, THead, TH, TD } from "@/components/ui/data-table";
+import { EmptyState } from "@/components/ui/empty-state";
+import { FormInput } from "@/components/ui/form-field";
+import { InlineAlert } from "@/components/ui/inline-alert";
+import { LoadingState } from "@/components/ui/loading-state";
+import { useToast } from "@/components/ui/toast-provider";
 
 type WithdrawalStatus = "PENDING" | "APPROVED" | "REJECTED" | "PAID";
 
@@ -31,6 +39,7 @@ type DesignerWithdrawalsResponse = {
 };
 
 export default function DesignerWithdrawalsPage() {
+  const { showToast } = useToast();
   const [data, setData] = useState<DesignerWithdrawalsResponse | null>(
     null,
   );
@@ -108,34 +117,21 @@ export default function DesignerWithdrawalsPage() {
   };
 
   const renderStatusBadge = (status: WithdrawalStatus) => {
-    const base =
-      "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold";
-    switch (status) {
-      case "PENDING":
-        return (
-          <span className={`${base} bg-[#fff7e0] text-[#8a6b1f]`}>
-            Pending
-          </span>
-        );
-      case "APPROVED":
-        return (
-          <span className={`${base} bg-[#f0fff6] text-[#137a3a]`}>
-            Approved
-          </span>
-        );
-      case "REJECTED":
-        return (
-          <span className={`${base} bg-[#fde8e7] text-[#b13832]`}>
-            Rejected
-          </span>
-        );
-      case "PAID":
-        return (
-          <span className={`${base} bg-[#e7f0ff] text-[#214f9c]`}>
-            Paid
-          </span>
-        );
-    }
+    const variantMap: Record<WithdrawalStatus, "warning" | "success" | "danger" | "info"> = {
+      PENDING: "warning",
+      APPROVED: "success",
+      REJECTED: "danger",
+      PAID: "info",
+    };
+    const labelMap: Record<WithdrawalStatus, string> = {
+      PENDING: "Pending",
+      APPROVED: "Approved",
+      REJECTED: "Rejected",
+      PAID: "Paid",
+    };
+    return (
+      <Badge variant={variantMap[status]}>{labelMap[status]}</Badge>
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -169,51 +165,28 @@ export default function DesignerWithdrawalsPage() {
       }
 
       setSubmitSuccess("Withdrawal request created successfully.");
+      showToast({ type: "success", title: "Withdrawal request created." });
       setAmount("");
       await load();
     } catch (err: any) {
       console.error("Designer withdrawal submit error:", err);
-      setSubmitError(
-        err?.message || "Failed to create withdrawal request.",
-      );
+      const errMsg = err?.message || "Failed to create withdrawal request.";
+      setSubmitError(errMsg);
+      showToast({ type: "error", title: errMsg });
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
-      <div className="mx-auto max-w-5xl px-6 py-10">
-        {/* Top navigation */}
-        <header className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f15b2b] text-sm font-semibold text-white">
-              B
-            </div>
-            <span className="text-lg font-semibold tracking-tight">
-              Brandbite
-            </span>
-          </div>
-          <nav className="hidden items-center gap-6 text-sm text-[#7a7a7a] md:flex">
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() => (window.location.href = "/designer/balance")}
-            >
-              Balance
-            </button>
-            <button className="font-medium text-[#424143]">
-              Withdrawals
-            </button>
-          </nav>
-        </header>
-
-        {/* Page header */}
+    <div className="max-w-5xl">
+      {/* Page header */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">
               My withdrawals
             </h1>
-            <p className="mt-1 text-sm text-[#7a7a7a]">
+            <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
               Request payouts from your token balance and track their
               status.
             </p>
@@ -222,64 +195,63 @@ export default function DesignerWithdrawalsPage() {
 
         {/* Error */}
         {error && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-white px-4 py-3 text-sm text-red-700">
-            <p className="font-medium">Error</p>
-            <p className="mt-1">{error}</p>
-          </div>
+          <InlineAlert variant="error" title="Error" className="mb-4">
+            {error}
+          </InlineAlert>
         )}
 
         {/* Summary + form */}
-        <section className="mb-6 grid gap-4 md:grid-cols-[2fr,3fr]">
+        <section className="mb-6 grid gap-4 md:grid-cols-[2fr_3fr]">
           {/* Summary cards */}
           <div className="space-y-3">
-            <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-              <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+            <div className="rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-4 shadow-sm">
+              <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
                 Available balance
               </p>
-              <p className="mt-2 text-3xl font-semibold text-[#f15b2b]">
+              <p className="mt-2 text-3xl font-semibold text-[var(--bb-primary)]">
                 {loading
                   ? "—"
                   : stats
                   ? stats.availableBalance
                   : 0}
-                <span className="ml-1 text-base font-normal text-[#7a7a7a]">
+                <span className="ml-1 text-base font-normal text-[var(--bb-text-secondary)]">
                   tokens
                 </span>
               </p>
-              <p className="mt-1 text-xs text-[#9a9892]">
+              <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
                 This is your current token balance before new withdrawals.
               </p>
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
-              <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-                <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+              <div className="rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-4 shadow-sm">
+                <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
                   Total requested
                 </p>
-                <p className="mt-2 text-2xl font-semibold text-[#424143]">
+                <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
                   {loading
                     ? "—"
                     : stats
                     ? stats.totalRequested
                     : 0}
                 </p>
-                <p className="mt-1 text-xs text-[#9a9892]">
+                <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
                   Sum of all your withdrawal requests.
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-                <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+              <div className="rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-4 shadow-sm">
+                <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
                   Pending requests
                 </p>
-                <p className="mt-2 text-2xl font-semibold text-[#424143]">
+                <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
                   {loading
                     ? "—"
                     : stats
                     ? stats.pendingCount
                     : 0}
                 </p>
-                <p className="mt-1 text-xs text-[#9a9892]">
+                <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
                   Waiting for approval from admin.
                 </p>
               </div>
@@ -287,118 +259,98 @@ export default function DesignerWithdrawalsPage() {
           </div>
 
           {/* Request form */}
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-4 shadow-sm">
             <h2 className="text-sm font-semibold tracking-tight">
               Request a withdrawal
             </h2>
-            <p className="mt-1 text-xs text-[#7a7a7a]">
+            <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
               Enter the amount of tokens you would like to withdraw.
               Minimum withdrawal amount applies.
             </p>
 
             {submitError && (
-              <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              <InlineAlert variant="error" size="sm" className="mt-3">
                 {submitError}
-              </div>
+              </InlineAlert>
             )}
 
             {submitSuccess && (
-              <div className="mt-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-700">
+              <InlineAlert variant="success" size="sm" className="mt-3">
                 {submitSuccess}
-              </div>
+              </InlineAlert>
             )}
 
             <form className="mt-4 space-y-3" onSubmit={handleSubmit}>
               <div className="flex flex-col gap-1">
                 <label
                   htmlFor="amount"
-                  className="text-xs font-medium text-[#424143]"
+                  className="text-xs font-medium text-[var(--bb-secondary)]"
                 >
                   Amount (tokens)
                 </label>
-                <input
+                <FormInput
                   id="amount"
                   type="number"
                   min={1}
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  className="w-full rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
                   placeholder="e.g. 50"
                 />
-                <p className="text-[11px] text-[#9a9892]">
+                <p className="text-xs text-[var(--bb-text-tertiary)]">
                   You can only request up to your available balance.
                 </p>
               </div>
 
-              <button
+              <Button
                 type="submit"
-                disabled={submitting}
-                className="inline-flex items-center justify-center rounded-full bg-[#f15b2b] px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:opacity-60"
+                loading={submitting}
+                loadingText="Submitting…"
               >
-                {submitting
-                  ? "Submitting…"
-                  : "Submit withdrawal request"}
-              </button>
+                Submit withdrawal request
+              </Button>
             </form>
           </div>
         </section>
 
         {/* Withdrawals table */}
-        <section className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
+        <section className="rounded-2xl border border-[var(--bb-border)] bg-white px-4 py-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold tracking-tight">
               My withdrawal history
             </h2>
-            <p className="text-xs text-[#9a9892]">
+            <p className="text-xs text-[var(--bb-text-tertiary)]">
               Showing {withdrawals.length} requests.
             </p>
           </div>
 
           {loading ? (
-            <div className="py-6 text-center text-sm text-[#7a7a7a]">
-              Loading withdrawals…
-            </div>
+            <LoadingState message="Loading withdrawals…" />
           ) : withdrawals.length === 0 ? (
-            <div className="py-6 text-center text-sm text-[#9a9892]">
-              You have not requested any withdrawals yet.
-            </div>
+            <EmptyState title="You have not requested any withdrawals yet." />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-[#e3e1dc] text-xs uppercase tracking-[0.08em] text-[#9a9892]">
-                    <th className="px-2 py-2">Created</th>
-                    <th className="px-2 py-2">Amount</th>
-                    <th className="px-2 py-2">Status</th>
-                    <th className="px-2 py-2">Approved at</th>
+            <DataTable>
+              <THead>
+                <TH>Created</TH>
+                <TH>Amount</TH>
+                <TH>Status</TH>
+                <TH>Approved at</TH>
+              </THead>
+              <tbody>
+                {withdrawals.map((w) => (
+                  <tr
+                    key={w.id}
+                    className="border-b border-[var(--bb-border-subtle)] text-xs last:border-b-0"
+                  >
+                    <TD>{formatDateTime(w.createdAt)}</TD>
+                    <TD>{w.amountTokens} tokens</TD>
+                    <TD>{renderStatusBadge(w.status)}</TD>
+                    <TD>{formatDateTime(w.approvedAt)}</TD>
                   </tr>
-                </thead>
-                <tbody>
-                  {withdrawals.map((w) => (
-                    <tr
-                      key={w.id}
-                      className="border-b border-[#f0eeea] text-xs last:border-b-0"
-                    >
-                      <td className="px-2 py-2 align-top text-[11px] text-[#7a7a7a]">
-                        {formatDateTime(w.createdAt)}
-                      </td>
-                      <td className="px-2 py-2 align-top text-[11px] text-[#424143]">
-                        {w.amountTokens} tokens
-                      </td>
-                      <td className="px-2 py-2 align-top text-[11px]">
-                        {renderStatusBadge(w.status)}
-                      </td>
-                      <td className="px-2 py-2 align-top text-[11px] text-[#7a7a7a]">
-                        {formatDateTime(w.approvedAt)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </DataTable>
           )}
         </section>
-      </div>
     </div>
   );
 }

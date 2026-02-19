@@ -10,6 +10,12 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { CompanyRole as CompanyRoleString } from "@/lib/permissions/companyRoles";
+import { EmptyState } from "@/components/ui/empty-state";
+import { InlineAlert } from "@/components/ui/inline-alert";
+import { useToast } from "@/components/ui/toast-provider";
+import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { FormInput, FormSelect } from "@/components/ui/form-field";
 
 type CompanyMembersResponse = {
   company: {
@@ -43,6 +49,7 @@ type ViewState =
   | { status: "ready"; data: CompanyMembersResponse };
 
 export default function CustomerMembersPage() {
+  const { showToast } = useToast();
   const [state, setState] = useState<ViewState>({ status: "loading" });
 
   // Invite form state
@@ -65,6 +72,13 @@ export default function CustomerMembersPage() {
     useState<string | null>(null);
   const [removingMemberId, setRemovingMemberId] =
     useState<string | null>(null);
+
+  // Confirmation dialog state
+  const [inviteToCancel, setInviteToCancel] = useState<string | null>(null);
+  const [memberToRemove, setMemberToRemove] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -188,12 +202,12 @@ export default function CustomerMembersPage() {
         const msg =
           json?.error || `Request failed with status ${res.status}`;
         setInviteError(msg);
+        showToast({ type: "error", title: msg });
         return;
       }
 
-      setInviteSuccess(
-        "Invitation created. In a future step, this will be used to onboard the member.",
-      );
+      setInviteSuccess("Invitation sent successfully.");
+      showToast({ type: "success", title: "Invitation sent successfully." });
       setInviteEmail("");
       setInviteRole("MEMBER");
 
@@ -201,9 +215,9 @@ export default function CustomerMembersPage() {
       await refreshMembers();
     } catch (error) {
       console.error("Invite submit error:", error);
-      setInviteError(
-        "Unexpected error while creating the invitation.",
-      );
+      const errMsg = "Unexpected error while creating the invitation.";
+      setInviteError(errMsg);
+      showToast({ type: "error", title: errMsg });
     } finally {
       setInviteStatus("idle");
     }
@@ -232,16 +246,18 @@ export default function CustomerMembersPage() {
         const msg =
           json?.error || `Request failed with status ${res.status}`;
         setCancelError(msg);
+        showToast({ type: "error", title: msg });
         return;
       }
 
+      showToast({ type: "success", title: "Invite cancelled." });
       // Refresh after cancelling
       await refreshMembers();
     } catch (error) {
       console.error("Cancel invite error:", error);
-      setCancelError(
-        "Unexpected error while cancelling the invite.",
-      );
+      const errMsg = "Unexpected error while cancelling the invite.";
+      setCancelError(errMsg);
+      showToast({ type: "error", title: errMsg });
     } finally {
       setCancelingId(null);
     }
@@ -276,15 +292,17 @@ export default function CustomerMembersPage() {
         const msg =
           json?.error || `Request failed with status ${res.status}`;
         setMemberActionError(msg);
+        showToast({ type: "error", title: msg });
         return;
       }
 
+      showToast({ type: "success", title: "Member role updated." });
       await refreshMembers();
     } catch (error) {
       console.error("Member role update error:", error);
-      setMemberActionError(
-        "Unexpected error while updating the member role.",
-      );
+      const errMsg = "Unexpected error while updating the member role.";
+      setMemberActionError(errMsg);
+      showToast({ type: "error", title: errMsg });
     } finally {
       setUpdatingMemberId(null);
     }
@@ -312,15 +330,17 @@ export default function CustomerMembersPage() {
         const msg =
           json?.error || `Request failed with status ${res.status}`;
         setMemberActionError(msg);
+        showToast({ type: "error", title: msg });
         return;
       }
 
+      showToast({ type: "success", title: "Member removed." });
       await refreshMembers();
     } catch (error) {
       console.error("Member removal error:", error);
-      setMemberActionError(
-        "Unexpected error while removing the member.",
-      );
+      const errMsg = "Unexpected error while removing the member.";
+      setMemberActionError(errMsg);
+      showToast({ type: "error", title: errMsg });
     } finally {
       setRemovingMemberId(null);
     }
@@ -367,58 +387,11 @@ export default function CustomerMembersPage() {
       .includes("only company owners or project managers");
 
   return (
-    <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
-      <div className="mx-auto max-w-6xl px-6 py-10">
-        {/* Top navigation (Brandbite style) */}
-        <header className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f15b2b] text-sm font-semibold text-white">
-              B
-            </div>
-            <span className="text-lg font-semibold tracking-tight">
-              Brandbite
-            </span>
-          </div>
-          <nav className="hidden items-center gap-6 text-sm text-[#7a7a7a] md:flex">
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() =>
-                (window.location.href = "/customer/tokens")
-              }
-            >
-              Tokens
-            </button>
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() =>
-                (window.location.href = "/customer/tickets")
-              }
-            >
-              Tickets
-            </button>
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() =>
-                (window.location.href = "/customer/board")
-              }
-            >
-              Board
-            </button>
-            <button
-              className="font-semibold text-[#424143]"
-              onClick={() =>
-                (window.location.href = "/customer/members")
-              }
-            >
-              Members
-            </button>
-          </nav>
-        </header>
-
-        {/* Page header */}
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+    <>
+      {/* Page header */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-xl font-semibold tracking-tight">
+            <h1 className="text-2xl font-semibold tracking-tight">
               Company members
             </h1>
             <p className="mt-1 text-sm text-[#7a7a7a]">
@@ -448,27 +421,26 @@ export default function CustomerMembersPage() {
 
         {/* Error state */}
         {error && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-white px-4 py-3 text-sm text-red-700">
-            <p className="font-medium">
-              {isPermissionError
-                ? "You don’t have access to manage members"
-                : "Error"}
-            </p>
-            <p className="mt-1">{error}</p>
+          <InlineAlert
+            variant="error"
+            title={isPermissionError ? "You don't have access to manage members" : "Error"}
+            className="mb-4"
+          >
+            <p>{error}</p>
             {isPermissionError && (
               <p className="mt-2 text-xs text-[#7a7a7a]">
                 Only company owners and project managers can view and
                 manage the members list and invites for this workspace.
               </p>
             )}
-          </div>
+          </InlineAlert>
         )}
 
         {/* Member action errors */}
         {memberActionError && !error && (
-          <div className="mb-4 rounded-xl border border-amber-200 bg-[#fffaf2] px-4 py-3 text-xs text-amber-800">
+          <InlineAlert variant="warning" className="mb-4">
             {memberActionError}
-          </div>
+          </InlineAlert>
         )}
 
         {/* Invite + lists only if we have data (no error) */}
@@ -485,21 +457,21 @@ export default function CustomerMembersPage() {
               </p>
 
               {inviteError && (
-                <div className="mt-3 rounded-lg border border-red-200 bg-[#fff7f7] px-3 py-2 text-xs text-red-700">
+                <InlineAlert variant="error" size="sm" className="mt-3">
                   {inviteError}
-                </div>
+                </InlineAlert>
               )}
 
               {inviteSuccess && (
-                <div className="mt-3 rounded-lg border border-emerald-200 bg-[#f0fbf4] px-3 py-2 text-xs text-emerald-700">
+                <InlineAlert variant="success" size="sm" className="mt-3">
                   {inviteSuccess}
-                </div>
+                </InlineAlert>
               )}
 
               {cancelError && (
-                <div className="mt-3 rounded-lg border border-amber-200 bg-[#fffaf2] px-3 py-2 text-xs text-amber-800">
+                <InlineAlert variant="warning" size="sm" className="mt-3">
                   {cancelError}
-                </div>
+                </InlineAlert>
               )}
 
               <form
@@ -510,13 +482,13 @@ export default function CustomerMembersPage() {
                   <label className="text-[11px] font-medium text-[#7a7a7a]">
                     Email
                   </label>
-                  <input
+                  <FormInput
                     type="email"
                     value={inviteEmail}
                     onChange={(e) =>
                       setInviteEmail(e.target.value)
                     }
-                    className="mt-1 w-full rounded-lg border border-[#d5cec0] bg-[#fdfaf5] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]/40"
+                    className="mt-1"
                     placeholder="designer@yourcompany.com"
                     required
                   />
@@ -526,8 +498,8 @@ export default function CustomerMembersPage() {
                   <label className="text-[11px] font-medium text-[#7a7a7a]">
                     Role
                   </label>
-                  <select
-                    className="mt-1 w-full rounded-lg border border-[#d5cec0] bg-[#fdfaf5] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]/40"
+                  <FormSelect
+                    className="mt-1"
                     value={inviteRole}
                     onChange={(e) =>
                       setInviteRole(
@@ -538,19 +510,18 @@ export default function CustomerMembersPage() {
                     <option value="MEMBER">Member</option>
                     <option value="PM">Project manager</option>
                     <option value="BILLING">Billing</option>
-                  </select>
+                  </FormSelect>
                 </div>
 
                 <div className="flex w-full md:w-auto">
-                  <button
+                  <Button
                     type="submit"
-                    disabled={inviteStatus === "submitting"}
-                    className="mt-2 w-full rounded-lg bg-[#f15b2b] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[#e44f20] disabled:opacity-70 md:mt-[22px]"
+                    loading={inviteStatus === "submitting"}
+                    loadingText="Sending…"
+                    className="mt-2 w-full md:mt-[22px]"
                   >
-                    {inviteStatus === "submitting"
-                      ? "Sending…"
-                      : "Send invite"}
-                  </button>
+                    Send invite
+                  </Button>
                 </div>
               </form>
             </section>
@@ -565,10 +536,10 @@ export default function CustomerMembersPage() {
               </p>
 
               {sortedInvites.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-[#d5cec0] bg-white/60 px-4 py-4 text-xs text-[#7a7a7a]">
-                  No pending invites. When you invite someone, they will
-                  appear here until they join.
-                </div>
+                <EmptyState
+                  title="No pending invites."
+                  description="When you invite someone, they will appear here until they join."
+                />
               ) : (
                 <div className="grid gap-3 md:grid-cols-2">
                   {sortedInvites.map((invite) => {
@@ -603,16 +574,18 @@ export default function CustomerMembersPage() {
                             </p>
                           )}
                         </div>
-                        <button
+                        <Button
                           type="button"
-                          disabled={isCanceling}
+                          variant="danger"
+                          size="sm"
+                          loading={isCanceling}
+                          loadingText="Cancelling…"
                           onClick={() =>
-                            handleCancelInvite(invite.id)
+                            setInviteToCancel(invite.id)
                           }
-                          className="rounded-full border border-[#f5d1c4] px-3 py-1 text-[11px] font-medium text-[#c5431a] hover:bg-[#fff4f0] disabled:opacity-60"
                         >
-                          {isCanceling ? "Cancelling…" : "Cancel"}
-                        </button>
+                          Cancel
+                        </Button>
                       </article>
                     );
                   })}
@@ -704,7 +677,10 @@ export default function CustomerMembersPage() {
                           type="button"
                           disabled={isRemoving || isUpdating}
                           onClick={() =>
-                            handleRemoveMember(member.id)
+                            setMemberToRemove({
+                              id: member.id,
+                              name: member.name || member.email,
+                            })
                           }
                           className="text-[11px] font-medium text-[#c5431a] hover:text-[#a83a16]"
                         >
@@ -717,59 +693,76 @@ export default function CustomerMembersPage() {
               })}
 
               {sortedMembers.length === 0 && !error && (
-                <div className="rounded-2xl border border-dashed border-[#d5cec0] bg:white/60 px-4 py-6 text-sm text-[#7a7a7a]">
-                  No members found for this company yet.
-                </div>
+                <EmptyState title="No members found for this company yet." />
               )}
             </section>
           </>
         )}
-      </div>
-    </div>
+
+      {/* Cancel invite confirmation */}
+      <ConfirmDialog
+        open={inviteToCancel !== null}
+        onClose={() => setInviteToCancel(null)}
+        onConfirm={async () => {
+          if (!inviteToCancel) return;
+          await handleCancelInvite(inviteToCancel);
+          setInviteToCancel(null);
+        }}
+        title="Cancel invite"
+        description="This invite will be cancelled. You can always send a new one."
+        confirmLabel="Cancel invite"
+        variant="warning"
+        loading={cancelingId === inviteToCancel}
+      />
+
+      {/* Remove member confirmation */}
+      <ConfirmDialog
+        open={memberToRemove !== null}
+        onClose={() => setMemberToRemove(null)}
+        onConfirm={async () => {
+          if (!memberToRemove) return;
+          await handleRemoveMember(memberToRemove.id);
+          setMemberToRemove(null);
+        }}
+        title="Remove member"
+        description={
+          memberToRemove
+            ? `${memberToRemove.name} will lose access to this workspace. This can't be undone.`
+            : ""
+        }
+        confirmLabel="Remove"
+        loading={removingMemberId === memberToRemove?.id}
+      />
+    </>
   );
 }
 
 function CustomerMembersSkeleton() {
   return (
-    <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
-      <div className="mx-auto max-w-6xl px-6 py-10">
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-full bg-[#e3ded4]" />
-            <div className="h-4 w-24 rounded bg-[#e3ded4]" />
-          </div>
-          <div className="hidden gap-4 md:flex">
-            <div className="h-4 w-16 rounded bg-[#e3ded4]" />
-            <div className="h-4 w-16 rounded bg-[#e3ded4]" />
-            <div className="h-4 w-16 rounded bg-[#e3ded4]" />
-            <div className="h-4 w-20 rounded bg-[#e3ded4]" />
-          </div>
-        </div>
+    <>
+      <div className="mb-4 h-5 w-40 rounded bg-[#e3ded4]" />
+      <div className="mb-2 h-3 w-72 rounded bg-[#e3ded4]" />
+      <div className="h-3 w-48 rounded bg-[#e3ded4]" />
 
-        <div className="mb-4 h-5 w-40 rounded bg-[#e3ded4]" />
-        <div className="mb-2 h-3 w-72 rounded bg-[#e3ded4]" />
-        <div className="h-3 w-48 rounded bg-[#e3ded4]" />
-
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
-          {Array.from({ length: 4 }).map((_, idx) => (
-            <div
-              key={idx}
-              className="rounded-2xl border border-[#ece5d8] bg-white px-4 py-3"
-            >
-              <div className="mb-3 flex items-center gap-3">
-                <div className="h-9 w-9 rounded-full bg-[#f5f3f0]" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-3 w-32 rounded bg-[#f5f3f0]" />
-                  <div className="h-3 w-40 rounded bg-[#f5f3f0]" />
-                </div>
-                <div className="h-5 w-16 rounded-full bg-[#f5f3f0]" />
+      <div className="mt-6 grid gap-4 md:grid-cols-2">
+        {Array.from({ length: 4 }).map((_, idx) => (
+          <div
+            key={idx}
+            className="rounded-2xl border border-[#ece5d8] bg-white px-4 py-3"
+          >
+            <div className="mb-3 flex items-center gap-3">
+              <div className="h-9 w-9 rounded-full bg-[#f5f3f0]" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3 w-32 rounded bg-[#f5f3f0]" />
+                <div className="h-3 w-40 rounded bg-[#f5f3f0]" />
               </div>
-              <div className="h-3 w-28 rounded bg-[#f5f3f0]" />
+              <div className="h-5 w-16 rounded-full bg-[#f5f3f0]" />
             </div>
-          ))}
-        </div>
+            <div className="h-3 w-28 rounded bg-[#f5f3f0]" />
+          </div>
+        ))}
       </div>
-    </div>
+    </>
   );
 }
 

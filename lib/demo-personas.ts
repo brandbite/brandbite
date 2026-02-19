@@ -11,6 +11,7 @@ import type { AppUserRole } from "./roles";
 export type DemoPersonaId =
   | "site-owner"
   | "site-admin"
+  | "customer-new"
   | "customer-owner"
   | "customer-pm"
   | "customer-billing"
@@ -44,6 +45,15 @@ export const DEMO_PERSONAS: DemoPersona[] = [
     redirectTo: "/debug/auto-assign",
     email: "admin@brandbite-demo.com",
     role: "SITE_ADMIN",
+  },
+  {
+    id: "customer-new",
+    label: "Customer • New (no company)",
+    description:
+      "A fresh customer with no company yet. Use this persona to test the onboarding wizard.",
+    redirectTo: "/onboarding",
+    email: "new@customer-demo.com",
+    role: "CUSTOMER",
   },
   {
     id: "customer-owner",

@@ -1,20 +1,36 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/page.tsx
 // @purpose: Customer-facing workspace overview dashboard (tokens + tickets + plan)
-// @version: v1.1.0
+// @version: v2.0.0
 // @status: active
-// @lastUpdate: 2025-11-22
+// @lastUpdate: 2025-11-25
 // -----------------------------------------------------------------------------
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { InlineAlert } from "@/components/ui/inline-alert";
 import {
   type CompanyRole,
   normalizeCompanyRole,
   canManagePlan,
+  canCreateTickets,
 } from "@/lib/permissions/companyRoles";
-import { CustomerNav } from "@/components/navigation/customer-nav";
+import {
+  isDueDateOverdue,
+  isDueDateSoon,
+  formatDueDateCountdown,
+} from "@/lib/board";
+import {
+  Bar,
+  BarChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+  Cell,
+} from "recharts";
 
 type UserRole = "SITE_OWNER" | "SITE_ADMIN" | "DESIGNER" | "CUSTOMER";
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
@@ -74,11 +90,21 @@ type CustomerTokensResponse = {
   }[];
 };
 
+type CustomerBoardTicket = {
+  id: string;
+  title: string;
+  status: TicketStatus;
+  dueDate: string | null;
+  companyTicketNumber: number | null;
+  project: { id: string; name: string; code: string | null } | null;
+};
+
 type CustomerBoardResponse = {
   stats: {
     byStatus: Record<TicketStatus, number>;
     total: number;
   };
+  tickets: CustomerBoardTicket[];
 };
 
 type DashboardData = {
@@ -103,35 +129,32 @@ function prettyCompanyRole(role: CompanyRole | null): string {
     case "MEMBER":
       return "Member";
     default:
-      return "—";
+      return "\u2014";
   }
 }
 
-function formatDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString();
-}
-
 function formatMoneyFromCents(cents: number | null | undefined): string {
-  if (cents == null) return "—";
+  if (cents == null) return "\u2014";
   const amount = cents / 100;
   return `$${amount.toFixed(2)}/mo`;
 }
 
-function statusLabel(status: TicketStatus): string {
-  switch (status) {
-    case "TODO":
-      return "Backlog";
-    case "IN_PROGRESS":
-      return "In progress";
-    case "IN_REVIEW":
-      return "In review";
-    case "DONE":
-      return "Done";
-  }
-}
+/* Status accent colors for chart bars */
+const STATUS_COLORS: Record<TicketStatus, string> = {
+  TODO: "#9CA3AF",
+  IN_PROGRESS: "#3B82F6",
+  IN_REVIEW: "#F15B2B",
+  DONE: "#22C55E",
+};
+
+const STATUS_LABELS: Record<TicketStatus, string> = {
+  TODO: "Backlog",
+  IN_PROGRESS: "In progress",
+  IN_REVIEW: "In review",
+  DONE: "Done",
+};
+
+const STATUS_ORDER: TicketStatus[] = ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"];
 
 export default function CustomerDashboardPage() {
   const [state, setState] = useState<DashboardState>({ status: "loading" });
@@ -223,210 +246,376 @@ export default function CustomerDashboardPage() {
   const tokenBalance = tokens?.company.tokenBalance ?? null;
   const tokenStats = tokens?.stats ?? null;
   const boardStats = board?.stats ?? null;
+  const boardTickets = board?.tickets ?? [];
+
+  const upcomingTickets = useMemo(
+    () =>
+      boardTickets
+        .filter((t) => t.dueDate != null && t.status !== "DONE")
+        .sort(
+          (a, b) =>
+            new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime(),
+        )
+        .slice(0, 5),
+    [boardTickets],
+  );
 
   const openTickets =
     boardStats?.total && boardStats.total > 0
       ? (boardStats.total ?? 0) - (boardStats.byStatus.DONE ?? 0)
       : 0;
 
-  return (
-    <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
-      <div className="mx-auto max-w-6xl px-6 py-10">
-        {/* Top navigation */}
-        <CustomerNav />
+  const doneTickets = boardStats?.byStatus.DONE ?? 0;
 
-        {/* Header */}
-        <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
-              Customer workspace
+  /* Chart data for ticket pipeline */
+  const pipelineChartData = boardStats
+    ? STATUS_ORDER.map((s) => ({
+        name: STATUS_LABELS[s],
+        count: boardStats.byStatus[s] ?? 0,
+        fill: STATUS_COLORS[s],
+      }))
+    : [];
+
+  /* Token bar data */
+  const totalCredits = tokenStats?.totalCredits ?? 0;
+  const totalDebits = tokenStats?.totalDebits ?? 0;
+  const maxToken = Math.max(totalCredits, totalDebits, 1);
+
+  return (
+    <>
+      {/* Header */}
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
+            Customer workspace
+          </p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+            Overview
+          </h1>
+          {company && (
+            <p className="mt-1 text-xs text-[#9a9892]">
+              Company{" "}
+              <span className="font-medium text-[#424143]">
+                {company.name}
+              </span>{" "}
+              ({company.slug})
             </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-              Overview
-            </h1>
-            {company && (
-              <p className="mt-1 text-xs text-[#9a9892]">
-                Company{" "}
-                <span className="font-medium text-[#424143]">
-                  {company.name}
-                </span>{" "}
-                ({company.slug})
-              </p>
-            )}
-            {companyRole && (
-              <p className="mt-1 text-xs text-[#9a9892]">
-                You are browsing as{" "}
-                <span className="font-medium text-[#424143]">
-                  {prettyCompanyRole(companyRole)}
-                </span>
-                .
-              </p>
-            )}
-          </div>
-          {isLoading && (
-            <div className="rounded-full bg-[#f5f3f0] px-3 py-1 text-[11px] text-[#7a7a7a]">
-              Loading overview…
-            </div>
+          )}
+          {companyRole && (
+            <p className="mt-1 text-xs text-[#9a9892]">
+              You are browsing as{" "}
+              <span className="font-medium text-[#424143]">
+                {prettyCompanyRole(companyRole)}
+              </span>
+              .
+            </p>
           )}
         </div>
+        <div className="flex items-center gap-3">
+          {isLoading && (
+            <div className="rounded-full bg-[#f5f3f0] px-3 py-1 text-[11px] text-[#7a7a7a]">
+              Loading overview...
+            </div>
+          )}
+          {canCreateTickets(companyRole) && (
+            <Link
+              href="/customer/tickets/new"
+              className="rounded-full bg-[#f15b2b] px-4 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-[#d94e22]"
+            >
+              + New request
+            </Link>
+          )}
+        </div>
+      </div>
 
-        {/* Error */}
-        {isError && (
-          <div className="mb-4 rounded-2xl border border-red-200 bg-[#fff7f7] px-4 py-3 text-xs text-red-700">
-            <p className="font-medium">Something went wrong</p>
-            <p className="mt-1">{state.message}</p>
-          </div>
-        )}
+      {/* Error */}
+      {isError && (
+        <InlineAlert variant="error" title="Something went wrong" className="mb-4">
+          {state.message}
+        </InlineAlert>
+      )}
 
-        {/* Content */}
-        {!isError && (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {/* Tokens card */}
-            <section className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
+      {/* Content */}
+      {!isError && (
+        <div className="space-y-4">
+          {/* Row 1: Hero stat cards */}
+          <div className="grid gap-4 md:grid-cols-3">
+            {/* Token balance card */}
+            <section className="relative overflow-hidden rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">
+              <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-[#F15B2B] to-[#f6a07a]" />
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold tracking-tight">
-                  Tokens
-                </h2>
-                <button
+                <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#b1afa9]">
+                  Token balance
+                </p>
+                <Link
+                  href="/customer/tokens"
                   className="text-[11px] font-medium text-[#f15b2b] hover:underline"
-                  onClick={() => (window.location.href = "/customer/tokens")}
                 >
                   View ledger
-                </button>
+                </Link>
               </div>
-              <p className="mt-1 text-[11px] text-[#7a7a7a]">
-                Current token balance and total usage.
+              <p className="mt-2 text-3xl font-bold text-[#424143]">
+                {tokenBalance != null ? tokenBalance.toLocaleString() : "\u2014"}
               </p>
-              <div className="mt-3">
-                <p className="text-[11px] text-[#9a9892]">Current balance</p>
-                <p className="text-2xl font-semibold text-[#424143]">
-                  {tokenBalance != null ? tokenBalance : "—"}{" "}
-                  <span className="text-sm font-normal text-[#9a9892]">
-                    tokens
-                  </span>
-                </p>
-                {tokenStats && (
-                  <div className="mt-3 space-y-1 text-[11px] text-[#7a7a7a]">
-                    <p>
-                      Total credits:{" "}
-                      <span className="font-semibold">
-                        {tokenStats.totalCredits}
-                      </span>
-                    </p>
-                    <p>
-                      Total debits:{" "}
-                      <span className="font-semibold">
-                        {tokenStats.totalDebits}
-                      </span>
-                    </p>
-                  </div>
-                )}
-              </div>
-            </section>
+              <p className="text-[11px] text-[#9a9892]">tokens available</p>
 
-            {/* Tickets card */}
-            <section className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold tracking-tight">
-                  Tickets
-                </h2>
-                <button
-                  className="text-[11px] font-medium text-[#f15b2b] hover:underline"
-                  onClick={() => (window.location.href = "/customer/board")}
-                >
-                  Open board
-                </button>
-              </div>
-              <p className="mt-1 text-[11px] text-[#7a7a7a]">
-                Snapshot of the current ticket pipeline.
-              </p>
-
-              {boardStats ? (
-                <div className="mt-3 space-y-2 text-[11px] text-[#7a7a7a]">
-                  <p>
-                    Total tickets:{" "}
-                    <span className="font-semibold">
-                      {boardStats.total}
+              {/* Credit / Debit mini bar */}
+              {tokenStats && (
+                <div className="mt-4 space-y-1.5">
+                  <div className="flex items-center gap-2 text-[11px]">
+                    <span className="w-14 text-[#9a9892]">Credits</span>
+                    <div className="relative h-2 flex-1 rounded-full bg-[#f5f3f0]">
+                      <div
+                        className="h-full rounded-full bg-[#22C55E]"
+                        style={{ width: `${(totalCredits / maxToken) * 100}%` }}
+                      />
+                    </div>
+                    <span className="w-10 text-right font-semibold text-[#424143]">
+                      {totalCredits}
                     </span>
-                  </p>
-                  <p>
-                    Open tickets (not done):{" "}
-                    <span className="font-semibold">{openTickets}</span>
-                  </p>
-                  <div className="mt-2 grid grid-cols-2 gap-1">
-                    {(Object.entries(boardStats.byStatus) as [
-                      TicketStatus,
-                      number,
-                    ][]).map(([status, count]) => (
-                      <p key={status}>
-                        <span className="text-[#9a9892]">
-                          {statusLabel(status)}:
-                        </span>{" "}
-                        <span className="font-semibold">{count}</span>
-                      </p>
-                    ))}
+                  </div>
+                  <div className="flex items-center gap-2 text-[11px]">
+                    <span className="w-14 text-[#9a9892]">Debits</span>
+                    <div className="relative h-2 flex-1 rounded-full bg-[#f5f3f0]">
+                      <div
+                        className="h-full rounded-full bg-[#EF4444]"
+                        style={{ width: `${(totalDebits / maxToken) * 100}%` }}
+                      />
+                    </div>
+                    <span className="w-10 text-right font-semibold text-[#424143]">
+                      {totalDebits}
+                    </span>
                   </div>
                 </div>
-              ) : (
-                <p className="mt-3 text-[11px] text-[#9a9892]">
-                  We could not load ticket stats yet.
-                </p>
               )}
             </section>
 
+            {/* Open tickets card */}
+            <section className="relative overflow-hidden rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">
+              <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-[#3B82F6] to-[#93C5FD]" />
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#b1afa9]">
+                  Open tickets
+                </p>
+                <Link
+                  href="/customer/board"
+                  className="text-[11px] font-medium text-[#f15b2b] hover:underline"
+                >
+                  Open board
+                </Link>
+              </div>
+              <p className="mt-2 text-3xl font-bold text-[#424143]">
+                {openTickets}
+              </p>
+              <p className="text-[11px] text-[#9a9892]">
+                of {boardStats?.total ?? 0} total
+              </p>
+
+              {/* Status breakdown dots */}
+              {boardStats && (
+                <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1">
+                  {STATUS_ORDER.filter((s) => s !== "DONE").map((s) => (
+                    <div key={s} className="flex items-center gap-1.5 text-[11px]">
+                      <span
+                        className="inline-block h-2 w-2 rounded-full"
+                        style={{ backgroundColor: STATUS_COLORS[s] }}
+                      />
+                      <span className="text-[#9a9892]">{STATUS_LABELS[s]}</span>
+                      <span className="font-semibold text-[#424143]">
+                        {boardStats.byStatus[s] ?? 0}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* Completed tickets card */}
+            <section className="relative overflow-hidden rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">
+              <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-[#22C55E] to-[#86EFAC]" />
+              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#b1afa9]">
+                Completed
+              </p>
+              <p className="mt-2 text-3xl font-bold text-[#424143]">
+                {doneTickets}
+              </p>
+              <p className="text-[11px] text-[#9a9892]">
+                of {boardStats?.total ?? 0} total
+              </p>
+
+              {/* Completion rate */}
+              {boardStats && boardStats.total > 0 && (
+                doneTickets > 0 ? (
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-[#9a9892]">Completion rate</span>
+                      <span className="font-semibold text-[#22C55E]">
+                        {Math.round((doneTickets / boardStats.total) * 100)}%
+                      </span>
+                    </div>
+                    <div className="mt-1 h-2 rounded-full bg-[#f5f3f0]">
+                      <div
+                        className="h-full rounded-full bg-[#22C55E]"
+                        style={{
+                          width: `${(doneTickets / boardStats.total) * 100}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-4 text-[11px] text-[#9a9892]">
+                    Complete your first ticket to see progress here.
+                  </p>
+                )
+              )}
+            </section>
+          </div>
+
+          {/* Row 2: Ticket pipeline chart */}
+          {boardStats && boardStats.total > 0 && (
+            <section className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">
+              <h2 className="text-sm font-semibold tracking-tight text-[#424143]">
+                Ticket pipeline
+              </h2>
+              <p className="mt-0.5 text-[11px] text-[#9a9892]">
+                Distribution of tickets across workflow stages
+              </p>
+              <div className="mt-4 h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={pipelineChartData}
+                    margin={{ top: 4, right: 0, bottom: 0, left: -20 }}
+                  >
+                    <XAxis
+                      dataKey="name"
+                      tick={{ fontSize: 11, fill: "#9a9892" }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      allowDecimals={false}
+                      tick={{ fontSize: 11, fill: "#9a9892" }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        borderRadius: 12,
+                        border: "1px solid #e3e1dc",
+                        fontSize: 12,
+                      }}
+                    />
+                    <Bar dataKey="count" radius={[6, 6, 0, 0]} maxBarSize={56}>
+                      {pipelineChartData.map((entry, i) => (
+                        <Cell key={i} fill={entry.fill} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </section>
+          )}
+
+          {/* Row 2.5: Upcoming deadlines */}
+          {boardTickets.length > 0 && (
+            <section className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">
+              <h2 className="text-sm font-semibold tracking-tight text-[#424143]">
+                Upcoming deadlines
+              </h2>
+              <p className="mt-0.5 text-[11px] text-[#9a9892]">
+                Open tickets with due dates, sorted by urgency
+              </p>
+              {upcomingTickets.length === 0 ? (
+                <p className="mt-4 text-[11px] text-[#9a9892]">
+                  No upcoming deadlines.
+                </p>
+              ) : (
+                <div className="mt-4 divide-y divide-[#f0eee9]">
+                  {upcomingTickets.map((t) => {
+                    const countdown = formatDueDateCountdown(t.dueDate);
+                    const overdue = isDueDateOverdue(t.dueDate);
+                    const soon = isDueDateSoon(t.dueDate);
+                    const code =
+                      t.project?.code && t.companyTicketNumber != null
+                        ? `${t.project.code}-${t.companyTicketNumber}`
+                        : t.companyTicketNumber != null
+                          ? `#${t.companyTicketNumber}`
+                          : "";
+                    return (
+                      <Link
+                        key={t.id}
+                        href={`/customer/tickets/${t.id}`}
+                        className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0 transition-opacity hover:opacity-80"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-medium text-[#424143]">
+                            {code && (
+                              <span className="mr-1.5 text-[#9a9892]">
+                                {code}
+                              </span>
+                            )}
+                            {t.title}
+                          </p>
+                        </div>
+                        {countdown && (
+                          <span
+                            className={`ml-4 shrink-0 text-[11px] font-medium ${
+                              overdue
+                                ? "text-[var(--bb-danger-text)]"
+                                : soon
+                                  ? "text-[var(--bb-warning-text)]"
+                                  : "text-[#9a9892]"
+                            }`}
+                          >
+                            {countdown.label}
+                          </span>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* Row 3: Company + Plan cards */}
+          <div className="grid gap-4 md:grid-cols-2">
             {/* Company card */}
-            <section className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-              <h2 className="text-sm font-semibold tracking-tight">
+            <section className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">
+              <h2 className="text-sm font-semibold tracking-tight text-[#424143]">
                 Company
               </h2>
-              <p className="mt-1 text-[11px] text-[#7a7a7a]">
+              <p className="mt-0.5 text-[11px] text-[#9a9892]">
                 Basic workspace metadata and footprint.
               </p>
               {company ? (
-                <div className="mt-3 space-y-2 text-[11px] text-[#7a7a7a]">
-                  <p>
-                    Name:{" "}
-                    <span className="font-semibold text-[#424143]">
-                      {company.name}
-                    </span>
-                  </p>
-                  <p>
-                    Slug:{" "}
-                    <span className="font-semibold text-[#424143]">
-                      {company.slug}
-                    </span>
-                  </p>
-                  <p>
-                    Created:{" "}
-                    <span className="font-semibold">
-                      {formatDate(company.createdAt)}
-                    </span>
-                  </p>
-                  <p>
-                    Last updated:{" "}
-                    <span className="font-semibold">
-                      {formatDate(company.updatedAt)}
-                    </span>
-                  </p>
-                  <div className="mt-2 grid grid-cols-3 gap-2">
-                    <div className="rounded-xl bg-[#f5f3f0] px-2 py-2 text-center">
-                      <p className="text-xs font-semibold text-[#424143]">
-                        {company.counts.members}
-                      </p>
-                      <p className="text-[10px] text-[#7a7a7a]">Members</p>
+                <div className="mt-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <div>
+                      <p className="text-[#9a9892]">Name</p>
+                      <p className="font-semibold text-[#424143]">{company.name}</p>
                     </div>
-                    <div className="rounded-xl bg-[#f5f3f0] px-2 py-2 text-center">
-                      <p className="text-xs font-semibold text-[#424143]">
-                        {company.counts.projects}
-                      </p>
-                      <p className="text-[10px] text-[#7a7a7a]">Projects</p>
+                    <div>
+                      <p className="text-[#9a9892]">Slug</p>
+                      <p className="font-semibold text-[#424143]">{company.slug}</p>
                     </div>
-                    <div className="rounded-xl bg-[#f5f3f0] px-2 py-2 text-center">
-                      <p className="text-xs font-semibold text-[#424143]">
-                        {company.counts.tickets}
-                      </p>
-                      <p className="text-[10px] text-[#7a7a7a]">Tickets</p>
-                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { label: "Members", value: company.counts.members },
+                      { label: "Projects", value: company.counts.projects },
+                      { label: "Tickets", value: company.counts.tickets },
+                    ].map((item) => (
+                      <div
+                        key={item.label}
+                        className="rounded-xl bg-[#f5f3f0] px-3 py-2.5 text-center"
+                      >
+                        <p className="text-lg font-bold text-[#424143]">
+                          {item.value}
+                        </p>
+                        <p className="text-[10px] text-[#9a9892]">{item.label}</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ) : (
@@ -437,71 +626,71 @@ export default function CustomerDashboardPage() {
             </section>
 
             {/* Plan & billing card */}
-            <section className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm lg:col-span-1 md:col-span-2">
+            <section className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold tracking-tight">
+                <h2 className="text-sm font-semibold tracking-tight text-[#424143]">
                   Plan &amp; billing
                 </h2>
-                <button
+                <Link
+                  href="/customer/settings"
                   className="text-[11px] font-medium text-[#f15b2b] hover:underline"
-                  onClick={() => (window.location.href = "/customer/settings")}
                 >
                   Open settings
-                </button>
+                </Link>
               </div>
-              <p className="mt-1 text-[11px] text-[#7a7a7a]">
-                Your current subscription configuration for this workspace.
+              <p className="mt-0.5 text-[11px] text-[#9a9892]">
+                Your current subscription configuration.
               </p>
 
               {!canManageCompanyPlan && (
                 <div className="mt-3 rounded-lg border border-[#f6c89f] bg-[#fff4e6] px-3 py-2 text-[11px] text-[#7a7a7a]">
                   <p className="font-medium text-[#9a5b2b]">Limited access</p>
                   <p className="mt-1">
-                    You can see the current plan, but only the owner or billing
-                    manager can modify billing details.
+                    Only the owner or billing manager can modify billing details.
                   </p>
                 </div>
               )}
 
-              <div className="mt-3 space-y-2 text-[11px] text-[#7a7a7a]">
-                {plan ? (
-                  <>
-                    <p>
-                      Current plan:{" "}
-                      <span className="font-semibold text-[#424143]">
-                        {plan.name}
-                      </span>
-                    </p>
-                    <p>
-                      Monthly tokens:{" "}
-                      <span className="font-semibold">
+              {plan ? (
+                <div className="mt-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex rounded-full bg-[#f5f3f0] px-3 py-1 text-xs font-semibold text-[#424143]">
+                      {plan.name}
+                    </span>
+                    <span
+                      className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
+                        plan.isActive
+                          ? "bg-[#e8f6f0] text-[#16a34a]"
+                          : "bg-[#fef2f2] text-[#dc2626]"
+                      }`}
+                    >
+                      {plan.isActive ? "Active" : "Inactive"}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-[11px]">
+                    <div className="rounded-xl bg-[#f5f3f0] px-3 py-2.5 text-center">
+                      <p className="text-lg font-bold text-[#424143]">
                         {plan.monthlyTokens}
-                      </span>
-                    </p>
-                    <p>
-                      Price:{" "}
-                      <span className="font-semibold">
+                      </p>
+                      <p className="text-[10px] text-[#9a9892]">Monthly tokens</p>
+                    </div>
+                    <div className="rounded-xl bg-[#f5f3f0] px-3 py-2.5 text-center">
+                      <p className="text-lg font-bold text-[#424143]">
                         {formatMoneyFromCents(plan.priceCents)}
-                      </span>
-                    </p>
-                    <p>
-                      Status:{" "}
-                      <span className="font-semibold">
-                        {plan.isActive ? "Active" : "Inactive"}
-                      </span>
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-[11px] text-[#9a9892]">
-                    No subscription plan is assigned to your company yet.
-                    Please contact support if this does not look correct.
-                  </p>
-                )}
-              </div>
+                      </p>
+                      <p className="text-[10px] text-[#9a9892]">Price</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-4 text-[11px] text-[#9a9892]">
+                  No subscription plan is assigned yet. Please contact support.
+                </p>
+              )}
             </section>
           </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </>
   );
 }

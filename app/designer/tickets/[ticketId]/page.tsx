@@ -9,7 +9,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { FormTextarea } from "@/components/ui/form-field";
+import { SafeHtml } from "@/components/ui/safe-html";
+import { InlineAlert } from "@/components/ui/inline-alert";
+import { EmptyState } from "@/components/ui/empty-state";
+import { priorityBadgeVariant, statusBadgeVariant, STATUS_LABELS, PRIORITY_LABELS, formatPriorityLabel, formatBoardDate, formatDateTime } from "@/lib/board";
 
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -30,6 +37,8 @@ type TicketDetailResponse = {
     createdAt: string;
     updatedAt: string;
     companyTicketNumber: number | null;
+    quantity: number;
+    effectivePayout: number | null;
     project: {
       id: string;
       name: string;
@@ -79,23 +88,12 @@ type TicketRevisionItem = {
   designerMessage: string | null;
 };
 
-const STATUS_LABELS: Record<TicketStatus, string> = {
-  TODO: "To do",
-  IN_PROGRESS: "In progress",
-  IN_REVIEW: "In review",
-  DONE: "Done",
-};
-
-const PRIORITY_BADGE: Record<TicketPriority, string> = {
-  LOW: "bg-[#f2f1ed] text-[#7a7a7a]",
-  MEDIUM: "bg-[#e1f0ff] text-[#245c9b]",
-  HIGH: "bg-[#fff5dd] text-[#8a6000]",
-  URGENT: "bg-[#fde8e7] text-[#b13832]",
-};
 
 export default function DesignerTicketDetailPage() {
   const params = useParams<{ ticketId: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromBoard = searchParams.get("from") === "board";
 
   const ticketIdFromParams =
     typeof params?.ticketId === "string" ? params.ticketId : "";
@@ -313,33 +311,6 @@ export default function DesignerTicketDetailPage() {
     return ticket.id;
   }, [ticket]);
 
-  const formatDate = (iso: string | null) => {
-    if (!iso) return "—";
-    const d = new Date(iso);
-    return d.toLocaleDateString();
-  };
-
-  const formatDateTime = (iso: string | null) => {
-    if (!iso) return "—";
-    const d = new Date(iso);
-    return d.toLocaleString();
-  };
-
-  const formatStatusLabel = (status: TicketStatus) =>
-    STATUS_LABELS[status];
-
-  const formatPriorityLabel = (priority: TicketPriority) => {
-    switch (priority) {
-      case "LOW":
-        return "Low";
-      case "MEDIUM":
-        return "Medium";
-      case "HIGH":
-        return "High";
-      case "URGENT":
-        return "Urgent";
-    }
-  };
 
   const handleSubmitComment = async () => {
     if (!ticketIdFromData) return;
@@ -388,67 +359,38 @@ export default function DesignerTicketDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
-      <div className="mx-auto max-w-6xl px-6 py-10">
-        {/* Top navigation */}
-        <header className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f15b2b] text-sm font-semibold text-white">
-              B
-            </div>
-            <span className="text-lg font-semibold tracking-tight">
-              Brandbite
-            </span>
-          </div>
-          <nav className="hidden items-center gap-6 text-sm text-[#7a7a7a] md:flex">
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() => router.push("/designer/balance")}
-            >
-              Balance
-            </button>
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() => router.push("/designer/withdrawals")}
-            >
-              Withdrawals
-            </button>
-            <button
-              className="font-medium text-[#424143]"
-              onClick={() => router.push("/designer/tickets")}
-            >
-              Tickets
-            </button>
-          </nav>
-        </header>
-
-        {/* Page header */}
+    <>
+      {/* Page header */}
         <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
           <div>
-            <button
-              type="button"
-              onClick={() => router.push("/designer/tickets")}
-              className="mb-2 inline-flex items-center gap-1 text-xs text-[#7a7a7a] hover:text-[#424143]"
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                router.push(
+                  fromBoard ? "/designer/board" : "/designer/tickets",
+                )
+              }
+              className="mb-2"
             >
-              <span className="text-lg leading-none">←</span>
-              <span>Back to tickets</span>
-            </button>
+              ← {fromBoard ? "Back to board" : "Back to tickets"}
+            </Button>
 
             <h1 className="text-2xl font-semibold tracking-tight">
               {ticket?.title ?? "Ticket"}
             </h1>
             {ticketCode && (
-              <p className="mt-1 text-xs text-[#9a9892]">
+              <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
                 Ticket code:{" "}
-                <span className="font-medium text-[#424143]">
+                <span className="font-medium text-[var(--bb-secondary)]">
                   {ticketCode}
                 </span>
               </p>
             )}
             {company && (
-              <p className="mt-1 text-xs text-[#9a9892]">
+              <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
                 Customer:{" "}
-                <span className="font-medium text-[#424143]">
+                <span className="font-medium text-[var(--bb-secondary)]">
                   {company.name}
                 </span>{" "}
                 ({company.slug})
@@ -458,26 +400,21 @@ export default function DesignerTicketDetailPage() {
 
           {ticket && (
             <div className="flex flex-col items-end gap-2">
-              <span className="inline-flex rounded-full bg-[#f5f3f0] px-3 py-1 text-[11px] font-medium text-[#424143]">
-                {formatStatusLabel(ticket.status)}
-              </span>
-              <span
-                className={`inline-flex rounded-full px-3 py-1 text-[11px] font-medium ${
-                  PRIORITY_BADGE[ticket.priority]
-                }`}
-              >
+              <Badge variant={statusBadgeVariant(ticket.status)}>
+                {STATUS_LABELS[ticket.status]}
+              </Badge>
+              <Badge variant={priorityBadgeVariant(ticket.priority)}>
                 {formatPriorityLabel(ticket.priority)}
-              </span>
+              </Badge>
             </div>
           )}
         </div>
 
         {/* Error state */}
         {error && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-white px-4 py-3 text-sm text-red-700">
-            <p className="font-medium">Error</p>
-            <p className="mt-1">{error}</p>
-          </div>
+          <InlineAlert variant="error" title="Something went wrong" className="mb-4">
+            {error}
+          </InlineAlert>
         )}
 
         {!error && ticket && (
@@ -485,16 +422,17 @@ export default function DesignerTicketDetailPage() {
             {/* Left: brief + job/meta + revisions */}
             <section className="md:col-span-2 space-y-4">
               {/* Brief */}
-              <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
-                <h2 className="text-sm font-semibold text-[#424143]">
+              <div className="rounded-2xl border border-[var(--bb-border)] bg-white px-4 py-4 shadow-sm">
+                <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">
                   Brief
                 </h2>
                 {ticket.description ? (
-                  <p className="mt-2 whitespace-pre-wrap text-sm text-[#7a7a7a]">
-                    {ticket.description}
-                  </p>
+                  <SafeHtml
+                    html={ticket.description}
+                    className="mt-2 text-sm text-[var(--bb-text-secondary)]"
+                  />
                 ) : (
-                  <p className="mt-2 text-xs text-[#9a9892]">
+                  <p className="mt-2 text-xs text-[var(--bb-text-tertiary)]">
                     No description was provided for this ticket.
                   </p>
                 )}
@@ -502,61 +440,73 @@ export default function DesignerTicketDetailPage() {
 
               {/* Meta */}
               <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-3 shadow-sm">
-                  <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
+                <div className="rounded-2xl border border-[var(--bb-border)] bg-white px-4 py-3 shadow-sm">
+                  <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
                     Project & job
                   </h3>
-                  <div className="mt-2 space-y-1 text-xs text-[#7a7a7a]">
+                  <div className="mt-2 space-y-1 text-xs text-[var(--bb-text-secondary)]">
                     <p>
                       Project:{" "}
-                      <span className="font-semibold text-[#424143]">
+                      <span className="font-semibold text-[var(--bb-secondary)]">
                         {ticket.project?.name || "—"}
                       </span>
                     </p>
                     <p>
                       Project code:{" "}
-                      <span className="font-semibold text-[#424143]">
+                      <span className="font-semibold text-[var(--bb-secondary)]">
                         {ticket.project?.code || "—"}
                       </span>
                     </p>
                     <p>
                       Job type:{" "}
-                      <span className="font-semibold text-[#424143]">
+                      <span className="font-semibold text-[var(--bb-secondary)]">
                         {ticket.jobType?.name || "—"}
                       </span>
                     </p>
                     <p>
                       Designer payout:{" "}
-                      <span className="font-semibold text-[#424143]">
-                        {ticket.jobType?.designerPayoutTokens != null
-                          ? `${ticket.jobType.designerPayoutTokens} tokens`
-                          : "—"}
+                      <span className="font-semibold text-[var(--bb-secondary)]">
+                        {ticket.effectivePayout != null
+                          ? ticket.quantity > 1 && ticket.jobType
+                            ? `${ticket.jobType.designerPayoutTokens} × ${ticket.quantity} = ${ticket.effectivePayout} tokens`
+                            : `${ticket.effectivePayout} tokens`
+                          : ticket.jobType?.designerPayoutTokens != null
+                            ? `${ticket.jobType.designerPayoutTokens} tokens`
+                            : "—"}
                       </span>
                     </p>
+                    {ticket.quantity > 1 && (
+                      <p>
+                        Quantity:{" "}
+                        <span className="font-semibold text-[var(--bb-secondary)]">
+                          ×{ticket.quantity}
+                        </span>
+                      </p>
+                    )}
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-3 shadow-sm">
-                  <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
+                <div className="rounded-2xl border border-[var(--bb-border)] bg-white px-4 py-3 shadow-sm">
+                  <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
                     Dates
                   </h3>
-                  <div className="mt-2 space-y-1 text-xs text-[#7a7a7a]">
+                  <div className="mt-2 space-y-1 text-xs text-[var(--bb-text-secondary)]">
                     <p>
                       Created:{" "}
-                      <span className="font-semibold text-[#424143]">
+                      <span className="font-semibold text-[var(--bb-secondary)]">
                         {formatDateTime(ticket.createdAt)}
                       </span>
                     </p>
                     <p>
                       Last updated:{" "}
-                      <span className="font-semibold text-[#424143]">
+                      <span className="font-semibold text-[var(--bb-secondary)]">
                         {formatDateTime(ticket.updatedAt)}
                       </span>
                     </p>
                     <p>
                       Due date:{" "}
-                      <span className="font-semibold text-[#424143]">
-                        {formatDate(ticket.dueDate)}
+                      <span className="font-semibold text-[var(--bb-secondary)]">
+                        {formatBoardDate(ticket.dueDate)}
                       </span>
                     </p>
                   </div>
@@ -564,29 +514,29 @@ export default function DesignerTicketDetailPage() {
               </div>
 
               {/* Revision history */}
-              <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
-                <h2 className="text-sm font-semibold text-[#424143]">
+              <div className="rounded-2xl border border-[var(--bb-border)] bg-white px-4 py-4 shadow-sm">
+                <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">
                   Revision history
                 </h2>
 
                 {revisionsLoading && (
-                  <p className="mt-2 text-xs text-[#9a9892]">
+                  <p className="mt-2 text-xs text-[var(--bb-text-tertiary)]">
                     Loading revision history…
                   </p>
                 )}
 
                 {!revisionsLoading && revisionsError && (
-                  <div className="mt-2 rounded-md border border-red-200 bg-[#fff7f7] px-3 py-2 text-[11px] text-red-700">
+                  <InlineAlert variant="error" size="sm" className="mt-2">
                     {revisionsError}
-                  </div>
+                  </InlineAlert>
                 )}
 
                 {!revisionsLoading &&
                   !revisionsError &&
                   (!revisions || revisions.length === 0) && (
-                    <p className="mt-2 text-xs text-[#9a9892]">
-                      No revisions have been submitted for this ticket yet.
-                    </p>
+                    <div className="mt-2">
+                      <EmptyState title="No revisions yet." description="Revisions will appear here once this ticket has been submitted for review." />
+                    </div>
                   )}
 
                 {!revisionsLoading &&
@@ -597,32 +547,32 @@ export default function DesignerTicketDetailPage() {
                       {revisions.map((rev) => (
                         <div
                           key={rev.version}
-                          className="rounded-xl bg-[#f7f4ef] px-3 py-3 text-[11px]"
+                          className="rounded-xl bg-[var(--bb-bg-card)] px-3 py-3 text-xs"
                         >
-                          <p className="text-xs font-semibold text-[#424143]">
+                          <p className="text-xs font-semibold text-[var(--bb-secondary)]">
                             Version v{rev.version}
                           </p>
                           {rev.submittedAt && (
-                            <p className="mt-1 text-[#7a7a7a]">
+                            <p className="mt-1 text-[var(--bb-text-secondary)]">
                               You sent this version for review on{" "}
-                              <span className="font-semibold text-[#424143]">
-                                {formatDate(rev.submittedAt)}
+                              <span className="font-semibold text-[var(--bb-secondary)]">
+                                {formatBoardDate(rev.submittedAt)}
                               </span>
                               .
                             </p>
                           )}
                           {rev.feedbackAt && (
-                            <p className="text-[#7a7a7a]">
+                            <p className="text-[var(--bb-text-secondary)]">
                               Customer requested changes on{" "}
-                              <span className="font-semibold text-[#424143]">
-                                {formatDate(rev.feedbackAt)}
+                              <span className="font-semibold text-[var(--bb-secondary)]">
+                                {formatBoardDate(rev.feedbackAt)}
                               </span>
                               .
                             </p>
                           )}
 
                           {rev.designerMessage && (
-                            <p className="mt-1 text-[#424143]">
+                            <p className="mt-1 text-[var(--bb-secondary)]">
                               <span className="font-semibold">
                                 Your note:
                               </span>{" "}
@@ -633,7 +583,7 @@ export default function DesignerTicketDetailPage() {
                           )}
 
                           {rev.feedbackMessage && (
-                            <p className="mt-1 text-[#7a7a7a]">
+                            <p className="mt-1 text-[var(--bb-text-secondary)]">
                               <span className="font-semibold">
                                 Customer feedback:
                               </span>{" "}
@@ -651,30 +601,27 @@ export default function DesignerTicketDetailPage() {
 
             {/* Right: comments + people */}
             <section className="space-y-4">
-              <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-3 shadow-sm">
-                <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
+              <div className="rounded-2xl border border-[var(--bb-border)] bg-white px-4 py-3 shadow-sm">
+                <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
                   Comments
                 </h3>
 
                 {commentsError && (
-                  <div className="mt-2 rounded-md border border-red-200 bg-[#fff7f7] px-3 py-2 text-[11px] text-red-700">
+                  <InlineAlert variant="error" size="sm" className="mt-2">
                     {commentsError}
-                  </div>
+                  </InlineAlert>
                 )}
 
                 <div className="mt-2 max-h-60 space-y-2 overflow-y-auto pr-1">
                   {commentsLoading && (
-                    <p className="text-[11px] text-[#9a9892]">
+                    <p className="text-xs text-[var(--bb-text-tertiary)]">
                       Loading comments…
                     </p>
                   )}
                   {!commentsLoading &&
                     !commentsError &&
                     (comments?.length ?? 0) === 0 && (
-                      <p className="text-[11px] text-[#9a9892]">
-                        No comments yet. Use the form below to coordinate
-                        with the customer or Brandbite team.
-                      </p>
+                      <EmptyState title="No comments yet." description="Use the form below to coordinate with the customer or Brandbite team." />
                     )}
                   {!commentsLoading &&
                     !commentsError &&
@@ -682,66 +629,58 @@ export default function DesignerTicketDetailPage() {
                     comments!.map((c) => (
                       <div
                         key={c.id}
-                        className="rounded-lg bg-[#f5f3f0] px-3 py-2 text-[11px]"
+                        className="rounded-lg bg-[var(--bb-bg-card)] px-3 py-2 text-xs"
                       >
                         <div className="mb-1 flex items-center justify-between">
-                          <span className="font-semibold text-[#424143]">
+                          <span className="font-semibold text-[var(--bb-secondary)]">
                             {c.author.name || c.author.email}
                           </span>
-                          <span className="text-[10px] text-[#9a9892]">
+                          <span className="text-xs text-[var(--bb-text-tertiary)]">
                             {formatDateTime(c.createdAt)}
                           </span>
                         </div>
-                        <p className="whitespace-pre-wrap text-[#424143]">
+                        <p className="whitespace-pre-wrap text-[var(--bb-secondary)]">
                           {c.body}
                         </p>
                       </div>
                     ))}
                 </div>
 
-                <div className="mt-3 border-t border-[#ebe7df] pt-3">
-                  <label className="mb-1 block text-[11px] font-medium text-[#424143]">
+                <div className="mt-3 border-t border-[var(--bb-border-subtle)] pt-3">
+                  <label className="mb-1 block text-xs font-medium text-[var(--bb-secondary)]">
                     Add a comment
                   </label>
-                  <textarea
+                  <FormTextarea
                     value={newComment}
                     onChange={(e) => setNewComment(e.target.value)}
                     rows={3}
                     placeholder="Share updates, questions, or next steps with the customer."
-                    className="w-full rounded-md border border-[#d4d2cc] bg-[#fbf8f4] px-3 py-2 text-[11px] text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
                   />
                   <div className="mt-2 flex items-center justify-between">
-                    <p className="text-[10px] text-[#9a9892]">
+                    <p className="text-xs text-[var(--bb-text-tertiary)]">
                       Comments are visible to the customer and Brandbite
                       admins.
                     </p>
-                    <button
-                      type="button"
-                      disabled={
-                        submittingComment ||
-                        !newComment.trim() ||
-                        !ticketIdFromData
-                      }
+                    <Button
+                      size="sm"
+                      disabled={!newComment.trim() || !ticketIdFromData}
+                      loading={submittingComment}
+                      loadingText="Sending…"
                       onClick={handleSubmitComment}
-                      className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-medium ${
-                        submittingComment || !newComment.trim()
-                          ? "cursor-not-allowed bg-[#e3ded4] text-[#9a9892]"
-                          : "bg-[#f15b2b] text-white hover:bg-[#e44f22]"
-                      }`}
                     >
-                      {submittingComment ? "Sending…" : "Add comment"}
-                    </button>
+                      Add comment
+                    </Button>
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-3 shadow-sm">
-                <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
+              <div className="rounded-2xl border border-[var(--bb-border)] bg-white px-4 py-3 shadow-sm">
+                <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
                   People
                 </h3>
-                <div className="mt-2 space-y-2 text-xs text-[#7a7a7a]">
+                <div className="mt-2 space-y-2 text-xs text-[var(--bb-text-secondary)]">
                   <div>
-                    <p className="font-semibold text-[#424143]">
+                    <p className="font-semibold text-[var(--bb-secondary)]">
                       Customer requester
                     </p>
                     <p>
@@ -751,7 +690,7 @@ export default function DesignerTicketDetailPage() {
                     </p>
                   </div>
                   <div>
-                    <p className="mt-2 font-semibold text-[#424143]">
+                    <p className="mt-2 font-semibold text-[var(--bb-secondary)]">
                       Designer
                     </p>
                     <p>
@@ -767,44 +706,32 @@ export default function DesignerTicketDetailPage() {
         )}
 
         {!error && !ticket && (
-          <div className="mt-6 rounded-xl border border-amber-200 bg-[#fffaf2] px-4 py-3 text-sm text-amber-800">
-            Ticket could not be loaded.
-          </div>
+          <InlineAlert variant="warning">Ticket could not be loaded.</InlineAlert>
         )}
-      </div>
-    </div>
+    </>
   );
 }
 
 function TicketDetailSkeleton() {
   return (
-    <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
-      <div className="mx-auto max-w-6xl px-6 py-10">
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-full bg-[#e3ded4]" />
-            <div className="h-4 w-24 rounded bg-[#e3ded4]" />
+    <>
+      <div className="mb-4 h-6 w-64 animate-pulse rounded bg-[var(--bb-border)]" />
+      <div className="mb-2 h-3 w-40 animate-pulse rounded bg-[var(--bb-border)]" />
+      <div className="mb-6 h-3 w-32 animate-pulse rounded bg-[var(--bb-border)]" />
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="md:col-span-2 space-y-4">
+          <div className="h-32 animate-pulse rounded-2xl bg-white" />
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="h-32 animate-pulse rounded-2xl bg-white" />
+            <div className="h-32 animate-pulse rounded-2xl bg-white" />
           </div>
+          <div className="h-40 animate-pulse rounded-2xl bg-white" />
         </div>
-        <div className="mb-4 h-6 w-64 rounded bg-[#e3ded4]" />
-        <div className="mb-2 h-3 w-40 rounded bg-[#e3ded4]" />
-        <div className="mb-6 h-3 w-32 rounded bg-[#e3ded4]" />
-
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="md:col-span-2 space-y-4">
-            <div className="h-32 rounded-2xl bg-white" />
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="h-32 rounded-2xl bg-white" />
-              <div className="h-32 rounded-2xl bg-white" />
-            </div>
-            <div className="h-40 rounded-2xl bg-white" />
-          </div>
-          <div className="space-y-4">
-            <div className="h-40 rounded-2xl bg-white" />
-            <div className="h-32 rounded-2xl bg-white" />
-          </div>
+        <div className="space-y-4">
+          <div className="h-40 animate-pulse rounded-2xl bg-white" />
+          <div className="h-32 animate-pulse rounded-2xl bg-white" />
         </div>
       </div>
-    </div>
+    </>
   );
 }

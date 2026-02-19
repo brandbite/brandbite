@@ -9,6 +9,10 @@
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { TicketPriority, TicketStatus } from "@prisma/client";
+import { Badge } from "@/components/ui/badge";
+import type { BadgeVariant } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { InlineAlert } from "@/components/ui/inline-alert";
 
 function formatTicketCode(args: {
   projectCode: string | null;
@@ -58,18 +62,16 @@ function formatPriorityLabel(priority: TicketPriority) {
   }
 }
 
-function formatReasonBadge(reason: string) {
-  const base =
-    "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium";
+function reasonBadgeVariant(reason: string): BadgeVariant {
   switch (reason) {
     case "AUTO_ASSIGN":
-      return `${base} bg-[#e6f3ff] text-[#19568a] border border-[#c2ddff]`;
+      return "info";
     case "FALLBACK":
-      return `${base} bg-[#ffe3e0] text-[#b02a1d] border border-[#f2a094]`;
+      return "warning";
     case "REBALANCE":
-      return `${base} bg-[#f7f0ff] text-[#653f9e] border border-[#dbc8ff]`;
+      return "primary";
     default:
-      return `${base} bg-[#f4f4f0] text-[#5c5b5a] border border-[#ddddcf]`;
+      return "neutral";
   }
 }
 
@@ -86,15 +88,15 @@ export default async function AssignmentLogDebugPage() {
     return (
       <div className="min-h-screen bg-[#f5f3f0] px-6 py-10 text-[#424143]">
         <div className="mx-auto max-w-5xl">
-          <h1 className="text-lg font-semibold tracking-tight">
+          <h1 className="text-2xl font-semibold tracking-tight">
             Assignment log
           </h1>
           <p className="mt-2 text-sm text-[#9a9892]">
             This page is only available to site owners and admins.
           </p>
-          <div className="mt-4 rounded-2xl border border-[#f3c2bf] bg-[#fff5f4] px-4 py-3 text-sm text-[#9b3a32]">
+          <InlineAlert variant="error" className="mt-4">
             You don&apos;t have permission to view ticket assignment logs.
-          </div>
+          </InlineAlert>
         </div>
       </div>
     );
@@ -159,15 +161,7 @@ export default async function AssignmentLogDebugPage() {
 
         {/* Empty state */}
         {logs.length === 0 && (
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-6 text-sm text-[#7a7a7a]">
-            <p className="font-medium text-[#424143]">
-              No assignment events yet
-            </p>
-            <p className="mt-1 text-xs text-[#9a9892]">
-              Once customers start creating tickets and the auto-assign
-              engine runs, events will appear here for debugging.
-            </p>
-          </div>
+          <EmptyState title="No assignment events yet." description="Once customers start creating tickets and the auto-assign engine runs, events will appear here for debugging." />
         )}
 
         {/* Log table */}
@@ -220,9 +214,9 @@ export default async function AssignmentLogDebugPage() {
                         {formatDateTime(log.createdAt)}
                       </p>
                       <p className="mt-1">
-                        <span className={formatReasonBadge(reason)}>
+                        <Badge variant={reasonBadgeVariant(reason)}>
                           {reason}
-                        </span>
+                        </Badge>
                       </p>
                     </div>
 

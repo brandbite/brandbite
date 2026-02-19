@@ -6,6 +6,7 @@
 // @lastUpdate: 2025-11-21
 // -----------------------------------------------------------------------------
 
+import crypto from "crypto";
 import {
   PrismaClient,
   UserRole,
@@ -28,11 +29,20 @@ async function main() {
   // Not: Bu kısım dev DB için. Tüm kayıtlari siliyor.
   // Production’da kullanılmamalı.
 
-  // Ticket ile ilişkili child tablolari önce temizle
+  // Ticket ile ilişkili child tablolari önce temizle (deepest children first)
+  await prisma.assetPinComment.deleteMany({});
+  await prisma.assetPin.deleteMany({});
+  await prisma.asset.deleteMany({});
+  await prisma.ticketRevision.deleteMany({});
+  await prisma.ticketOutputSpec.deleteMany({});
   await prisma.ticketAssignmentLog.deleteMany({});
   await prisma.ticketComment.deleteMany({});
+  await prisma.notificationPreference.deleteMany({});
+  await prisma.notification.deleteMany({});
   await prisma.tokenLedger.deleteMany({});
   await prisma.withdrawal.deleteMany({});
+  await prisma.ticketTagAssignment.deleteMany({});
+  await prisma.ticketTag.deleteMany({});
 
   // Sonra ticket ve diğer üst seviye kayıtlar
   await prisma.ticket.deleteMany({});
@@ -114,6 +124,16 @@ async function main() {
     },
   });
 
+  // New customer with NO company — for onboarding wizard testing
+  const customerNew = await prisma.userAccount.create({
+    data: {
+      authUserId: "demo-customer-new",
+      email: "new@customer-demo.com",
+      name: "New Customer",
+      role: UserRole.CUSTOMER,
+    },
+  });
+
   console.log("✅ Users created.");
 
   // ---------------------------------------------------------------------------
@@ -162,8 +182,10 @@ async function main() {
       name: "Acme Studio",
       slug: "acme-studio",
       planId: fullPlan.id,
+      website: "https://acme-studio.com",
       tokenBalance: 120, // demo amaçlı başlangıç bakiye
       autoAssignDefaultEnabled: true, // Demo company: auto-assign ON by default
+      onboardingCompletedAt: new Date(), // Pre-seeded company — onboarding already done
     },
   });
 
@@ -201,8 +223,10 @@ async function main() {
       name: "Acme Studio (Manual Assign)",
       slug: "acme-studio-manual",
       planId: basicPlan.id,
+      website: "https://acme-manual.com",
       tokenBalance: 80, // biraz daha düşük demo bakiye
       autoAssignDefaultEnabled: false, // burada auto-assign kapalı
+      onboardingCompletedAt: new Date(), // Pre-seeded company — onboarding already done
     },
   });
 
@@ -239,6 +263,7 @@ async function main() {
 
   const websiteProject = await prisma.project.create({
     data: {
+      id: crypto.randomUUID(),
       companyId: company.id,
       name: "Website revamp",
       code: "ACME-WEB",
@@ -247,6 +272,7 @@ async function main() {
 
   const onboardingProject = await prisma.project.create({
     data: {
+      id: crypto.randomUUID(),
       companyId: company.id,
       name: "Onboarding visuals",
       code: "ACME-ONB",
@@ -326,8 +352,33 @@ async function main() {
   console.log("✅ JobTypes created.");
 
   // ---------------------------------------------------------------------------
+  // 5b) TAGS (company-scoped labels for tickets)
+  // ---------------------------------------------------------------------------
+
+  const tagBranding = await prisma.ticketTag.create({
+    data: { name: "Branding", color: "ORANGE", companyId: company.id },
+  });
+  const tagSocialMedia = await prisma.ticketTag.create({
+    data: { name: "Social media", color: "BLUE", companyId: company.id },
+  });
+  const tagUrgent = await prisma.ticketTag.create({
+    data: { name: "Urgent", color: "RED", companyId: company.id },
+  });
+  const tagWebsite = await prisma.ticketTag.create({
+    data: { name: "Website", color: "GREEN", companyId: company.id },
+  });
+  const tagPrint = await prisma.ticketTag.create({
+    data: { name: "Print", color: "PURPLE", companyId: company.id },
+  });
+
+  console.log("✅ Tags created.");
+
+  // ---------------------------------------------------------------------------
   // 6) TICKETS
   // ---------------------------------------------------------------------------
+
+  // Helper: date N days from now (positive = future, negative = past)
+  const daysFromNow = (n) => new Date(Date.now() + n * 86400000);
 
   const ticket1 = await prisma.ticket.create({
     data: {
@@ -336,6 +387,7 @@ async function main() {
         "Update hero section to match new brand colours and layout.",
       status: TicketStatus.IN_PROGRESS,
       priority: TicketPriority.HIGH,
+      dueDate: daysFromNow(5),
       companyId: company.id,
       projectId: websiteProject.id,
       createdById: customerPM.id,
@@ -352,6 +404,7 @@ async function main() {
         "Create a hero illustration for the pricing page header.",
       status: TicketStatus.TODO,
       priority: TicketPriority.MEDIUM,
+      dueDate: daysFromNow(-3),
       companyId: company.id,
       projectId: websiteProject.id,
       createdById: customerOwner.id,
@@ -368,6 +421,7 @@ async function main() {
         "Design illustrations for each step in the onboarding flow.",
       status: TicketStatus.IN_REVIEW,
       priority: TicketPriority.HIGH,
+      dueDate: daysFromNow(12),
       companyId: company.id,
       projectId: onboardingProject.id,
       createdById: customerOwner.id,
@@ -384,6 +438,7 @@ async function main() {
         "Cover illustration for upcoming product blog post.",
       status: TicketStatus.TODO,
       priority: TicketPriority.LOW,
+      dueDate: daysFromNow(25),
       companyId: company.id,
       projectId: onboardingProject.id,
       createdById: customerPM.id,
@@ -394,6 +449,23 @@ async function main() {
   });
 
   console.log("✅ Tickets created.");
+
+  // ---------------------------------------------------------------------------
+  // 6b) TAG ASSIGNMENTS
+  // ---------------------------------------------------------------------------
+
+  await prisma.ticketTagAssignment.createMany({
+    data: [
+      { ticketId: ticket1.id, tagId: tagWebsite.id },
+      { ticketId: ticket1.id, tagId: tagBranding.id },
+      { ticketId: ticket2.id, tagId: tagWebsite.id },
+      { ticketId: ticket3.id, tagId: tagBranding.id },
+      { ticketId: ticket3.id, tagId: tagUrgent.id },
+      { ticketId: ticket4.id, tagId: tagSocialMedia.id },
+    ],
+  });
+
+  console.log("✅ Tag assignments created.");
 
   // ---------------------------------------------------------------------------
   // 7) TOKEN LEDGER + WITHDRAWALS (basit demo)

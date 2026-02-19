@@ -9,6 +9,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { InlineAlert } from "@/components/ui/inline-alert";
+import { EmptyState } from "@/components/ui/empty-state";
+import { LoadingState } from "@/components/ui/loading-state";
 
 type CompanyPlan = {
   id: string;
@@ -217,37 +220,7 @@ export default function AdminPlanAssignmentPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
-      <div className="mx-auto max-w-6xl px-6 py-10">
-        {/* Top navigation */}
-        <header className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f15b2b] text-sm font-semibold text-white">
-              B
-            </div>
-            <span className="text-lg font-semibold tracking-tight">
-              Brandbite
-            </span>
-          </div>
-          <nav className="hidden items-center gap-6 text-sm text-[#7a7a7a] md:flex">
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() => (window.location.href = "/admin/companies")}
-            >
-              Companies
-            </button>
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() => (window.location.href = "/admin/plans")}
-            >
-              Plans
-            </button>
-            <button className="font-medium text-[#424143]">
-              Plan assignment
-            </button>
-          </nav>
-        </header>
-
+    <>
         {/* Page header */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -264,26 +237,21 @@ export default function AdminPlanAssignmentPage() {
 
         {/* Error */}
         {error && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-white px-4 py-3 text-sm text-red-700">
-            <p className="font-medium">Error</p>
-            <p className="mt-1">{error}</p>
-          </div>
+          <InlineAlert variant="error" title="Something went wrong" className="mb-4">
+            {error}
+          </InlineAlert>
         )}
 
         {/* Info / status */}
-        {(saveMessage || saveError) && (
-          <div className="mb-4 flex flex-wrap gap-3">
-            {saveMessage && (
-              <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-700">
-                {saveMessage}
-              </div>
-            )}
-            {saveError && (
-              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-                {saveError}
-              </div>
-            )}
-          </div>
+        {saveMessage && (
+          <InlineAlert variant="success" className="mb-4">
+            {saveMessage}
+          </InlineAlert>
+        )}
+        {saveError && (
+          <InlineAlert variant="error" className="mb-4">
+            {saveError}
+          </InlineAlert>
         )}
 
         {/* Content */}
@@ -298,13 +266,9 @@ export default function AdminPlanAssignmentPage() {
           </div>
 
           {loading ? (
-            <div className="py-6 text-center text-sm text-[#7a7a7a]">
-              Loading companies and plans…
-            </div>
+            <LoadingState message="Loading companies and plans…" />
           ) : companies.length === 0 ? (
-            <div className="py-6 text-center text-sm text-[#9a9892]">
-              No companies found.
-            </div>
+            <EmptyState title="No companies found." description="Once companies are created, they will appear here for plan assignment." />
           ) : (
             <div className="max-h-[480px] overflow-auto">
               <table className="min-w-full text-left text-sm">
@@ -400,7 +364,6 @@ export default function AdminPlanAssignmentPage() {
             </div>
           )}
         </section>
-      </div>
-    </div>
+    </>
   );
 }

@@ -9,7 +9,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CustomerNav } from "@/components/navigation/customer-nav";
+import { EmptyState } from "@/components/ui/empty-state";
+import { InlineAlert } from "@/components/ui/inline-alert";
+import { LoadingState } from "@/components/ui/loading-state";
 
 type LedgerDirection = "CREDIT" | "DEBIT";
 
@@ -152,13 +154,9 @@ export default function CustomerTokensPage() {
     direction === "CREDIT" ? "Credit" : "Debit";
 
   return (
-    <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
-      <div className="mx-auto max-w-6xl px-6 py-10">
-        {/* Top navigation */}
-        <CustomerNav />
-
-        {/* Page header */}
-        <div className="mb-4 mt-2 flex flex-wrap items-center justify-between gap-4">
+    <>
+      {/* Page header */}
+      <div className="mb-4 mt-2 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">
               Tokens overview
@@ -198,10 +196,9 @@ export default function CustomerTokensPage() {
 
         {/* Error state */}
         {error && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-white px-4 py-3 text-sm text-red-700">
-            <p className="font-medium">Error</p>
-            <p className="mt-1">{error}</p>
-          </div>
+          <InlineAlert variant="error" title="Error" className="mb-4">
+            {error}
+          </InlineAlert>
         )}
 
         {/* Summary cards */}
@@ -309,13 +306,9 @@ export default function CustomerTokensPage() {
           </div>
 
           {loading ? (
-            <div className="py-6 text-center text-sm text-[#7a7a7a]">
-              Loading token ledger…
-            </div>
+            <LoadingState message="Loading token ledger…" />
           ) : filteredLedger.length === 0 ? (
-            <div className="py-6 text-center text-sm text-[#9a9892]">
-              No token movements yet.
-            </div>
+            <EmptyState title="No token movements yet." />
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-xs">
@@ -375,7 +368,6 @@ export default function CustomerTokensPage() {
             </div>
           )}
         </section>
-      </div>
-    </div>
+    </>
   );
 }

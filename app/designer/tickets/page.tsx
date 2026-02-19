@@ -10,6 +10,24 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { DataTable, THead, TH, TD } from "@/components/ui/data-table";
+import { EmptyState } from "@/components/ui/empty-state";
+import { FormSelect } from "@/components/ui/form-field";
+import { InlineAlert } from "@/components/ui/inline-alert";
+import { LoadingState } from "@/components/ui/loading-state";
+import { useToast } from "@/components/ui/toast-provider";
+import { Badge } from "@/components/ui/badge";
+import {
+  priorityBadgeVariant,
+  statusBadgeVariant,
+  formatPriorityLabel,
+  formatBoardDate,
+  STATUS_LABELS,
+  STATUS_ORDER,
+  PRIORITY_ORDER,
+  isDueDateOverdue,
+  isDueDateSoon,
+} from "@/lib/board";
 
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -52,6 +70,7 @@ type DesignerTicketsResponse = {
 
 export default function DesignerTicketsPage() {
   const router = useRouter();
+  const { showToast } = useToast();
 
   const [data, setData] = useState<DesignerTicketsResponse | null>(
     null,
@@ -148,6 +167,55 @@ export default function DesignerTicketsPage() {
     });
   }, [tickets, statusFilter, projectFilter]);
 
+  // ---------------------------------------------------------------------------
+  // Column sorting
+  // ---------------------------------------------------------------------------
+
+  type SortField = "status" | "priority" | "due";
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDir(field === "due" ? "desc" : "asc");
+    }
+  };
+
+  const sortedTickets = useMemo(() => {
+    if (!sortField) return filteredTickets;
+
+    const copy = [...filteredTickets];
+
+    copy.sort((a, b) => {
+      let cmp = 0;
+
+      switch (sortField) {
+        case "status":
+          cmp =
+            STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
+          break;
+        case "priority":
+          cmp =
+            PRIORITY_ORDER.indexOf(a.priority) -
+            PRIORITY_ORDER.indexOf(b.priority);
+          break;
+        case "due": {
+          const aTime = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+          const bTime = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+          cmp = aTime - bTime;
+          break;
+        }
+      }
+
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+
+    return copy;
+  }, [filteredTickets, sortField, sortDir]);
+
   const handleStatusChange = async (
     ticketId: string,
     newStatus: TicketStatus,
@@ -172,6 +240,7 @@ export default function DesignerTicketsPage() {
         throw new Error(msg);
       }
 
+      showToast({ type: "success", title: "Ticket status updated." });
       await load();
     } catch (err: unknown) {
       console.error("Designer ticket update error:", err);
@@ -180,97 +249,24 @@ export default function DesignerTicketsPage() {
           ? err.message
           : "Failed to update ticket. Please try again.";
       setError(message);
+      showToast({ type: "error", title: message });
     } finally {
       setUpdatingId(null);
     }
   };
 
-  const formatDate = (iso: string | null) => {
-    if (!iso) return "—";
-    const d = new Date(iso);
-    return d.toLocaleDateString();
-  };
-
-  const formatStatusLabel = (status: TicketStatus) => {
-    switch (status) {
-      case "TODO":
-        return "To do";
-      case "IN_PROGRESS":
-        return "In progress";
-      case "IN_REVIEW":
-        return "In review";
-      case "DONE":
-        return "Done";
-    }
-  };
-
-  const statusBadgeClass = (status: TicketStatus) => {
-    switch (status) {
-      case "TODO":
-        return "bg-[#f4f1ff] text-[#4a3fb3]";
-      case "IN_PROGRESS":
-        return "bg-[#e9f6ff] text-[#1d72b8]";
-      case "IN_REVIEW":
-        return "bg-[#fff7e0] text-[#8a6b1f]";
-      case "DONE":
-        return "bg-[#f0fff6] text-[#137a3a]";
-    }
-  };
-
-  const priorityBadgeClass = (priority: TicketPriority) => {
-    switch (priority) {
-      case "LOW":
-        return "bg-[#eef4ff] text-[#274690]";
-      case "MEDIUM":
-        return "bg-[#eaf4ff] text-[#1d72b8]";
-      case "HIGH":
-        return "bg-[#fff7e0] text-[#8a6b1f]";
-      case "URGENT":
-        return "bg-[#fde8e7] text-[#b13832]";
-    }
-  };
 
   const isUpdating = (id: string) => updatingId === id;
 
   return (
-    <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
-      <div className="mx-auto max-w-6xl px-6 py-10">
-        {/* Top navigation */}
-        <header className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f15b2b] text-sm font-semibold text-white">
-              B
-            </div>
-            <span className="text-lg font-semibold tracking-tight">
-              Brandbite
-            </span>
-          </div>
-          <nav className="hidden items-center gap-6 text-sm text-[#7a7a7a] md:flex">
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() => router.push("/designer/balance")}
-            >
-              Balance
-            </button>
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() => router.push("/designer/withdrawals")}
-            >
-              Withdrawals
-            </button>
-            <button className="font-medium text-[#424143]">
-              Tickets
-            </button>
-          </nav>
-        </header>
-
-        {/* Page header */}
+    <>
+      {/* Page header */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">
               My tickets
             </h1>
-            <p className="mt-1 text-sm text-[#7a7a7a]">
+            <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
               Tickets assigned to you, across all customer projects. You can
               move tickets between{" "}
               <span className="font-medium">To do</span>,{" "}
@@ -284,22 +280,21 @@ export default function DesignerTicketsPage() {
 
         {/* Error */}
         {error && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-white px-4 py-3 text-sm text-red-700">
-            <p className="font-medium">Error</p>
-            <p className="mt-1">{error}</p>
-          </div>
+          <InlineAlert variant="error" title="Error" className="mb-4">
+            {error}
+          </InlineAlert>
         )}
 
         {/* Summary cards */}
         <section className="mb-6 grid gap-4 md:grid-cols-4">
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
               Total
             </p>
-            <p className="mt-2 text-3xl font-semibold text-[#424143]">
+            <p className="mt-2 text-3xl font-semibold text-[var(--bb-secondary)]">
               {loading ? "—" : data ? data.stats.total : 0}
             </p>
-            <p className="mt-1 text-xs text-[#9a9892]">
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               All tickets assigned to you.
             </p>
           </div>
@@ -308,19 +303,19 @@ export default function DesignerTicketsPage() {
             .map((status) => (
               <div
                 key={status}
-                className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm"
+                className="rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-4 shadow-sm"
               >
-                <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
-                  {formatStatusLabel(status)}
+                <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
+                  {STATUS_LABELS[status]}
                 </p>
-                <p className="mt-2 text-2xl font-semibold text-[#424143]">
+                <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
                   {loading
                     ? "—"
                     : data
                     ? data.stats.byStatus[status]
                     : 0}
                 </p>
-                <p className="mt-1 text-xs text-[#9a9892]">
+                <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
                   Tickets currently in this state.
                 </p>
               </div>
@@ -328,36 +323,36 @@ export default function DesignerTicketsPage() {
         </section>
 
         {/* Filters */}
-        <section className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
+        <section className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-4 shadow-sm">
           <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-[#424143]">
+            <label className="text-xs font-medium text-[var(--bb-secondary)]">
               Status
             </label>
-            <select
+            <FormSelect
               value={statusFilter}
               onChange={(e) =>
                 setStatusFilter(
                   e.target.value as "ALL" | TicketStatus,
                 )
               }
-              className="rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+              className="w-auto"
             >
               <option value="ALL">All</option>
               <option value="TODO">To do</option>
               <option value="IN_PROGRESS">In progress</option>
               <option value="IN_REVIEW">In review</option>
               <option value="DONE">Done</option>
-            </select>
+            </FormSelect>
           </div>
 
           <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-[#424143]">
+            <label className="text-xs font-medium text-[var(--bb-secondary)]">
               Project
             </label>
-            <select
+            <FormSelect
               value={projectFilter}
               onChange={(e) => setProjectFilter(e.target.value)}
-              className="rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+              className="w-auto"
             >
               <option value="ALL">All projects</option>
               {projects.map((p) => (
@@ -365,167 +360,172 @@ export default function DesignerTicketsPage() {
                   {p}
                 </option>
               ))}
-            </select>
+            </FormSelect>
           </div>
         </section>
 
         {/* Tickets table */}
-        <section className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
+        <section>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold tracking-tight">
               Assigned tickets
             </h2>
-            <p className="text-xs text-[#9a9892]">
+            <p className="text-xs text-[var(--bb-text-tertiary)]">
               Showing {filteredTickets.length} of {tickets.length} tickets.
             </p>
           </div>
 
           {loading ? (
-            <div className="py-6 text-center text-sm text-[#7a7a7a]">
-              Loading tickets…
-            </div>
+            <LoadingState message="Loading tickets…" />
           ) : filteredTickets.length === 0 ? (
-            <div className="py-6 text-center text-sm text-[#9a9892]">
-              No tickets match your filters.
-            </div>
+            <EmptyState title="No tickets match your filters." />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-[#e3e1dc] text-xs uppercase tracking-[0.08em] text-[#9a9892]">
-                    <th className="px-2 py-2">Ticket</th>
-                    <th className="px-2 py-2">Project</th>
-                    <th className="px-2 py-2">Status</th>
-                    <th className="px-2 py-2">Priority</th>
-                    <th className="px-2 py-2">Payout</th>
-                    <th className="px-2 py-2">Due</th>
-                    <th className="px-2 py-2">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredTickets.map((t) => {
-                    const statusLabel = formatStatusLabel(t.status);
-                    const ticketCode =
-                      t.project?.code && t.companyTicketNumber != null
-                        ? `${t.project.code}-${t.companyTicketNumber}`
-                        : t.companyTicketNumber != null
-                        ? `#${t.companyTicketNumber}`
-                        : t.id;
+            <DataTable>
+              <THead>
+                <TH>Ticket</TH>
+                <TH>Project</TH>
+                <TH
+                  sortable
+                  sortDirection={sortField === "status" ? sortDir : null}
+                  onSort={() => handleSort("status")}
+                >
+                  Status
+                </TH>
+                <TH
+                  sortable
+                  sortDirection={sortField === "priority" ? sortDir : null}
+                  onSort={() => handleSort("priority")}
+                >
+                  Priority
+                </TH>
+                <TH>Payout</TH>
+                <TH
+                  sortable
+                  sortDirection={sortField === "due" ? sortDir : null}
+                  onSort={() => handleSort("due")}
+                >
+                  Due
+                </TH>
+                <TH>Actions</TH>
+              </THead>
+              <tbody>
+                {sortedTickets.map((t) => {
+                  const statusLabel = STATUS_LABELS[t.status];
+                  const ticketCode =
+                    t.project?.code && t.companyTicketNumber != null
+                      ? `${t.project.code}-${t.companyTicketNumber}`
+                      : t.companyTicketNumber != null
+                      ? `#${t.companyTicketNumber}`
+                      : t.id;
 
-                    const payoutTokens =
-                      t.jobType?.designerPayoutTokens ?? 0;
+                  const payoutTokens =
+                    t.jobType?.designerPayoutTokens ?? 0;
 
-                    return (
-                      <tr
-                        key={t.id}
-                        className="border-b border-[#f0eeea] text-xs last:border-b-0"
-                      >
-                        <td className="px-2 py-2 align-top text-[11px] text-[#424143]">
-                          <div className="font-medium">
-                            {ticketCode}
-                          </div>
-                          <div className="text-[11px] text-[#7a7a7a]">
-                            {t.title}
-                          </div>
-                        </td>
-                        <td className="px-2 py-2 align-top text-[11px] text-[#424143]">
-                          {t.project ? (
-                            <>
-                              <div className="font-medium">
-                                {t.project.name}
-                              </div>
-                              <div className="text-[10px] text-[#9a9892]">
-                                {t.company?.name}
-                              </div>
-                            </>
-                          ) : (
-                            "—"
+                  return (
+                    <tr
+                      key={t.id}
+                      className="border-b border-[var(--bb-border-subtle)] text-xs last:border-b-0 cursor-pointer transition-colors hover:bg-[var(--bb-bg-warm)]"
+                      onClick={() =>
+                        router.push(
+                          `/designer/tickets/${t.id}`,
+                        )
+                      }
+                    >
+                      <TD>
+                        <div className="font-medium">
+                          {ticketCode}
+                        </div>
+                        <div className="text-xs text-[var(--bb-text-secondary)]">
+                          {t.title}
+                        </div>
+                      </TD>
+                      <TD>
+                        {t.project ? (
+                          <>
+                            <div className="font-medium">
+                              {t.project.name}
+                            </div>
+                            <div className="text-xs text-[var(--bb-text-tertiary)]">
+                              {t.company?.name}
+                            </div>
+                          </>
+                        ) : (
+                          "—"
+                        )}
+                      </TD>
+                      <TD>
+                        <Badge variant={statusBadgeVariant(t.status)}>{statusLabel}</Badge>
+                      </TD>
+                      <TD>
+                        <Badge variant={priorityBadgeVariant(t.priority)}>{formatPriorityLabel(t.priority)}</Badge>
+                      </TD>
+                      <TD>
+                        {payoutTokens > 0
+                          ? `${payoutTokens} tokens`
+                          : "—"}
+                      </TD>
+                      <TD>
+                        {t.dueDate ? (
+                          <span
+                            className={
+                              isDueDateOverdue(t.dueDate)
+                                ? "font-semibold text-[var(--bb-danger-text)]"
+                                : isDueDateSoon(t.dueDate)
+                                  ? "font-semibold text-[var(--bb-warning-text)]"
+                                  : ""
+                            }
+                          >
+                            {formatBoardDate(t.dueDate)}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </TD>
+                      <TD onClick={(e) => e.stopPropagation()}>
+                        <div className="flex flex-col gap-2">
+                          <FormSelect
+                            value={t.status}
+                            onChange={(e) =>
+                              handleStatusChange(
+                                t.id,
+                                e.target
+                                  .value as TicketStatus,
+                              )
+                            }
+                            disabled={isUpdating(t.id) || t.status === "DONE"}
+                            size="sm"
+                            className="w-auto"
+                          >
+                            <option value="TODO">
+                              To do
+                            </option>
+                            <option value="IN_PROGRESS">
+                              In progress
+                            </option>
+                            <option value="IN_REVIEW">
+                              In review
+                            </option>
+                            {/* Designers cannot set DONE; clients close tickets */}
+                          </FormSelect>
+                          {isUpdating(t.id) && (
+                            <span className="text-xs text-[var(--bb-text-tertiary)]">
+                              Updating status…
+                            </span>
                           )}
-                        </td>
-                        <td className="px-2 py-2 align-top text-[11px]">
-                          <span
-                            className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusBadgeClass(
-                              t.status,
-                            )}`}
-                          >
-                            {statusLabel}
-                          </span>
-                        </td>
-                        <td className="px-2 py-2 align-top text-[11px]">
-                          <span
-                            className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${priorityBadgeClass(
-                              t.priority,
-                            )}`}
-                          >
-                            {t.priority}
-                          </span>
-                        </td>
-                        <td className="px-2 py-2 align-top text-[11px] text-[#424143]">
-                          {payoutTokens > 0
-                            ? `${payoutTokens} tokens`
-                            : "—"}
-                        </td>
-                        <td className="px-2 py-2 align-top text-[11px] text-[#7a7a7a]">
-                          {formatDate(t.dueDate)}
-                        </td>
-                        <td className="px-2 py-2 align-top text-[11px]">
-                          <div className="flex flex-col gap-2">
-                            <select
-                              value={t.status}
-                              onChange={(e) =>
-                                handleStatusChange(
-                                  t.id,
-                                  e.target
-                                    .value as TicketStatus,
-                                )
-                              }
-                              disabled={isUpdating(t.id) || t.status === "DONE"}
-                              className="rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-2 py-1 text-[11px] text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
-                            >
-                              <option value="TODO">
-                                To do
-                              </option>
-                              <option value="IN_PROGRESS">
-                                In progress
-                              </option>
-                              <option value="IN_REVIEW">
-                                In review
-                              </option>
-                              {/* Designers cannot set DONE; clients close tickets */}
-                            </select>
-                            {isUpdating(t.id) && (
-                              <span className="text-[10px] text-[#9a9892]">
-                                Updating status…
-                              </span>
-                            )}
-                            {t.status === "DONE" && (
-                              <span className="text-[10px] text-[#9a9892]">
-                                Ticket is done. Only the client can reopen it.
-                              </span>
-                            )}
-
-                            <button
-                              type="button"
-                              onClick={() =>
-                                router.push(
-                                  `/designer/tickets/${t.id}`,
-                                )
-                              }
-                              className="inline-flex items-center text-[11px] font-medium text-[#1d72b8] hover:underline"
-                            >
-                              View details ↗
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                          {t.status === "DONE" && (
+                            <span className="text-xs text-[var(--bb-text-tertiary)]">
+                              Ticket is done. Only the client can reopen it.
+                            </span>
+                          )}
+                        </div>
+                      </TD>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </DataTable>
           )}
         </section>
-      </div>
-    </div>
+    </>
   );
 }

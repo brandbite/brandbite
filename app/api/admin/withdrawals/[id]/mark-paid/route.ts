@@ -14,9 +14,9 @@ import { WithdrawalStatus } from "@prisma/client";
  */
 export async function POST(
   _request: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
-  const id = context.params.id;
+  const { id } = await context.params;
 
   if (!id) {
     return NextResponse.json(

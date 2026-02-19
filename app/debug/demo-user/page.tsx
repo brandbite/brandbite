@@ -11,6 +11,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { DEMO_PERSONAS } from "@/lib/demo-personas";
+import { InlineAlert } from "@/components/ui/inline-alert";
 
 const personas = DEMO_PERSONAS;
 
@@ -76,9 +77,9 @@ export default function DebugDemoUserPage() {
           </header>
 
           {error && (
-            <div className="mb-4 rounded-lg border border-red-200 bg-[#fff7f7] px-3 py-2 text-sm text-red-700">
+            <InlineAlert variant="error" className="mb-4">
               {error}
-            </div>
+            </InlineAlert>
           )}
 
           <div className="grid gap-4 md:grid-cols-2">

@@ -9,6 +9,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { DataTable, THead, TH, TD } from "@/components/ui/data-table";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { FormSelect } from "@/components/ui/form-field";
+import { InlineAlert } from "@/components/ui/inline-alert";
+import { LoadingState } from "@/components/ui/loading-state";
 import { useToast } from "@/components/ui/toast-provider";
 
 type WithdrawalStatus = "PENDING" | "APPROVED" | "REJECTED" | "PAID";
@@ -252,33 +259,15 @@ export default function AdminWithdrawalsPage() {
   };
 
   const renderStatusBadge = (status: WithdrawalStatus) => {
-    const base =
-      "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold";
     switch (status) {
       case "PENDING":
-        return (
-          <span className={`${base} bg-[#fff7e0] text-[#8a6b1f]`}>
-            Pending
-          </span>
-        );
+        return <Badge variant="warning">Pending</Badge>;
       case "APPROVED":
-        return (
-          <span className={`${base} bg-[#f0fff6] text-[#137a3a]`}>
-            Approved
-          </span>
-        );
+        return <Badge variant="success">Approved</Badge>;
       case "REJECTED":
-        return (
-          <span className={`${base} bg-[#fde8e7] text-[#b13832]`}>
-            Rejected
-          </span>
-        );
+        return <Badge variant="danger">Rejected</Badge>;
       case "PAID":
-        return (
-          <span className={`${base} bg-[#e7f0ff] text-[#214f9c]`}>
-            Paid
-          </span>
-        );
+        return <Badge variant="info">Paid</Badge>;
     }
   };
 
@@ -286,31 +275,7 @@ export default function AdminWithdrawalsPage() {
     actionLoadingId === `${id}:${action}`;
 
   return (
-    <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
-      <div className="mx-auto max-w-6xl px-6 py-10">
-        {/* Top navigation */}
-        <header className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f15b2b] text-sm font-semibold text-white">
-              B
-            </div>
-            <span className="text-lg font-semibold tracking-tight">
-              Brandbite
-            </span>
-          </div>
-          <nav className="hidden items-center gap-6 text-sm text-[#7a7a7a] md:flex">
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() => (window.location.href = "/admin/ledger")}
-            >
-              Ledger
-            </button>
-            <button className="font-medium text-[#424143]">
-              Withdrawals
-            </button>
-          </nav>
-        </header>
-
+    <>
         {/* Page header */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -325,10 +290,9 @@ export default function AdminWithdrawalsPage() {
 
         {/* Error */}
         {error && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-white px-4 py-3 text-sm text-red-700">
-            <p className="font-medium">Error</p>
-            <p className="mt-1">{error}</p>
-          </div>
+          <InlineAlert variant="error" title="Error" className="mb-4">
+            {error}
+          </InlineAlert>
         )}
 
         {/* Summary cards */}
@@ -379,29 +343,29 @@ export default function AdminWithdrawalsPage() {
             <label className="text-xs font-medium text-[#424143]">
               Status
             </label>
-            <select
+            <FormSelect
+              className="w-auto"
               value={statusFilter}
               onChange={(e) =>
                 setStatusFilter(e.target.value as "ALL" | WithdrawalStatus)
               }
-              className="rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
             >
               <option value="ALL">All</option>
               <option value="PENDING">Pending</option>
               <option value="APPROVED">Approved</option>
               <option value="REJECTED">Rejected</option>
               <option value="PAID">Paid</option>
-            </select>
+            </FormSelect>
           </div>
 
           <div className="flex items-center gap-2">
             <label className="text-xs font-medium text-[#424143]">
               Designer
             </label>
-            <select
+            <FormSelect
+              className="w-auto"
               value={designerFilter}
               onChange={(e) => setDesignerFilter(e.target.value)}
-              className="rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
             >
               <option value="ALL">All designers</option>
               {designers.map((d) => (
@@ -409,7 +373,7 @@ export default function AdminWithdrawalsPage() {
                   {d}
                 </option>
               ))}
-            </select>
+            </FormSelect>
           </div>
         </section>
 
@@ -425,115 +389,101 @@ export default function AdminWithdrawalsPage() {
           </div>
 
           {loading ? (
-            <div className="py-6 text-center text-sm text-[#7a7a7a]">
-              Loading withdrawals…
-            </div>
+            <LoadingState message="Loading withdrawals…" />
           ) : filteredWithdrawals.length === 0 ? (
-            <div className="py-6 text-center text-sm text-[#9a9892]">
-              No withdrawals match your filters.
-            </div>
+            <EmptyState title="No withdrawals match your filters." />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-[#e3e1dc] text-xs uppercase tracking-[0.08em] text-[#9a9892]">
-                    <th className="px-2 py-2">Created</th>
-                    <th className="px-2 py-2">Designer</th>
-                    <th className="px-2 py-2">Amount</th>
-                    <th className="px-2 py-2">Status</th>
-                    <th className="px-2 py-2">Approved at</th>
-                    <th className="px-2 py-2">Paid at</th>
-                    <th className="px-2 py-2">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredWithdrawals.map((w) => {
-                    const designerLabel = w.designer.name || w.designer.email;
+            <DataTable>
+              <THead>
+                <TH>Created</TH>
+                <TH>Designer</TH>
+                <TH>Amount</TH>
+                <TH>Status</TH>
+                <TH>Approved at</TH>
+                <TH>Paid at</TH>
+                <TH>Actions</TH>
+              </THead>
+              <tbody>
+                {filteredWithdrawals.map((w) => {
+                  const designerLabel = w.designer.name || w.designer.email;
 
-                    const canApprove = w.status === "PENDING";
-                    const canReject = w.status === "PENDING";
-                    const canMarkPaid = w.status === "APPROVED";
+                  const canApprove = w.status === "PENDING";
+                  const canReject = w.status === "PENDING";
+                  const canMarkPaid = w.status === "APPROVED";
 
-                    return (
-                      <tr
-                        key={w.id}
-                        className="border-b border-[#f0eeea] text-xs last:border-b-0"
-                      >
-                        <td className="px-2 py-2 align-top text-[11px] text-[#7a7a7a]">
-                          {formatDateTime(w.createdAt)}
-                        </td>
-                        <td className="px-2 py-2 align-top text-[11px] text-[#424143]">
-                          <div className="font-medium">{designerLabel}</div>
-                          <div className="text-[10px] text-[#9a9892]">
-                            {w.designer.email}
-                          </div>
-                        </td>
-                        <td className="px-2 py-2 align-top text-[11px] text-[#424143]">
-                          {w.amountTokens} tokens
-                        </td>
-                        <td className="px-2 py-2 align-top text-[11px]">
-                          <div className="space-y-1">
-                            {renderStatusBadge(w.status)}
-                            {w.status === "REJECTED" && w.adminRejectReason && (
-                              <p className="text-[10px] text-[#b13832]">
-                                {w.adminRejectReason}
-                              </p>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-2 py-2 align-top text-[11px] text-[#7a7a7a]">
-                          {formatDateTime(w.approvedAt)}
-                        </td>
-                        <td className="px-2 py-2 align-top text-[11px] text-[#7a7a7a]">
-                          {formatDateTime(w.paidAt)}
-                        </td>
-                        <td className="px-2 py-2 align-top text-[11px]">
-                          <div className="flex flex-wrap gap-2">
-                            <button
-                              disabled={
-                                !canApprove || isActionLoading(w.id, "APPROVE")
-                              }
-                              onClick={() => handleAction(w.id, "APPROVE")}
-                              className="rounded-full border border-[#e3e1dc] bg-[#fbfaf8] px-3 py-1 text-[11px] font-medium text-[#424143] disabled:opacity-50"
-                            >
-                              {isActionLoading(w.id, "APPROVE")
-                                ? "Approving…"
-                                : "Approve"}
-                            </button>
-                            <button
-                              disabled={
-                                !canReject || isActionLoading(w.id, "REJECT")
-                              }
-                              onClick={() => handleAction(w.id, "REJECT")}
-                              className="rounded-full border border-[#fde0de] bg-[#fff7f6] px-3 py-1 text-[11px] font-medium text-[#b13832] disabled:opacity-50"
-                            >
-                              {isActionLoading(w.id, "REJECT")
-                                ? "Rejecting…"
-                                : "Reject"}
-                            </button>
-                            <button
-                              disabled={
-                                !canMarkPaid ||
-                                isActionLoading(w.id, "MARK_PAID")
-                              }
-                              onClick={() => handleAction(w.id, "MARK_PAID")}
-                              className="rounded-full border border-[#d6e4ff] bg-[#f4f7ff] px-3 py-1 text-[11px] font-medium text-[#214f9c] disabled:opacity-50"
-                            >
-                              {isActionLoading(w.id, "MARK_PAID")
-                                ? "Marking…"
-                                : "Mark as paid"}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                  return (
+                    <tr
+                      key={w.id}
+                      className="border-b border-[#f0eeea] last:border-b-0"
+                    >
+                      <TD className="text-[#7a7a7a]">
+                        {formatDateTime(w.createdAt)}
+                      </TD>
+                      <TD>
+                        <div className="font-medium">{designerLabel}</div>
+                        <div className="text-[10px] text-[#9a9892]">
+                          {w.designer.email}
+                        </div>
+                      </TD>
+                      <TD>
+                        {w.amountTokens} tokens
+                      </TD>
+                      <TD>
+                        <div className="space-y-1">
+                          {renderStatusBadge(w.status)}
+                          {w.status === "REJECTED" && w.adminRejectReason && (
+                            <p className="text-[10px] text-[#b13832]">
+                              {w.adminRejectReason}
+                            </p>
+                          )}
+                        </div>
+                      </TD>
+                      <TD className="text-[#7a7a7a]">
+                        {formatDateTime(w.approvedAt)}
+                      </TD>
+                      <TD className="text-[#7a7a7a]">
+                        {formatDateTime(w.paidAt)}
+                      </TD>
+                      <TD>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            disabled={!canApprove}
+                            loading={isActionLoading(w.id, "APPROVE")}
+                            loadingText="Approving…"
+                            onClick={() => handleAction(w.id, "APPROVE")}
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            disabled={!canReject}
+                            loading={isActionLoading(w.id, "REJECT")}
+                            loadingText="Rejecting…"
+                            onClick={() => handleAction(w.id, "REJECT")}
+                          >
+                            Reject
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            disabled={!canMarkPaid}
+                            loading={isActionLoading(w.id, "MARK_PAID")}
+                            loadingText="Marking…"
+                            onClick={() => handleAction(w.id, "MARK_PAID")}
+                          >
+                            Mark as paid
+                          </Button>
+                        </div>
+                      </TD>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </DataTable>
           )}
         </section>
-      </div>
-    </div>
+    </>
   );
 }

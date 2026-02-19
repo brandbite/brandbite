@@ -86,6 +86,17 @@ enum BillingStatus {
   CANCELED
 }
 
+// --- Notifications ---
+
+enum NotificationType {
+  REVISION_SUBMITTED    // Designer submitted a new revision
+  FEEDBACK_SUBMITTED    // Customer submitted revision feedback (pins)
+  TICKET_COMPLETED      // Ticket marked as DONE
+  TICKET_ASSIGNED       // Ticket assigned to designer
+  TICKET_STATUS_CHANGED // Any status transition
+  PIN_RESOLVED          // Designer resolved a pin
+}
+
 // --- Assets & Annotations ---
 
 enum AssetKind {
@@ -96,6 +107,17 @@ enum AssetKind {
 enum PinStatus {
   OPEN
   RESOLVED
+}
+
+enum TagColor {
+  GRAY
+  BLUE
+  GREEN
+  ORANGE
+  RED
+  PURPLE
+  PINK
+  YELLOW
 }
 
 // -----------------------------------------------------------------------------
@@ -136,6 +158,11 @@ model UserAccount {
   resolvedAssetPins   AssetPin[]        @relation("AssetPinResolvedBy")
   assetPinComments    AssetPinComment[]
 
+  // Notifications
+  notifications        Notification[]           @relation("UserNotifications")
+  actedNotifications   Notification[]           @relation("NotificationActor")
+  notificationPrefs    NotificationPreference[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -149,6 +176,8 @@ model Company {
   name String
 
   slug String @unique
+
+  website String? // Company website URL (optional)
 
   planId String?
   plan   Plan?   @relation(fields: [planId], references: [id])
@@ -168,6 +197,9 @@ model Company {
 
   ledgerEntries TokenLedger[]
 
+  // Tags (company-scoped labels for tickets)
+  tags TicketTag[]
+
   // Output presets (optional company overrides)
   outputSizePresets OutputSizePreset[]
 
@@ -177,6 +209,10 @@ model Company {
   billingStatus        BillingStatus?
 
   tokenBalance Int @default(0)
+
+  /// Null = onboarding not yet completed (wizard should be shown).
+  /// Set to now() once the customer finishes the onboarding wizard.
+  onboardingCompletedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -214,6 +250,9 @@ model CompanyInvite {
 
   invitedByUserId String?
   invitedByUser   UserAccount? @relation(fields: [invitedByUserId], references: [id])
+
+  /// The role the invitee will receive upon accepting (defaults to MEMBER)
+  roleInCompany CompanyRole @default(MEMBER)
 
   token  String       @unique
   status InviteStatus @default(PENDING)
@@ -395,6 +434,13 @@ model Ticket {
   jobTypeId String?
   jobType   JobType? @relation(fields: [jobTypeId], references: [id])
 
+  // Quantity multiplier (default 1). Effective cost = jobType.tokenCost * quantity.
+  quantity Int @default(1)
+
+  // Admin overrides — when set, these replace the calculated (jobType cost * quantity).
+  tokenCostOverride      Int?
+  designerPayoutOverride Int?
+
   // Şirket içi ticket numarası
   companyTicketNumber Int?
   revisionCount       Int              @default(0)
@@ -410,9 +456,49 @@ model Ticket {
   comments      TicketComment[]
 
   assignmentLogs TicketAssignmentLog[]
+  notifications  Notification[]
+
+  tagAssignments TicketTagAssignment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// Tags (company-scoped labels for tickets)
+// -----------------------------------------------------------------------------
+
+model TicketTag {
+  id    String   @id @default(cuid())
+  name  String
+  color TagColor @default(GRAY)
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  assignments TicketTagAssignment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+model TicketTagAssignment {
+  id String @id @default(cuid())
+
+  ticketId String
+  ticket   Ticket @relation(fields: [ticketId], references: [id])
+
+  tagId String
+  tag   TicketTag @relation(fields: [tagId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([ticketId, tagId])
+  @@index([ticketId])
+  @@index([tagId])
 }
 
 model TicketComment {
@@ -606,6 +692,63 @@ model Withdrawal {
 
   @@index([designerId, createdAt])
   @@index([status, createdAt])
+}
+
+// -----------------------------------------------------------------------------
+// Notifications
+// -----------------------------------------------------------------------------
+
+model Notification {
+  id String @id @default(cuid())
+
+  userId String
+  user   UserAccount @relation("UserNotifications", fields: [userId], references: [id])
+
+  type NotificationType
+
+  title   String
+  message String
+
+  ticketId String?
+  ticket   Ticket? @relation(fields: [ticketId], references: [id])
+
+  /// The user who triggered this notification (designer or customer)
+  actorId String?
+  actor   UserAccount? @relation("NotificationActor", fields: [actorId], references: [id])
+
+  read   Boolean   @default(false)
+  readAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, read, createdAt])
+  @@index([userId, createdAt])
+}
+
+model NotificationPreference {
+  id String @id @default(cuid())
+
+  userId String
+  user   UserAccount @relation(fields: [userId], references: [id])
+
+  type    NotificationType
+  enabled Boolean          @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, type])
+}
+
+// -----------------------------------------------------------------------------
+// App Settings (key-value store for admin-configurable values)
+// -----------------------------------------------------------------------------
+
+model AppSetting {
+  key   String @id
+  value String
+
+  updatedAt DateTime @updatedAt
 }
 
 // -----------------------------------------------------------------------------

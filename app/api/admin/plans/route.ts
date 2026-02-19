@@ -172,7 +172,7 @@ export async function POST(req: NextRequest) {
       data: {
         name,
         monthlyTokens,
-        priceCents,
+        priceCents: priceCents ?? 0,
         isActive,
         stripeProductId,
         stripePriceId,
@@ -286,7 +286,7 @@ export async function PATCH(req: NextRequest) {
         }
       }
 
-      updateData.priceCents = priceCents;
+      updateData.priceCents = priceCents ?? 0;
     }
 
     if (typeof body.isActive === "boolean") {

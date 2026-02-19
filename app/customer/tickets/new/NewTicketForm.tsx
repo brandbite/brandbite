@@ -16,6 +16,13 @@ import {
   canCreateTickets,
   isBillingReadOnly,
 } from "@/lib/permissions/companyRoles";
+import { Button } from "@/components/ui/button";
+import { FormInput, FormSelect } from "@/components/ui/form-field";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { TagMultiSelect, type TagOption } from "@/components/ui/tag-multi-select";
+import { JobTypePicker } from "@/components/ui/job-type-picker";
+import type { TagColorKey } from "@/lib/tag-colors";
+import { canManageTags as canManageTagsCheck } from "@/lib/permissions/companyRoles";
 
 type ProjectOption = {
   id: string;
@@ -27,12 +34,17 @@ type JobTypeOption = {
   id: string;
   name: string;
   description: string | null;
+  tokenCost?: number;
 };
 
 type Props = {
   companySlug: string;
   projects: ProjectOption[];
   jobTypes: JobTypeOption[];
+  tokenBalance?: number;
+  tags?: TagOption[];
+  canCreateTags?: boolean;
+  onTagCreated?: (tag: TagOption) => void;
   redirectTo?: string;
   onCreated?: (ticket: { id: string; code?: string | null }) => void;
 };
@@ -119,6 +131,10 @@ export default function NewTicketForm({
   companySlug,
   projects,
   jobTypes,
+  tokenBalance,
+  tags: tagsProp,
+  canCreateTags: canCreateTagsProp,
+  onTagCreated,
   redirectTo,
   onCreated,
 }: Props) {
@@ -129,6 +145,40 @@ export default function NewTicketForm({
   const [projectId, setProjectId] = useState<string>("");
   const [jobTypeId, setJobTypeId] = useState<string>("");
   const [priority, setPriority] = useState<TicketPriorityValue>("MEDIUM");
+  const [dueDate, setDueDate] = useState<string>("");
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [localTags, setLocalTags] = useState<TagOption[]>(tagsProp ?? []);
+
+  // Sync when tags prop changes (e.g. after parent re-fetches)
+  useEffect(() => {
+    if (tagsProp) setLocalTags(tagsProp);
+  }, [tagsProp]);
+
+  // Quantity multiplier (1–10), reset when job type changes
+  const [quantity, setQuantity] = useState(1);
+
+  const handleJobTypeChange = (id: string) => {
+    setJobTypeId(id);
+    setQuantity(1);
+  };
+
+  // Derive selected job type for token cost display
+  const selectedJobType = useMemo(
+    () => (jobTypeId ? jobTypes.find((jt) => jt.id === jobTypeId) ?? null : null),
+    [jobTypeId, jobTypes],
+  );
+
+  // Effective cost = unit cost × quantity
+  const effectiveCost =
+    selectedJobType?.tokenCost != null
+      ? selectedJobType.tokenCost * quantity
+      : null;
+
+  // True when a job type is selected and its cost exceeds the company balance
+  const insufficientTokens =
+    tokenBalance != null &&
+    effectiveCost != null &&
+    tokenBalance < effectiveCost;
 
   const [submitting, setSubmitting] = useState(false);
   const [uploadingBriefs, setUploadingBriefs] = useState(false);
@@ -383,6 +433,14 @@ export default function NewTicketForm({
       return;
     }
 
+    // Token balance guard — prevent submission when cost exceeds balance
+    if (insufficientTokens) {
+      setError(
+        `Not enough tokens. This request costs ${effectiveCost} tokens but your balance is ${tokenBalance} tokens.`,
+      );
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -399,7 +457,10 @@ export default function NewTicketForm({
             description,
             projectId: projectId || null,
             jobTypeId: jobTypeId || null,
+            quantity: quantity > 1 ? quantity : undefined,
             priority,
+            dueDate: dueDate || null,
+            tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined,
           }),
         },
       );
@@ -509,12 +570,11 @@ export default function NewTicketForm({
       {/* Title */}
       <div className="space-y-1">
         <label className="text-xs font-medium text-[#424143]">Title</label>
-        <input
+        <FormInput
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Briefly describe what you need designed"
-          className="w-full rounded-md border border-[#d4d2cc] bg-white px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
           disabled={isBusy}
         />
         <p className="text-[11px] text-[#9a9892]">
@@ -525,13 +585,12 @@ export default function NewTicketForm({
       {/* Description */}
       <div className="space-y-1">
         <label className="text-xs font-medium text-[#424143]">Details</label>
-        <textarea
+        <RichTextEditor
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          onChange={setDescription}
           placeholder="Share links, context, and any requirements that will help your designer"
-          rows={5}
-          className="w-full rounded-md border border-[#d4d2cc] bg-white px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
           disabled={isBusy}
+          minHeight="60px"
         />
         <p className="text-[11px] text-[#9a9892]">
           You can always add more context later from the ticket view.
@@ -614,10 +673,9 @@ export default function NewTicketForm({
         <label className="text-xs font-medium text-[#424143]">
           Priority
         </label>
-        <select
+        <FormSelect
           value={priority}
           onChange={(e) => setPriority(e.target.value as TicketPriorityValue)}
-          className="w-full rounded-md border border-[#d4d2cc] bg-white px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
           disabled={isBusy}
         >
           {PRIORITY_OPTIONS.map((opt) => (
@@ -625,9 +683,25 @@ export default function NewTicketForm({
               {opt.label}
             </option>
           ))}
-        </select>
+        </FormSelect>
         <p className="text-[11px] text-[#9a9892]">
           Higher priority requests are more likely to be picked up first.
+        </p>
+      </div>
+
+      {/* Due date */}
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-[#424143]">
+          Due date
+        </label>
+        <FormInput
+          type="date"
+          value={dueDate}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDueDate(e.target.value)}
+          disabled={isBusy}
+        />
+        <p className="text-[11px] text-[#9a9892]">
+          Set a target date for delivery. Optional.
         </p>
       </div>
 
@@ -636,10 +710,9 @@ export default function NewTicketForm({
         <label className="text-xs font-medium text-[#424143]">
           Project
         </label>
-        <select
+        <FormSelect
           value={projectId}
           onChange={(e) => setProjectId(e.target.value)}
-          className="w-full rounded-md border border-[#d4d2cc] bg-white px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
           disabled={isBusy}
         >
           <option value="">No specific project</option>
@@ -648,7 +721,7 @@ export default function NewTicketForm({
               {p.name} {p.code ? `(${p.code})` : ""}
             </option>
           ))}
-        </select>
+        </FormSelect>
         <p className="text-[11px] text-[#9a9892]">
           Use projects to group related requests together.
         </p>
@@ -659,47 +732,154 @@ export default function NewTicketForm({
         <label className="text-xs font-medium text-[#424143]">
           Job type
         </label>
-        <select
+        <JobTypePicker
+          jobTypes={jobTypes}
           value={jobTypeId}
-          onChange={(e) => setJobTypeId(e.target.value)}
-          className="w-full rounded-md border border-[#d4d2cc] bg-white px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+          onChange={handleJobTypeChange}
           disabled={isBusy}
-        >
-          <option value="">Choose a job type</option>
-          {jobTypes.map((jt) => (
-            <option key={jt.id} value={jt.id}>
-              {jt.name}
-              {jt.description ? ` — ${jt.description}` : ""}
-            </option>
-          ))}
-        </select>
-        <p className="text-[11px] text-[#9a9892]">
-          Job types are linked to token costs and designer payouts in the admin
-          panel.
-        </p>
+        />
+
+        {/* Quantity stepper — visible when a job type is selected */}
+        {selectedJobType && (
+          <div className="flex items-center gap-2 pt-1">
+            <span className="text-[11px] text-[#9a9892]">Quantity</span>
+            <div className="inline-flex items-center rounded-md border border-[var(--bb-border-input)]">
+              <button
+                type="button"
+                disabled={isBusy || quantity <= 1}
+                onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                className="flex h-7 w-7 items-center justify-center text-sm text-[#6b6258] hover:bg-[var(--bb-bg-warm)] disabled:opacity-40 disabled:cursor-not-allowed rounded-l-md"
+              >
+                −
+              </button>
+              <span className="flex h-7 w-8 items-center justify-center border-x border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] text-xs font-semibold text-[#424143]">
+                {quantity}
+              </span>
+              <button
+                type="button"
+                disabled={isBusy || quantity >= 10}
+                onClick={() => setQuantity((q) => Math.min(10, q + 1))}
+                className="flex h-7 w-7 items-center justify-center text-sm text-[#6b6258] hover:bg-[var(--bb-bg-warm)] disabled:opacity-40 disabled:cursor-not-allowed rounded-r-md"
+              >
+                +
+              </button>
+            </div>
+            {quantity > 1 && (
+              <span className="text-[11px] text-[#9a9892]">
+                ×{quantity} sets
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Token balance + cost preview */}
+        {tokenBalance != null ? (
+          <div className="flex items-center gap-1.5 text-[11px]">
+            {effectiveCost != null && selectedJobType?.tokenCost != null ? (
+              <>
+                <span className="text-[#9a9892]">
+                  Cost:{" "}
+                  <span className="font-semibold text-[#424143]">
+                    {quantity > 1
+                      ? `${selectedJobType.tokenCost} × ${quantity} = ${effectiveCost} tokens`
+                      : `${effectiveCost} tokens`}
+                  </span>
+                </span>
+                <span className="text-[#d4d2cc]">·</span>
+                {(() => {
+                  const remaining = tokenBalance - effectiveCost;
+                  const isNegative = remaining < 0;
+                  return (
+                    <span className={isNegative ? "text-[#b13832]" : "text-[#9a9892]"}>
+                      Remaining after:{" "}
+                      <span className={`font-semibold ${isNegative ? "text-[#b13832]" : "text-[#424143]"}`}>
+                        {remaining.toLocaleString()} tokens
+                      </span>
+                    </span>
+                  );
+                })()}
+              </>
+            ) : (
+              <span className="text-[#9a9892]">
+                Your balance: <span className="font-semibold text-[#424143]">{tokenBalance.toLocaleString()} tokens</span>
+              </span>
+            )}
+          </div>
+        ) : (
+          <p className="text-[11px] text-[#9a9892]">
+            Job types are linked to token costs and designer payouts.
+          </p>
+        )}
+
+        {insufficientTokens && (
+          <div className="mt-1.5 rounded-md border border-red-200 bg-[#fff7f7] px-2.5 py-1.5 text-[11px] text-red-700">
+            Not enough tokens to create this ticket. Choose a different job type or top up your balance.
+          </div>
+        )}
       </div>
+
+      {/* Tags */}
+      {localTags.length > 0 || canCreateTagsProp ? (
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-[#424143]">Tags</label>
+          <TagMultiSelect
+            availableTags={localTags}
+            selectedTagIds={selectedTagIds}
+            onChange={setSelectedTagIds}
+            onCreateTag={async (name, color) => {
+              try {
+                const res = await fetch("/api/customer/tags", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ name, color }),
+                });
+                const json = await res.json().catch(() => null);
+                if (!res.ok) {
+                  setError(json?.error || "Failed to create tag");
+                  return null;
+                }
+                const created = json.tag as TagOption;
+                setLocalTags((prev) =>
+                  [...prev, created].sort((a, b) =>
+                    a.name.localeCompare(b.name),
+                  ),
+                );
+                onTagCreated?.(created);
+                return created;
+              } catch {
+                setError("Failed to create tag");
+                return null;
+              }
+            }}
+            canCreate={canCreateTagsProp ?? (companyRole !== null && canManageTagsCheck(companyRole))}
+            disabled={isBusy}
+          />
+          <p className="text-[11px] text-[#9a9892]">
+            Add up to 5 tags to categorize this request.
+          </p>
+        </div>
+      ) : null}
 
       {/* Actions */}
       <div className="flex items-center justify-end gap-3 pt-2">
-        <button
+        <Button
           type="button"
+          variant="secondary"
+          size="sm"
           onClick={() => router.push(redirectTo ?? "/customer/tickets")}
-          className="rounded-full border border-[#d4d2cc] px-4 py-2 text-xs font-medium text-[#424143] hover:bg-[#f7f4f0] disabled:cursor-not-allowed disabled:opacity-70"
           disabled={isBusy}
         >
           Cancel
-        </button>
-        <button
+        </Button>
+        <Button
           type="submit"
-          disabled={isBusy || isLimitedAccess}
-          className="rounded-full bg-[#f15b2b] px-5 py-2 text-xs font-medium text-white shadow-sm transition-transform hover:-translate-y-0.5 hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
+          size="sm"
+          disabled={isLimitedAccess || insufficientTokens}
+          loading={isBusy}
+          loadingText={uploadingBriefs ? "Uploading attachments..." : "Creating..."}
         >
-          {uploadingBriefs
-            ? "Uploading attachments..."
-            : submitting
-              ? "Creating..."
-              : "Create ticket"}
-        </button>
+          Create ticket
+        </Button>
       </div>
     </form>
   );

@@ -1,14 +1,31 @@
 // -----------------------------------------------------------------------------
 // @file: app/designer/page.tsx
 // @purpose: Designer-facing overview dashboard (tokens + tickets + withdrawals)
-// @version: v1.1.0
+// @version: v2.0.0
 // @status: active
-// @lastUpdate: 2025-11-20
+// @lastUpdate: 2025-11-25
 // -----------------------------------------------------------------------------
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import {
+  isDueDateOverdue,
+  isDueDateSoon,
+  formatDueDateCountdown,
+} from "@/lib/board";
+import { InlineAlert } from "@/components/ui/inline-alert";
+import { LoadingState } from "@/components/ui/loading-state";
+import {
+  Bar,
+  BarChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+  Cell,
+} from "recharts";
 
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -108,23 +125,10 @@ type DashboardState =
   | { status: "ready"; data: DesignerDashboardData };
 
 function formatDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
+  if (!iso) return "\u2014";
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return "\u2014";
   return d.toLocaleDateString();
-}
-
-function statusLabel(status: TicketStatus): string {
-  switch (status) {
-    case "TODO":
-      return "Backlog";
-    case "IN_PROGRESS":
-      return "In progress";
-    case "IN_REVIEW":
-      return "In review";
-    case "DONE":
-      return "Done";
-  }
 }
 
 function withdrawalStatusLabel(status: WithdrawalStatus): string {
@@ -139,6 +143,40 @@ function withdrawalStatusLabel(status: WithdrawalStatus): string {
       return "Paid";
   }
 }
+
+/* Status accent colors for chart bars */
+const STATUS_COLORS: Record<TicketStatus, string> = {
+  TODO: "#9CA3AF",
+  IN_PROGRESS: "#3B82F6",
+  IN_REVIEW: "#F15B2B",
+  DONE: "#22C55E",
+};
+
+const STATUS_LABELS: Record<TicketStatus, string> = {
+  TODO: "Backlog",
+  IN_PROGRESS: "In progress",
+  IN_REVIEW: "In review",
+  DONE: "Done",
+};
+
+const STATUS_ORDER: TicketStatus[] = ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"];
+
+/* Priority accent colors */
+const PRIORITY_COLORS: Record<TicketPriority, string> = {
+  URGENT: "#EF4444",
+  HIGH: "#F59E0B",
+  MEDIUM: "#3B82F6",
+  LOW: "#9CA3AF",
+};
+
+const PRIORITY_LABELS: Record<TicketPriority, string> = {
+  URGENT: "Urgent",
+  HIGH: "High",
+  MEDIUM: "Medium",
+  LOW: "Low",
+};
+
+const PRIORITY_ORDER: TicketPriority[] = ["URGENT", "HIGH", "MEDIUM", "LOW"];
 
 export default function DesignerDashboardPage() {
   const [state, setState] = useState<DashboardState>({ status: "loading" });
@@ -233,7 +271,6 @@ export default function DesignerDashboardPage() {
   const totalTickets = ticketStats?.total ?? 0;
   const doneTickets = ticketStats?.byStatus.DONE ?? 0;
 
-  // API'den gelen openTotal'ı tercih et, ama geriye dönük güvenlik için fallback bırak
   const openTickets =
     ticketStats?.openTotal != null
       ? ticketStats.openTotal
@@ -244,287 +281,503 @@ export default function DesignerDashboardPage() {
   const loadScore = ticketStats?.loadScore ?? 0;
   const priorityStats = ticketStats?.byPriority ?? null;
 
+  const designerTickets = ticketsData?.tickets ?? [];
+  const upcomingTickets = useMemo(
+    () =>
+      designerTickets
+        .filter((t) => t.dueDate != null && t.status !== "DONE")
+        .sort(
+          (a, b) =>
+            new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime(),
+        )
+        .slice(0, 5),
+    [designerTickets],
+  );
+
   const withdrawalsStats = withdrawalsData?.stats ?? null;
   const latestWithdrawal =
     withdrawalsData && withdrawalsData.withdrawals.length > 0
       ? withdrawalsData.withdrawals[0]
       : null;
 
-  return (
-    <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
-      <div className="mx-auto max-w-6xl px-6 py-10">
-        {/* Top navigation */}
-        <header className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f15b2b] text-sm font-semibold text-white">
-              B
-            </div>
-            <span className="text-lg font-semibold tracking-tight">
-              Brandbite
-            </span>
-          </div>
-          <nav className="hidden items-center gap-6 text-sm text-[#7a7a7a] md:flex">
-            <button className="font-medium text-[#424143]">
-              Overview
-            </button>
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() => (window.location.href = "/designer/tickets")}
-            >
-              Tickets
-            </button>
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() => (window.location.href = "/designer/balance")}
-            >
-              Balance
-            </button>
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() => (window.location.href = "/designer/withdrawals")}
-            >
-              Withdrawals
-            </button>
-          </nav>
-        </header>
+  /* Chart data for ticket pipeline (stacked bar) */
+  const statusChartData = ticketStats
+    ? STATUS_ORDER.map((s) => ({
+        name: STATUS_LABELS[s],
+        count: ticketStats.byStatus[s] ?? 0,
+        fill: STATUS_COLORS[s],
+      }))
+    : [];
 
-        {/* Header */}
-        <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
-              Designer workspace
+  /* Priority chart data */
+  const priorityChartData = priorityStats
+    ? PRIORITY_ORDER.map((p) => ({
+        name: PRIORITY_LABELS[p],
+        count: priorityStats[p] ?? 0,
+        fill: PRIORITY_COLORS[p],
+      }))
+    : [];
+
+  /* Load score color */
+  const loadScoreColor =
+    loadScore >= 80 ? "#EF4444" : loadScore >= 50 ? "#F59E0B" : "#22C55E";
+
+  return (
+    <>
+      {/* Header */}
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
+            Designer workspace
+          </p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+            Overview
+          </h1>
+          {user && (
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
+              Signed in as{" "}
+              <span className="font-medium text-[var(--bb-secondary)]">
+                {user.name || user.email}
+              </span>
+              .
             </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-              Overview
-            </h1>
-            {user && (
-              <p className="mt-1 text-xs text-[#9a9892]">
-                Signed in as{" "}
-                <span className="font-medium text-[#424143]">
-                  {user.name || user.email}
-                </span>
-                .
-              </p>
-            )}
-          </div>
-          {isLoading && (
-            <div className="rounded-full bg-[#f5f3f0] px-3 py-1 text-[11px] text-[#7a7a7a]">
-              Loading overview…
-            </div>
           )}
         </div>
-
-        {/* Error */}
-        {isError && (
-          <div className="mb-4 rounded-2xl border border-red-200 bg-[#fff7f7] px-4 py-3 text-xs text-red-700">
-            <p className="font-medium">Something went wrong</p>
-            <p className="mt-1">{state.message}</p>
-          </div>
+        {isLoading && (
+          <LoadingState display="inline" message="Loading overview..." />
         )}
+      </div>
 
-        {/* Content */}
-        {!isError && (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {/* Tokens card */}
-            <section className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
+      {/* Error */}
+      {isError && (
+        <InlineAlert variant="error" title="Something went wrong" className="mb-4">
+          {state.message}
+        </InlineAlert>
+      )}
+
+      {/* Content */}
+      {!isError && (
+        <div className="space-y-4">
+          {/* Row 1: Hero stat cards */}
+          <div className="grid gap-4 md:grid-cols-3">
+            {/* Token balance card */}
+            <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-5 shadow-sm">
+              <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-[#F15B2B] to-[#f6a07a]" />
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold tracking-tight">
-                  Tokens
-                </h2>
-                <button
-                  className="text-[11px] font-medium text-[#f15b2b] hover:underline"
-                  onClick={() => (window.location.href = "/designer/balance")}
+                <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
+                  Token balance
+                </p>
+                <Link
+                  href="/designer/balance"
+                  className="text-[11px] font-medium text-[var(--bb-primary)] hover:underline"
                 >
                   View balance
-                </button>
+                </Link>
               </div>
-              <p className="mt-1 text-[11px] text-[#7a7a7a]">
-                Your current designer token balance and latest activity.
+              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">
+                {tokenBalance != null ? tokenBalance.toLocaleString() : "\u2014"}
+              </p>
+              <p className="text-[11px] text-[var(--bb-text-tertiary)]">tokens earned</p>
+
+              {/* Last activity */}
+              {lastLedgerEntry && (
+                <div className="mt-4 rounded-xl bg-[var(--bb-bg-card)] px-3 py-2.5 text-[11px] text-[var(--bb-text-secondary)]">
+                  <p className="font-medium text-[var(--bb-secondary)]">
+                    Last activity
+                  </p>
+                  <p className="mt-1">
+                    {lastLedgerEntry.direction === "CREDIT"
+                      ? "Credited"
+                      : "Debited"}{" "}
+                    <span className="font-semibold">
+                      {lastLedgerEntry.amount} tokens
+                    </span>{" "}
+                    on {formatDate(lastLedgerEntry.createdAt)}.
+                  </p>
+                </div>
+              )}
+            </section>
+
+            {/* Active tickets card */}
+            <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-5 shadow-sm">
+              <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-[#3B82F6] to-[#93C5FD]" />
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
+                  Active tickets
+                </p>
+                <Link
+                  href="/designer/board"
+                  className="text-[11px] font-medium text-[var(--bb-primary)] hover:underline"
+                >
+                  Open board
+                </Link>
+              </div>
+              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">
+                {openTickets}
+              </p>
+              <p className="text-[11px] text-[var(--bb-text-tertiary)]">
+                of {totalTickets} total
               </p>
 
-              <div className="mt-3">
-                <p className="text-[11px] text-[#9a9892]">
-                  Current balance
+              {/* Status breakdown dots */}
+              {ticketStats && (
+                <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1">
+                  {STATUS_ORDER.filter((s) => s !== "DONE").map((s) => (
+                    <div key={s} className="flex items-center gap-1.5 text-[11px]">
+                      <span
+                        className="inline-block h-2 w-2 rounded-full"
+                        style={{ backgroundColor: STATUS_COLORS[s] }}
+                      />
+                      <span className="text-[var(--bb-text-tertiary)]">
+                        {STATUS_LABELS[s]}
+                      </span>
+                      <span className="font-semibold text-[var(--bb-secondary)]">
+                        {ticketStats.byStatus[s] ?? 0}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* Earnings / Withdrawals card */}
+            <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-5 shadow-sm">
+              <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-[#22C55E] to-[#86EFAC]" />
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
+                  Earnings
                 </p>
-                <p className="text-2xl font-semibold text-[#424143]">
-                  {tokenBalance != null ? tokenBalance : "—"}{" "}
-                  <span className="text-sm font-normal text-[#9a9892]">
-                    tokens
+                <Link
+                  href="/designer/withdrawals"
+                  className="text-[11px] font-medium text-[var(--bb-primary)] hover:underline"
+                >
+                  Request payout
+                </Link>
+              </div>
+              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">
+                {withdrawalsStats?.availableBalance ?? 0}
+              </p>
+              <p className="text-[11px] text-[var(--bb-text-tertiary)]">
+                tokens available for withdrawal
+              </p>
+
+              {withdrawalsStats && (
+                <div className="mt-4 flex gap-3">
+                  <div className="flex-1 rounded-xl bg-[var(--bb-bg-card)] px-3 py-2 text-center">
+                    <p className="text-sm font-bold text-[var(--bb-secondary)]">
+                      {withdrawalsStats.pendingCount}
+                    </p>
+                    <p className="text-[10px] text-[var(--bb-text-tertiary)]">
+                      Pending
+                    </p>
+                  </div>
+                  <div className="flex-1 rounded-xl bg-[var(--bb-bg-card)] px-3 py-2 text-center">
+                    <p className="text-sm font-bold text-[var(--bb-secondary)]">
+                      {withdrawalsStats.totalRequested}
+                    </p>
+                    <p className="text-[10px] text-[var(--bb-text-tertiary)]">
+                      Total requested
+                    </p>
+                  </div>
+                  <div className="flex-1 rounded-xl bg-[var(--bb-bg-card)] px-3 py-2 text-center">
+                    <p className="text-sm font-bold text-[var(--bb-secondary)]">
+                      {withdrawalsStats.withdrawalsCount}
+                    </p>
+                    <p className="text-[10px] text-[var(--bb-text-tertiary)]">
+                      All time
+                    </p>
+                  </div>
+                </div>
+              )}
+            </section>
+          </div>
+
+          {/* Row 2: Workload charts */}
+          {ticketStats && totalTickets > 0 && (
+            <div className="grid gap-4 md:grid-cols-2">
+              {/* Status distribution chart */}
+              <section className="rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-5 shadow-sm">
+                <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
+                  Ticket pipeline
+                </h2>
+                <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
+                  Distribution by workflow stage
+                </p>
+                <div className="mt-4 h-44">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={statusChartData}
+                      margin={{ top: 4, right: 0, bottom: 0, left: -20 }}
+                    >
+                      <XAxis
+                        dataKey="name"
+                        tick={{ fontSize: 11, fill: "#9a9892" }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        allowDecimals={false}
+                        tick={{ fontSize: 11, fill: "#9a9892" }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          borderRadius: 12,
+                          border: "1px solid #e3e1dc",
+                          fontSize: 12,
+                        }}
+                      />
+                      <Bar dataKey="count" radius={[6, 6, 0, 0]} maxBarSize={48}>
+                        {statusChartData.map((entry, i) => (
+                          <Cell key={i} fill={entry.fill} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </section>
+
+              {/* Priority distribution chart */}
+              <section className="rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-5 shadow-sm">
+                <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
+                  Priority breakdown
+                </h2>
+                <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
+                  Open tickets by priority level
+                </p>
+                <div className="mt-4 h-44">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={priorityChartData}
+                      margin={{ top: 4, right: 0, bottom: 0, left: -20 }}
+                    >
+                      <XAxis
+                        dataKey="name"
+                        tick={{ fontSize: 11, fill: "#9a9892" }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        allowDecimals={false}
+                        tick={{ fontSize: 11, fill: "#9a9892" }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          borderRadius: 12,
+                          border: "1px solid #e3e1dc",
+                          fontSize: 12,
+                        }}
+                      />
+                      <Bar dataKey="count" radius={[6, 6, 0, 0]} maxBarSize={48}>
+                        {priorityChartData.map((entry, i) => (
+                          <Cell key={i} fill={entry.fill} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </section>
+            </div>
+          )}
+
+          {/* Row 2.5: Upcoming deadlines */}
+          {designerTickets.length > 0 && (
+            <section className="rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-5 shadow-sm">
+              <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
+                Upcoming deadlines
+              </h2>
+              <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
+                Your assigned tickets with due dates, sorted by urgency
+              </p>
+              {upcomingTickets.length === 0 ? (
+                <p className="mt-4 text-[11px] text-[var(--bb-text-tertiary)]">
+                  No upcoming deadlines.
+                </p>
+              ) : (
+                <div className="mt-4 divide-y divide-[var(--bb-border-subtle)]">
+                  {upcomingTickets.map((t) => {
+                    const countdown = formatDueDateCountdown(t.dueDate);
+                    const overdue = isDueDateOverdue(t.dueDate);
+                    const soon = isDueDateSoon(t.dueDate);
+                    const code =
+                      t.project?.code && t.companyTicketNumber != null
+                        ? `${t.project.code}-${t.companyTicketNumber}`
+                        : t.companyTicketNumber != null
+                          ? `#${t.companyTicketNumber}`
+                          : "";
+                    return (
+                      <Link
+                        key={t.id}
+                        href={`/designer/tickets/${t.id}`}
+                        className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0 transition-opacity hover:opacity-80"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-medium text-[var(--bb-secondary)]">
+                            {code && (
+                              <span className="mr-1.5 text-[var(--bb-text-tertiary)]">
+                                {code}
+                              </span>
+                            )}
+                            {t.title}
+                          </p>
+                          {t.company && (
+                            <p className="mt-0.5 truncate text-[10px] text-[var(--bb-text-tertiary)]">
+                              {t.company.name}
+                            </p>
+                          )}
+                        </div>
+                        {countdown && (
+                          <span
+                            className={`ml-4 shrink-0 text-[11px] font-medium ${
+                              overdue
+                                ? "text-[var(--bb-danger-text)]"
+                                : soon
+                                  ? "text-[var(--bb-warning-text)]"
+                                  : "text-[var(--bb-text-tertiary)]"
+                            }`}
+                          >
+                            {countdown.label}
+                          </span>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* Row 3: Load score + Latest withdrawal */}
+          <div className="grid gap-4 md:grid-cols-2">
+            {/* Load score card */}
+            <section className="rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-5 shadow-sm">
+              <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
+                Load score
+              </h2>
+              <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
+                Your current workload capacity indicator.
+              </p>
+
+              <div className="mt-4 flex items-center gap-4">
+                {/* Circular gauge */}
+                <div className="relative flex h-20 w-20 flex-shrink-0 items-center justify-center">
+                  <svg
+                    className="h-full w-full -rotate-90"
+                    viewBox="0 0 36 36"
+                  >
+                    <circle
+                      cx="18"
+                      cy="18"
+                      r="15.9155"
+                      fill="none"
+                      stroke="#f5f3f0"
+                      strokeWidth="3"
+                    />
+                    <circle
+                      cx="18"
+                      cy="18"
+                      r="15.9155"
+                      fill="none"
+                      stroke={loadScoreColor}
+                      strokeWidth="3"
+                      strokeDasharray={`${Math.min(loadScore, 100)} ${
+                        100 - Math.min(loadScore, 100)
+                      }`}
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <span className="absolute text-lg font-bold text-[var(--bb-secondary)]">
+                    {loadScore}
                   </span>
-                </p>
-                {lastLedgerEntry && (
-                  <div className="mt-3 rounded-xl bg-[#f5f3f0] px-3 py-2 text-[11px] text-[#7a7a7a]">
-                    <p className="font-medium text-[#424143]">
-                      Last activity
-                    </p>
-                    <p className="mt-1">
-                      {lastLedgerEntry.direction === "CREDIT"
-                        ? "Credited"
-                        : "Debited"}{" "}
-                      <span className="font-semibold">
-                        {lastLedgerEntry.amount} tokens
-                      </span>{" "}
-                      on {formatDate(lastLedgerEntry.createdAt)}.
-                    </p>
-                    {lastLedgerEntry.notes && (
-                      <p className="mt-1 text-[11px] text-[#7a7a7a]">
-                        {lastLedgerEntry.notes}
-                      </p>
-                    )}
+                </div>
+
+                {/* Status breakdown list */}
+                {ticketStats && (
+                  <div className="flex-1 space-y-1.5">
+                    {STATUS_ORDER.map((s) => (
+                      <div
+                        key={s}
+                        className="flex items-center justify-between text-[11px]"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className="inline-block h-2 w-2 rounded-full"
+                            style={{ backgroundColor: STATUS_COLORS[s] }}
+                          />
+                          <span className="text-[var(--bb-text-tertiary)]">
+                            {STATUS_LABELS[s]}
+                          </span>
+                        </div>
+                        <span className="font-semibold text-[var(--bb-secondary)]">
+                          {ticketStats.byStatus[s] ?? 0}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
             </section>
 
-            {/* Tickets card */}
-            <section className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
+            {/* Recent withdrawal card */}
+            <section className="rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-5 shadow-sm">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold tracking-tight">
-                  Tickets
+                <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
+                  Recent withdrawals
                 </h2>
-                <button
-                  className="text-[11px] font-medium text-[#f15b2b] hover:underline"
-                  onClick={() => (window.location.href = "/designer/tickets")}
+                <Link
+                  href="/designer/withdrawals"
+                  className="text-[11px] font-medium text-[var(--bb-primary)] hover:underline"
                 >
-                  View tickets
-                </button>
+                  View all
+                </Link>
               </div>
-              <p className="mt-1 text-[11px] text-[#7a7a7a]">
-                Snapshot of tickets currently assigned to you and your load.
+              <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
+                Your latest payout requests.
               </p>
 
-              {ticketStats ? (
-                <div className="mt-3 space-y-2 text-[11px] text-[#7a7a7a]">
-                  <p>
-                    Total tickets:{" "}
-                    <span className="font-semibold">{totalTickets}</span>
-                  </p>
-                  <p>
-                    Open tickets (not done):{" "}
-                    <span className="font-semibold">{openTickets}</span>
-                  </p>
-                  <p>
-                    Current load score:{" "}
-                    <span className="font-semibold">{loadScore}</span>
-                  </p>
-
-                  <div className="mt-2 grid grid-cols-2 gap-1">
-                    {(Object.entries(ticketStats.byStatus) as [
-                      TicketStatus,
-                      number,
-                    ][]).map(([status, count]) => (
-                      <p key={status}>
-                        <span className="text-[#9a9892]">
-                          {statusLabel(status)}:
-                        </span>{" "}
-                        <span className="font-semibold">{count}</span>
-                      </p>
-                    ))}
-                  </div>
-
-                  {priorityStats && (
-                    <p className="mt-2 text-[11px] text-[#9a9892]">
-                      By priority (open):{" "}
-                      <span className="font-medium text-[#424143]">
-                        Urgent {priorityStats.URGENT ?? 0}
+              {latestWithdrawal ? (
+                <div className="mt-4 space-y-2">
+                  {withdrawalsData!.withdrawals.slice(0, 3).map((w) => (
+                    <div
+                      key={w.id}
+                      className="flex items-center justify-between rounded-xl bg-[var(--bb-bg-card)] px-3 py-2.5"
+                    >
+                      <div>
+                        <p className="text-xs font-semibold text-[var(--bb-secondary)]">
+                          {w.amountTokens} tokens
+                        </p>
+                        <p className="text-[10px] text-[var(--bb-text-tertiary)]">
+                          {formatDate(w.createdAt)}
+                        </p>
+                      </div>
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
+                          w.status === "PAID"
+                            ? "bg-[#e8f6f0] text-[#16a34a]"
+                            : w.status === "APPROVED"
+                            ? "bg-[#dbeafe] text-[#2563eb]"
+                            : w.status === "REJECTED"
+                            ? "bg-[#fef2f2] text-[#dc2626]"
+                            : "bg-[#fef3c7] text-[#d97706]"
+                        }`}
+                      >
+                        {withdrawalStatusLabel(w.status)}
                       </span>
-                      {" · "}
-                      <span className="font-medium text-[#424143]">
-                        High {priorityStats.HIGH ?? 0}
-                      </span>
-                      {" · "}
-                      <span className="font-medium text-[#424143]">
-                        Medium {priorityStats.MEDIUM ?? 0}
-                      </span>
-                      {" · "}
-                      <span className="font-medium text-[#424143]">
-                        Low {priorityStats.LOW ?? 0}
-                      </span>
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <p className="mt-3 text-[11px] text-[#9a9892]">
-                  We could not load ticket stats yet.
-                </p>
-              )}
-            </section>
-
-            {/* Withdrawals card */}
-            <section className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm lg:col-span-1 md:col-span-2">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold tracking-tight">
-                  Withdrawals
-                </h2>
-                <button
-                  className="text-[11px] font-medium text-[#f15b2b] hover:underline"
-                  onClick={() =>
-                    (window.location.href = "/designer/withdrawals")
-                  }
-                >
-                  Request payout
-                </button>
-              </div>
-              <p className="mt-1 text-[11px] text-[#7a7a7a]">
-                Quick view of your payout requests and available balance.
-              </p>
-
-              {withdrawalsStats ? (
-                <div className="mt-3 space-y-2 text-[11px] text-[#7a7a7a]">
-                  <p>
-                    Available for withdrawal:{" "}
-                    <span className="font-semibold">
-                      {withdrawalsStats.availableBalance} tokens
-                    </span>
-                  </p>
-                  <p>
-                    Total requested so far:{" "}
-                    <span className="font-semibold">
-                      {withdrawalsStats.totalRequested} tokens
-                    </span>
-                  </p>
-                  <p>
-                    Pending requests:{" "}
-                    <span className="font-semibold">
-                      {withdrawalsStats.pendingCount}
-                    </span>
-                  </p>
-                  <p>
-                    Total withdrawals:{" "}
-                    <span className="font-semibold">
-                      {withdrawalsStats.withdrawalsCount}
-                    </span>
-                  </p>
-
-                  {latestWithdrawal && (
-                    <div className="mt-3 rounded-xl bg-[#f5f3f0] px-3 py-2">
-                      <p className="text-[11px] font-medium text-[#424143]">
-                        Latest request
-                      </p>
-                      <p className="mt-1 text-[11px] text-[#7a7a7a]">
-                        {latestWithdrawal.amountTokens} tokens —{" "}
-                        {withdrawalStatusLabel(latestWithdrawal.status)}
-                      </p>
-                      <p className="mt-1 text-[11px] text-[#9a9892]">
-                        Created {formatDate(latestWithdrawal.createdAt)}
-                        {latestWithdrawal.approvedAt
-                          ? ` • Updated ${formatDate(
-                              latestWithdrawal.approvedAt,
-                            )}`
-                          : ""}
-                      </p>
                     </div>
-                  )}
+                  ))}
                 </div>
               ) : (
-                <p className="mt-3 text-[11px] text-[#9a9892]">
-                  We could not load withdrawal stats yet.
+                <p className="mt-4 text-[11px] text-[var(--bb-text-tertiary)]">
+                  No withdrawal requests yet.
                 </p>
               )}
             </section>
           </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </>
   );
 }

@@ -9,6 +9,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { EmptyState } from "@/components/ui/empty-state";
+import { InlineAlert } from "@/components/ui/inline-alert";
+import { useToast } from "@/components/ui/toast-provider";
+import { Button } from "@/components/ui/button";
+import { FormInput } from "@/components/ui/form-field";
+import { FormTextarea } from "@/components/ui/form-field";
+import { FormSelect } from "@/components/ui/form-field";
+import { LoadingState } from "@/components/ui/loading-state";
+import { Badge } from "@/components/ui/badge";
 
 type JobType = {
   id: string;
@@ -26,6 +35,7 @@ type JobTypesResponse = {
 };
 
 export default function AdminJobTypesPage() {
+  const { showToast } = useToast();
   const [data, setData] = useState<JobTypesResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -178,11 +188,11 @@ export default function AdminJobTypesPage() {
         throw new Error(msg);
       }
 
-      setSaveSuccess(
-        isEditing
-          ? "Job type updated successfully."
-          : "Job type created successfully.",
-      );
+      const msg = isEditing
+        ? "Job type updated successfully."
+        : "Job type created successfully.";
+      setSaveSuccess(msg);
+      showToast({ type: "success", title: msg });
 
       await load();
 
@@ -191,9 +201,9 @@ export default function AdminJobTypesPage() {
       }
     } catch (err: any) {
       console.error("Admin job types save error:", err);
-      setSaveError(
-        err?.message || "Failed to save job type.",
-      );
+      const errMsg = err?.message || "Failed to save job type.";
+      setSaveError(errMsg);
+      showToast({ type: "error", title: errMsg });
     } finally {
       setSaving(false);
     }
@@ -205,47 +215,7 @@ export default function AdminJobTypesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
-      <div className="mx-auto max-w-6xl px-6 py-10">
-        {/* Top navigation */}
-        <header className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f15b2b] text-sm font-semibold text-white">
-              B
-            </div>
-            <span className="text-lg font-semibold tracking-tight">
-              Brandbite
-            </span>
-          </div>
-          <nav className="hidden items-center gap-6 text-sm text-[#7a7a7a] md:flex">
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() => (window.location.href = "/admin/ledger")}
-            >
-              Ledger
-            </button>
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() =>
-                (window.location.href = "/admin/withdrawals")
-              }
-            >
-              Withdrawals
-            </button>
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() =>
-                (window.location.href = "/admin/token-analytics")
-              }
-            >
-              Analytics
-            </button>
-            <button className="font-medium text-[#424143]">
-              Job types
-            </button>
-          </nav>
-        </header>
-
+    <>
         {/* Page header */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -256,21 +226,14 @@ export default function AdminJobTypesPage() {
               Configure token cost and designer payout for each job type.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={handleNewClick}
-            className="inline-flex items-center justify-center rounded-full bg-[#f15b2b] px-4 py-2 text-sm font-semibold text-white shadow-sm"
-          >
-            New job type
-          </button>
+          <Button onClick={handleNewClick}>New job type</Button>
         </div>
 
         {/* Error */}
         {error && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-white px-4 py-3 text-sm text-red-700">
-            <p className="font-medium">Error</p>
-            <p className="mt-1">{error}</p>
-          </div>
+          <InlineAlert variant="error" title="Error" className="mb-4">
+            {error}
+          </InlineAlert>
         )}
 
         {/* Summary cards */}
@@ -311,7 +274,7 @@ export default function AdminJobTypesPage() {
         </section>
 
         {/* Filter + table + form layout */}
-        <section className="grid gap-4 md:grid-cols-[3fr,2fr]">
+        <section className="grid gap-4 md:grid-cols-[3fr_2fr]">
           {/* Left: table */}
           <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
@@ -319,19 +282,20 @@ export default function AdminJobTypesPage() {
                 <h2 className="text-sm font-semibold tracking-tight">
                   Job type list
                 </h2>
-                <select
+                <FormSelect
                   value={filterActive}
                   onChange={(e) =>
                     setFilterActive(
                       e.target.value as "ALL" | "ACTIVE" | "INACTIVE",
                     )
                   }
-                  className="rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-2 py-1 text-xs text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+                  size="sm"
+                  className="w-auto"
                 >
                   <option value="ALL">All</option>
                   <option value="ACTIVE">Active</option>
                   <option value="INACTIVE">Inactive</option>
-                </select>
+                </FormSelect>
               </div>
               <p className="text-xs text-[#9a9892]">
                 Showing {filteredJobTypes.length} of {jobTypes.length}
@@ -339,15 +303,11 @@ export default function AdminJobTypesPage() {
             </div>
 
             {loading ? (
-              <div className="py-6 text-center text-sm text-[#7a7a7a]">
-                Loading job types…
-              </div>
+              <LoadingState message="Loading job types…" />
             ) : filteredJobTypes.length === 0 ? (
-              <div className="py-6 text-center text-sm text-[#9a9892]">
-                No job types match your filter.
-              </div>
+              <EmptyState title="No job types match your filter." />
             ) : (
-              <div className="max-h-[420px] overflow-auto">
+              <div className="max-h-[420px] overflow-y-auto overflow-x-auto">
                 <table className="min-w-full text-left text-sm">
                   <thead>
                     <tr className="border-b border-[#e3e1dc] text-xs uppercase tracking-[0.08em] text-[#9a9892]">
@@ -390,15 +350,9 @@ export default function AdminJobTypesPage() {
                           </span>
                         </td>
                         <td className="px-2 py-2 align-top text-center text-[11px]">
-                          <span
-                            className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                              jt.isActive
-                                ? "bg-[#f0fff6] text-[#137a3a]"
-                                : "bg-[#f5f3f0] text-[#9a9892]"
-                            }`}
-                          >
+                          <Badge variant={jt.isActive ? "success" : "neutral"}>
                             {jt.isActive ? "Active" : "Inactive"}
-                          </span>
+                          </Badge>
                         </td>
                         <td className="px-2 py-2 align-top text-right text-[11px] text-[#9a9892]">
                           {formatDate(jt.updatedAt)}
@@ -422,15 +376,15 @@ export default function AdminJobTypesPage() {
             </p>
 
             {saveError && (
-              <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              <InlineAlert variant="error" size="sm" className="mt-3">
                 {saveError}
-              </div>
+              </InlineAlert>
             )}
 
             {saveSuccess && (
-              <div className="mt-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-700">
+              <InlineAlert variant="success" size="sm" className="mt-3">
                 {saveSuccess}
-              </div>
+              </InlineAlert>
             )}
 
             <form className="mt-4 space-y-3" onSubmit={handleSubmit}>
@@ -441,13 +395,12 @@ export default function AdminJobTypesPage() {
                 >
                   Name
                 </label>
-                <input
+                <FormInput
                   id="job-name"
                   type="text"
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
                   required
-                  className="w-full rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
                   placeholder="e.g. Logo design"
                 />
               </div>
@@ -459,12 +412,11 @@ export default function AdminJobTypesPage() {
                 >
                   Description
                 </label>
-                <textarea
+                <FormTextarea
                   id="job-description"
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
                   rows={3}
-                  className="w-full rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
                   placeholder="Short description visible to team and admins."
                 />
               </div>
@@ -477,14 +429,13 @@ export default function AdminJobTypesPage() {
                   >
                     Token cost (customer)
                   </label>
-                  <input
+                  <FormInput
                     id="job-token-cost"
                     type="number"
                     min={1}
                     value={formTokenCost}
                     onChange={(e) => setFormTokenCost(e.target.value)}
                     required
-                    className="w-full rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
                     placeholder="e.g. 8"
                   />
                 </div>
@@ -496,14 +447,13 @@ export default function AdminJobTypesPage() {
                   >
                     Designer payout (tokens)
                   </label>
-                  <input
+                  <FormInput
                     id="job-designer-payout"
                     type="number"
                     min={0}
                     value={formDesignerPayout}
                     onChange={(e) => setFormDesignerPayout(e.target.value)}
                     required
-                    className="w-full rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
                     placeholder="e.g. 5"
                   />
                 </div>
@@ -521,31 +471,23 @@ export default function AdminJobTypesPage() {
                 </label>
 
                 {selected && (
-                  <button
-                    type="button"
-                    onClick={resetForm}
-                    className="text-xs font-medium text-[#7a7a7a]"
-                  >
+                  <Button variant="ghost" size="sm" onClick={resetForm}>
                     Clear selection
-                  </button>
+                  </Button>
                 )}
               </div>
 
-              <button
+              <Button
                 type="submit"
-                disabled={saving}
-                className="mt-2 inline-flex items-center justify-center rounded-full bg-[#f15b2b] px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:opacity-60"
+                loading={saving}
+                loadingText="Saving…"
+                className="mt-2"
               >
-                {saving
-                  ? "Saving…"
-                  : selected
-                  ? "Save changes"
-                  : "Create job type"}
-              </button>
+                {selected ? "Save changes" : "Create job type"}
+              </Button>
             </form>
           </div>
         </section>
-      </div>
-    </div>
+    </>
   );
 }

@@ -1,18 +1,27 @@
 // -----------------------------------------------------------------------------
 // @file: app/admin/board/page.tsx
-// @purpose: Admin-facing kanban board over all tickets (read-only, unified UI)
-// @version: v1.1.0
+// @purpose: Admin-facing kanban board over all tickets (read-only, Figma redesign)
+// @version: v2.0.0
 // @status: active
-// @lastUpdate: 2025-12-12
+// @lastUpdate: 2025-12-27
 // -----------------------------------------------------------------------------
 
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { AdminNav } from "@/components/navigation/admin-nav";
 import { useToast } from "@/components/ui/toast-provider";
-
-type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
+import { InlineAlert } from "@/components/ui/inline-alert";
+import { EmptyState } from "@/components/ui/empty-state";
+import {
+  STATUS_ORDER,
+  STATUS_LABELS,
+  formatBoardDate,
+  columnAccentColor,
+  PROJECT_COLORS,
+  avatarColor,
+  getInitials,
+} from "@/lib/board";
+import type { TicketStatus } from "@/lib/board";
 
 type AdminTicket = {
   id: string;
@@ -34,41 +43,6 @@ type AdminBoardStats = {
   openTotal: number;
 };
 
-const STATUS_ORDER: TicketStatus[] = [
-  "TODO",
-  "IN_PROGRESS",
-  "IN_REVIEW",
-  "DONE",
-];
-
-const STATUS_LABELS: Record<TicketStatus, string> = {
-  TODO: "Backlog",
-  IN_PROGRESS: "In progress",
-  IN_REVIEW: "In review",
-  DONE: "Done",
-};
-
-const statusColumnClass = (status: TicketStatus): string => {
-  switch (status) {
-    case "TODO":
-      return "bg-[#f5f3f0]";
-    case "IN_PROGRESS":
-      return "bg-[#eaf4ff]";
-    case "IN_REVIEW":
-      return "bg-[#fff7e0]";
-    case "DONE":
-      return "bg-[#e8f6f0]";
-    default:
-      return "bg-[#f5f3f0]";
-  }
-};
-
-const formatDate = (iso: string | null): string => {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString();
-};
 
 export default function AdminBoardPage() {
   const { showToast } = useToast();
@@ -168,6 +142,32 @@ export default function AdminBoardPage() {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [tickets]);
 
+  /** Deduped designer list for toolbar avatar circles */
+  const uniqueDesigners = useMemo(() => {
+    const seen = new Map<string, { name: string | null; email: string }>();
+    tickets.forEach((t) => {
+      if (t.designer && !seen.has(t.designer.id)) {
+        seen.set(t.designer.id, {
+          name: t.designer.name,
+          email: t.designer.email,
+        });
+      }
+    });
+    return Array.from(seen.values());
+  }, [tickets]);
+
+  /** Companies with ticket counts for sidebar */
+  const companiesWithCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    tickets.forEach((t) => {
+      const name = t.company?.name;
+      if (name) map.set(name, (map.get(name) ?? 0) + 1);
+    });
+    return Array.from(map.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [tickets]);
+
   const filteredTickets = useMemo(() => {
     return tickets.filter((t) => {
       if (companyFilter !== "ALL" && t.company?.name !== companyFilter) {
@@ -217,11 +217,8 @@ export default function AdminBoardPage() {
   // ---------------------------------------------------------------------------
 
   return (
-    <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
-      <div className="mx-auto max-w-6xl px-6 pb-10 pt-6">
-        <AdminNav />
-
-        <div className="mt-4 grid gap-6 md:grid-cols-[240px,1fr] lg:grid-cols-[260px,1fr]">
+    <>
+      <div className="mt-4 grid gap-6 md:grid-cols-[240px_1fr] lg:grid-cols-[260px_1fr]">
           {/* Left workspace / context rail */}
           <aside className="flex flex-col rounded-2xl bg-white/60 p-4">
             <div>
@@ -232,11 +229,63 @@ export default function AdminBoardPage() {
                 Cross-company work
               </h2>
               <p className="mt-1 text-[11px] text-[#7a7a7a]">
-                Monitor every request across all customer workspaces. This view
-                is read-only and helps you spot bottlenecks and plan payouts.
+                Monitor every request across all customer workspaces.
               </p>
             </div>
 
+            {/* Companies list */}
+            <div className="mt-4">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9]">
+                  Companies
+                </p>
+              </div>
+              <div className="space-y-1">
+                <button
+                  type="button"
+                  onClick={() => setCompanyFilter("ALL")}
+                  className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-[11px] transition-colors ${
+                    companyFilter === "ALL"
+                      ? "bg-[#f5f3f0] font-semibold text-[#424143]"
+                      : "text-[#7a7a7a] hover:bg-[#f5f3f0]/60"
+                  }`}
+                >
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-[#9CA3AF] text-[9px] font-bold text-white">
+                    All
+                  </span>
+                  <span className="flex-1 truncate">All companies</span>
+                  <span className="text-[10px] text-[#b1afa9]">{stats.total}</span>
+                </button>
+                {companiesWithCounts.map((c, i) => (
+                  <button
+                    key={c.name}
+                    type="button"
+                    onClick={() =>
+                      setCompanyFilter(companyFilter === c.name ? "ALL" : c.name)
+                    }
+                    className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-[11px] transition-colors ${
+                      companyFilter === c.name
+                        ? "bg-[#f5f3f0] font-semibold text-[#424143]"
+                        : "text-[#7a7a7a] hover:bg-[#f5f3f0]/60"
+                    }`}
+                  >
+                    <span
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[9px] font-bold text-white"
+                      style={{
+                        backgroundColor:
+                          PROJECT_COLORS[i % PROJECT_COLORS.length],
+                      }}
+                    >
+                      {c.name[0]?.toUpperCase()}
+                    </span>
+                    <span className="flex-1 truncate">{c.name}</span>
+                    <span className="text-[10px] text-[#b1afa9]">{c.count}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Stats */}
             <div className="mt-4 space-y-2">
               <div className="rounded-xl border border-[#ece9e1] bg-[#f7f5f0] p-3">
                 <div className="flex items-center justify-between gap-3">
@@ -245,7 +294,7 @@ export default function AdminBoardPage() {
                       All tickets
                     </p>
                     <p className="mt-0.5 text-[10px] text-[#9a9892]">
-                      Board across companies, grouped by status.
+                      Board across companies.
                     </p>
                   </div>
                   <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-[#424143]">
@@ -259,10 +308,6 @@ export default function AdminBoardPage() {
                   Open tickets:{" "}
                   <span className="font-semibold">{stats.openTotal}</span>
                 </p>
-                <p className="mt-1">
-                  Keep an eye on how many requests are actively moving through
-                  the pipeline.
-                </p>
               </div>
             </div>
 
@@ -273,21 +318,15 @@ export default function AdminBoardPage() {
 
           {/* Main board area */}
           <main className="flex flex-col">
-            {/* Header + description */}
+            {/* Header */}
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
                   Admin board
                 </p>
-                <h1 className="mt-1 text-xl font-semibold tracking-tight">
+                <h1 className="mt-1 text-2xl font-semibold tracking-tight">
                   {activeScopeLabel}
                 </h1>
-                <p className="mt-1 text-xs text-[#7a7a7a]">
-                  This read-only board shows how work is flowing across the
-                  entire system – from backlog to done. Filter by company or
-                  search across projects and designers to quickly inspect what’s
-                  happening.
-                </p>
               </div>
               {loading && (
                 <div className="rounded-full bg-[#f5f3f0] px-3 py-1 text-[11px] text-[#7a7a7a]">
@@ -298,77 +337,49 @@ export default function AdminBoardPage() {
 
             {/* Error / alerts */}
             {error && (
-              <div className="mb-4 rounded-xl border border-red-200 bg-[#fff7f7] px-4 py-3 text-xs text-red-700">
-                <p className="font-medium">Something went wrong</p>
-                <p className="mt-1">{error}</p>
-              </div>
+              <InlineAlert variant="error" title="Something went wrong" className="mb-4">
+                {error}
+              </InlineAlert>
             )}
 
-            {/* Filters */}
-            <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div className="relative flex-1">
+            {/* Toolbar: search + designer avatars */}
+            <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
+              <div className="relative max-w-md flex-1">
                 <input
                   type="text"
-                  placeholder="Search by title, company, project or designer"
+                  placeholder="Search board"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full rounded-full border border-[#e3e1dc] bg-[#f7f5f0] px-4 pb-2 pt-2 text-xs text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+                  className="w-full rounded-lg border border-[#e3e1dc] bg-white px-4 py-2 text-xs text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
                 />
               </div>
-              <div className="flex flex-wrap items-center gap-2 text-[11px] text-[#7a7a7a]">
-                <span>Company:</span>
-                <select
-                  className="rounded-full border border-[#e3e1dc] bg-[#f7f5f0] px-2 py-1 text-[11px] outline-none"
-                  value={companyFilter}
-                  onChange={(e) => setCompanyFilter(e.target.value)}
-                >
-                  <option value="ALL">All</option>
-                  {companies.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Stats pills */}
-            <div className="mb-3 flex flex-wrap items-center gap-3 text-[11px] text-[#7a7a7a]">
-              <div className="rounded-full bg-[#f5f3f0] px-3 py-1">
-                Total: <span className="font-semibold">{stats.total}</span>
-              </div>
-              <div className="rounded-full bg-[#f5f3f0] px-3 py-1">
-                Open:{" "}
-                <span className="font-semibold">{stats.openTotal}</span>
-              </div>
-              <div className="rounded-full bg-[#f5f3f0] px-3 py-1">
-                Backlog:{" "}
-                <span className="font-semibold">
-                  {stats.byStatus.TODO ?? 0}
-                </span>
-              </div>
-              <div className="rounded-full bg-[#f5f3f0] px-3 py-1">
-                In progress:{" "}
-                <span className="font-semibold">
-                  {stats.byStatus.IN_PROGRESS ?? 0}
-                </span>
-              </div>
-              <div className="rounded-full bg-[#f5f3f0] px-3 py-1">
-                In review:{" "}
-                <span className="font-semibold">
-                  {stats.byStatus.IN_REVIEW ?? 0}
-                </span>
-              </div>
-              <div className="rounded-full bg-[#f5f3f0] px-3 py-1">
-                Done:{" "}
-                <span className="font-semibold">
-                  {stats.byStatus.DONE ?? 0}
-                </span>
-              </div>
+              {/* Designer avatar circles */}
+              {uniqueDesigners.length > 0 && (
+                <div className="flex items-center -space-x-1.5">
+                  {uniqueDesigners.slice(0, 5).map((d, i) => {
+                    const label = d.name || d.email;
+                    return (
+                      <div
+                        key={i}
+                        title={label}
+                        className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-[9px] font-bold text-white"
+                        style={{ backgroundColor: avatarColor(label) }}
+                      >
+                        {getInitials(d.name, d.email)}
+                      </div>
+                    );
+                  })}
+                  {uniqueDesigners.length > 5 && (
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[#e3e1dc] text-[9px] font-bold text-[#7a7a7a]">
+                      +{uniqueDesigners.length - 5}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Columns */}
-            <div className="grid gap-3 md:grid-cols-4">
+            <div className="flex gap-4 overflow-x-auto pb-2">
               {STATUS_ORDER.map((status) => {
                 const columnTickets = ticketsByStatus[status] || [];
                 const columnTitle = STATUS_LABELS[status];
@@ -376,89 +387,80 @@ export default function AdminBoardPage() {
                 return (
                   <div
                     key={status}
-                    className="flex flex-col rounded-2xl bg-white/60 p-2"
+                    className="w-80 shrink-0 overflow-hidden rounded-2xl bg-white/60"
                   >
-                    <div className="mb-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1">
-                          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9a9892]">
-                            {columnTitle}
-                          </span>
-                          <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[11px] font-semibold text-[#7a7a7a]">
-                            {columnTickets.length}
-                          </span>
-                        </div>
-                      </div>
-                      {status === "DONE" && (
-                        <p className="mt-1 text-[10px] text-[#b1afa9]">
-                          Completed by customers. This board is read-only for
-                          admins.
-                        </p>
-                      )}
-                    </div>
-
+                    {/* Accent bar */}
                     <div
-                      className={`flex-1 space-y-2 rounded-xl ${statusColumnClass(
-                        status,
-                      )} bg-opacity-70 p-2`}
-                    >
-                      {columnTickets.length === 0 ? (
-                        <p className="py-4 text-center text-[11px] text-[#9a9892]">
-                          No tickets in this column.
-                        </p>
-                      ) : (
-                        columnTickets.map((t) => {
-                          const companyName = t.company?.name ?? "—";
-                          const projectName = t.project?.name ?? "—";
-                          const projectCode = t.project?.code ?? null;
-                          const designerLabel =
-                            t.designer?.name ||
-                            t.designer?.email ||
-                            "Unassigned";
+                      className="h-1"
+                      style={{ backgroundColor: columnAccentColor[status] }}
+                    />
 
-                          return (
-                            <div
-                              key={t.id}
-                              className="rounded-xl bg-white p-3 text-[11px] text-[#424143] shadow-sm"
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex flex-col">
-                                  <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#9a9892]">
-                                    {companyName}
-                                  </span>
-                                  <span className="mt-0.5 text-[13px] font-semibold text-[#424143]">
-                                    {t.title}
-                                  </span>
+                    <div className="p-2">
+                      {/* Column header */}
+                      <div className="mb-2 flex items-center gap-1">
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9a9892]">
+                          {columnTitle}
+                        </span>
+                        <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[11px] font-semibold text-[#7a7a7a]">
+                          {columnTickets.length}
+                        </span>
+                      </div>
+
+                      {/* Cards */}
+                      <div className="space-y-2">
+                        {columnTickets.length === 0 ? (
+                          <EmptyState title="No tickets in this column." />
+                        ) : (
+                          columnTickets.map((t) => {
+                            const companyName = t.company?.name ?? "—";
+                            const projectCode = t.project?.code ?? null;
+                            const designerLabel =
+                              t.designer?.name ||
+                              t.designer?.email ||
+                              "Unassigned";
+
+                            return (
+                              <div
+                                key={t.id}
+                                className="rounded-xl bg-white p-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                              >
+                                {/* Company name */}
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#9a9892]">
+                                  {companyName}
+                                </p>
+                                {/* Title */}
+                                <p className="mt-0.5 text-sm font-semibold leading-snug text-[#424143]">
+                                  {t.title}
+                                </p>
+
+                                {/* Footer separator */}
+                                <div className="mt-2.5 border-t border-[#f0eee9] pt-2">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 text-[10px] text-[#9a9892]">
+                                      {projectCode && (
+                                        <span className="font-medium">{projectCode}</span>
+                                      )}
+                                    </div>
+                                    {/* Designer avatar */}
+                                    <div
+                                      title={designerLabel}
+                                      className="flex h-6 w-6 items-center justify-center rounded-full text-[8px] font-bold text-white"
+                                      style={{
+                                        backgroundColor: avatarColor(designerLabel),
+                                      }}
+                                    >
+                                      {getInitials(
+                                        t.designer?.name ?? null,
+                                        t.designer?.email ?? null,
+                                      )}
+                                    </div>
+                                  </div>
                                 </div>
-                                {projectCode && (
-                                  <span className="rounded-full bg-[#eaf4ff] px-2 py-0.5 text-[10px] font-semibold text-[#1d72b8]">
-                                    {projectCode}
-                                  </span>
-                                )}
                               </div>
-
-                              <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-[#7a7a7a]">
-                                <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5">
-                                  Project:{" "}
-                                  <span className="font-semibold">
-                                    {projectName}
-                                  </span>
-                                </span>
-                                <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5">
-                                  Designer:{" "}
-                                  <span className="font-semibold">
-                                    {designerLabel}
-                                  </span>
-                                </span>
-                              </div>
-
-                              <div className="mt-2 text-[10px] text-[#9a9892]">
-                                Created {formatDate(t.createdAt)}
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
+                            );
+                          })
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -466,7 +468,6 @@ export default function AdminBoardPage() {
             </div>
           </main>
         </div>
-      </div>
-    </div>
+    </>
   );
 }

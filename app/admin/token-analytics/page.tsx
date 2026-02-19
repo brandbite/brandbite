@@ -9,6 +9,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { InlineAlert } from "@/components/ui/inline-alert";
+import { EmptyState } from "@/components/ui/empty-state";
+import { FormSelect } from "@/components/ui/form-field";
+import { LoadingState } from "@/components/ui/loading-state";
 import {
   Bar,
   BarChart,
@@ -140,39 +144,7 @@ export default function AdminTokenAnalyticsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
-      <div className="mx-auto max-w-6xl px-6 py-10">
-        {/* Top navigation */}
-        <header className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f15b2b] text-sm font-semibold text-white">
-              B
-            </div>
-            <span className="text-lg font-semibold tracking-tight">
-              Brandbite
-            </span>
-          </div>
-          <nav className="hidden items-center gap-6 text-sm text-[#7a7a7a] md:flex">
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() => (window.location.href = "/admin/ledger")}
-            >
-              Ledger
-            </button>
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() =>
-                (window.location.href = "/admin/withdrawals")
-              }
-            >
-              Withdrawals
-            </button>
-            <button className="font-medium text-[#424143]">
-              Analytics
-            </button>
-          </nav>
-        </header>
-
+    <>
         {/* Page header */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -188,10 +160,9 @@ export default function AdminTokenAnalyticsPage() {
 
         {/* Error */}
         {error && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-white px-4 py-3 text-sm text-red-700">
-            <p className="font-medium">Error</p>
-            <p className="mt-1">{error}</p>
-          </div>
+          <InlineAlert variant="error" title="Something went wrong" className="mb-4">
+            {error}
+          </InlineAlert>
         )}
 
         {/* Summary cards */}
@@ -267,10 +238,10 @@ export default function AdminTokenAnalyticsPage() {
             <label className="text-xs font-medium text-[#424143]">
               Company
             </label>
-            <select
+            <FormSelect
               value={companyFilter}
               onChange={(e) => setCompanyFilter(e.target.value)}
-              className="rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+              className="w-auto"
             >
               <option value="ALL">All companies</option>
               {companyNames.map((name) => (
@@ -278,12 +249,12 @@ export default function AdminTokenAnalyticsPage() {
                   {name}
                 </option>
               ))}
-            </select>
+            </FormSelect>
           </div>
         </section>
 
         {/* Chart + table */}
-        <section className="grid gap-4 md:grid-cols-[3fr,4fr]">
+        <section className="grid gap-4 md:grid-cols-[3fr_4fr]">
           {/* Chart */}
           <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
@@ -295,13 +266,9 @@ export default function AdminTokenAnalyticsPage() {
               </p>
             </div>
             {loading ? (
-              <div className="py-6 text-center text-sm text-[#7a7a7a]">
-                Loading chart…
-              </div>
+              <LoadingState message="Loading chart…" />
             ) : chartData.length === 0 ? (
-              <div className="py-6 text-center text-sm text-[#9a9892]">
-                No data to display.
-              </div>
+              <EmptyState title="No data to display." description="Token activity will appear here once companies start using tokens." />
             ) : (
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
@@ -340,13 +307,9 @@ export default function AdminTokenAnalyticsPage() {
             </div>
 
             {loading ? (
-              <div className="py-6 text-center text-sm text-[#7a7a7a]">
-                Loading companies…
-              </div>
+              <LoadingState message="Loading companies…" />
             ) : filteredCompanies.length === 0 ? (
-              <div className="py-6 text-center text-sm text-[#9a9892]">
-                No companies match your filter.
-              </div>
+              <EmptyState title="No companies match your filter." description="Try selecting a different company or choose 'All companies'." />
             ) : (
               <div className="max-h-80 overflow-auto">
                 <table className="min-w-full text-left text-sm">
@@ -407,7 +370,6 @@ export default function AdminTokenAnalyticsPage() {
             )}
           </div>
         </section>
-      </div>
-    </div>
+    </>
   );
 }

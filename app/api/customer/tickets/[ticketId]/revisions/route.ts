@@ -71,6 +71,20 @@ export async function GET(
       submittedAt: true,
       feedbackAt: true,
       feedbackMessage: true,
+      assets: {
+        where: { deletedAt: null },
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          url: true,
+          mimeType: true,
+          bytes: true,
+          width: true,
+          height: true,
+          originalName: true,
+          _count: { select: { pins: true } },
+        },
+      },
     },
   });
 
@@ -81,6 +95,16 @@ export async function GET(
       submittedAt: rev.submittedAt ? rev.submittedAt.toISOString() : null,
       feedbackAt: rev.feedbackAt ? rev.feedbackAt.toISOString() : null,
       feedbackMessage: rev.feedbackMessage ?? null,
+      assets: (rev as any).assets?.map((a: any) => ({
+        id: a.id,
+        url: a.url,
+        mimeType: a.mimeType,
+        bytes: a.bytes,
+        width: a.width,
+        height: a.height,
+        originalName: a.originalName,
+        pinCount: a._count?.pins ?? 0,
+      })) ?? [],
     })),
   });
 }

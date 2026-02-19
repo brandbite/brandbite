@@ -9,7 +9,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { AdminNav } from "@/components/navigation/admin-nav";
+import { EmptyState } from "@/components/ui/empty-state";
 
 type CompletedJob = {
   ticketId: string;
@@ -138,16 +138,14 @@ export default function AdminCompletedJobsPage() {
   }, [data]);
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-slate-100">
-      <div className="mx-auto max-w-6xl px-6 py-8">
-        <AdminNav />
+    <div className="-mx-6 -mb-10 -mt-2 rounded-2xl bg-[#0f172a] px-6 py-8 text-slate-100">
 
         <div className="mt-4 mb-4 flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
               Admin · Completed jobs
             </p>
-            <h1 className="mt-1 text-xl font-semibold tracking-tight">
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight">
               Completed jobs
             </h1>
             <p className="mt-1 text-xs text-slate-400">
@@ -165,9 +163,9 @@ export default function AdminCompletedJobsPage() {
         </div>
 
         {error && (
-          <div className="mb-4 rounded-xl border border-red-500/40 bg-red-900/30 px-4 py-3 text-xs text-red-100">
+          <div className="mb-4 rounded-xl border border-red-500/30 bg-red-950/40 px-4 py-3 text-sm text-red-200">
             <p className="font-medium">Something went wrong</p>
-            <p className="mt-1">{error}</p>
+            <p className="mt-1 text-xs">{error}</p>
           </div>
         )}
 
@@ -259,11 +257,8 @@ export default function AdminCompletedJobsPage() {
               <tbody>
                 {filteredJobs.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan={7}
-                      className="px-3 py-6 text-center text-[11px] text-slate-400"
-                    >
-                      No completed jobs found for this filter.
+                    <td colSpan={7} className="px-3 py-4">
+                      <EmptyState title="No completed jobs found for this filter." description="Try adjusting your search terms or clear the filter." />
                     </td>
                   </tr>
                 ) : (
@@ -340,7 +335,6 @@ export default function AdminCompletedJobsPage() {
             </table>
           </div>
         </div>
-      </div>
     </div>
   );
 }

@@ -7,16 +7,16 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { WithdrawalStatus } from "@prisma/client";
+import { Prisma, WithdrawalStatus } from "@prisma/client";
 
 /**
  * POST /api/admin/withdrawals/:id/reject
  */
 export async function POST(
   request: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
-  const id = context.params.id;
+  const { id } = await context.params;
 
   if (!id) {
     return NextResponse.json(
@@ -61,7 +61,7 @@ export async function POST(
       data: {
         status: WithdrawalStatus.REJECTED,
         metadata: {
-          ...(withdrawal.metadata ?? {}),
+          ...((typeof withdrawal.metadata === "object" && withdrawal.metadata !== null && !Array.isArray(withdrawal.metadata)) ? (withdrawal.metadata as Prisma.JsonObject) : {}),
           adminRejectReason: adminReason,
         },
       },

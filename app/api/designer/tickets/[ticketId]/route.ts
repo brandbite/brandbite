@@ -91,6 +91,12 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
       );
     }
 
+    // Effective payout for the designer (quantity × base, with possible override)
+    const qty = ticket.quantity ?? 1;
+    const effectivePayout = ticket.jobType
+      ? (ticket.designerPayoutOverride ?? ticket.jobType.designerPayoutTokens * qty)
+      : null;
+
     return NextResponse.json(
       {
         company: ticket.company,
@@ -104,6 +110,8 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
           createdAt: ticket.createdAt.toISOString(),
           updatedAt: ticket.updatedAt.toISOString(),
           companyTicketNumber: ticket.companyTicketNumber,
+          quantity: qty,
+          effectivePayout,
           project: ticket.project,
           jobType: ticket.jobType,
           designer: ticket.designer,

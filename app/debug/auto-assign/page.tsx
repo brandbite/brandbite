@@ -9,6 +9,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { EmptyState } from "@/components/ui/empty-state";
+import { InlineAlert } from "@/components/ui/inline-alert";
+import { LoadingState } from "@/components/ui/loading-state";
+import { FormSelect } from "@/components/ui/form-field";
 
 type ProjectAutoAssignMode = "INHERIT" | "ON" | "OFF";
 
@@ -240,36 +244,25 @@ export default function AutoAssignDebugPage() {
             </p>
           </div>
           {isLoading && (
-            <div className="rounded-full bg-[#f5f3f0] px-3 py-1 text-[11px] text-[#7a7a7a]">
-              Loading overview…
-            </div>
+            <LoadingState display="inline" message="Loading overview…" />
           )}
         </header>
 
         {/* Error state */}
         {isError && (
-          <div className="mb-4 rounded-2xl border border-[#f3c2bf] bg-[#fff5f4] px-4 py-3 text-xs text-[#9b3a32]">
-            <p className="font-medium">Something went wrong</p>
-            <p className="mt-1">{state.message}</p>
-            <p className="mt-2 text-[11px] text-[#c27c73]">
+          <InlineAlert variant="error" title="Something went wrong" className="mb-4">
+            <p>{state.message}</p>
+            <p className="mt-1 text-[11px] opacity-70">
               Make sure you&apos;re signed in as a{" "}
               <span className="font-medium">SITE_OWNER</span> or{" "}
               <span className="font-medium">SITE_ADMIN</span>.
             </p>
-          </div>
+          </InlineAlert>
         )}
 
         {/* Empty state */}
         {!isError && !isLoading && companies.length === 0 && (
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-6 text-sm text-[#7a7a7a]">
-            <p className="font-medium text-[#424143]">
-              No companies found in this environment
-            </p>
-            <p className="mt-1 text-xs text-[#9a9892]">
-              Once you seed demo data or create companies, they will appear in
-              this panel.
-            </p>
-          </div>
+          <EmptyState title="No companies found in this environment." description="Once you seed demo data or create companies, they will appear in this panel." />
         )}
 
         {/* Companies list */}
@@ -329,9 +322,7 @@ export default function AutoAssignDebugPage() {
                       Projects
                     </p>
                     {company.projects.length === 0 ? (
-                      <p className="text-[11px] text-[#9a9892]">
-                        No projects found for this company.
-                      </p>
+                      <EmptyState title="No projects found for this company." />
                     ) : (
                       <div className="space-y-2">
                         {company.projects.map((project) => {
@@ -356,8 +347,9 @@ export default function AutoAssignDebugPage() {
                                 </p>
                               </div>
                               <div className="flex items-center gap-2">
-                                <select
-                                  className="rounded-full border border-[#d9d7d0] bg-white px-3 py-1 text-[11px] text-[#424143]"
+                                <FormSelect
+                                  size="sm"
+                                  className="w-auto"
                                   value={project.autoAssignMode}
                                   onChange={(e) =>
                                     handleChangeProjectMode(
@@ -373,7 +365,7 @@ export default function AutoAssignDebugPage() {
                                   </option>
                                   <option value="ON">Always on</option>
                                   <option value="OFF">Always off</option>
-                                </select>
+                                </FormSelect>
                                 {isProjectUpdating && (
                                   <span className="text-[11px] text-[#9a9892]">
                                     Saving…

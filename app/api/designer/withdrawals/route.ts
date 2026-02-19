@@ -10,8 +10,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { getUserTokenBalance } from "@/lib/token-engine";
+import { getAppSettingInt } from "@/lib/app-settings";
 
-const MIN_WITHDRAWAL_TOKENS = 20; // TODO: make configurable via admin settings later
+const DEFAULT_MIN_WITHDRAWAL_TOKENS = 20;
 
 // -----------------------------------------------------------------------------
 // GET: list withdrawals for current designer + basic stats
@@ -111,10 +112,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (amountTokens < MIN_WITHDRAWAL_TOKENS) {
+    const minWithdrawalTokens = await getAppSettingInt(
+      "MIN_WITHDRAWAL_TOKENS",
+      DEFAULT_MIN_WITHDRAWAL_TOKENS,
+    );
+
+    if (amountTokens < minWithdrawalTokens) {
       return NextResponse.json(
         {
-          error: `Minimum withdrawal amount is ${MIN_WITHDRAWAL_TOKENS} tokens.`,
+          error: `Minimum withdrawal amount is ${minWithdrawalTokens} tokens.`,
         },
         { status: 400 },
       );

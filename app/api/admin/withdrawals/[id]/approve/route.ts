@@ -7,7 +7,7 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { WithdrawalStatus } from "@prisma/client";
+import { Prisma, WithdrawalStatus } from "@prisma/client";
 import { applyUserLedgerEntry, getUserTokenBalance } from "@/lib/token-engine";
 
 /**
@@ -15,9 +15,9 @@ import { applyUserLedgerEntry, getUserTokenBalance } from "@/lib/token-engine";
  */
 export async function POST(
   _request: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
-  const id = context.params.id;
+  const { id } = await context.params;
 
   if (!id) {
     return NextResponse.json(
@@ -81,7 +81,7 @@ export async function POST(
           status: WithdrawalStatus.APPROVED,
           approvedAt: new Date(),
           metadata: {
-            ...(withdrawal.metadata ?? {}),
+            ...((typeof withdrawal.metadata === "object" && withdrawal.metadata !== null && !Array.isArray(withdrawal.metadata)) ? (withdrawal.metadata as Prisma.JsonObject) : {}),
             ledgerEntryId: ledgerResult.ledger.id,
           },
         },

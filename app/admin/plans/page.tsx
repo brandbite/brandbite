@@ -9,6 +9,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { DataTable, THead, TH, TD } from "@/components/ui/data-table";
+import { EmptyState } from "@/components/ui/empty-state";
+import { InlineAlert } from "@/components/ui/inline-alert";
+import { useToast } from "@/components/ui/toast-provider";
+import { Button } from "@/components/ui/button";
+import { FormInput } from "@/components/ui/form-field";
+import { LoadingState } from "@/components/ui/loading-state";
+import { Badge } from "@/components/ui/badge";
 
 type Plan = {
   id: string;
@@ -30,6 +38,7 @@ type PlansResponse = {
 };
 
 export default function AdminPlansPage() {
+  const { showToast } = useToast();
   const [data, setData] = useState<PlansResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -201,11 +210,11 @@ export default function AdminPlansPage() {
         throw new Error(msg);
       }
 
-      setSaveSuccess(
-        isEditing
-          ? "Plan updated successfully."
-          : "Plan created successfully.",
-      );
+      const msg = isEditing
+        ? "Plan updated successfully."
+        : "Plan created successfully.";
+      setSaveSuccess(msg);
+      showToast({ type: "success", title: msg });
 
       await load();
 
@@ -214,9 +223,9 @@ export default function AdminPlansPage() {
       }
     } catch (err: any) {
       console.error("Admin plans save error:", err);
-      setSaveError(
-        err?.message || "Failed to save plan.",
-      );
+      const errMsg = err?.message || "Failed to save plan.";
+      setSaveError(errMsg);
+      showToast({ type: "error", title: errMsg });
     } finally {
       setSaving(false);
     }
@@ -234,61 +243,7 @@ export default function AdminPlansPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
-      <div className="mx-auto max-w-6xl px-6 py-10">
-        {/* Top navigation */}
-        <header className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f15b2b] text-sm font-semibold text-white">
-              B
-            </div>
-            <span className="text-lg font-semibold tracking-tight">
-              Brandbite
-            </span>
-          </div>
-          <nav className="hidden items-center gap-6 text-sm text-[#7a7a7a] md:flex">
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() => (window.location.href = "/admin/companies")}
-            >
-              Companies
-            </button>
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() => (window.location.href = "/admin/ledger")}
-            >
-              Ledger
-            </button>
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() =>
-                (window.location.href = "/admin/withdrawals")
-              }
-            >
-              Withdrawals
-            </button>
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() =>
-                (window.location.href = "/admin/token-analytics")
-              }
-            >
-              Analytics
-            </button>
-            <button
-              className="font-medium text-[#7a7a7a]"
-              onClick={() =>
-                (window.location.href = "/admin/job-types")
-              }
-            >
-              Job types
-            </button>
-            <button className="font-medium text-[#424143]">
-              Plans
-            </button>
-          </nav>
-        </header>
-
+    <>
         {/* Page header */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -299,21 +254,14 @@ export default function AdminPlansPage() {
               Configure subscription plans with monthly tokens, pricing and Stripe mapping.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={handleNewPlan}
-            className="inline-flex items-center justify-center rounded-full bg-[#f15b2b] px-4 py-2 text-sm font-semibold text-white shadow-sm"
-          >
-            New plan
-          </button>
+          <Button onClick={handleNewPlan}>New plan</Button>
         </div>
 
         {/* Error */}
         {error && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-white px-4 py-3 text-sm text-red-700">
-            <p className="font-medium">Error</p>
-            <p className="mt-1">{error}</p>
-          </div>
+          <InlineAlert variant="error" title="Error" className="mb-4">
+            {error}
+          </InlineAlert>
         )}
 
         {/* Summary cards */}
@@ -354,7 +302,7 @@ export default function AdminPlansPage() {
         </section>
 
         {/* Table + Form */}
-        <section className="grid gap-4 md:grid-cols-[3fr,2fr]">
+        <section className="grid gap-4 md:grid-cols-[3fr_2fr]">
           {/* List */}
           <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
@@ -367,91 +315,65 @@ export default function AdminPlansPage() {
             </div>
 
             {loading ? (
-              <div className="py-6 text-center text-sm text-[#7a7a7a]">
-                Loading plans…
-              </div>
+              <LoadingState message="Loading plans…" />
             ) : plans.length === 0 ? (
-              <div className="py-6 text-center text-sm text-[#9a9892]">
-                No plans defined yet.
-              </div>
+              <EmptyState title="No plans defined yet." />
             ) : (
-              <div className="max-h-[420px] overflow-auto">
-                <table className="min-w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-[#e3e1dc] text-xs uppercase tracking-[0.08em] text-[#9a9892]">
-                      <th className="px-2 py-2">Name</th>
-                      <th className="px-2 py-2 text-right">
-                        Monthly tokens
-                      </th>
-                      <th className="px-2 py-2 text-right">
-                        Price
-                      </th>
-                      <th className="px-2 py-2 text-center">
-                        Status
-                      </th>
-                      <th className="px-2 py-2 text-left">
-                        Stripe IDs
-                      </th>
-                      <th className="px-2 py-2 text-right">
-                        Companies
-                      </th>
-                      <th className="px-2 py-2 text-right">
-                        Updated
-                      </th>
+              <DataTable maxHeight="420px">
+                <THead>
+                  <TH>Name</TH>
+                  <TH align="right">Monthly tokens</TH>
+                  <TH align="right">Price</TH>
+                  <TH align="center">Status</TH>
+                  <TH>Stripe IDs</TH>
+                  <TH align="right">Companies</TH>
+                  <TH align="right">Updated</TH>
+                </THead>
+                <tbody>
+                  {plans.map((p) => (
+                    <tr
+                      key={p.id}
+                      className={`border-b border-[#f0eeea] last:border-b-0 ${
+                        selected?.id === p.id
+                          ? "bg-[#fff5ef]"
+                          : "bg-white"
+                      } cursor-pointer`}
+                      onClick={() => handleClickPlan(p)}
+                    >
+                      <TD>
+                        <div className="font-semibold">
+                          {p.name}
+                        </div>
+                      </TD>
+                      <TD align="right">
+                        {p.monthlyTokens}
+                      </TD>
+                      <TD align="right">
+                        {formatPrice(p.priceCents)}
+                      </TD>
+                      <TD align="center">
+                        <Badge variant={p.isActive ? "success" : "neutral"}>
+                          {p.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                      </TD>
+                      <TD>
+                        <div className="text-[#424143]">
+                          {p.stripeProductId || "—"}
+                        </div>
+                        <div className="mt-0.5 text-[10px] text-[#9a9892]">
+                          {p.stripePriceId || "—"}
+                        </div>
+                      </TD>
+                      <TD align="right">
+                        {p.attachedCompanies}
+                      </TD>
+                      <TD align="right" className="text-[#9a9892]">
+                        {formatDate(p.updatedAt)}
+                      </TD>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {plans.map((p) => (
-                      <tr
-                        key={p.id}
-                        className={`border-b border-[#f0eeea] text-xs last:border-b-0 ${
-                          selected?.id === p.id
-                            ? "bg-[#fff5ef]"
-                            : "bg-white"
-                        } cursor-pointer`}
-                        onClick={() => handleClickPlan(p)}
-                      >
-                        <td className="px-2 py-2 align-top text-[11px] text-[#424143]">
-                          <div className="font-semibold">
-                            {p.name}
-                          </div>
-                        </td>
-                        <td className="px-2 py-2 align-top text-right text-[11px] text-[#424143]">
-                          {p.monthlyTokens}
-                        </td>
-                        <td className="px-2 py-2 align-top text-right text-[11px] text-[#424143]">
-                          {formatPrice(p.priceCents)}
-                        </td>
-                        <td className="px-2 py-2 align-top text-center text-[11px]">
-                          <span
-                            className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                              p.isActive
-                                ? "bg-[#f0fff6] text-[#137a3a]"
-                                : "bg-[#f5f3f0] text-[#9a9892]"
-                            }`}
-                          >
-                            {p.isActive ? "Active" : "Inactive"}
-                          </span>
-                        </td>
-                        <td className="px-2 py-2 align-top text-left text-[11px]">
-                          <div className="text-[#424143]">
-                            {p.stripeProductId || "—"}
-                          </div>
-                          <div className="mt-0.5 text-[10px] text-[#9a9892]">
-                            {p.stripePriceId || "—"}
-                          </div>
-                        </td>
-                        <td className="px-2 py-2 align-top text-right text-[11px] text-[#424143]">
-                          {p.attachedCompanies}
-                        </td>
-                        <td className="px-2 py-2 align-top text-right text-[11px] text-[#9a9892]">
-                          {formatDate(p.updatedAt)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  ))}
+                </tbody>
+              </DataTable>
             )}
           </div>
 
@@ -466,15 +388,15 @@ export default function AdminPlansPage() {
             </p>
 
             {saveError && (
-              <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              <InlineAlert variant="error" size="sm" className="mt-3">
                 {saveError}
-              </div>
+              </InlineAlert>
             )}
 
             {saveSuccess && (
-              <div className="mt-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-700">
+              <InlineAlert variant="success" size="sm" className="mt-3">
                 {saveSuccess}
-              </div>
+              </InlineAlert>
             )}
 
             <form className="mt-4 space-y-3" onSubmit={handleSubmit}>
@@ -485,13 +407,12 @@ export default function AdminPlansPage() {
                 >
                   Name
                 </label>
-                <input
+                <FormInput
                   id="plan-name"
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
-                  className="w-full rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
                   placeholder="e.g. Basic, Pro, Full"
                 />
               </div>
@@ -503,14 +424,13 @@ export default function AdminPlansPage() {
                 >
                   Monthly tokens
                 </label>
-                <input
+                <FormInput
                   id="plan-monthly-tokens"
                   type="number"
                   min={1}
                   value={monthlyTokens}
                   onChange={(e) => setMonthlyTokens(e.target.value)}
                   required
-                  className="w-full rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
                   placeholder="e.g. 100, 200, 400"
                 />
               </div>
@@ -522,13 +442,12 @@ export default function AdminPlansPage() {
                 >
                   Price (in cents, optional)
                 </label>
-                <input
+                <FormInput
                   id="plan-price-cents"
                   type="number"
                   min={0}
                   value={priceCents}
                   onChange={(e) => setPriceCents(e.target.value)}
-                  className="w-full rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
                   placeholder="e.g. 4900 for €49.00"
                 />
               </div>
@@ -540,12 +459,11 @@ export default function AdminPlansPage() {
                 >
                   Stripe product ID (optional)
                 </label>
-                <input
+                <FormInput
                   id="plan-stripe-product-id"
                   type="text"
                   value={stripeProductId}
                   onChange={(e) => setStripeProductId(e.target.value)}
-                  className="w-full rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
                   placeholder="e.g. prod_123..."
                 />
               </div>
@@ -557,12 +475,11 @@ export default function AdminPlansPage() {
                 >
                   Stripe price ID (optional)
                 </label>
-                <input
+                <FormInput
                   id="plan-stripe-price-id"
                   type="text"
                   value={stripePriceId}
                   onChange={(e) => setStripePriceId(e.target.value)}
-                  className="w-full rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
                   placeholder="e.g. price_123..."
                 />
               </div>
@@ -579,31 +496,23 @@ export default function AdminPlansPage() {
                 </label>
 
                 {selected && (
-                  <button
-                    type="button"
-                    onClick={resetForm}
-                    className="text-xs font-medium text-[#7a7a7a]"
-                  >
+                  <Button variant="ghost" size="sm" onClick={resetForm}>
                     Clear selection
-                  </button>
+                  </Button>
                 )}
               </div>
 
-              <button
+              <Button
                 type="submit"
-                disabled={saving}
-                className="mt-2 inline-flex items-center justify-center rounded-full bg-[#f15b2b] px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:opacity-60"
+                loading={saving}
+                loadingText="Saving…"
+                className="mt-2"
               >
-                {saving
-                  ? "Saving…"
-                  : selected
-                  ? "Save changes"
-                  : "Create plan"}
-              </button>
+                {selected ? "Save changes" : "Create plan"}
+              </Button>
             </form>
           </div>
         </section>
-      </div>
-    </div>
+    </>
   );
 }

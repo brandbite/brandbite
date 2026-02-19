@@ -9,54 +9,74 @@
 
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   CompanyRole,
   normalizeCompanyRole,
   canMoveTicketsOnBoard,
+  canEditTickets,
+  canManageTags,
 } from "@/lib/permissions/companyRoles";
 import { TicketStatus, TicketPriority } from "@prisma/client";
 import { useToast } from "@/components/ui/toast-provider";
-import { CustomerNav } from "@/components/navigation/customer-nav";
+import { InlineAlert } from "@/components/ui/inline-alert";
+import { EmptyState } from "@/components/ui/empty-state";
+import {
+  STATUS_ORDER,
+  STATUS_LABELS,
+  statusColumnClass,
+  formatBoardDate,
+  PRIORITY_ORDER,
+  formatPriorityLabel,
+  priorityBadgeVariant,
+  statusBadgeVariant,
+  columnAccentColor,
+  PROJECT_COLORS,
+  AVATAR_COLORS,
+  avatarColor,
+  priorityIconMap,
+  priorityColorClass,
+  formatDueDateShort,
+  isDueDateOverdue,
+  formatDueDateCountdown,
+  getInitials,
+} from "@/lib/board";
+import { Badge } from "@/components/ui/badge";
+import { TagBadge } from "@/components/ui/tag-badge";
+import { TagMultiSelect, type TagOption } from "@/components/ui/tag-multi-select";
+import type { TagColorKey } from "@/lib/tag-colors";
+import { Modal, ModalHeader, ModalFooter } from "@/components/ui/modal";
+import { RevisionImage, RevisionImageGrid, RevisionImageLarge, DownloadAllButton, BriefThumbnailRow } from "@/components/ui/revision-image";
+import { Button } from "@/components/ui/button";
+import { FormInput, FormSelect } from "@/components/ui/form-field";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { SafeHtml, stripHtml } from "@/components/ui/safe-html";
+import {
+  downloadSingleAsset,
+  downloadAssetsAsZip,
+} from "@/lib/download-helpers";
+
 import NewTicketForm from "@/app/customer/tickets/new/NewTicketForm";
-
-type TicketStatusLabel = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
-
-type TicketStatusConfig = {
-  label: TicketStatusLabel;
-  title: string;
-  description: string;
-};
-
-type TicketStatusDisplay = {
-  status: TicketStatus;
-  config: TicketStatusConfig;
-};
 
 type CustomerBoardTicket = {
   id: string;
+  code: string | null;
   title: string;
-  description: string | null;
+  description?: string | null;
   status: TicketStatus;
   priority: TicketPriority;
-  project: {
-    id: string;
-    name: string;
-    code: string | null;
-  } | null;
-  jobType: {
-    id: string;
-    name: string;
-  } | null;
-  designer: {
-    id: string;
-    name: string | null;
-    email: string | null;
-  } | null;
-  companyTicketNumber: number | null;
+  projectId: string | null;
+  projectName: string | null;
+  projectCode: string | null;
+  designerName: string | null;
+  jobTypeId: string | null;
+  jobTypeName: string | null;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
   dueDate: string | null;
+  thumbnailUrl?: string | null;
+  thumbnailAssetId?: string | null;
+  tags?: { id: string; name: string; color: string }[];
 };
 
 type BoardStats = {
@@ -70,11 +90,23 @@ type CustomerBoardResponse = {
   tickets: CustomerBoardTicket[];
 };
 
+type RevisionAsset = {
+  id: string;
+  url: string | null;
+  mimeType: string;
+  bytes: number;
+  width: number | null;
+  height: number | null;
+  originalName: string | null;
+  pinCount?: number;
+};
+
 type TicketRevisionEntry = {
   version: number;
   submittedAt: string | null;
   feedbackAt: string | null;
   feedbackMessage: string | null;
+  assets?: RevisionAsset[];
 };
 
 type CompanyRoleResponse = {
@@ -93,14 +125,9 @@ type UpdateStatusResponse = {
   stats?: BoardStats;
 };
 
-type TicketStatusColumnDefinition = {
-  status: TicketStatus;
-  title: string;
-  description: string;
-};
-
 type NewTicketMetadataResponse = {
   companySlug: string;
+  tokenBalance: number;
   projects: {
     id: string;
     name: string;
@@ -110,129 +137,20 @@ type NewTicketMetadataResponse = {
     id: string;
     name: string;
     description: string | null;
+    tokenCost: number;
+  }[];
+  tags?: {
+    id: string;
+    name: string;
+    color: string;
   }[];
 };
 
-const ticketStatusColumns: TicketStatusColumnDefinition[] = [
-  {
-    status: "TODO",
-    title: "To do",
-    description: "New and not yet started requests.",
-  },
-  {
-    status: "IN_PROGRESS",
-    title: "In progress",
-    description: "Your designer is actively working on these.",
-  },
-  {
-    status: "IN_REVIEW",
-    title: "In review",
-    description: "Waiting for your feedback or approval.",
-  },
-  {
-    status: "DONE",
-    title: "Done",
-    description: "Completed requests you approved as done.",
-  },
-];
 
-const statusOrder: TicketStatus[] = [
-  "TODO",
-  "IN_PROGRESS",
-  "IN_REVIEW",
-  "DONE",
-];
 
-const priorityOrder: TicketPriority[] = ["URGENT", "HIGH", "MEDIUM", "LOW"];
-
-const statusLabels: Record<TicketStatus, TicketStatusLabel> = {
-  TODO: "TODO",
-  IN_PROGRESS: "IN_PROGRESS",
-  IN_REVIEW: "IN_REVIEW",
-  DONE: "DONE",
-};
-
-const statusDisplayConfigs: Record<TicketStatus, TicketStatusConfig> = {
-  TODO: {
-    label: "TODO",
-    title: "To do",
-    description: "New and not yet started requests.",
-  },
-  IN_PROGRESS: {
-    label: "IN_PROGRESS",
-    title: "In progress",
-    description: "Your designer is actively working on these.",
-  },
-  IN_REVIEW: {
-    label: "IN_REVIEW",
-    title: "In review",
-    description: "Waiting for your feedback or approval.",
-  },
-  DONE: {
-    label: "DONE",
-    title: "Done",
-    description: "Completed requests you approved as done.",
-  },
-};
-
-const priorityLabelMap: Record<TicketPriority, string> = {
-  URGENT: "Urgent",
-  HIGH: "High",
-  MEDIUM: "Medium",
-  LOW: "Low",
-};
-
-const priorityBadgeClass: Record<TicketPriority, string> = {
-  URGENT:
-    "bg-[#fdecea] text-[#b13832] border border-[#f7c7c0] shadow-[0_1px_0_rgba(0,0,0,0.02)]",
-  HIGH: "bg-[#fff4e5] text-[#c76a18] border border-[#f7d0a9]",
-  MEDIUM: "bg-[#eef3ff] text-[#3259c7] border border-[#c7d1f7]",
-  LOW: "bg-[#f3f2f0] text-[#5a5953] border border-[#d4d2ce]",
-};
-
-const priorityIconMap: Record<TicketPriority, string> = {
-  URGENT: "↑↑",
-  HIGH: "↑",
-  MEDIUM: "→",
-  LOW: "↓",
-};
-
-const statusBadgeClass: Record<TicketStatus, string> = {
-  TODO: "bg-[#f5f3f0] text-[#5a5953] border border-[#d4d2ce]",
-  IN_PROGRESS: "bg-[#eaf4ff] text-[#3259c7] border border-[#c7d1f7]",
-  IN_REVIEW: "bg-[#fff7e0] text-[#c76a18] border border-[#f7d0a9]",
-  DONE: "bg-[#e8f6f0] text-[#287b5a] border border-[#b9e2cd]",
-};
-
-const statusColumnClass = (status: TicketStatus): string => {
-  switch (status) {
-    case "TODO":
-      return "bg-[#f5f3f0]";
-    case "IN_PROGRESS":
-      return "bg-[#eaf4ff]";
-    case "IN_REVIEW":
-      return "bg-[#fff7e0]";
-    case "DONE":
-      return "bg-[#e8f6f0]";
-    default:
-      return "bg-[#f5f3f0]";
-  }
-};
-
-const statusTagColor = (status: TicketStatus): string => {
-  switch (status) {
-    case "TODO":
-      return "bg-[#f5f3f0] text-[#5a5953]";
-    case "IN_PROGRESS":
-      return "bg-[#eaf4ff] text-[#3259c7]";
-    case "IN_REVIEW":
-      return "bg-[#fff7e0] text-[#c76a18]";
-    case "DONE":
-      return "bg-[#e8f6f0] text-[#287b5a]";
-    default:
-      return "bg-[#f5f3f0] text-[#5a5953]";
-  }
-};
+// priorityIconMap, priorityColorClass, columnAccentColor, PROJECT_COLORS,
+// AVATAR_COLORS, avatarColor, formatDueDateShort, isDueDateOverdue, getInitials
+// are now imported from @/lib/board
 
 const statusIndicatorColor = (status: TicketStatus): string => {
   switch (status) {
@@ -249,16 +167,6 @@ const statusIndicatorColor = (status: TicketStatus): string => {
   }
 };
 
-const formatDate = (iso: string | null): string => {
-  if (!iso) return "—";
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-};
 
 const formatTimeAgo = (iso: string | null): string => {
   if (!iso) return "—";
@@ -311,8 +219,8 @@ const sortTicketsForColumn = (
   tickets: CustomerBoardTicket[],
 ): CustomerBoardTicket[] => {
   return [...tickets].sort((a, b) => {
-    const priorityIndexA = priorityOrder.indexOf(a.priority);
-    const priorityIndexB = priorityOrder.indexOf(b.priority);
+    const priorityIndexA = PRIORITY_ORDER.indexOf(a.priority);
+    const priorityIndexB = PRIORITY_ORDER.indexOf(b.priority);
     if (priorityIndexA !== priorityIndexB) {
       return priorityIndexA - priorityIndexB;
     }
@@ -380,10 +288,6 @@ const canDropTicketToStatus = (
   };
 };
 
-const formatPriorityLabel = (priority: TicketPriority): string => {
-  return priorityLabelMap[priority] ?? priority;
-};
-
 export default function CustomerBoardPage() {
   const { showToast } = useToast();
 
@@ -397,6 +301,12 @@ export default function CustomerBoardPage() {
 
   const [projectFilter, setProjectFilter] = useState<string>("ALL");
   const [search, setSearch] = useState<string>("");
+  const [filterOpen, setFilterOpen] = useState<boolean>(false);
+
+  // Thumbnail presigned URL cache: assetId → downloadUrl
+  const [thumbnailUrls, setThumbnailUrls] = useState<Record<string, string>>({});
+  const thumbnailFetchingRef = useRef<Set<string>>(new Set());
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const [draggingTicketId, setDraggingTicketId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] =
@@ -414,10 +324,23 @@ export default function CustomerBoardPage() {
   const [detailRevisionsError, setDetailRevisionsError] = useState<
     string | null
   >(null);
+  const [showPreviousVersions, setShowPreviousVersions] = useState(false);
+
+  // Brief attachments state
+  type BriefAsset = { id: string; url: string | null; originalName: string | null };
+  const [detailBriefAssets, setDetailBriefAssets] = useState<BriefAsset[]>([]);
+  const [detailBriefAssetsLoading, setDetailBriefAssetsLoading] = useState(false);
 
   const [pendingDoneTicketId, setPendingDoneTicketId] = useState<
     string | null
   >(null);
+  const [pendingDoneRevisions, setPendingDoneRevisions] = useState<
+    TicketRevisionEntry[] | null
+  >(null);
+  const [pendingDoneRevisionsLoading, setPendingDoneRevisionsLoading] =
+    useState(false);
+  const [doneModalDownloading, setDoneModalDownloading] = useState(false);
+  const [detailFooterDownloading, setDetailFooterDownloading] = useState(false);
 
   const [pendingRevisionTicketId, setPendingRevisionTicketId] =
     useState<string | null>(null);
@@ -442,6 +365,28 @@ export default function CustomerBoardPage() {
   const [newTicketMetaError, setNewTicketMetaError] = useState<string | null>(
     null,
   );
+
+  // Inline edit state for detail modal
+  const [isEditingDetail, setIsEditingDetail] = useState(false);
+  const [editForm, setEditForm] = useState<{
+    title: string;
+    description: string;
+    priority: string;
+    dueDate: string;
+    projectId: string;
+    jobTypeId: string;
+    tagIds: string[];
+  }>({
+    title: "",
+    description: "",
+    priority: "MEDIUM",
+    dueDate: "",
+    projectId: "",
+    jobTypeId: "",
+    tagIds: [],
+  });
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   // ---------------------------------------------------------------------------
   // Load board data
@@ -690,6 +635,84 @@ export default function CustomerBoardPage() {
   }, [detailTicketId]);
 
   // ---------------------------------------------------------------------------
+  // Fetch revisions for "Mark as done" modal preview
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (!pendingDoneTicketId) {
+      setPendingDoneRevisions(null);
+      setPendingDoneRevisionsLoading(false);
+      setDoneModalDownloading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const loadRevisions = async () => {
+      setPendingDoneRevisionsLoading(true);
+      try {
+        const res = await fetch(
+          `/api/customer/tickets/${pendingDoneTicketId}/revisions`,
+          { cache: "no-store" },
+        );
+        const json = await res.json().catch(() => null);
+        if (!res.ok || cancelled) return;
+        const entries = ((json as any)?.revisions ?? []) as TicketRevisionEntry[];
+        if (!cancelled) setPendingDoneRevisions(entries);
+      } catch {
+        // silently fail — modal still usable without preview
+      } finally {
+        if (!cancelled) setPendingDoneRevisionsLoading(false);
+      }
+    };
+    loadRevisions();
+    return () => { cancelled = true; };
+  }, [pendingDoneTicketId]);
+
+  // ---------------------------------------------------------------------------
+  // Detail ticket brief attachments load
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (!detailTicketId) {
+      setDetailBriefAssets([]);
+      setDetailBriefAssetsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadBriefAssets = async () => {
+      setDetailBriefAssetsLoading(true);
+      try {
+        const res = await fetch(
+          `/api/customer/tickets/${detailTicketId}/assets?kind=BRIEF_INPUT`,
+          { cache: "no-store" },
+        );
+        const json = await res.json().catch(() => null);
+        if (!cancelled && res.ok && Array.isArray((json as any)?.assets)) {
+          setDetailBriefAssets(
+            (json as any).assets.map((a: any) => ({
+              id: a.id,
+              url: a.url ?? null,
+              originalName: a.originalName ?? null,
+            })),
+          );
+        }
+      } catch {
+        // Silently fail — brief assets are supplementary
+      } finally {
+        if (!cancelled) setDetailBriefAssetsLoading(false);
+      }
+    };
+
+    loadBriefAssets();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [detailTicketId]);
+
+  // ---------------------------------------------------------------------------
   // Derived values
   // ---------------------------------------------------------------------------
 
@@ -699,7 +722,7 @@ export default function CustomerBoardPage() {
     const list = Array.from(
       new Set(
         tickets
-          .map((t) => t.project?.name)
+          .map((t) => t.projectName)
           .filter((p): p is string => !!p),
       ),
     );
@@ -707,18 +730,91 @@ export default function CustomerBoardPage() {
     return list;
   }, [tickets]);
 
+  // Fetch presigned URLs for thumbnails that have an assetId but no public url
+  useEffect(() => {
+    const toFetch = tickets.filter(
+      (t) =>
+        t.thumbnailAssetId &&
+        !t.thumbnailUrl &&
+        !thumbnailUrls[t.thumbnailAssetId] &&
+        !thumbnailFetchingRef.current.has(t.thumbnailAssetId),
+    );
+    if (toFetch.length === 0) return;
+
+    for (const t of toFetch) {
+      const assetId = t.thumbnailAssetId!;
+      thumbnailFetchingRef.current.add(assetId);
+      fetch(`/api/assets/${assetId}/download`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data?.downloadUrl) {
+            setThumbnailUrls((prev) => ({ ...prev, [assetId]: data.downloadUrl }));
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          thumbnailFetchingRef.current.delete(assetId);
+        });
+    }
+  }, [tickets, thumbnailUrls]);
+
+  // "/" keyboard shortcut to focus search
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (e.key === "/") {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
+
+  const uniqueDesigners = useMemo(() => {
+    const seen = new Set<string>();
+    const result: { name: string }[] = [];
+    for (const t of tickets) {
+      if (t.designerName && !seen.has(t.designerName)) {
+        seen.add(t.designerName);
+        result.push({ name: t.designerName });
+      }
+    }
+    return result;
+  }, [tickets]);
+
+  const projectsWithColors = useMemo(() => {
+    const projectMap = new Map<
+      string,
+      { name: string; code: string | null; count: number }
+    >();
+    for (const t of tickets) {
+      if (t.projectName) {
+        const existing = projectMap.get(t.projectName);
+        if (existing) {
+          existing.count += 1;
+        } else {
+          projectMap.set(t.projectName, {
+            name: t.projectName,
+            code: t.projectCode,
+            count: 1,
+          });
+        }
+      }
+    }
+    return Array.from(projectMap.values()).sort((a, b) => b.count - a.count);
+  }, [tickets]);
+
   const filteredTickets = useMemo(() => {
     return tickets.filter((t) => {
-      if (projectFilter !== "ALL" && t.project?.name !== projectFilter) {
+      if (projectFilter !== "ALL" && t.projectName !== projectFilter) {
         return false;
       }
 
       const q = search.trim().toLowerCase();
       if (q) {
-        const code =
-          t.project?.code && t.companyTicketNumber
-            ? `${t.project.code}-${t.companyTicketNumber}`.toLowerCase()
-            : "";
+        const code = (t.code ?? "").toLowerCase();
         const title = t.title.toLowerCase();
         const description = (t.description ?? "").toLowerCase();
 
@@ -745,7 +841,7 @@ export default function CustomerBoardPage() {
     for (const t of filteredTickets) {
       map[t.status].push(t);
     }
-    for (const status of statusOrder) {
+    for (const status of STATUS_ORDER) {
       map[status] = sortTicketsForColumn(map[status]);
     }
     return map;
@@ -1092,6 +1188,116 @@ export default function CustomerBoardPage() {
     setDetailRevisions(null);
     setDetailRevisionsError(null);
     setDetailRevisionsLoading(false);
+    setShowPreviousVersions(false);
+    setDetailBriefAssets([]);
+    setDetailBriefAssetsLoading(false);
+    setIsEditingDetail(false);
+    setEditError(null);
+  };
+
+  // ---------------------------------------------------------------------------
+  // Inline edit — permission + handlers
+  // ---------------------------------------------------------------------------
+
+  const canEditDetail =
+    detailTicket?.status === "TODO" && canEditTickets(companyRole);
+
+  const startEditingDetail = () => {
+    if (!detailTicket) return;
+    setEditForm({
+      title: detailTicket.title,
+      description: detailTicket.description ?? "",
+      priority: detailTicket.priority,
+      dueDate: detailTicket.dueDate
+        ? new Date(detailTicket.dueDate).toISOString().split("T")[0]
+        : "",
+      projectId: detailTicket.projectId ?? "",
+      jobTypeId: detailTicket.jobTypeId ?? "",
+      tagIds: (detailTicket.tags ?? []).map((t) => t.id),
+    });
+    setEditError(null);
+    setIsEditingDetail(true);
+
+    // Load metadata for dropdowns if not already loaded
+    if (!newTicketMeta && !newTicketMetaLoading) {
+      loadNewTicketMetadata();
+    }
+  };
+
+  const cancelEditingDetail = () => {
+    setIsEditingDetail(false);
+    setEditError(null);
+  };
+
+  const saveDetailEdits = async () => {
+    if (!detailTicket) return;
+    setEditSaving(true);
+    setEditError(null);
+
+    try {
+      const res = await fetch(`/api/customer/tickets/${detailTicket.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: editForm.title,
+          description: editForm.description,
+          priority: editForm.priority,
+          dueDate: editForm.dueDate || null,
+          projectId: editForm.projectId || null,
+          jobTypeId: editForm.jobTypeId || null,
+          tagIds: editForm.tagIds,
+        }),
+      });
+
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        setEditError(json?.error || "Failed to save changes.");
+        return;
+      }
+
+      // Update the ticket in local state so the board reflects changes
+      const updatedTicket = json.ticket;
+      setData((prev) => {
+        if (!prev) return prev;
+        const updatedTickets = prev.tickets.map((t) =>
+          t.id === detailTicket.id
+            ? {
+                ...t,
+                title: updatedTicket.title,
+                description: updatedTicket.description,
+                priority: updatedTicket.priority,
+                dueDate: updatedTicket.dueDate,
+                updatedAt: updatedTicket.updatedAt,
+                projectId: updatedTicket.projectId ?? null,
+                projectName: updatedTicket.projectName ?? null,
+                projectCode: updatedTicket.projectCode ?? null,
+                jobTypeId: updatedTicket.jobTypeId ?? null,
+                jobTypeName: updatedTicket.jobTypeName ?? null,
+                code: updatedTicket.code ?? t.code,
+                tags: updatedTicket.tags ?? t.tags,
+              }
+            : t,
+        );
+        return {
+          ...prev,
+          tickets: updatedTickets,
+          stats: computeStats(updatedTickets),
+        };
+      });
+
+      setIsEditingDetail(false);
+      showToast({
+        type: "success",
+        title: "Ticket updated",
+        description: "Your changes have been saved.",
+      });
+    } catch (err) {
+      console.error("[DetailModal] Save edit error:", err);
+      setEditError("Unexpected error while saving changes.");
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   const handleConfirmDone = async () => {
@@ -1154,12 +1360,6 @@ export default function CustomerBoardPage() {
     setSearch(event.target.value);
   };
 
-  const statusColumnsForRender: TicketStatusDisplay[] = statusOrder.map(
-    (status) => ({
-      status,
-      config: statusDisplayConfigs[status],
-    }),
-  );
 
   // ---------------------------------------------------------------------------
   // Render helpers
@@ -1168,12 +1368,18 @@ export default function CustomerBoardPage() {
   const renderTicketCard = (ticket: CustomerBoardTicket) => {
     const isDragging = draggingTicketId === ticket.id;
     const isUpdating = updatingTicketId === ticket.id;
+    const dueDateLabel = formatDueDateShort(ticket.dueDate);
+    const overdue = isDueDateOverdue(ticket.dueDate);
+    const thumbSrc =
+      ticket.thumbnailUrl ??
+      (ticket.thumbnailAssetId ? thumbnailUrls[ticket.thumbnailAssetId] : null) ??
+      null;
 
     return (
       <div
         key={ticket.id}
-        className={`group cursor-pointer rounded-2xl border border-[#e4e0da] bg-white p-3 text-xs shadow-sm transition-shadow ${
-          isDragging ? "opacity-50 shadow-lg" : "hover:shadow-md"
+        className={`group cursor-pointer rounded-xl border border-[#e4e0da] bg-white p-3.5 text-xs shadow-sm transition-all duration-200 ${
+          isDragging ? "scale-[1.02] opacity-50 shadow-lg" : "hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--bb-primary-border)]"
         }`}
         draggable={canDragTicket && ticket.status === "IN_REVIEW"}
         onDragStart={(event) =>
@@ -1183,64 +1389,94 @@ export default function CustomerBoardPage() {
         onMouseDown={(event) => handleMouseDown(event, ticket.id)}
         onMouseUp={(event) => handleMouseUp(event, ticket.id)}
       >
-        <div className="mb-2 flex items-start justify-between gap-2">
-          <div>
-            <div className="flex items-center gap-2">
-              {ticket.project?.code && ticket.companyTicketNumber && (
-                <span className="rounded-full bg-[#eef3ff] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#3259c7]">
-                  {ticket.project.code}-{ticket.companyTicketNumber}
-                </span>
-              )}
-              <span
-                className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusBadgeClass[ticket.status]}`}
-              >
-                <span
-                  className={`inline-block h-1.5 w-1.5 rounded-full ${statusIndicatorColor(
-                    ticket.status,
-                  )}`}
-                />
-                {statusLabels[ticket.status].replace("_", " ")}
-              </span>
-            </div>
-            <h3 className="mt-1 text-[13px] font-semibold text-[#424143]">
-              {ticket.title}
-            </h3>
-          </div>
-          <span
-            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${priorityBadgeClass[ticket.priority]}`}
-          >
-            <span className="text-[9px]">
-              {priorityIconMap[ticket.priority]}
-            </span>
-            {priorityLabelMap[ticket.priority]}
-          </span>
-        </div>
+        {/* Title */}
+        <p className="text-sm font-semibold leading-snug text-[#424143]">
+          {ticket.title}
+        </p>
 
+        {/* Description */}
         {ticket.description && (
-          <p className="mb-2 line-clamp-2 text-[11px] text-[#5a5953]">
-            {ticket.description}
+          <p className="mt-1 line-clamp-2 text-xs text-[#7a7a7a]">
+            {stripHtml(ticket.description)}
           </p>
         )}
 
-        <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-[#9a9892]">
-          <div className="flex items-center gap-2">
-            {ticket.project?.name && (
-              <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5">
-                {ticket.project.name}
-              </span>
-            )}
-            {ticket.designer && (
-              <span className="flex items-center gap-1 rounded-full bg-[#f5f3f0] px-2 py-0.5">
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#32b37b]" />
-                {ticket.designer.name || ticket.designer.email || "Designer"}
+        {/* Thumbnail */}
+        {thumbSrc && (
+          <div className="mt-2 overflow-hidden rounded-lg bg-[#f5f3f0]">
+            <img
+              src={thumbSrc}
+              alt=""
+              className="h-28 w-full object-cover"
+              loading="lazy"
+            />
+          </div>
+        )}
+
+        {/* Due date pill */}
+        {dueDateLabel && (
+          <div className="mt-2">
+            <span
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                overdue
+                  ? "bg-[#fde8e7] text-[#b13832]"
+                  : "bg-[#eaf4ff] text-[#1d72b8]"
+              }`}
+            >
+              <span className="text-[9px]">📅</span>
+              {dueDateLabel}
+            </span>
+          </div>
+        )}
+
+        {/* Tags */}
+        {ticket.tags && ticket.tags.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {ticket.tags.slice(0, 3).map((tag) => (
+              <TagBadge
+                key={tag.id}
+                name={tag.name}
+                color={tag.color as TagColorKey}
+              />
+            ))}
+            {ticket.tags.length > 3 && (
+              <span className="inline-flex items-center text-[10px] text-[#9a9892]">
+                +{ticket.tags.length - 3}
               </span>
             )}
           </div>
-          <span className="whitespace-nowrap">
-            Updated {formatTimeAgo(ticket.updatedAt)}
-          </span>
+        )}
+
+        {/* Footer: ticket code + priority icon + avatar */}
+        <div className="mt-3 flex items-center justify-between border-t border-[#f0eeea] pt-2.5 text-[10px] text-[#9a9892]">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-[#3B82F6]">✓</span>
+            {ticket.code && (
+              <span className="font-medium text-[#7a7a7a]">
+                {ticket.code}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <span
+              className={`text-[11px] ${priorityColorClass(ticket.priority)}`}
+              title={formatPriorityLabel(ticket.priority)}
+            >
+              {priorityIconMap[ticket.priority]}
+            </span>
+            {ticket.designerName && (
+              <span
+                className="flex h-6 w-6 items-center justify-center rounded-full text-[8px] font-bold text-white"
+                style={{ backgroundColor: avatarColor(ticket.designerName) }}
+                title={ticket.designerName}
+              >
+                {getInitials(ticket.designerName, null)}
+              </span>
+            )}
+          </div>
         </div>
 
+        {/* Updating indicator */}
         {isUpdating && (
           <div className="mt-2 text-[10px] text-[#9a9892]">
             Updating status…
@@ -1256,276 +1492,388 @@ export default function CustomerBoardPage() {
 
   return (
     <>
-      {/* Global customer navigation (logo + Dashboard / Board / Plans vs.) */}
-      <CustomerNav />
-
-      <div className="flex min-h-screen bg-[#f5f3f0]">
-        {/* Sidebar - projects / workspace context (desktop and up) */}
-        <aside className="hidden w-64 flex-col border-r border-[#e4e0da] bg-[#fbfaf8] px-4 py-4 md:flex lg:w-72">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
+      <div className="mt-4 grid gap-6 md:grid-cols-[240px_1fr] lg:grid-cols-[260px_1fr]">
+        {/* Left sidebar — Projects + workspace info */}
+        <aside className="flex flex-col rounded-2xl bg-white/60 p-4">
+          {/* Projects header */}
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#9a9892]">
               Projects
             </p>
             <button
               type="button"
-              className="mt-3 flex w-full items-center gap-3 rounded-2xl bg-white px-3 py-2 text-left text-[11px] text-[#424143] shadow-sm ring-1 ring-[#e4e0da] hover:shadow-md"
+              onClick={openNewTicketModal}
+              className="flex h-5 w-5 items-center justify-center rounded-md bg-[#f5f3f0] text-xs text-[#7a7a7a] transition-colors hover:bg-[#e3e1dc] hover:text-[#424143]"
+              title="Create new request"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#f15b2b] text-[12px] font-semibold text-white">
-                BB
-              </div>
-              <div className="flex-1">
-                <p className="text-[12px] font-semibold text-[#424143]">
-                  All requests
-                </p>
-                <p className="text-[10px] text-[#7a7a7a]">
-                  Board for your active company
-                </p>
-              </div>
+              +
             </button>
           </div>
 
-          <div className="mt-auto space-y-2 pt-4 text-[10px] text-[#9a9892]">
-            <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
-              Workspace
-            </p>
-            <p>
-              You&apos;re viewing design requests for your demo workspace. Plan
-              upgrades and limits will appear here later.
-            </p>
+          {/* RECENT section */}
+          <p className="mt-4 text-[9px] font-semibold uppercase tracking-[0.2em] text-[#b1afa9]">
+            Recent
+          </p>
+
+          {/* Project items list */}
+          <div className="mt-2 space-y-0.5">
+            {projectsWithColors.slice(0, 6).map((proj, idx) => {
+              const color =
+                PROJECT_COLORS[idx % PROJECT_COLORS.length];
+              const isActive = projectFilter === proj.name;
+              return (
+                <button
+                  key={proj.name}
+                  type="button"
+                  onClick={() =>
+                    setProjectFilter(isActive ? "ALL" : proj.name)
+                  }
+                  className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[11px] transition-colors ${
+                    isActive
+                      ? "bg-[#f5f3f0] font-semibold text-[#424143]"
+                      : "text-[#7a7a7a] hover:bg-[#f5f3f0]"
+                  }`}
+                >
+                  <span
+                    className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-[9px] font-bold text-white"
+                    style={{ backgroundColor: color }}
+                  >
+                    {proj.name.charAt(0).toUpperCase()}
+                  </span>
+                  <span className="truncate">{proj.name}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* View all projects link */}
+          {projectsWithColors.length > 6 ? (
+            <button
+              type="button"
+              onClick={() => setProjectFilter("ALL")}
+              className="mt-2 text-left text-[10px] font-medium text-[#f15b2b] hover:underline"
+            >
+              View all projects
+            </button>
+          ) : projectsWithColors.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setProjectFilter("ALL")}
+              className={`mt-1 text-left text-[10px] font-medium transition-colors ${
+                projectFilter === "ALL"
+                  ? "text-[#424143]"
+                  : "text-[#b1afa9] hover:text-[#7a7a7a]"
+              }`}
+            >
+              All projects
+            </button>
+          ) : null}
+
+          {/* Divider */}
+          <div className="my-4 border-t border-[#e3e1dc]" />
+
+          {/* All requests card */}
+          <div className="rounded-xl border border-[#ece9e1] bg-[#f7f5f0] p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold text-[#424143]">
+                  All requests
+                </p>
+                <p className="mt-0.5 text-[10px] text-[#9a9892]">
+                  Board for your active company.
+                </p>
+              </div>
+              {currentStats && (
+                <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-[#424143]">
+                  {currentStats.total}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Role display */}
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-[#7a7a7a]">
+            <span className="font-semibold text-[#424143]">Your role:</span>
+            {companyRoleLoading ? (
+              <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5">
+                Loading…
+              </span>
+            ) : companyRole ? (
+              <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 font-semibold text-[#424143]">
+                {companyRole}
+              </span>
+            ) : (
+              <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5">
+                Not set
+              </span>
+            )}
+          </div>
+
+          <div className="mt-auto pt-4 text-[10px] text-[#9a9892]">
+            <p>Viewing design requests for your workspace.</p>
           </div>
         </aside>
 
         {/* Main board area */}
-        <div className="flex min-h-screen flex-1 flex-col">
-          {/* Header */}
-          <div className="border-b border-[#e4e0da] bg-[#fdfcfb]">
-            <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
-                  Customer board
-                </p>
-                <h1 className="mt-1 text-lg font-semibold text-[#424143]">
-                  Design requests
-                </h1>
-              </div>
-              <div className="flex flex-col items-end gap-2 text-right text-[11px] text-[#7a7a7a]">
-                <button
-                  type="button"
-                  onClick={openNewTicketModal}
-                  className="inline-flex items-center gap-1 rounded-full bg-[#f15b2b] px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition-transform hover:-translate-y-0.5 hover:bg-[#e04f22]"
-                >
-                  <span className="text-[13px]">＋</span>
-                  New request
-                </button>
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[#f5f3f0] px-2 py-0.5">
-                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#32b37b]" />
-                    <span className="font-semibold text-[#424143]">
-                      {currentStats.total}
-                    </span>
-                    <span className="text-[#7a7a7a]">total requests</span>
+        <main className="flex min-w-0 flex-col">
+          {/* Header — project-aware */}
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div className="flex items-center gap-3">
+              {projectFilter !== "ALL" ? (
+                <>
+                  <span
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-sm font-bold text-white"
+                    style={{
+                      backgroundColor:
+                        PROJECT_COLORS[
+                          projectsWithColors.findIndex(
+                            (p) => p.name === projectFilter,
+                          ) % PROJECT_COLORS.length
+                        ] || "#3B82F6",
+                    }}
+                  >
+                    {projectFilter.charAt(0).toUpperCase()}
                   </span>
-                </div>
-                <div className="flex flex-wrap items-center justify-end gap-1">
-                  {statusOrder.map((status) => (
+                  <div>
+                    <h1 className="text-xl font-semibold tracking-tight">
+                      {projectFilter}
+                    </h1>
                     <button
-                      key={status}
                       type="button"
-                      onClick={() => handleStatusBadgeClick(status)}
-                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusBadgeClass[status]}`}
+                      className="mt-0.5 text-[10px] text-[#7a7a7a] hover:text-[#424143] hover:underline"
                     >
-                      <span
-                        className={`inline-block h-1.5 w-1.5 rounded-full ${statusIndicatorColor(
-                          status,
-                        )}`}
-                      />
-                      {statusDisplayConfigs[status].title}
-                      <span className="rounded-full bg-black/5 px-1 text-[9px] font-bold">
-                        {currentStats.byStatus[status] ?? 0}
-                      </span>
+                      ⚙ Project settings
                     </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Content */}
-          <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pb-6 pt-3">
-            {loadError && (
-              <div className="mb-3 rounded-xl border border-[#f7c7c0] bg-[#fdecea] px-4 py-3 text-xs text-[#b13832]">
-                {loadError}
-              </div>
-            )}
-
-            {companyRoleError && (
-              <div className="mb-3 rounded-xl border border-[#f7c7c0] bg-[#fdecea] px-4 py-3 text-xs text-[#b13832]">
-                {companyRoleError}
-              </div>
-            )}
-
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2 text-[11px] text-[#7a7a7a]">
-                <span className="font-semibold text-[#424143]">
-                  Your role in this company:
-                </span>
-                {companyRoleLoading ? (
-                  <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5">
-                    Loading…
-                  </span>
-                ) : companyRole ? (
-                  <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 font-semibold text-[#424143]">
-                    {companyRole}
-                  </span>
-                ) : (
-                  <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5">
-                    Not set
-                  </span>
-                )}
-              </div>
-            </div>
-
-            <div className="flex flex-1 flex-col gap-4">
-              <div>
-                {mutationError && (
-                  <div className="mb-4 rounded-xl border border-amber-200 bg-[#fffaf2] px-4 py-3 text-xs text-amber-800">
-                    {mutationError}
                   </div>
-                )}
-
-                {/* Filters */}
-                <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
-                  <div className="relative flex-1">
-                    <input
-                      type="text"
-                      value={search}
-                      onChange={handleSearchChange}
-                      placeholder="Search by title, code or description"
-                      className="w-full rounded-2xl border border-[#e3dfd7] bg-white px-3 py-2 text-[13px] text-[#424143] shadow-sm outline-none placeholder:text-[#b1afa9] focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
-                    />
-                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[11px] text-[#b1afa9]">
-                      ⌘K
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-[11px] text-[#7a7a7a]">
-                    <span>Project:</span>
-                    <select
-                      className="rounded-2xl border border-[#e3dfd7] bg-white px-2 py-1 text-[11px] text-[#424143] shadow-sm outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
-                      value={projectFilter}
-                      onChange={handleProjectFilterChange}
-                    >
-                      <option value="ALL">All projects</option>
-                      {projects.map((projectName) => (
-                        <option key={projectName} value={projectName}>
-                          {projectName}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Columns */}
-                {loading ? (
-                  <div className="flex flex-1 items-center justify-center py-16 text-[12px] text-[#7a7a7a]">
-                    Loading your board…
-                  </div>
-                ) : (
-                  <div className="flex flex-1 flex-col gap-4 md:flex-row">
-                    {statusColumnsForRender.map(({ status, config }) => {
-                      const columnTickets = ticketsByStatus[status] ?? [];
-                      const isDropTargetActive = dragOverStatus === status;
-
-                      return (
-                        <div
-                          key={status}
-                          id={`customer-board-column-${status}`}
-                          className={`flex-1 rounded-3xl border border-[#e4e0da] p-3 ${statusColumnClass(
-                            status,
-                          )}`}
-                          onDragOver={(event) => handleDragOver(event, status)}
-                          onDrop={(event) => handleDrop(event, status)}
-                        >
-                          <div className="mb-2 flex items-center justify-between gap-2">
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <div
-                                  className={`inline-flex items-center gap-1 rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-semibold ${statusTagColor(
-                                    status,
-                                  )}`}
-                                >
-                                  <span
-                                    className={`inline-block h-1.5 w-1.5 rounded-full ${statusIndicatorColor(
-                                      status,
-                                    )}`}
-                                  />
-                                  {config.title}
-                                </div>
-                                <span className="rounded-full bg-white/70 px-2 py-0.5 text-[10px] text-[#7a7a7a]">
-                                  {config.description}
-                                </span>
-                              </div>
-                            </div>
-                            <span className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-semibold text-[#424143]">
-                              {columnTickets.length}{" "}
-                              {columnTickets.length === 1 ? "ticket" : "tickets"}
-                            </span>
-                          </div>
-
-                          <div
-                            className={`mt-2 flex min-h-[80px] flex-col gap-2 rounded-2xl border border-dashed border-transparent bg-white/50 p-1 transition-colors ${
-                              isDropTargetActive ? "border-[#f15b2b]" : ""
-                            }`}
-                          >
-                            {columnTickets.length === 0 ? (
-                              <div className="flex flex-1 items-center justify-center py-6 text-[11px] text-[#9a9892]">
-                                No tickets in this column yet.
-                              </div>
-                            ) : (
-                              columnTickets.map((ticket) =>
-                                renderTicketCard(ticket),
-                              )
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* New ticket modal */}
-        {newTicketModalOpen && (
-          <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 px-4 py-8">
-            <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
-              <div className="mb-3 flex items-start justify-between gap-3">
+                </>
+              ) : (
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
-                    New request
+                    Customer board
                   </p>
-                  <h2 className="mt-1 text-lg font-semibold text-[#424143]">
-                    Create a new design request
-                  </h2>
-                  <p className="mt-1 text-[11px] text-[#7a7a7a]">
-                    This will be added to your board in the{" "}
-                    <span className="font-semibold">To do</span> column.
-                  </p>
+                  <h1 className="mt-1 text-xl font-semibold tracking-tight">
+                    Design requests
+                  </h1>
                 </div>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={openNewTicketModal}
+                className="inline-flex items-center gap-1 rounded-full bg-[#f15b2b] px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition-transform hover:-translate-y-0.5 hover:bg-[#e04f22]"
+              >
+                <span className="text-[13px]">+</span>
+                New ticket
+              </button>
+              {loading && (
+                <div className="rounded-full bg-[#f5f3f0] px-3 py-1 text-[11px] text-[#7a7a7a]">
+                  Loading board…
+                </div>
+              )}
+            </div>
+          </div>
+          {/* Error / alerts */}
+          {loadError && (
+            <InlineAlert variant="error" className="mb-3">
+              {loadError}
+            </InlineAlert>
+          )}
+
+          {companyRoleError && (
+            <InlineAlert variant="error" className="mb-3">
+              {companyRoleError}
+            </InlineAlert>
+          )}
+
+          {mutationError && (
+            <InlineAlert variant="warning" className="mb-4">
+              {mutationError}
+            </InlineAlert>
+          )}
+
+          {/* Toolbar: search + avatars + share + filter */}
+          <div className="mb-3 flex items-center gap-3">
+            {/* Search */}
+            <div className="relative max-w-md flex-1">
+              <input
+                ref={searchRef}
+                type="text"
+                value={search}
+                onChange={handleSearchChange}
+                placeholder="Search board"
+                className="w-full rounded-lg border border-[#e3e1dc] bg-white px-4 py-2 text-xs text-[#424143] outline-none placeholder:text-[#b1afa9] focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+              />
+              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-[#b1afa9]">
+                🔍
+              </span>
+            </div>
+
+            {/* Member avatar circles */}
+            {uniqueDesigners.length > 0 && (
+              <div className="flex -space-x-1.5">
+                {uniqueDesigners.slice(0, 5).map((d) => (
+                  <span
+                    key={d.name}
+                    className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-[9px] font-bold text-white"
+                    style={{ backgroundColor: avatarColor(d.name) }}
+                    title={d.name}
+                  >
+                    {getInitials(d.name, null)}
+                  </span>
+                ))}
+                {uniqueDesigners.length > 5 && (
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[#e3e1dc] text-[8px] font-bold text-[#7a7a7a]">
+                    +{uniqueDesigners.length - 5}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Share button — copies board URL to clipboard */}
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(window.location.href).then(() => {
+                  showToast({ type: "success", title: "Link copied to clipboard" });
+                });
+              }}
+              className="inline-flex items-center gap-1 rounded-lg border border-[#e3e1dc] bg-white px-3 py-2 text-[11px] font-medium text-[#7a7a7a] transition-colors hover:border-[#424143] hover:text-[#424143]"
+            >
+              ↗ Share
+            </button>
+
+            {/* Filter button */}
+            <button
+              type="button"
+              onClick={() => setFilterOpen(!filterOpen)}
+              className={`inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-[11px] font-medium transition-colors ${
+                filterOpen
+                  ? "border-[#f15b2b] bg-[#fff7f4] text-[#f15b2b]"
+                  : "border-[#e3e1dc] bg-white text-[#7a7a7a] hover:border-[#424143] hover:text-[#424143]"
+              }`}
+            >
+              ≡ Filter
+            </button>
+          </div>
+
+          {/* Collapsible filter dropdown */}
+          {filterOpen && (
+            <div className="mb-3 flex items-center gap-2 rounded-lg border border-[#e3e1dc] bg-white px-3 py-2 text-[11px] text-[#7a7a7a]">
+              <span className="font-medium">Project:</span>
+              <select
+                className="rounded-md border border-[#e3e1dc] bg-[#f7f5f0] px-2 py-1 text-[11px] outline-none"
+                value={projectFilter}
+                onChange={handleProjectFilterChange}
+              >
+                <option value="ALL">All projects</option>
+                {projects.map((projectName) => (
+                  <option key={projectName} value={projectName}>
+                    {projectName}
+                  </option>
+                ))}
+              </select>
+              {projectFilter !== "ALL" && (
                 <button
                   type="button"
-                  onClick={closeNewTicketModal}
-                  className="rounded-full bg-[#f5f3f0] px-2 py-1 text-[11px] text-[#7a7a7a] hover:bg-[#e4e0da]"
+                  onClick={() => setProjectFilter("ALL")}
+                  className="ml-1 text-[10px] text-[#f15b2b] hover:underline"
                 >
-                  Close
+                  Clear
                 </button>
-              </div>
+              )}
+            </div>
+          )}
+
+          {/* Columns */}
+          {loading ? (
+            <div className="py-6 text-center text-sm text-[#7a7a7a]">
+              Loading your board…
+            </div>
+          ) : (
+            <div className="flex gap-4 overflow-x-auto pb-2">
+              {STATUS_ORDER.map((status) => {
+                const columnTickets = ticketsByStatus[status] ?? [];
+                const columnTitle = STATUS_LABELS[status];
+                const isDropTargetActive = dragOverStatus === status;
+
+                return (
+                  <div
+                    key={status}
+                    id={`customer-board-column-${status}`}
+                    className={`flex w-80 shrink-0 flex-col overflow-hidden rounded-xl transition-all duration-200 ${
+                      isDropTargetActive
+                        ? "bg-[#fff5f0] ring-2 ring-[#f15b2b]/60"
+                        : "bg-white/60 ring-0"
+                    }`}
+                    onDragOver={(event) => handleDragOver(event, status)}
+                    onDrop={(event) => handleDrop(event, status)}
+                  >
+                    {/* Colored accent bar */}
+                    <div
+                      className="h-1 w-full"
+                      style={{ backgroundColor: columnAccentColor[status] }}
+                    />
+
+                    {/* Column header */}
+                    <div className="flex items-center justify-between px-3 pb-1 pt-2.5">
+                      <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#7a7a7a]">
+                        {columnTitle}
+                      </span>
+                      <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[10px] font-semibold text-[#7a7a7a]">
+                        {columnTickets.length}
+                      </span>
+                    </div>
+
+                    {/* Column body */}
+                    <div className="flex-1 space-y-2 p-2">
+                      {columnTickets.length === 0 && !isDropTargetActive ? (
+                        <EmptyState title={status === "DONE" ? "Completed tickets will appear here." : "No tickets here yet."} />
+                      ) : (
+                        columnTickets.map((ticket) =>
+                          renderTicketCard(ticket),
+                        )
+                      )}
+                      {/* Drop placeholder */}
+                      {isDropTargetActive && (
+                        <div className="animate-pulse rounded-xl border-2 border-dashed border-[#f15b2b]/40 bg-[#f15b2b]/5 px-3 py-4 text-center text-[11px] font-medium text-[#f15b2b]/60">
+                          Drop here
+                        </div>
+                      )}
+                    </div>
+
+                    {/* "+ Create" button at bottom of TO DO column */}
+                    {status === "TODO" && (
+                      <button
+                        type="button"
+                        onClick={openNewTicketModal}
+                        className="mx-2 mb-2 flex items-center justify-center gap-1 rounded-lg border border-dashed border-[#d4d2cc] py-2 text-xs font-semibold text-[#9a9892] transition-colors hover:border-[#f15b2b] hover:text-[#f15b2b]"
+                      >
+                        <span className="text-sm">+</span>
+                        Create
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </main>
+      </div>
+
+        {/* New ticket modal */}
+        <Modal open={newTicketModalOpen} onClose={closeNewTicketModal} size="2xl" scrollable>
+          <ModalHeader
+            eyebrow="New request"
+            title="Create a new design request"
+            subtitle="This will be added to your board in the To do column."
+            onClose={closeNewTicketModal}
+          />
 
               {newTicketMetaError && (
-                <div className="mb-3 rounded-xl border border-[#f7c7c0] bg-[#fdecea] px-3 py-2 text-[11px] text-[#b13832]">
+                <InlineAlert variant="error" size="sm" className="mb-3">
                   {newTicketMetaError}
-                </div>
+                </InlineAlert>
               )}
 
               {newTicketMetaLoading || !newTicketMeta ? (
@@ -1537,6 +1885,21 @@ export default function CustomerBoardPage() {
                   companySlug={newTicketMeta.companySlug}
                   projects={newTicketMeta.projects}
                   jobTypes={newTicketMeta.jobTypes}
+                  tokenBalance={newTicketMeta.tokenBalance}
+                  tags={(newTicketMeta.tags ?? []) as TagOption[]}
+                  canCreateTags={canManageTags(companyRole)}
+                  onTagCreated={(tag) => {
+                    setNewTicketMeta((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            tags: [...(prev.tags ?? []), tag].sort(
+                              (a, b) => a.name.localeCompare(b.name),
+                            ),
+                          }
+                        : prev,
+                    );
+                  }}
                   redirectTo="/customer/board"
                   onCreated={() => {
                     closeNewTicketModal();
@@ -1550,216 +1913,712 @@ export default function CustomerBoardPage() {
                   }}
                 />
               )}
-            </div>
-          </div>
-        )}
+        </Modal>
 
-        {/* Ticket detail modal */}
-        {detailTicket && (
-          <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 px-4 py-8">
-            <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
-              <div className="mb-3 flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
-                    Ticket
-                  </p>
-                  <h2 className="mt-1 text-lg font-semibold text-[#424143]">
-                    {detailTicket.title}
-                  </h2>
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-[#7a7a7a]">
-                    {detailTicket.project?.code &&
-                      detailTicket.companyTicketNumber && (
-                        <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5">
-                          {detailTicket.project.code}-
-                          {detailTicket.companyTicketNumber}
-                        </span>
-                      )}
-                    <span
-                      className={`flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold ${statusBadgeClass[detailTicket.status]}`}
-                    >
-                      <span
-                        className={`inline-block h-1.5 w-1.5 rounded-full ${statusIndicatorColor(
-                          detailTicket.status,
-                        )}`}
-                      />
-                      {statusLabels[detailTicket.status].replace("_", " ")}
-                    </span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 font-semibold ${priorityBadgeClass[detailTicket.priority]}`}
-                    >
-                      {formatPriorityLabel(detailTicket.priority)}
-                    </span>
-                  </div>
-                </div>
+        {/* Ticket detail modal — Jira-style two-column layout */}
+        <Modal open={!!detailTicket} onClose={closeTicketDetails} size="full">
+          <ModalHeader
+            eyebrow="Ticket"
+            title={detailTicket?.title ?? ""}
+            subtitle={detailTicket?.code ?? undefined}
+            onClose={closeTicketDetails}
+          />
+
+              {detailTicket && (
+              <>
+              {/* Edit button — only for TODO tickets with permission */}
+              {canEditDetail && !isEditingDetail && (
                 <button
                   type="button"
-                  onClick={closeTicketDetails}
-                  className="rounded-full bg-[#f5f3f0] px-2 py-1 text-[11px] text-[#7a7a7a] hover:bg-[#e4e0da]"
+                  onClick={startEditingDetail}
+                  className="mb-3 flex items-center gap-1.5 rounded-lg border border-[#e3e1dc] bg-white px-3 py-1.5 text-[11px] font-medium text-[#666] transition-colors hover:border-[#f15b2b] hover:text-[#f15b2b]"
                 >
-                  Close
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+                    <path d="m5.433 13.917 1.262-3.155A4 4 0 0 1 7.58 9.42l6.92-6.918a2.121 2.121 0 0 1 3 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 0 1-.65-.65Z" />
+                    <path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0 0 10 3H4.75A2.75 2.75 0 0 0 2 5.75v9.5A2.75 2.75 0 0 0 4.75 18h9.5A2.75 2.75 0 0 0 17 15.25V10a.75.75 0 0 0-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5Z" />
+                  </svg>
+                  Edit ticket
                 </button>
-              </div>
-
-              {detailTicket.description && (
-                <div className="mb-3 rounded-xl bg-[#f5f3f0] px-3 py-3 text-[11px] text-[#424143]">
-                  {detailTicket.description}
-                </div>
               )}
 
-              <div className="grid gap-3 text-[11px] text-[#7a7a7a] md:grid-cols-2">
-                <div>
-                  <p className="font-semibold text-[#424143]">Meta</p>
-                  <div className="mt-1 space-y-1">
-                    <p>
-                      Priority:{" "}
-                      <span className="font-semibold">
-                        {formatPriorityLabel(detailTicket.priority)}
-                      </span>
-                    </p>
-                    <p>
-                      Project:{" "}
-                      <span className="font-semibold">
-                        {detailTicket.project?.name || "—"}
-                      </span>
-                    </p>
-                    <p>
-                      Job type:{" "}
-                      <span className="font-semibold">
-                        {detailTicket.jobType?.name || "—"}
-                      </span>
-                    </p>
-                  </div>
-                </div>
-                <div>
-                  <p className="font-semibold text-[#424143]">People</p>
-                  <div className="mt-1 space-y-1">
-                    <p>
-                      Designer:{" "}
-                      <span className="font-semibold">
-                        {detailTicket.designer?.name ||
-                          detailTicket.designer?.email ||
-                          "—"}
-                      </span>
-                    </p>
-                  </div>
-                </div>
+              {/* Status / priority pills */}
+              <div className="mb-4 flex shrink-0 flex-wrap items-center gap-2">
+                <Badge variant={statusBadgeVariant(detailTicket.status)} className="gap-1.5">
+                  <span
+                    className={`inline-block h-1.5 w-1.5 rounded-full ${statusIndicatorColor(
+                      detailTicket.status,
+                    )}`}
+                  />
+                  {STATUS_LABELS[detailTicket.status]}
+                </Badge>
+                <Badge variant={priorityBadgeVariant(detailTicket.priority)}>
+                  <span className={priorityColorClass(detailTicket.priority)}>
+                    {priorityIconMap[detailTicket.priority]}
+                  </span>
+                  {" "}{formatPriorityLabel(detailTicket.priority)}
+                </Badge>
               </div>
 
-              <div className="mt-3 grid gap-3 text-[11px] text-[#7a7a7a] md:grid-cols-2">
-                <div>
-                  <p className="font-semibold text-[#424143]">Dates</p>
-                  <div className="mt-1 space-y-1">
-                    <p>
-                      Created:{" "}
-                      <span className="font-semibold">
-                        {formatDate(detailTicket.createdAt)}
-                      </span>
-                    </p>
-                    <p>
-                      Updated:{" "}
-                      <span className="font-semibold">
-                        {formatDate(detailTicket.updatedAt)}
-                      </span>
-                    </p>
-                    <p>
-                      Due date:{" "}
-                      <span className="font-semibold">
-                        {formatDate(detailTicket.dueDate)}
-                      </span>
-                    </p>
-                  </div>
-                </div>
-
-                <div>
-                  <p className="font-semibold text-[#424143]">
-                    Revision history
-                  </p>
-                  <div className="mt-1 space-y-1">
-                    {detailRevisionsLoading && (
-                      <p className="text-[#9a9892]">
-                        Loading revision history…
-                      </p>
-                    )}
-
-                    {!detailRevisionsLoading && detailRevisionsError && (
-                      <p className="text-[#b13832]">{detailRevisionsError}</p>
-                    )}
-
-                    {!detailRevisionsLoading &&
-                      !detailRevisionsError &&
-                      (!detailRevisions || detailRevisions.length === 0) && (
-                        <p className="text-[#9a9892]">
-                          No revisions yet. Once your designer sends this ticket
-                          for review, you&apos;ll see each version and your
-                          feedback here.
-                        </p>
+              {/* Two-column Jira layout */}
+              <div className="grid min-h-0 flex-1 gap-6 overflow-y-auto md:grid-cols-[1fr_260px] md:overflow-visible">
+                {/* Left column — main content (scrollable on desktop) */}
+                <div className="min-w-0 md:overflow-y-auto md:pr-2">
+                  {/* Description — edit mode or read mode */}
+                  {isEditingDetail ? (
+                    <div className="mb-5 space-y-4">
+                      {editError && (
+                        <InlineAlert variant="error" size="sm">{editError}</InlineAlert>
                       )}
 
-                    {!detailRevisionsLoading &&
-                      !detailRevisionsError &&
-                      detailRevisions &&
-                      detailRevisions.length > 0 && (
-                        <div className="space-y-2">
-                          {detailRevisions.map((rev) => (
-                            <div
-                              key={rev.version}
-                              className="rounded-xl bg-[#f5f3f0] px-3 py-2"
-                            >
-                              <p className="text-[10px] font-semibold text-[#424143]">
-                                Version v{rev.version}
-                              </p>
+                      {/* Title edit */}
+                      <div className="space-y-1">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9]">Title</p>
+                        <FormInput
+                          value={editForm.title}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                            setEditForm((f) => ({ ...f, title: e.target.value }))
+                          }
+                          disabled={editSaving}
+                        />
+                      </div>
 
-                              {rev.submittedAt && (
-                                <p className="mt-1">
+                      {/* Description edit */}
+                      <div className="space-y-1">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9]">Description</p>
+                        <RichTextEditor
+                          value={editForm.description}
+                          onChange={(html) =>
+                            setEditForm((f) => ({ ...f, description: html }))
+                          }
+                          disabled={editSaving}
+                          minHeight="60px"
+                        />
+                      </div>
+
+                      {/* Save/Cancel */}
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          onClick={saveDetailEdits}
+                          loading={editSaving}
+                          loadingText="Saving…"
+                        >
+                          Save changes
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={cancelEditingDetail}
+                          disabled={editSaving}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    detailTicket.description && (
+                      <div className="mb-5">
+                        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9]">
+                          Description
+                        </p>
+                        <SafeHtml
+                          html={detailTicket.description}
+                          className="rounded-xl bg-[#f7f5f0] px-4 py-3 text-xs leading-relaxed text-[#424143]"
+                        />
+                      </div>
+                    )
+                  )}
+
+                  {/* Brief attachments */}
+                  {detailBriefAssetsLoading && (
+                    <div className="mb-5">
+                      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9]">
+                        Brief attachments
+                      </p>
+                      <div className="flex items-center gap-2 py-3">
+                        <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#e3e1dc] border-t-[#9a9892]" />
+                        <p className="text-xs text-[#9a9892]">Loading attachments…</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {!detailBriefAssetsLoading && detailBriefAssets.length > 0 && (() => {
+                    const hasDesignerWork = detailRevisions && detailRevisions.length > 0 &&
+                      detailRevisions.some((r) => r.assets && r.assets.length > 0);
+
+                    return (
+                      <div className="mb-5">
+                        <div className="mb-1.5 flex items-center justify-between">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9]">
+                            Brief attachments
+                            <span className="ml-1.5 text-[#9a9892]">({detailBriefAssets.length})</span>
+                          </p>
+                          <DownloadAllButton
+                            assets={detailBriefAssets}
+                            zipFilename="brief-attachments.zip"
+                          />
+                        </div>
+                        {hasDesignerWork ? (
+                          <BriefThumbnailRow assets={detailBriefAssets} />
+                        ) : (
+                          <RevisionImageLarge
+                            assets={detailBriefAssets}
+                            pinMode="view"
+                          />
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Divider between brief context and designer work */}
+                  {(detailRevisions && detailRevisions.length > 0) && (
+                    <div className="mb-5 border-t border-[#ece9e1]" />
+                  )}
+
+                  {/* Revisions — loading / error / empty states */}
+                  {detailRevisionsLoading && (
+                    <p className="text-xs text-[#9a9892]">Loading revisions…</p>
+                  )}
+
+                  {!detailRevisionsLoading && detailRevisionsError && (
+                    <p className="text-xs text-[#b13832]">{detailRevisionsError}</p>
+                  )}
+
+                  {!detailRevisionsLoading &&
+                    !detailRevisionsError &&
+                    (!detailRevisions || detailRevisions.length === 0) && (
+                      <EmptyState title="No revisions yet." description="Once your designer sends this ticket for review, you'll see each version and your feedback here." />
+                    )}
+
+                  {/* Current version + Previous versions */}
+                  {!detailRevisionsLoading &&
+                    !detailRevisionsError &&
+                    detailRevisions &&
+                    detailRevisions.length > 0 && (() => {
+                      const reversed = [...detailRevisions].reverse();
+                      const latestRev = reversed[0];
+                      const olderRevs = reversed.slice(1);
+
+                      return (
+                        <div className="space-y-5">
+                          {/* ── Current version ── */}
+                          <div>
+                            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9]">
+                              Current version
+                            </p>
+                            <div className={`rounded-xl border-2 bg-[#fbfaf8] px-4 py-4 ${
+                              latestRev.feedbackAt ? "border-[#f5a623]/40" : "border-[#4c8ef7]/40"
+                            }`}>
+                              <div className="flex items-center gap-2">
+                                <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] text-white ${
+                                  latestRev.feedbackAt ? "bg-[#f5a623]" : "bg-[#4c8ef7]"
+                                }`}>
+                                  {latestRev.feedbackAt ? "✎" : "✓"}
+                                </span>
+                                <p className="text-xs font-semibold text-[#424143]">
+                                  Version {latestRev.version}
+                                </p>
+                                {latestRev.assets && latestRev.assets.length > 0 && (
+                                  <DownloadAllButton
+                                    assets={latestRev.assets}
+                                    zipFilename={`version-${latestRev.version}.zip`}
+                                  />
+                                )}
+                              </div>
+
+                              {latestRev.submittedAt && (
+                                <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-[#1d72b8]">
+                                  <span className="text-[10px]">📤</span>
                                   Sent for review on{" "}
-                                  <span className="font-semibold">
-                                    {formatDate(rev.submittedAt)}
-                                  </span>
-                                  .
+                                  <span className="font-semibold">{formatBoardDate(latestRev.submittedAt)}</span>
                                 </p>
                               )}
 
-                              {rev.feedbackAt && (
-                                <p className="mt-1">
+                              {latestRev.feedbackAt && (
+                                <p className="mt-1 flex items-center gap-1.5 text-[11px] text-[#f5a623]">
+                                  <span className="text-[10px]">💬</span>
                                   Changes requested on{" "}
-                                  <span className="font-semibold">
-                                    {formatDate(rev.feedbackAt)}
-                                  </span>
-                                  .
+                                  <span className="font-semibold">{formatBoardDate(latestRev.feedbackAt)}</span>
                                 </p>
                               )}
 
-                              {rev.feedbackMessage && (
-                                <p className="mt-1 italic text-[#5a5953]">
-                                  “{rev.feedbackMessage}”
-                                </p>
+                              {latestRev.feedbackMessage && (
+                                <div className="mt-2 rounded-lg bg-[#fff7e0] px-3 py-2">
+                                  <p className="text-[11px] italic text-[#5a5953]">
+                                    &ldquo;{latestRev.feedbackMessage}&rdquo;
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Large image display for current version */}
+                              {latestRev.assets && latestRev.assets.length > 0 && (
+                                <RevisionImageLarge
+                                  assets={latestRev.assets}
+                                  pinMode={detailTicket?.status === "IN_REVIEW" ? "review" : "view"}
+                                  ticketId={detailTicket?.id}
+                                  onRevisionSubmitted={() => {
+                                    closeTicketDetails();
+                                    showToast({
+                                      type: "success",
+                                      title: "Changes requested",
+                                      description: "Your pin annotations have been sent to your designer.",
+                                    });
+                                    void load();
+                                  }}
+                                />
                               )}
                             </div>
-                          ))}
+                          </div>
+
+                          {/* ── Previous versions (collapsible) ── */}
+                          {olderRevs.length > 0 && (
+                            <div>
+                              <button
+                                type="button"
+                                onClick={() => setShowPreviousVersions((v) => !v)}
+                                className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9] transition-colors hover:text-[#7a7a7a]"
+                              >
+                                <svg
+                                  width="12"
+                                  height="12"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className={`transition-transform ${showPreviousVersions ? "rotate-90" : ""}`}
+                                >
+                                  <polyline points="9 18 15 12 9 6" />
+                                </svg>
+                                Previous versions
+                                <span className="text-[#9a9892]">({olderRevs.length})</span>
+                              </button>
+
+                              {showPreviousVersions && (
+                                <div className="space-y-2.5">
+                                  {olderRevs.map((rev) => (
+                                    <div
+                                      key={rev.version}
+                                      className="rounded-xl border border-[#e3e1dc] bg-[#fbfaf8] px-4 py-3"
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] text-white ${
+                                          rev.feedbackAt ? "bg-[#f5a623]" : "bg-[#4c8ef7]"
+                                        }`}>
+                                          {rev.feedbackAt ? "✎" : "✓"}
+                                        </span>
+                                        <p className="text-xs font-semibold text-[#424143]">
+                                          Version {rev.version}
+                                        </p>
+                                        {rev.assets && rev.assets.length > 0 && (
+                                          <DownloadAllButton
+                                            assets={rev.assets}
+                                            zipFilename={`version-${rev.version}.zip`}
+                                          />
+                                        )}
+                                      </div>
+
+                                      {rev.submittedAt && (
+                                        <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-[#1d72b8]">
+                                          <span className="text-[10px]">📤</span>
+                                          Sent for review on{" "}
+                                          <span className="font-semibold">{formatBoardDate(rev.submittedAt)}</span>
+                                        </p>
+                                      )}
+
+                                      {rev.feedbackAt && (
+                                        <p className="mt-1 flex items-center gap-1.5 text-[11px] text-[#f5a623]">
+                                          <span className="text-[10px]">💬</span>
+                                          Changes requested on{" "}
+                                          <span className="font-semibold">{formatBoardDate(rev.feedbackAt)}</span>
+                                        </p>
+                                      )}
+
+                                      {rev.feedbackMessage && (
+                                        <div className="mt-2 rounded-lg bg-[#fff7e0] px-3 py-2">
+                                          <p className="text-[11px] italic text-[#5a5953]">
+                                            &ldquo;{rev.feedbackMessage}&rdquo;
+                                          </p>
+                                        </div>
+                                      )}
+
+                                      {/* Thumbnail grid for older versions */}
+                                      {rev.assets && rev.assets.length > 0 && (
+                                        <RevisionImageGrid
+                                          assets={rev.assets}
+                                          pinMode="view"
+                                        />
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
-                      )}
-                  </div>
+                      );
+                    })()}
                 </div>
+
+                {/* Right column — metadata sidebar (fixed while left scrolls) */}
+                <aside className="self-start overflow-y-auto rounded-xl bg-[#f7f5f0] p-4">
+                  {/* Details */}
+                  <div className="mb-5">
+                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9]">
+                      Details
+                    </p>
+                    <div className="space-y-3 text-xs">
+                      <div>
+                        <p className="text-[#9a9892]">Status</p>
+                        <div className="mt-0.5 flex items-center gap-1.5 font-semibold text-[#424143]">
+                          <span
+                            className={`inline-block h-1.5 w-1.5 rounded-full ${statusIndicatorColor(
+                              detailTicket.status,
+                            )}`}
+                          />
+                          {STATUS_LABELS[detailTicket.status]}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-[#9a9892]">Priority</p>
+                        {isEditingDetail ? (
+                          <FormSelect
+                            size="sm"
+                            value={editForm.priority}
+                            onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                              setEditForm((f) => ({ ...f, priority: e.target.value }))
+                            }
+                            disabled={editSaving}
+                          >
+                            <option value="LOW">Low</option>
+                            <option value="MEDIUM">Medium</option>
+                            <option value="HIGH">High</option>
+                            <option value="URGENT">Urgent</option>
+                          </FormSelect>
+                        ) : (
+                          <p className="mt-0.5 font-semibold text-[#424143]">
+                            <span className={priorityColorClass(detailTicket.priority)}>
+                              {priorityIconMap[detailTicket.priority]}
+                            </span>
+                            {" "}{formatPriorityLabel(detailTicket.priority)}
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-[#9a9892]">Project</p>
+                        {isEditingDetail ? (
+                          <FormSelect
+                            size="sm"
+                            value={editForm.projectId}
+                            onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                              setEditForm((f) => ({ ...f, projectId: e.target.value }))
+                            }
+                            disabled={editSaving || !newTicketMeta}
+                          >
+                            <option value="">No specific project</option>
+                            {(newTicketMeta?.projects ?? []).map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name}{p.code ? ` (${p.code})` : ""}
+                              </option>
+                            ))}
+                          </FormSelect>
+                        ) : (
+                          <p className="mt-0.5 font-semibold text-[#424143]">
+                            {detailTicket.projectName || "—"}
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-[#9a9892]">Job type</p>
+                        {isEditingDetail ? (
+                          <FormSelect
+                            size="sm"
+                            value={editForm.jobTypeId}
+                            onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                              setEditForm((f) => ({ ...f, jobTypeId: e.target.value }))
+                            }
+                            disabled={editSaving || !newTicketMeta}
+                          >
+                            <option value="">Choose a job type</option>
+                            {(newTicketMeta?.jobTypes ?? []).map((jt) => (
+                              <option key={jt.id} value={jt.id}>
+                                {jt.name}
+                              </option>
+                            ))}
+                          </FormSelect>
+                        ) : (
+                          <p className="mt-0.5 font-semibold text-[#424143]">
+                            {detailTicket.jobTypeName || "—"}
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-[#9a9892]">Tags</p>
+                        {isEditingDetail ? (
+                          <div className="mt-1">
+                            <TagMultiSelect
+                              availableTags={((newTicketMeta?.tags ?? []) as TagOption[])}
+                              selectedTagIds={editForm.tagIds}
+                              onChange={(tagIds) =>
+                                setEditForm((f) => ({ ...f, tagIds }))
+                              }
+                              onCreateTag={async (name, color) => {
+                                try {
+                                  const res = await fetch("/api/customer/tags", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ name, color }),
+                                  });
+                                  const json = await res.json().catch(() => null);
+                                  if (!res.ok) {
+                                    showToast({ type: "error", title: json?.error || "Failed to create tag" });
+                                    return null;
+                                  }
+                                  const created = json.tag as TagOption;
+                                  // Add to local metadata cache
+                                  setNewTicketMeta((prev) =>
+                                    prev
+                                      ? {
+                                          ...prev,
+                                          tags: [...(prev.tags ?? []), created].sort(
+                                            (a, b) => a.name.localeCompare(b.name),
+                                          ),
+                                        }
+                                      : prev,
+                                  );
+                                  return created;
+                                } catch {
+                                  showToast({ type: "error", title: "Failed to create tag" });
+                                  return null;
+                                }
+                              }}
+                              canCreate={canManageTags(companyRole)}
+                              disabled={editSaving}
+                            />
+                          </div>
+                        ) : (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {detailTicket.tags && detailTicket.tags.length > 0 ? (
+                              detailTicket.tags.map((tag) => (
+                                <TagBadge
+                                  key={tag.id}
+                                  name={tag.name}
+                                  color={tag.color as TagColorKey}
+                                />
+                              ))
+                            ) : (
+                              <p className="text-[11px] text-[#9a9892]">—</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="mb-5 border-t border-[#ece9e1]" />
+
+                  {/* People */}
+                  <div className="mb-5">
+                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9]">
+                      People
+                    </p>
+                    <div className="flex items-center gap-2.5">
+                      <div
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                        style={{ backgroundColor: avatarColor(detailTicket.designerName || "Unassigned") }}
+                      >
+                        {getInitials(detailTicket.designerName, null)}
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-[#424143]">
+                          {detailTicket.designerName || "Unassigned"}
+                        </p>
+                        <p className="text-[10px] text-[#9a9892]">Designer</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="mb-5 border-t border-[#ece9e1]" />
+
+                  {/* Dates */}
+                  <div>
+                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9]">
+                      Dates
+                    </p>
+                    <div className="space-y-2 text-xs">
+                      <div>
+                        <p className="text-[#9a9892]">Created</p>
+                        <p className="mt-0.5 font-semibold text-[#424143]">
+                          {formatBoardDate(detailTicket.createdAt)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[#9a9892]">Updated</p>
+                        <p className="mt-0.5 font-semibold text-[#424143]">
+                          {formatBoardDate(detailTicket.updatedAt ?? null)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[#9a9892]">Due date</p>
+                        {isEditingDetail ? (
+                          <FormInput
+                            type="date"
+                            size="sm"
+                            value={editForm.dueDate}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                              setEditForm((f) => ({ ...f, dueDate: e.target.value }))
+                            }
+                            disabled={editSaving}
+                          />
+                        ) : (
+                          <>
+                            <p className={`mt-0.5 font-semibold ${isDueDateOverdue(detailTicket.dueDate) ? "text-[#b13832]" : "text-[#424143]"}`}>
+                              {formatBoardDate(detailTicket.dueDate)}
+                            </p>
+                            {(() => {
+                              const countdown = formatDueDateCountdown(detailTicket.dueDate);
+                              if (!countdown) return null;
+                              return (
+                                <p className={`mt-0.5 text-[10px] font-medium ${countdown.overdue ? "text-[#b13832]" : "text-[#7a7a7a]"}`}>
+                                  {countdown.label}
+                                </p>
+                              );
+                            })()}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </aside>
               </div>
-            </div>
-          </div>
-        )}
+
+              {/* Quick actions footer */}
+              {(() => {
+                // Get latest revision assets for download
+                const latestRevAssets = (() => {
+                  if (!detailRevisions || detailRevisions.length === 0) return [];
+                  const reversed = [...detailRevisions].reverse();
+                  return reversed[0]?.assets ?? [];
+                })();
+
+                const handleFooterDownload = async () => {
+                  if (latestRevAssets.length === 0) return;
+                  setDetailFooterDownloading(true);
+                  try {
+                    if (latestRevAssets.length === 1) {
+                      await downloadSingleAsset(
+                        latestRevAssets[0].id,
+                        latestRevAssets[0].originalName || "final-work",
+                      );
+                    } else {
+                      await downloadAssetsAsZip(
+                        latestRevAssets.map((a) => ({ id: a.id, originalName: a.originalName })),
+                        `${detailTicket.title?.replace(/[^a-zA-Z0-9]/g, "-") || "final-work"}.zip`,
+                      );
+                    }
+                  } catch (err) {
+                    console.error("[DetailFooter] download error:", err);
+                  } finally {
+                    setDetailFooterDownloading(false);
+                  }
+                };
+
+                if (detailTicket.status === "DONE") {
+                  return latestRevAssets.length > 0 ? (
+                    <ModalFooter className="shrink-0 border-t border-[#f0eee9] pt-3">
+                      <button
+                        type="button"
+                        disabled={detailFooterDownloading}
+                        onClick={handleFooterDownload}
+                        className="ml-auto flex items-center gap-1.5 rounded-lg bg-[#f15b2b] px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#d94e22] disabled:opacity-60"
+                      >
+                        {detailFooterDownloading ? (
+                          <>
+                            <span className="h-3 w-3 animate-spin rounded-full border-[1.5px] border-white border-t-transparent" />
+                            Downloading…
+                          </>
+                        ) : (
+                          <>
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+                              <path d="M10 3a.75.75 0 0 1 .75.75v7.19l2.72-2.72a.75.75 0 1 1 1.06 1.06l-4 4a.75.75 0 0 1-1.06 0l-4-4a.75.75 0 0 1 1.06-1.06l2.72 2.72V3.75A.75.75 0 0 1 10 3Z" />
+                              <path d="M3 15.75a.75.75 0 0 1 .75-.75h12.5a.75.75 0 0 1 0 1.5H3.75a.75.75 0 0 1-.75-.75Z" />
+                            </svg>
+                            Download final work{latestRevAssets.length > 1 ? ` (${latestRevAssets.length} files)` : ""}
+                          </>
+                        )}
+                      </button>
+                    </ModalFooter>
+                  ) : null;
+                }
+
+                if (detailTicket.status === "IN_REVIEW") {
+                  return (
+                    <ModalFooter className="shrink-0 border-t border-[#f0eee9] pt-3">
+                      {latestRevAssets.length > 0 && (
+                        <button
+                          type="button"
+                          disabled={detailFooterDownloading}
+                          onClick={handleFooterDownload}
+                          className="mr-auto flex items-center gap-1.5 rounded-lg border border-[#e3e1dc] bg-white px-3 py-1.5 text-[11px] font-medium text-[#666] transition-colors hover:border-[#f15b2b] hover:text-[#f15b2b] disabled:opacity-60"
+                        >
+                          {detailFooterDownloading ? (
+                            <>
+                              <span className="h-3 w-3 animate-spin rounded-full border-[1.5px] border-current border-t-transparent" />
+                              Downloading…
+                            </>
+                          ) : (
+                            <>
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+                                <path d="M10 3a.75.75 0 0 1 .75.75v7.19l2.72-2.72a.75.75 0 1 1 1.06 1.06l-4 4a.75.75 0 0 1-1.06 0l-4-4a.75.75 0 0 1 1.06-1.06l2.72 2.72V3.75A.75.75 0 0 1 10 3Z" />
+                                <path d="M3 15.75a.75.75 0 0 1 .75-.75h12.5a.75.75 0 0 1 0 1.5H3.75a.75.75 0 0 1-.75-.75Z" />
+                              </svg>
+                              Download{latestRevAssets.length > 1 ? ` (${latestRevAssets.length})` : ""}
+                            </>
+                          )}
+                        </button>
+                      )}
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          closeTicketDetails();
+                          setPendingRevisionTicketId(detailTicket.id);
+                        }}
+                      >
+                        Request revision
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="bg-[#32b37b] hover:bg-[#2ba06a]"
+                        onClick={() => {
+                          closeTicketDetails();
+                          setPendingDoneTicketId(detailTicket.id);
+                        }}
+                      >
+                        Mark as done
+                      </Button>
+                    </ModalFooter>
+                  );
+                }
+
+                return null;
+              })()}
+              </>
+              )}
+        </Modal>
 
         {/* Revision modal */}
-        {pendingRevisionTicket && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-8">
-            <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
-              <h2 className="text-sm font-semibold text-[#424143]">
-                Send this request back to your designer?
-              </h2>
-              <p className="mt-1 text-[11px] text-[#7a7a7a]">
-                Your designer will see your message and continue working on this
-                request. The status will move back to{" "}
-                <span className="font-semibold">In progress</span>.
-              </p>
+        <Modal open={!!pendingRevisionTicket} onClose={handleCancelRevision} size="md">
+          <ModalHeader
+            title="Send this request back to your designer?"
+            subtitle="Your designer will see your message and continue working on this request. The status will move back to In progress."
+          />
 
-              <div className="mt-3">
-                <label className="block text-[11px] font-semibold text-[#424143]">
+              <div>
+                <label className="block text-xs font-medium text-[#424143]">
                   Message for your designer
                 </label>
                 <textarea
@@ -1771,7 +2630,7 @@ export default function CustomerBoardPage() {
                     }
                   }}
                   placeholder="For example: Could we make the hero headline larger and try a version with a darker background?"
-                  className="mt-1 h-28 w-full rounded-2xl border border-[#e3dfd7] bg-white px-3 py-2 text-[12px] text-[#424143] shadow-sm outline-none placeholder:text-[#b1afa9] focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+                  className="mt-1.5 h-28 w-full rounded-xl border border-[#e3e1dc] bg-white px-3 py-2.5 text-xs text-[#424143] outline-none placeholder:text-[#b1afa9] focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
                 />
                 {revisionMessageError && (
                   <p className="mt-1 text-[11px] text-[#b13832]">
@@ -1780,68 +2639,136 @@ export default function CustomerBoardPage() {
                 )}
               </div>
 
-              <div className="mt-4 flex justify-end gap-2 text-[12px]">
-                <button
-                  type="button"
-                  onClick={handleCancelRevision}
-                  className="rounded-full border border-[#e3dfd7] px-3 py-1 text-[#7a7a7a] hover:bg-[#f5f3f0]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmRevision}
-                  className="rounded-full bg-[#f15b2b] px-3 py-1 font-semibold text-white hover:bg-[#e04f22]"
-                >
-                  Send back to designer
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+          <ModalFooter>
+            <Button variant="secondary" size="sm" onClick={handleCancelRevision}>Cancel</Button>
+            <Button size="sm" onClick={handleConfirmRevision}>Send back to designer</Button>
+          </ModalFooter>
+        </Modal>
 
-        {/* Done confirmation modal */}
-        {pendingDoneTicket && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-8">
-            <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
-              <h2 className="text-sm font-semibold text-[#424143]">
-                Mark this request as done?
-              </h2>
-              <p className="mt-1 text-[11px] text-[#7a7a7a]">
-                Once you mark this request as done, your designer will get paid
-                for this job, and the ticket will move to{" "}
-                <span className="font-semibold">Done</span>.
-              </p>
+        {/* Done confirmation modal — with final work preview + download */}
+        <Modal open={!!pendingDoneTicket} onClose={() => setPendingDoneTicketId(null)} size="lg">
+          <ModalHeader
+            title="Mark this request as done?"
+            subtitle="Once you mark this request as done, your designer will get paid for this job, and the ticket will move to Done."
+          />
 
-              <div className="mt-3 rounded-xl bg-[#f5f3f0] px-3 py-3 text-[11px] text-[#424143]">
-                <p className="font-semibold">{pendingDoneTicket.title}</p>
-                {pendingDoneTicket.project?.name && (
+              <div className="rounded-xl bg-[#f7f5f0] px-3 py-3 text-xs text-[#424143]">
+                <p className="font-semibold">{pendingDoneTicket?.title}</p>
+                {pendingDoneTicket?.projectName && (
                   <p className="mt-1 text-[#7a7a7a]">
-                    Project: {pendingDoneTicket.project.name}
+                    Project: {pendingDoneTicket.projectName}
                   </p>
                 )}
               </div>
 
-              <div className="mt-4 flex justify-end gap-2 text-[12px]">
-                <button
-                  type="button"
-                  onClick={() => setPendingDoneTicketId(null)}
-                  className="rounded-full border border-[#e3dfd7] px-3 py-1 text-[#7a7a7a] hover:bg-[#f5f3f0]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmDone}
-                  className="rounded-full bg-[#32b37b] px-3 py-1 font-semibold text-white hover:bg-[#2ba06a]"
-                >
-                  Yes, mark as done
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+              {/* Final work preview */}
+              {pendingDoneRevisionsLoading && (
+                <div className="mt-3 flex items-center justify-center py-6">
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-[#e3e1dc] border-t-[#f15b2b]" />
+                </div>
+              )}
+
+              {(() => {
+                if (pendingDoneRevisionsLoading || !pendingDoneRevisions || pendingDoneRevisions.length === 0) return null;
+                const latestRev = [...pendingDoneRevisions].reverse()[0];
+                const finalAssets = latestRev?.assets ?? [];
+                if (finalAssets.length === 0) return null;
+
+                return (
+                  <div className="mt-3">
+                    <p className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#b1afa9]">
+                      <span>Final work</span>
+                      <span className="font-normal normal-case tracking-normal text-[#9a9892]">
+                        — Version {latestRev.version} • {finalAssets.length} file{finalAssets.length !== 1 ? "s" : ""}
+                      </span>
+                    </p>
+
+                    {/* Thumbnail grid */}
+                    <div className={`grid gap-1.5 rounded-xl border border-[#e3e1dc] bg-[#fbfaf8] p-2 ${
+                      finalAssets.length === 1 ? "grid-cols-1" : "grid-cols-3"
+                    }`}>
+                      {finalAssets.slice(0, 6).map((asset) => (
+                        <div
+                          key={asset.id}
+                          className="relative overflow-hidden rounded-lg bg-[#f5f3f0]"
+                          style={{ height: finalAssets.length === 1 ? "160px" : "80px" }}
+                        >
+                          <RevisionImage
+                            assetId={asset.id}
+                            url={asset.url}
+                            alt={asset.originalName || "Final work"}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                      ))}
+                      {finalAssets.length > 6 && (
+                        <div className="flex items-center justify-center rounded-lg bg-[#f0eee9] text-[11px] font-medium text-[#7a7a7a]" style={{ height: "80px" }}>
+                          +{finalAssets.length - 6} more
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Prominent download button */}
+                    <button
+                      type="button"
+                      disabled={doneModalDownloading}
+                      onClick={async () => {
+                        setDoneModalDownloading(true);
+                        try {
+                          if (finalAssets.length === 1) {
+                            await downloadSingleAsset(
+                              finalAssets[0].id,
+                              finalAssets[0].originalName || "final-work",
+                            );
+                          } else {
+                            await downloadAssetsAsZip(
+                              finalAssets.map((a) => ({ id: a.id, originalName: a.originalName })),
+                              `${pendingDoneTicket?.title?.replace(/[^a-zA-Z0-9]/g, "-") || "final-work"}.zip`,
+                            );
+                          }
+                        } catch (err) {
+                          console.error("[DoneModal] download error:", err);
+                        } finally {
+                          setDoneModalDownloading(false);
+                        }
+                      }}
+                      className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#f15b2b] px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-[#d94e22] disabled:opacity-60"
+                    >
+                      {doneModalDownloading ? (
+                        <>
+                          <span className="h-3.5 w-3.5 animate-spin rounded-full border-[1.5px] border-white border-t-transparent" />
+                          Preparing download…
+                        </>
+                      ) : finalAssets.length === 1 ? (
+                        <>
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                            <path d="M10 3a.75.75 0 0 1 .75.75v7.19l2.72-2.72a.75.75 0 1 1 1.06 1.06l-4 4a.75.75 0 0 1-1.06 0l-4-4a.75.75 0 0 1 1.06-1.06l2.72 2.72V3.75A.75.75 0 0 1 10 3Z" />
+                            <path d="M3 15.75a.75.75 0 0 1 .75-.75h12.5a.75.75 0 0 1 0 1.5H3.75a.75.75 0 0 1-.75-.75Z" />
+                          </svg>
+                          Download final file
+                          {finalAssets[0].originalName && (
+                            <span className="font-normal opacity-70">({finalAssets[0].originalName})</span>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                            <path d="M10 3a.75.75 0 0 1 .75.75v7.19l2.72-2.72a.75.75 0 1 1 1.06 1.06l-4 4a.75.75 0 0 1-1.06 0l-4-4a.75.75 0 0 1 1.06-1.06l2.72 2.72V3.75A.75.75 0 0 1 10 3Z" />
+                            <path d="M3 15.75a.75.75 0 0 1 .75-.75h12.5a.75.75 0 0 1 0 1.5H3.75a.75.75 0 0 1-.75-.75Z" />
+                          </svg>
+                          Download all ({finalAssets.length} files)
+                        </>
+                      )}
+                    </button>
+                  </div>
+                );
+              })()}
+
+          <ModalFooter>
+            <Button variant="secondary" size="sm" onClick={() => setPendingDoneTicketId(null)}>Cancel</Button>
+            <Button size="sm" onClick={handleConfirmDone} className="bg-[#32b37b] hover:bg-[#2ba06a]">Yes, mark as done</Button>
+          </ModalFooter>
+        </Modal>
     </>
   );
 }

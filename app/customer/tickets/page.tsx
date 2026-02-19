@@ -9,9 +9,23 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { DataTable, THead, TH, TD } from "@/components/ui/data-table";
 import type { CompanyRole as CompanyRoleString } from "@/lib/permissions/companyRoles";
 import { canCreateTickets } from "@/lib/permissions/companyRoles";
-import { CustomerNav } from "@/components/navigation/customer-nav";
+import { EmptyState } from "@/components/ui/empty-state";
+import { InlineAlert } from "@/components/ui/inline-alert";
+import { LoadingState } from "@/components/ui/loading-state";
+import { FormInput, FormSelect } from "@/components/ui/form-field";
+import { Badge } from "@/components/ui/badge";
+import {
+  priorityBadgeVariant,
+  statusBadgeVariant,
+  isDueDateOverdue,
+  isDueDateSoon,
+  STATUS_ORDER,
+  PRIORITY_ORDER,
+} from "@/lib/board";
+
 
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -46,12 +60,6 @@ const STATUS_LABELS: Record<TicketStatus, string> = {
   DONE: "Done",
 };
 
-const PRIORITY_BADGE: Record<TicketPriority, string> = {
-  LOW: "bg-[#f2f1ed] text-[#7a7a7a]",
-  MEDIUM: "bg-[#e1f0ff] text-[#245c9b]",
-  HIGH: "bg-[#fff5dd] text-[#8a6000]",
-  URGENT: "bg-[#fde8e7] text-[#b13832]",
-};
 
 export default function CustomerTicketsPage() {
   const [company, setCompany] =
@@ -199,6 +207,59 @@ export default function CustomerTicketsPage() {
     });
   }, [tickets, statusFilter, projectFilter, search]);
 
+  // ---------------------------------------------------------------------------
+  // Column sorting
+  // ---------------------------------------------------------------------------
+
+  type SortField = "status" | "priority" | "created" | "due";
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDir(field === "created" || field === "due" ? "desc" : "asc");
+    }
+  };
+
+  const sortedTickets = useMemo(() => {
+    if (!sortField) return filteredTickets;
+
+    const copy = [...filteredTickets];
+
+    copy.sort((a, b) => {
+      let cmp = 0;
+
+      switch (sortField) {
+        case "status":
+          cmp =
+            STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
+          break;
+        case "priority":
+          cmp =
+            PRIORITY_ORDER.indexOf(a.priority) -
+            PRIORITY_ORDER.indexOf(b.priority);
+          break;
+        case "created":
+          cmp =
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+          break;
+        case "due": {
+          const aTime = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+          const bTime = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+          cmp = aTime - bTime;
+          break;
+        }
+      }
+
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+
+    return copy;
+  }, [filteredTickets, sortField, sortDir]);
+
   const canCreateNewTicket = companyRoleLoading
     ? false
     : canCreateTickets(companyRole);
@@ -226,13 +287,9 @@ export default function CustomerTicketsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
-      <div className="mx-auto max-w-6xl px-6 py-10">
-        {/* Top navigation */}
-        <CustomerNav />
-
-        {/* Page header */}
-        <div className="mb-4 mt-2 flex flex-wrap items-center justify-between gap-4">
+    <>
+      {/* Page header */}
+      <div className="mb-4 mt-2 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">
               My tickets
@@ -295,10 +352,9 @@ export default function CustomerTicketsPage() {
 
         {/* Error */}
         {error && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-white px-4 py-3 text-sm text-red-700">
-            <p className="font-medium">Error</p>
-            <p className="mt-1">{error}</p>
-          </div>
+          <InlineAlert variant="error" title="Error" className="mb-4">
+            {error}
+          </InlineAlert>
         )}
 
         {/* Filters */}
@@ -307,12 +363,13 @@ export default function CustomerTicketsPage() {
             <label className="block text-xs font-medium text-[#424143]">
               Search
             </label>
-            <input
+            <FormInput
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by ticket, project, designer..."
-              className="mt-1 w-full rounded-md border border-[#d4d2cc] bg-[#fbf8f4] px-3 py-2 text-xs text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+              size="sm"
+              className="mt-1"
             />
           </div>
           <div className="flex flex-wrap gap-3">
@@ -320,29 +377,31 @@ export default function CustomerTicketsPage() {
               <label className="text-xs font-medium text-[#424143]">
                 Status
               </label>
-              <select
+              <FormSelect
                 value={statusFilter}
                 onChange={(e) =>
                   setStatusFilter(e.target.value as "ALL" | TicketStatus)
                 }
-                className="rounded-md border border-[#d4d2cc] bg-[#fbf8f4] px-2 py-1 text-xs text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+                size="sm"
+                className="w-auto"
               >
                 <option value="ALL">All</option>
                 <option value="TODO">To do</option>
                 <option value="IN_PROGRESS">In progress</option>
                 <option value="IN_REVIEW">In review</option>
                 <option value="DONE">Done</option>
-              </select>
+              </FormSelect>
             </div>
 
             <div className="flex items-center gap-2">
               <label className="text-xs font-medium text-[#424143]">
                 Project
               </label>
-              <select
+              <FormSelect
                 value={projectFilter}
                 onChange={(e) => setProjectFilter(e.target.value)}
-                className="rounded-md border border-[#d4d2cc] bg-[#fbf8f4] px-2 py-1 text-xs text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+                size="sm"
+                className="w-auto"
               >
                 <option value="ALL">All projects</option>
                 {projects.map((p) => (
@@ -350,16 +409,14 @@ export default function CustomerTicketsPage() {
                     {p}
                   </option>
                 ))}
-              </select>
+              </FormSelect>
             </div>
           </div>
         </section>
 
         {/* Tickets table */}
         {!loading && filteredTickets.length === 0 && !error && (
-          <section className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-6 text-sm text-[#7a7a7a]">
-            No tickets found for this filter.
-          </section>
+          <EmptyState title="No tickets found for this filter." />
         )}
 
         {!loading && filteredTickets.length > 0 && (
@@ -373,101 +430,121 @@ export default function CustomerTicketsPage() {
               </p>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-[#ebe7df] text-[11px] uppercase tracking-[0.12em] text-[#9a9892]">
-                    <th className="px-2 py-2">Ticket</th>
-                    <th className="px-2 py-2">Project</th>
-                    <th className="px-2 py-2">Status</th>
-                    <th className="px-2 py-2">Priority</th>
-                    <th className="px-2 py-2">Designer</th>
-                    <th className="px-2 py-2">Job type</th>
-                    <th className="px-2 py-2">Created</th>
-                    <th className="px-2 py-2">Due</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredTickets.map((t) => (
-                    <tr
-                      key={t.id}
-                      className="border-b border-[#f0eeea] text-xs last:border-b-0"
-                    >
-                      <td className="px-2 py-2 align-top">
-                        <div className="font-medium text-[#424143]">
-                          {t.code}
+            <DataTable>
+              <THead>
+                <TH>Ticket</TH>
+                <TH>Project</TH>
+                <TH
+                  sortable
+                  sortDirection={sortField === "status" ? sortDir : null}
+                  onSort={() => handleSort("status")}
+                >
+                  Status
+                </TH>
+                <TH
+                  sortable
+                  sortDirection={sortField === "priority" ? sortDir : null}
+                  onSort={() => handleSort("priority")}
+                >
+                  Priority
+                </TH>
+                <TH>Designer</TH>
+                <TH>Job type</TH>
+                <TH
+                  sortable
+                  sortDirection={sortField === "created" ? sortDir : null}
+                  onSort={() => handleSort("created")}
+                >
+                  Created
+                </TH>
+                <TH
+                  sortable
+                  sortDirection={sortField === "due" ? sortDir : null}
+                  onSort={() => handleSort("due")}
+                >
+                  Due
+                </TH>
+              </THead>
+              <tbody>
+                {sortedTickets.map((t) => (
+                  <tr
+                    key={t.id}
+                    className="border-b border-[#f0eeea] last:border-b-0 cursor-pointer transition-colors hover:bg-[var(--bb-bg-warm)]"
+                    onClick={() =>
+                      (window.location.href =
+                        `/customer/tickets/${t.id}`)
+                    }
+                  >
+                    <TD>
+                      <div className="font-medium text-[#424143]">
+                        {t.code}
+                      </div>
+                      <div className="text-[11px] text-[#7a7a7a]">
+                        {t.title}
+                      </div>
+                    </TD>
+                    <TD>
+                      <div className="text-[11px] font-medium text-[#424143]">
+                        {t.projectName ?? "-"}
+                      </div>
+                      {t.projectCode && (
+                        <div className="text-[11px] text-[#9a9892]">
+                          {t.projectCode}
                         </div>
-                        <div className="text-[11px] text-[#7a7a7a]">
-                          {t.title}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            (window.location.href =
-                              `/customer/tickets/${t.id}`)
-                          }
-                          className="mt-1 inline-flex items-center gap-1 text-[11px] text-[#f15b2b] hover:underline"
-                        >
-                          <span>View details</span>
-                          <span aria-hidden>↗</span>
-                        </button>
-                      </td>
-                      <td className="px-2 py-2 align-top">
-                        <div className="text-[11px] font-medium text-[#424143]">
-                          {t.projectName ?? "-"}
-                        </div>
-                        {t.projectCode && (
-                          <div className="text-[11px] text-[#9a9892]">
-                            {t.projectCode}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-2 py-2 align-top">
-                        <span className="inline-flex rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[11px] font-medium text-[#424143]">
-                          {formatStatusLabel(t.status)}
-                        </span>
-                      </td>
-                      <td className="px-2 py-2 align-top">
+                      )}
+                    </TD>
+                    <TD>
+                      <Badge variant={statusBadgeVariant(t.status)}>
+                        {formatStatusLabel(t.status)}
+                      </Badge>
+                    </TD>
+                    <TD>
+                      <Badge variant={priorityBadgeVariant(t.priority)}>
+                        {formatPriorityLabel(t.priority)}
+                      </Badge>
+                    </TD>
+                    <TD>
+                      <div className="text-[11px] text-[#424143]">
+                        {t.designerName ?? "-"}
+                      </div>
+                    </TD>
+                    <TD>
+                      <div className="text-[11px] text-[#424143]">
+                        {t.jobTypeName ?? "-"}
+                      </div>
+                    </TD>
+                    <TD className="text-[#7a7a7a]">
+                      {formatDate(t.createdAt)}
+                    </TD>
+                    <TD>
+                      {t.dueDate ? (
                         <span
-                          className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${PRIORITY_BADGE[t.priority]}`}
+                          className={
+                            isDueDateOverdue(t.dueDate)
+                              ? "font-semibold text-[var(--bb-danger-text)]"
+                              : isDueDateSoon(t.dueDate)
+                                ? "font-semibold text-[var(--bb-warning-text)]"
+                                : "text-[#7a7a7a]"
+                          }
                         >
-                          {formatPriorityLabel(t.priority)}
-                        </span>
-                      </td>
-                      <td className="px-2 py-2 align-top">
-                        <div className="text-[11px] text-[#424143]">
-                          {t.designerName ?? "-"}
-                        </div>
-                      </td>
-                      <td className="px-2 py-2 align-top">
-                        <div className="text-[11px] text-[#424143]">
-                          {t.jobTypeName ?? "-"}
-                        </div>
-                      </td>
-                      <td className="px-2 py-2 align-top">
-                        <div className="text-[11px] text-[#7a7a7a]">
-                          {formatDate(t.createdAt)}
-                        </div>
-                      </td>
-                      <td className="px-2 py-2 align-top">
-                        <div className="text-[11px] text-[#7a7a7a]">
                           {formatDate(t.dueDate)}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        </span>
+                      ) : (
+                        <span className="text-[#7a7a7a]">-</span>
+                      )}
+                    </TD>
+                  </tr>
+                ))}
+              </tbody>
+            </DataTable>
           </section>
         )}
 
         {loading && (
-          <section className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-6 text-sm text-[#7a7a7a]">
-            Loading tickets…
+          <section className="rounded-2xl border border-[#e3e1dc] bg-white px-4 shadow-sm">
+            <LoadingState message="Loading tickets…" />
           </section>
         )}
-      </div>
-    </div>
+    </>
   );
 }

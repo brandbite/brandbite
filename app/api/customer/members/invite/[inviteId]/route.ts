@@ -16,10 +16,9 @@ import {
 } from "@/lib/permissions/companyRoles";
 
 type RouteParams = {
-  params?: {
-    inviteId?: string;
-    id?: string; // fallback: in case the folder is named [id]
-  };
+  params: Promise<{
+    inviteId: string;
+  }>;
 };
 
 export async function DELETE(req: NextRequest, context: RouteParams) {
@@ -52,14 +51,9 @@ export async function DELETE(req: NextRequest, context: RouteParams) {
     }
 
     // -----------------------------------------------------------------------
-    // Param güvenli okuma
+    // Param okuma
     // -----------------------------------------------------------------------
-    const params = context.params ?? {};
-    const inviteId =
-      params.inviteId ??
-      params.id ??
-      new URL(req.url).pathname.split("/").pop() ??
-      null;
+    const { inviteId } = await context.params;
 
     if (!inviteId) {
       return NextResponse.json(

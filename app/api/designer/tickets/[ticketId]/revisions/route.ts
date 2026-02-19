@@ -91,7 +91,21 @@ export async function GET(_req: NextRequest, context: RouteContext) {
         submittedAt: true,
         feedbackAt: true,
         feedbackMessage: true,
-        designerMessage: true, // 🔴 BURASI ÖNEMLİ: designer notunu da seçiyoruz
+        designerMessage: true,
+        assets: {
+          where: { deletedAt: null },
+          orderBy: { createdAt: "asc" },
+          select: {
+            id: true,
+            url: true,
+            mimeType: true,
+            bytes: true,
+            width: true,
+            height: true,
+            originalName: true,
+            _count: { select: { pins: true } },
+          },
+        },
       },
     });
 
@@ -104,7 +118,17 @@ export async function GET(_req: NextRequest, context: RouteContext) {
             : null,
           feedbackAt: r.feedbackAt ? r.feedbackAt.toISOString() : null,
           feedbackMessage: r.feedbackMessage ?? null,
-          designerMessage: r.designerMessage ?? null, // 🔴 JSON’a ekliyoruz
+          designerMessage: r.designerMessage ?? null,
+          assets: (r as any).assets?.map((a: any) => ({
+            id: a.id,
+            url: a.url,
+            mimeType: a.mimeType,
+            bytes: a.bytes,
+            width: a.width,
+            height: a.height,
+            originalName: a.originalName,
+            pinCount: a._count?.pins ?? 0,
+          })) ?? [],
         })),
       },
       { status: 200 },

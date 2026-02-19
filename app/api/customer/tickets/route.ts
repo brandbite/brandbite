@@ -19,6 +19,7 @@ import {
 } from "@prisma/client";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { canCreateTickets } from "@/lib/permissions/companyRoles";
+import { createNotification } from "@/lib/notifications";
 
 // -----------------------------------------------------------------------------
 // Helpers
@@ -94,6 +95,23 @@ export async function GET(_req: NextRequest) {
             name: true,
           },
         },
+        assets: {
+          where: { kind: "BRIEF_INPUT", deletedAt: null },
+          select: {
+            id: true,
+            url: true,
+            mimeType: true,
+          },
+          orderBy: { createdAt: "asc" },
+          take: 1,
+        },
+        tagAssignments: {
+          select: {
+            tag: {
+              select: { id: true, name: true, color: true },
+            },
+          },
+        },
       },
       orderBy: {
         createdAt: "desc",
@@ -113,14 +131,24 @@ export async function GET(_req: NextRequest) {
         id: t.id,
         code,
         title: t.title,
+        description: t.description ?? null,
         status: t.status,
         priority: t.priority,
+        projectId: t.project?.id ?? null,
         projectName: t.project?.name ?? null,
         projectCode: t.project?.code ?? null,
         designerName: t.designer?.name ?? null,
+        jobTypeId: t.jobType?.id ?? null,
         jobTypeName: t.jobType?.name ?? null,
         createdAt: t.createdAt.toISOString(),
         dueDate: t.dueDate ? t.dueDate.toISOString() : null,
+        thumbnailUrl: t.assets?.[0]?.url ?? null,
+        thumbnailAssetId: t.assets?.[0]?.id ?? null,
+        tags: t.tagAssignments.map((ta: any) => ({
+          id: ta.tag.id,
+          name: ta.tag.name,
+          color: ta.tag.color,
+        })),
       };
     });
 
@@ -215,6 +243,15 @@ export async function POST(req: NextRequest) {
         ? (raw.jobTypeId as string)
         : null;
 
+    // Parse quantity (integer 1–10, default 1)
+    const rawQuantity =
+      typeof raw.quantity === "number"
+        ? raw.quantity
+        : typeof raw.quantity === "string"
+        ? parseInt(raw.quantity, 10)
+        : 1;
+    const quantity = Math.max(1, Math.min(10, Math.floor(rawQuantity) || 1));
+
     const priorityRaw =
       typeof raw.priority === "string"
         ? raw.priority.toUpperCase()
@@ -236,6 +273,22 @@ export async function POST(req: NextRequest) {
         selectedPriority = TicketPriority.MEDIUM;
         break;
     }
+
+    // Parse optional dueDate (ISO 8601 string or YYYY-MM-DD)
+    let parsedDueDate: Date | null = null;
+    if (typeof raw.dueDate === "string" && raw.dueDate.trim().length > 0) {
+      const d = new Date(raw.dueDate.trim());
+      if (!Number.isNaN(d.getTime())) {
+        parsedDueDate = d;
+      }
+    }
+
+    // Parse optional tagIds (max 5)
+    const rawTagIds: string[] = Array.isArray(raw.tagIds)
+      ? (raw.tagIds as unknown[])
+          .filter((id): id is string => typeof id === "string" && id.length > 0)
+          .slice(0, 5)
+      : [];
 
     if (!title) {
       return NextResponse.json(
@@ -304,7 +357,10 @@ export async function POST(req: NextRequest) {
     }
 
     // If there is a job type, make sure the company has enough tokens
-    if (jobType && company.tokenBalance < jobType.tokenCost) {
+    // Effective cost accounts for quantity multiplier.
+    const effectiveCost = jobType ? jobType.tokenCost * quantity : 0;
+
+    if (jobType && company.tokenBalance < effectiveCost) {
       return NextResponse.json(
         { error: "Not enough tokens for this job type" },
         { status: 400 },
@@ -373,6 +429,7 @@ export async function POST(req: NextRequest) {
               id: true,
               designerId: true,
               priority: true,
+              quantity: true,
               jobType: {
                 select: { tokenCost: true },
               },
@@ -396,7 +453,7 @@ export async function POST(req: NextRequest) {
             if (!loadByDesigner.has(t.designerId)) continue;
 
             const weight = priorityWeights[t.priority as TicketPriority];
-            const tokenCost = t.jobType?.tokenCost ?? 1;
+            const tokenCost = (t.jobType?.tokenCost ?? 1) * (t.quantity ?? 1);
             const delta = weight * tokenCost;
 
             loadByDesigner.set(
@@ -437,10 +494,12 @@ export async function POST(req: NextRequest) {
           description: description || null,
           status: TicketStatus.TODO,
           priority: selectedPriority,
+          dueDate: parsedDueDate,
           companyId: company.id,
           projectId: project?.id ?? null,
           createdById: requesterMember.userId,
           jobTypeId: jobType?.id ?? null,
+          quantity,
           companyTicketNumber: nextCompanyTicketNumber,
           designerId: assignedDesignerId,
         },
@@ -457,7 +516,7 @@ export async function POST(req: NextRequest) {
       // 4) If there is a job type, debit company tokens and create ledger entry
       if (jobType) {
         const balanceBefore = company.tokenBalance;
-        const balanceAfter = balanceBefore - jobType.tokenCost;
+        const balanceAfter = balanceBefore - effectiveCost;
 
         await tx.company.update({
           where: { id: company.id },
@@ -471,11 +530,13 @@ export async function POST(req: NextRequest) {
             companyId: company.id,
             ticketId: createdTicket.id,
             direction: LedgerDirection.DEBIT,
-            amount: jobType.tokenCost,
+            amount: effectiveCost,
             reason: "JOB_REQUEST_CREATED",
             notes: `New ticket created: ${createdTicket.title}`,
             metadata: {
               jobTypeId: jobType.id,
+              unitCost: jobType.tokenCost,
+              quantity,
               companyTicketNumber: createdTicket.companyTicketNumber,
               createdByUserId: requesterMember.userId,
             },
@@ -522,8 +583,42 @@ export async function POST(req: NextRequest) {
         });
       }
 
+      // 6) Attach tags (if any)
+      if (rawTagIds.length > 0) {
+        const validTags = await tx.ticketTag.findMany({
+          where: { id: { in: rawTagIds }, companyId: company.id },
+          select: { id: true },
+        });
+        if (validTags.length > 0) {
+          await tx.ticketTagAssignment.createMany({
+            data: validTags.map((t) => ({
+              ticketId: createdTicket.id,
+              tagId: t.id,
+            })),
+          });
+        }
+      }
+
       return createdTicket;
     });
+
+    // Fire notification to assigned designer (fire-and-forget)
+    if (ticket.designerId) {
+      const code =
+        ticket.project?.code && ticket.companyTicketNumber != null
+          ? `${ticket.project.code}-${ticket.companyTicketNumber}`
+          : ticket.companyTicketNumber != null
+          ? `#${ticket.companyTicketNumber}`
+          : ticket.id;
+      createNotification({
+        userId: ticket.designerId,
+        type: "TICKET_ASSIGNED",
+        title: "New ticket assigned",
+        message: `${code} "${ticket.title}" was assigned to you`,
+        ticketId: ticket.id,
+        actorId: user.id,
+      });
+    }
 
     const code =
       ticket.project?.code && ticket.companyTicketNumber != null

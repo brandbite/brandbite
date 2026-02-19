@@ -73,6 +73,26 @@ export function canManageBilling(
 }
 
 /**
+ * Who can edit the company profile (name, website, etc.).
+ * OWNER + PM can edit company profile.
+ */
+export function canEditCompanyProfile(
+  role: CompanyRole | null | undefined,
+): boolean {
+  return isCompanyAdminRole(role); // OWNER + PM
+}
+
+/**
+ * Who can manage tags (create/edit/delete) for a company.
+ * OWNER + PM can manage tags; all other roles can view/assign existing tags.
+ */
+export function canManageTags(
+  role: CompanyRole | null | undefined,
+): boolean {
+  return isCompanyAdminRole(role); // OWNER + PM
+}
+
+/**
  * Board visibility: anyone who is actually a member of the company.
  */
 export function canViewBoard(
@@ -99,6 +119,18 @@ export function canCreateTickets(
  * For now we mirror canCreateTickets, so BILLING is read-only.
  */
 export function canMoveTicketsOnBoard(
+  role: CompanyRole | null | undefined,
+): boolean {
+  return canCreateTickets(role);
+}
+
+/**
+ * Who can edit ticket fields (title, description, priority, dueDate, project, jobType).
+ * Same rules as canCreateTickets: OWNER, PM, MEMBER can edit; BILLING cannot.
+ *
+ * NOTE: The API also enforces a status guard — only TODO tickets are editable.
+ */
+export function canEditTickets(
   role: CompanyRole | null | undefined,
 ): boolean {
   return canCreateTickets(role);

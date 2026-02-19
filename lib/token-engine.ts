@@ -49,6 +49,42 @@ function computeSignedAmount(
 }
 
 // -----------------------------------------------------------------------------
+// Effective cost / payout helper
+// -----------------------------------------------------------------------------
+
+export type EffectiveTokenValues = {
+  effectiveCost: number;
+  effectivePayout: number;
+  isOverridden: boolean;
+};
+
+/**
+ * Calculate the effective token cost and designer payout for a ticket,
+ * accounting for quantity and admin overrides.
+ */
+export function getEffectiveTokenValues(ticket: {
+  quantity: number;
+  tokenCostOverride: number | null;
+  designerPayoutOverride: number | null;
+  jobType: { tokenCost: number; designerPayoutTokens: number } | null;
+}): EffectiveTokenValues {
+  if (!ticket.jobType) {
+    return { effectiveCost: 0, effectivePayout: 0, isOverridden: false };
+  }
+
+  const baseCost = ticket.jobType.tokenCost * ticket.quantity;
+  const basePayout = ticket.jobType.designerPayoutTokens * ticket.quantity;
+
+  return {
+    effectiveCost: ticket.tokenCostOverride ?? baseCost,
+    effectivePayout: ticket.designerPayoutOverride ?? basePayout,
+    isOverridden:
+      ticket.tokenCostOverride != null ||
+      ticket.designerPayoutOverride != null,
+  };
+}
+
+// -----------------------------------------------------------------------------
 // Company-level tokens (müşteri bakiyesi)
 // -----------------------------------------------------------------------------
 
@@ -334,54 +370,22 @@ export async function completeTicketAndApplyTokens(
       };
     }
 
-    const { tokenCost, designerPayoutTokens } = ticket.jobType;
+    // Effective payout: override > (base × quantity) > base
+    const effectivePayout =
+      ticket.designerPayoutOverride ??
+      ticket.jobType.designerPayoutTokens * (ticket.quantity ?? 1);
 
-    // --- Company tarafı (DEBIT) ---
-    const company = await tx.company.findUnique({
-      where: { id: ticket.companyId },
-      select: { tokenBalance: true },
-    });
-
-    if (!company) {
-      throw new Error(
-        `Company not found for id=${ticket.companyId} (ticket ${ticketId})`
-      );
-    }
-
-    const companyBalanceBefore = company.tokenBalance;
-    const companyBalanceAfter = companyBalanceBefore - tokenCost;
-
-    const companyLedgerEntry = await tx.tokenLedger.create({
-      data: {
-        companyId: ticket.companyId,
-        ticketId: ticket.id,
-        direction: "DEBIT",
-        amount: tokenCost,
-        reason: "JOB_PAYMENT",
-        notes: `Job payment for ticket ${ticket.id}`,
-        metadata: ticket.jobTypeId
-          ? { jobTypeId: ticket.jobTypeId }
-          : undefined,
-        balanceBefore: companyBalanceBefore,
-        balanceAfter: companyBalanceAfter,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    await tx.company.update({
-      where: { id: ticket.companyId },
-      data: {
-        tokenBalance: companyBalanceAfter,
-      },
-    });
+    // Company is NOT debited here — the company was already charged at ticket
+    // creation time (reason: "JOB_REQUEST_CREATED"). Completion only credits
+    // the designer.
+    const companyLedgerEntry = null;
+    const companyBalanceAfter = null;
 
     // --- Designer tarafı (CREDIT) ---
     let designerLedgerEntry: { id: string } | null = null;
     let designerBalanceAfter: number | null = null;
 
-    if (ticket.designerId && designerPayoutTokens > 0) {
+    if (ticket.designerId && effectivePayout > 0) {
       const [credits, debits] = await Promise.all([
         tx.tokenLedger.aggregate({
           where: { userId: ticket.designerId, direction: "CREDIT" },
@@ -397,7 +401,7 @@ export async function completeTicketAndApplyTokens(
       const designerDebitSum = debits._sum.amount ?? 0;
 
       const designerBalanceBefore = designerCreditSum - designerDebitSum;
-      designerBalanceAfter = designerBalanceBefore + designerPayoutTokens;
+      designerBalanceAfter = designerBalanceBefore + effectivePayout;
 
       designerLedgerEntry = await tx.tokenLedger.create({
         data: {
@@ -405,12 +409,17 @@ export async function completeTicketAndApplyTokens(
           companyId: ticket.companyId,
           ticketId: ticket.id,
           direction: "CREDIT",
-          amount: designerPayoutTokens,
+          amount: effectivePayout,
           reason: "JOB_PAYMENT",
           notes: `Designer payout for ticket ${ticket.id}`,
-          metadata: ticket.jobTypeId
-            ? { jobTypeId: ticket.jobTypeId }
-            : undefined,
+          metadata: {
+            ...(ticket.jobTypeId ? { jobTypeId: ticket.jobTypeId } : {}),
+            quantity: ticket.quantity ?? 1,
+            basePayout: ticket.jobType.designerPayoutTokens,
+            ...(ticket.designerPayoutOverride != null
+              ? { overridden: true, override: ticket.designerPayoutOverride }
+              : {}),
+          },
           balanceBefore: designerBalanceBefore,
           balanceAfter: designerBalanceAfter,
         },
