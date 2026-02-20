@@ -2836,7 +2836,7 @@ export default function CustomerBoardPage() {
                         <p className="text-xs font-semibold text-[#424143]">
                           {detailTicket.isAssigned ? "Assigned" : "Unassigned"}
                         </p>
-                        <p className="text-[10px] text-[#9a9892]">Design team</p>
+                        <p className="text-[10px] text-[#9a9892]">Creative team</p>
                       </div>
                     </div>
                   </div>
