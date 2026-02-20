@@ -1708,11 +1708,9 @@ export default function CustomerBoardPage() {
                 PROJECT_COLORS[idx % PROJECT_COLORS.length];
               const isActive = projectFilter === proj.name;
               const showMenu = canManageProjects(companyRole);
+              const menuOpen = projectMenuId === proj.id;
               return (
-                <div
-                  key={proj.id}
-                  className="group relative"
-                >
+                <div key={proj.id} className="group relative">
                   <button
                     type="button"
                     onClick={() =>
@@ -1731,48 +1729,56 @@ export default function CustomerBoardPage() {
                       {proj.name.charAt(0).toUpperCase()}
                     </span>
                     <span className="min-w-0 flex-1 truncate">{proj.name}</span>
-                    <span className="flex-shrink-0 text-[10px] text-[#b1afa9]">
+
+                    {/* Ticket count — hidden on hover when menu is available */}
+                    <span className={`flex-shrink-0 rounded-full bg-[#f0eee9] px-1.5 py-0.5 text-[10px] tabular-nums text-[#9a9892] ${showMenu ? "group-hover:hidden" : ""}`}>
                       {proj.ticketCount}
                     </span>
-                  </button>
 
-                  {/* Context menu trigger */}
-                  {showMenu && (
-                    <div className="absolute right-1 top-1/2 -translate-y-1/2">
-                      <button
-                        type="button"
+                    {/* Menu trigger — replaces count on hover */}
+                    {showMenu && (
+                      <span
+                        role="button"
+                        tabIndex={-1}
                         onClick={(e) => {
                           e.stopPropagation();
-                          setProjectMenuId(projectMenuId === proj.id ? null : proj.id);
+                          setProjectMenuId(menuOpen ? null : proj.id);
                         }}
-                        className="flex h-5 w-5 items-center justify-center rounded text-[11px] text-[#b1afa9] opacity-0 transition-opacity hover:bg-[#e3e1dc] hover:text-[#424143] group-hover:opacity-100"
-                        style={projectMenuId === proj.id ? { opacity: 1 } : undefined}
+                        className={`hidden flex-shrink-0 items-center justify-center rounded-md px-1 py-0.5 text-[13px] font-bold leading-none tracking-wider text-[#9a9892] transition-colors hover:bg-[#e3e1dc] hover:text-[#424143] group-hover:flex ${menuOpen ? "!flex bg-[#e3e1dc] text-[#424143]" : ""}`}
                       >
-                        ...
-                      </button>
+                        &#8943;
+                      </span>
+                    )}
+                  </button>
 
-                      {/* Dropdown menu */}
-                      {projectMenuId === proj.id && (
-                        <div
-                          ref={projectMenuRef}
-                          className="absolute right-0 top-6 z-50 min-w-[120px] rounded-lg border border-[#e3e1dc] bg-white py-1 shadow-lg"
-                        >
-                          <button
-                            type="button"
-                            onClick={() => openRenameProject(proj)}
-                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] text-[#424143] hover:bg-[#f5f3f0]"
-                          >
-                            Rename
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => openDeleteProject(proj)}
-                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] text-red-600 hover:bg-red-50"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      )}
+                  {/* Dropdown menu */}
+                  {menuOpen && (
+                    <div
+                      ref={projectMenuRef}
+                      className="absolute left-full top-0 z-50 ml-1 min-w-[140px] rounded-xl border border-[#e3e1dc] bg-white py-1.5 shadow-xl"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => openRenameProject(proj)}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-medium text-[#424143] transition-colors hover:bg-[#f5f3f0]"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3 w-3 text-[#9a9892]">
+                          <path d="M13.488 2.513a1.75 1.75 0 0 0-2.475 0L6.75 6.774a2.75 2.75 0 0 0-.596.892l-.848 2.047a.75.75 0 0 0 .98.98l2.047-.848a2.75 2.75 0 0 0 .892-.596l4.261-4.262a1.75 1.75 0 0 0 0-2.474Z" />
+                          <path d="M4.75 3.5c-.69 0-1.25.56-1.25 1.25v6.5c0 .69.56 1.25 1.25 1.25h6.5c.69 0 1.25-.56 1.25-1.25V9A.75.75 0 0 1 14 9v2.25A2.75 2.75 0 0 1 11.25 14h-6.5A2.75 2.75 0 0 1 2 11.25v-6.5A2.75 2.75 0 0 1 4.75 2H7a.75.75 0 0 1 0 1.5H4.75Z" />
+                        </svg>
+                        Rename
+                      </button>
+                      <div className="mx-2 my-1 border-t border-[#f0eee9]" />
+                      <button
+                        type="button"
+                        onClick={() => openDeleteProject(proj)}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-medium text-red-600 transition-colors hover:bg-red-50"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3 w-3">
+                          <path fillRule="evenodd" d="M5 3.25V4H2.75a.75.75 0 0 0 0 1.5h.3l.815 8.15A1.5 1.5 0 0 0 5.357 15h5.285a1.5 1.5 0 0 0 1.493-1.35l.815-8.15h.3a.75.75 0 0 0 0-1.5H11v-.75A2.25 2.25 0 0 0 8.75 1h-1.5A2.25 2.25 0 0 0 5 3.25Zm2.25-.75a.75.75 0 0 0-.75.75V4h3v-.75a.75.75 0 0 0-.75-.75h-1.5ZM6.05 6a.75.75 0 0 1 .787.713l.275 5.5a.75.75 0 0 1-1.498.075l-.275-5.5A.75.75 0 0 1 6.05 6Zm3.9 0a.75.75 0 0 1 .712.787l-.275 5.5a.75.75 0 0 1-1.498-.075l.275-5.5a.75.75 0 0 1 .786-.711Z" clipRule="evenodd" />
+                        </svg>
+                        Delete project
+                      </button>
                     </div>
                   )}
                 </div>
