@@ -185,6 +185,18 @@ export default function NewTicketForm({
     effectiveCost != null &&
     tokenBalance < effectiveCost;
 
+  // Due date constraints: today → 2 years from now (YYYY-MM-DD format)
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    return d.toISOString().split("T")[0];
+  }, []);
+
+  const maxDateStr = useMemo(() => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() + 2);
+    return d.toISOString().split("T")[0];
+  }, []);
+
   const [submitting, setSubmitting] = useState(false);
   const [uploadingBriefs, setUploadingBriefs] = useState(false);
   const [uploadProgressText, setUploadProgressText] = useState<string | null>(
@@ -446,6 +458,18 @@ export default function NewTicketForm({
       return;
     }
 
+    // Due date validation — reject past dates and dates beyond 2 years
+    if (dueDate) {
+      if (dueDate < todayStr) {
+        setError("Due date cannot be in the past.");
+        return;
+      }
+      if (dueDate > maxDateStr) {
+        setError("Due date cannot be more than 2 years in the future.");
+        return;
+      }
+    }
+
     setSubmitting(true);
 
     try {
@@ -704,6 +728,8 @@ export default function NewTicketForm({
           value={dueDate}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDueDate(e.target.value)}
           disabled={isBusy}
+          min={todayStr}
+          max={maxDateStr}
         />
         <p className="text-[11px] text-[#9a9892]">
           Set a target date for delivery. Optional.

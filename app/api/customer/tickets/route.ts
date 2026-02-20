@@ -279,9 +279,34 @@ export async function POST(req: NextRequest) {
     let parsedDueDate: Date | null = null;
     if (typeof raw.dueDate === "string" && raw.dueDate.trim().length > 0) {
       const d = new Date(raw.dueDate.trim());
-      if (!Number.isNaN(d.getTime())) {
-        parsedDueDate = d;
+      if (Number.isNaN(d.getTime())) {
+        return NextResponse.json(
+          { error: "Invalid due date format." },
+          { status: 400 },
+        );
       }
+
+      // Reject past dates (compare date-only, ignoring time)
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (d < today) {
+        return NextResponse.json(
+          { error: "Due date cannot be in the past." },
+          { status: 400 },
+        );
+      }
+
+      // Reject dates more than 2 years in the future
+      const maxDate = new Date();
+      maxDate.setFullYear(maxDate.getFullYear() + 2);
+      if (d > maxDate) {
+        return NextResponse.json(
+          { error: "Due date cannot be more than 2 years in the future." },
+          { status: 400 },
+        );
+      }
+
+      parsedDueDate = d;
     }
 
     // Parse optional tagIds (max 5)
