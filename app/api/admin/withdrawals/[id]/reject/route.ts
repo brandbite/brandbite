@@ -1,6 +1,6 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/admin/withdrawals/[id]/reject/route.ts
-// @purpose: Reject a designer withdrawal request
+// @purpose: Reject a creative withdrawal request
 // @version: v1.0.0
 // @lastUpdate: 2025-11-13
 // -----------------------------------------------------------------------------

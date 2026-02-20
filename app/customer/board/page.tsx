@@ -267,7 +267,7 @@ const canDropTicketToStatus = (
     return {
       allowed: false,
       reason:
-        "New requests in To do can only be picked up by your designer. You can approve or request changes once the ticket is In review.",
+        "New requests in To do can only be picked up by your creative. You can approve or request changes once the ticket is In review.",
     };
   }
 
@@ -275,7 +275,7 @@ const canDropTicketToStatus = (
     return {
       allowed: false,
       reason:
-        "In progress requests are controlled by your designer. You can approve work once it reaches In review.",
+        "In progress requests are controlled by your creative. You can approve work once it reaches In review.",
     };
   }
 
@@ -1068,7 +1068,7 @@ export default function CustomerBoardPage() {
       return {
         title: "Request marked as done",
         description:
-          "Your designer will be paid for this job and the ticket has moved to Done.",
+          "Your creative will be paid for this job and the ticket has moved to Done.",
       };
     }
 
@@ -1076,14 +1076,14 @@ export default function CustomerBoardPage() {
       return {
         title: "Changes requested",
         description:
-          "Your message has been sent to your designer and the ticket is back in progress.",
+          "Your message has been sent to your creative and the ticket is back in progress.",
       };
     }
 
     if (status === "IN_PROGRESS") {
       return {
         title: "Request moved back to In progress",
-        description: "This ticket is now open again for your designer.",
+        description: "This ticket is now open again for your creative.",
       };
     }
 
@@ -1500,7 +1500,7 @@ export default function CustomerBoardPage() {
     if (!pendingRevisionTicketId) return;
 
     if (!revisionMessage.trim()) {
-      const msg = "Please add a short message for your designer.";
+      const msg = "Please add a short message for your creative.";
       setRevisionMessageError(msg);
 
       showToast({
@@ -2443,7 +2443,7 @@ export default function CustomerBoardPage() {
                   )}
 
                   {!detailBriefAssetsLoading && detailBriefAssets.length > 0 && (() => {
-                    const hasDesignerWork = detailRevisions && detailRevisions.length > 0 &&
+                    const hasCreativeWork = detailRevisions && detailRevisions.length > 0 &&
                       detailRevisions.some((r) => r.assets && r.assets.length > 0);
 
                     return (
@@ -2458,7 +2458,7 @@ export default function CustomerBoardPage() {
                             zipFilename="brief-attachments.zip"
                           />
                         </div>
-                        {hasDesignerWork ? (
+                        {hasCreativeWork ? (
                           <BriefThumbnailRow assets={detailBriefAssets} />
                         ) : (
                           <RevisionImageLarge
@@ -2470,7 +2470,7 @@ export default function CustomerBoardPage() {
                     );
                   })()}
 
-                  {/* Divider between brief context and designer work */}
+                  {/* Divider between brief context and creative work */}
                   {(detailRevisions && detailRevisions.length > 0) && (
                     <div className="mb-5 border-t border-[#ece9e1]" />
                   )}
@@ -2487,7 +2487,7 @@ export default function CustomerBoardPage() {
                   {!detailRevisionsLoading &&
                     !detailRevisionsError &&
                     (!detailRevisions || detailRevisions.length === 0) && (
-                      <EmptyState title="No revisions yet." description="Once your designer sends this ticket for review, you'll see each version and your feedback here." />
+                      <EmptyState title="No revisions yet." description="Once your creative sends this ticket for review, you'll see each version and your feedback here." />
                     )}
 
                   {/* Current version + Previous versions */}
@@ -2561,7 +2561,7 @@ export default function CustomerBoardPage() {
                                     showToast({
                                       type: "success",
                                       title: "Changes requested",
-                                      description: "Your pin annotations have been sent to your designer.",
+                                      description: "Your pin annotations have been sent to your creative.",
                                     });
                                     void load();
                                   }}
@@ -3014,13 +3014,13 @@ export default function CustomerBoardPage() {
         {/* Revision modal */}
         <Modal open={!!pendingRevisionTicket} onClose={handleCancelRevision} size="md">
           <ModalHeader
-            title="Send this request back to your designer?"
-            subtitle="Your designer will see your message and continue working on this request. The status will move back to In progress."
+            title="Send this request back to your creative?"
+            subtitle="Your creative will see your message and continue working on this request. The status will move back to In progress."
           />
 
               <div>
                 <label className="block text-xs font-medium text-[#424143]">
-                  Message for your designer
+                  Message for your creative
                 </label>
                 <textarea
                   value={revisionMessage}
@@ -3042,7 +3042,7 @@ export default function CustomerBoardPage() {
 
           <ModalFooter>
             <Button variant="secondary" size="sm" onClick={handleCancelRevision}>Cancel</Button>
-            <Button size="sm" onClick={handleConfirmRevision}>Send back to designer</Button>
+            <Button size="sm" onClick={handleConfirmRevision}>Send back to creative</Button>
           </ModalFooter>
         </Modal>
 
@@ -3050,7 +3050,7 @@ export default function CustomerBoardPage() {
         <Modal open={!!pendingDoneTicket} onClose={() => setPendingDoneTicketId(null)} size="lg">
           <ModalHeader
             title="Mark this request as done?"
-            subtitle="Once you mark this request as done, your designer will get paid for this job, and the ticket will move to Done."
+            subtitle="Once you mark this request as done, your creative will get paid for this job, and the ticket will move to Done."
           />
 
               <div className="rounded-xl bg-[#f7f5f0] px-3 py-3 text-xs text-[#424143]">

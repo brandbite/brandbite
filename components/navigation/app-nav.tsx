@@ -1,6 +1,6 @@
 // -----------------------------------------------------------------------------
 // @file: components/navigation/app-nav.tsx
-// @purpose: Unified navigation for all roles — admin, customer, designer
+// @purpose: Unified navigation for all roles — admin, customer, creative
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -16,7 +16,7 @@ type NavItem = {
   label: string;
 };
 
-type AppNavRole = "admin" | "customer" | "designer";
+type AppNavRole = "admin" | "customer" | "creative";
 
 const NAV_CONFIG: Record<
   AppNavRole,
@@ -34,7 +34,7 @@ const NAV_CONFIG: Record<
       { href: "/admin/payout-rules", label: "Payout Rules" },
       { href: "/admin/ledger", label: "Ledger" },
       { href: "/admin/token-analytics", label: "Analytics" },
-      { href: "/admin/designer-analytics", label: "Designers" },
+      { href: "/admin/creative-analytics", label: "Creatives" },
       { href: "/admin/withdrawals", label: "Withdrawals" },
       { href: "/admin/settings", label: "Settings" },
     ],
@@ -53,16 +53,16 @@ const NAV_CONFIG: Record<
     ],
     brandLabel: "Brandbite",
   },
-  designer: {
+  creative: {
     items: [
-      { href: "/designer", label: "Overview" },
-      { href: "/designer/board", label: "Board" },
-      { href: "/designer/tickets", label: "Tickets" },
-      { href: "/designer/balance", label: "Balance" },
-      { href: "/designer/withdrawals", label: "Withdrawals" },
-      { href: "/designer/settings", label: "Settings" },
+      { href: "/creative", label: "Overview" },
+      { href: "/creative/board", label: "Board" },
+      { href: "/creative/tickets", label: "Tickets" },
+      { href: "/creative/balance", label: "Balance" },
+      { href: "/creative/withdrawals", label: "Withdrawals" },
+      { href: "/creative/settings", label: "Settings" },
     ],
-    brandLabel: "Brandbite \u00b7 Designer",
+    brandLabel: "Brandbite \u00b7 Creative",
   },
 };
 
@@ -124,14 +124,14 @@ export function AppNav({ role }: { role: AppNavRole }) {
             );
           })}
         </nav>
-        {(role === "customer" || role === "designer") && (
+        {(role === "customer" || role === "creative") && (
           <NotificationBell role={role} />
         )}
       </div>
 
       {/* Mobile: notification bell + hamburger */}
       <div className="flex items-center gap-2 md:hidden">
-        {(role === "customer" || role === "designer") && (
+        {(role === "customer" || role === "creative") && (
           <NotificationBell role={role} />
         )}
 

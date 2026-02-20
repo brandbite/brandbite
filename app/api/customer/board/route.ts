@@ -57,7 +57,7 @@ export async function GET(_req: NextRequest) {
             id: true,
             name: true,
             tokenCost: true,
-            designerPayoutTokens: true,
+            creativePayoutTokens: true,
           },
         },
       },
@@ -94,13 +94,13 @@ export async function GET(_req: NextRequest) {
             code: t.project.code,
           }
         : null,
-      isAssigned: t.designerId != null,
+      isAssigned: t.creativeId != null,
       jobType: t.jobType
         ? {
             id: t.jobType.id,
             name: t.jobType.name,
             tokenCost: t.jobType.tokenCost,
-            designerPayoutTokens: t.jobType.designerPayoutTokens,
+            creativePayoutTokens: t.jobType.creativePayoutTokens,
           }
         : null,
     }));

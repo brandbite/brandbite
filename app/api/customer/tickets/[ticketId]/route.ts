@@ -82,7 +82,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
             id: true,
             name: true,
             tokenCost: true,
-            designerPayoutTokens: true,
+            creativePayoutTokens: true,
           },
         },
         tagAssignments: {
@@ -122,7 +122,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
       ? (ticket.tokenCostOverride ?? ticket.jobType.tokenCost * qty)
       : null;
     const effectivePayout = ticket.jobType
-      ? (ticket.designerPayoutOverride ?? ticket.jobType.designerPayoutTokens * qty)
+      ? (ticket.creativePayoutOverride ?? ticket.jobType.creativePayoutTokens * qty)
       : null;
 
     return NextResponse.json(
@@ -140,7 +140,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
           effectiveCost,
           effectivePayout,
           tokenCostOverride: ticket.tokenCostOverride ?? null,
-          designerPayoutOverride: ticket.designerPayoutOverride ?? null,
+          creativePayoutOverride: ticket.creativePayoutOverride ?? null,
           createdAt: ticket.createdAt.toISOString(),
           updatedAt: ticket.updatedAt.toISOString(),
           project: ticket.project
@@ -150,14 +150,14 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
                 code: ticket.project.code,
               }
             : null,
-          isAssigned: ticket.designerId != null,
+          isAssigned: ticket.creativeId != null,
           jobType: ticket.jobType
             ? {
                 id: ticket.jobType.id,
                 name: ticket.jobType.name,
                 tokenCost: ticket.jobType.tokenCost,
-                designerPayoutTokens:
-                  ticket.jobType.designerPayoutTokens,
+                creativePayoutTokens:
+                  ticket.jobType.creativePayoutTokens,
               }
             : null,
           tags: ticket.tagAssignments.map((ta) => ({
@@ -322,7 +322,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
         return NextResponse.json(
           {
             error:
-              "Ticket can only be edited while in To do status. Once a designer starts working, the ticket is locked.",
+              "Ticket can only be edited while in To do status. Once a creative starts working, the ticket is locked.",
           },
           { status: 403 },
         );
@@ -486,7 +486,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
                 id: true,
                 name: true,
                 tokenCost: true,
-                designerPayoutTokens: true,
+                creativePayoutTokens: true,
               },
             },
             tagAssignments: {
@@ -523,7 +523,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
             projectCode: updated.project?.code ?? null,
             jobTypeId: updated.jobType?.id ?? null,
             jobTypeName: updated.jobType?.name ?? null,
-            isAssigned: updated.designerId != null,
+            isAssigned: updated.creativeId != null,
             tags: updated.tagAssignments.map((ta) => ({
               id: ta.tag.id,
               name: ta.tag.name,

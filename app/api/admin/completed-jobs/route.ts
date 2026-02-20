@@ -16,11 +16,11 @@ type CompletedJob = {
   title: string;
   companyName: string | null;
   projectName: string | null;
-  designerName: string | null;
-  designerEmail: string | null;
+  creativeName: string | null;
+  creativeEmail: string | null;
   completedAt: string;
   jobTypeName: string | null;
-  designerPayoutTokens: number | null;
+  creativePayoutTokens: number | null;
   hasPayoutEntry: boolean;
   payoutLedgerCreatedAt: string | null;
 };
@@ -69,7 +69,7 @@ export async function GET(_req: NextRequest) {
             code: true,
           },
         },
-        designer: {
+        creative: {
           select: {
             id: true,
             name: true,
@@ -81,7 +81,7 @@ export async function GET(_req: NextRequest) {
             id: true,
             name: true,
             tokenCost: true,
-            designerPayoutTokens: true,
+            creativePayoutTokens: true,
           },
         },
         ledgerEntries: {
@@ -115,11 +115,11 @@ export async function GET(_req: NextRequest) {
         title: t.title,
         companyName: t.company?.name ?? null,
         projectName: t.project?.name ?? null,
-        designerName: t.designer?.name ?? null,
-        designerEmail: t.designer?.email ?? null,
+        creativeName: t.creative?.name ?? null,
+        creativeEmail: t.creative?.email ?? null,
         completedAt: t.updatedAt.toISOString(),
         jobTypeName: t.jobType?.name ?? null,
-        designerPayoutTokens: t.jobType?.designerPayoutTokens ?? null,
+        creativePayoutTokens: t.jobType?.creativePayoutTokens ?? null,
         hasPayoutEntry,
         payoutLedgerCreatedAt,
       };

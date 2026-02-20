@@ -1,6 +1,6 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/admin/withdrawals/[id]/approve/route.ts
-// @purpose: Approve a designer withdrawal and apply token debit
+// @purpose: Approve a creative withdrawal and apply token debit
 // @version: v1.0.0
 // @lastUpdate: 2025-11-13
 // -----------------------------------------------------------------------------
@@ -48,12 +48,12 @@ export async function POST(
       );
     }
 
-    const balance = await getUserTokenBalance(withdrawal.designerId);
+    const balance = await getUserTokenBalance(withdrawal.creativeId);
 
     if (withdrawal.amountTokens > balance) {
       return NextResponse.json(
         {
-          error: "Designer does not have enough tokens at approval time",
+          error: "Creative does not have enough tokens at approval time",
           availableBalance: balance,
           requestedAmount: withdrawal.amountTokens,
         },
@@ -65,7 +65,7 @@ export async function POST(
     const result = await prisma.$transaction(async (tx) => {
       // Ledger DEBIT
       const ledgerResult = await applyUserLedgerEntry({
-        userId: withdrawal.designerId,
+        userId: withdrawal.creativeId,
         amount: withdrawal.amountTokens,
         direction: "DEBIT",
         reason: "WITHDRAW",
@@ -90,7 +90,7 @@ export async function POST(
       return {
         updated,
         ledgerEntryId: ledgerResult.ledger.id,
-        designerBalanceAfter: ledgerResult.balanceAfter,
+        creativeBalanceAfter: ledgerResult.balanceAfter,
       };
     });
 
@@ -99,7 +99,7 @@ export async function POST(
         message: "Withdrawal approved and token debit applied",
         withdrawal: result.updated,
         ledgerEntryId: result.ledgerEntryId,
-        designerBalanceAfter: result.designerBalanceAfter,
+        creativeBalanceAfter: result.creativeBalanceAfter,
       },
       { status: 200 }
     );

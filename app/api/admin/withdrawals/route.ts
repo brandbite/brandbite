@@ -1,6 +1,6 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/admin/withdrawals/route.ts
-// @purpose: Admin API for managing designer withdrawals (list + status updates)
+// @purpose: Admin API for managing creative withdrawals (list + status updates)
 // @version: v1.1.0
 // @status: active
 // @lastUpdate: 2025-11-15
@@ -33,7 +33,7 @@ export async function GET(_req: NextRequest) {
 
     const withdrawals = await prisma.withdrawal.findMany({
       include: {
-        designer: {
+        creative: {
           select: {
             id: true,
             email: true,
@@ -65,11 +65,11 @@ export async function GET(_req: NextRequest) {
       status: w.status,
       createdAt: w.createdAt.toISOString(),
       approvedAt: w.approvedAt ? w.approvedAt.toISOString() : null,
-      designer: {
-        id: w.designer.id,
-        email: w.designer.email,
-        name: w.designer.name,
-        role: w.designer.role,
+      creative: {
+        id: w.creative.id,
+        email: w.creative.email,
+        name: w.creative.name,
+        role: w.creative.role,
       },
     }));
 
@@ -129,7 +129,7 @@ export async function PATCH(req: NextRequest) {
       const withdrawal = await tx.withdrawal.findUnique({
         where: { id },
         include: {
-          designer: {
+          creative: {
             select: {
               id: true,
               email: true,
@@ -159,7 +159,7 @@ export async function PATCH(req: NextRequest) {
             approvedAt: new Date(),
           },
           include: {
-            designer: {
+            creative: {
               select: {
                 id: true,
                 email: true,
@@ -188,7 +188,7 @@ export async function PATCH(req: NextRequest) {
             approvedAt: null,
           },
           include: {
-            designer: {
+            creative: {
               select: {
                 id: true,
                 email: true,
@@ -215,18 +215,18 @@ export async function PATCH(req: NextRequest) {
         );
       }
 
-      // Calculate designer balance before this debit
+      // Calculate creative balance before this debit
       const [creditAgg, debitAgg] = await Promise.all([
         tx.tokenLedger.aggregate({
           where: {
-            userId: withdrawal.designerId,
+            userId: withdrawal.creativeId,
             direction: LedgerDirection.CREDIT,
           },
           _sum: { amount: true },
         }),
         tx.tokenLedger.aggregate({
           where: {
-            userId: withdrawal.designerId,
+            userId: withdrawal.creativeId,
             direction: LedgerDirection.DEBIT,
           },
           _sum: { amount: true },
@@ -240,7 +240,7 @@ export async function PATCH(req: NextRequest) {
 
       await tx.tokenLedger.create({
         data: {
-          userId: withdrawal.designerId,
+          userId: withdrawal.creativeId,
           direction: LedgerDirection.DEBIT,
           amount: withdrawal.amountTokens,
           reason: "WITHDRAWAL_PAID",
@@ -257,7 +257,7 @@ export async function PATCH(req: NextRequest) {
           approvedAt: withdrawal.approvedAt ?? new Date(),
         },
         include: {
-          designer: {
+          creative: {
             select: {
               id: true,
               email: true,
@@ -280,7 +280,7 @@ export async function PATCH(req: NextRequest) {
         approvedAt: updated.approvedAt
           ? updated.approvedAt.toISOString()
           : null,
-        designer: updated.designer,
+        creative: updated.creative,
       },
     });
   } catch (error: any) {

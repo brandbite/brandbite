@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: prisma/schema.prisma
 // @purpose: Brandbite core database schema (roles, tickets, tokens, ledger)
-// @version: v1.8.0
+// @version: v2.0.0
 // @status: active
-// @lastUpdate: 2025-12-26
+// @lastUpdate: 2026-02-20
 // -----------------------------------------------------------------------------
 
 generator client {
@@ -22,7 +22,7 @@ datasource db {
 enum UserRole {
   SITE_OWNER
   SITE_ADMIN
-  DESIGNER
+  DESIGNER  // DB value stays "DESIGNER"; display label = "Creative"
   CUSTOMER
 }
 
@@ -70,7 +70,7 @@ enum InviteStatus {
 enum ProjectRole {
   OWNER // project owner (usually company owner / lead)
   PM // project manager
-  CONTRIBUTOR // aktif çalışan
+  CONTRIBUTOR // aktif calisan
   VIEWER // read-only
 }
 
@@ -89,12 +89,12 @@ enum BillingStatus {
 // --- Notifications ---
 
 enum NotificationType {
-  REVISION_SUBMITTED    // Designer submitted a new revision
+  REVISION_SUBMITTED    // Creative submitted a new revision
   FEEDBACK_SUBMITTED    // Customer submitted revision feedback (pins)
   TICKET_COMPLETED      // Ticket marked as DONE
-  TICKET_ASSIGNED       // Ticket assigned to designer
+  TICKET_ASSIGNED       // Ticket assigned to creative
   TICKET_STATUS_CHANGED // Any status transition
-  PIN_RESOLVED          // Designer resolved a pin
+  PIN_RESOLVED          // Creative resolved a pin
 }
 
 // --- Assets & Annotations ---
@@ -131,12 +131,12 @@ model UserAccount {
   name       String?
   role       UserRole
 
-  /// Admin-controlled flag: whether this designer can send revision notes to clients
-  designerRevisionNotesEnabled Boolean @default(false)
+  /// Admin-controlled flag: whether this creative can send revision notes to clients
+  creativeRevisionNotesEnabled Boolean @default(false) @map("designerRevisionNotesEnabled")
 
-  /// Whether this designer has paused accepting new assignments
+  /// Whether this creative has paused accepting new assignments
   isPaused       Boolean   @default(false)
-  /// When the designer activated pause mode
+  /// When the creative activated pause mode
   pausedAt       DateTime?
   /// When the pause expires (null = manual/indefinite pause)
   pauseExpiresAt DateTime?
@@ -145,7 +145,7 @@ model UserAccount {
 
   // Relations
   companies       CompanyMember[]
-  designerTickets Ticket[]        @relation("DesignerTickets")
+  creativeTickets Ticket[]        @relation("CreativeTickets")
   customerTickets Ticket[]        @relation("CustomerTickets")
 
   projectMemberships ProjectMember[]
@@ -172,8 +172,8 @@ model UserAccount {
   actedNotifications   Notification[]           @relation("NotificationActor")
   notificationPrefs    NotificationPreference[]
 
-  // Designer skills (job type capabilities)
-  designerSkills DesignerSkill[] @relation("DesignerSkills")
+  // Creative skills (job type capabilities)
+  creativeSkills CreativeSkill[] @relation("CreativeSkills")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -194,9 +194,9 @@ model Company {
   planId String?
   plan   Plan?   @relation(fields: [planId], references: [id])
 
-  /// Şirket için default auto-assign davranışı:
-  /// - true: eğer proje "INHERIT" ise auto-assign açık kabul edilir.
-  /// - false: eğer proje "INHERIT" ise auto-assign kapalı kabul edilir.
+  /// Company default auto-assign behaviour:
+  /// - true: if project is "INHERIT", auto-assign is considered enabled.
+  /// - false: if project is "INHERIT", auto-assign is considered disabled.
   autoAssignDefaultEnabled Boolean @default(false)
 
   members CompanyMember[]
@@ -215,7 +215,7 @@ model Company {
   // Output presets (optional company overrides)
   outputSizePresets OutputSizePreset[]
 
-  // Stripe billing mapping (ileride kullanılacak)
+  // Stripe billing mapping
   stripeCustomerId     String?        @unique
   stripeSubscriptionId String?        @unique
   billingStatus        BillingStatus?
@@ -239,11 +239,11 @@ model CompanyMember {
   userId String
   user   UserAccount @relation(fields: [userId], references: [id])
 
-  /// company içi rol:
-  /// - OWNER  : şirket sahibi (plan, billing, üyeler)
-  /// - PM     : şirket genelinde proje / ticket yönetimi
-  /// - BILLING: muhasebe / fatura
-  /// - MEMBER : normal üye (default)
+  /// Company-level role:
+  /// - OWNER  : company owner (plan, billing, members)
+  /// - PM     : company-wide project / ticket management
+  /// - BILLING: accounting / finance
+  /// - MEMBER : regular member (default)
   roleInCompany CompanyRole @default(MEMBER)
 
   createdAt DateTime @default(now())
@@ -286,11 +286,11 @@ model Plan {
   stripePriceId   String? @unique
 
   monthlyTokens Int
-  priceCents    Int // seed.mjs ile uyumlu
+  priceCents    Int
 
   isActive Boolean @default(true)
 
-  // Plan bazlı maksimum eşzamanlı IN_PROGRESS ticket sayısı
+  // Plan-level max concurrent IN_PROGRESS ticket count
   maxConcurrentInProgressTickets Int @default(1)
 
   companies Company[]
@@ -370,7 +370,7 @@ model JobType {
   categoryRef          JobTypeCategory?  @relation(fields: [categoryId], references: [id])
   description          String?
   tokenCost            Int
-  designerPayoutTokens Int // seed.mjs ile uyumlu
+  creativePayoutTokens Int               @map("designerPayoutTokens")
   estimatedHours       Int?              // from service catalog (for reference)
 
   // Quantity support — some jobs are per-unit (e.g. banner sizes, pages)
@@ -385,7 +385,7 @@ model JobType {
   // Output size presets (global presets live here; company overrides also relate here)
   outputSizePresets OutputSizePreset[]
 
-  designerSkills DesignerSkill[]
+  creativeSkills CreativeSkill[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -394,23 +394,24 @@ model JobType {
 }
 
 // -----------------------------------------------------------------------------
-// Designer Skills (many-to-many: UserAccount <-> JobType)
+// Creative Skills (many-to-many: UserAccount <-> JobType)
 // -----------------------------------------------------------------------------
 
-model DesignerSkill {
+model CreativeSkill {
   id String @id @default(cuid())
 
-  designerId String
-  designer   UserAccount @relation("DesignerSkills", fields: [designerId], references: [id])
+  creativeId String      @map("designerId")
+  creative   UserAccount @relation("CreativeSkills", fields: [creativeId], references: [id])
 
   jobTypeId String
   jobType   JobType @relation(fields: [jobTypeId], references: [id])
 
   createdAt DateTime @default(now())
 
-  @@unique([designerId, jobTypeId])
-  @@index([designerId])
+  @@unique([creativeId, jobTypeId])
+  @@index([creativeId])
   @@index([jobTypeId])
+  @@map("DesignerSkill")
 }
 
 // -----------------------------------------------------------------------------
@@ -486,13 +487,13 @@ model Ticket {
   projectId String?
   project   Project? @relation(fields: [projectId], references: [id])
 
-  // Ticket’i açan kullanıcı (customer)
+  // User who created the ticket (customer)
   createdById String
   createdBy   UserAccount @relation("CustomerTickets", fields: [createdById], references: [id])
 
-  // Atanan designer
-  designerId String?
-  designer   UserAccount? @relation("DesignerTickets", fields: [designerId], references: [id])
+  // Assigned creative
+  creativeId String?              @map("designerId")
+  creative   UserAccount?         @relation("CreativeTickets", fields: [creativeId], references: [id])
 
   jobTypeId String?
   jobType   JobType? @relation(fields: [jobTypeId], references: [id])
@@ -502,9 +503,9 @@ model Ticket {
 
   // Admin overrides — when set, these replace the calculated (jobType cost * quantity).
   tokenCostOverride      Int?
-  designerPayoutOverride Int?
+  creativePayoutOverride Int?     @map("designerPayoutOverride")
 
-  // Şirket içi ticket numarası
+  // Company-scoped ticket number
   companyTicketNumber Int?
   revisionCount       Int              @default(0)
   revisions           TicketRevision[]
@@ -526,7 +527,7 @@ model Ticket {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([designerId, status, updatedAt])
+  @@index([creativeId, status, updatedAt])
 }
 
 // -----------------------------------------------------------------------------
@@ -592,11 +593,11 @@ model TicketRevision {
   /// Revision number for this ticket (v1, v2, v3, ...)
   version Int
 
-  submittedByDesignerId String?
-  submittedByDesigner   UserAccount? @relation("TicketRevisionSubmittedBy", fields: [submittedByDesignerId], references: [id])
+  submittedByCreativeId String?          @map("submittedByDesignerId")
+  submittedByCreative   UserAccount?     @relation("TicketRevisionSubmittedBy", fields: [submittedByCreativeId], references: [id])
 
   submittedAt DateTime @default(now())
-  designerMessage String?
+  creativeMessage String?                @map("designerMessage")
 
   feedbackByCustomerId String?
   feedbackByCustomer   UserAccount? @relation("TicketRevisionFeedbackBy", fields: [feedbackByCustomerId], references: [id])
@@ -611,7 +612,7 @@ model TicketRevision {
 
   @@unique([ticketId, version])
   @@index([ticketId, version])
-  @@index([submittedByDesignerId, submittedAt])
+  @@index([submittedByCreativeId, submittedAt])
   @@index([feedbackByCustomerId, feedbackAt])
 }
 
@@ -742,8 +743,8 @@ model TokenLedger {
 model Withdrawal {
   id String @id @default(cuid())
 
-  designerId String
-  designer   UserAccount @relation(fields: [designerId], references: [id])
+  creativeId String       @map("designerId")
+  creative   UserAccount  @relation(fields: [creativeId], references: [id])
 
   amountTokens Int
   status       WithdrawalStatus @default(PENDING)
@@ -755,7 +756,7 @@ model Withdrawal {
   approvedAt DateTime?
   paidAt     DateTime?
 
-  @@index([designerId, createdAt])
+  @@index([creativeId, createdAt])
   @@index([status, createdAt])
 }
 
@@ -777,7 +778,7 @@ model Notification {
   ticketId String?
   ticket   Ticket? @relation(fields: [ticketId], references: [id])
 
-  /// The user who triggered this notification (designer or customer)
+  /// The user who triggered this notification (creative or customer)
   actorId String?
   actor   UserAccount? @relation("NotificationActor", fields: [actorId], references: [id])
 
@@ -817,7 +818,7 @@ model AppSetting {
 }
 
 // -----------------------------------------------------------------------------
-// Payout Rules (admin-configurable designer payout milestones)
+// Payout Rules (admin-configurable creative payout milestones)
 // -----------------------------------------------------------------------------
 
 model PayoutRule {
@@ -845,11 +846,11 @@ model TicketAssignmentLog {
   ticketId String
   ticket   Ticket @relation(fields: [ticketId], references: [id])
 
-  // Ticket hangi designera atanmış?
-  designerId String?
-  designer   UserAccount? @relation(fields: [designerId], references: [id])
+  // Which creative was assigned to the ticket?
+  creativeId String?          @map("designerId")
+  creative   UserAccount?     @relation(fields: [creativeId], references: [id])
 
-  /// reason örnekleri:
+  /// reason examples:
   /// - AUTO_ASSIGN
   /// - MANUAL
   /// - FALLBACK
@@ -862,6 +863,6 @@ model TicketAssignmentLog {
   createdAt DateTime @default(now())
 
   @@index([ticketId, createdAt])
-  @@index([designerId, createdAt])
+  @@index([creativeId, createdAt])
   @@index([reason, createdAt])
 }

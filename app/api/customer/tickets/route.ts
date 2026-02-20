@@ -20,7 +20,7 @@ import {
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { canCreateTickets } from "@/lib/permissions/companyRoles";
 import { createNotification } from "@/lib/notifications";
-import { isDesignerPaused } from "@/lib/designer-availability";
+import { isCreativePaused } from "@/lib/creative-availability";
 
 // -----------------------------------------------------------------------------
 // Helpers
@@ -131,7 +131,7 @@ export async function GET(_req: NextRequest) {
         projectId: t.project?.id ?? null,
         projectName: t.project?.name ?? null,
         projectCode: t.project?.code ?? null,
-        isAssigned: t.designerId != null,
+        isAssigned: t.creativeId != null,
         jobTypeId: t.jobType?.id ?? null,
         jobTypeName: t.jobType?.name ?? null,
         createdAt: t.createdAt.toISOString(),
@@ -401,7 +401,7 @@ export async function POST(req: NextRequest) {
     // -------------------------------------------------------------------------
     // Transaction:
     //  - Compute next companyTicketNumber
-    //  - Auto-assign designer based on effective flag (or fallback/unassigned)
+    //  - Auto-assign creative based on effective flag (or fallback/unassigned)
     //  - Create ticket
     //  - (Optional) debit tokens + ledger
     //  - (Optional) write TicketAssignmentLog (AUTO_ASSIGN / FALLBACK)
@@ -417,68 +417,68 @@ export async function POST(req: NextRequest) {
       const nextCompanyTicketNumber =
         (lastTicket?.companyTicketNumber ?? 100) + 1;
 
-      // 2) Decide designer assignment based on settings
-      let assignedDesignerId: string | null = null;
+      // 2) Decide creative assignment based on settings
+      let assignedCreativeId: string | null = null;
       let assignmentReason: "AUTO_ASSIGN" | "FALLBACK" | null = null;
       let fallbackMode:
         | "settings_disabled"
-        | "no_designers"
-        | "no_skilled_designers"
+        | "no_creatives"
+        | "no_skilled_creatives"
         | null = null;
       let skillFiltered = false;
-      let skilledDesignerCount = 0;
-      let pausedDesignerCount = 0;
+      let skilledCreativeCount = 0;
+      let pausedCreativeCount = 0;
 
       if (autoAssignEffective) {
         // auto-assign açık: skill-filtered + load-based algoritma
-        let designers: { id: string }[];
+        let creatives: { id: string }[];
 
         if (jobType) {
-          // Find designers who have this job type as a skill
-          const skilledDesigners = await tx.designerSkill.findMany({
+          // Find creatives who have this job type as a skill
+          const skilledCreatives = await tx.creativeSkill.findMany({
             where: { jobTypeId: jobType.id },
-            select: { designerId: true },
+            select: { creativeId: true },
           });
-          designers = skilledDesigners.map((s) => ({ id: s.designerId }));
-          skilledDesignerCount = designers.length;
+          creatives = skilledCreatives.map((s) => ({ id: s.creativeId }));
+          skilledCreativeCount = creatives.length;
           skillFiltered = true;
 
-          // No skilled designers → leave unassigned for admin to handle
-          if (designers.length === 0) {
-            fallbackMode = "no_skilled_designers";
+          // No skilled creatives → leave unassigned for admin to handle
+          if (creatives.length === 0) {
+            fallbackMode = "no_skilled_creatives";
           }
         } else {
-          // No job type specified: use all designers
-          designers = await tx.userAccount.findMany({
+          // No job type specified: use all creatives
+          creatives = await tx.userAccount.findMany({
             where: { role: UserRole.DESIGNER },
             select: { id: true },
           });
         }
 
-        // Filter out paused designers
-        if (designers.length > 0) {
-          const designerPauseStates = await tx.userAccount.findMany({
-            where: { id: { in: designers.map((d) => d.id) } },
+        // Filter out paused creatives
+        if (creatives.length > 0) {
+          const creativePauseStates = await tx.userAccount.findMany({
+            where: { id: { in: creatives.map((d) => d.id) } },
             select: { id: true, isPaused: true, pauseExpiresAt: true },
           });
 
           const pausedIds = new Set(
-            designerPauseStates
-              .filter((d) => isDesignerPaused(d))
+            creativePauseStates
+              .filter((d) => isCreativePaused(d))
               .map((d) => d.id),
           );
 
-          pausedDesignerCount = pausedIds.size;
-          designers = designers.filter((d) => !pausedIds.has(d.id));
+          pausedCreativeCount = pausedIds.size;
+          creatives = creatives.filter((d) => !pausedIds.has(d.id));
         }
 
-        if (designers.length > 0) {
-          const designerIds = designers.map((d) => d.id);
+        if (creatives.length > 0) {
+          const creativeIds = creatives.map((d) => d.id);
 
-          // Current open tickets per designer with jobType + priority
+          // Current open tickets per creative with jobType + priority
           const openTickets = await tx.ticket.findMany({
             where: {
-              designerId: { in: designerIds },
+              creativeId: { in: creativeIds },
               status: {
                 in: [
                   TicketStatus.TODO,
@@ -489,7 +489,7 @@ export async function POST(req: NextRequest) {
             },
             select: {
               id: true,
-              designerId: true,
+              creativeId: true,
               priority: true,
               quantity: true,
               jobType: {
@@ -505,30 +505,30 @@ export async function POST(req: NextRequest) {
             URGENT: 4,
           };
 
-          const loadByDesigner = new Map<string, number>();
-          for (const id of designerIds) {
-            loadByDesigner.set(id, 0);
+          const loadByCreative = new Map<string, number>();
+          for (const id of creativeIds) {
+            loadByCreative.set(id, 0);
           }
 
           for (const t of openTickets) {
-            if (!t.designerId) continue;
-            if (!loadByDesigner.has(t.designerId)) continue;
+            if (!t.creativeId) continue;
+            if (!loadByCreative.has(t.creativeId)) continue;
 
             const weight = priorityWeights[t.priority as TicketPriority];
             const tokenCost = (t.jobType?.tokenCost ?? 1) * (t.quantity ?? 1);
             const delta = weight * tokenCost;
 
-            loadByDesigner.set(
-              t.designerId,
-              (loadByDesigner.get(t.designerId) ?? 0) + delta,
+            loadByCreative.set(
+              t.creativeId,
+              (loadByCreative.get(t.creativeId) ?? 0) + delta,
             );
           }
 
-          assignedDesignerId = designerIds.reduce(
+          assignedCreativeId = creativeIds.reduce(
             (bestId: string | null, currentId: string) => {
               if (!bestId) return currentId;
-              const bestLoad = loadByDesigner.get(bestId) ?? 0;
-              const currentLoad = loadByDesigner.get(currentId) ?? 0;
+              const bestLoad = loadByCreative.get(bestId) ?? 0;
+              const currentLoad = loadByCreative.get(currentId) ?? 0;
               if (currentLoad < bestLoad) return currentId;
               return bestId;
             },
@@ -537,15 +537,15 @@ export async function POST(req: NextRequest) {
 
           assignmentReason = "AUTO_ASSIGN";
         } else {
-          // Auto-assign açık ama hiç designer yok → fallback
-          assignedDesignerId = null;
+          // Auto-assign açık ama hiç creative yok → fallback
+          assignedCreativeId = null;
           assignmentReason = "FALLBACK";
-          // Preserve "no_skilled_designers" if already set; otherwise "no_designers"
-          if (!fallbackMode) fallbackMode = "no_designers";
+          // Preserve "no_skilled_creatives" if already set; otherwise "no_creatives"
+          if (!fallbackMode) fallbackMode = "no_creatives";
         }
       } else {
         // Auto-assign ayarlardan kapalı → fallback/unassigned
-        assignedDesignerId = null;
+        assignedCreativeId = null;
         assignmentReason = "FALLBACK";
         fallbackMode = "settings_disabled";
       }
@@ -564,7 +564,7 @@ export async function POST(req: NextRequest) {
           jobTypeId: jobType?.id ?? null,
           quantity,
           companyTicketNumber: nextCompanyTicketNumber,
-          designerId: assignedDesignerId,
+          creativeId: assignedCreativeId,
         },
         include: {
           project: {
@@ -610,11 +610,11 @@ export async function POST(req: NextRequest) {
       }
 
       // 5) TicketAssignmentLog (AUTO_ASSIGN or FALLBACK)
-      if (assignmentReason === "AUTO_ASSIGN" && createdTicket.designerId) {
+      if (assignmentReason === "AUTO_ASSIGN" && createdTicket.creativeId) {
         await tx.ticketAssignmentLog.create({
           data: {
             ticketId: createdTicket.id,
-            designerId: createdTicket.designerId,
+            creativeId: createdTicket.creativeId,
             reason: "AUTO_ASSIGN",
             metadata: {
               algorithm: "v3-skill-weighted-token-cost",
@@ -623,8 +623,8 @@ export async function POST(req: NextRequest) {
               companyAutoAssignDefault,
               projectAutoAssignMode: projectAutoAssignMode ?? "INHERIT",
               skillFiltered,
-              skilledDesignerCount,
-              pausedDesignerCount,
+              skilledCreativeCount,
+              pausedCreativeCount,
               jobTypeId: jobType?.id ?? null,
             },
           },
@@ -633,7 +633,7 @@ export async function POST(req: NextRequest) {
         await tx.ticketAssignmentLog.create({
           data: {
             ticketId: createdTicket.id,
-            designerId: createdTicket.designerId ?? null,
+            creativeId: createdTicket.creativeId ?? null,
             reason: "FALLBACK",
             metadata: {
               source: "customer-ticket-create",
@@ -642,15 +642,15 @@ export async function POST(req: NextRequest) {
               projectAutoAssignMode: projectAutoAssignMode ?? "INHERIT",
               fallbackMode,
               skillFiltered,
-              skilledDesignerCount,
-              pausedDesignerCount,
+              skilledCreativeCount,
+              pausedCreativeCount,
               jobTypeId: jobType?.id ?? null,
               note:
                 fallbackMode === "settings_disabled"
                   ? "Auto-assign disabled by company/project settings."
-                  : fallbackMode === "no_skilled_designers"
-                  ? "No designers with matching skill found; ticket left unassigned for admin."
-                  : "No active designers available in pool at assignment time.",
+                  : fallbackMode === "no_skilled_creatives"
+                  ? "No creatives with matching skill found; ticket left unassigned for admin."
+                  : "No active creatives available in pool at assignment time.",
             },
           },
         });
@@ -675,8 +675,8 @@ export async function POST(req: NextRequest) {
       return createdTicket;
     });
 
-    // Fire notification to assigned designer (fire-and-forget)
-    if (ticket.designerId) {
+    // Fire notification to assigned creative (fire-and-forget)
+    if (ticket.creativeId) {
       const code =
         ticket.project?.code && ticket.companyTicketNumber != null
           ? `${ticket.project.code}-${ticket.companyTicketNumber}`
@@ -684,7 +684,7 @@ export async function POST(req: NextRequest) {
           ? `#${ticket.companyTicketNumber}`
           : ticket.id;
       createNotification({
-        userId: ticket.designerId,
+        userId: ticket.creativeId,
         type: "TICKET_ASSIGNED",
         title: "New ticket assigned",
         message: `${code} "${ticket.title}" was assigned to you`,

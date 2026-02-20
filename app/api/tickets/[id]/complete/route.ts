@@ -1,6 +1,6 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/tickets/[id]/complete/route.ts
-// @purpose: Completes a ticket and applies token movements (company debit + designer credit)
+// @purpose: Completes a ticket and applies token movements (company debit + creative credit)
 // @version: v1.0.0
 // @lastUpdate: 2025-11-13
 // -----------------------------------------------------------------------------
@@ -13,7 +13,7 @@ import { createNotification } from "@/lib/notifications";
 /**
  * Geçici tasarım:
  * - Auth kontrolü yok; BetterAuth entegrasyonu sonrası yalnızca yetkili kullanıcılar
- *   (örn: atanmış designer veya admin) ticket'ı tamamlayabilecek.
+ *   (örn: atanmış creative veya admin) ticket'ı tamamlayabilecek.
  *
  * Kullanım:
  * POST /api/tickets/:id/complete
@@ -48,12 +48,12 @@ export async function POST(
     // Fire notifications (fire-and-forget)
     const ticketMeta = await prisma.ticket.findUnique({
       where: { id: ticketId },
-      select: { title: true, createdById: true, designerId: true },
+      select: { title: true, createdById: true, creativeId: true },
     });
     if (ticketMeta) {
-      if (ticketMeta.designerId) {
+      if (ticketMeta.creativeId) {
         createNotification({
-          userId: ticketMeta.designerId,
+          userId: ticketMeta.creativeId,
           type: "TICKET_COMPLETED",
           title: "Ticket completed",
           message: `"${ticketMeta.title}" has been marked as done`,
@@ -77,9 +77,9 @@ export async function POST(
           ledgerEntryId: result.companyLedgerEntry?.id ?? null,
           balanceAfter: result.companyBalanceAfter,
         },
-        designer: {
-          ledgerEntryId: result.designerLedgerEntry?.id ?? null,
-          balanceAfter: result.designerBalanceAfter,
+        creative: {
+          ledgerEntryId: result.creativeLedgerEntry?.id ?? null,
+          balanceAfter: result.creativeBalanceAfter,
         },
         alreadyCompleted: false,
       },

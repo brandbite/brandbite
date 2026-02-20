@@ -52,7 +52,7 @@ const TYPE_ICONS: Record<string, string> = {
 // NotificationBell
 // ---------------------------------------------------------------------------
 
-export function NotificationBell({ role }: { role: "customer" | "designer" }) {
+export function NotificationBell({ role }: { role: "customer" | "creative" }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -156,8 +156,8 @@ export function NotificationBell({ role }: { role: "customer" | "designer" }) {
 
       if (notif.ticketId) {
         setOpen(false);
-        if (role === "designer") {
-          router.push(`/designer/board`);
+        if (role === "creative") {
+          router.push(`/creative/board`);
         } else {
           router.push(`/customer/tickets/${notif.ticketId}`);
         }

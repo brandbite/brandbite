@@ -295,7 +295,7 @@ export default function CustomerTicketsPage() {
             </h1>
             <p className="mt-1 text-sm text-[#7a7a7a]">
               All design requests created for your company, with project,
-              status, and designer information.
+              status, and creative information.
             </p>
             {company && (
               <p className="mt-1 text-xs text-[#9a9892]">
@@ -366,7 +366,7 @@ export default function CustomerTicketsPage() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by ticket, project, designer..."
+              placeholder="Search by ticket, project, creative..."
               size="sm"
               className="mt-1"
             />

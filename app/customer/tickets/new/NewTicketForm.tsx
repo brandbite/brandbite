@@ -613,7 +613,7 @@ export default function NewTicketForm({
           disabled={isBusy}
         />
         <p className="text-[11px] text-[#9a9892]">
-          This will be the main line your designer sees on the board.
+          This will be the main line your creative sees on the board.
         </p>
       </div>
 
@@ -623,7 +623,7 @@ export default function NewTicketForm({
         <RichTextEditor
           value={description}
           onChange={setDescription}
-          placeholder="Share links, context, and any requirements that will help your designer"
+          placeholder="Share links, context, and any requirements that will help your creative"
           disabled={isBusy}
           minHeight="60px"
         />
@@ -846,7 +846,7 @@ export default function NewTicketForm({
           </div>
         ) : (
           <p className="text-[11px] text-[#9a9892]">
-            Job types are linked to token costs and designer payouts.
+            Job types are linked to token costs and creative payouts.
           </p>
         )}
 

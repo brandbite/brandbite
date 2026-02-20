@@ -239,7 +239,7 @@ export default function AutoAssignDebugPage() {
               Auto-assign configuration
             </h1>
             <p className="mt-1 text-xs text-[#9a9892]">
-              Manage how tickets are automatically assigned to designers on each
+              Manage how tickets are automatically assigned to creatives on each
               workspace and project. Only visible to site owners and admins.
             </p>
           </div>

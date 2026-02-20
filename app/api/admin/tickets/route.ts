@@ -1,6 +1,6 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/admin/tickets/route.ts
-// @purpose: Admin ticket list + manual designer assignment API
+// @purpose: Admin ticket list + manual creative assignment API
 // @version: v0.1.0
 // @status: experimental
 // @lastUpdate: 2025-11-21
@@ -17,9 +17,9 @@ import {
 
 type PatchPayload = {
   ticketId?: string;
-  designerId?: string | null;
+  creativeId?: string | null;
   tokenCostOverride?: number | null;
-  designerPayoutOverride?: number | null;
+  creativePayoutOverride?: number | null;
 };
 
 export async function GET(_req: NextRequest) {
@@ -39,7 +39,7 @@ export async function GET(_req: NextRequest) {
       );
     }
 
-    const [tickets, designers] = await Promise.all([
+    const [tickets, creatives] = await Promise.all([
       prisma.ticket.findMany({
         orderBy: { createdAt: "desc" },
         select: {
@@ -49,7 +49,7 @@ export async function GET(_req: NextRequest) {
           createdAt: true,
           quantity: true,
           tokenCostOverride: true,
-          designerPayoutOverride: true,
+          creativePayoutOverride: true,
           company: {
             select: {
               id: true,
@@ -63,7 +63,7 @@ export async function GET(_req: NextRequest) {
               code: true,
             },
           },
-          designer: {
+          creative: {
             select: {
               id: true,
               name: true,
@@ -75,7 +75,7 @@ export async function GET(_req: NextRequest) {
               id: true,
               name: true,
               tokenCost: true,
-              designerPayoutTokens: true,
+              creativePayoutTokens: true,
             },
           },
         },
@@ -98,7 +98,7 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json(
       {
         tickets,
-        designers,
+        creatives,
       },
       { status: 200 },
     );
@@ -152,12 +152,12 @@ export async function PATCH(req: NextRequest) {
         companyId: true,
         quantity: true,
         tokenCostOverride: true,
-        designerPayoutOverride: true,
+        creativePayoutOverride: true,
         jobType: {
           select: {
             id: true,
             tokenCost: true,
-            designerPayoutTokens: true,
+            creativePayoutTokens: true,
           },
         },
       },
@@ -171,15 +171,15 @@ export async function PATCH(req: NextRequest) {
     }
 
     // -----------------------------------------------------------------------
-    // Designer assignment (unchanged logic)
+    // Creative assignment (unchanged logic)
     // -----------------------------------------------------------------------
-    const hasDesignerChange = "designerId" in body;
-    const designerId = body.designerId ?? null;
+    const hasCreativeChange = "creativeId" in body;
+    const creativeId = body.creativeId ?? null;
 
-    if (hasDesignerChange && designerId) {
-      const designer = await prisma.userAccount.findFirst({
+    if (hasCreativeChange && creativeId) {
+      const creative = await prisma.userAccount.findFirst({
         where: {
-          id: designerId,
+          id: creativeId,
           role: UserRole.DESIGNER,
         },
         select: {
@@ -187,11 +187,11 @@ export async function PATCH(req: NextRequest) {
         },
       });
 
-      if (!designer) {
+      if (!creative) {
         return NextResponse.json(
           {
             error:
-              "Designer not found or not a designer.",
+              "Creative not found or not a creative.",
           },
           { status: 400 },
         );
@@ -202,7 +202,7 @@ export async function PATCH(req: NextRequest) {
     // Token cost override with ledger reconciliation
     // -----------------------------------------------------------------------
     const hasCostOverrideChange = "tokenCostOverride" in body;
-    const hasPayoutOverrideChange = "designerPayoutOverride" in body;
+    const hasPayoutOverrideChange = "creativePayoutOverride" in body;
 
     // Parse override values: null means "clear override", number means "set"
     const newCostOverride = hasCostOverrideChange
@@ -212,8 +212,8 @@ export async function PATCH(req: NextRequest) {
       : undefined; // undefined = no change
 
     const newPayoutOverride = hasPayoutOverrideChange
-      ? (typeof body.designerPayoutOverride === "number" && body.designerPayoutOverride >= 0
-          ? body.designerPayoutOverride
+      ? (typeof body.creativePayoutOverride === "number" && body.creativePayoutOverride >= 0
+          ? body.creativePayoutOverride
           : null)
       : undefined;
 
@@ -222,14 +222,14 @@ export async function PATCH(req: NextRequest) {
       const oldValues = getEffectiveTokenValues({
         quantity: ticket.quantity,
         tokenCostOverride: ticket.tokenCostOverride,
-        designerPayoutOverride: ticket.designerPayoutOverride,
+        creativePayoutOverride: ticket.creativePayoutOverride,
         jobType: ticket.jobType,
       });
 
       const newValues = getEffectiveTokenValues({
         quantity: ticket.quantity,
         tokenCostOverride: newCostOverride ?? null,
-        designerPayoutOverride: ticket.designerPayoutOverride,
+        creativePayoutOverride: ticket.creativePayoutOverride,
         jobType: ticket.jobType,
       });
 
@@ -260,9 +260,9 @@ export async function PATCH(req: NextRequest) {
     // Update ticket
     // -----------------------------------------------------------------------
     const updateData: Record<string, unknown> = {};
-    if (hasDesignerChange) updateData.designerId = designerId;
+    if (hasCreativeChange) updateData.creativeId = creativeId;
     if (newCostOverride !== undefined) updateData.tokenCostOverride = newCostOverride;
-    if (newPayoutOverride !== undefined) updateData.designerPayoutOverride = newPayoutOverride;
+    if (newPayoutOverride !== undefined) updateData.creativePayoutOverride = newPayoutOverride;
 
     const updated = await prisma.ticket.update({
       where: { id: ticketId },
@@ -271,8 +271,8 @@ export async function PATCH(req: NextRequest) {
         id: true,
         quantity: true,
         tokenCostOverride: true,
-        designerPayoutOverride: true,
-        designer: {
+        creativePayoutOverride: true,
+        creative: {
           select: {
             id: true,
             name: true,
@@ -284,7 +284,7 @@ export async function PATCH(req: NextRequest) {
             id: true,
             name: true,
             tokenCost: true,
-            designerPayoutTokens: true,
+            creativePayoutTokens: true,
           },
         },
       },

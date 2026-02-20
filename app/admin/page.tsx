@@ -29,7 +29,7 @@ type AdminDashboardResponse = {
   platform: {
     totalCompanies: number;
     activeCompanies: number;
-    totalDesigners: number;
+    totalCreatives: number;
     totalTickets: number;
     ticketsByStatus: Record<TicketStatus, number>;
     ticketsByPriority: Record<TicketPriority, number>;
@@ -214,14 +214,14 @@ export default function AdminDashboardPage() {
               </p>
             </section>
 
-            {/* Designers */}
+            {/* Creatives */}
             <section className="relative overflow-hidden rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">
               <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-[#F15B2B] to-[#f6a07a]" />
               <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#b1afa9]">
-                Designers
+                Creatives
               </p>
               <p className="mt-2 text-3xl font-bold text-[#424143]">
-                {platform?.totalDesigners ?? "\u2014"}
+                {platform?.totalCreatives ?? "\u2014"}
               </p>
               <p className="text-[11px] text-[#9a9892]">registered on platform</p>
             </section>
@@ -482,7 +482,7 @@ export default function AdminDashboardPage() {
               <p className="mt-2 text-2xl font-bold text-[#424143]">
                 {withdrawals?.totalPaid?.toLocaleString() ?? 0}
               </p>
-              <p className="text-[11px] text-[#9a9892]">tokens to designers</p>
+              <p className="text-[11px] text-[#9a9892]">tokens to creatives</p>
             </section>
 
             {/* Net tokens */}

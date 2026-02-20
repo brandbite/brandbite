@@ -125,7 +125,7 @@ export const formatDateTime = (iso: string | null): string => {
 };
 
 // ---------------------------------------------------------------------------
-// Figma redesign shared helpers (used across customer, admin, designer boards)
+// Figma redesign shared helpers (used across customer, admin, creative boards)
 // ---------------------------------------------------------------------------
 
 /** Column accent bar colors (top of each status column) */

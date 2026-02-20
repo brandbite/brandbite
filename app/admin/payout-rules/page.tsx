@@ -235,7 +235,7 @@ export default function AdminPayoutRulesPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Payout rules</h1>
           <p className="mt-1 text-sm text-[#7a7a7a]">
-            Configure milestone-based payout bonuses for designers. Base rate is{" "}
+            Configure milestone-based payout bonuses for creatives. Base rate is{" "}
             <span className="font-semibold text-[#424143]">{basePayout}%</span>.
           </p>
         </div>
@@ -267,7 +267,7 @@ export default function AdminPayoutRulesPage() {
           <p className="mt-2 text-2xl font-semibold text-[#424143]">
             {loading ? "\u2014" : activeCount}
           </p>
-          <p className="mt-1 text-xs text-[#9a9892]">Rules being evaluated for designers.</p>
+          <p className="mt-1 text-xs text-[#9a9892]">Rules being evaluated for creatives.</p>
         </div>
         <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
           <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
@@ -370,7 +370,7 @@ export default function AdminPayoutRulesPage() {
             {selected ? "Edit payout rule" : "Create new payout rule"}
           </h2>
           <p className="mt-1 text-xs text-[#7a7a7a]">
-            Designers who meet the threshold earn the bonus payout rate. The highest
+            Creatives who meet the threshold earn the bonus payout rate. The highest
             qualifying rate is always applied.
           </p>
 
@@ -410,7 +410,7 @@ export default function AdminPayoutRulesPage() {
                 value={formDescription}
                 onChange={(e) => setFormDescription(e.target.value)}
                 rows={2}
-                placeholder="Optional description shown to designers."
+                placeholder="Optional description shown to creatives."
               />
             </div>
 

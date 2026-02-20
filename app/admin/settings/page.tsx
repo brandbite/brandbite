@@ -25,7 +25,7 @@ const SETTING_META: Record<
   MIN_WITHDRAWAL_TOKENS: {
     label: "Minimum withdrawal (tokens)",
     description:
-      "The minimum number of tokens a designer must request when creating a withdrawal. Designers cannot submit a withdrawal below this amount.",
+      "The minimum number of tokens a creative must request when creating a withdrawal. Creatives cannot submit a withdrawal below this amount.",
     type: "number",
   },
 };

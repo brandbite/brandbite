@@ -54,7 +54,7 @@ export async function POST(req: Request) {
         id: true,
         companyId: true,
         createdById: true,
-        designerId: true,
+        creativeId: true,
       },
     });
 
@@ -90,7 +90,7 @@ export async function POST(req: Request) {
       if (user.role !== "DESIGNER") {
         return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
       }
-      if (!ticket.designerId || ticket.designerId !== user.id) {
+      if (!ticket.creativeId || ticket.creativeId !== user.id) {
         return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
       }
       if (!revisionId) {

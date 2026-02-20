@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // @file: prisma/seed-job-types.mjs
 // @purpose: Seed all Brandbite services as job types with token costs and
-//           designer payouts. Idempotent — safe to run multiple times.
+//           creative payouts. Idempotent — safe to run multiple times.
 // @version: v1.0.0
 // @status: active
 // @lastUpdate: 2025-02-19
@@ -9,7 +9,7 @@
 //
 // Pricing model:
 //   1 token ≈ 1 estimated hour ≈ $35
-//   Designer payout = 60% of token cost (rounded to nearest integer)
+//   Creative payout = 60% of token cost (rounded to nearest integer)
 //   Brandbite margin = 40%
 //
 // Usage:
@@ -128,7 +128,7 @@ async function main() {
         data: {
           description: svc.desc,
           tokenCost: svc.tokens,
-          designerPayoutTokens: svc.payout,
+          creativePayoutTokens: svc.payout,
           isActive: true,
         },
       });
@@ -140,7 +140,7 @@ async function main() {
           name: svc.name,
           description: svc.desc,
           tokenCost: svc.tokens,
-          designerPayoutTokens: svc.payout,
+          creativePayoutTokens: svc.payout,
           isActive: true,
         },
       });

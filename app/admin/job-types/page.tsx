@@ -34,7 +34,7 @@ type JobType = {
   categoryRef: CategoryRef | null;
   description: string | null;
   tokenCost: number;
-  designerPayoutTokens: number;
+  creativePayoutTokens: number;
   estimatedHours: number | null;
   hasQuantity: boolean;
   quantityLabel: string | null;
@@ -129,7 +129,7 @@ export default function AdminJobTypesPage() {
   const derivedTokenCost = formEstimatedHours
     ? parseInt(formEstimatedHours, 10) || 0
     : 0;
-  const derivedDesignerPayout = Math.round(derivedTokenCost * 0.6);
+  const derivedCreativePayout = Math.round(derivedTokenCost * 0.6);
 
   // Duplicate detection — check when name changes
   useEffect(() => {
@@ -338,7 +338,7 @@ export default function AdminJobTypesPage() {
               Job types
             </h1>
             <p className="mt-1 text-sm text-[#7a7a7a]">
-              Set estimated hours for each job type. Token cost and designer
+              Set estimated hours for each job type. Token cost and creative
               payout are calculated automatically.
             </p>
           </div>
@@ -557,7 +557,7 @@ export default function AdminJobTypesPage() {
               {selected ? "Edit job type" : "Create new job type"}
             </h2>
             <p className="mt-1 text-xs text-[#7a7a7a]">
-              Enter estimated hours. Token cost and designer payout are
+              Enter estimated hours. Token cost and creative payout are
               calculated automatically (1 token = 1 hour, 60% base payout).
             </p>
 
@@ -676,9 +676,9 @@ export default function AdminJobTypesPage() {
                   </p>
                   <p className="mt-0.5">
                     <span className="font-medium text-[#424143]">
-                      Designer payout:
+                      Creative payout:
                     </span>{" "}
-                    {derivedDesignerPayout} tokens{" "}
+                    {derivedCreativePayout} tokens{" "}
                     <span className="text-[10px]">(60% base rate)</span>
                   </p>
                 </div>

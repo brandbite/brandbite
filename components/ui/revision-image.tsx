@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // @file: components/ui/revision-image.tsx
 // @purpose: Revision asset thumbnail grid with presigned URL fallback, lightbox,
-//           pin annotation support (edit for customers, resolve for designers, readonly)
+//           pin annotation support (edit for customers, resolve for creatives, readonly)
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -394,7 +394,7 @@ function ImageLightbox({
     [asset.id],
   );
 
-  // Resolve a single pin (designer mode)
+  // Resolve a single pin (creative mode)
   const handleResolvePin = useCallback(
     async (pin: PinData) => {
       if (!pin.id || resolvingPinId) return;
@@ -724,13 +724,13 @@ function ImageLightbox({
 
 type RevisionImageGridProps = {
   assets: AssetEntry[];
-  /** "review" = customer can place pins, "resolve" = designer can resolve pins, "view" = readonly */
+  /** "review" = customer can place pins, "resolve" = creative can resolve pins, "view" = readonly */
   pinMode?: PinMode;
   /** Ticket ID needed for revision submission */
   ticketId?: string;
   /** Callback when revision is submitted through the lightbox */
   onRevisionSubmitted?: () => void;
-  /** Callback for designers to open upload modal after resolving all pins */
+  /** Callback for creatives to open upload modal after resolving all pins */
   onUploadWork?: () => void;
 };
 
@@ -961,7 +961,7 @@ export function DownloadAllButton({
 
 // ---------------------------------------------------------------------------
 // BriefThumbnailRow — compact 64×64 thumbnails for brief attachments
-// Used when designer work exists so briefs don't dominate the viewport
+// Used when creative work exists so briefs don't dominate the viewport
 // ---------------------------------------------------------------------------
 
 export function BriefThumbnailRow({

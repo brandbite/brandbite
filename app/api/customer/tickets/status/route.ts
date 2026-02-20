@@ -97,12 +97,12 @@ export async function PATCH(req: NextRequest) {
         id: true,
         status: true,
         companyId: true,
-        designerId: true,
+        creativeId: true,
         jobType: {
           select: {
             id: true,
             name: true,
-            designerPayoutTokens: true,
+            creativePayoutTokens: true,
           },
         },
       },
@@ -154,8 +154,8 @@ export async function PATCH(req: NextRequest) {
     // New rules for customer board transitions (hibrit yapı)
     //
     // - Customer ticket oluşturur → TODO
-    // - IN_PROGRESS → sadece designer (customer buraya geçiremez)
-    // - IN_REVIEW → designer alır (işi review’a gönderir)
+    // - IN_PROGRESS → sadece creative (customer buraya geçiremez)
+    // - IN_REVIEW → creative alır (işi review’a gönderir)
     // - Customer:
     //     * IN_REVIEW → DONE  (işi onaylar)
     //     * IN_REVIEW → IN_PROGRESS (revize ister, ticket geri açılır)
@@ -166,7 +166,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Only your design team can move tickets into review. Ask your designer to send the ticket for review.",
+            "Only your design team can move tickets into review. Ask your creative to send the ticket for review.",
         },
         { status: 400 },
       );
@@ -181,7 +181,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Tickets can only be moved back into In progress from review. To start work on a ticket, your designer needs to pick it up.",
+            "Tickets can only be moved back into In progress from review. To start work on a ticket, your creative needs to pick it up.",
         },
         { status: 400 },
       );
@@ -285,25 +285,25 @@ export async function PATCH(req: NextRequest) {
     }
 
     // -------------------------------------------------------------------------
-    // Status update + (opsiyonel) designer payout (DONE’da)
+    // Status update + (opsiyonel) creative payout (DONE’da)
     // + (yeni) revision feedback kaydı (IN_REVIEW → IN_PROGRESS)
     // -------------------------------------------------------------------------
 
     const updated = await prisma.$transaction(async (tx) => {
-      // 1) Designer payout (DONE olduğunda)
+      // 1) Creative payout (DONE olduğunda)
       if (isDoneTransition) {
-        const hasDesigner =
-          !!ticket.designerId && !!ticket.jobType?.designerPayoutTokens;
+        const hasCreative =
+          !!ticket.creativeId && !!ticket.jobType?.creativePayoutTokens;
 
         if (
-          hasDesigner &&
-          ticket.jobType!.designerPayoutTokens > 0 &&
-          ticket.designerId
+          hasCreative &&
+          ticket.jobType!.creativePayoutTokens > 0 &&
+          ticket.creativeId
         ) {
           const existingPayout = await tx.tokenLedger.findFirst({
             where: {
               ticketId: ticket.id,
-              userId: ticket.designerId,
+              userId: ticket.creativeId,
               direction: LedgerDirection.CREDIT,
               reason: "DESIGNER_JOB_PAYOUT",
             },
@@ -315,9 +315,9 @@ export async function PATCH(req: NextRequest) {
               data: {
                 companyId: ticket.companyId,
                 ticketId: ticket.id,
-                userId: ticket.designerId,
+                userId: ticket.creativeId,
                 direction: LedgerDirection.CREDIT,
-                amount: ticket.jobType!.designerPayoutTokens,
+                amount: ticket.jobType!.creativePayoutTokens,
                 reason: "DESIGNER_JOB_PAYOUT",
                 notes: `Automatic payout for completed ticket`,
               },

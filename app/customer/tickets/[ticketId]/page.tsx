@@ -76,13 +76,13 @@ type TicketDetailResponse = {
     effectiveCost: number | null;
     effectivePayout: number | null;
     tokenCostOverride: number | null;
-    designerPayoutOverride: number | null;
+    creativePayoutOverride: number | null;
     project: { id: string; name: string; code: string | null } | null;
     jobType: {
       id: string;
       name: string;
       tokenCost: number;
-      designerPayoutTokens: number;
+      creativePayoutTokens: number;
     } | null;
     isAssigned: boolean;
     createdBy: { id: string; name: string | null; email: string } | null;
@@ -287,7 +287,7 @@ export default function CustomerTicketDetailPage() {
     [briefAssets],
   );
 
-  const hasDesignerWork = useMemo(
+  const hasCreativeWork = useMemo(
     () =>
       revisions != null &&
       revisions.length > 0 &&
@@ -541,7 +541,7 @@ export default function CustomerTicketDetailPage() {
 
   const handleConfirmRevision = useCallback(async () => {
     if (!revisionMessage.trim()) {
-      setRevisionMessageError("Please add a short message for your designer.");
+      setRevisionMessageError("Please add a short message for your creative.");
       return;
     }
     await persistStatus("IN_PROGRESS", revisionMessage.trim());
@@ -867,7 +867,7 @@ export default function CustomerTicketDetailPage() {
                     This request is ready for your review
                   </p>
                   <p className="mt-0.5 text-xs text-[#7a7a7a]">
-                    Review the designer&apos;s work below, then approve it or
+                    Review the creative&apos;s work below, then approve it or
                     request changes.
                   </p>
                 </div>
@@ -983,7 +983,7 @@ export default function CustomerTicketDetailPage() {
                   briefAssetEntries.length === 0 && (
                     <EmptyState
                       title="No attachments yet."
-                      description="Add reference images to help your designer."
+                      description="Add reference images to help your creative."
                     />
                   )}
 
@@ -1003,7 +1003,7 @@ export default function CustomerTicketDetailPage() {
                           zipFilename="brief-attachments.zip"
                         />
                       </div>
-                      {hasDesignerWork ? (
+                      {hasCreativeWork ? (
                         <BriefThumbnailRow assets={briefAssetEntries} />
                       ) : (
                         <RevisionImageLarge
@@ -1044,7 +1044,7 @@ export default function CustomerTicketDetailPage() {
                     <div className="mt-3">
                       <EmptyState
                         title="No revisions yet."
-                        description="Once your designer sends this ticket for review, you'll see each version and your feedback here."
+                        description="Once your creative sends this ticket for review, you'll see each version and your feedback here."
                       />
                     </div>
                   )}
@@ -1480,7 +1480,7 @@ export default function CustomerTicketDetailPage() {
                   (comments?.length ?? 0) === 0 && (
                     <EmptyState
                       title="No comments yet."
-                      description="Use the form below to start a thread with your team and the designer."
+                      description="Use the form below to start a thread with your team and the creative."
                     />
                   )}
                 {!commentsLoading &&
@@ -1520,7 +1520,7 @@ export default function CustomerTicketDetailPage() {
                 />
                 <div className="mt-2 flex items-center justify-between">
                   <p className="text-[10px] text-[#9a9892]">
-                    Comments are visible to your team and Brandbite designers.
+                    Comments are visible to your team and Brandbite creatives.
                   </p>
                   <button
                     type="button"
@@ -1558,13 +1558,13 @@ export default function CustomerTicketDetailPage() {
         size="md"
       >
         <ModalHeader
-          title="Send this request back to your designer?"
-          subtitle="Your designer will see your message and continue working on this request. The status will move back to In progress."
+          title="Send this request back to your creative?"
+          subtitle="Your creative will see your message and continue working on this request. The status will move back to In progress."
         />
 
         <div>
           <label className="block text-xs font-medium text-[#424143]">
-            Message for your designer
+            Message for your creative
           </label>
           <textarea
             value={revisionMessage}
@@ -1597,7 +1597,7 @@ export default function CustomerTicketDetailPage() {
             loading={statusSaving}
             loadingText="Sending…"
           >
-            Send back to designer
+            Send back to creative
           </Button>
         </ModalFooter>
       </Modal>
@@ -1612,7 +1612,7 @@ export default function CustomerTicketDetailPage() {
       >
         <ModalHeader
           title="Mark this request as done?"
-          subtitle="Once you mark this request as done, your designer will get paid for this job, and the ticket will move to Done."
+          subtitle="Once you mark this request as done, your creative will get paid for this job, and the ticket will move to Done."
         />
 
         <div className="rounded-xl bg-[#f7f5f0] px-3 py-3 text-xs text-[#424143]">

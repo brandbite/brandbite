@@ -1,6 +1,6 @@
 // -----------------------------------------------------------------------------
 // @file: app/admin/tickets/page.tsx
-// @purpose: Admin-facing ticket list & designer assignment screen with token
+// @purpose: Admin-facing ticket list & creative assignment screen with token
 //           cost / payout override support
 // @version: v0.3.0
 // @status: experimental
@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 
-type AdminDesigner = {
+type AdminCreative = {
   id: string;
   name: string | null;
   email: string;
@@ -31,7 +31,7 @@ type AdminTicket = {
   createdAt: string;
   quantity: number;
   tokenCostOverride: number | null;
-  designerPayoutOverride: number | null;
+  creativePayoutOverride: number | null;
   company: {
     id: string;
     name: string;
@@ -41,18 +41,18 @@ type AdminTicket = {
     name: string;
     code: string | null;
   } | null;
-  designer: AdminDesigner | null;
+  creative: AdminCreative | null;
   jobType: {
     id: string;
     name: string;
     tokenCost: number;
-    designerPayoutTokens: number;
+    creativePayoutTokens: number;
   } | null;
 };
 
 type AdminTicketsResponse = {
   tickets: AdminTicket[];
-  designers: AdminDesigner[];
+  creatives: AdminCreative[];
 };
 
 // Local draft state for override editing
@@ -68,12 +68,12 @@ function getEffectiveCost(t: AdminTicket): number | null {
 
 function getEffectivePayout(t: AdminTicket): number | null {
   if (!t.jobType) return null;
-  return t.designerPayoutOverride ?? t.jobType.designerPayoutTokens * (t.quantity ?? 1);
+  return t.creativePayoutOverride ?? t.jobType.creativePayoutTokens * (t.quantity ?? 1);
 }
 
 export default function AdminTicketsPage() {
   const [tickets, setTickets] = useState<AdminTicket[]>([]);
-  const [designers, setDesigners] = useState<AdminDesigner[]>([]);
+  const [creatives, setCreatives] = useState<AdminCreative[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [savingTicketId, setSavingTicketId] = useState<string | null>(null);
@@ -116,7 +116,7 @@ export default function AdminTicketsPage() {
       }
 
       setTickets(json.tickets);
-      setDesigners(json.designers);
+      setCreatives(json.creatives);
     } catch (err) {
       console.error("[AdminTicketsPage] load error", err);
       setError(
@@ -133,9 +133,9 @@ export default function AdminTicketsPage() {
     load();
   }, []);
 
-  const handleAssignDesigner = async (
+  const handleAssignCreative = async (
     ticketId: string,
-    designerId: string | null,
+    creativeId: string | null,
   ) => {
     setError(null);
     setSavingTicketId(ticketId);
@@ -147,7 +147,7 @@ export default function AdminTicketsPage() {
         },
         body: JSON.stringify({
           ticketId,
-          designerId,
+          creativeId,
         }),
       });
 
@@ -160,7 +160,7 @@ export default function AdminTicketsPage() {
         if (res.status === 403) {
           throw new Error(
             json?.error ||
-              "Only site owners or admins can assign designers.",
+              "Only site owners or admins can assign creatives.",
           );
         }
         throw new Error(
@@ -168,12 +168,12 @@ export default function AdminTicketsPage() {
         );
       }
 
-      const updatedDesigner: AdminDesigner | null =
-        json?.designer ?? null;
+      const updatedCreative: AdminCreative | null =
+        json?.creative ?? null;
 
       setTickets((prev) =>
         prev.map((t) =>
-          t.id === ticketId ? { ...t, designer: updatedDesigner } : t,
+          t.id === ticketId ? { ...t, creative: updatedCreative } : t,
         ),
       );
     } catch (err) {
@@ -181,7 +181,7 @@ export default function AdminTicketsPage() {
       setError(
         err instanceof Error
           ? err.message
-          : "Failed to assign designer. Please try again.",
+          : "Failed to assign creative. Please try again.",
       );
     } finally {
       setSavingTicketId(null);
@@ -199,8 +199,8 @@ export default function AdminTicketsPage() {
         costOverride:
           t.tokenCostOverride != null ? String(t.tokenCostOverride) : "",
         payoutOverride:
-          t.designerPayoutOverride != null
-            ? String(t.designerPayoutOverride)
+          t.creativePayoutOverride != null
+            ? String(t.creativePayoutOverride)
             : "",
       },
     }));
@@ -230,7 +230,7 @@ export default function AdminTicketsPage() {
       // Empty string → clear override (null), number → set
       payload.tokenCostOverride =
         costVal === "" ? null : parseInt(costVal, 10);
-      payload.designerPayoutOverride =
+      payload.creativePayoutOverride =
         payoutVal === "" ? null : parseInt(payoutVal, 10);
 
       // Validate
@@ -244,8 +244,8 @@ export default function AdminTicketsPage() {
       }
       if (
         payoutVal !== "" &&
-        (isNaN(payload.designerPayoutOverride as number) ||
-          (payload.designerPayoutOverride as number) < 0)
+        (isNaN(payload.creativePayoutOverride as number) ||
+          (payload.creativePayoutOverride as number) < 0)
       ) {
         setError("Payout override must be a non-negative number.");
         return;
@@ -272,10 +272,10 @@ export default function AdminTicketsPage() {
             ? {
                 ...t,
                 tokenCostOverride: json.tokenCostOverride ?? null,
-                designerPayoutOverride:
-                  json.designerPayoutOverride ?? null,
+                creativePayoutOverride:
+                  json.creativePayoutOverride ?? null,
                 jobType: json.jobType ?? t.jobType,
-                designer: json.designer ?? t.designer,
+                creative: json.creative ?? t.creative,
               }
             : t,
         ),
@@ -310,7 +310,7 @@ export default function AdminTicketsPage() {
 
         <div className="mb-4 flex items-center justify-between">
           <p className="text-xs text-[#7a7a7a]">
-            Assign designers and manage token cost overrides. Changes update
+            Assign creatives and manage token cost overrides. Changes update
             immediately.
           </p>
           {loading && (
@@ -329,7 +329,7 @@ export default function AdminTicketsPage() {
             <TH>Status</TH>
             <TH>Job Type</TH>
             <TH>Tokens</TH>
-            <TH>Designer</TH>
+            <TH>Creative</TH>
           </THead>
           <tbody>
             {tickets.length === 0 ? (
@@ -338,13 +338,13 @@ export default function AdminTicketsPage() {
                   {loading ? (
                     <p className="text-center text-[11px] text-[#9a9892]">Loading tickets…</p>
                   ) : (
-                    <EmptyState title="No tickets found." description="Once tickets are created, they will appear here for designer assignment." />
+                    <EmptyState title="No tickets found." description="Once tickets are created, they will appear here for creative assignment." />
                   )}
                 </td>
               </tr>
             ) : (
               tickets.map((t) => {
-                const designerValue = t.designer?.id ?? "";
+                const creativeValue = t.creative?.id ?? "";
                 const isSaving = savingTicketId === t.id;
                 const isEditing = t.id in editingOverrides;
                 const draft = editingOverrides[t.id];
@@ -353,7 +353,7 @@ export default function AdminTicketsPage() {
                 const effectivePayout = getEffectivePayout(t);
                 const hasOverride =
                   t.tokenCostOverride != null ||
-                  t.designerPayoutOverride != null;
+                  t.creativePayoutOverride != null;
 
                 return (
                   <tr
@@ -421,7 +421,7 @@ export default function AdminTicketsPage() {
                                 min="0"
                                 className="w-16 rounded border border-[#d4d2cc] bg-white px-1.5 py-0.5 text-[11px] outline-none focus:border-[var(--bb-primary)]"
                                 placeholder={String(
-                                  t.jobType.designerPayoutTokens *
+                                  t.jobType.creativePayoutTokens *
                                     (t.quantity ?? 1),
                                 )}
                                 value={draft.payoutOverride}
@@ -476,7 +476,7 @@ export default function AdminTicketsPage() {
                                 {effectivePayout}
                               </span>
                               {hasOverride &&
-                                t.designerPayoutOverride != null && (
+                                t.creativePayoutOverride != null && (
                                   <Badge variant="warning" className="ml-1">
                                     override
                                   </Badge>
@@ -499,17 +499,17 @@ export default function AdminTicketsPage() {
                       <div className="inline-flex items-center gap-2">
                         <select
                           className="rounded-full border border-[#e3e1dc] bg-[#f7f5f0] px-2 py-1 text-[11px] text-[#424143] outline-none"
-                          value={designerValue}
+                          value={creativeValue}
                           disabled={isSaving}
                           onChange={(e) =>
-                            handleAssignDesigner(
+                            handleAssignCreative(
                               t.id,
                               e.target.value || null,
                             )
                           }
                         >
                           <option value="">Unassigned</option>
-                          {designers.map((d) => (
+                          {creatives.map((d) => (
                             <option key={d.id} value={d.id}>
                               {d.name || d.email}
                             </option>

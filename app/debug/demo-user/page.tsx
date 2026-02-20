@@ -107,7 +107,7 @@ export default function DebugDemoUserPage() {
                       : p.role === "CUSTOMER"
                       ? "Customer"
                       : p.role === "DESIGNER"
-                      ? "Designer"
+                      ? "Creative"
                       : p.role}
                   </p>
                   <p className="text-[12px] text-[#7a7a7a]">{p.description}</p>

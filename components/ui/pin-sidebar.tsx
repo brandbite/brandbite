@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // @file: components/ui/pin-sidebar.tsx
 // @purpose: Pin list sidebar + mobile bottom sheet for lightbox pin annotations
-//           Supports edit (customer), resolve (designer), and readonly modes
+//           Supports edit (customer), resolve (creative), and readonly modes
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -422,7 +422,7 @@ export function PinSidebar({
       <div className="flex shrink-0 items-center justify-between border-b border-[#f0eee9] px-4 py-3">
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9a9892]">
-            {mode === "resolve" ? "Designer review" : "Revision notes"}
+            {mode === "resolve" ? "Creative review" : "Revision notes"}
           </span>
           {pins.length > 0 && mode !== "resolve" && (
             <span className="flex h-4.5 min-w-[18px] items-center justify-center rounded-full bg-[#f15b2b] px-1.5 text-[9px] font-bold text-white">
@@ -498,7 +498,7 @@ export function PinSidebar({
           </button>
           {pins.length > 0 && !submitting && (
             <p className="mt-1.5 text-center text-[9px] text-[#b1afa9]">
-              Done pinning? This will send all your notes to the designer
+              Done pinning? This will send all your notes to the creative
             </p>
           )}
         </div>

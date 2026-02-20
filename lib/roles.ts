@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: lib/roles.ts
 // @purpose: Brandbite role helpers and shared auth-related types
-// @version: v1.2.0
+// @version: v1.3.0
 // @status: active
-// @lastUpdate: 2025-12-27
+// @lastUpdate: 2026-02-20
 // -----------------------------------------------------------------------------
 
 import type { UserRole, CompanyRole } from "@prisma/client";
@@ -31,9 +31,11 @@ export type SessionUser = {
 
 /**
  * Convenience constant groups for role checks.
+ * Note: The DB enum value is still DESIGNER (Prisma can't @map enum values).
+ *       Display layer maps it to "Creative" via formatRole().
  */
 export const SITE_ADMIN_ROLES: AppUserRole[] = ["SITE_OWNER", "SITE_ADMIN"];
-export const DESIGNER_ROLES: AppUserRole[] = ["DESIGNER"];
+export const CREATIVE_ROLES: AppUserRole[] = ["DESIGNER"];
 export const CUSTOMER_ROLES: AppUserRole[] = ["CUSTOMER"];
 
 /**
@@ -44,8 +46,8 @@ export function isSiteAdminRole(role: AppUserRole): boolean {
   return SITE_ADMIN_ROLES.includes(role);
 }
 
-export function isDesignerRole(role: AppUserRole): boolean {
-  return DESIGNER_ROLES.includes(role);
+export function isCreativeRole(role: AppUserRole): boolean {
+  return CREATIVE_ROLES.includes(role);
 }
 
 export function isCustomerRole(role: AppUserRole): boolean {
@@ -71,7 +73,8 @@ export function isAtLeastCompanyPM(
 }
 
 /**
- * Tiny helper: format a role for debug / logs.
+ * Tiny helper: format a role for debug / logs / UI.
+ * Maps the DB enum value DESIGNER to the display name "Creative".
  */
 export function formatRole(role: AppUserRole): string {
   switch (role) {
@@ -80,7 +83,7 @@ export function formatRole(role: AppUserRole): string {
     case "SITE_ADMIN":
       return "Site admin";
     case "DESIGNER":
-      return "Designer";
+      return "Creative";
     case "CUSTOMER":
       return "Customer";
     default:

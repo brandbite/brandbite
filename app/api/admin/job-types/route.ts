@@ -51,7 +51,7 @@ export async function GET(_req: NextRequest) {
         : null,
       description: jt.description,
       tokenCost: jt.tokenCost,
-      designerPayoutTokens: jt.designerPayoutTokens,
+      creativePayoutTokens: jt.creativePayoutTokens,
       estimatedHours: jt.estimatedHours,
       hasQuantity: jt.hasQuantity,
       quantityLabel: jt.quantityLabel,
@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
 
     // Derive token values from estimated hours
     const tokenCost = estimatedHours;
-    const designerPayoutTokens = Math.round(
+    const creativePayoutTokens = Math.round(
       estimatedHours * (BASE_PAYOUT_PERCENT / 100),
     );
 
@@ -145,7 +145,7 @@ export async function POST(req: NextRequest) {
         description: description || null,
         estimatedHours,
         tokenCost,
-        designerPayoutTokens,
+        creativePayoutTokens,
         hasQuantity,
         quantityLabel,
         defaultQuantity,
@@ -173,7 +173,7 @@ export async function POST(req: NextRequest) {
           categoryRef: withCategory?.categoryRef ?? null,
           description: created.description,
           tokenCost: created.tokenCost,
-          designerPayoutTokens: created.designerPayoutTokens,
+          creativePayoutTokens: created.creativePayoutTokens,
           estimatedHours: created.estimatedHours,
           hasQuantity: created.hasQuantity,
           quantityLabel: created.quantityLabel,
@@ -233,7 +233,7 @@ export async function PATCH(req: NextRequest) {
       description?: string | null;
       estimatedHours?: number;
       tokenCost?: number;
-      designerPayoutTokens?: number;
+      creativePayoutTokens?: number;
       hasQuantity?: boolean;
       quantityLabel?: string | null;
       defaultQuantity?: number;
@@ -274,7 +274,7 @@ export async function PATCH(req: NextRequest) {
       }
       data.estimatedHours = estimatedHours;
       data.tokenCost = estimatedHours;
-      data.designerPayoutTokens = Math.round(
+      data.creativePayoutTokens = Math.round(
         estimatedHours * (BASE_PAYOUT_PERCENT / 100),
       );
     }
@@ -335,7 +335,7 @@ export async function PATCH(req: NextRequest) {
         categoryRef: updated.categoryRef ?? null,
         description: updated.description,
         tokenCost: updated.tokenCost,
-        designerPayoutTokens: updated.designerPayoutTokens,
+        creativePayoutTokens: updated.creativePayoutTokens,
         estimatedHours: updated.estimatedHours,
         hasQuantity: updated.hasQuantity,
         quantityLabel: updated.quantityLabel,

@@ -489,7 +489,7 @@ export default function CustomerMembersPage() {
                       setInviteEmail(e.target.value)
                     }
                     className="mt-1"
-                    placeholder="designer@yourcompany.com"
+                    placeholder="creative@yourcompany.com"
                     required
                   />
                 </div>

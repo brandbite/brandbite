@@ -33,7 +33,7 @@ export async function GET() {
     // Run all queries in parallel for maximum performance
     const [
       totalCompanies,
-      totalDesigners,
+      totalCreatives,
       totalTickets,
       ticketsByStatus,
       ticketsByPriority,
@@ -52,7 +52,7 @@ export async function GET() {
       // Total companies
       prisma.company.count(),
 
-      // Total designers
+      // Total creatives
       prisma.userAccount.count({
         where: { role: "DESIGNER" },
       }),
@@ -178,7 +178,7 @@ export async function GET() {
       platform: {
         totalCompanies,
         activeCompanies,
-        totalDesigners,
+        totalCreatives,
         totalTickets,
         ticketsByStatus: statusMap,
         ticketsByPriority: priorityMap,

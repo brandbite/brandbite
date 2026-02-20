@@ -1,6 +1,6 @@
 // -----------------------------------------------------------------------------
 // @file: app/admin/withdrawals/page.tsx
-// @purpose: Admin-facing overview & controls for designer withdrawals (with toasts)
+// @purpose: Admin-facing overview & controls for creative withdrawals (with toasts)
 // @version: v1.3.0
 // @status: active
 // @lastUpdate: 2025-11-29
@@ -28,7 +28,7 @@ type AdminWithdrawal = {
   approvedAt: string | null;
   paidAt: string | null;
   adminRejectReason?: string | null;
-  designer: {
+  creative: {
     id: string;
     email: string;
     name: string | null;
@@ -58,7 +58,7 @@ export default function AdminWithdrawalsPage() {
   const [statusFilter, setStatusFilter] = useState<"ALL" | WithdrawalStatus>(
     "ALL",
   );
-  const [designerFilter, setDesignerFilter] = useState<string>("ALL");
+  const [creativeFilter, setCreativeFilter] = useState<string>("ALL");
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -124,9 +124,9 @@ export default function AdminWithdrawalsPage() {
 
   const withdrawals = data?.withdrawals ?? [];
 
-  const designers = useMemo(() => {
+  const creatives = useMemo(() => {
     const list = Array.from(
-      new Set(withdrawals.map((w) => w.designer.name || w.designer.email)),
+      new Set(withdrawals.map((w) => w.creative.name || w.creative.email)),
     );
     return list;
   }, [withdrawals]);
@@ -136,13 +136,13 @@ export default function AdminWithdrawalsPage() {
       if (statusFilter !== "ALL" && w.status !== statusFilter) {
         return false;
       }
-      const designerLabel = w.designer.name || w.designer.email;
-      if (designerFilter !== "ALL" && designerLabel !== designerFilter) {
+      const creativeLabel = w.creative.name || w.creative.email;
+      if (creativeFilter !== "ALL" && creativeLabel !== creativeFilter) {
         return false;
       }
       return true;
     });
-  }, [withdrawals, statusFilter, designerFilter]);
+  }, [withdrawals, statusFilter, creativeFilter]);
 
   const getActionSuccessCopy = (action: AdminWithdrawalAction) => {
     switch (action) {
@@ -156,7 +156,7 @@ export default function AdminWithdrawalsPage() {
         return {
           title: "Withdrawal rejected",
           description:
-            "This withdrawal has been rejected. The designer will see this in their history.",
+            "This withdrawal has been rejected. The creative will see this in their history.",
         };
       case "MARK_PAID":
         return {
@@ -280,10 +280,10 @@ export default function AdminWithdrawalsPage() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">
-              Designer withdrawals
+              Creative withdrawals
             </h1>
             <p className="mt-1 text-sm text-[#7a7a7a]">
-              Review, approve and mark designer withdrawal requests as paid.
+              Review, approve and mark creative withdrawal requests as paid.
             </p>
           </div>
         </div>
@@ -320,7 +320,7 @@ export default function AdminWithdrawalsPage() {
               {loading ? "—" : stats ? stats.totalPaid : 0}
             </p>
             <p className="mt-1 text-xs text-[#9a9892]">
-              Tokens that have been paid out to designers.
+              Tokens that have been paid out to creatives.
             </p>
           </div>
 
@@ -360,15 +360,15 @@ export default function AdminWithdrawalsPage() {
 
           <div className="flex items-center gap-2">
             <label className="text-xs font-medium text-[#424143]">
-              Designer
+              Creative
             </label>
             <FormSelect
               className="w-auto"
-              value={designerFilter}
-              onChange={(e) => setDesignerFilter(e.target.value)}
+              value={creativeFilter}
+              onChange={(e) => setCreativeFilter(e.target.value)}
             >
-              <option value="ALL">All designers</option>
-              {designers.map((d) => (
+              <option value="ALL">All creatives</option>
+              {creatives.map((d) => (
                 <option key={d} value={d}>
                   {d}
                 </option>
@@ -396,7 +396,7 @@ export default function AdminWithdrawalsPage() {
             <DataTable>
               <THead>
                 <TH>Created</TH>
-                <TH>Designer</TH>
+                <TH>Creative</TH>
                 <TH>Amount</TH>
                 <TH>Status</TH>
                 <TH>Approved at</TH>
@@ -405,7 +405,7 @@ export default function AdminWithdrawalsPage() {
               </THead>
               <tbody>
                 {filteredWithdrawals.map((w) => {
-                  const designerLabel = w.designer.name || w.designer.email;
+                  const creativeLabel = w.creative.name || w.creative.email;
 
                   const canApprove = w.status === "PENDING";
                   const canReject = w.status === "PENDING";
@@ -420,9 +420,9 @@ export default function AdminWithdrawalsPage() {
                         {formatDateTime(w.createdAt)}
                       </TD>
                       <TD>
-                        <div className="font-medium">{designerLabel}</div>
+                        <div className="font-medium">{creativeLabel}</div>
                         <div className="text-[10px] text-[#9a9892]">
-                          {w.designer.email}
+                          {w.creative.email}
                         </div>
                       </TD>
                       <TD>

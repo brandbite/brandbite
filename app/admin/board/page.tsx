@@ -30,7 +30,7 @@ type AdminTicket = {
   createdAt: string;
   company: { id: string; name: string } | null;
   project: { id: string; name: string; code: string | null } | null;
-  designer: { id: string; name: string | null; email: string } | null;
+  creative: { id: string; name: string | null; email: string } | null;
 };
 
 type AdminTicketsResponse = {
@@ -142,14 +142,14 @@ export default function AdminBoardPage() {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [tickets]);
 
-  /** Deduped designer list for toolbar avatar circles */
-  const uniqueDesigners = useMemo(() => {
+  /** Deduped creative list for toolbar avatar circles */
+  const uniqueCreatives = useMemo(() => {
     const seen = new Map<string, { name: string | null; email: string }>();
     tickets.forEach((t) => {
-      if (t.designer && !seen.has(t.designer.id)) {
-        seen.set(t.designer.id, {
-          name: t.designer.name,
-          email: t.designer.email,
+      if (t.creative && !seen.has(t.creative.id)) {
+        seen.set(t.creative.id, {
+          name: t.creative.name,
+          email: t.creative.email,
         });
       }
     });
@@ -181,8 +181,8 @@ export default function AdminBoardPage() {
           t.company?.name ?? "",
           t.project?.name ?? "",
           t.project?.code ?? "",
-          t.designer?.name ?? "",
-          t.designer?.email ?? "",
+          t.creative?.name ?? "",
+          t.creative?.email ?? "",
         ]
           .join(" ")
           .toLowerCase();
@@ -342,7 +342,7 @@ export default function AdminBoardPage() {
               </InlineAlert>
             )}
 
-            {/* Toolbar: search + designer avatars */}
+            {/* Toolbar: search + creative avatars */}
             <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
               <div className="relative max-w-md flex-1">
                 <input
@@ -353,10 +353,10 @@ export default function AdminBoardPage() {
                   className="w-full rounded-lg border border-[#e3e1dc] bg-white px-4 py-2 text-xs text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
                 />
               </div>
-              {/* Designer avatar circles */}
-              {uniqueDesigners.length > 0 && (
+              {/* Creative avatar circles */}
+              {uniqueCreatives.length > 0 && (
                 <div className="flex items-center -space-x-1.5">
-                  {uniqueDesigners.slice(0, 5).map((d, i) => {
+                  {uniqueCreatives.slice(0, 5).map((d, i) => {
                     const label = d.name || d.email;
                     return (
                       <div
@@ -369,9 +369,9 @@ export default function AdminBoardPage() {
                       </div>
                     );
                   })}
-                  {uniqueDesigners.length > 5 && (
+                  {uniqueCreatives.length > 5 && (
                     <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[#e3e1dc] text-[9px] font-bold text-[#7a7a7a]">
-                      +{uniqueDesigners.length - 5}
+                      +{uniqueCreatives.length - 5}
                     </div>
                   )}
                 </div>
@@ -414,9 +414,9 @@ export default function AdminBoardPage() {
                           columnTickets.map((t) => {
                             const companyName = t.company?.name ?? "—";
                             const projectCode = t.project?.code ?? null;
-                            const designerLabel =
-                              t.designer?.name ||
-                              t.designer?.email ||
+                            const creativeLabel =
+                              t.creative?.name ||
+                              t.creative?.email ||
                               "Unassigned";
 
                             return (
@@ -441,17 +441,17 @@ export default function AdminBoardPage() {
                                         <span className="font-medium">{projectCode}</span>
                                       )}
                                     </div>
-                                    {/* Designer avatar */}
+                                    {/* Creative avatar */}
                                     <div
-                                      title={designerLabel}
+                                      title={creativeLabel}
                                       className="flex h-6 w-6 items-center justify-center rounded-full text-[8px] font-bold text-white"
                                       style={{
-                                        backgroundColor: avatarColor(designerLabel),
+                                        backgroundColor: avatarColor(creativeLabel),
                                       }}
                                     >
                                       {getInitials(
-                                        t.designer?.name ?? null,
-                                        t.designer?.email ?? null,
+                                        t.creative?.name ?? null,
+                                        t.creative?.email ?? null,
                                       )}
                                     </div>
                                   </div>

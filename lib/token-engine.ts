@@ -1,8 +1,8 @@
 // -----------------------------------------------------------------------------
 // @file: lib/token-engine.ts
-// @purpose: Token accounting helpers for Brandbite (companies, designers, tickets)
-// @version: v1.3.0
-// @lastUpdate: 2025-12-26
+// @purpose: Token accounting helpers for Brandbite (companies, creatives, tickets)
+// @version: v2.0.0
+// @lastUpdate: 2026-02-20
 // -----------------------------------------------------------------------------
 
 import {
@@ -59,28 +59,28 @@ export type EffectiveTokenValues = {
 };
 
 /**
- * Calculate the effective token cost and designer payout for a ticket,
+ * Calculate the effective token cost and creative payout for a ticket,
  * accounting for quantity and admin overrides.
  */
 export function getEffectiveTokenValues(ticket: {
   quantity: number;
   tokenCostOverride: number | null;
-  designerPayoutOverride: number | null;
-  jobType: { tokenCost: number; designerPayoutTokens: number } | null;
+  creativePayoutOverride: number | null;
+  jobType: { tokenCost: number; creativePayoutTokens: number } | null;
 }): EffectiveTokenValues {
   if (!ticket.jobType) {
     return { effectiveCost: 0, effectivePayout: 0, isOverridden: false };
   }
 
   const baseCost = ticket.jobType.tokenCost * ticket.quantity;
-  const basePayout = ticket.jobType.designerPayoutTokens * ticket.quantity;
+  const basePayout = ticket.jobType.creativePayoutTokens * ticket.quantity;
 
   return {
     effectiveCost: ticket.tokenCostOverride ?? baseCost,
-    effectivePayout: ticket.designerPayoutOverride ?? basePayout,
+    effectivePayout: ticket.creativePayoutOverride ?? basePayout,
     isOverridden:
       ticket.tokenCostOverride != null ||
-      ticket.designerPayoutOverride != null,
+      ticket.creativePayoutOverride != null,
   };
 }
 
@@ -97,12 +97,12 @@ export type PayoutEvaluation = {
 };
 
 /**
- * Evaluate which payout percentage a designer qualifies for.
+ * Evaluate which payout percentage a creative qualifies for.
  * Iterates active rules sorted by payoutPercent DESC; first match wins
- * (designer always gets the best rate they qualify for).
+ * (creative always gets the best rate they qualify for).
  */
-export async function evaluateDesignerPayoutPercent(
-  designerId: string,
+export async function evaluateCreativePayoutPercent(
+  creativeId: string,
   tx?: Prisma.TransactionClient,
 ): Promise<PayoutEvaluation> {
   const db = tx ?? prisma;
@@ -126,7 +126,7 @@ export async function evaluateDesignerPayoutPercent(
 
     const completedCount = await (db as any).ticket.count({
       where: {
-        designerId,
+        creativeId,
         status: "DONE",
         updatedAt: { gte: windowStart },
       },
@@ -250,7 +250,7 @@ export async function recalculateCompanyTokenBalance(companyId: string) {
 }
 
 // -----------------------------------------------------------------------------
-// User-level tokens (designer bakiyesi)
+// User-level tokens (creative bakiyesi)
 // -----------------------------------------------------------------------------
 
 export interface ApplyUserLedgerInput {
@@ -265,7 +265,7 @@ export interface ApplyUserLedgerInput {
 }
 
 /**
- * Designer (UserAccount) için token ledger kaydı oluşturur.
+ * Creative (UserAccount) için token ledger kaydı oluşturur.
  * Şu an için UserAccount üzerinde ayrı bir tokenBalance alanımız yok;
  * bu yüzden balanceBefore / balanceAfter değerlerini ledger üzerinden hesaplıyoruz.
  */
@@ -324,7 +324,7 @@ export async function applyUserLedgerEntry(input: ApplyUserLedgerInput) {
 }
 
 /**
- * Mevcut user ledger'ına göre designer token bakiyesini hesaplar.
+ * Mevcut user ledger'ına göre creative token bakiyesini hesaplar.
  * Bu fonksiyon, örneğin withdraw talebi öncesi "ne kadar token çekebilir?" sorusuna
  * cevap olmak için kullanılabilir.
  */
@@ -355,13 +355,13 @@ export interface TicketCompletionResult {
     id: string;
     status: TicketStatus;
     companyId: string;
-    designerId: string | null;
+    creativeId: string | null;
     jobTypeId: string | null;
   };
   companyLedgerEntry: Prisma.TokenLedgerGetPayload<{ select: { id: true } }> | null;
-  designerLedgerEntry: Prisma.TokenLedgerGetPayload<{ select: { id: true } }> | null;
+  creativeLedgerEntry: Prisma.TokenLedgerGetPayload<{ select: { id: true } }> | null;
   companyBalanceAfter: number | null;
-  designerBalanceAfter: number | null;
+  creativeBalanceAfter: number | null;
   alreadyCompleted: boolean;
 }
 
@@ -369,7 +369,7 @@ export interface TicketCompletionResult {
  * Ticket tamamlandığında:
  * - Ticket.status => DONE
  * - Company'den jobType.tokenCost kadar DEBIT
- * - Designer'a jobType.designerPayoutTokens kadar CREDIT
+ * - Creative'e jobType.creativePayoutTokens kadar CREDIT
  *
  * İdempotent yaklaşım:
  * - Ticket zaten DONE ise veya bu ticket için reason = "JOB_PAYMENT" ledger kaydı varsa,
@@ -423,13 +423,13 @@ export async function completeTicketAndApplyTokens(
           id: finalTicket.id,
           status: finalTicket.status,
           companyId: finalTicket.companyId,
-          designerId: finalTicket.designerId,
+          creativeId: finalTicket.creativeId,
           jobTypeId: finalTicket.jobTypeId,
         },
         companyLedgerEntry: null,
-        designerLedgerEntry: null,
+        creativeLedgerEntry: null,
         companyBalanceAfter: null,
-        designerBalanceAfter: null,
+        creativeBalanceAfter: null,
         alreadyCompleted: true,
       };
     }
@@ -440,11 +440,11 @@ export async function completeTicketAndApplyTokens(
     let matchedRuleId: string | null = null;
     let matchedRuleName: string | null = null;
 
-    if (ticket.designerPayoutOverride != null) {
-      effectivePayout = ticket.designerPayoutOverride;
-    } else if (ticket.designerId) {
-      const ruleResult = await evaluateDesignerPayoutPercent(
-        ticket.designerId,
+    if (ticket.creativePayoutOverride != null) {
+      effectivePayout = ticket.creativePayoutOverride;
+    } else if (ticket.creativeId) {
+      const ruleResult = await evaluateCreativePayoutPercent(
+        ticket.creativeId,
         tx,
       );
       appliedPayoutPercent = ruleResult.payoutPercent;
@@ -457,46 +457,47 @@ export async function completeTicketAndApplyTokens(
       );
     } else {
       effectivePayout =
-        ticket.jobType.designerPayoutTokens * (ticket.quantity ?? 1);
+        ticket.jobType.creativePayoutTokens * (ticket.quantity ?? 1);
     }
 
     // Company is NOT debited here — the company was already charged at ticket
     // creation time (reason: "JOB_REQUEST_CREATED"). Completion only credits
-    // the designer.
+    // the creative.
     const companyLedgerEntry = null;
     const companyBalanceAfter = null;
 
-    // --- Designer tarafı (CREDIT) ---
-    let designerLedgerEntry: { id: string } | null = null;
-    let designerBalanceAfter: number | null = null;
+    // --- Creative tarafı (CREDIT) ---
+    let creativeLedgerEntry: { id: string } | null = null;
+    let creativeBalanceAfter: number | null = null;
 
-    if (ticket.designerId && effectivePayout > 0) {
+    if (ticket.creativeId && effectivePayout > 0) {
       const [credits, debits] = await Promise.all([
         tx.tokenLedger.aggregate({
-          where: { userId: ticket.designerId, direction: "CREDIT" },
+          where: { userId: ticket.creativeId, direction: "CREDIT" },
           _sum: { amount: true },
         }),
         tx.tokenLedger.aggregate({
-          where: { userId: ticket.designerId, direction: "DEBIT" },
+          where: { userId: ticket.creativeId, direction: "DEBIT" },
           _sum: { amount: true },
         }),
       ]);
 
-      const designerCreditSum = credits._sum.amount ?? 0;
-      const designerDebitSum = debits._sum.amount ?? 0;
+      const creativeCreditSum = credits._sum.amount ?? 0;
+      const creativeDebitSum = debits._sum.amount ?? 0;
 
-      const designerBalanceBefore = designerCreditSum - designerDebitSum;
-      designerBalanceAfter = designerBalanceBefore + effectivePayout;
+      const creativeBalanceBefore = creativeCreditSum - creativeDebitSum;
+      creativeBalanceAfter = creativeBalanceBefore + effectivePayout;
 
-      designerLedgerEntry = await tx.tokenLedger.create({
+      creativeLedgerEntry = await tx.tokenLedger.create({
         data: {
-          userId: ticket.designerId,
+          userId: ticket.creativeId,
           companyId: ticket.companyId,
           ticketId: ticket.id,
           direction: "CREDIT",
           amount: effectivePayout,
           reason: "JOB_PAYMENT",
-          notes: `Designer payout for ticket ${ticket.id}`,
+          // Legacy note: reason kept as "DESIGNER_JOB_PAYOUT" would break existing data
+          notes: `Creative payout for ticket ${ticket.id}`,
           metadata: {
             ...(ticket.jobTypeId ? { jobTypeId: ticket.jobTypeId } : {}),
             tokenCost: ticket.jobType.tokenCost,
@@ -505,12 +506,12 @@ export async function completeTicketAndApplyTokens(
             ...(matchedRuleId
               ? { payoutRuleId: matchedRuleId, payoutRuleName: matchedRuleName }
               : {}),
-            ...(ticket.designerPayoutOverride != null
-              ? { overridden: true, override: ticket.designerPayoutOverride }
+            ...(ticket.creativePayoutOverride != null
+              ? { overridden: true, override: ticket.creativePayoutOverride }
               : {}),
           },
-          balanceBefore: designerBalanceBefore,
-          balanceAfter: designerBalanceAfter,
+          balanceBefore: creativeBalanceBefore,
+          balanceAfter: creativeBalanceAfter,
         },
         select: {
           id: true,
@@ -527,7 +528,7 @@ export async function completeTicketAndApplyTokens(
         id: true,
         status: true,
         companyId: true,
-        designerId: true,
+        creativeId: true,
         jobTypeId: true,
       },
     });
@@ -535,9 +536,9 @@ export async function completeTicketAndApplyTokens(
     return {
       ticket: updatedTicket,
       companyLedgerEntry,
-      designerLedgerEntry,
+      creativeLedgerEntry,
       companyBalanceAfter,
-      designerBalanceAfter,
+      creativeBalanceAfter,
       alreadyCompleted: false,
     };
   });

@@ -48,18 +48,18 @@ const DASHBOARDS = [
     ],
   },
   {
-    role: "Designer",
+    role: "Creative",
     tagline: "Assignments & earnings",
     description:
       "View assigned tickets, submit revisions, track earnings, and manage your withdrawal balance.",
-    href: "/designer/board",
+    href: "/creative/board",
     color: "bg-[#8b5cf6]",
     ringColor: "group-hover:ring-[#8b5cf6]/20",
     pages: [
-      { label: "Board", href: "/designer/board" },
-      { label: "Tickets", href: "/designer/tickets" },
-      { label: "Balance", href: "/designer/balance" },
-      { label: "Withdrawals", href: "/designer/withdrawals" },
+      { label: "Board", href: "/creative/board" },
+      { label: "Tickets", href: "/creative/tickets" },
+      { label: "Balance", href: "/creative/balance" },
+      { label: "Withdrawals", href: "/creative/withdrawals" },
     ],
   },
 ];
@@ -68,7 +68,7 @@ const QUICK_STEPS = [
   {
     step: "1",
     title: "Pick a persona",
-    description: "Choose a demo role — admin, customer, or designer — to explore the platform.",
+    description: "Choose a demo role — admin, customer, or creative — to explore the platform.",
   },
   {
     step: "2",
@@ -112,7 +112,7 @@ export default function HomePage() {
       : activeUser?.role === "CUSTOMER"
         ? "Customer"
         : activeUser?.role === "DESIGNER"
-          ? "Designer"
+          ? "Creative"
           : activeUser?.role ?? "";
 
   return (

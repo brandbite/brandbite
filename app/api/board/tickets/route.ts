@@ -25,7 +25,7 @@ export async function GET() {
             code: true,
           },
         },
-        designer: {
+        creative: {
           select: {
             id: true,
             name: true,
@@ -63,7 +63,7 @@ export async function GET() {
         priority: t.priority,
         projectName: t.project?.name ?? null,
         companyName: t.company?.name ?? null,
-        designerName: t.designer?.name ?? t.designer?.email ?? null,
+        creativeName: t.creative?.name ?? t.creative?.email ?? null,
         tokenCost: t.jobType?.tokenCost ?? null,
         createdAt: t.createdAt.toISOString(),
       };

@@ -127,7 +127,7 @@ export default async function AssignmentLogDebugPage() {
           },
         },
       },
-      designer: {
+      creative: {
         select: {
           id: true,
           name: true,
@@ -173,7 +173,7 @@ export default async function AssignmentLogDebugPage() {
             <div className="divide-y divide-[#f1f0ea] text-xs">
               {logs.map((log) => {
                 const ticket = log.ticket;
-                const designer = log.designer;
+                const creative = log.creative;
 
                 const code = ticket
                   ? formatTicketCode({
@@ -249,14 +249,14 @@ export default async function AssignmentLogDebugPage() {
                       )}
                     </div>
 
-                    {/* Right column: designer + metadata */}
+                    {/* Right column: creative + metadata */}
                     <div className="w-full md:w-64">
                       <p className="text-[11px] font-medium text-[#424143]">
-                        {designer ? (
+                        {creative ? (
                           <>
                             Assigned to{" "}
                             <span className="font-semibold">
-                              {designer.name || designer.email}
+                              {creative.name || creative.email}
                             </span>
                           </>
                         ) : (
@@ -265,9 +265,9 @@ export default async function AssignmentLogDebugPage() {
                           </span>
                         )}
                       </p>
-                      {designer && (
+                      {creative && (
                         <p className="mt-0.5 text-[10px] text-[#9a9892]">
-                          {designer.email}
+                          {creative.email}
                         </p>
                       )}
                       {metadataPreview && (

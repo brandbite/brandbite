@@ -117,9 +117,9 @@ function billingStatusClassName(
 type PreferenceEntry = { type: string; enabled: boolean };
 
 const CUSTOMER_PREFS: { type: string; label: string; description: string }[] = [
-  { type: "REVISION_SUBMITTED", label: "Designer submitted a new revision", description: "Get notified when your designer uploads new work for review" },
+  { type: "REVISION_SUBMITTED", label: "Creative submitted a new revision", description: "Get notified when your creative uploads new work for review" },
   { type: "TICKET_STATUS_CHANGED", label: "Ticket status changed", description: "Get notified when a ticket's status is updated" },
-  { type: "PIN_RESOLVED", label: "Feedback note resolved", description: "Get notified when a designer resolves one of your revision notes" },
+  { type: "PIN_RESOLVED", label: "Feedback note resolved", description: "Get notified when a creative resolves one of your revision notes" },
   { type: "TICKET_COMPLETED", label: "Ticket completed", description: "Get notified when a ticket is marked as done" },
 ];
 
@@ -378,7 +378,7 @@ export default function CustomerSettingsPage() {
       case "SITE_ADMIN":
         return "Site admin";
       case "DESIGNER":
-        return "Designer";
+        return "Creative";
       case "CUSTOMER":
         return "Customer";
       default:

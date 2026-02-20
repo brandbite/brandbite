@@ -153,7 +153,7 @@ export default function AdminLedgerPage() {
               Global token ledger
             </h1>
             <p className="mt-1 text-sm text-[#7a7a7a]">
-              All token movements across companies, jobs and designers. Only
+              All token movements across companies, jobs and creatives. Only
               visible to site admins.
             </p>
           </div>

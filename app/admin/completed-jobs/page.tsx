@@ -17,11 +17,11 @@ type CompletedJob = {
   title: string;
   companyName: string | null;
   projectName: string | null;
-  designerName: string | null;
-  designerEmail: string | null;
+  creativeName: string | null;
+  creativeEmail: string | null;
   completedAt: string;
   jobTypeName: string | null;
-  designerPayoutTokens: number | null;
+  creativePayoutTokens: number | null;
   hasPayoutEntry: boolean;
   payoutLedgerCreatedAt: string | null;
 };
@@ -110,8 +110,8 @@ export default function AdminCompletedJobsPage() {
         job.title,
         job.companyName ?? "",
         job.projectName ?? "",
-        job.designerName ?? "",
-        job.designerEmail ?? "",
+        job.creativeName ?? "",
+        job.creativeEmail ?? "",
         job.jobTypeName ?? "",
       ]
         .join(" ")
@@ -126,7 +126,7 @@ export default function AdminCompletedJobsPage() {
     const withPayout = data.filter((j) => j.hasPayoutEntry).length;
     const withoutPayout = total - withPayout;
     const totalTokens = data.reduce((sum, j) => {
-      return sum + (j.designerPayoutTokens ?? 0);
+      return sum + (j.creativePayoutTokens ?? 0);
     }, 0);
 
     return {
@@ -152,7 +152,7 @@ export default function AdminCompletedJobsPage() {
               Tickets that have been marked as{" "}
               <span className="font-semibold text-slate-100">Done</span> by
               customers. Use this view to review recent work and reconcile
-              designer payouts.
+              creative payouts.
             </p>
           </div>
           {loading && (
@@ -193,7 +193,7 @@ export default function AdminCompletedJobsPage() {
           </div>
           <div className="rounded-2xl bg-slate-800/70 px-4 py-3">
             <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">
-              Total designer tokens (v1)
+              Total creative tokens (v1)
             </p>
             <p className="mt-2 text-xl font-semibold">
               {stats.totalTokens.toLocaleString()}
@@ -206,7 +206,7 @@ export default function AdminCompletedJobsPage() {
           <div className="relative flex-1">
             <input
               type="text"
-              placeholder="Search by ticket code, title, company, project or designer"
+              placeholder="Search by ticket code, title, company, project or creative"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full rounded-full border border-slate-700 bg-slate-900/60 px-4 py-2 text-xs text-slate-100 outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400"
@@ -238,7 +238,7 @@ export default function AdminCompletedJobsPage() {
                     Company / Project
                   </th>
                   <th className="border-b border-slate-700 px-3 py-2 font-semibold text-slate-300">
-                    Designer
+                    Creative
                   </th>
                   <th className="border-b border-slate-700 px-3 py-2 font-semibold text-slate-300">
                     Job type
@@ -289,10 +289,10 @@ export default function AdminCompletedJobsPage() {
                       </td>
                       <td className="border-t border-slate-800 px-3 py-2 align-top">
                         <div className="text-[11px] font-medium text-slate-100">
-                          {job.designerName ?? "—"}
+                          {job.creativeName ?? "—"}
                         </div>
                         <div className="text-[10px] text-slate-400">
-                          {job.designerEmail ?? "—"}
+                          {job.creativeEmail ?? "—"}
                         </div>
                       </td>
                       <td className="border-t border-slate-800 px-3 py-2 align-top">
@@ -302,7 +302,7 @@ export default function AdminCompletedJobsPage() {
                       </td>
                       <td className="border-t border-slate-800 px-3 py-2 align-top">
                         <div className="text-[11px] font-semibold text-slate-100">
-                          {job.designerPayoutTokens ?? "—"}
+                          {job.creativePayoutTokens ?? "—"}
                         </div>
                       </td>
                       <td className="border-t border-slate-800 px-3 py-2 align-top">

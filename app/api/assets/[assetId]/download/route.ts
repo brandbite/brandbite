@@ -35,7 +35,7 @@ export async function GET(
           select: {
             companyId: true,
             createdById: true,
-            designerId: true,
+            creativeId: true,
           },
         },
       },
@@ -45,7 +45,7 @@ export async function GET(
       return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
     }
 
-    // Access check: must belong to same company member OR assigned designer
+    // Access check: must belong to same company member OR assigned creative
     const companyId = asset.ticket.companyId;
 
     if (user.role === "CUSTOMER") {
@@ -60,7 +60,7 @@ export async function GET(
         return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
       }
     } else if (user.role === "DESIGNER") {
-      if (!asset.ticket.designerId || asset.ticket.designerId !== user.id) {
+      if (!asset.ticket.creativeId || asset.ticket.creativeId !== user.id) {
         return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
       }
     } else {

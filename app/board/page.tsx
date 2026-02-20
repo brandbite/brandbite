@@ -20,7 +20,7 @@ type TicketCard = {
   priority: TicketPriority;
   projectName?: string | null;
   companyName?: string | null;
-  designerName?: string | null;
+  creativeName?: string | null;
   tokenCost?: number | null;
   createdAt: string;
 };
@@ -108,7 +108,7 @@ export default function BoardPage() {
         t.title,
         t.projectName,
         t.companyName,
-        t.designerName,
+        t.creativeName,
       ]
         .filter(Boolean)
         .join(" ")
@@ -146,7 +146,7 @@ export default function BoardPage() {
           </div>
           <nav className="hidden items-center gap-6 text-sm text-[#7a7a7a] md:flex">
             <button className="font-medium text-[#424143]">Board</button>
-            <button className="font-medium text-[#7a7a7a]">Designers</button>
+            <button className="font-medium text-[#7a7a7a]">Creatives</button>
             <button className="font-medium text-[#7a7a7a]">Tokens</button>
           </nav>
         </header>
@@ -182,7 +182,7 @@ export default function BoardPage() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by ticket, project, company, designer..."
+              placeholder="Search by ticket, project, company, creative..."
               className="w-full rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
             />
           </div>
@@ -294,12 +294,12 @@ export default function BoardPage() {
                                 <span>{ticket.companyName}</span>
                               </div>
                             )}
-                            {ticket.designerName && (
+                            {ticket.creativeName && (
                               <div className="flex items-center gap-1">
                                 <span className="text-[10px] uppercase tracking-wide text-[#b8b6b1]">
-                                  Designer
+                                  Creative
                                 </span>
-                                <span>{ticket.designerName}</span>
+                                <span>{ticket.creativeName}</span>
                               </div>
                             )}
                           </div>

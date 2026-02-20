@@ -1,6 +1,6 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/assets/[assetId]/pins/route.ts
-// @purpose: GET + POST + PATCH asset pin annotations (customer review feedback + designer resolution)
+// @purpose: GET + POST + PATCH asset pin annotations (customer review feedback + creative resolution)
 // @version: v1.1.0
 // @status: active
 // @lastUpdate: 2025-12-28
@@ -33,7 +33,7 @@ async function loadAssetAndAuthorize(
           id: true,
           companyId: true,
           createdById: true,
-          designerId: true,
+          creativeId: true,
           status: true,
         },
       },
@@ -55,7 +55,7 @@ async function loadAssetAndAuthorize(
       return { error: "FORBIDDEN" as const, status: 403, asset: null };
     }
   } else if (user.role === "DESIGNER") {
-    if (!asset.ticket.designerId || asset.ticket.designerId !== user.id) {
+    if (!asset.ticket.creativeId || asset.ticket.creativeId !== user.id) {
       return { error: "FORBIDDEN" as const, status: 403, asset: null };
     }
   } else if (user.role === "SITE_OWNER" || user.role === "SITE_ADMIN") {
@@ -304,10 +304,10 @@ export async function POST(
       return { pinCount: pins.length };
     });
 
-    // Fire notification to designer when customer submits feedback
-    if (submitRevision && asset.ticket.designerId) {
+    // Fire notification to creative when customer submits feedback
+    if (submitRevision && asset.ticket.creativeId) {
       createNotification({
-        userId: asset.ticket.designerId,
+        userId: asset.ticket.creativeId,
         type: "FEEDBACK_SUBMITTED",
         title: "Customer feedback received",
         message: `Customer submitted ${result.pinCount} revision note${result.pinCount > 1 ? "s" : ""}`,
@@ -333,7 +333,7 @@ export async function POST(
 }
 
 // ---------------------------------------------------------------------------
-// PATCH /api/assets/[assetId]/pins — Resolve a single pin (designer only)
+// PATCH /api/assets/[assetId]/pins — Resolve a single pin (creative only)
 // ---------------------------------------------------------------------------
 
 export async function PATCH(
@@ -345,7 +345,7 @@ export async function PATCH(
 
     if (user.role !== "DESIGNER" && user.role !== "SITE_OWNER" && user.role !== "SITE_ADMIN") {
       return NextResponse.json(
-        { error: "Only designers can resolve pins." },
+        { error: "Only creatives can resolve pins." },
         { status: 403 },
       );
     }

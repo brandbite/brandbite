@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: lib/demo-personas.ts
 // @purpose: Central demo personas config (ids, labels, emails, redirects)
-// @version: v1.2.0
+// @version: v2.0.0
 // @status: active
-// @lastUpdate: 2025-11-20
+// @lastUpdate: 2026-02-20
 // -----------------------------------------------------------------------------
 
 import type { AppUserRole } from "./roles";
@@ -15,8 +15,8 @@ export type DemoPersonaId =
   | "customer-owner"
   | "customer-pm"
   | "customer-billing"
-  | "designer-ada"
-  | "designer-liam";
+  | "creative-ada"
+  | "creative-liam";
 
 export type DemoPersona = {
   id: DemoPersonaId;
@@ -83,21 +83,21 @@ export const DEMO_PERSONAS: DemoPersona[] = [
     role: "CUSTOMER",
   },
   {
-    id: "designer-ada",
-    label: "Designer • Ada",
+    id: "creative-ada",
+    label: "Creative · Ada",
     description:
-      "Designer working on demo tickets such as Website revamp. Used to test designer auto-assignment.",
-    redirectTo: "/designer/balance",
-    email: "ada.designer@demo.com",
+      "Creative working on demo tickets such as Website revamp. Used to test creative auto-assignment.",
+    redirectTo: "/creative/balance",
+    email: "ada.creative@demo.com",
     role: "DESIGNER",
   },
   {
-    id: "designer-liam",
-    label: "Designer • Liam",
+    id: "creative-liam",
+    label: "Creative · Liam",
     description:
-      "Designer working on demo tickets such as onboarding visuals. Also participates in auto-assign load-balancing.",
-    redirectTo: "/designer/balance",
-    email: "liam.designer@demo.com",
+      "Creative working on demo tickets such as onboarding visuals. Also participates in auto-assign load-balancing.",
+    redirectTo: "/creative/balance",
+    email: "liam.creative@demo.com",
     role: "DESIGNER",
   },
 ];
