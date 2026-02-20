@@ -33,8 +33,12 @@ type ProjectOption = {
 type JobTypeOption = {
   id: string;
   name: string;
+  category: string | null;
   description: string | null;
   tokenCost?: number;
+  hasQuantity?: boolean;
+  quantityLabel?: string | null;
+  defaultQuantity?: number;
 };
 
 type Props = {
@@ -159,7 +163,8 @@ export default function NewTicketForm({
 
   const handleJobTypeChange = (id: string) => {
     setJobTypeId(id);
-    setQuantity(1);
+    const jt = jobTypes.find((j) => j.id === id);
+    setQuantity(jt?.defaultQuantity ?? 1);
   };
 
   // Derive selected job type for token cost display
@@ -739,10 +744,12 @@ export default function NewTicketForm({
           disabled={isBusy}
         />
 
-        {/* Quantity stepper — visible when a job type is selected */}
-        {selectedJobType && (
+        {/* Quantity stepper — visible when a job type with hasQuantity is selected */}
+        {selectedJobType?.hasQuantity && (
           <div className="flex items-center gap-2 pt-1">
-            <span className="text-[11px] text-[#9a9892]">Quantity</span>
+            <span className="text-[11px] text-[#9a9892]">
+              {selectedJobType.quantityLabel || "Quantity"}
+            </span>
             <div className="inline-flex items-center rounded-md border border-[var(--bb-border-input)]">
               <button
                 type="button"
@@ -766,7 +773,7 @@ export default function NewTicketForm({
             </div>
             {quantity > 1 && (
               <span className="text-[11px] text-[#9a9892]">
-                ×{quantity} sets
+                ×{quantity}
               </span>
             )}
           </div>

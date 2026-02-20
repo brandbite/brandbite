@@ -338,9 +338,16 @@ model JobType {
   id String @id @default(cuid())
 
   name                 String
+  category             String?           // e.g. "Visual Design & Brand Identity"
   description          String?
   tokenCost            Int
   designerPayoutTokens Int // seed.mjs ile uyumlu
+  estimatedHours       Int?              // from service catalog (for reference)
+
+  // Quantity support — some jobs are per-unit (e.g. banner sizes, pages)
+  hasQuantity      Boolean @default(false) // show quantity stepper in form
+  quantityLabel    String?                 // e.g. "Number of sizes", "Number of pages"
+  defaultQuantity  Int     @default(1)     // pre-filled quantity for this job type
 
   isActive Boolean @default(true)
 
