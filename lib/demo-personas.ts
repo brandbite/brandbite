@@ -32,8 +32,8 @@ export const DEMO_PERSONAS: DemoPersona[] = [
     id: "site-owner",
     label: "Site owner",
     description:
-      "Platform-level owner for Brandbite. Can access debug panels like auto-assign configuration.",
-    redirectTo: "/debug/auto-assign",
+      "Platform-level owner for Brandbite. Full access to admin dashboard, analytics, and all configuration.",
+    redirectTo: "/admin",
     email: "owner@brandbite-demo.com",
     role: "SITE_OWNER",
   },
@@ -41,8 +41,8 @@ export const DEMO_PERSONAS: DemoPersona[] = [
     id: "site-admin",
     label: "Site admin",
     description:
-      "Platform admin with similar privileges as the site owner. Also used to inspect auto-assign settings.",
-    redirectTo: "/debug/auto-assign",
+      "Platform admin with similar privileges as the site owner. Manages job types, payouts, and tickets.",
+    redirectTo: "/admin",
     email: "admin@brandbite-demo.com",
     role: "SITE_ADMIN",
   },

@@ -8,6 +8,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useToast } from "@/components/ui/toast-provider";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Button } from "@/components/ui/button";
@@ -215,6 +216,57 @@ export default function AdminSettingsPage() {
             })}
           </div>
         )}
+
+        {/* Debug tools */}
+        <div className="mt-10">
+          <h2 className="text-lg font-semibold tracking-tight text-[#424143]">
+            Debug tools
+          </h2>
+          <p className="mt-1 text-sm text-[#7a7a7a]">
+            Internal tools for inspecting and configuring platform behaviour.
+          </p>
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Link
+              href="/debug/auto-assign"
+              className="group rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm transition-colors hover:border-[#f15b2b]/40 hover:bg-[#fff5ef]"
+            >
+              <h3 className="text-sm font-semibold text-[#424143] group-hover:text-[#f15b2b]">
+                Auto-assign configuration
+              </h3>
+              <p className="mt-1 text-xs text-[#7a7a7a]">
+                View and toggle auto-assign settings at company and project
+                level. Inspect per-project modes (inherit, on, off).
+              </p>
+            </Link>
+
+            <Link
+              href="/debug/assignment-log"
+              className="group rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm transition-colors hover:border-[#f15b2b]/40 hover:bg-[#fff5ef]"
+            >
+              <h3 className="text-sm font-semibold text-[#424143] group-hover:text-[#f15b2b]">
+                Assignment log
+              </h3>
+              <p className="mt-1 text-xs text-[#7a7a7a]">
+                Review ticket assignment history and auto-assign decisions
+                across the platform.
+              </p>
+            </Link>
+
+            <Link
+              href="/debug/demo-user"
+              className="group rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm transition-colors hover:border-[#f15b2b]/40 hover:bg-[#fff5ef]"
+            >
+              <h3 className="text-sm font-semibold text-[#424143] group-hover:text-[#f15b2b]">
+                Demo user switcher
+              </h3>
+              <p className="mt-1 text-xs text-[#7a7a7a]">
+                Switch between demo personas to test different user roles and
+                permissions.
+              </p>
+            </Link>
+          </div>
+        </div>
     </>
   );
 }
