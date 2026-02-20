@@ -16,6 +16,7 @@ import {
   canMoveTicketsOnBoard,
   canEditTickets,
   canManageTags,
+  canManageProjects,
 } from "@/lib/permissions/companyRoles";
 import { TicketStatus, TicketPriority } from "@prisma/client";
 import { useToast } from "@/components/ui/toast-provider";
@@ -376,6 +377,25 @@ export default function CustomerBoardPage() {
   const [newProjectSaving, setNewProjectSaving] = useState(false);
   const [newProjectError, setNewProjectError] = useState<string | null>(null);
 
+  // Sidebar projects (fetched from API — includes empty projects)
+  type SidebarProject = { id: string; name: string; code: string | null; ticketCount: number };
+  const [sidebarProjects, setSidebarProjects] = useState<SidebarProject[]>([]);
+
+  // Project context menu
+  const [projectMenuId, setProjectMenuId] = useState<string | null>(null);
+  const projectMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // Rename project modal
+  const [renameProject, setRenameProject] = useState<SidebarProject | null>(null);
+  const [renameProjectName, setRenameProjectName] = useState("");
+  const [renameProjectSaving, setRenameProjectSaving] = useState(false);
+  const [renameProjectError, setRenameProjectError] = useState<string | null>(null);
+
+  // Delete project confirmation
+  const [deleteProject, setDeleteProject] = useState<SidebarProject | null>(null);
+  const [deleteProjectSaving, setDeleteProjectSaving] = useState(false);
+  const [deleteProjectError, setDeleteProjectError] = useState<string | null>(null);
+
   // Inline edit state for detail modal
   const [isEditingDetail, setIsEditingDetail] = useState(false);
   const [editForm, setEditForm] = useState<{
@@ -576,9 +596,9 @@ export default function CustomerBoardPage() {
         title: "Project created",
         description: `"${json.project.name}" (${json.project.code}) is ready.`,
       });
-      // Refresh board data so the new project shows up in the sidebar
+      // Refresh board + sidebar projects + new-ticket metadata
       void load();
-      // Also refresh new-ticket metadata so the new project appears in forms
+      void loadSidebarProjects();
       setNewTicketMeta(null);
     } catch {
       setNewProjectError("Unexpected error creating project.");
@@ -587,11 +607,128 @@ export default function CustomerBoardPage() {
     }
   };
 
+  // ---------------------------------------------------------------------------
+  // Sidebar projects: fetch, rename, delete
+  // ---------------------------------------------------------------------------
+
+  const loadSidebarProjects = async () => {
+    try {
+      const res = await fetch("/api/customer/projects", { cache: "no-store" });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.projects) {
+        setSidebarProjects(json.projects);
+      }
+    } catch {
+      // Silently fail — sidebar falls back to empty
+    }
+  };
+
+  const openRenameProject = (proj: SidebarProject) => {
+    setRenameProject(proj);
+    setRenameProjectName(proj.name);
+    setRenameProjectError(null);
+    setProjectMenuId(null);
+  };
+
+  const closeRenameProject = () => {
+    setRenameProject(null);
+    setRenameProjectError(null);
+  };
+
+  const handleRenameProject = async () => {
+    if (!renameProject) return;
+    const trimmed = renameProjectName.trim();
+    if (!trimmed || trimmed.length < 2) {
+      setRenameProjectError("Project name must be at least 2 characters.");
+      return;
+    }
+    setRenameProjectSaving(true);
+    setRenameProjectError(null);
+    try {
+      const res = await fetch(`/api/customer/projects/${renameProject.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setRenameProjectError(json?.error || "Failed to rename project.");
+        return;
+      }
+      closeRenameProject();
+      showToast({ type: "success", title: "Project renamed" });
+      void load();
+      void loadSidebarProjects();
+      setNewTicketMeta(null);
+    } catch {
+      setRenameProjectError("Unexpected error renaming project.");
+    } finally {
+      setRenameProjectSaving(false);
+    }
+  };
+
+  const openDeleteProject = (proj: SidebarProject) => {
+    setDeleteProject(proj);
+    setDeleteProjectError(null);
+    setProjectMenuId(null);
+  };
+
+  const closeDeleteProject = () => {
+    setDeleteProject(null);
+    setDeleteProjectError(null);
+  };
+
+  const handleDeleteProject = async () => {
+    if (!deleteProject) return;
+    setDeleteProjectSaving(true);
+    setDeleteProjectError(null);
+    try {
+      const res = await fetch(`/api/customer/projects/${deleteProject.id}`, {
+        method: "DELETE",
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setDeleteProjectError(json?.error || "Failed to delete project.");
+        return;
+      }
+      closeDeleteProject();
+      setProjectFilter("ALL");
+      showToast({
+        type: "success",
+        title: "Project deleted",
+        description:
+          json.unlinkedTickets > 0
+            ? `${json.unlinkedTickets} ticket(s) moved to "No project".`
+            : undefined,
+      });
+      void load();
+      void loadSidebarProjects();
+      setNewTicketMeta(null);
+    } catch {
+      setDeleteProjectError("Unexpected error deleting project.");
+    } finally {
+      setDeleteProjectSaving(false);
+    }
+  };
+
+  // Close project menu when clicking outside
+  useEffect(() => {
+    if (!projectMenuId) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (projectMenuRef.current && !projectMenuRef.current.contains(e.target as Node)) {
+        setProjectMenuId(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [projectMenuId]);
+
   useEffect(() => {
     let cancelled = false;
     const initialLoad = async () => {
       if (cancelled) return;
       await load();
+      await loadSidebarProjects();
     };
     initialLoad();
     return () => {
@@ -1559,44 +1696,92 @@ export default function CustomerBoardPage() {
             </button>
           </div>
 
-          {/* RECENT section */}
-          <p className="mt-4 text-[9px] font-semibold uppercase tracking-[0.2em] text-[#b1afa9]">
-            Recent
-          </p>
-
           {/* Project items list */}
-          <div className="mt-2 space-y-0.5">
-            {projectsWithColors.slice(0, 6).map((proj, idx) => {
+          <div className="mt-3 space-y-0.5">
+            {sidebarProjects.length === 0 && (
+              <p className="px-2 py-2 text-[11px] text-[#b1afa9]">
+                No projects yet.
+              </p>
+            )}
+            {sidebarProjects.slice(0, 8).map((proj, idx) => {
               const color =
                 PROJECT_COLORS[idx % PROJECT_COLORS.length];
               const isActive = projectFilter === proj.name;
+              const showMenu = canManageProjects(companyRole);
               return (
-                <button
-                  key={proj.name}
-                  type="button"
-                  onClick={() =>
-                    setProjectFilter(isActive ? "ALL" : proj.name)
-                  }
-                  className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[11px] transition-colors ${
-                    isActive
-                      ? "bg-[#f5f3f0] font-semibold text-[#424143]"
-                      : "text-[#7a7a7a] hover:bg-[#f5f3f0]"
-                  }`}
+                <div
+                  key={proj.id}
+                  className="group relative"
                 >
-                  <span
-                    className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-[9px] font-bold text-white"
-                    style={{ backgroundColor: color }}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setProjectFilter(isActive ? "ALL" : proj.name)
+                    }
+                    className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[11px] transition-colors ${
+                      isActive
+                        ? "bg-[#f5f3f0] font-semibold text-[#424143]"
+                        : "text-[#7a7a7a] hover:bg-[#f5f3f0]"
+                    }`}
                   >
-                    {proj.name.charAt(0).toUpperCase()}
-                  </span>
-                  <span className="truncate">{proj.name}</span>
-                </button>
+                    <span
+                      className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-[9px] font-bold text-white"
+                      style={{ backgroundColor: color }}
+                    >
+                      {proj.name.charAt(0).toUpperCase()}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">{proj.name}</span>
+                    <span className="flex-shrink-0 text-[10px] text-[#b1afa9]">
+                      {proj.ticketCount}
+                    </span>
+                  </button>
+
+                  {/* Context menu trigger */}
+                  {showMenu && (
+                    <div className="absolute right-1 top-1/2 -translate-y-1/2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setProjectMenuId(projectMenuId === proj.id ? null : proj.id);
+                        }}
+                        className="flex h-5 w-5 items-center justify-center rounded text-[11px] text-[#b1afa9] opacity-0 transition-opacity hover:bg-[#e3e1dc] hover:text-[#424143] group-hover:opacity-100"
+                        style={projectMenuId === proj.id ? { opacity: 1 } : undefined}
+                      >
+                        ...
+                      </button>
+
+                      {/* Dropdown menu */}
+                      {projectMenuId === proj.id && (
+                        <div
+                          ref={projectMenuRef}
+                          className="absolute right-0 top-6 z-50 min-w-[120px] rounded-lg border border-[#e3e1dc] bg-white py-1 shadow-lg"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => openRenameProject(proj)}
+                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] text-[#424143] hover:bg-[#f5f3f0]"
+                          >
+                            Rename
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openDeleteProject(proj)}
+                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] text-red-600 hover:bg-red-50"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
 
           {/* View all projects link */}
-          {projectsWithColors.length > 6 ? (
+          {sidebarProjects.length > 8 ? (
             <button
               type="button"
               onClick={() => setProjectFilter("ALL")}
@@ -1604,7 +1789,7 @@ export default function CustomerBoardPage() {
             >
               View all projects
             </button>
-          ) : projectsWithColors.length > 0 ? (
+          ) : sidebarProjects.length > 0 ? (
             <button
               type="button"
               onClick={() => setProjectFilter("ALL")}
@@ -2008,6 +2193,118 @@ export default function CustomerBoardPage() {
               disabled={!newProjectName.trim() || newProjectName.trim().length < 2}
             >
               Create project
+            </Button>
+          </ModalFooter>
+        </Modal>
+
+        {/* Rename project modal */}
+        <Modal open={!!renameProject} onClose={closeRenameProject} size="sm">
+          <ModalHeader
+            eyebrow="Rename project"
+            title={renameProject?.name ?? ""}
+            subtitle="Change the display name of this project."
+            onClose={closeRenameProject}
+          />
+
+          <div className="space-y-4 px-5 pb-2">
+            {renameProjectError && (
+              <InlineAlert variant="error" size="sm">
+                {renameProjectError}
+              </InlineAlert>
+            )}
+
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-[#424143]">
+                New name
+              </label>
+              <FormInput
+                type="text"
+                value={renameProjectName}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRenameProjectName(e.target.value)}
+                placeholder="Project name"
+                disabled={renameProjectSaving}
+                autoFocus
+                onKeyDown={(e: React.KeyboardEvent) => {
+                  if (e.key === "Enter" && !renameProjectSaving) {
+                    e.preventDefault();
+                    handleRenameProject();
+                  }
+                }}
+              />
+            </div>
+          </div>
+
+          <ModalFooter>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={closeRenameProject}
+              disabled={renameProjectSaving}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleRenameProject}
+              loading={renameProjectSaving}
+              loadingText="Saving..."
+              disabled={!renameProjectName.trim() || renameProjectName.trim().length < 2}
+            >
+              Save
+            </Button>
+          </ModalFooter>
+        </Modal>
+
+        {/* Delete project confirmation modal */}
+        <Modal open={!!deleteProject} onClose={closeDeleteProject} size="sm">
+          <ModalHeader
+            eyebrow="Delete project"
+            title={deleteProject?.name ?? ""}
+            onClose={closeDeleteProject}
+          />
+
+          <div className="space-y-3 px-5 pb-2">
+            {deleteProjectError && (
+              <InlineAlert variant="error" size="sm">
+                {deleteProjectError}
+              </InlineAlert>
+            )}
+
+            <p className="text-sm text-[#424143]">
+              Are you sure you want to delete this project?
+            </p>
+
+            {deleteProject && deleteProject.ticketCount > 0 && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
+                <strong>{deleteProject.ticketCount} ticket{deleteProject.ticketCount !== 1 ? "s" : ""}</strong>{" "}
+                will be moved to &ldquo;No project&rdquo;. No tickets will be deleted.
+              </div>
+            )}
+
+            {deleteProject && deleteProject.ticketCount === 0 && (
+              <p className="text-[11px] text-[#9a9892]">
+                This project has no tickets.
+              </p>
+            )}
+          </div>
+
+          <ModalFooter>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={closeDeleteProject}
+              disabled={deleteProjectSaving}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleDeleteProject}
+              loading={deleteProjectSaving}
+              loadingText="Deleting..."
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete project
             </Button>
           </ModalFooter>
         </Modal>

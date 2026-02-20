@@ -93,6 +93,16 @@ export function canManageTags(
 }
 
 /**
+ * Who can manage projects (create/rename/delete) for a company.
+ * OWNER + PM can manage projects.
+ */
+export function canManageProjects(
+  role: CompanyRole | null | undefined,
+): boolean {
+  return isCompanyAdminRole(role); // OWNER + PM
+}
+
+/**
  * Board visibility: anyone who is actually a member of the company.
  */
 export function canViewBoard(
