@@ -83,13 +83,6 @@ export async function GET(_req: NextRequest) {
             code: true,
           },
         },
-        designer: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
         jobType: {
           select: {
             id: true,
@@ -138,7 +131,7 @@ export async function GET(_req: NextRequest) {
         projectId: t.project?.id ?? null,
         projectName: t.project?.name ?? null,
         projectCode: t.project?.code ?? null,
-        designerName: t.designer?.name ?? null,
+        isAssigned: t.designerId != null,
         jobTypeId: t.jobType?.id ?? null,
         jobTypeName: t.jobType?.name ?? null,
         createdAt: t.createdAt.toISOString(),

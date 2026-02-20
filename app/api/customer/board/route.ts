@@ -52,13 +52,6 @@ export async function GET(_req: NextRequest) {
             code: true,
           },
         },
-        designer: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
         jobType: {
           select: {
             id: true,
@@ -101,13 +94,7 @@ export async function GET(_req: NextRequest) {
             code: t.project.code,
           }
         : null,
-      designer: t.designer
-        ? {
-            id: t.designer.id,
-            name: t.designer.name,
-            email: t.designer.email,
-          }
-        : null,
+      isAssigned: t.designerId != null,
       jobType: t.jobType
         ? {
             id: t.jobType.id,

@@ -77,13 +77,6 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
             code: true,
           },
         },
-        designer: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
         jobType: {
           select: {
             id: true,
@@ -157,13 +150,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
                 code: ticket.project.code,
               }
             : null,
-          designer: ticket.designer
-            ? {
-                id: ticket.designer.id,
-                name: ticket.designer.name,
-                email: ticket.designer.email,
-              }
-            : null,
+          isAssigned: ticket.designerId != null,
           jobType: ticket.jobType
             ? {
                 id: ticket.jobType.id,
@@ -502,7 +489,6 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
                 designerPayoutTokens: true,
               },
             },
-            designer: { select: { id: true, name: true, email: true } },
             tagAssignments: {
               select: {
                 tag: { select: { id: true, name: true, color: true } },
@@ -537,13 +523,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
             projectCode: updated.project?.code ?? null,
             jobTypeId: updated.jobType?.id ?? null,
             jobTypeName: updated.jobType?.name ?? null,
-            designer: updated.designer
-              ? {
-                  id: updated.designer.id,
-                  name: updated.designer.name,
-                  email: updated.designer.email,
-                }
-              : null,
+            isAssigned: updated.designerId != null,
             tags: updated.tagAssignments.map((ta) => ({
               id: ta.tag.id,
               name: ta.tag.name,

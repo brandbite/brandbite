@@ -68,7 +68,7 @@ type CustomerBoardTicket = {
   projectId: string | null;
   projectName: string | null;
   projectCode: string | null;
-  designerName: string | null;
+  isAssigned: boolean;
   jobTypeId: string | null;
   jobTypeName: string | null;
   createdAt: string;
@@ -776,17 +776,10 @@ export default function CustomerBoardPage() {
     return () => document.removeEventListener("keydown", handler);
   }, []);
 
-  const uniqueDesigners = useMemo(() => {
-    const seen = new Set<string>();
-    const result: { name: string }[] = [];
-    for (const t of tickets) {
-      if (t.designerName && !seen.has(t.designerName)) {
-        seen.add(t.designerName);
-        result.push({ name: t.designerName });
-      }
-    }
-    return result;
-  }, [tickets]);
+  const assignedCount = useMemo(
+    () => tickets.filter((t) => t.isAssigned).length,
+    [tickets],
+  );
 
   const projectsWithColors = useMemo(() => {
     const projectMap = new Map<
@@ -1468,13 +1461,12 @@ export default function CustomerBoardPage() {
             >
               {priorityIconMap[ticket.priority]}
             </span>
-            {ticket.designerName && (
+            {ticket.isAssigned && (
               <span
-                className="flex h-6 w-6 items-center justify-center rounded-full text-[8px] font-bold text-white"
-                style={{ backgroundColor: avatarColor(ticket.designerName) }}
-                title={ticket.designerName}
+                className="flex h-6 w-6 items-center justify-center rounded-full bg-[#22C55E] text-[8px] font-bold text-white"
+                title="Assigned"
               >
-                {getInitials(ticket.designerName, null)}
+                &#x2713;
               </span>
             )}
           </div>
@@ -1713,25 +1705,12 @@ export default function CustomerBoardPage() {
               </span>
             </div>
 
-            {/* Member avatar circles */}
-            {uniqueDesigners.length > 0 && (
-              <div className="flex -space-x-1.5">
-                {uniqueDesigners.slice(0, 5).map((d) => (
-                  <span
-                    key={d.name}
-                    className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-[9px] font-bold text-white"
-                    style={{ backgroundColor: avatarColor(d.name) }}
-                    title={d.name}
-                  >
-                    {getInitials(d.name, null)}
-                  </span>
-                ))}
-                {uniqueDesigners.length > 5 && (
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[#e3e1dc] text-[8px] font-bold text-[#7a7a7a]">
-                    +{uniqueDesigners.length - 5}
-                  </span>
-                )}
-              </div>
+            {/* Assignment summary */}
+            {assignedCount > 0 && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#f0fdf4] px-2.5 py-1 text-[11px] font-medium text-[#22C55E]">
+                <span className="inline-block h-2 w-2 rounded-full bg-[#22C55E]" />
+                {assignedCount} assigned
+              </span>
             )}
 
             {/* Share button — copies board URL to clipboard */}
@@ -2430,16 +2409,17 @@ export default function CustomerBoardPage() {
                     </p>
                     <div className="flex items-center gap-2.5">
                       <div
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
-                        style={{ backgroundColor: avatarColor(detailTicket.designerName || "Unassigned") }}
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white ${
+                          detailTicket.isAssigned ? "bg-[#22C55E]" : "bg-[#9CA3AF]"
+                        }`}
                       >
-                        {getInitials(detailTicket.designerName, null)}
+                        {detailTicket.isAssigned ? "\u2713" : "\u2014"}
                       </div>
                       <div>
                         <p className="text-xs font-semibold text-[#424143]">
-                          {detailTicket.designerName || "Unassigned"}
+                          {detailTicket.isAssigned ? "Assigned" : "Unassigned"}
                         </p>
-                        <p className="text-[10px] text-[#9a9892]">Designer</p>
+                        <p className="text-[10px] text-[#9a9892]">Design team</p>
                       </div>
                     </div>
                   </div>

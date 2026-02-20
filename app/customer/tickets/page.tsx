@@ -38,7 +38,7 @@ type CustomerTicket = {
   priority: TicketPriority;
   projectName: string | null;
   projectCode: string | null;
-  designerName: string | null;
+  isAssigned: boolean;
   jobTypeName: string | null;
   createdAt: string;
   dueDate: string | null;
@@ -197,7 +197,6 @@ export default function CustomerTicketsPage() {
         t.code,
         t.title,
         t.projectName ?? "",
-        t.designerName ?? "",
         t.jobTypeName ?? "",
       ]
         .join(" ")
@@ -448,7 +447,7 @@ export default function CustomerTicketsPage() {
                 >
                   Priority
                 </TH>
-                <TH>Designer</TH>
+                <TH>Assigned</TH>
                 <TH>Job type</TH>
                 <TH
                   sortable
@@ -505,7 +504,7 @@ export default function CustomerTicketsPage() {
                     </TD>
                     <TD>
                       <div className="text-[11px] text-[#424143]">
-                        {t.designerName ?? "-"}
+                        {t.isAssigned ? "Yes" : "-"}
                       </div>
                     </TD>
                     <TD>

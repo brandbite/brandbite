@@ -84,7 +84,7 @@ type TicketDetailResponse = {
       tokenCost: number;
       designerPayoutTokens: number;
     } | null;
-    designer: { id: string; name: string | null; email: string } | null;
+    isAssigned: boolean;
     createdBy: { id: string; name: string | null; email: string } | null;
     tags: { id: string; name: string; color: string }[];
   };
@@ -1438,28 +1438,20 @@ export default function CustomerTicketDetailPage() {
                   </div>
                 </div>
 
-                {/* Designer */}
+                {/* Assignment status */}
                 <div className="flex items-center gap-2.5">
                   <div
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
-                    style={{
-                      backgroundColor: avatarColor(
-                        ticket.designer?.name || "Unassigned",
-                      ),
-                    }}
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white ${
+                      ticket.isAssigned ? "bg-[#22C55E]" : "bg-[#9CA3AF]"
+                    }`}
                   >
-                    {getInitials(
-                      ticket.designer?.name ?? null,
-                      ticket.designer?.email ?? null,
-                    )}
+                    {ticket.isAssigned ? "\u2713" : "\u2014"}
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-[#424143]">
-                      {ticket.designer?.name ||
-                        ticket.designer?.email ||
-                        "Unassigned"}
+                      {ticket.isAssigned ? "Assigned" : "Unassigned"}
                     </p>
-                    <p className="text-[10px] text-[#9a9892]">Designer</p>
+                    <p className="text-[10px] text-[#9a9892]">Design team</p>
                   </div>
                 </div>
               </div>
