@@ -401,14 +401,44 @@ export async function POST(req: NextRequest) {
       // 2) Decide designer assignment based on settings
       let assignedDesignerId: string | null = null;
       let assignmentReason: "AUTO_ASSIGN" | "FALLBACK" | null = null;
-      let fallbackMode: "settings_disabled" | "no_designers" | null = null;
+      let fallbackMode:
+        | "settings_disabled"
+        | "no_designers"
+        | "no_skilled_designers"
+        | null = null;
+      let skillFiltered = false;
+      let skilledDesignerCount = 0;
 
       if (autoAssignEffective) {
-        // auto-assign açık: load-based algoritma
-        const designers = await tx.userAccount.findMany({
-          where: { role: UserRole.DESIGNER },
-          select: { id: true },
-        });
+        // auto-assign açık: skill-filtered + load-based algoritma
+        let designers: { id: string }[];
+
+        if (jobType) {
+          // Find designers who have this job type as a skill
+          const skilledDesigners = await tx.designerSkill.findMany({
+            where: { jobTypeId: jobType.id },
+            select: { designerId: true },
+          });
+          designers = skilledDesigners.map((s) => ({ id: s.designerId }));
+          skilledDesignerCount = designers.length;
+          skillFiltered = true;
+
+          // Fallback: no skilled designers → use all designers
+          if (designers.length === 0) {
+            designers = await tx.userAccount.findMany({
+              where: { role: UserRole.DESIGNER },
+              select: { id: true },
+            });
+            skillFiltered = false;
+            fallbackMode = "no_skilled_designers";
+          }
+        } else {
+          // No job type specified: use all designers
+          designers = await tx.userAccount.findMany({
+            where: { role: UserRole.DESIGNER },
+            select: { id: true },
+          });
+        }
 
         if (designers.length > 0) {
           const designerIds = designers.map((d) => d.id);
@@ -554,11 +584,14 @@ export async function POST(req: NextRequest) {
             designerId: createdTicket.designerId,
             reason: "AUTO_ASSIGN",
             metadata: {
-              algorithm: "v2-priority-weighted-token-cost",
+              algorithm: "v3-skill-weighted-token-cost",
               source: "customer-ticket-create",
               autoAssignEffective: true,
               companyAutoAssignDefault,
               projectAutoAssignMode: projectAutoAssignMode ?? "INHERIT",
+              skillFiltered,
+              skilledDesignerCount,
+              jobTypeId: jobType?.id ?? null,
             },
           },
         });
@@ -574,9 +607,14 @@ export async function POST(req: NextRequest) {
               companyAutoAssignDefault,
               projectAutoAssignMode: projectAutoAssignMode ?? "INHERIT",
               fallbackMode,
+              skillFiltered,
+              skilledDesignerCount,
+              jobTypeId: jobType?.id ?? null,
               note:
                 fallbackMode === "settings_disabled"
                   ? "Auto-assign disabled by company/project settings."
+                  : fallbackMode === "no_skilled_designers"
+                  ? "No designers with matching skill found; fell back to all designers."
                   : "No active designers available in pool at assignment time.",
             },
           },

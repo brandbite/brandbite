@@ -43,6 +43,7 @@ async function main() {
   await prisma.withdrawal.deleteMany({});
   await prisma.ticketTagAssignment.deleteMany({});
   await prisma.ticketTag.deleteMany({});
+  await prisma.designerSkill.deleteMany({});
 
   // Sonra ticket ve diğer üst seviye kayıtlar
   await prisma.ticket.deleteMany({});
@@ -350,6 +351,21 @@ async function main() {
   });
 
   console.log("✅ JobTypes created.");
+
+  // ---------------------------------------------------------------------------
+  // 5a) DESIGNER SKILLS
+  // ---------------------------------------------------------------------------
+
+  await prisma.designerSkill.createMany({
+    data: [
+      { designerId: designerAda.id, jobTypeId: jobLandingHero.id },
+      { designerId: designerAda.id, jobTypeId: jobPricingVisuals.id },
+      { designerId: designerLiam.id, jobTypeId: jobPricingVisuals.id },
+      { designerId: designerLiam.id, jobTypeId: jobOnboarding.id },
+    ],
+  });
+
+  console.log("✅ Designer skills seeded.");
 
   // ---------------------------------------------------------------------------
   // 5b) TAGS (company-scoped labels for tickets)
