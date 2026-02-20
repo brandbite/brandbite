@@ -370,6 +370,12 @@ export default function CustomerBoardPage() {
     null,
   );
 
+  // New project modal
+  const [newProjectModalOpen, setNewProjectModalOpen] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
+  const [newProjectSaving, setNewProjectSaving] = useState(false);
+  const [newProjectError, setNewProjectError] = useState<string | null>(null);
+
   // Inline edit state for detail modal
   const [isEditingDetail, setIsEditingDetail] = useState(false);
   const [editForm, setEditForm] = useState<{
@@ -532,6 +538,53 @@ export default function CustomerBoardPage() {
   const closeNewTicketModal = () => {
     setNewTicketModalOpen(false);
     setNewTicketMetaError(null);
+  };
+
+  const openNewProjectModal = () => {
+    setNewProjectName("");
+    setNewProjectError(null);
+    setNewProjectModalOpen(true);
+  };
+
+  const closeNewProjectModal = () => {
+    setNewProjectModalOpen(false);
+    setNewProjectError(null);
+  };
+
+  const handleCreateProject = async () => {
+    const trimmed = newProjectName.trim();
+    if (!trimmed || trimmed.length < 2) {
+      setNewProjectError("Project name must be at least 2 characters.");
+      return;
+    }
+    setNewProjectSaving(true);
+    setNewProjectError(null);
+    try {
+      const res = await fetch("/api/customer/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setNewProjectError(json?.error || "Failed to create project.");
+        return;
+      }
+      closeNewProjectModal();
+      showToast({
+        type: "success",
+        title: "Project created",
+        description: `"${json.project.name}" (${json.project.code}) is ready.`,
+      });
+      // Refresh board data so the new project shows up in the sidebar
+      void load();
+      // Also refresh new-ticket metadata so the new project appears in forms
+      setNewTicketMeta(null);
+    } catch {
+      setNewProjectError("Unexpected error creating project.");
+    } finally {
+      setNewProjectSaving(false);
+    }
   };
 
   useEffect(() => {
@@ -1498,9 +1551,9 @@ export default function CustomerBoardPage() {
             </p>
             <button
               type="button"
-              onClick={openNewTicketModal}
-              className="flex h-5 w-5 items-center justify-center rounded-md bg-[#f5f3f0] text-xs text-[#7a7a7a] transition-colors hover:bg-[#e3e1dc] hover:text-[#424143]"
-              title="Create new request"
+              onClick={openNewProjectModal}
+              className="flex h-6 w-6 items-center justify-center rounded-lg bg-[#f15b2b] text-sm font-bold text-white shadow-sm transition-all hover:bg-[#d94e22] hover:shadow-md active:scale-95"
+              title="Create new project"
             >
               +
             </button>
@@ -1896,6 +1949,67 @@ export default function CustomerBoardPage() {
                   }}
                 />
               )}
+        </Modal>
+
+        {/* New project modal */}
+        <Modal open={newProjectModalOpen} onClose={closeNewProjectModal} size="sm">
+          <ModalHeader
+            eyebrow="New project"
+            title="Create a project"
+            subtitle="Group related design requests under one project."
+            onClose={closeNewProjectModal}
+          />
+
+          <div className="space-y-4 px-5 pb-2">
+            {newProjectError && (
+              <InlineAlert variant="error" size="sm">
+                {newProjectError}
+              </InlineAlert>
+            )}
+
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-[#424143]">
+                Project name
+              </label>
+              <FormInput
+                type="text"
+                value={newProjectName}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewProjectName(e.target.value)}
+                placeholder="e.g. Q1 Campaign, Website Redesign"
+                disabled={newProjectSaving}
+                autoFocus
+                onKeyDown={(e: React.KeyboardEvent) => {
+                  if (e.key === "Enter" && !newProjectSaving) {
+                    e.preventDefault();
+                    handleCreateProject();
+                  }
+                }}
+              />
+              <p className="text-[11px] text-[#9a9892]">
+                A short code will be generated automatically from the name.
+              </p>
+            </div>
+          </div>
+
+          <ModalFooter>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={closeNewProjectModal}
+              disabled={newProjectSaving}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleCreateProject}
+              loading={newProjectSaving}
+              loadingText="Creating..."
+              disabled={!newProjectName.trim() || newProjectName.trim().length < 2}
+            >
+              Create project
+            </Button>
+          </ModalFooter>
         </Modal>
 
         {/* Ticket detail modal — Jira-style two-column layout */}
