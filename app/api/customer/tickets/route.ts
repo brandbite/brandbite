@@ -443,13 +443,8 @@ export async function POST(req: NextRequest) {
           skilledDesignerCount = designers.length;
           skillFiltered = true;
 
-          // Fallback: no skilled designers → use all designers
+          // No skilled designers → leave unassigned for admin to handle
           if (designers.length === 0) {
-            designers = await tx.userAccount.findMany({
-              where: { role: UserRole.DESIGNER },
-              select: { id: true },
-            });
-            skillFiltered = false;
             fallbackMode = "no_skilled_designers";
           }
         } else {
@@ -545,7 +540,8 @@ export async function POST(req: NextRequest) {
           // Auto-assign açık ama hiç designer yok → fallback
           assignedDesignerId = null;
           assignmentReason = "FALLBACK";
-          fallbackMode = "no_designers";
+          // Preserve "no_skilled_designers" if already set; otherwise "no_designers"
+          if (!fallbackMode) fallbackMode = "no_designers";
         }
       } else {
         // Auto-assign ayarlardan kapalı → fallback/unassigned
@@ -653,7 +649,7 @@ export async function POST(req: NextRequest) {
                 fallbackMode === "settings_disabled"
                   ? "Auto-assign disabled by company/project settings."
                   : fallbackMode === "no_skilled_designers"
-                  ? "No designers with matching skill found; fell back to all designers."
+                  ? "No designers with matching skill found; ticket left unassigned for admin."
                   : "No active designers available in pool at assignment time.",
             },
           },
