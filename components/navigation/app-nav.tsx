@@ -30,6 +30,7 @@ const NAV_CONFIG: Record<
       { href: "/admin/tickets", label: "Tickets" },
       { href: "/admin/plans", label: "Plans" },
       { href: "/admin/job-types", label: "Job Types" },
+      { href: "/admin/job-type-categories", label: "Categories" },
       { href: "/admin/payout-rules", label: "Payout Rules" },
       { href: "/admin/ledger", label: "Ledger" },
       { href: "/admin/token-analytics", label: "Analytics" },

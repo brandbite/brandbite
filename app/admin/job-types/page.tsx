@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/admin/job-types/page.tsx
-// @purpose: Admin-facing management of job types (estimated hours → auto pricing)
-// @version: v2.0.0
+// @purpose: Admin-facing management of job types (estimated hours -> auto pricing)
+// @version: v3.0.0
 // @status: active
-// @lastUpdate: 2025-12-27
+// @lastUpdate: 2026-02-20
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -19,10 +19,19 @@ import { FormSelect } from "@/components/ui/form-field";
 import { LoadingState } from "@/components/ui/loading-state";
 import { Badge } from "@/components/ui/badge";
 
+type CategoryRef = {
+  id: string;
+  name: string;
+  slug: string;
+  icon: string | null;
+};
+
 type JobType = {
   id: string;
   name: string;
   category: string | null;
+  categoryId: string | null;
+  categoryRef: CategoryRef | null;
   description: string | null;
   tokenCost: number;
   designerPayoutTokens: number;
@@ -35,6 +44,16 @@ type JobType = {
   updatedAt: string;
 };
 
+type CategoryOption = {
+  id: string;
+  name: string;
+  slug: string;
+  icon: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  jobTypeCount: number;
+};
+
 type JobTypesResponse = {
   jobTypes: JobType[];
 };
@@ -45,11 +64,16 @@ export default function AdminJobTypesPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Categories from DB
+  const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([]);
+
   const [filterActive, setFilterActive] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
+  const [filterCategory, setFilterCategory] = useState<string>("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [selected, setSelected] = useState<JobType | null>(null);
   const [formName, setFormName] = useState("");
-  const [formCategory, setFormCategory] = useState("");
+  const [formCategoryId, setFormCategoryId] = useState("");
   const [formDescription, setFormDescription] = useState("");
   const [formEstimatedHours, setFormEstimatedHours] = useState("");
   const [formHasQuantity, setFormHasQuantity] = useState(false);
@@ -61,15 +85,42 @@ export default function AdminJobTypesPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
 
+  // Duplicate detection
+  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
+
   const jobTypes = data?.jobTypes ?? [];
 
+  // Filter and search
   const filteredJobTypes = useMemo(() => {
     return jobTypes.filter((jt) => {
-      if (filterActive === "ACTIVE") return jt.isActive;
-      if (filterActive === "INACTIVE") return !jt.isActive;
+      // Active filter
+      if (filterActive === "ACTIVE" && !jt.isActive) return false;
+      if (filterActive === "INACTIVE" && jt.isActive) return false;
+
+      // Category filter
+      if (filterCategory !== "ALL") {
+        if (filterCategory === "UNCATEGORIZED") {
+          if (jt.categoryId) return false;
+        } else {
+          if (jt.categoryId !== filterCategory) return false;
+        }
+      }
+
+      // Search filter
+      if (searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase();
+        const nameMatch = jt.name.toLowerCase().includes(q);
+        const descMatch = jt.description?.toLowerCase().includes(q) ?? false;
+        const catMatch =
+          jt.categoryRef?.name.toLowerCase().includes(q) ??
+          jt.category?.toLowerCase().includes(q) ??
+          false;
+        if (!nameMatch && !descMatch && !catMatch) return false;
+      }
+
       return true;
     });
-  }, [jobTypes, filterActive]);
+  }, [jobTypes, filterActive, filterCategory, searchQuery]);
 
   const activeCount = jobTypes.filter((jt) => jt.isActive).length;
   const inactiveCount = jobTypes.length - activeCount;
@@ -80,10 +131,35 @@ export default function AdminJobTypesPage() {
     : 0;
   const derivedDesignerPayout = Math.round(derivedTokenCost * 0.6);
 
+  // Duplicate detection — check when name changes
+  useEffect(() => {
+    const trimmed = formName.trim().toLowerCase();
+    if (!trimmed || trimmed.length < 2) {
+      setDuplicateWarning(null);
+      return;
+    }
+
+    const existing = jobTypes.find(
+      (jt) =>
+        jt.name.trim().toLowerCase() === trimmed &&
+        jt.id !== selected?.id,
+    );
+
+    if (existing) {
+      setDuplicateWarning(
+        `A job type named "${existing.name}" already exists${
+          existing.isActive ? "" : " (inactive)"
+        }.`,
+      );
+    } else {
+      setDuplicateWarning(null);
+    }
+  }, [formName, jobTypes, selected]);
+
   const resetForm = () => {
     setSelected(null);
     setFormName("");
-    setFormCategory("");
+    setFormCategoryId("");
     setFormDescription("");
     setFormEstimatedHours("");
     setFormHasQuantity(false);
@@ -92,12 +168,13 @@ export default function AdminJobTypesPage() {
     setFormIsActive(true);
     setSaveError(null);
     setSaveSuccess(null);
+    setDuplicateWarning(null);
   };
 
   const fillFormFromSelection = (jt: JobType) => {
     setSelected(jt);
     setFormName(jt.name);
-    setFormCategory(jt.category ?? "");
+    setFormCategoryId(jt.categoryId ?? "");
     setFormDescription(jt.description ?? "");
     // Fallback to tokenCost for legacy rows where estimatedHours was not set
     setFormEstimatedHours(
@@ -115,28 +192,32 @@ export default function AdminJobTypesPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/job-types", {
-        cache: "no-store",
-      });
-      const json = await res.json().catch(() => null);
+      const [jtRes, catRes] = await Promise.all([
+        fetch("/api/admin/job-types", { cache: "no-store" }),
+        fetch("/api/admin/job-type-categories", { cache: "no-store" }),
+      ]);
 
-      if (!res.ok) {
-        if (res.status === 401) {
+      const jtJson = await jtRes.json().catch(() => null);
+      const catJson = await catRes.json().catch(() => null);
+
+      if (!jtRes.ok) {
+        if (jtRes.status === 401) {
           throw new Error(
             "You must be signed in as an admin to view this page.",
           );
         }
-        if (res.status === 403) {
+        if (jtRes.status === 403) {
           throw new Error(
             "You do not have permission to manage job types.",
           );
         }
         const msg =
-          json?.error || `Request failed with status ${res.status}`;
+          jtJson?.error || `Request failed with status ${jtRes.status}`;
         throw new Error(msg);
       }
 
-      setData(json as JobTypesResponse);
+      setData(jtJson as JobTypesResponse);
+      setCategoryOptions((catJson?.categories ?? []) as CategoryOption[]);
     } catch (err: any) {
       console.error("Admin job types fetch error:", err);
       setError(
@@ -182,7 +263,11 @@ export default function AdminJobTypesPage() {
 
       const payload = {
         name: formName.trim(),
-        category: formCategory.trim() || null,
+        categoryId: formCategoryId || null,
+        // Also set legacy text field from category name for backward compat
+        category: formCategoryId
+          ? categoryOptions.find((c) => c.id === formCategoryId)?.name ?? null
+          : null,
         description: formDescription.trim() || null,
         estimatedHours,
         hasQuantity: formHasQuantity,
@@ -239,9 +324,9 @@ export default function AdminJobTypesPage() {
     }
   };
 
-  const formatDate = (iso: string) => {
-    const d = new Date(iso);
-    return d.toLocaleDateString();
+  /** Get display category name for a job type */
+  const getCategoryDisplay = (jt: JobType): string => {
+    return jt.categoryRef?.name ?? jt.category ?? "";
   };
 
   return (
@@ -274,7 +359,7 @@ export default function AdminJobTypesPage() {
               Total job types
             </p>
             <p className="mt-2 text-3xl font-semibold text-[#424143]">
-              {loading ? "\u2014" : jobTypes.length}
+              {loading ? "&mdash;" : jobTypes.length}
             </p>
             <p className="mt-1 text-xs text-[#9a9892]">
               All configured job types.
@@ -285,7 +370,7 @@ export default function AdminJobTypesPage() {
               Active
             </p>
             <p className="mt-2 text-2xl font-semibold text-[#424143]">
-              {loading ? "\u2014" : activeCount}
+              {loading ? "&mdash;" : activeCount}
             </p>
             <p className="mt-1 text-xs text-[#9a9892]">
               Job types available to customers.
@@ -296,7 +381,7 @@ export default function AdminJobTypesPage() {
               Inactive
             </p>
             <p className="mt-2 text-2xl font-semibold text-[#424143]">
-              {loading ? "\u2014" : inactiveCount}
+              {loading ? "&mdash;" : inactiveCount}
             </p>
             <p className="mt-1 text-xs text-[#9a9892]">
               Hidden job types kept for history.
@@ -308,7 +393,45 @@ export default function AdminJobTypesPage() {
         <section className="grid gap-4 md:grid-cols-[3fr_2fr]">
           {/* Left: table */}
           <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
-            <div className="mb-3 flex items-center justify-between">
+            {/* Search bar */}
+            <div className="mb-3">
+              <div className="relative">
+                <svg
+                  className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9a9892]"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+                  />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Search job types..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full rounded-lg border border-[#e3e1dc] bg-[#faf9f7] py-2 pl-10 pr-3 text-sm text-[#424143] outline-none placeholder:text-[#9a9892] transition-colors focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9a9892] hover:text-[#424143]"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Filters row */}
+            <div className="mb-3 flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-semibold tracking-tight">
                   Job type list
@@ -323,9 +446,25 @@ export default function AdminJobTypesPage() {
                   size="sm"
                   className="w-auto"
                 >
-                  <option value="ALL">All</option>
+                  <option value="ALL">All status</option>
                   <option value="ACTIVE">Active</option>
                   <option value="INACTIVE">Inactive</option>
+                </FormSelect>
+                <FormSelect
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value)}
+                  size="sm"
+                  className="w-auto"
+                >
+                  <option value="ALL">All categories</option>
+                  <option value="UNCATEGORIZED">Uncategorized</option>
+                  {categoryOptions
+                    .filter((c) => c.isActive)
+                    .map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.icon ? `${cat.icon} ` : ""}{cat.name}
+                      </option>
+                    ))}
                 </FormSelect>
               </div>
               <p className="text-xs text-[#9a9892]">
@@ -334,9 +473,15 @@ export default function AdminJobTypesPage() {
             </div>
 
             {loading ? (
-              <LoadingState message="Loading job types\u2026" />
+              <LoadingState message="Loading job types..." />
             ) : filteredJobTypes.length === 0 ? (
-              <EmptyState title="No job types match your filter." />
+              <EmptyState
+                title={
+                  searchQuery
+                    ? "No job types match your search."
+                    : "No job types match your filter."
+                }
+              />
             ) : (
               <div className="max-h-[420px] overflow-y-auto overflow-x-auto">
                 <table className="min-w-full text-left text-sm">
@@ -369,7 +514,16 @@ export default function AdminJobTypesPage() {
                           )}
                         </td>
                         <td className="px-2 py-2 align-top text-[11px] text-[#9a9892]">
-                          {jt.category || "\u2014"}
+                          {getCategoryDisplay(jt) ? (
+                            <span className="inline-flex items-center gap-1">
+                              {jt.categoryRef?.icon && (
+                                <span>{jt.categoryRef.icon}</span>
+                              )}
+                              {getCategoryDisplay(jt)}
+                            </span>
+                          ) : (
+                            <span className="text-[#d4d2cc]">&mdash;</span>
+                          )}
                         </td>
                         <td className="px-2 py-2 align-top text-right text-[11px] text-[#424143]">
                           {jt.estimatedHours ?? jt.tokenCost}{" "}
@@ -435,6 +589,11 @@ export default function AdminJobTypesPage() {
                   required
                   placeholder="e.g. Logo design"
                 />
+                {duplicateWarning && (
+                  <p className="text-[10px] text-amber-600">
+                    {duplicateWarning}
+                  </p>
+                )}
               </div>
 
               <div className="flex flex-col gap-1">
@@ -444,13 +603,31 @@ export default function AdminJobTypesPage() {
                 >
                   Category
                 </label>
-                <FormInput
+                <FormSelect
                   id="job-category"
-                  type="text"
-                  value={formCategory}
-                  onChange={(e) => setFormCategory(e.target.value)}
-                  placeholder="e.g. Visual Design & Brand Identity"
-                />
+                  value={formCategoryId}
+                  onChange={(e) => setFormCategoryId(e.target.value)}
+                >
+                  <option value="">No category</option>
+                  {categoryOptions
+                    .filter((c) => c.isActive)
+                    .map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.icon ? `${cat.icon} ` : ""}{cat.name}
+                      </option>
+                    ))}
+                </FormSelect>
+                {categoryOptions.length === 0 && !loading && (
+                  <p className="text-[10px] text-[#9a9892]">
+                    No categories yet.{" "}
+                    <a
+                      href="/admin/job-type-categories"
+                      className="text-[#f15b2b] underline"
+                    >
+                      Create categories
+                    </a>
+                  </p>
+                )}
               </div>
 
               <div className="flex flex-col gap-1">
@@ -576,7 +753,7 @@ export default function AdminJobTypesPage() {
               <Button
                 type="submit"
                 loading={saving}
-                loadingText="Saving\u2026"
+                loadingText="Saving..."
                 className="mt-2"
               >
                 {selected ? "Save changes" : "Create job type"}

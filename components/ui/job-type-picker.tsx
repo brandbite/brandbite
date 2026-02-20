@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: components/ui/job-type-picker.tsx
-// @purpose: Modal-based job type picker with category filtering and search
-// @version: v1.0.0
+// @purpose: Modal-based job type picker with dynamic category filtering and search
+// @version: v2.0.0
 // @status: active
-// @lastUpdate: 2025-02-19
+// @lastUpdate: 2026-02-20
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -21,6 +21,7 @@ type JobTypeOption = {
   id: string;
   name: string;
   category: string | null;
+  categorySortOrder?: number;
   description: string | null;
   tokenCost?: number;
   hasQuantity?: boolean;
@@ -36,27 +37,6 @@ type JobTypePickerProps = {
 };
 
 /* -------------------------------------------------------------------------- */
-/*  Category ordering                                                          */
-/* -------------------------------------------------------------------------- */
-
-const CATEGORY_ORDER = [
-  "Brand Strategy & Creative Direction",
-  "Copywriting & Creative Writing",
-  "Visual Design & Brand Identity",
-  "Digital Content & Marketing",
-  "Video & Motion Production",
-];
-
-/** Short labels for the category pills on mobile */
-const CATEGORY_SHORT: Record<string, string> = {
-  "Brand Strategy & Creative Direction": "Strategy",
-  "Copywriting & Creative Writing": "Copywriting",
-  "Visual Design & Brand Identity": "Visual Design",
-  "Digital Content & Marketing": "Digital",
-  "Video & Motion Production": "Video & Motion",
-};
-
-/* -------------------------------------------------------------------------- */
 /*  Helpers                                                                    */
 /* -------------------------------------------------------------------------- */
 
@@ -64,15 +44,31 @@ function getCategoryName(jt: JobTypeOption): string {
   return jt.category || "Other";
 }
 
-function sortedCategories(cats: string[]): string[] {
+/**
+ * Sort categories using categorySortOrder from DB.
+ * Categories without a sort order go last, sorted alphabetically.
+ */
+function sortedCategories(
+  cats: string[],
+  sortOrderMap: Map<string, number>,
+): string[] {
   return [...cats].sort((a, b) => {
-    const ai = CATEGORY_ORDER.indexOf(a);
-    const bi = CATEGORY_ORDER.indexOf(b);
-    if (ai === -1 && bi === -1) return a.localeCompare(b);
-    if (ai === -1) return 1;
-    if (bi === -1) return -1;
-    return ai - bi;
+    const aOrder = sortOrderMap.get(a) ?? 999;
+    const bOrder = sortOrderMap.get(b) ?? 999;
+    if (aOrder !== bOrder) return aOrder - bOrder;
+    return a.localeCompare(b);
   });
+}
+
+/** Short label for mobile pills — take first word or first N chars */
+function shortLabel(cat: string): string {
+  // If it contains "&", take text before "&"
+  const parts = cat.split("&");
+  if (parts.length > 1) {
+    return parts[0].trim().split(/\s+/).slice(0, 2).join(" ");
+  }
+  // Otherwise take first 2 words
+  return cat.split(/\s+/).slice(0, 2).join(" ");
 }
 
 /* -------------------------------------------------------------------------- */
@@ -115,11 +111,23 @@ export function JobTypePicker({
   // Derived data
   // ---------------------------------------------------------------------------
 
+  /** Build a map of category name -> sortOrder from job type data */
+  const categorySortOrderMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const jt of jobTypes) {
+      const cat = getCategoryName(jt);
+      if (jt.categorySortOrder !== undefined && !map.has(cat)) {
+        map.set(cat, jt.categorySortOrder);
+      }
+    }
+    return map;
+  }, [jobTypes]);
+
   /** All unique category names in sorted order */
   const categories = useMemo(() => {
     const names = new Set(jobTypes.map(getCategoryName));
-    return sortedCategories(Array.from(names));
-  }, [jobTypes]);
+    return sortedCategories(Array.from(names), categorySortOrderMap);
+  }, [jobTypes, categorySortOrderMap]);
 
   /** Job types grouped by category */
   const grouped = useMemo(() => {
@@ -262,7 +270,7 @@ export function JobTypePicker({
 
   return (
     <>
-      {/* ── Trigger button ──────────────────────────────────────────────── */}
+      {/* -- Trigger button ------------------------------------------------- */}
       <button
         type="button"
         onClick={handleOpen}
@@ -295,7 +303,7 @@ export function JobTypePicker({
               </div>
             </>
           ) : (
-            <span>Choose a service type…</span>
+            <span>Choose a service type&hellip;</span>
           )}
         </div>
 
@@ -315,7 +323,7 @@ export function JobTypePicker({
         </svg>
       </button>
 
-      {/* ── Modal ───────────────────────────────────────────────────────── */}
+      {/* -- Modal ---------------------------------------------------------- */}
       <Modal open={open} onClose={handleClose} size="full">
         {/* Header */}
         <ModalHeader
@@ -343,7 +351,7 @@ export function JobTypePicker({
             <input
               ref={searchRef}
               type="text"
-              placeholder="Search services…"
+              placeholder="Search services&hellip;"
               value={search}
               onChange={handleSearchChange}
               onKeyDown={handleSearchKeyDown}
@@ -365,9 +373,9 @@ export function JobTypePicker({
           </div>
         </div>
 
-        {/* ── Body: sidebar + list ──────────────────────────────────────── */}
+        {/* -- Body: sidebar + list ----------------------------------------- */}
         <div className="flex min-h-0 flex-1 flex-col gap-3 md:flex-row md:gap-4">
-          {/* Category sidebar — desktop: vertical, mobile: horizontal pills */}
+          {/* Category sidebar -- desktop: vertical, mobile: horizontal pills */}
 
           {/* Desktop sidebar */}
           <nav className="hidden shrink-0 md:flex md:w-[200px] md:flex-col md:gap-1">
@@ -439,7 +447,7 @@ export function JobTypePicker({
                         : "bg-[var(--bb-bg-card)] text-[var(--bb-text-secondary)] border border-[var(--bb-border)]"
                   }`}
                 >
-                  {CATEGORY_SHORT[cat] ?? cat} ({count})
+                  {shortLabel(cat)} ({count})
                 </button>
               );
             })}
@@ -457,7 +465,7 @@ export function JobTypePicker({
             ) : (
               Array.from(filteredGrouped.entries()).map(([cat, items]) => (
                 <div key={cat}>
-                  {/* Category header — sticky */}
+                  {/* Category header -- sticky */}
                   <div className="sticky top-0 z-10 border-b border-[var(--bb-border-subtle)] bg-[var(--bb-bg-warm)] px-4 py-2">
                     <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--bb-text-tertiary)]">
                       {cat}
@@ -525,7 +533,7 @@ export function JobTypePicker({
           </div>
         </div>
 
-        {/* ── Footer ────────────────────────────────────────────────────── */}
+        {/* -- Footer ------------------------------------------------------- */}
         <div className="mt-4 flex shrink-0 items-center justify-between gap-3 border-t border-[var(--bb-border-subtle)] pt-4">
           <div className="min-w-0 flex-1 text-xs text-[var(--bb-text-tertiary)]">
             {pendingJobType ? (

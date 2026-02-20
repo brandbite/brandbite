@@ -1,8 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/services/page.tsx
 // @purpose: Customer-facing service catalog with category grouping
-// @version: v1.0.0
+// @version: v2.0.0
 // @status: active
+// @lastUpdate: 2026-02-20
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -20,6 +21,8 @@ type Service = {
   id: string;
   name: string;
   category: string | null;
+  categoryIcon: string | null;
+  categorySortOrder: number;
   description: string | null;
   tokenCost: number;
   estimatedHours: number | null;
@@ -28,24 +31,12 @@ type Service = {
   defaultQuantity: number;
 };
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-const CATEGORY_ORDER = [
-  "Brand Strategy & Creative Direction",
-  "Copywriting & Creative Writing",
-  "Visual Design & Brand Identity",
-  "Digital Content & Marketing",
-  "Video & Motion Production",
-];
-
-const CATEGORY_ICONS: Record<string, string> = {
-  "Brand Strategy & Creative Direction": "\u2728",
-  "Copywriting & Creative Writing": "\u270D\uFE0F",
-  "Visual Design & Brand Identity": "\uD83C\uDFA8",
-  "Digital Content & Marketing": "\uD83D\uDCF1",
-  "Video & Motion Production": "\uD83C\uDFAC",
+type CategoryInfo = {
+  id: string;
+  name: string;
+  slug: string;
+  icon: string | null;
+  sortOrder: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -54,6 +45,7 @@ const CATEGORY_ICONS: Record<string, string> = {
 
 export default function CustomerServicesPage() {
   const [services, setServices] = useState<Service[]>([]);
+  const [categories, setCategories] = useState<CategoryInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -76,6 +68,7 @@ export default function CustomerServicesPage() {
 
         if (!cancelled) {
           setServices(json.services ?? []);
+          setCategories(json.categories ?? []);
         }
       } catch (err: unknown) {
         if (!cancelled) {
@@ -94,13 +87,15 @@ export default function CustomerServicesPage() {
     };
   }, []);
 
-  // Group services by category in defined order
+  // Group services by category, using DB sort order
   const grouped = useMemo(() => {
-    const map = new Map<string, Service[]>();
-
-    for (const cat of CATEGORY_ORDER) {
-      map.set(cat, []);
+    // Build a category order map from DB categories
+    const catOrderMap = new Map<string, { sortOrder: number; icon: string | null }>();
+    for (const cat of categories) {
+      catOrderMap.set(cat.name, { sortOrder: cat.sortOrder, icon: cat.icon });
     }
+
+    const map = new Map<string, Service[]>();
 
     for (const svc of services) {
       const cat = svc.category ?? "Other";
@@ -108,16 +103,28 @@ export default function CustomerServicesPage() {
       map.get(cat)!.push(svc);
     }
 
-    // Remove empty categories
-    const result: { category: string; services: Service[] }[] = [];
-    for (const [category, items] of map) {
+    // Sort by category sort order (from DB), then alphabetically for unknowns
+    const result: { category: string; icon: string | null; services: Service[] }[] = [];
+    const sortedCats = [...map.keys()].sort((a, b) => {
+      const aOrder = catOrderMap.get(a)?.sortOrder ?? 999;
+      const bOrder = catOrderMap.get(b)?.sortOrder ?? 999;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return a.localeCompare(b);
+    });
+
+    for (const category of sortedCats) {
+      const items = map.get(category) ?? [];
       if (items.length > 0) {
-        result.push({ category, services: items });
+        const icon =
+          catOrderMap.get(category)?.icon ??
+          items[0]?.categoryIcon ??
+          null;
+        result.push({ category, icon, services: items });
       }
     }
 
     return result;
-  }, [services]);
+  }, [services, categories]);
 
   // Filtered view
   const visibleGroups = activeCategory
@@ -184,7 +191,7 @@ export default function CustomerServicesPage() {
                   : "border border-[var(--bb-border)] bg-white text-[#7a7a7a] hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
               }`}
             >
-              {CATEGORY_ICONS[g.category] ?? ""}{" "}
+              {g.icon ?? ""}{" "}
               {g.category} ({g.services.length})
             </button>
           ))}
@@ -199,7 +206,7 @@ export default function CustomerServicesPage() {
               {/* Category header */}
               <div className="mb-4 flex items-center gap-3">
                 <h2 className="text-base font-semibold text-[var(--bb-secondary)]">
-                  {CATEGORY_ICONS[group.category] ?? ""}{" "}
+                  {group.icon ?? ""}{" "}
                   {group.category}
                 </h2>
                 <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[10px] font-medium text-[#7a7a7a]">

@@ -340,6 +340,24 @@ model ProjectMember {
 }
 
 // -----------------------------------------------------------------------------
+// Job Type Categories
+// -----------------------------------------------------------------------------
+
+model JobTypeCategory {
+  id        String  @id @default(cuid())
+  name      String  @unique
+  slug      String  @unique
+  icon      String? // emoji or icon identifier
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  jobTypes JobType[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
 // Job Types
 // -----------------------------------------------------------------------------
 
@@ -347,7 +365,9 @@ model JobType {
   id String @id @default(cuid())
 
   name                 String
-  category             String?           // e.g. "Visual Design & Brand Identity"
+  category             String?           // legacy free-text category (kept for migration)
+  categoryId           String?
+  categoryRef          JobTypeCategory?  @relation(fields: [categoryId], references: [id])
   description          String?
   tokenCost            Int
   designerPayoutTokens Int // seed.mjs ile uyumlu
@@ -369,6 +389,8 @@ model JobType {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([categoryId])
 }
 
 // -----------------------------------------------------------------------------

@@ -56,12 +56,15 @@ export default async function CustomerNewTicketPage({
     },
   });
 
-  const jobTypes = await prisma.jobType.findMany({
+  const rawJobTypes = await prisma.jobType.findMany({
     where: { isActive: true },
     select: {
       id: true,
       name: true,
       category: true,
+      categoryRef: {
+        select: { name: true, icon: true, sortOrder: true },
+      },
       description: true,
       tokenCost: true,
       hasQuantity: true,
@@ -72,6 +75,19 @@ export default async function CustomerNewTicketPage({
       name: "asc",
     },
   });
+
+  // Flatten categoryRef into the job type for the picker
+  const jobTypes = rawJobTypes.map((jt) => ({
+    id: jt.id,
+    name: jt.name,
+    category: jt.categoryRef?.name ?? jt.category,
+    categorySortOrder: jt.categoryRef?.sortOrder ?? 999,
+    description: jt.description,
+    tokenCost: jt.tokenCost,
+    hasQuantity: jt.hasQuantity,
+    quantityLabel: jt.quantityLabel,
+    defaultQuantity: jt.defaultQuantity,
+  }));
 
   const tags = await prisma.ticketTag.findMany({
     where: { companyId: company.id },

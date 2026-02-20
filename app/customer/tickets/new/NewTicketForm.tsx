@@ -34,6 +34,7 @@ type JobTypeOption = {
   id: string;
   name: string;
   category: string | null;
+  categorySortOrder?: number;
   description: string | null;
   tokenCost?: number;
   hasQuantity?: boolean;

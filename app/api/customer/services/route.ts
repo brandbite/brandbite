@@ -30,6 +30,10 @@ export async function GET(_req: NextRequest) {
         id: true,
         name: true,
         category: true,
+        categoryId: true,
+        categoryRef: {
+          select: { id: true, name: true, slug: true, icon: true, sortOrder: true },
+        },
         description: true,
         tokenCost: true,
         estimatedHours: true,
@@ -40,7 +44,29 @@ export async function GET(_req: NextRequest) {
       orderBy: { name: "asc" },
     });
 
-    return NextResponse.json({ services: jobTypes });
+    // Also fetch all active categories for proper ordering
+    const categories = await prisma.jobTypeCategory.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, slug: true, icon: true, sortOrder: true },
+      orderBy: { sortOrder: "asc" },
+    });
+
+    // Map services — prefer categoryRef.name over legacy text field
+    const services = jobTypes.map((jt) => ({
+      id: jt.id,
+      name: jt.name,
+      category: jt.categoryRef?.name ?? jt.category,
+      categoryIcon: jt.categoryRef?.icon ?? null,
+      categorySortOrder: jt.categoryRef?.sortOrder ?? 999,
+      description: jt.description,
+      tokenCost: jt.tokenCost,
+      estimatedHours: jt.estimatedHours,
+      hasQuantity: jt.hasQuantity,
+      quantityLabel: jt.quantityLabel,
+      defaultQuantity: jt.defaultQuantity,
+    }));
+
+    return NextResponse.json({ services, categories });
   } catch (error: any) {
     if (error?.code === "UNAUTHENTICATED") {
       return NextResponse.json(

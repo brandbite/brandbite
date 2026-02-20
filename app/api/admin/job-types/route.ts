@@ -29,12 +29,26 @@ export async function GET(_req: NextRequest) {
 
     const jobTypes = await prisma.jobType.findMany({
       orderBy: { createdAt: "asc" },
+      include: {
+        categoryRef: {
+          select: { id: true, name: true, slug: true, icon: true },
+        },
+      },
     });
 
     const items = jobTypes.map((jt) => ({
       id: jt.id,
       name: jt.name,
       category: jt.category,
+      categoryId: jt.categoryId,
+      categoryRef: jt.categoryRef
+        ? {
+            id: jt.categoryRef.id,
+            name: jt.categoryRef.name,
+            slug: jt.categoryRef.slug,
+            icon: jt.categoryRef.icon,
+          }
+        : null,
       description: jt.description,
       tokenCost: jt.tokenCost,
       designerPayoutTokens: jt.designerPayoutTokens,
@@ -83,6 +97,7 @@ export async function POST(req: NextRequest) {
 
     const name = (body?.name as string | undefined)?.trim();
     const category = (body?.category as string | undefined)?.trim() || null;
+    const categoryId = (body?.categoryId as string | undefined) || null;
     const description = (body?.description as string | undefined)?.trim();
     const estimatedHoursRaw = body?.estimatedHours;
     const isActiveRaw = body?.isActive;
@@ -126,6 +141,7 @@ export async function POST(req: NextRequest) {
       data: {
         name,
         category,
+        categoryId,
         description: description || null,
         estimatedHours,
         tokenCost,
@@ -137,12 +153,24 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // Fetch with category relation for response
+    const withCategory = await prisma.jobType.findUnique({
+      where: { id: created.id },
+      include: {
+        categoryRef: {
+          select: { id: true, name: true, slug: true, icon: true },
+        },
+      },
+    });
+
     return NextResponse.json(
       {
         jobType: {
           id: created.id,
           name: created.name,
           category: created.category,
+          categoryId: created.categoryId,
+          categoryRef: withCategory?.categoryRef ?? null,
           description: created.description,
           tokenCost: created.tokenCost,
           designerPayoutTokens: created.designerPayoutTokens,
@@ -201,6 +229,7 @@ export async function PATCH(req: NextRequest) {
     const data: {
       name?: string;
       category?: string | null;
+      categoryId?: string | null;
       description?: string | null;
       estimatedHours?: number;
       tokenCost?: number;
@@ -256,6 +285,12 @@ export async function PATCH(req: NextRequest) {
       data.category = body.category.trim() || null;
     }
 
+    if (body?.categoryId === null) {
+      data.categoryId = null;
+    } else if (typeof body?.categoryId === "string") {
+      data.categoryId = body.categoryId;
+    }
+
     if (typeof body?.hasQuantity === "boolean") {
       data.hasQuantity = body.hasQuantity;
     }
@@ -284,6 +319,11 @@ export async function PATCH(req: NextRequest) {
     const updated = await prisma.jobType.update({
       where: { id },
       data,
+      include: {
+        categoryRef: {
+          select: { id: true, name: true, slug: true, icon: true },
+        },
+      },
     });
 
     return NextResponse.json({
@@ -291,6 +331,8 @@ export async function PATCH(req: NextRequest) {
         id: updated.id,
         name: updated.name,
         category: updated.category,
+        categoryId: updated.categoryId,
+        categoryRef: updated.categoryRef ?? null,
         description: updated.description,
         tokenCost: updated.tokenCost,
         designerPayoutTokens: updated.designerPayoutTokens,
