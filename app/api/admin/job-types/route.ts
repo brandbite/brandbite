@@ -1,15 +1,16 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/admin/job-types/route.ts
-// @purpose: Admin API for managing job types (token cost & designer payout)
-// @version: v1.0.0
+// @purpose: Admin API for managing job types (estimated hours → auto token pricing)
+// @version: v2.0.0
 // @status: active
-// @lastUpdate: 2025-11-15
+// @lastUpdate: 2025-12-27
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { isSiteAdminRole } from "@/lib/roles";
+import { BASE_PAYOUT_PERCENT } from "@/lib/token-engine";
 
 // -----------------------------------------------------------------------------
 // GET: list all job types
@@ -83,8 +84,7 @@ export async function POST(req: NextRequest) {
     const name = (body?.name as string | undefined)?.trim();
     const category = (body?.category as string | undefined)?.trim() || null;
     const description = (body?.description as string | undefined)?.trim();
-    const tokenCostRaw = body?.tokenCost;
-    const designerPayoutTokensRaw = body?.designerPayoutTokens;
+    const estimatedHoursRaw = body?.estimatedHours;
     const isActiveRaw = body?.isActive;
     const hasQuantity = typeof body?.hasQuantity === "boolean" ? body.hasQuantity : false;
     const quantityLabel = (body?.quantityLabel as string | undefined)?.trim() || null;
@@ -97,39 +97,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const tokenCost =
-      typeof tokenCostRaw === "string"
-        ? parseInt(tokenCostRaw, 10)
-        : tokenCostRaw;
-    const designerPayoutTokens =
-      typeof designerPayoutTokensRaw === "string"
-        ? parseInt(designerPayoutTokensRaw, 10)
-        : designerPayoutTokensRaw;
+    const estimatedHours =
+      typeof estimatedHoursRaw === "string"
+        ? parseInt(estimatedHoursRaw, 10)
+        : estimatedHoursRaw;
 
     if (
-      typeof tokenCost !== "number" ||
-      !Number.isFinite(tokenCost) ||
-      tokenCost <= 0
+      typeof estimatedHours !== "number" ||
+      !Number.isFinite(estimatedHours) ||
+      estimatedHours <= 0
     ) {
       return NextResponse.json(
-        { error: "tokenCost must be a positive integer" },
+        { error: "estimatedHours must be a positive integer" },
         { status: 400 },
       );
     }
 
-    if (
-      typeof designerPayoutTokens !== "number" ||
-      !Number.isFinite(designerPayoutTokens) ||
-      designerPayoutTokens < 0
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "designerPayoutTokens must be a non-negative integer",
-        },
-        { status: 400 },
-      );
-    }
+    // Derive token values from estimated hours
+    const tokenCost = estimatedHours;
+    const designerPayoutTokens = Math.round(
+      estimatedHours * (BASE_PAYOUT_PERCENT / 100),
+    );
 
     const isActive =
       typeof isActiveRaw === "boolean" ? isActiveRaw : true;
@@ -139,6 +127,7 @@ export async function POST(req: NextRequest) {
         name,
         category,
         description: description || null,
+        estimatedHours,
         tokenCost,
         designerPayoutTokens,
         hasQuantity,
@@ -213,6 +202,7 @@ export async function PATCH(req: NextRequest) {
       name?: string;
       category?: string | null;
       description?: string | null;
+      estimatedHours?: number;
       tokenCost?: number;
       designerPayoutTokens?: number;
       hasQuantity?: boolean;
@@ -238,43 +228,26 @@ export async function PATCH(req: NextRequest) {
       data.description = body.description.trim() || null;
     }
 
-    if (body?.tokenCost !== undefined) {
-      const tokenCost =
-        typeof body.tokenCost === "string"
-          ? parseInt(body.tokenCost, 10)
-          : body.tokenCost;
+    if (body?.estimatedHours !== undefined) {
+      const estimatedHours =
+        typeof body.estimatedHours === "string"
+          ? parseInt(body.estimatedHours, 10)
+          : body.estimatedHours;
       if (
-        typeof tokenCost !== "number" ||
-        !Number.isFinite(tokenCost) ||
-        tokenCost <= 0
+        typeof estimatedHours !== "number" ||
+        !Number.isFinite(estimatedHours) ||
+        estimatedHours <= 0
       ) {
         return NextResponse.json(
-          { error: "tokenCost must be a positive integer" },
+          { error: "estimatedHours must be a positive integer" },
           { status: 400 },
         );
       }
-      data.tokenCost = tokenCost;
-    }
-
-    if (body?.designerPayoutTokens !== undefined) {
-      const designerPayoutTokens =
-        typeof body.designerPayoutTokens === "string"
-          ? parseInt(body.designerPayoutTokens, 10)
-          : body.designerPayoutTokens;
-      if (
-        typeof designerPayoutTokens !== "number" ||
-        !Number.isFinite(designerPayoutTokens) ||
-        designerPayoutTokens < 0
-      ) {
-        return NextResponse.json(
-          {
-            error:
-              "designerPayoutTokens must be a non-negative integer",
-          },
-          { status: 400 },
-        );
-      }
-      data.designerPayoutTokens = designerPayoutTokens;
+      data.estimatedHours = estimatedHours;
+      data.tokenCost = estimatedHours;
+      data.designerPayoutTokens = Math.round(
+        estimatedHours * (BASE_PAYOUT_PERCENT / 100),
+      );
     }
 
     if (body?.category === null) {

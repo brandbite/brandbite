@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/admin/job-types/page.tsx
-// @purpose: Admin-facing management of job types (token cost & designer payout)
-// @version: v1.0.0
+// @purpose: Admin-facing management of job types (estimated hours → auto pricing)
+// @version: v2.0.0
 // @status: active
-// @lastUpdate: 2025-11-15
+// @lastUpdate: 2025-12-27
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -22,9 +22,14 @@ import { Badge } from "@/components/ui/badge";
 type JobType = {
   id: string;
   name: string;
+  category: string | null;
   description: string | null;
   tokenCost: number;
   designerPayoutTokens: number;
+  estimatedHours: number | null;
+  hasQuantity: boolean;
+  quantityLabel: string | null;
+  defaultQuantity: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -44,9 +49,12 @@ export default function AdminJobTypesPage() {
 
   const [selected, setSelected] = useState<JobType | null>(null);
   const [formName, setFormName] = useState("");
+  const [formCategory, setFormCategory] = useState("");
   const [formDescription, setFormDescription] = useState("");
-  const [formTokenCost, setFormTokenCost] = useState("");
-  const [formDesignerPayout, setFormDesignerPayout] = useState("");
+  const [formEstimatedHours, setFormEstimatedHours] = useState("");
+  const [formHasQuantity, setFormHasQuantity] = useState(false);
+  const [formQuantityLabel, setFormQuantityLabel] = useState("");
+  const [formDefaultQuantity, setFormDefaultQuantity] = useState("1");
   const [formIsActive, setFormIsActive] = useState(true);
 
   const [saving, setSaving] = useState(false);
@@ -66,12 +74,21 @@ export default function AdminJobTypesPage() {
   const activeCount = jobTypes.filter((jt) => jt.isActive).length;
   const inactiveCount = jobTypes.length - activeCount;
 
+  // Derived token values (auto-calculated from estimated hours)
+  const derivedTokenCost = formEstimatedHours
+    ? parseInt(formEstimatedHours, 10) || 0
+    : 0;
+  const derivedDesignerPayout = Math.round(derivedTokenCost * 0.6);
+
   const resetForm = () => {
     setSelected(null);
     setFormName("");
+    setFormCategory("");
     setFormDescription("");
-    setFormTokenCost("");
-    setFormDesignerPayout("");
+    setFormEstimatedHours("");
+    setFormHasQuantity(false);
+    setFormQuantityLabel("");
+    setFormDefaultQuantity("1");
     setFormIsActive(true);
     setSaveError(null);
     setSaveSuccess(null);
@@ -80,9 +97,15 @@ export default function AdminJobTypesPage() {
   const fillFormFromSelection = (jt: JobType) => {
     setSelected(jt);
     setFormName(jt.name);
+    setFormCategory(jt.category ?? "");
     setFormDescription(jt.description ?? "");
-    setFormTokenCost(String(jt.tokenCost));
-    setFormDesignerPayout(String(jt.designerPayoutTokens));
+    // Fallback to tokenCost for legacy rows where estimatedHours was not set
+    setFormEstimatedHours(
+      String(jt.estimatedHours ?? jt.tokenCost),
+    );
+    setFormHasQuantity(jt.hasQuantity);
+    setFormQuantityLabel(jt.quantityLabel ?? "");
+    setFormDefaultQuantity(String(jt.defaultQuantity));
     setFormIsActive(jt.isActive);
     setSaveError(null);
     setSaveSuccess(null);
@@ -155,11 +178,18 @@ export default function AdminJobTypesPage() {
     setSaveSuccess(null);
 
     try {
+      const estimatedHours = parseInt(formEstimatedHours, 10);
+
       const payload = {
         name: formName.trim(),
+        category: formCategory.trim() || null,
         description: formDescription.trim() || null,
-        tokenCost: parseInt(formTokenCost, 10),
-        designerPayoutTokens: parseInt(formDesignerPayout, 10),
+        estimatedHours,
+        hasQuantity: formHasQuantity,
+        quantityLabel: formHasQuantity ? formQuantityLabel.trim() || null : null,
+        defaultQuantity: formHasQuantity
+          ? Math.max(1, parseInt(formDefaultQuantity, 10) || 1)
+          : 1,
         isActive: formIsActive,
       };
 
@@ -223,7 +253,8 @@ export default function AdminJobTypesPage() {
               Job types
             </h1>
             <p className="mt-1 text-sm text-[#7a7a7a]">
-              Configure token cost and designer payout for each job type.
+              Set estimated hours for each job type. Token cost and designer
+              payout are calculated automatically.
             </p>
           </div>
           <Button onClick={handleNewClick}>New job type</Button>
@@ -243,7 +274,7 @@ export default function AdminJobTypesPage() {
               Total job types
             </p>
             <p className="mt-2 text-3xl font-semibold text-[#424143]">
-              {loading ? "—" : jobTypes.length}
+              {loading ? "\u2014" : jobTypes.length}
             </p>
             <p className="mt-1 text-xs text-[#9a9892]">
               All configured job types.
@@ -254,7 +285,7 @@ export default function AdminJobTypesPage() {
               Active
             </p>
             <p className="mt-2 text-2xl font-semibold text-[#424143]">
-              {loading ? "—" : activeCount}
+              {loading ? "\u2014" : activeCount}
             </p>
             <p className="mt-1 text-xs text-[#9a9892]">
               Job types available to customers.
@@ -265,7 +296,7 @@ export default function AdminJobTypesPage() {
               Inactive
             </p>
             <p className="mt-2 text-2xl font-semibold text-[#424143]">
-              {loading ? "—" : inactiveCount}
+              {loading ? "\u2014" : inactiveCount}
             </p>
             <p className="mt-1 text-xs text-[#9a9892]">
               Hidden job types kept for history.
@@ -303,7 +334,7 @@ export default function AdminJobTypesPage() {
             </div>
 
             {loading ? (
-              <LoadingState message="Loading job types…" />
+              <LoadingState message="Loading job types\u2026" />
             ) : filteredJobTypes.length === 0 ? (
               <EmptyState title="No job types match your filter." />
             ) : (
@@ -312,10 +343,10 @@ export default function AdminJobTypesPage() {
                   <thead>
                     <tr className="border-b border-[#e3e1dc] text-xs uppercase tracking-[0.08em] text-[#9a9892]">
                       <th className="px-2 py-2">Name</th>
-                      <th className="px-2 py-2 text-right">Cost</th>
-                      <th className="px-2 py-2 text-right">Payout</th>
+                      <th className="px-2 py-2">Category</th>
+                      <th className="px-2 py-2 text-right">Est. Hours</th>
+                      <th className="px-2 py-2 text-center">Qty</th>
                       <th className="px-2 py-2 text-center">Status</th>
-                      <th className="px-2 py-2 text-right">Updated</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -332,30 +363,31 @@ export default function AdminJobTypesPage() {
                         <td className="px-2 py-2 align-top text-[11px] text-[#424143]">
                           <div className="font-semibold">{jt.name}</div>
                           {jt.description && (
-                            <div className="mt-0.5 text-[10px] text-[#7a7a7a]">
+                            <div className="mt-0.5 text-[10px] text-[#7a7a7a] line-clamp-1">
                               {jt.description}
                             </div>
                           )}
                         </td>
-                        <td className="px-2 py-2 align-top text-right text-[11px] text-[#424143]">
-                          {jt.tokenCost}{" "}
-                          <span className="text-[10px] text-[#9a9892]">
-                            tokens
-                          </span>
+                        <td className="px-2 py-2 align-top text-[11px] text-[#9a9892]">
+                          {jt.category || "\u2014"}
                         </td>
                         <td className="px-2 py-2 align-top text-right text-[11px] text-[#424143]">
-                          {jt.designerPayoutTokens}{" "}
+                          {jt.estimatedHours ?? jt.tokenCost}{" "}
                           <span className="text-[10px] text-[#9a9892]">
-                            tokens
+                            hrs
                           </span>
+                        </td>
+                        <td className="px-2 py-2 align-top text-center text-[11px]">
+                          {jt.hasQuantity ? (
+                            <Badge variant="info">Yes</Badge>
+                          ) : (
+                            <span className="text-[#9a9892]">\u2014</span>
+                          )}
                         </td>
                         <td className="px-2 py-2 align-top text-center text-[11px]">
                           <Badge variant={jt.isActive ? "success" : "neutral"}>
                             {jt.isActive ? "Active" : "Inactive"}
                           </Badge>
-                        </td>
-                        <td className="px-2 py-2 align-top text-right text-[11px] text-[#9a9892]">
-                          {formatDate(jt.updatedAt)}
                         </td>
                       </tr>
                     ))}
@@ -371,8 +403,8 @@ export default function AdminJobTypesPage() {
               {selected ? "Edit job type" : "Create new job type"}
             </h2>
             <p className="mt-1 text-xs text-[#7a7a7a]">
-              Token cost is what the customer pays. Designer payout is
-              what the designer earns when the job is completed.
+              Enter estimated hours. Token cost and designer payout are
+              calculated automatically (1 token = 1 hour, 60% base payout).
             </p>
 
             {saveError && (
@@ -407,6 +439,22 @@ export default function AdminJobTypesPage() {
 
               <div className="flex flex-col gap-1">
                 <label
+                  htmlFor="job-category"
+                  className="text-xs font-medium text-[#424143]"
+                >
+                  Category
+                </label>
+                <FormInput
+                  id="job-category"
+                  type="text"
+                  value={formCategory}
+                  onChange={(e) => setFormCategory(e.target.value)}
+                  placeholder="e.g. Visual Design & Brand Identity"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label
                   htmlFor="job-description"
                   className="text-xs font-medium text-[#424143]"
                 >
@@ -416,48 +464,96 @@ export default function AdminJobTypesPage() {
                   id="job-description"
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
-                  rows={3}
+                  rows={2}
                   placeholder="Short description visible to team and admins."
                 />
               </div>
 
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="flex flex-col gap-1">
-                  <label
-                    htmlFor="job-token-cost"
-                    className="text-xs font-medium text-[#424143]"
-                  >
-                    Token cost (customer)
-                  </label>
-                  <FormInput
-                    id="job-token-cost"
-                    type="number"
-                    min={1}
-                    value={formTokenCost}
-                    onChange={(e) => setFormTokenCost(e.target.value)}
-                    required
-                    placeholder="e.g. 8"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label
-                    htmlFor="job-designer-payout"
-                    className="text-xs font-medium text-[#424143]"
-                  >
-                    Designer payout (tokens)
-                  </label>
-                  <FormInput
-                    id="job-designer-payout"
-                    type="number"
-                    min={0}
-                    value={formDesignerPayout}
-                    onChange={(e) => setFormDesignerPayout(e.target.value)}
-                    required
-                    placeholder="e.g. 5"
-                  />
-                </div>
+              <div className="flex flex-col gap-1">
+                <label
+                  htmlFor="job-estimated-hours"
+                  className="text-xs font-medium text-[#424143]"
+                >
+                  Estimated hours
+                </label>
+                <FormInput
+                  id="job-estimated-hours"
+                  type="number"
+                  min={1}
+                  value={formEstimatedHours}
+                  onChange={(e) => setFormEstimatedHours(e.target.value)}
+                  required
+                  placeholder="e.g. 8"
+                />
               </div>
+
+              {/* Derived values preview */}
+              {derivedTokenCost > 0 && (
+                <div className="rounded-lg border border-[#e3e1dc] bg-[#faf9f7] px-3 py-2 text-xs text-[#7a7a7a]">
+                  <p>
+                    <span className="font-medium text-[#424143]">
+                      Token cost:
+                    </span>{" "}
+                    {derivedTokenCost} tokens{" "}
+                    <span className="text-[10px]">(1 token = 1 hour)</span>
+                  </p>
+                  <p className="mt-0.5">
+                    <span className="font-medium text-[#424143]">
+                      Designer payout:
+                    </span>{" "}
+                    {derivedDesignerPayout} tokens{" "}
+                    <span className="text-[10px]">(60% base rate)</span>
+                  </p>
+                </div>
+              )}
+
+              {/* Has Quantity */}
+              <label className="flex items-center gap-2 text-xs font-medium text-[#424143]">
+                <input
+                  type="checkbox"
+                  checked={formHasQuantity}
+                  onChange={(e) => setFormHasQuantity(e.target.checked)}
+                  className="h-3 w-3 rounded border-[#d4d2cc] text-[#f15b2b] focus:ring-[#f15b2b]"
+                />
+                Has quantity (per-unit pricing)
+              </label>
+
+              {/* Quantity fields — visible when hasQuantity is checked */}
+              {formHasQuantity && (
+                <div className="grid gap-3 md:grid-cols-2 border-l-2 border-[#f15b2b]/20 pl-4">
+                  <div className="flex flex-col gap-1">
+                    <label
+                      htmlFor="job-quantity-label"
+                      className="text-xs font-medium text-[#424143]"
+                    >
+                      Quantity label
+                    </label>
+                    <FormInput
+                      id="job-quantity-label"
+                      type="text"
+                      value={formQuantityLabel}
+                      onChange={(e) => setFormQuantityLabel(e.target.value)}
+                      placeholder="e.g. Number of sizes"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label
+                      htmlFor="job-default-quantity"
+                      className="text-xs font-medium text-[#424143]"
+                    >
+                      Default quantity
+                    </label>
+                    <FormInput
+                      id="job-default-quantity"
+                      type="number"
+                      min={1}
+                      value={formDefaultQuantity}
+                      onChange={(e) => setFormDefaultQuantity(e.target.value)}
+                      placeholder="1"
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="flex items-center justify-between">
                 <label className="flex items-center gap-2 text-xs font-medium text-[#424143]">
@@ -480,7 +576,7 @@ export default function AdminJobTypesPage() {
               <Button
                 type="submit"
                 loading={saving}
-                loadingText="Saving…"
+                loadingText="Saving\u2026"
                 className="mt-2"
               >
                 {selected ? "Save changes" : "Create job type"}
