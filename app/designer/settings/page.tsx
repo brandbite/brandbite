@@ -8,6 +8,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/ui/toast-provider";
 import { LoadingState } from "@/components/ui/loading-state";
+import { PauseControl } from "@/components/designer/pause-control";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -208,6 +209,9 @@ export default function DesignerSettingsPage() {
           Manage your designer account preferences
         </p>
       </div>
+
+      {/* Availability / Pause control */}
+      <PauseControl />
 
       {/* Skills & expertise */}
       <div className="mb-4 rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">

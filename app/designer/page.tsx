@@ -17,6 +17,7 @@ import {
 } from "@/lib/board";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { LoadingState } from "@/components/ui/loading-state";
+import { PauseBanner } from "@/components/designer/pause-banner";
 import {
   Bar,
   BarChart,
@@ -369,6 +370,9 @@ export default function DesignerDashboardPage() {
           <LoadingState display="inline" message="Loading overview..." />
         )}
       </div>
+
+      {/* Pause banner */}
+      <PauseBanner />
 
       {/* Error */}
       {isError && (

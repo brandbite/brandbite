@@ -134,6 +134,15 @@ model UserAccount {
   /// Admin-controlled flag: whether this designer can send revision notes to clients
   designerRevisionNotesEnabled Boolean @default(false)
 
+  /// Whether this designer has paused accepting new assignments
+  isPaused       Boolean   @default(false)
+  /// When the designer activated pause mode
+  pausedAt       DateTime?
+  /// When the pause expires (null = manual/indefinite pause)
+  pauseExpiresAt DateTime?
+  /// Pause type: "1_HOUR", "7_DAYS", "MANUAL"
+  pauseType      String?
+
   // Relations
   companies       CompanyMember[]
   designerTickets Ticket[]        @relation("DesignerTickets")

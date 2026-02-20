@@ -20,6 +20,7 @@ import {
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { canCreateTickets } from "@/lib/permissions/companyRoles";
 import { createNotification } from "@/lib/notifications";
+import { isDesignerPaused } from "@/lib/designer-availability";
 
 // -----------------------------------------------------------------------------
 // Helpers
@@ -408,6 +409,7 @@ export async function POST(req: NextRequest) {
         | null = null;
       let skillFiltered = false;
       let skilledDesignerCount = 0;
+      let pausedDesignerCount = 0;
 
       if (autoAssignEffective) {
         // auto-assign açık: skill-filtered + load-based algoritma
@@ -438,6 +440,23 @@ export async function POST(req: NextRequest) {
             where: { role: UserRole.DESIGNER },
             select: { id: true },
           });
+        }
+
+        // Filter out paused designers
+        if (designers.length > 0) {
+          const designerPauseStates = await tx.userAccount.findMany({
+            where: { id: { in: designers.map((d) => d.id) } },
+            select: { id: true, isPaused: true, pauseExpiresAt: true },
+          });
+
+          const pausedIds = new Set(
+            designerPauseStates
+              .filter((d) => isDesignerPaused(d))
+              .map((d) => d.id),
+          );
+
+          pausedDesignerCount = pausedIds.size;
+          designers = designers.filter((d) => !pausedIds.has(d.id));
         }
 
         if (designers.length > 0) {
@@ -591,6 +610,7 @@ export async function POST(req: NextRequest) {
               projectAutoAssignMode: projectAutoAssignMode ?? "INHERIT",
               skillFiltered,
               skilledDesignerCount,
+              pausedDesignerCount,
               jobTypeId: jobType?.id ?? null,
             },
           },
@@ -609,6 +629,7 @@ export async function POST(req: NextRequest) {
               fallbackMode,
               skillFiltered,
               skilledDesignerCount,
+              pausedDesignerCount,
               jobTypeId: jobType?.id ?? null,
               note:
                 fallbackMode === "settings_disabled"

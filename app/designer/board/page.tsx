@@ -13,6 +13,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { type PendingFile, getImageDimensions } from "@/lib/upload-helpers";
 import { useToast } from "@/components/ui/toast-provider";
 import { InlineAlert } from "@/components/ui/inline-alert";
+import { PauseBanner } from "@/components/designer/pause-banner";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Modal, ModalHeader, ModalFooter } from "@/components/ui/modal";
@@ -1205,6 +1206,9 @@ export default function DesignerBoardPage() {
                 </div>
               )}
             </div>
+
+            {/* Pause banner */}
+            <PauseBanner />
 
             {error && (
               <InlineAlert variant="error" title="Something went wrong" className="mb-4">
