@@ -494,6 +494,8 @@ model Ticket {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([designerId, status, updatedAt])
 }
 
 // -----------------------------------------------------------------------------
@@ -781,6 +783,25 @@ model AppSetting {
   value String
 
   updatedAt DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// Payout Rules (admin-configurable designer payout milestones)
+// -----------------------------------------------------------------------------
+
+model PayoutRule {
+  id                  String   @id @default(cuid())
+  name                String
+  description         String?
+  minCompletedTickets Int
+  timeWindowDays      Int
+  payoutPercent       Int
+  priority            Int      @default(0)
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([isActive, payoutPercent])
 }
 
 // -----------------------------------------------------------------------------

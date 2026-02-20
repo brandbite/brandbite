@@ -113,10 +113,27 @@ type DesignerWithdrawalsResponse = {
   withdrawals: DesignerWithdrawal[];
 };
 
+type PayoutTierResponse = {
+  currentPayoutPercent: number;
+  currentTierName: string | null;
+  basePayoutPercent: number;
+  tiers: {
+    id: string;
+    name: string;
+    description: string | null;
+    minCompletedTickets: number;
+    timeWindowDays: number;
+    payoutPercent: number;
+    completedInWindow: number;
+    qualified: boolean;
+  }[];
+};
+
 type DesignerDashboardData = {
   balance: DesignerBalanceResponse;
   tickets: DesignerTicketsResponse;
   withdrawals: DesignerWithdrawalsResponse;
+  payoutTier: PayoutTierResponse | null;
 };
 
 type DashboardState =
@@ -188,16 +205,18 @@ export default function DesignerDashboardPage() {
       setState({ status: "loading" });
 
       try {
-        const [balanceRes, ticketsRes, withdrawalsRes] = await Promise.all([
+        const [balanceRes, ticketsRes, withdrawalsRes, payoutTierRes] = await Promise.all([
           fetch("/api/designer/balance"),
           fetch("/api/designer/tickets"),
           fetch("/api/designer/withdrawals"),
+          fetch("/api/designer/payout-tier"),
         ]);
 
-        const [balanceJson, ticketsJson, withdrawalsJson] = await Promise.all([
+        const [balanceJson, ticketsJson, withdrawalsJson, payoutTierJson] = await Promise.all([
           balanceRes.json().catch(() => null),
           ticketsRes.json().catch(() => null),
           withdrawalsRes.json().catch(() => null),
+          payoutTierRes.json().catch(() => null),
         ]);
 
         if (!balanceRes.ok) {
@@ -229,6 +248,7 @@ export default function DesignerDashboardPage() {
             balance: balanceJson as DesignerBalanceResponse,
             tickets: ticketsJson as DesignerTicketsResponse,
             withdrawals: withdrawalsJson as DesignerWithdrawalsResponse,
+            payoutTier: payoutTierRes.ok ? (payoutTierJson as PayoutTierResponse) : null,
           },
         });
       } catch (err: any) {
@@ -293,6 +313,8 @@ export default function DesignerDashboardPage() {
         .slice(0, 5),
     [designerTickets],
   );
+
+  const payoutTierData = data?.payoutTier ?? null;
 
   const withdrawalsStats = withdrawalsData?.stats ?? null;
   const latestWithdrawal =
@@ -359,7 +381,7 @@ export default function DesignerDashboardPage() {
       {!isError && (
         <div className="space-y-4">
           {/* Row 1: Hero stat cards */}
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {/* Token balance card */}
             <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-5 shadow-sm">
               <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-[#F15B2B] to-[#f6a07a]" />
@@ -489,6 +511,58 @@ export default function DesignerDashboardPage() {
                   </div>
                 </div>
               )}
+            </section>
+
+            {/* Payout rate card */}
+            <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-5 shadow-sm">
+              <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-[#8B5CF6] to-[#C4B5FD]" />
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
+                  Payout rate
+                </p>
+                <Link
+                  href="/designer/settings"
+                  className="text-[11px] font-medium text-[var(--bb-primary)] hover:underline"
+                >
+                  View tiers
+                </Link>
+              </div>
+              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">
+                {payoutTierData ? `${payoutTierData.currentPayoutPercent}%` : "\u2014"}
+              </p>
+              <p className="text-[11px] text-[var(--bb-text-tertiary)]">
+                {payoutTierData?.currentTierName ?? "Base rate"}
+              </p>
+
+              {/* Next tier progress */}
+              {payoutTierData && payoutTierData.tiers.length > 0 && (() => {
+                const nextTier = payoutTierData.tiers.find((t) => !t.qualified);
+                if (!nextTier) return (
+                  <div className="mt-4 rounded-xl bg-[var(--bb-bg-card)] px-3 py-2.5 text-[11px] text-[var(--bb-text-secondary)]">
+                    <p className="font-medium text-[#8B5CF6]">Max tier reached</p>
+                  </div>
+                );
+                const progress = Math.min(
+                  Math.round((nextTier.completedInWindow / nextTier.minCompletedTickets) * 100),
+                  100,
+                );
+                return (
+                  <div className="mt-4 rounded-xl bg-[var(--bb-bg-card)] px-3 py-2.5">
+                    <p className="text-[10px] font-medium text-[var(--bb-text-secondary)]">
+                      Next: {nextTier.name} ({nextTier.payoutPercent}%)
+                    </p>
+                    <div className="mt-1.5 h-1.5 w-full rounded-full bg-[#e3e1dc]">
+                      <div
+                        className="h-full rounded-full bg-[#8B5CF6] transition-all"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                    <p className="mt-1 text-[10px] text-[var(--bb-text-tertiary)]">
+                      {nextTier.completedInWindow}/{nextTier.minCompletedTickets} tickets
+                    </p>
+                  </div>
+                );
+              })()}
             </section>
           </div>
 

@@ -1,8 +1,8 @@
 // -----------------------------------------------------------------------------
 // @file: lib/token-engine.ts
 // @purpose: Token accounting helpers for Brandbite (companies, designers, tickets)
-// @version: v1.2.0
-// @lastUpdate: 2025-11-13
+// @version: v1.3.0
+// @lastUpdate: 2025-12-26
 // -----------------------------------------------------------------------------
 
 import {
@@ -81,6 +81,70 @@ export function getEffectiveTokenValues(ticket: {
     isOverridden:
       ticket.tokenCostOverride != null ||
       ticket.designerPayoutOverride != null,
+  };
+}
+
+// -----------------------------------------------------------------------------
+// Payout rule evaluation (gamification system)
+// -----------------------------------------------------------------------------
+
+export const BASE_PAYOUT_PERCENT = 60;
+
+export type PayoutEvaluation = {
+  payoutPercent: number;
+  matchedRuleId: string | null;
+  matchedRuleName: string | null;
+};
+
+/**
+ * Evaluate which payout percentage a designer qualifies for.
+ * Iterates active rules sorted by payoutPercent DESC; first match wins
+ * (designer always gets the best rate they qualify for).
+ */
+export async function evaluateDesignerPayoutPercent(
+  designerId: string,
+  tx?: Prisma.TransactionClient,
+): Promise<PayoutEvaluation> {
+  const db = tx ?? prisma;
+
+  const rules = await (db as any).payoutRule.findMany({
+    where: { isActive: true },
+    orderBy: { payoutPercent: "desc" },
+  });
+
+  if (rules.length === 0) {
+    return {
+      payoutPercent: BASE_PAYOUT_PERCENT,
+      matchedRuleId: null,
+      matchedRuleName: null,
+    };
+  }
+
+  for (const rule of rules) {
+    const windowStart = new Date();
+    windowStart.setDate(windowStart.getDate() - rule.timeWindowDays);
+
+    const completedCount = await (db as any).ticket.count({
+      where: {
+        designerId,
+        status: "DONE",
+        updatedAt: { gte: windowStart },
+      },
+    });
+
+    if (completedCount >= rule.minCompletedTickets) {
+      return {
+        payoutPercent: rule.payoutPercent,
+        matchedRuleId: rule.id,
+        matchedRuleName: rule.name,
+      };
+    }
+  }
+
+  return {
+    payoutPercent: BASE_PAYOUT_PERCENT,
+    matchedRuleId: null,
+    matchedRuleName: null,
   };
 }
 
@@ -370,10 +434,31 @@ export async function completeTicketAndApplyTokens(
       };
     }
 
-    // Effective payout: override > (base × quantity) > base
-    const effectivePayout =
-      ticket.designerPayoutOverride ??
-      ticket.jobType.designerPayoutTokens * (ticket.quantity ?? 1);
+    // Effective payout: override > gamification rule > base
+    let effectivePayout: number;
+    let appliedPayoutPercent: number = BASE_PAYOUT_PERCENT;
+    let matchedRuleId: string | null = null;
+    let matchedRuleName: string | null = null;
+
+    if (ticket.designerPayoutOverride != null) {
+      effectivePayout = ticket.designerPayoutOverride;
+    } else if (ticket.designerId) {
+      const ruleResult = await evaluateDesignerPayoutPercent(
+        ticket.designerId,
+        tx,
+      );
+      appliedPayoutPercent = ruleResult.payoutPercent;
+      matchedRuleId = ruleResult.matchedRuleId;
+      matchedRuleName = ruleResult.matchedRuleName;
+      effectivePayout = Math.round(
+        ticket.jobType.tokenCost *
+          (ticket.quantity ?? 1) *
+          (appliedPayoutPercent / 100),
+      );
+    } else {
+      effectivePayout =
+        ticket.jobType.designerPayoutTokens * (ticket.quantity ?? 1);
+    }
 
     // Company is NOT debited here — the company was already charged at ticket
     // creation time (reason: "JOB_REQUEST_CREATED"). Completion only credits
@@ -414,8 +499,12 @@ export async function completeTicketAndApplyTokens(
           notes: `Designer payout for ticket ${ticket.id}`,
           metadata: {
             ...(ticket.jobTypeId ? { jobTypeId: ticket.jobTypeId } : {}),
+            tokenCost: ticket.jobType.tokenCost,
             quantity: ticket.quantity ?? 1,
-            basePayout: ticket.jobType.designerPayoutTokens,
+            appliedPayoutPercent,
+            ...(matchedRuleId
+              ? { payoutRuleId: matchedRuleId, payoutRuleName: matchedRuleName }
+              : {}),
             ...(ticket.designerPayoutOverride != null
               ? { overridden: true, override: ticket.designerPayoutOverride }
               : {}),

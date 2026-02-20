@@ -24,6 +24,17 @@ type SkillJobType = {
   description: string | null;
 };
 
+type PayoutTier = {
+  id: string;
+  name: string;
+  description: string | null;
+  minCompletedTickets: number;
+  timeWindowDays: number;
+  payoutPercent: number;
+  completedInWindow: number;
+  qualified: boolean;
+};
+
 const DESIGNER_PREFS: {
   type: string;
   label: string;
@@ -67,23 +78,37 @@ export default function DesignerSettingsPage() {
   const [savingSkills, setSavingSkills] = useState(false);
   const skillSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Payout tiers state
+  const [payoutTiers, setPayoutTiers] = useState<PayoutTier[]>([]);
+  const [currentPayoutPercent, setCurrentPayoutPercent] = useState<number>(60);
+  const [currentTierName, setCurrentTierName] = useState<string | null>(null);
+  const [basePayoutPercent, setBasePayoutPercent] = useState<number>(60);
+
   // Load preferences + skills
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [prefsRes, skillsRes] = await Promise.all([
+        const [prefsRes, skillsRes, tierRes] = await Promise.all([
           fetch("/api/notifications/preferences"),
           fetch("/api/designer/skills"),
+          fetch("/api/designer/payout-tier"),
         ]);
         const prefsJson = await prefsRes.json().catch(() => null);
         const skillsJson = await skillsRes.json().catch(() => null);
+        const tierJson = await tierRes.json().catch(() => null);
 
         if (!cancelled) {
           if (prefsJson?.preferences) setPreferences(prefsJson.preferences);
           if (skillsJson?.jobTypes) setJobTypes(skillsJson.jobTypes);
           if (skillsJson?.selectedJobTypeIds)
             setSelectedSkillIds(skillsJson.selectedJobTypeIds);
+          if (tierJson?.tiers) {
+            setPayoutTiers(tierJson.tiers);
+            setCurrentPayoutPercent(tierJson.currentPayoutPercent ?? 60);
+            setCurrentTierName(tierJson.currentTierName ?? null);
+            setBasePayoutPercent(tierJson.basePayoutPercent ?? 60);
+          }
         }
       } catch {
         showToast({ type: "error", title: "Failed to load settings" });
@@ -233,6 +258,127 @@ export default function DesignerSettingsPage() {
               </label>
             );
           })}
+        </div>
+      </div>
+
+      {/* Payout tiers */}
+      <div className="mb-4 rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-[#424143]">Payout tiers</h2>
+            <p className="mt-0.5 text-[11px] text-[#9a9892]">
+              Complete more tickets to unlock higher payout rates. Your current rate
+              is{" "}
+              <span className="font-semibold text-[#424143]">
+                {currentPayoutPercent}%
+              </span>
+              {currentTierName && (
+                <span>
+                  {" "}
+                  (<span className="font-medium text-[#8B5CF6]">{currentTierName}</span>)
+                </span>
+              )}
+              .
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 space-y-2">
+          {/* Base rate */}
+          <div
+            className={`flex items-center justify-between rounded-xl px-3 py-3 transition-colors ${
+              !currentTierName
+                ? "border border-[#8B5CF6]/30 bg-[#f5f0ff]"
+                : "bg-[#f5f3f0]/50"
+            }`}
+          >
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-[#424143]">Base Rate</p>
+              <p className="mt-0.5 text-[10px] text-[#9a9892]">
+                Default payout for all designers
+              </p>
+            </div>
+            <span
+              className={`text-sm font-bold ${
+                !currentTierName ? "text-[#8B5CF6]" : "text-[#9a9892]"
+              }`}
+            >
+              {basePayoutPercent}%
+            </span>
+          </div>
+
+          {payoutTiers.map((tier) => {
+            const progress = Math.min(
+              Math.round(
+                (tier.completedInWindow / tier.minCompletedTickets) * 100,
+              ),
+              100,
+            );
+            const windowLabel =
+              tier.timeWindowDays % 365 === 0
+                ? `${tier.timeWindowDays / 365} year${tier.timeWindowDays / 365 > 1 ? "s" : ""}`
+                : tier.timeWindowDays % 30 === 0
+                  ? `${tier.timeWindowDays / 30} month${tier.timeWindowDays / 30 > 1 ? "s" : ""}`
+                  : `${tier.timeWindowDays} days`;
+
+            return (
+              <div
+                key={tier.id}
+                className={`rounded-xl px-3 py-3 transition-colors ${
+                  tier.qualified
+                    ? "border border-[#8B5CF6]/30 bg-[#f5f0ff]"
+                    : "bg-[#f5f3f0]/50"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-medium text-[#424143]">
+                        {tier.name}
+                      </p>
+                      {tier.qualified && (
+                        <span className="inline-flex rounded-full bg-[#8B5CF6] px-2 py-0.5 text-[9px] font-semibold text-white">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-[10px] text-[#9a9892]">
+                      {tier.minCompletedTickets} tickets in {windowLabel}
+                    </p>
+                  </div>
+                  <span
+                    className={`text-sm font-bold ${
+                      tier.qualified ? "text-[#8B5CF6]" : "text-[#9a9892]"
+                    }`}
+                  >
+                    {tier.payoutPercent}%
+                  </span>
+                </div>
+
+                {/* Progress bar */}
+                {!tier.qualified && (
+                  <div className="mt-2">
+                    <div className="h-1.5 w-full rounded-full bg-[#e3e1dc]">
+                      <div
+                        className="h-full rounded-full bg-[#8B5CF6] transition-all"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                    <p className="mt-1 text-[10px] text-[#9a9892]">
+                      {tier.completedInWindow} / {tier.minCompletedTickets}{" "}
+                      tickets completed
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {payoutTiers.length === 0 && (
+            <p className="px-3 py-3 text-xs text-[#9a9892]">
+              No payout tiers configured yet.
+            </p>
+          )}
         </div>
       </div>
 
