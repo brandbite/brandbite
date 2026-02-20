@@ -163,6 +163,9 @@ model UserAccount {
   actedNotifications   Notification[]           @relation("NotificationActor")
   notificationPrefs    NotificationPreference[]
 
+  // Designer skills (job type capabilities)
+  designerSkills DesignerSkill[] @relation("DesignerSkills")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -346,8 +349,30 @@ model JobType {
   // Output size presets (global presets live here; company overrides also relate here)
   outputSizePresets OutputSizePreset[]
 
+  designerSkills DesignerSkill[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// Designer Skills (many-to-many: UserAccount <-> JobType)
+// -----------------------------------------------------------------------------
+
+model DesignerSkill {
+  id String @id @default(cuid())
+
+  designerId String
+  designer   UserAccount @relation("DesignerSkills", fields: [designerId], references: [id])
+
+  jobTypeId String
+  jobType   JobType @relation(fields: [jobTypeId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([designerId, jobTypeId])
+  @@index([designerId])
+  @@index([jobTypeId])
 }
 
 // -----------------------------------------------------------------------------
