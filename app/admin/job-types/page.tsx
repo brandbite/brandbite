@@ -381,7 +381,7 @@ export default function AdminJobTypesPage() {
                           {jt.hasQuantity ? (
                             <Badge variant="info">Yes</Badge>
                           ) : (
-                            <span className="text-[#9a9892]">\u2014</span>
+                            <span className="text-[#9a9892]">&mdash;</span>
                           )}
                         </td>
                         <td className="px-2 py-2 align-top text-center text-[11px]">
