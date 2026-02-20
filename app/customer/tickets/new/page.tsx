@@ -55,8 +55,12 @@ export default async function CustomerNewTicketPage() {
     select: {
       id: true,
       name: true,
+      category: true,
       description: true,
       tokenCost: true,
+      hasQuantity: true,
+      quantityLabel: true,
+      defaultQuantity: true,
     },
     orderBy: {
       name: "asc",

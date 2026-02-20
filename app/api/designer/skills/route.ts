@@ -30,7 +30,7 @@ export async function GET(_req: NextRequest) {
       prisma.jobType.findMany({
         where: { isActive: true },
         orderBy: { name: "asc" },
-        select: { id: true, name: true, description: true },
+        select: { id: true, name: true, category: true, description: true },
       }),
     ]);
 

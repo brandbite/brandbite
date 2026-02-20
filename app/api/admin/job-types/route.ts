@@ -33,9 +33,14 @@ export async function GET(_req: NextRequest) {
     const items = jobTypes.map((jt) => ({
       id: jt.id,
       name: jt.name,
+      category: jt.category,
       description: jt.description,
       tokenCost: jt.tokenCost,
       designerPayoutTokens: jt.designerPayoutTokens,
+      estimatedHours: jt.estimatedHours,
+      hasQuantity: jt.hasQuantity,
+      quantityLabel: jt.quantityLabel,
+      defaultQuantity: jt.defaultQuantity,
       isActive: jt.isActive,
       createdAt: jt.createdAt.toISOString(),
       updatedAt: jt.updatedAt.toISOString(),
@@ -76,10 +81,14 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => null);
 
     const name = (body?.name as string | undefined)?.trim();
+    const category = (body?.category as string | undefined)?.trim() || null;
     const description = (body?.description as string | undefined)?.trim();
     const tokenCostRaw = body?.tokenCost;
     const designerPayoutTokensRaw = body?.designerPayoutTokens;
     const isActiveRaw = body?.isActive;
+    const hasQuantity = typeof body?.hasQuantity === "boolean" ? body.hasQuantity : false;
+    const quantityLabel = (body?.quantityLabel as string | undefined)?.trim() || null;
+    const defaultQuantity = typeof body?.defaultQuantity === "number" ? Math.max(1, body.defaultQuantity) : 1;
 
     if (!name) {
       return NextResponse.json(
@@ -128,9 +137,13 @@ export async function POST(req: NextRequest) {
     const created = await prisma.jobType.create({
       data: {
         name,
+        category,
         description: description || null,
         tokenCost,
         designerPayoutTokens,
+        hasQuantity,
+        quantityLabel,
+        defaultQuantity,
         isActive,
       },
     });
@@ -140,9 +153,14 @@ export async function POST(req: NextRequest) {
         jobType: {
           id: created.id,
           name: created.name,
+          category: created.category,
           description: created.description,
           tokenCost: created.tokenCost,
           designerPayoutTokens: created.designerPayoutTokens,
+          estimatedHours: created.estimatedHours,
+          hasQuantity: created.hasQuantity,
+          quantityLabel: created.quantityLabel,
+          defaultQuantity: created.defaultQuantity,
           isActive: created.isActive,
           createdAt: created.createdAt.toISOString(),
           updatedAt: created.updatedAt.toISOString(),
@@ -193,9 +211,13 @@ export async function PATCH(req: NextRequest) {
 
     const data: {
       name?: string;
+      category?: string | null;
       description?: string | null;
       tokenCost?: number;
       designerPayoutTokens?: number;
+      hasQuantity?: boolean;
+      quantityLabel?: string | null;
+      defaultQuantity?: number;
       isActive?: boolean;
     } = {};
 
@@ -255,6 +277,26 @@ export async function PATCH(req: NextRequest) {
       data.designerPayoutTokens = designerPayoutTokens;
     }
 
+    if (body?.category === null) {
+      data.category = null;
+    } else if (typeof body?.category === "string") {
+      data.category = body.category.trim() || null;
+    }
+
+    if (typeof body?.hasQuantity === "boolean") {
+      data.hasQuantity = body.hasQuantity;
+    }
+
+    if (body?.quantityLabel === null) {
+      data.quantityLabel = null;
+    } else if (typeof body?.quantityLabel === "string") {
+      data.quantityLabel = body.quantityLabel.trim() || null;
+    }
+
+    if (typeof body?.defaultQuantity === "number" && body.defaultQuantity >= 1) {
+      data.defaultQuantity = body.defaultQuantity;
+    }
+
     if (typeof body?.isActive === "boolean") {
       data.isActive = body.isActive;
     }
@@ -275,9 +317,14 @@ export async function PATCH(req: NextRequest) {
       jobType: {
         id: updated.id,
         name: updated.name,
+        category: updated.category,
         description: updated.description,
         tokenCost: updated.tokenCost,
         designerPayoutTokens: updated.designerPayoutTokens,
+        estimatedHours: updated.estimatedHours,
+        hasQuantity: updated.hasQuantity,
+        quantityLabel: updated.quantityLabel,
+        defaultQuantity: updated.defaultQuantity,
         isActive: updated.isActive,
         createdAt: updated.createdAt.toISOString(),
         updatedAt: updated.updatedAt.toISOString(),

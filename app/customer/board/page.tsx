@@ -136,8 +136,12 @@ type NewTicketMetadataResponse = {
   jobTypes: {
     id: string;
     name: string;
+    category: string | null;
     description: string | null;
     tokenCost: number;
+    hasQuantity?: boolean;
+    quantityLabel?: string | null;
+    defaultQuantity?: number;
   }[];
   tags?: {
     id: string;

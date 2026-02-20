@@ -20,8 +20,12 @@ import { Button } from "@/components/ui/button";
 type JobTypeOption = {
   id: string;
   name: string;
+  category: string | null;
   description: string | null;
   tokenCost?: number;
+  hasQuantity?: boolean;
+  quantityLabel?: string | null;
+  defaultQuantity?: number;
 };
 
 type JobTypePickerProps = {
@@ -57,12 +61,7 @@ const CATEGORY_SHORT: Record<string, string> = {
 /* -------------------------------------------------------------------------- */
 
 function getCategoryName(jt: JobTypeOption): string {
-  if (!jt.description) return "Other";
-  // Some descriptions include detail after " — ", e.g.
-  // "Brand Strategy & Creative Direction — archetype overview, ..."
-  // Extract only the category prefix.
-  const sep = jt.description.indexOf(" — ");
-  return sep !== -1 ? jt.description.slice(0, sep) : jt.description;
+  return jt.category || "Other";
 }
 
 function sortedCategories(cats: string[]): string[] {
