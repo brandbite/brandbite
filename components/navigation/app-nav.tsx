@@ -43,6 +43,7 @@ const NAV_CONFIG: Record<
   customer: {
     items: [
       { href: "/customer", label: "Overview" },
+      { href: "/customer/services", label: "Services" },
       { href: "/customer/tokens", label: "Tokens" },
       { href: "/customer/board", label: "Board" },
       { href: "/customer/tickets", label: "Tickets" },

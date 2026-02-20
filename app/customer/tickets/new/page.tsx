@@ -13,7 +13,13 @@ import type { TagOption } from "@/components/ui/tag-multi-select";
 
 const DEFAULT_COMPANY_SLUG = "acme-studio";
 
-export default async function CustomerNewTicketPage() {
+export default async function CustomerNewTicketPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ jobTypeId?: string }>;
+}) {
+  const params = await searchParams;
+  const initialJobTypeId = params.jobTypeId ?? undefined;
   const company = await prisma.company.findUnique({
     where: { slug: DEFAULT_COMPANY_SLUG },
     select: {
@@ -105,6 +111,7 @@ export default async function CustomerNewTicketPage() {
             jobTypes={jobTypes}
             tokenBalance={company.tokenBalance}
             tags={tags as unknown as TagOption[]}
+            initialJobTypeId={initialJobTypeId}
           />
         </main>
     </div>

@@ -51,6 +51,7 @@ type Props = {
   onTagCreated?: (tag: TagOption) => void;
   redirectTo?: string;
   onCreated?: (ticket: { id: string; code?: string | null }) => void;
+  initialJobTypeId?: string;
 };
 
 type TicketPriorityValue = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -141,13 +142,14 @@ export default function NewTicketForm({
   onTagCreated,
   redirectTo,
   onCreated,
+  initialJobTypeId,
 }: Props) {
   const router = useRouter();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [projectId, setProjectId] = useState<string>("");
-  const [jobTypeId, setJobTypeId] = useState<string>("");
+  const [jobTypeId, setJobTypeId] = useState<string>(initialJobTypeId ?? "");
   const [priority, setPriority] = useState<TicketPriorityValue>("MEDIUM");
   const [dueDate, setDueDate] = useState<string>("");
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
@@ -159,7 +161,10 @@ export default function NewTicketForm({
   }, [tagsProp]);
 
   // Quantity multiplier (1–10), reset when job type changes
-  const [quantity, setQuantity] = useState(1);
+  const initialQty = initialJobTypeId
+    ? (jobTypes.find((j) => j.id === initialJobTypeId)?.defaultQuantity ?? 1)
+    : 1;
+  const [quantity, setQuantity] = useState(initialQty);
 
   const handleJobTypeChange = (id: string) => {
     setJobTypeId(id);
