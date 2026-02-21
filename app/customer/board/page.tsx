@@ -1850,7 +1850,7 @@ export default function CustomerBoardPage() {
           </div>
 
           <div className="mt-auto pt-4 text-[10px] text-[#9a9892]">
-            <p>Viewing design requests for your workspace.</p>
+            <p>Viewing creative requests for your workspace.</p>
           </div>
         </aside>
 
@@ -1892,7 +1892,7 @@ export default function CustomerBoardPage() {
                     Customer board
                   </p>
                   <h1 className="mt-1 text-xl font-semibold tracking-tight">
-                    Design requests
+                    Creative requests
                   </h1>
                 </div>
               )}
@@ -2092,7 +2092,7 @@ export default function CustomerBoardPage() {
         <Modal open={newTicketModalOpen} onClose={closeNewTicketModal} size="2xl" scrollable>
           <ModalHeader
             eyebrow="New request"
-            title="Create a new design request"
+            title="Create a new creative request"
             subtitle="This will be added to your board in the To do column."
             onClose={closeNewTicketModal}
           />
@@ -2147,7 +2147,7 @@ export default function CustomerBoardPage() {
           <ModalHeader
             eyebrow="New project"
             title="Create a project"
-            subtitle="Group related design requests under one project."
+            subtitle="Group related creative requests under one project."
             onClose={closeNewProjectModal}
           />
 

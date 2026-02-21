@@ -29,7 +29,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "Brandbite",
-  description: "Design Subscription Portal",
+  description: "Creative Subscription Portal",
 };
 
 export default function RootLayout({

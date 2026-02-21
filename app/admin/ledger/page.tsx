@@ -14,6 +14,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { FormSelect } from "@/components/ui/form-field";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { LoadingState } from "@/components/ui/loading-state";
+import { formatRole } from "@/lib/roles";
 
 type LedgerDirection = "CREDIT" | "DEBIT";
 
@@ -352,7 +353,7 @@ export default function AdminLedgerPage() {
                               {e.user.name || e.user.email}
                             </div>
                             <div className="text-[10px] text-[#9a9892]">
-                              {e.user.role}
+                              {formatRole(e.user.role as import("@prisma/client").UserRole)}
                             </div>
                           </>
                         ) : (

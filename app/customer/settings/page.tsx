@@ -1050,7 +1050,7 @@ export default function CustomerSettingsPage() {
           <div className="mt-6 rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">
             <h2 className="text-sm font-semibold text-[#424143]">Tags</h2>
             <p className="mt-0.5 text-[11px] text-[#9a9892]">
-              Manage tags used to categorize design requests across your
+              Manage tags used to categorize creative requests across your
               company.
             </p>
 

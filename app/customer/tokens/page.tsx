@@ -162,7 +162,7 @@ export default function CustomerTokensPage() {
               Tokens overview
             </h1>
             <p className="mt-1 text-sm text-[#7a7a7a]">
-              Your company&apos;s token balance and recent usage across design
+              Your company&apos;s token balance and recent usage across creative
               requests.
             </p>
             {company && (

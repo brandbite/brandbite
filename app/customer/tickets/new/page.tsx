@@ -106,11 +106,11 @@ export default async function CustomerNewTicketPage({
       <main className="mt-4 rounded-2xl border border-[#e3e1dc] bg-white px-5 py-6 shadow-sm">
           <div className="mb-4">
             <h1 className="text-2xl font-semibold tracking-tight">
-              Create a new design request
+              Create a new creative request
             </h1>
             <p className="mt-1 text-sm text-[#7a7a7a]">
               Describe what you need, pick a project and a job type. We will
-              route this request to your design team.
+              route this request to your creative team.
             </p>
             <p className="mt-1 text-xs text-[#9a9892]">
               Company:{" "}

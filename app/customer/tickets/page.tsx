@@ -294,7 +294,7 @@ export default function CustomerTicketsPage() {
               My tickets
             </h1>
             <p className="mt-1 text-sm text-[#7a7a7a]">
-              All design requests created for your company, with project,
+              All creative requests created for your company, with project,
               status, and creative information.
             </p>
             {company && (

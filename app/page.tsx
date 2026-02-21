@@ -34,9 +34,9 @@ const DASHBOARDS = [
   },
   {
     role: "Customer",
-    tagline: "Design requests & projects",
+    tagline: "Creative requests & projects",
     description:
-      "Create design requests, track progress on the kanban board, and manage your team and tokens.",
+      "Create creative requests, track progress on the kanban board, and manage your team and tokens.",
     href: "/customer/board",
     color: "bg-[#2b7ff1]",
     ringColor: "group-hover:ring-[#2b7ff1]/20",
@@ -129,7 +129,7 @@ export default function HomePage() {
             Brandbite
           </h1>
           <p className="mt-2 max-w-md text-sm text-[#7a7a7a]">
-            Design-as-a-service platform. Submit requests, track progress, and
+            Creative-as-a-service platform. Submit requests, track progress, and
             manage your creative pipeline — all in one place.
           </p>
         </div>
@@ -287,7 +287,7 @@ export default function HomePage() {
             </span>
           </div>
           <p className="text-[10px] text-[#b1afa9]">
-            Design subscription platform &middot; Demo environment
+            Creative subscription platform &middot; Demo environment
           </p>
         </footer>
       </div>

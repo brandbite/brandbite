@@ -158,7 +158,7 @@ export default function BoardPage() {
               Tickets board
             </h1>
             <p className="mt-1 text-sm text-[#7a7a7a]">
-              Visual overview of all active design requests. This view is now
+              Visual overview of all active creative requests. This view is now
               powered by real Ticket records from the database.
             </p>
           </div>

@@ -222,7 +222,7 @@ export default function OnboardingPage() {
             </p>
             <p className="mt-2 text-center text-xs text-[#9a9892]">
               We&apos;ll use these details to tailor your dashboard and assign
-              your first design team.
+              your first creative team.
             </p>
 
             <div className="mt-8 space-y-5">
@@ -292,7 +292,7 @@ export default function OnboardingPage() {
               Invite your team
             </h1>
             <p className="mt-1 text-center text-xs text-[#9a9892]">
-              Add team members so they can submit tickets and review design work.
+              Add team members so they can submit tickets and review creative work.
               You can always invite more people later.
             </p>
 

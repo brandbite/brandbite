@@ -166,7 +166,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Only your design team can move tickets into review. Ask your creative to send the ticket for review.",
+            "Only your creative team can move tickets into review. Ask your creative to send the ticket for review.",
         },
         { status: 400 },
       );
