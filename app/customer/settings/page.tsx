@@ -1095,7 +1095,7 @@ export default function CustomerSettingsPage() {
                                   key={key}
                                   type="button"
                                   onClick={() => setEditTagColor(key)}
-                                  className={`h-4 w-4 rounded-full border-2 ${
+                                  className={`h-6 w-6 rounded-full border-2 ${
                                     editTagColor === key
                                       ? "border-[#424143] scale-110"
                                       : "border-transparent"
@@ -1196,7 +1196,7 @@ export default function CustomerSettingsPage() {
                           key={key}
                           type="button"
                           onClick={() => setNewTagColor(key)}
-                          className={`h-5 w-5 rounded-full border-2 transition-transform ${
+                          className={`h-6 w-6 rounded-full border-2 transition-transform ${
                             newTagColor === key
                               ? "scale-110 border-[#424143]"
                               : "border-transparent hover:scale-105"

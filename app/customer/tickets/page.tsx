@@ -447,9 +447,10 @@ export default function CustomerTicketsPage() {
                 >
                   Priority
                 </TH>
-                <TH>Assigned</TH>
-                <TH>Job type</TH>
+                <TH className="hidden md:table-cell">Assigned</TH>
+                <TH className="hidden md:table-cell">Job type</TH>
                 <TH
+                  className="hidden md:table-cell"
                   sortable
                   sortDirection={sortField === "created" ? sortDir : null}
                   onSort={() => handleSort("created")}
@@ -502,17 +503,17 @@ export default function CustomerTicketsPage() {
                         {formatPriorityLabel(t.priority)}
                       </Badge>
                     </TD>
-                    <TD>
+                    <TD className="hidden md:table-cell">
                       <div className="text-[11px] text-[#424143]">
                         {t.isAssigned ? "Yes" : "-"}
                       </div>
                     </TD>
-                    <TD>
+                    <TD className="hidden md:table-cell">
                       <div className="text-[11px] text-[#424143]">
                         {t.jobTypeName ?? "-"}
                       </div>
                     </TD>
-                    <TD className="text-[#7a7a7a]">
+                    <TD className="hidden md:table-cell text-[#7a7a7a]">
                       {formatDate(t.createdAt)}
                     </TD>
                     <TD>

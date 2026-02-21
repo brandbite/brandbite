@@ -323,11 +323,11 @@ export default function AdminTicketsPage() {
         {/* Table */}
         <DataTable maxHeight="600px">
           <THead>
-            <TH>Created</TH>
+            <TH className="hidden md:table-cell">Created</TH>
             <TH>Company</TH>
             <TH>Title</TH>
             <TH>Status</TH>
-            <TH>Job Type</TH>
+            <TH className="hidden md:table-cell">Job Type</TH>
             <TH>Tokens</TH>
             <TH>Creative</TH>
           </THead>
@@ -360,7 +360,7 @@ export default function AdminTicketsPage() {
                     key={t.id}
                     className="border-b border-[#f0eeea] last:border-b-0"
                   >
-                    <TD>
+                    <TD className="hidden md:table-cell">
                       {formatDateTime(t.createdAt)}
                     </TD>
                     <TD>
@@ -374,7 +374,7 @@ export default function AdminTicketsPage() {
                     <TD>
                       {t.status}
                     </TD>
-                    <TD>
+                    <TD className="hidden md:table-cell">
                       {t.jobType ? (
                         <div className="space-y-0.5">
                           <div className="text-xs">{t.jobType.name}</div>
@@ -397,7 +397,7 @@ export default function AdminTicketsPage() {
                               <input
                                 type="number"
                                 min="0"
-                                className="w-16 rounded border border-[#d4d2cc] bg-white px-1.5 py-0.5 text-[11px] outline-none focus:border-[var(--bb-primary)]"
+                                className="w-full max-w-[4rem] rounded border border-[#d4d2cc] bg-white px-1.5 py-0.5 text-[11px] outline-none focus:border-[var(--bb-primary)]"
                                 placeholder={String(
                                   t.jobType.tokenCost * (t.quantity ?? 1),
                                 )}
@@ -419,7 +419,7 @@ export default function AdminTicketsPage() {
                               <input
                                 type="number"
                                 min="0"
-                                className="w-16 rounded border border-[#d4d2cc] bg-white px-1.5 py-0.5 text-[11px] outline-none focus:border-[var(--bb-primary)]"
+                                className="w-full max-w-[4rem] rounded border border-[#d4d2cc] bg-white px-1.5 py-0.5 text-[11px] outline-none focus:border-[var(--bb-primary)]"
                                 placeholder={String(
                                   t.jobType.creativePayoutTokens *
                                     (t.quantity ?? 1),

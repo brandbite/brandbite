@@ -1302,7 +1302,7 @@ export default function CreativeBoardPage() {
             </div>
 
             {/* Columns */}
-            <div className="flex gap-4 overflow-x-auto pb-2">
+            <div className="flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory md:snap-none">
               {STATUS_ORDER.map((status) => {
                 const columnTickets = ticketsByStatus[status] ?? [];
                 const columnTitle = STATUS_LABELS[status];
@@ -1312,7 +1312,7 @@ export default function CreativeBoardPage() {
                 return (
                   <div
                     key={status}
-                    className={`w-80 shrink-0 overflow-hidden rounded-2xl transition-colors ${
+                    className={`w-80 shrink-0 snap-start overflow-hidden rounded-2xl transition-colors ${
                       isActiveDrop
                         ? "bg-[#fff5f0] ring-2 ring-[#f15b2b]/60"
                         : "bg-white/60"

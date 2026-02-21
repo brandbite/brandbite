@@ -860,11 +860,11 @@ export default function CustomerTicketDetailPage() {
       )}
 
       {!error && ticket && (
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-3">
           {/* ============================================================= */}
           {/* LEFT COLUMN — main content (2/3 width)                        */}
           {/* ============================================================= */}
-          <section className="space-y-4 lg:col-span-2">
+          <section className="space-y-4 md:col-span-2">
             {/* Status action banner — IN_REVIEW */}
             {ticket.status === "IN_REVIEW" && normalizedRole && (
               <div className="flex items-center gap-3 rounded-xl border border-[#f5c4ad] bg-[#fff8f5] px-4 py-3">
@@ -1190,7 +1190,7 @@ export default function CustomerTicketDetailPage() {
           {/* ============================================================= */}
           {/* RIGHT COLUMN — sidebar (1/3 width)                            */}
           {/* ============================================================= */}
-          <aside className="space-y-4 lg:col-span-1">
+          <aside className="space-y-4 md:col-span-1">
             {/* Details card */}
             <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
               <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
@@ -1785,15 +1785,15 @@ function TicketDetailSkeleton() {
         <div className="mt-2 h-3 w-40 rounded bg-[#e3ded4]" />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-3">
         {/* Left skeleton */}
-        <div className="space-y-4 lg:col-span-2">
+        <div className="space-y-4 md:col-span-2">
           <div className="h-48 rounded-2xl border border-[#e3e1dc] bg-white" />
           <div className="h-32 rounded-2xl border border-[#e3e1dc] bg-white" />
         </div>
 
         {/* Right skeleton */}
-        <div className="space-y-4 lg:col-span-1">
+        <div className="space-y-4 md:col-span-1">
           <div className="h-64 rounded-2xl border border-[#e3e1dc] bg-white" />
           <div className="h-24 rounded-2xl border border-[#e3e1dc] bg-white" />
           <div className="h-40 rounded-2xl border border-[#e3e1dc] bg-white" />

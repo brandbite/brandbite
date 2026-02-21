@@ -398,8 +398,9 @@ export default function CreativeTicketsPage() {
                 >
                   Priority
                 </TH>
-                <TH>Payout</TH>
+                <TH className="hidden md:table-cell">Payout</TH>
                 <TH
+                  className="hidden md:table-cell"
                   sortable
                   sortDirection={sortField === "due" ? sortDir : null}
                   onSort={() => handleSort("due")}
@@ -459,12 +460,12 @@ export default function CreativeTicketsPage() {
                       <TD>
                         <Badge variant={priorityBadgeVariant(t.priority)}>{formatPriorityLabel(t.priority)}</Badge>
                       </TD>
-                      <TD>
+                      <TD className="hidden md:table-cell">
                         {payoutTokens > 0
                           ? `${payoutTokens} tokens`
                           : "—"}
                       </TD>
-                      <TD>
+                      <TD className="hidden md:table-cell">
                         {t.dueDate ? (
                           <span
                             className={

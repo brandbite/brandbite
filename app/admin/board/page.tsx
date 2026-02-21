@@ -379,7 +379,7 @@ export default function AdminBoardPage() {
             </div>
 
             {/* Columns */}
-            <div className="flex gap-4 overflow-x-auto pb-2">
+            <div className="flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory md:snap-none">
               {STATUS_ORDER.map((status) => {
                 const columnTickets = ticketsByStatus[status] || [];
                 const columnTitle = STATUS_LABELS[status];
@@ -387,7 +387,7 @@ export default function AdminBoardPage() {
                 return (
                   <div
                     key={status}
-                    className="w-80 shrink-0 overflow-hidden rounded-2xl bg-white/60"
+                    className="w-80 shrink-0 snap-start overflow-hidden rounded-2xl bg-white/60"
                   >
                     {/* Accent bar */}
                     <div
