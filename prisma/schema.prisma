@@ -803,8 +803,9 @@ model NotificationPreference {
   userId String
   user   UserAccount @relation(fields: [userId], references: [id])
 
-  type    NotificationType
-  enabled Boolean          @default(true)
+  type         NotificationType
+  enabled      Boolean          @default(true)
+  emailEnabled Boolean          @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

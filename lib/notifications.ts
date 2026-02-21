@@ -1,11 +1,16 @@
 // -----------------------------------------------------------------------------
 // @file: lib/notifications.ts
 // @purpose: Helper functions for creating, querying, and managing in-app
-//           notifications with user preference support
+//           notifications with user preference support + email notifications
 // -----------------------------------------------------------------------------
 
 import { prisma } from "@/lib/prisma";
-import type { NotificationType } from "@prisma/client";
+import type { NotificationType, UserRole } from "@prisma/client";
+import { sendNotificationEmail } from "@/lib/email";
+import {
+  buildNotificationEmailHtml,
+  getSubjectForType,
+} from "@/lib/email-templates";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -21,7 +26,7 @@ const ALL_TYPES: NotificationType[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Create notification (respects user preferences)
+// Create notification (respects user preferences — in-app + email)
 // ---------------------------------------------------------------------------
 
 type CreateNotificationInput = {
@@ -34,38 +39,100 @@ type CreateNotificationInput = {
 };
 
 /**
- * Creates a notification for a user, but only if their preferences allow it.
- * If no preference row exists for this type, it defaults to enabled.
+ * Creates an in-app notification for a user and sends an email notification,
+ * respecting per-channel preferences. If no preference row exists for this
+ * type, both channels default to enabled.
  * Fire-and-forget — errors are swallowed to avoid breaking the main flow.
  */
 export async function createNotification(
   input: CreateNotificationInput,
 ): Promise<void> {
   try {
-    // Check user preference
+    // Check user preference (both channels)
     const pref = await prisma.notificationPreference.findUnique({
       where: {
         userId_type: { userId: input.userId, type: input.type },
       },
-      select: { enabled: true },
+      select: { enabled: true, emailEnabled: true },
     });
 
-    // No row = enabled by default
-    if (pref && !pref.enabled) return;
+    const inAppEnabled = pref ? pref.enabled : true;
+    const emailEnabled = pref ? pref.emailEnabled : true;
 
-    await prisma.notification.create({
-      data: {
-        userId: input.userId,
-        type: input.type,
-        title: input.title,
-        message: input.message,
-        ticketId: input.ticketId ?? null,
-        actorId: input.actorId ?? null,
-      },
-    });
+    // Nothing to do if both channels are off
+    if (!inAppEnabled && !emailEnabled) return;
+
+    // Create in-app notification if enabled
+    if (inAppEnabled) {
+      await prisma.notification.create({
+        data: {
+          userId: input.userId,
+          type: input.type,
+          title: input.title,
+          message: input.message,
+          ticketId: input.ticketId ?? null,
+          actorId: input.actorId ?? null,
+        },
+      });
+    }
+
+    // Send email notification if enabled (async, fire-and-forget)
+    if (emailEnabled) {
+      sendEmailForNotification(input).catch((err) =>
+        console.error("[notifications] email send failed", err),
+      );
+    }
   } catch (err) {
     console.error("[notifications] failed to create notification", err);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Email sending helper (private)
+// ---------------------------------------------------------------------------
+
+function roleToRecipientRole(
+  role: UserRole,
+): "customer" | "creative" | "admin" {
+  if (role === "CUSTOMER") return "customer";
+  if (role === "DESIGNER") return "creative";
+  return "admin"; // SITE_OWNER, SITE_ADMIN
+}
+
+async function sendEmailForNotification(
+  input: CreateNotificationInput,
+): Promise<void> {
+  // Look up recipient email + name + role
+  const recipient = await prisma.userAccount.findUnique({
+    where: { id: input.userId },
+    select: { email: true, name: true, role: true },
+  });
+
+  if (!recipient?.email) return;
+
+  // Look up actor name if provided
+  let actorName: string | null = null;
+  if (input.actorId) {
+    const actor = await prisma.userAccount.findUnique({
+      where: { id: input.actorId },
+      select: { name: true },
+    });
+    actorName = actor?.name ?? null;
+  }
+
+  const recipientRole = roleToRecipientRole(recipient.role);
+  const subject = getSubjectForType(input.type, input.title);
+  const html = buildNotificationEmailHtml({
+    recipientName: recipient.name,
+    type: input.type,
+    title: input.title,
+    message: input.message,
+    ticketId: input.ticketId ?? null,
+    actorName,
+    recipientRole,
+  });
+
+  await sendNotificationEmail(recipient.email, subject, html);
 }
 
 // ---------------------------------------------------------------------------
@@ -143,39 +210,56 @@ export async function markAllAsRead(userId: string): Promise<number> {
 export type PreferenceEntry = {
   type: NotificationType;
   enabled: boolean;
+  emailEnabled: boolean;
 };
 
 /**
  * Returns all notification type preferences for a user.
- * Types without an explicit row default to enabled.
+ * Types without an explicit row default to enabled for both channels.
  */
 export async function getUserPreferences(
   userId: string,
 ): Promise<PreferenceEntry[]> {
   const rows = await prisma.notificationPreference.findMany({
     where: { userId },
-    select: { type: true, enabled: true },
+    select: { type: true, enabled: true, emailEnabled: true },
   });
 
-  const map = new Map(rows.map((r) => [r.type, r.enabled]));
+  const map = new Map(
+    rows.map((r) => [r.type, { enabled: r.enabled, emailEnabled: r.emailEnabled }]),
+  );
 
   return ALL_TYPES.map((type) => ({
     type,
-    enabled: map.get(type) ?? true,
+    enabled: map.get(type)?.enabled ?? true,
+    emailEnabled: map.get(type)?.emailEnabled ?? true,
   }));
 }
 
 /**
  * Upserts a single notification preference for a user.
+ * Accepts either or both channel toggles.
  */
 export async function setUserPreference(
   userId: string,
   type: NotificationType,
-  enabled: boolean,
+  updates: { enabled?: boolean; emailEnabled?: boolean },
 ): Promise<void> {
+  const updateData: Record<string, boolean> = {};
+  const createData: Record<string, unknown> = { userId, type };
+
+  if (updates.enabled !== undefined) {
+    updateData.enabled = updates.enabled;
+    createData.enabled = updates.enabled;
+  }
+  if (updates.emailEnabled !== undefined) {
+    updateData.emailEnabled = updates.emailEnabled;
+    createData.emailEnabled = updates.emailEnabled;
+  }
+
   await prisma.notificationPreference.upsert({
     where: { userId_type: { userId, type } },
-    create: { userId, type, enabled },
-    update: { enabled },
+    create: createData as any,
+    update: updateData,
   });
 }

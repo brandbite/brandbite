@@ -22,7 +22,7 @@ type PatchPayload = {
   creativePayoutOverride?: number | null;
 };
 
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
 
@@ -39,9 +39,59 @@ export async function GET(_req: NextRequest) {
       );
     }
 
-    const [tickets, creatives] = await Promise.all([
+    // ── Parse query params ──────────────────────────────────────────────
+    const url = new URL(req.url);
+    const search = url.searchParams.get("search")?.trim() || "";
+    const status = url.searchParams.get("status") || "";
+    const companyId = url.searchParams.get("company") || "";
+    const sortBy = url.searchParams.get("sortBy") || "createdAt";
+    const sortDir = url.searchParams.get("sortDir") || "desc";
+    const limit = Math.min(
+      Math.max(parseInt(url.searchParams.get("limit") || "50", 10), 1),
+      200,
+    );
+    const offset = Math.max(
+      parseInt(url.searchParams.get("offset") || "0", 10),
+      0,
+    );
+
+    // ── Build where clause ──────────────────────────────────────────────
+    const where: any = {};
+
+    if (
+      status &&
+      ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"].includes(status)
+    ) {
+      where.status = status;
+    }
+
+    if (companyId) {
+      where.companyId = companyId;
+    }
+
+    if (search) {
+      where.OR = [
+        { title: { contains: search, mode: "insensitive" } },
+        { company: { name: { contains: search, mode: "insensitive" } } },
+      ];
+    }
+
+    // ── Build orderBy ───────────────────────────────────────────────────
+    const dir = sortDir === "asc" ? "asc" : "desc";
+    const validSortFields: Record<string, any> = {
+      createdAt: { createdAt: dir },
+      status: { status: dir },
+      title: { title: dir },
+    };
+    const orderBy = validSortFields[sortBy] || { createdAt: "desc" };
+
+    // ── Execute query + count + creatives in parallel ───────────────────
+    const [tickets, totalCount, creatives] = await Promise.all([
       prisma.ticket.findMany({
-        orderBy: { createdAt: "desc" },
+        where,
+        orderBy,
+        take: limit,
+        skip: offset,
         select: {
           id: true,
           title: true,
@@ -80,6 +130,7 @@ export async function GET(_req: NextRequest) {
           },
         },
       }),
+      prisma.ticket.count({ where }),
       prisma.userAccount.findMany({
         where: {
           role: UserRole.DESIGNER,
@@ -99,6 +150,12 @@ export async function GET(_req: NextRequest) {
       {
         tickets,
         creatives,
+        pagination: {
+          total: totalCount,
+          limit,
+          offset,
+          hasMore: offset + limit < totalCount,
+        },
       },
       { status: 200 },
     );

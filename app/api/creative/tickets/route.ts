@@ -80,7 +80,7 @@ function toTicketStatusString(status: TicketStatus): TicketStatusString {
 // GET: list creative tickets
 // -----------------------------------------------------------------------------
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
 
@@ -91,57 +91,29 @@ export async function GET() {
       );
     }
 
-    const tickets = await prisma.ticket.findMany({
-      where: {
-        creativeId: user.id,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
+    // ── Parse query params ──────────────────────────────────────────────
+    const url = new URL(req.url);
+    const search = url.searchParams.get("search")?.trim() || "";
+    const status = url.searchParams.get("status") || "";
+    const priority = url.searchParams.get("priority") || "";
+    const sortBy = url.searchParams.get("sortBy") || "createdAt";
+    const sortDir = url.searchParams.get("sortDir") || "desc";
+    const limit = Math.min(
+      Math.max(parseInt(url.searchParams.get("limit") || "50", 10), 1),
+      200,
+    );
+    const offset = Math.max(
+      parseInt(url.searchParams.get("offset") || "0", 10),
+      0,
+    );
+
+    // ── Stats: always computed from UNFILTERED set ──────────────────────
+    const allTickets = await prisma.ticket.findMany({
+      where: { creativeId: user.id },
       select: {
-        id: true,
-        title: true,
-        description: true,
         status: true,
         priority: true,
-        dueDate: true,
-        companyTicketNumber: true,
-        createdAt: true,
-        updatedAt: true,
-        company: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-          },
-        },
-        project: {
-          select: {
-            id: true,
-            name: true,
-            code: true,
-          },
-        },
-        jobType: {
-          select: {
-            id: true,
-            name: true,
-            tokenCost: true,
-            creativePayoutTokens: true,
-          },
-        },
-        revisionCount: true,
-        revisions: {
-          orderBy: {
-            version: "desc",
-          },
-          take: 1,
-          select: {
-            feedbackMessage: true,
-            feedbackAt: true,
-            feedbackByCustomerId: true,
-          },
-        },
+        jobType: { select: { tokenCost: true } },
       },
     });
 
@@ -169,25 +141,115 @@ export async function GET() {
     let openTotal = 0;
     let loadScore = 0;
 
-    for (const t of tickets) {
+    for (const t of allTickets) {
       const statusKey = toTicketStatusString(t.status);
-
       byStatus[statusKey] = (byStatus[statusKey] ?? 0) + 1;
       byPriority[t.priority] = (byPriority[t.priority] ?? 0) + 1;
 
       if (t.status !== TicketStatus.DONE) {
         openTotal += 1;
-
         const weight = priorityWeights[t.priority];
         const tokenCost = t.jobType?.tokenCost ?? 1;
         loadScore += weight * tokenCost;
       }
     }
 
-    const response: CreativeTicketsResponse = {
+    // ── Build filtered where clause ─────────────────────────────────────
+    const where: any = { creativeId: user.id };
+
+    if (
+      status &&
+      ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"].includes(status)
+    ) {
+      where.status = status;
+    }
+
+    if (
+      priority &&
+      ["LOW", "MEDIUM", "HIGH", "URGENT"].includes(priority)
+    ) {
+      where.priority = priority;
+    }
+
+    if (search) {
+      where.OR = [
+        { title: { contains: search, mode: "insensitive" } },
+        { company: { name: { contains: search, mode: "insensitive" } } },
+        { project: { name: { contains: search, mode: "insensitive" } } },
+      ];
+    }
+
+    // ── Build orderBy ───────────────────────────────────────────────────
+    const dir = sortDir === "asc" ? "asc" : "desc";
+    const validSortFields: Record<string, any> = {
+      createdAt: { createdAt: dir },
+      dueDate: { dueDate: dir },
+      status: { status: dir },
+      priority: { priority: dir },
+      title: { title: dir },
+    };
+    const orderBy = validSortFields[sortBy] || { createdAt: "desc" };
+
+    // ── Execute filtered query + count ──────────────────────────────────
+    const [tickets, totalCount] = await Promise.all([
+      prisma.ticket.findMany({
+        where,
+        orderBy,
+        take: limit,
+        skip: offset,
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          status: true,
+          priority: true,
+          dueDate: true,
+          companyTicketNumber: true,
+          createdAt: true,
+          updatedAt: true,
+          company: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+            },
+          },
+          project: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+            },
+          },
+          jobType: {
+            select: {
+              id: true,
+              name: true,
+              tokenCost: true,
+              creativePayoutTokens: true,
+            },
+          },
+          revisionCount: true,
+          revisions: {
+            orderBy: {
+              version: "desc",
+            },
+            take: 1,
+            select: {
+              feedbackMessage: true,
+              feedbackAt: true,
+              feedbackByCustomerId: true,
+            },
+          },
+        },
+      }),
+      prisma.ticket.count({ where }),
+    ]);
+
+    const response = {
       stats: {
         byStatus,
-        total: tickets.length,
+        total: allTickets.length,
         openTotal,
         byPriority,
         loadScore,
@@ -245,6 +307,12 @@ export async function GET() {
           latestRevisionFeedbackSnippet,
         };
       }),
+      pagination: {
+        total: totalCount,
+        limit,
+        offset,
+        hasMore: offset + limit < totalCount,
+      },
     };
 
     return NextResponse.json(response, { status: 200 });

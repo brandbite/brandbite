@@ -114,7 +114,7 @@ function billingStatusClassName(
   }
 }
 
-type PreferenceEntry = { type: string; enabled: boolean };
+type PreferenceEntry = { type: string; enabled: boolean; emailEnabled: boolean };
 
 const CUSTOMER_PREFS: { type: string; label: string; description: string }[] = [
   { type: "REVISION_SUBMITTED", label: "Creative submitted a new revision", description: "Get notified when your creative uploads new work for review" },
@@ -245,22 +245,30 @@ export default function CustomerSettingsPage() {
   }, []);
 
   const handleTogglePref = useCallback(
-    async (type: string, currentEnabled: boolean) => {
-      setTogglingType(type);
-      const newEnabled = !currentEnabled;
+    async (
+      type: string,
+      channel: "enabled" | "emailEnabled",
+      currentValue: boolean,
+    ) => {
+      setTogglingType(`${type}:${channel}`);
+      const newValue = !currentValue;
       setNotifPrefs((prev) =>
-        prev.map((p) => (p.type === type ? { ...p, enabled: newEnabled } : p)),
+        prev.map((p) =>
+          p.type === type ? { ...p, [channel]: newValue } : p,
+        ),
       );
       try {
         const res = await fetch("/api/notifications/preferences", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type, enabled: newEnabled }),
+          body: JSON.stringify({ type, [channel]: newValue }),
         });
         if (!res.ok) throw new Error();
       } catch {
         setNotifPrefs((prev) =>
-          prev.map((p) => (p.type === type ? { ...p, enabled: currentEnabled } : p)),
+          prev.map((p) =>
+            p.type === type ? { ...p, [channel]: currentValue } : p,
+          ),
         );
         showToast({ type: "error", title: "Failed to update preference" });
       } finally {
@@ -1005,41 +1013,75 @@ export default function CustomerSettingsPage() {
             {notifPrefsLoading ? (
               <p className="mt-4 text-xs text-[#9a9892]">Loading preferences...</p>
             ) : (
-              <div className="mt-4 space-y-1">
+              <div className="mt-4">
+                {/* Column headers */}
+                <div className="flex items-center justify-end gap-4 px-3 pb-2">
+                  <span className="w-9 text-center text-[10px] font-medium uppercase tracking-wider text-[#9a9892]">
+                    In-app
+                  </span>
+                  <span className="w-9 text-center text-[10px] font-medium uppercase tracking-wider text-[#9a9892]">
+                    Email
+                  </span>
+                </div>
+                <div className="space-y-1">
                 {CUSTOMER_PREFS.map((pref) => {
-                  const prefMap = new Map(notifPrefs.map((p) => [p.type, p.enabled]));
-                  const enabled = prefMap.get(pref.type) ?? true;
-                  const isToggling = togglingType === pref.type;
+                  const prefData = notifPrefs.find((p) => p.type === pref.type);
+                  const enabled = prefData?.enabled ?? true;
+                  const emailEnabled = prefData?.emailEnabled ?? true;
+                  const isTogglingInApp = togglingType === `${pref.type}:enabled`;
+                  const isTogglingEmail = togglingType === `${pref.type}:emailEnabled`;
 
                   return (
                     <div
                       key={pref.type}
                       className="flex items-center justify-between rounded-xl px-3 py-3 transition-colors hover:bg-[#f5f3f0]/50"
                     >
-                      <div className="mr-4 min-w-0">
+                      <div className="mr-4 min-w-0 flex-1">
                         <p className="text-xs font-medium text-[#424143]">{pref.label}</p>
                         <p className="mt-0.5 text-[10px] text-[#9a9892]">{pref.description}</p>
                       </div>
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-label={pref.label}
-                        aria-checked={enabled}
-                        disabled={isToggling}
-                        onClick={() => handleTogglePref(pref.type, enabled)}
-                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
-                          enabled ? "bg-[#f15b2b]" : "bg-[#d0cec9]"
-                        }`}
-                      >
-                        <span
-                          className={`pointer-events-none inline-block h-4 w-4 translate-y-0.5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
-                            enabled ? "translate-x-[18px]" : "translate-x-0.5"
+                      <div className="flex items-center gap-4">
+                        {/* In-app toggle */}
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-label={`${pref.label} in-app`}
+                          aria-checked={enabled}
+                          disabled={isTogglingInApp}
+                          onClick={() => handleTogglePref(pref.type, "enabled", enabled)}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
+                            enabled ? "bg-[#f15b2b]" : "bg-[#d0cec9]"
                           }`}
-                        />
-                      </button>
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4 w-4 translate-y-0.5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                              enabled ? "translate-x-[18px]" : "translate-x-0.5"
+                            }`}
+                          />
+                        </button>
+                        {/* Email toggle */}
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-label={`${pref.label} email`}
+                          aria-checked={emailEnabled}
+                          disabled={isTogglingEmail}
+                          onClick={() => handleTogglePref(pref.type, "emailEnabled", emailEnabled)}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
+                            emailEnabled ? "bg-[#f15b2b]" : "bg-[#d0cec9]"
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4 w-4 translate-y-0.5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                              emailEnabled ? "translate-x-[18px]" : "translate-x-0.5"
+                            }`}
+                          />
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
+                </div>
               </div>
             )}
           </div>

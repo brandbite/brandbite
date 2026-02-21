@@ -42,7 +42,7 @@ function isAutoAssignEnabled(
 // GET: list tickets for the current customer's active company
 // -----------------------------------------------------------------------------
 
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
 
@@ -71,47 +71,110 @@ export async function GET(_req: NextRequest) {
       );
     }
 
-    const tickets = await prisma.ticket.findMany({
-      where: {
-        companyId: company.id,
-      },
-      include: {
-        project: {
-          select: {
-            id: true,
-            name: true,
-            code: true,
+    // ── Parse query params ──────────────────────────────────────────────
+    const url = new URL(req.url);
+    const search = url.searchParams.get("search")?.trim() || "";
+    const status = url.searchParams.get("status") || "";
+    const projectId = url.searchParams.get("project") || "";
+    const priority = url.searchParams.get("priority") || "";
+    const tagId = url.searchParams.get("tag") || "";
+    const sortBy = url.searchParams.get("sortBy") || "createdAt";
+    const sortDir = url.searchParams.get("sortDir") || "desc";
+    const limit = Math.min(
+      Math.max(parseInt(url.searchParams.get("limit") || "50", 10), 1),
+      200,
+    );
+    const offset = Math.max(
+      parseInt(url.searchParams.get("offset") || "0", 10),
+      0,
+    );
+
+    // ── Build where clause ──────────────────────────────────────────────
+    const where: any = { companyId: company.id };
+
+    if (
+      status &&
+      ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"].includes(status)
+    ) {
+      where.status = status;
+    }
+
+    if (
+      priority &&
+      ["LOW", "MEDIUM", "HIGH", "URGENT"].includes(priority)
+    ) {
+      where.priority = priority;
+    }
+
+    if (projectId) {
+      where.projectId = projectId;
+    }
+
+    if (tagId) {
+      where.tagAssignments = { some: { tagId } };
+    }
+
+    if (search) {
+      where.OR = [
+        { title: { contains: search, mode: "insensitive" } },
+        { project: { name: { contains: search, mode: "insensitive" } } },
+        { jobType: { name: { contains: search, mode: "insensitive" } } },
+      ];
+    }
+
+    // ── Build orderBy ───────────────────────────────────────────────────
+    const dir = sortDir === "asc" ? "asc" : "desc";
+    const validSortFields: Record<string, any> = {
+      createdAt: { createdAt: dir },
+      dueDate: { dueDate: dir },
+      status: { status: dir },
+      priority: { priority: dir },
+      title: { title: dir },
+    };
+    const orderBy = validSortFields[sortBy] || { createdAt: "desc" };
+
+    // ── Execute query + count in parallel ───────────────────────────────
+    const [tickets, totalCount] = await Promise.all([
+      prisma.ticket.findMany({
+        where,
+        include: {
+          project: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+            },
           },
-        },
-        jobType: {
-          select: {
-            id: true,
-            name: true,
+          jobType: {
+            select: {
+              id: true,
+              name: true,
+            },
           },
-        },
-        assets: {
-          where: { kind: "BRIEF_INPUT", deletedAt: null },
-          select: {
-            id: true,
-            url: true,
-            mimeType: true,
+          assets: {
+            where: { kind: "BRIEF_INPUT", deletedAt: null },
+            select: {
+              id: true,
+              url: true,
+              mimeType: true,
+            },
+            orderBy: { createdAt: "asc" },
+            take: 1,
           },
-          orderBy: { createdAt: "asc" },
-          take: 1,
-        },
-        tagAssignments: {
-          select: {
-            tag: {
-              select: { id: true, name: true, color: true },
+          tagAssignments: {
+            select: {
+              tag: {
+                select: { id: true, name: true, color: true },
+              },
             },
           },
         },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-      take: 200,
-    });
+        orderBy,
+        take: limit,
+        skip: offset,
+      }),
+      prisma.ticket.count({ where }),
+    ]);
 
     const payload = tickets.map((t) => {
       const code =
@@ -153,6 +216,12 @@ export async function GET(_req: NextRequest) {
         slug: company.slug,
       },
       tickets: payload,
+      pagination: {
+        total: totalCount,
+        limit,
+        offset,
+        hasMore: offset + limit < totalCount,
+      },
     });
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {

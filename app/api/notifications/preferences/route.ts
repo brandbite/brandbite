@@ -1,6 +1,7 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/notifications/preferences/route.ts
 // @purpose: GET + PATCH notification preferences for current user
+//           Supports both in-app (enabled) and email (emailEnabled) channels
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
@@ -19,6 +20,7 @@ const VALID_TYPES: NotificationType[] = [
 
 // ---------------------------------------------------------------------------
 // GET /api/notifications/preferences
+// Returns: { preferences: [{ type, enabled, emailEnabled }] }
 // ---------------------------------------------------------------------------
 
 export async function GET() {
@@ -40,7 +42,8 @@ export async function GET() {
 
 // ---------------------------------------------------------------------------
 // PATCH /api/notifications/preferences
-// Body: { type: NotificationType, enabled: boolean }
+// Body: { type: NotificationType, enabled?: boolean, emailEnabled?: boolean }
+// At least one of enabled or emailEnabled must be provided.
 // ---------------------------------------------------------------------------
 
 export async function PATCH(req: NextRequest) {
@@ -50,6 +53,7 @@ export async function PATCH(req: NextRequest) {
 
     const type = body.type as string | undefined;
     const enabled = body.enabled;
+    const emailEnabled = body.emailEnabled;
 
     if (!type || !VALID_TYPES.includes(type as NotificationType)) {
       return NextResponse.json(
@@ -58,16 +62,29 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    if (typeof enabled !== "boolean") {
+    // At least one channel toggle must be provided
+    const hasEnabled = typeof enabled === "boolean";
+    const hasEmailEnabled = typeof emailEnabled === "boolean";
+
+    if (!hasEnabled && !hasEmailEnabled) {
       return NextResponse.json(
-        { error: "enabled must be a boolean" },
+        { error: "At least one of enabled or emailEnabled must be a boolean" },
         { status: 400 },
       );
     }
 
-    await setUserPreference(user.id, type as NotificationType, enabled);
+    const updates: { enabled?: boolean; emailEnabled?: boolean } = {};
+    if (hasEnabled) updates.enabled = enabled as boolean;
+    if (hasEmailEnabled) updates.emailEnabled = emailEnabled as boolean;
 
-    return NextResponse.json({ success: true, type, enabled });
+    await setUserPreference(user.id, type as NotificationType, updates);
+
+    return NextResponse.json({
+      success: true,
+      type,
+      ...(hasEnabled ? { enabled } : {}),
+      ...(hasEmailEnabled ? { emailEnabled } : {}),
+    });
   } catch (err: unknown) {
     if (err instanceof Error && err.message === "UNAUTHORIZED") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
