@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { getUserPreferences, setUserPreference } from "@/lib/notifications";
 import type { NotificationType } from "@prisma/client";
 
@@ -23,8 +24,15 @@ const VALID_TYPES: NotificationType[] = [
 // Returns: { preferences: [{ type, enabled, emailEnabled }] }
 // ---------------------------------------------------------------------------
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    // Rate limit: 30 requests/min per IP
+    const ip = getClientIp(req.headers);
+    const rl = rateLimit(`notif-prefs:${ip}`, { limit: 30, windowSeconds: 60 });
+    if (!rl.allowed) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
+
     const user = await getCurrentUserOrThrow();
     const preferences = await getUserPreferences(user.id);
     return NextResponse.json({ preferences });
@@ -33,10 +41,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     console.error("[notification-prefs] GET error", err);
-    return NextResponse.json(
-      { error: "Failed to load preferences" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load preferences" }, { status: 500 });
   }
 }
 
@@ -56,10 +61,7 @@ export async function PATCH(req: NextRequest) {
     const emailEnabled = body.emailEnabled;
 
     if (!type || !VALID_TYPES.includes(type as NotificationType)) {
-      return NextResponse.json(
-        { error: "Invalid notification type" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Invalid notification type" }, { status: 400 });
     }
 
     // At least one channel toggle must be provided
@@ -90,9 +92,6 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     console.error("[notification-prefs] PATCH error", err);
-    return NextResponse.json(
-      { error: "Failed to update preference" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to update preference" }, { status: 500 });
   }
 }

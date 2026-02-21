@@ -9,15 +9,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import type Stripe from "stripe";
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 type BillingStatus = "ACTIVE" | "PAST_DUE" | "CANCELED";
 
-function mapStripeSubscriptionStatus(
-  status: Stripe.Subscription.Status,
-): BillingStatus {
+function mapStripeSubscriptionStatus(status: Stripe.Subscription.Status): BillingStatus {
   switch (status) {
     case "trialing":
     case "active":
@@ -42,39 +41,31 @@ function mapStripeSubscriptionStatus(
  * - Uses STRIPE_WEBHOOK_SECRET to verify the payload.
  */
 export async function POST(req: NextRequest) {
+  // Rate limit: 30 requests/min per IP
+  const ip = getClientIp(req.headers);
+  const rl = rateLimit(`webhook:${ip}`, { limit: 30, windowSeconds: 60 });
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   if (!webhookSecret) {
-    console.error(
-      "[billing.webhook] STRIPE_WEBHOOK_SECRET is not set, ignoring webhook.",
-    );
-    return NextResponse.json(
-      { error: "Webhook not configured." },
-      { status: 500 },
-    );
+    console.error("[billing.webhook] STRIPE_WEBHOOK_SECRET is not set, ignoring webhook.");
+    return NextResponse.json({ error: "Webhook not configured." }, { status: 500 });
   }
 
   const signature = req.headers.get("stripe-signature");
   if (!signature) {
-    return NextResponse.json(
-      { error: "Missing stripe-signature header." },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Missing stripe-signature header." }, { status: 400 });
   }
 
   let event: Stripe.Event;
 
   try {
     const body = await req.text();
-    event = stripe.webhooks.constructEvent(
-      body,
-      signature,
-      webhookSecret,
-    );
+    event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
   } catch (err: unknown) {
     console.error("[billing.webhook] Signature verification failed.", err);
-    return NextResponse.json(
-      { error: "Invalid signature." },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Invalid signature." }, { status: 400 });
   }
 
   try {
@@ -113,10 +104,9 @@ export async function POST(req: NextRequest) {
         }
 
         if (!company) {
-          console.warn(
-            "[billing.webhook] Company not found for checkout.session.completed",
-            { companyId },
-          );
+          console.warn("[billing.webhook] Company not found for checkout.session.completed", {
+            companyId,
+          });
           break;
         }
 
@@ -124,44 +114,31 @@ export async function POST(req: NextRequest) {
         let stripeCustomerId: string | null = null;
         if (typeof session.customer === "string") {
           stripeCustomerId = session.customer;
-        } else if (
-          session.customer &&
-          typeof (session.customer as any).id === "string"
-        ) {
+        } else if (session.customer && typeof (session.customer as any).id === "string") {
           stripeCustomerId = (session.customer as Stripe.Customer).id;
         }
 
         let stripeSubscriptionId: string | null = null;
         if (typeof session.subscription === "string") {
           stripeSubscriptionId = session.subscription;
-        } else if (
-          session.subscription &&
-          typeof (session.subscription as any).id === "string"
-        ) {
-          stripeSubscriptionId = (
-            session.subscription as Stripe.Subscription
-          ).id;
+        } else if (session.subscription && typeof (session.subscription as any).id === "string") {
+          stripeSubscriptionId = (session.subscription as Stripe.Subscription).id;
         }
 
         const isFirstSubscription = !company.stripeSubscriptionId;
 
         await prisma.$transaction(async (tx) => {
           const beforeBalance = company.tokenBalance;
-          const shouldCredit =
-            isFirstSubscription && plan.monthlyTokens > 0;
+          const shouldCredit = isFirstSubscription && plan.monthlyTokens > 0;
 
-          const afterBalance = shouldCredit
-            ? beforeBalance + plan.monthlyTokens
-            : beforeBalance;
+          const afterBalance = shouldCredit ? beforeBalance + plan.monthlyTokens : beforeBalance;
 
           const updatedCompany = await tx.company.update({
             where: { id: company.id },
             data: {
               planId: plan.id,
-              stripeCustomerId:
-                stripeCustomerId ?? company.stripeCustomerId,
-              stripeSubscriptionId:
-                stripeSubscriptionId ?? company.stripeSubscriptionId,
+              stripeCustomerId: stripeCustomerId ?? company.stripeCustomerId,
+              stripeSubscriptionId: stripeSubscriptionId ?? company.stripeSubscriptionId,
               billingStatus: "ACTIVE",
               tokenBalance: afterBalance,
             },
@@ -175,8 +152,7 @@ export async function POST(req: NextRequest) {
                 direction: "CREDIT",
                 amount: plan.monthlyTokens,
                 reason: "SUBSCRIPTION_INITIAL_CREDIT",
-                notes:
-                  "Initial subscription credit from Stripe checkout.session.completed",
+                notes: "Initial subscription credit from Stripe checkout.session.completed",
                 metadata: {
                   stripeEventId: event.id,
                   stripeSessionId: session.id,
@@ -190,16 +166,13 @@ export async function POST(req: NextRequest) {
           }
         });
 
-        console.log(
-          "[billing.webhook] checkout.session.completed handled",
-          {
-            planId,
-            companyId,
-            stripeCustomerId,
-            stripeSubscriptionId,
-            isFirstSubscription,
-          },
-        );
+        console.log("[billing.webhook] checkout.session.completed handled", {
+          planId,
+          companyId,
+          stripeCustomerId,
+          stripeSubscriptionId,
+          isFirstSubscription,
+        });
 
         break;
       }
@@ -220,9 +193,7 @@ export async function POST(req: NextRequest) {
         }
 
         if (!subscriptionId) {
-          console.warn(
-            "[billing.webhook] invoice.payment_succeeded without subscription id.",
-          );
+          console.warn("[billing.webhook] invoice.payment_succeeded without subscription id.");
           break;
         }
 
@@ -251,10 +222,9 @@ export async function POST(req: NextRequest) {
         const plan = company.plan;
 
         if (plan.monthlyTokens <= 0) {
-          console.log(
-            "[billing.webhook] Plan has no monthlyTokens, skipping credit.",
-            { planId: plan.id },
-          );
+          console.log("[billing.webhook] Plan has no monthlyTokens, skipping credit.", {
+            planId: plan.id,
+          });
           break;
         }
 
@@ -282,8 +252,7 @@ export async function POST(req: NextRequest) {
               direction: "CREDIT",
               amount: plan.monthlyTokens,
               reason: "SUBSCRIPTION_RENEWAL",
-              notes:
-                "Monthly subscription renewal credit from Stripe invoice.payment_succeeded",
+              notes: "Monthly subscription renewal credit from Stripe invoice.payment_succeeded",
               metadata: {
                 stripeEventId: event.id,
                 stripeInvoiceId: invoice.id,
@@ -295,10 +264,10 @@ export async function POST(req: NextRequest) {
           });
         });
 
-        console.log(
-          "[billing.webhook] invoice.payment_succeeded handled",
-          { subscriptionId, invoiceId: invoice.id },
-        );
+        console.log("[billing.webhook] invoice.payment_succeeded handled", {
+          subscriptionId,
+          invoiceId: invoice.id,
+        });
 
         break;
       }
@@ -316,19 +285,14 @@ export async function POST(req: NextRequest) {
         });
 
         if (!company) {
-          console.warn(
-            "[billing.webhook] No company found for subscription event",
-            {
-              subscriptionId,
-              type: event.type,
-            },
-          );
+          console.warn("[billing.webhook] No company found for subscription event", {
+            subscriptionId,
+            type: event.type,
+          });
           break;
         }
 
-        const billingStatus = mapStripeSubscriptionStatus(
-          subscription.status,
-        );
+        const billingStatus = mapStripeSubscriptionStatus(subscription.status);
 
         await prisma.company.update({
           where: { id: company.id },
@@ -337,33 +301,24 @@ export async function POST(req: NextRequest) {
           },
         });
 
-        console.log(
-          "[billing.webhook] subscription event handled",
-          {
-            companyId: company.id,
-            subscriptionId,
-            billingStatus,
-            type: event.type,
-          },
-        );
+        console.log("[billing.webhook] subscription event handled", {
+          companyId: company.id,
+          subscriptionId,
+          billingStatus,
+          type: event.type,
+        });
 
         break;
       }
 
       default: {
-        console.log(
-          "[billing.webhook] Unhandled event type",
-          event.type,
-        );
+        console.log("[billing.webhook] Unhandled event type", event.type);
       }
     }
 
     return NextResponse.json({ received: true }, { status: 200 });
   } catch (err: unknown) {
     console.error("[billing.webhook] Handler error", err);
-    return NextResponse.json(
-      { error: "Webhook handler failure." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Webhook handler failure." }, { status: 500 });
   }
 }

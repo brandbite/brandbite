@@ -5,6 +5,7 @@
 
 "use client";
 
+import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
 
 export default function CreativeError({
@@ -16,13 +17,12 @@ export default function CreativeError({
 }) {
   useEffect(() => {
     console.error("[creative] Unhandled error:", error);
+    Sentry.captureException(error);
   }, [error]);
 
   return (
     <div className="mx-auto max-w-md rounded-2xl border border-red-200 bg-[var(--bb-bg-page)] px-6 py-8 text-center shadow-sm">
-      <h2 className="text-lg font-semibold text-[var(--bb-secondary)]">
-        Something went wrong
-      </h2>
+      <h2 className="text-lg font-semibold text-[var(--bb-secondary)]">Something went wrong</h2>
       <p className="mt-2 text-sm text-[var(--bb-text-secondary)]">
         An error occurred while loading this page.
       </p>

@@ -20,17 +20,11 @@ export async function GET(_req: NextRequest) {
     const user = await getCurrentUserOrThrow();
 
     if (user.role !== "CUSTOMER") {
-      return NextResponse.json(
-        { error: "Only customers can access projects." },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Only customers can access projects." }, { status: 403 });
     }
 
     if (!user.activeCompanyId) {
-      return NextResponse.json(
-        { error: "No active company found." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "No active company found." }, { status: 400 });
     }
 
     const projects = await prisma.project.findMany({
@@ -54,17 +48,11 @@ export async function GET(_req: NextRequest) {
     });
   } catch (err: any) {
     if (err?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Not authenticated." },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
     }
 
     console.error("[Projects] GET error:", err);
-    return NextResponse.json(
-      { error: "Failed to load projects." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load projects." }, { status: 500 });
   }
 }
 
@@ -77,10 +65,7 @@ export async function POST(req: NextRequest) {
     const user = await getCurrentUserOrThrow();
 
     if (!user.activeCompanyId) {
-      return NextResponse.json(
-        { error: "No active company found." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "No active company found." }, { status: 400 });
     }
 
     // Only OWNER or PM can create projects
@@ -116,7 +101,7 @@ export async function POST(req: NextRequest) {
       .map((w) => w[0]?.toUpperCase() || "")
       .join("")
       .slice(0, 3);
-    let baseCode = `${prefix}-${nameInitials || "PRJ"}`;
+    const baseCode = `${prefix}-${nameInitials || "PRJ"}`;
 
     // Ensure code uniqueness
     let code = baseCode;
@@ -148,15 +133,9 @@ export async function POST(req: NextRequest) {
     console.error("[Projects] POST error:", err);
 
     if (err?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Not authenticated." },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
     }
 
-    return NextResponse.json(
-      { error: "Failed to create project." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to create project." }, { status: 500 });
   }
 }

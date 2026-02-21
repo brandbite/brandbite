@@ -5,12 +5,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserOrThrow } from "@/lib/auth";
-import {
-  getNotifications,
-  getUnreadCount,
-  markAsRead,
-  markAllAsRead,
-} from "@/lib/notifications";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { getNotifications, getUnreadCount, markAsRead, markAllAsRead } from "@/lib/notifications";
 
 // ---------------------------------------------------------------------------
 // GET /api/notifications?limit=20&offset=0&unreadOnly=false
@@ -18,6 +14,13 @@ import {
 
 export async function GET(req: NextRequest) {
   try {
+    // Rate limit: 30 requests/min per IP
+    const ip = getClientIp(req.headers);
+    const rl = rateLimit(`notifications:${ip}`, { limit: 30, windowSeconds: 60 });
+    if (!rl.allowed) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
+
     const user = await getCurrentUserOrThrow();
 
     const url = new URL(req.url);
@@ -25,10 +28,7 @@ export async function GET(req: NextRequest) {
       Math.max(parseInt(url.searchParams.get("limit") ?? "20", 10) || 20, 1),
       50,
     );
-    const offset = Math.max(
-      parseInt(url.searchParams.get("offset") ?? "0", 10) || 0,
-      0,
-    );
+    const offset = Math.max(parseInt(url.searchParams.get("offset") ?? "0", 10) || 0, 0);
     const unreadOnly = url.searchParams.get("unreadOnly") === "true";
 
     const [notifications, unreadCount] = await Promise.all([
@@ -42,10 +42,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     console.error("[notifications] GET error", err);
-    return NextResponse.json(
-      { error: "Failed to load notifications" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load notifications" }, { status: 500 });
   }
 }
 
@@ -66,18 +63,12 @@ export async function PATCH(req: NextRequest) {
 
     const id = body.id as string | undefined;
     if (!id || typeof id !== "string") {
-      return NextResponse.json(
-        { error: "Missing notification id" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Missing notification id" }, { status: 400 });
     }
 
     const updated = await markAsRead(id, user.id);
     if (!updated) {
-      return NextResponse.json(
-        { error: "Notification not found" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Notification not found" }, { status: 404 });
     }
 
     return NextResponse.json({ success: true });
@@ -86,9 +77,6 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     console.error("[notifications] PATCH error", err);
-    return NextResponse.json(
-      { error: "Failed to update notification" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to update notification" }, { status: 500 });
   }
 }

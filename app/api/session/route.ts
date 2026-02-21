@@ -6,18 +6,22 @@
 // @lastUpdate: 2025-11-16
 // -----------------------------------------------------------------------------
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getCurrentUser } from "@/lib/auth";
-import {
-  getDemoPersonaById,
-  isValidDemoPersona,
-  type DemoPersonaId,
-} from "@/lib/demo-personas";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { getDemoPersonaById, isValidDemoPersona, type DemoPersonaId } from "@/lib/demo-personas";
 import { formatRole } from "@/lib/roles";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    // Rate limit: 60 requests/min per IP
+    const ip = getClientIp(req.headers);
+    const rl = rateLimit(`session:${ip}`, { limit: 60, windowSeconds: 60 });
+    if (!rl.allowed) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
+
     const cookieStore = await cookies();
     const personaIdRaw = cookieStore.get("bb-demo-user")?.value ?? null;
 
@@ -61,9 +65,6 @@ export async function GET() {
     );
   } catch (error) {
     console.error("[GET /api/session] error:", error);
-    return NextResponse.json(
-      { ok: false, error: "Failed to load session" },
-      { status: 500 },
-    );
+    return NextResponse.json({ ok: false, error: "Failed to load session" }, { status: 500 });
   }
 }

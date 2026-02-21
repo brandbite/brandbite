@@ -5,6 +5,7 @@
 
 "use client";
 
+import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
 
 export default function RootError({
@@ -16,6 +17,7 @@ export default function RootError({
 }) {
   useEffect(() => {
     console.error("Unhandled error:", error);
+    Sentry.captureException(error);
   }, [error]);
 
   return (
@@ -24,9 +26,7 @@ export default function RootError({
         <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600">
           !
         </div>
-        <h2 className="text-lg font-semibold text-[var(--bb-secondary)]">
-          Something went wrong
-        </h2>
+        <h2 className="text-lg font-semibold text-[var(--bb-secondary)]">Something went wrong</h2>
         <p className="mt-2 text-sm text-[var(--bb-text-secondary)]">
           An unexpected error occurred. Please try again.
         </p>
