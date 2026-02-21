@@ -99,6 +99,13 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
             email: true,
           },
         },
+        completedBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
       },
     });
 
@@ -170,6 +177,14 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
                 id: ticket.createdBy.id,
                 name: ticket.createdBy.name,
                 email: ticket.createdBy.email,
+              }
+            : null,
+          completedAt: ticket.completedAt?.toISOString() ?? null,
+          completedBy: ticket.completedBy
+            ? {
+                id: ticket.completedBy.id,
+                name: ticket.completedBy.name,
+                email: ticket.completedBy.email,
               }
             : null,
         },

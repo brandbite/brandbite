@@ -16,6 +16,8 @@ import {
   TicketPriority,
   LedgerDirection,
   WithdrawalStatus,
+  AssetKind,
+  PinStatus,
 } from "@prisma/client";
 
 const prisma = new PrismaClient();
@@ -583,7 +585,320 @@ async function main() {
     },
   });
 
+  // ticket5 — DONE, completed by customer, shows approval state
+  const ticket5 = await prisma.ticket.create({
+    data: {
+      title: "Brand strategy deck",
+      description:
+        "Create a brand strategy deck covering archetype, tone of voice, and competitor analysis.",
+      status: TicketStatus.DONE,
+      priority: TicketPriority.MEDIUM,
+      dueDate: daysFromNow(-2),
+      companyId: company.id,
+      projectId: websiteProject.id,
+      createdById: customerOwner.id,
+      creativeId: creativeAda.id,
+      jobTypeId: findJob("Brand Strategy Deck – Simple").id,
+      companyTicketNumber: 105,
+      revisionCount: 1,
+      completedAt: daysFromNow(-1),
+      completedById: customerOwner.id,
+    },
+  });
+
   console.log("✅ Tickets created.");
+
+  // ---------------------------------------------------------------------------
+  // 6a) REVISIONS, ASSETS, PINS & COMMENTS (demo review flow)
+  // ---------------------------------------------------------------------------
+
+  // Update revisionCount on tickets that have revisions
+  await prisma.ticket.update({
+    where: { id: ticket1.id },
+    data: { revisionCount: 1 },
+  });
+  await prisma.ticket.update({
+    where: { id: ticket3.id },
+    data: { revisionCount: 2 },
+  });
+
+  // -- ticket3 (IN_REVIEW, Liam): 2 revisions with feedback loop --
+  const t3rev1 = await prisma.ticketRevision.create({
+    data: {
+      ticketId: ticket3.id,
+      version: 1,
+      submittedByCreativeId: creativeLiam.id,
+      submittedAt: daysFromNow(-8),
+      creativeMessage: "Initial motion concepts — 3 scene options for the onboarding flow.",
+      feedbackByCustomerId: customerOwner.id,
+      feedbackAt: daysFromNow(-6),
+      feedbackMessage: "Love option B but the intro text needs to be larger and the background should be darker.",
+    },
+  });
+
+  const t3rev2 = await prisma.ticketRevision.create({
+    data: {
+      ticketId: ticket3.id,
+      version: 2,
+      submittedByCreativeId: creativeLiam.id,
+      submittedAt: daysFromNow(-3),
+      creativeMessage: "Applied larger text and darker background per feedback. Also refined transitions.",
+      // No customer feedback yet — this is the IN_REVIEW version
+    },
+  });
+
+  // -- ticket1 (IN_PROGRESS, Ada): 1 revision with changes requested --
+  const t1rev1 = await prisma.ticketRevision.create({
+    data: {
+      ticketId: ticket1.id,
+      version: 1,
+      submittedByCreativeId: creativeAda.id,
+      submittedAt: daysFromNow(-4),
+      creativeMessage: "First logo concepts — 3 directions exploring different styles.",
+      feedbackByCustomerId: customerPM.id,
+      feedbackAt: daysFromNow(-2),
+      feedbackMessage: "Logo looks great but needs more contrast on dark backgrounds. Direction A is preferred.",
+    },
+  });
+
+  // -- ticket5 (DONE, Ada): 1 approved revision --
+  const t5rev1 = await prisma.ticketRevision.create({
+    data: {
+      ticketId: ticket5.id,
+      version: 1,
+      submittedByCreativeId: creativeAda.id,
+      submittedAt: daysFromNow(-3),
+      creativeMessage: "Brand strategy deck covering archetype, tone of voice, and competitor scan.",
+      // Approved — no changes requested
+    },
+  });
+
+  // -- Assets for ticket3 v1 (3 OUTPUT_IMAGE) --
+  const t3v1Asset1 = await prisma.asset.create({
+    data: {
+      ticketId: ticket3.id,
+      revisionId: t3rev1.id,
+      kind: AssetKind.OUTPUT_IMAGE,
+      storageKey: "seed/t3-v1-scene-option-a.png",
+      url: "https://placehold.co/1280x720/1a1a2e/f15b2b?text=Scene+A+%E2%80%93+v1",
+      mimeType: "image/png",
+      bytes: 245000,
+      width: 1280,
+      height: 720,
+      originalName: "onboarding-scene-A-v1.png",
+      createdById: creativeLiam.id,
+    },
+  });
+  const t3v1Asset2 = await prisma.asset.create({
+    data: {
+      ticketId: ticket3.id,
+      revisionId: t3rev1.id,
+      kind: AssetKind.OUTPUT_IMAGE,
+      storageKey: "seed/t3-v1-scene-option-b.png",
+      url: "https://placehold.co/1280x720/2d2d44/f7c948?text=Scene+B+%E2%80%93+v1",
+      mimeType: "image/png",
+      bytes: 312000,
+      width: 1280,
+      height: 720,
+      originalName: "onboarding-scene-B-v1.png",
+      createdById: creativeLiam.id,
+    },
+  });
+  const t3v1Asset3 = await prisma.asset.create({
+    data: {
+      ticketId: ticket3.id,
+      revisionId: t3rev1.id,
+      kind: AssetKind.OUTPUT_IMAGE,
+      storageKey: "seed/t3-v1-scene-option-c.png",
+      url: "https://placehold.co/1280x720/0f3460/e94560?text=Scene+C+%E2%80%93+v1",
+      mimeType: "image/png",
+      bytes: 198000,
+      width: 1280,
+      height: 720,
+      originalName: "onboarding-scene-C-v1.png",
+      createdById: creativeLiam.id,
+    },
+  });
+
+  // -- Assets for ticket3 v2 (2 OUTPUT_IMAGE — refined B + transitions) --
+  await prisma.asset.create({
+    data: {
+      ticketId: ticket3.id,
+      revisionId: t3rev2.id,
+      kind: AssetKind.OUTPUT_IMAGE,
+      storageKey: "seed/t3-v2-scene-b-refined.png",
+      url: "https://placehold.co/1280x720/0d0d1a/f15b2b?text=Scene+B+Refined+%E2%80%93+v2",
+      mimeType: "image/png",
+      bytes: 287000,
+      width: 1280,
+      height: 720,
+      originalName: "onboarding-scene-B-refined-v2.png",
+      createdById: creativeLiam.id,
+    },
+  });
+  await prisma.asset.create({
+    data: {
+      ticketId: ticket3.id,
+      revisionId: t3rev2.id,
+      kind: AssetKind.OUTPUT_IMAGE,
+      storageKey: "seed/t3-v2-transitions.png",
+      url: "https://placehold.co/1280x720/0d0d1a/32b37b?text=Transitions+%E2%80%93+v2",
+      mimeType: "image/png",
+      bytes: 334000,
+      width: 1280,
+      height: 720,
+      originalName: "onboarding-transitions-v2.png",
+      createdById: creativeLiam.id,
+    },
+  });
+
+  // -- Brief input asset for ticket3 (reference storyboard) --
+  await prisma.asset.create({
+    data: {
+      ticketId: ticket3.id,
+      revisionId: null,
+      kind: AssetKind.BRIEF_INPUT,
+      storageKey: "seed/t3-brief-storyboard.png",
+      url: "https://placehold.co/800x600/f5f5f0/333333?text=Storyboard+Reference",
+      mimeType: "image/png",
+      bytes: 156000,
+      width: 800,
+      height: 600,
+      originalName: "onboarding-storyboard-reference.png",
+      createdById: customerOwner.id,
+    },
+  });
+
+  // -- Assets for ticket1 v1 (2 OUTPUT_IMAGE — logo directions) --
+  await prisma.asset.create({
+    data: {
+      ticketId: ticket1.id,
+      revisionId: t1rev1.id,
+      kind: AssetKind.OUTPUT_IMAGE,
+      storageKey: "seed/t1-v1-logo-direction-a.png",
+      url: "https://placehold.co/800x800/ffffff/f15b2b?text=Logo+Direction+A",
+      mimeType: "image/png",
+      bytes: 89000,
+      width: 800,
+      height: 800,
+      originalName: "logo-direction-A.png",
+      createdById: creativeAda.id,
+    },
+  });
+  await prisma.asset.create({
+    data: {
+      ticketId: ticket1.id,
+      revisionId: t1rev1.id,
+      kind: AssetKind.OUTPUT_IMAGE,
+      storageKey: "seed/t1-v1-logo-direction-b.png",
+      url: "https://placehold.co/800x800/1a1a2e/f7c948?text=Logo+Direction+B",
+      mimeType: "image/png",
+      bytes: 102000,
+      width: 800,
+      height: 800,
+      originalName: "logo-direction-B.png",
+      createdById: creativeAda.id,
+    },
+  });
+
+  // -- Brief input assets for ticket1 (reference images from customer) --
+  await prisma.asset.create({
+    data: {
+      ticketId: ticket1.id,
+      revisionId: null,
+      kind: AssetKind.BRIEF_INPUT,
+      storageKey: "seed/t1-brief-current-logo.png",
+      url: "https://placehold.co/600x400/e8e8e8/666666?text=Current+Logo",
+      mimeType: "image/png",
+      bytes: 45000,
+      width: 600,
+      height: 400,
+      originalName: "current-logo-reference.png",
+      createdById: customerPM.id,
+    },
+  });
+  await prisma.asset.create({
+    data: {
+      ticketId: ticket1.id,
+      revisionId: null,
+      kind: AssetKind.BRIEF_INPUT,
+      storageKey: "seed/t1-brief-inspiration.png",
+      url: "https://placehold.co/600x400/f0f0f0/333333?text=Inspiration+Board",
+      mimeType: "image/png",
+      bytes: 67000,
+      width: 600,
+      height: 400,
+      originalName: "logo-inspiration-board.png",
+      createdById: customerPM.id,
+    },
+  });
+
+  // -- Assets for ticket5 v1 (approved brand strategy deck) --
+  await prisma.asset.create({
+    data: {
+      ticketId: ticket5.id,
+      revisionId: t5rev1.id,
+      kind: AssetKind.OUTPUT_IMAGE,
+      storageKey: "seed/t5-v1-strategy-deck.png",
+      url: "https://placehold.co/1280x720/1a1a2e/ffffff?text=Brand+Strategy+Deck",
+      mimeType: "image/png",
+      bytes: 425000,
+      width: 1280,
+      height: 720,
+      originalName: "brand-strategy-deck-final.png",
+      createdById: creativeAda.id,
+    },
+  });
+
+  // -- Pins on ticket3 v1, first asset (customer feedback annotations) --
+  const pin1 = await prisma.assetPin.create({
+    data: {
+      assetId: t3v1Asset1.id,
+      createdById: customerOwner.id,
+      x: 0.45,
+      y: 0.15,
+      order: 1,
+      label: "Make headline text larger",
+      status: PinStatus.OPEN,
+    },
+  });
+
+  await prisma.assetPin.create({
+    data: {
+      assetId: t3v1Asset1.id,
+      createdById: customerOwner.id,
+      x: 0.5,
+      y: 0.6,
+      order: 2,
+      label: "Background too bright here",
+      status: PinStatus.RESOLVED,
+      resolvedAt: daysFromNow(-5),
+      resolvedById: creativeLiam.id,
+    },
+  });
+
+  await prisma.assetPin.create({
+    data: {
+      assetId: t3v1Asset1.id,
+      createdById: customerOwner.id,
+      x: 0.3,
+      y: 0.35,
+      order: 3,
+      label: "Can we try a different font?",
+      status: PinStatus.OPEN,
+    },
+  });
+
+  // -- Pin comment on pin 1 --
+  await prisma.assetPinComment.create({
+    data: {
+      pinId: pin1.id,
+      authorId: customerOwner.id,
+      message: "The headline should be at least 2x current size for mobile readability.",
+    },
+  });
+
+  console.log("✅ Revisions, assets, pins & comments seeded.");
 
   // ---------------------------------------------------------------------------
   // 6b) TAG ASSIGNMENTS

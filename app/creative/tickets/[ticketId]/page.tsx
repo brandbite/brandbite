@@ -17,6 +17,14 @@ import { SafeHtml } from "@/components/ui/safe-html";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { EmptyState } from "@/components/ui/empty-state";
 import { priorityBadgeVariant, statusBadgeVariant, STATUS_LABELS, PRIORITY_LABELS, formatPriorityLabel, formatBoardDate, formatDateTime } from "@/lib/board";
+import {
+  RevisionImageGrid,
+  BriefThumbnailRow,
+  DownloadAllButton,
+  type AssetEntry,
+} from "@/components/ui/revision-image";
+import { formatBytes } from "@/lib/upload-helpers";
+import { RevisionCompare } from "@/components/ui/revision-compare";
 
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -60,6 +68,12 @@ type TicketDetailResponse = {
       name: string | null;
       email: string;
     } | null;
+    completedAt: string | null;
+    completedBy: {
+      id: string;
+      name: string | null;
+      email: string;
+    } | null;
   };
 };
 
@@ -80,12 +94,26 @@ type TicketComment = {
   };
 };
 
+type RevisionAsset = {
+  id: string;
+  url: string | null;
+  mimeType: string;
+  bytes: number;
+  width: number | null;
+  height: number | null;
+  originalName: string | null;
+  pinCount: number;
+  openPins: number;
+  resolvedPins: number;
+};
+
 type TicketRevisionItem = {
   version: number;
   submittedAt: string | null;
   feedbackAt: string | null;
   feedbackMessage: string | null;
   creativeMessage: string | null;
+  assets: RevisionAsset[];
 };
 
 
@@ -113,6 +141,10 @@ export default function CreativeTicketDetailPage() {
   const [revisionsError, setRevisionsError] = useState<string | null>(
     null,
   );
+
+  const [briefAssets, setBriefAssets] = useState<AssetEntry[]>([]);
+  const [briefAssetsLoading, setBriefAssetsLoading] = useState(false);
+  const [showCompare, setShowCompare] = useState(false);
 
   // ---------------------------------------------------------------------------
   // Ticket detail load
@@ -293,6 +325,44 @@ export default function CreativeTicketDetailPage() {
   }, [ticketIdFromData]);
 
   // ---------------------------------------------------------------------------
+  // Brief assets load (BRIEF_INPUT attachments from customer)
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!ticketIdFromData) return;
+
+    let cancelled = false;
+
+    const loadBriefAssets = async () => {
+      setBriefAssetsLoading(true);
+      try {
+        const res = await fetch(
+          `/api/creative/tickets/${ticketIdFromData}/assets?kind=BRIEF_INPUT`,
+          { cache: "no-store" },
+        );
+        const json = await res.json().catch(() => null);
+
+        if (!cancelled && res.ok && Array.isArray(json?.assets)) {
+          setBriefAssets(
+            json.assets.map((a: any) => ({
+              id: a.id,
+              url: a.url ?? null,
+              originalName: a.originalName ?? null,
+              pinCount: a.pinCount ?? 0,
+            })),
+          );
+        }
+      } catch (err) {
+        console.error("Creative brief assets fetch error:", err);
+      } finally {
+        if (!cancelled) setBriefAssetsLoading(false);
+      }
+    };
+
+    loadBriefAssets();
+    return () => { cancelled = true; };
+  }, [ticketIdFromData]);
+
+  // ---------------------------------------------------------------------------
   // Derived state
   // ---------------------------------------------------------------------------
   const error = state.status === "error" ? state.message : null;
@@ -421,6 +491,25 @@ export default function CreativeTicketDetailPage() {
           <div className="grid gap-4 md:grid-cols-3">
             {/* Left: brief + job/meta + revisions */}
             <section className="md:col-span-2 space-y-4">
+              {/* Approval banner — DONE */}
+              {ticket.status === "DONE" && ticket.completedAt && (
+                <div className="flex items-center gap-3 rounded-xl border border-[#a3e0bf] bg-[#f0faf4] px-4 py-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#32b37b] text-white">
+                    &#10003;
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-[var(--bb-secondary)]">
+                      Approved
+                    </p>
+                    <p className="mt-0.5 text-xs text-[var(--bb-text-tertiary)]">
+                      {ticket.completedBy?.name || ticket.completedBy?.email || "Customer"}{" "}
+                      approved this work on{" "}
+                      {formatBoardDate(ticket.completedAt)}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Brief */}
               <div className="rounded-2xl border border-[var(--bb-border)] bg-white px-4 py-4 shadow-sm">
                 <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">
@@ -513,11 +602,35 @@ export default function CreativeTicketDetailPage() {
                 </div>
               </div>
 
+              {/* Brief attachments */}
+              {!briefAssetsLoading && briefAssets.length > 0 && (
+                <div className="rounded-2xl border border-[var(--bb-border)] bg-white px-4 py-4 shadow-sm">
+                  <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">
+                    Brief attachments
+                  </h2>
+                  <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
+                    Reference files provided by the customer.
+                  </p>
+                  <BriefThumbnailRow assets={briefAssets} />
+                </div>
+              )}
+
               {/* Revision history */}
               <div className="rounded-2xl border border-[var(--bb-border)] bg-white px-4 py-4 shadow-sm">
-                <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">
-                  Revision history
-                </h2>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">
+                    Revision history
+                  </h2>
+                  {revisions && revisions.length >= 2 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowCompare(true)}
+                      className="inline-flex items-center gap-1 rounded-full border border-[#d0cec9] bg-[#f9f8f6] px-2.5 py-1 text-[11px] font-medium text-[#666] transition-colors hover:border-[#f15b2b] hover:bg-[#fff5f2] hover:text-[#f15b2b]"
+                    >
+                      &#8596; Compare
+                    </button>
+                  )}
+                </div>
 
                 {revisionsLoading && (
                   <p className="mt-2 text-xs text-[var(--bb-text-tertiary)]">
@@ -544,56 +657,124 @@ export default function CreativeTicketDetailPage() {
                   revisions &&
                   revisions.length > 0 && (
                     <div className="mt-3 space-y-3">
-                      {revisions.map((rev) => (
-                        <div
-                          key={rev.version}
-                          className="rounded-xl bg-[var(--bb-bg-card)] px-3 py-3 text-xs"
-                        >
-                          <p className="text-xs font-semibold text-[var(--bb-secondary)]">
-                            Version v{rev.version}
-                          </p>
-                          {rev.submittedAt && (
-                            <p className="mt-1 text-[var(--bb-text-secondary)]">
-                              You sent this version for review on{" "}
-                              <span className="font-semibold text-[var(--bb-secondary)]">
-                                {formatBoardDate(rev.submittedAt)}
-                              </span>
-                              .
-                            </p>
-                          )}
-                          {rev.feedbackAt && (
-                            <p className="text-[var(--bb-text-secondary)]">
-                              Customer requested changes on{" "}
-                              <span className="font-semibold text-[var(--bb-secondary)]">
-                                {formatBoardDate(rev.feedbackAt)}
-                              </span>
-                              .
-                            </p>
-                          )}
+                      {[...revisions].reverse().map((rev, idx) => {
+                        const isLatest = idx === 0;
+                        const totalOpen = rev.assets.reduce((sum, a) => sum + (a.openPins ?? 0), 0);
+                        const totalResolved = rev.assets.reduce((sum, a) => sum + (a.resolvedPins ?? 0), 0);
+                        const totalBytes = rev.assets.reduce((sum, a) => sum + (a.bytes ?? 0), 0);
+                        const assetEntries: AssetEntry[] = rev.assets.map((a) => ({
+                          id: a.id,
+                          url: a.url,
+                          originalName: a.originalName,
+                          pinCount: a.pinCount,
+                        }));
 
-                          {rev.creativeMessage && (
-                            <p className="mt-1 text-[var(--bb-secondary)]">
-                              <span className="font-semibold">
-                                Your note:
-                              </span>{" "}
-                              <span className="italic">
-                                “{rev.creativeMessage}”
-                              </span>
-                            </p>
-                          )}
+                        return (
+                          <div
+                            key={rev.version}
+                            className={`rounded-xl px-3 py-3 text-xs ${
+                              isLatest
+                                ? "border border-[var(--bb-primary)]/20 bg-[var(--bb-primary)]/[0.03]"
+                                : "bg-[var(--bb-bg-card)]"
+                            }`}
+                          >
+                            {/* Revision header */}
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs font-semibold text-[var(--bb-secondary)]">
+                                Version v{rev.version}
+                              </p>
+                              {isLatest && (
+                                <span className="rounded-full bg-[var(--bb-primary)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">
+                                  Current
+                                </span>
+                              )}
+                              {rev.assets.length > 0 && (
+                                <span className="text-[var(--bb-text-tertiary)]">
+                                  · {rev.assets.length} file{rev.assets.length !== 1 ? "s" : ""}
+                                  {totalBytes > 0 && ` · ${formatBytes(totalBytes)}`}
+                                </span>
+                              )}
+                              {(totalOpen > 0 || totalResolved > 0) && (
+                                <span className="flex items-center gap-1.5 text-[var(--bb-text-tertiary)]">
+                                  ·
+                                  {totalOpen > 0 && (
+                                    <span className="flex items-center gap-0.5">
+                                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#f15b2b]" />
+                                      {totalOpen} open
+                                    </span>
+                                  )}
+                                  {totalResolved > 0 && (
+                                    <span className="flex items-center gap-0.5">
+                                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#32b37b]" />
+                                      {totalResolved} resolved
+                                    </span>
+                                  )}
+                                </span>
+                              )}
+                            </div>
 
-                          {rev.feedbackMessage && (
-                            <p className="mt-1 text-[var(--bb-text-secondary)]">
-                              <span className="font-semibold">
-                                Customer feedback:
-                              </span>{" "}
-                              <span className="italic">
-                                “{rev.feedbackMessage}”
-                              </span>
-                            </p>
-                          )}
-                        </div>
-                      ))}
+                            {rev.submittedAt && (
+                              <p className="mt-1 text-[var(--bb-text-secondary)]">
+                                You sent this version for review on{" "}
+                                <span className="font-semibold text-[var(--bb-secondary)]">
+                                  {formatBoardDate(rev.submittedAt)}
+                                </span>
+                                .
+                              </p>
+                            )}
+                            {rev.feedbackAt && (
+                              <p className="text-[var(--bb-text-secondary)]">
+                                Customer requested changes on{" "}
+                                <span className="font-semibold text-[var(--bb-secondary)]">
+                                  {formatBoardDate(rev.feedbackAt)}
+                                </span>
+                                .
+                              </p>
+                            )}
+
+                            {rev.creativeMessage && (
+                              <p className="mt-1 text-[var(--bb-secondary)]">
+                                <span className="font-semibold">
+                                  Your note:
+                                </span>{" "}
+                                <span className="italic">
+                                  &ldquo;{rev.creativeMessage}&rdquo;
+                                </span>
+                              </p>
+                            )}
+
+                            {rev.feedbackMessage && (
+                              <p className="mt-1 text-[var(--bb-text-secondary)]">
+                                <span className="font-semibold">
+                                  Customer feedback:
+                                </span>{" "}
+                                <span className="italic">
+                                  &ldquo;{rev.feedbackMessage}&rdquo;
+                                </span>
+                              </p>
+                            )}
+
+                            {/* Asset thumbnails */}
+                            {assetEntries.length > 0 && (
+                              <RevisionImageGrid
+                                assets={assetEntries}
+                                pinMode={ticket.status === "IN_PROGRESS" ? "resolve" : "view"}
+                                ticketId={ticket.id}
+                              />
+                            )}
+
+                            {/* Download all button */}
+                            {assetEntries.length >= 2 && (
+                              <div className="mt-2">
+                                <DownloadAllButton
+                                  assets={assetEntries}
+                                  zipFilename={`${ticketCode || ticket.id}-v${rev.version}`}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
               </div>
@@ -707,6 +888,23 @@ export default function CreativeTicketDetailPage() {
 
         {!error && !ticket && (
           <InlineAlert variant="warning">Ticket could not be loaded.</InlineAlert>
+        )}
+
+        {/* Revision comparison overlay */}
+        {showCompare && revisions && revisions.length >= 2 && (
+          <RevisionCompare
+            revisions={revisions.map((r) => ({
+              version: r.version,
+              submittedAt: r.submittedAt,
+              assets: r.assets.map((a) => ({
+                id: a.id,
+                url: a.url,
+                originalName: a.originalName,
+                pinCount: a.pinCount,
+              })),
+            }))}
+            onClose={() => setShowCompare(false)}
+          />
         )}
     </>
   );

@@ -145,8 +145,9 @@ model UserAccount {
 
   // Relations
   companies       CompanyMember[]
-  creativeTickets Ticket[]        @relation("CreativeTickets")
-  customerTickets Ticket[]        @relation("CustomerTickets")
+  creativeTickets  Ticket[]        @relation("CreativeTickets")
+  customerTickets  Ticket[]        @relation("CustomerTickets")
+  completedTickets Ticket[]        @relation("TicketCompletedBy")
 
   projectMemberships ProjectMember[]
 
@@ -504,6 +505,11 @@ model Ticket {
   // Admin overrides — when set, these replace the calculated (jobType cost * quantity).
   tokenCostOverride      Int?
   creativePayoutOverride Int?     @map("designerPayoutOverride")
+
+  // Completion tracking (who approved the final revision)
+  completedAt   DateTime?
+  completedById String?
+  completedBy   UserAccount? @relation("TicketCompletedBy", fields: [completedById], references: [id])
 
   // Company-scoped ticket number
   companyTicketNumber Int?

@@ -353,11 +353,14 @@ export async function PATCH(req: NextRequest) {
         // sessizce geçiyoruz; ileride log eklenebilir.
       }
 
-      // 3) Ticket status update
+      // 3) Ticket status update (+ completion tracking for DONE)
       const updatedTicket = await tx.ticket.update({
         where: { id: ticket.id },
         data: {
           status: nextStatus,
+          ...(isDoneTransition
+            ? { completedAt: new Date(), completedById: user.id }
+            : {}),
         },
         select: {
           id: true,

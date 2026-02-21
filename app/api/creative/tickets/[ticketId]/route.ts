@@ -78,6 +78,13 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
             email: true,
           },
         },
+        completedBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
       },
     });
 
@@ -116,6 +123,8 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
           jobType: ticket.jobType,
           creative: ticket.creative,
           createdBy: ticket.createdBy,
+          completedAt: ticket.completedAt?.toISOString() ?? null,
+          completedBy: ticket.completedBy ?? null,
         },
       },
       { status: 200 },

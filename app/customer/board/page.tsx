@@ -100,6 +100,8 @@ type RevisionAsset = {
   height: number | null;
   originalName: string | null;
   pinCount?: number;
+  openPins?: number;
+  resolvedPins?: number;
 };
 
 type TicketRevisionEntry = {

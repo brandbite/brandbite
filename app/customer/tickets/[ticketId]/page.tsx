@@ -55,6 +55,7 @@ import {
   downloadSingleAsset,
   downloadAssetsAsZip,
 } from "@/lib/download-helpers";
+import { RevisionCompare } from "@/components/ui/revision-compare";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -86,6 +87,8 @@ type TicketDetailResponse = {
     } | null;
     isAssigned: boolean;
     createdBy: { id: string; name: string | null; email: string } | null;
+    completedAt: string | null;
+    completedBy: { id: string; name: string | null; email: string } | null;
     tags: { id: string; name: string; color: string }[];
   };
 };
@@ -99,6 +102,8 @@ type TicketRevisionAsset = {
   height: number | null;
   originalName: string | null;
   pinCount: number;
+  openPins: number;
+  resolvedPins: number;
 };
 
 type TicketRevisionEntry = {
@@ -224,6 +229,7 @@ export default function CustomerTicketDetailPage() {
   );
   const [revisionsLoading, setRevisionsLoading] = useState(false);
   const [revisionsError, setRevisionsError] = useState<string | null>(null);
+  const [showCompare, setShowCompare] = useState(false);
 
   // Status action modals
   const [showRevisionModal, setShowRevisionModal] = useState(false);
@@ -896,6 +902,25 @@ export default function CustomerTicketDetailPage() {
               </div>
             )}
 
+            {/* Approval banner — DONE */}
+            {ticket.status === "DONE" && ticket.completedAt && (
+              <div className="flex items-center gap-3 rounded-xl border border-[#a3e0bf] bg-[#f0faf4] px-4 py-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#32b37b] text-white">
+                  &#10003;
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-[#424143]">
+                    Approved
+                  </p>
+                  <p className="mt-0.5 text-xs text-[#7a7a7a]">
+                    {ticket.completedBy?.name || ticket.completedBy?.email || "Customer"}{" "}
+                    marked this as complete on{" "}
+                    {formatBoardDate(ticket.completedAt)}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Brief card */}
             <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
               <div className="flex items-center justify-between gap-3">
@@ -1019,9 +1044,20 @@ export default function CustomerTicketDetailPage() {
             {/* Revision History */}
             {ticket.status !== "TODO" && (
               <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
-                <h2 className="text-sm font-semibold text-[#424143]">
-                  Revision history
-                </h2>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-[#424143]">
+                    Revision history
+                  </h2>
+                  {revisions && revisions.length >= 2 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowCompare(true)}
+                      className="inline-flex items-center gap-1 rounded-full border border-[#d0cec9] bg-[#f9f8f6] px-2.5 py-1 text-[11px] font-medium text-[#666] transition-colors hover:border-[#f15b2b] hover:bg-[#fff5f2] hover:text-[#f15b2b]"
+                    >
+                      &#8596; Compare
+                    </button>
+                  )}
+                </div>
 
                 {revisionsLoading && (
                   <div className="mt-3 flex items-center gap-2 py-3">
@@ -1054,7 +1090,8 @@ export default function CustomerTicketDetailPage() {
                   revisions &&
                   revisions.length > 0 && (
                     <div className="mt-3 space-y-6">
-                      {[...revisions].reverse().map((rev) => {
+                      {[...revisions].reverse().map((rev, idx) => {
+                        const isLatest = idx === 0;
                         const revAssets: AssetEntry[] = rev.assets.map(
                           (a) => ({
                             id: a.id,
@@ -1063,17 +1100,41 @@ export default function CustomerTicketDetailPage() {
                             pinCount: a.pinCount,
                           }),
                         );
+                        const totalOpen = rev.assets.reduce((sum, a) => sum + (a.openPins ?? 0), 0);
+                        const totalResolved = rev.assets.reduce((sum, a) => sum + (a.resolvedPins ?? 0), 0);
 
                         return (
                           <div key={rev.version}>
                             <div className="mb-2 flex items-center justify-between">
                               <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#b1afa9]">
                                 <span>Version {rev.version}</span>
+                                {isLatest && (
+                                  <span className="rounded-full bg-[#f15b2b] px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white">
+                                    Current
+                                  </span>
+                                )}
                                 {rev.submittedAt && (
                                   <span className="font-normal normal-case tracking-normal text-[#9a9892]">
                                     — {formatBoardDate(rev.submittedAt)}{" "}
                                     &middot; {revAssets.length} file
                                     {revAssets.length !== 1 ? "s" : ""}
+                                  </span>
+                                )}
+                                {(totalOpen > 0 || totalResolved > 0) && (
+                                  <span className="flex items-center gap-1.5 font-normal normal-case tracking-normal text-[#9a9892]">
+                                    &middot;
+                                    {totalOpen > 0 && (
+                                      <span className="flex items-center gap-0.5">
+                                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#f15b2b]" />
+                                        {totalOpen} open
+                                      </span>
+                                    )}
+                                    {totalResolved > 0 && (
+                                      <span className="flex items-center gap-0.5">
+                                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#32b37b]" />
+                                        {totalResolved} resolved
+                                      </span>
+                                    )}
                                   </span>
                                 )}
                               </p>
@@ -1689,6 +1750,23 @@ export default function CustomerTicketDetailPage() {
           </Button>
         </ModalFooter>
       </Modal>
+
+      {/* Revision comparison overlay */}
+      {showCompare && revisions && revisions.length >= 2 && (
+        <RevisionCompare
+          revisions={revisions.map((r) => ({
+            version: r.version,
+            submittedAt: r.submittedAt,
+            assets: r.assets.map((a) => ({
+              id: a.id,
+              url: a.url,
+              originalName: a.originalName,
+              pinCount: a.pinCount,
+            })),
+          }))}
+          onClose={() => setShowCompare(false)}
+        />
+      )}
     </>
   );
 }
