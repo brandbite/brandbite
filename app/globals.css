@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   /* ── Brand ─────────────────────────────────────────────────────────────── */
   --bb-primary: #f15b2b;
@@ -46,6 +48,53 @@
   --bb-danger-border: #f7c7c0;
 }
 
+/* ── Dark mode overrides ──────────────────────────────────────────────────── */
+.dark {
+  /* ── Brand ───────────────────────────────────────────────────────────── */
+  --bb-primary: #f47a52;
+  --bb-primary-hover: #f16a3e;
+  --bb-primary-light: #2a1a14;
+  --bb-primary-border: #5c3122;
+
+  /* ── Text ────────────────────────────────────────────────────────────── */
+  --bb-secondary: #e5e7eb;
+  --bb-text-secondary: #a1a1aa;
+  --bb-text-tertiary: #71717a;
+  --bb-text-muted: #52525b;
+
+  /* ── Borders ─────────────────────────────────────────────────────────── */
+  --bb-border: #2e2e33;
+  --bb-border-subtle: #27272a;
+  --bb-border-input: #3f3f46;
+
+  /* ── Backgrounds ─────────────────────────────────────────────────────── */
+  --bb-bg: #0a0a0f;
+  --bb-surface: #18181b;
+  --bb-bg-page: #111114;
+  --bb-bg-warm: #1a1a1e;
+  --bb-bg-card: #1e1e23;
+
+  /* ── Semantic: info ──────────────────────────────────────────────────── */
+  --bb-info-bg: #0c1929;
+  --bb-info-text: #60a5fa;
+  --bb-info-border: #1e3a5f;
+
+  /* ── Semantic: success ───────────────────────────────────────────────── */
+  --bb-success-bg: #0a2618;
+  --bb-success-text: #4ade80;
+  --bb-success-border: #14532d;
+
+  /* ── Semantic: warning ───────────────────────────────────────────────── */
+  --bb-warning-bg: #27200a;
+  --bb-warning-text: #fbbf24;
+  --bb-warning-border: #713f12;
+
+  /* ── Semantic: danger ────────────────────────────────────────────────── */
+  --bb-danger-bg: #2a0f0f;
+  --bb-danger-text: #f87171;
+  --bb-danger-border: #7f1d1d;
+}
+
 *,
 *::before,
 *::after {
@@ -60,8 +109,8 @@ body {
 
 body {
   font-family: var(--font-inter), system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  background: var(--bb-bg);
-  color: #e5e7eb;
+  background: var(--bb-bg-page);
+  color: var(--bb-secondary);
 }
 
 /* Heading font — Josefin Sans for branding/display elements */

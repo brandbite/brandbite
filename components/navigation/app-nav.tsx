@@ -8,8 +8,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { NotificationBell } from "@/components/ui/notification-bell";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 type NavItem = {
   href: string;
@@ -70,11 +71,29 @@ export function AppNav({ role }: { role: AppNavRole }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const config = NAV_CONFIG[role];
+  const hamburgerRef = useRef<HTMLButtonElement>(null);
 
   const isActive = (href: string) => {
     if (href === `/${role}`) return pathname === href;
     return pathname === href || pathname.startsWith(href + "/");
   };
+
+  // Escape key closes mobile nav and restores focus
+  const handleEscape = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === "Escape" && mobileOpen) {
+        setMobileOpen(false);
+        hamburgerRef.current?.focus();
+      }
+    },
+    [mobileOpen],
+  );
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [mobileOpen, handleEscape]);
 
   return (
     <header className="relative mb-6 flex items-center justify-between">
@@ -99,7 +118,7 @@ export function AppNav({ role }: { role: AppNavRole }) {
 
       {/* Desktop nav */}
       <div className="hidden items-center gap-6 md:flex">
-        <nav className="flex items-center gap-6 text-sm text-[#7a7a7a]">
+        <nav className="flex items-center gap-6 text-sm text-[var(--bb-text-secondary)]">
           {config.items.map((item) => {
             const active = isActive(item.href);
             if (active) {
@@ -107,7 +126,7 @@ export function AppNav({ role }: { role: AppNavRole }) {
                 <span
                   key={item.href}
                   aria-current="page"
-                  className="font-semibold text-[#424143]"
+                  className="font-semibold text-[var(--bb-secondary)]"
                 >
                   {item.label}
                 </span>
@@ -117,13 +136,14 @@ export function AppNav({ role }: { role: AppNavRole }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className="font-medium text-[#7a7a7a] hover:text-[#424143]"
+                className="font-medium text-[var(--bb-text-secondary)] hover:text-[var(--bb-secondary)]"
               >
                 {item.label}
               </Link>
             );
           })}
         </nav>
+        <ThemeToggle />
         {(role === "customer" || role === "creative") && (
           <NotificationBell role={role} />
         )}
@@ -131,12 +151,14 @@ export function AppNav({ role }: { role: AppNavRole }) {
 
       {/* Mobile: notification bell + hamburger */}
       <div className="flex items-center gap-2 md:hidden">
+        <ThemeToggle />
         {(role === "customer" || role === "creative") && (
           <NotificationBell role={role} />
         )}
 
       {/* Mobile hamburger */}
       <button
+        ref={hamburgerRef}
         type="button"
         onClick={() => setMobileOpen(!mobileOpen)}
         className="flex h-8 w-8 flex-col items-center justify-center gap-1"
@@ -144,17 +166,17 @@ export function AppNav({ role }: { role: AppNavRole }) {
         aria-expanded={mobileOpen}
       >
         <span
-          className={`block h-0.5 w-5 rounded-full bg-[#424143] transition-transform duration-200 ${
+          className={`block h-0.5 w-5 rounded-full bg-[var(--bb-secondary)] transition-transform duration-200 ${
             mobileOpen ? "translate-y-[6px] rotate-45" : ""
           }`}
         />
         <span
-          className={`block h-0.5 w-5 rounded-full bg-[#424143] transition-opacity duration-200 ${
+          className={`block h-0.5 w-5 rounded-full bg-[var(--bb-secondary)] transition-opacity duration-200 ${
             mobileOpen ? "opacity-0" : ""
           }`}
         />
         <span
-          className={`block h-0.5 w-5 rounded-full bg-[#424143] transition-transform duration-200 ${
+          className={`block h-0.5 w-5 rounded-full bg-[var(--bb-secondary)] transition-transform duration-200 ${
             mobileOpen ? "-translate-y-[6px] -rotate-45" : ""
           }`}
         />
@@ -163,7 +185,7 @@ export function AppNav({ role }: { role: AppNavRole }) {
 
       {/* Mobile dropdown */}
       {mobileOpen && (
-        <nav className="absolute left-0 right-0 top-full z-50 mt-2 rounded-xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-lg md:hidden">
+        <nav className="absolute left-0 right-0 top-full z-50 mt-2 rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-lg md:hidden">
           <div className="flex flex-col gap-3 text-sm">
             {config.items.map((item) => {
               const active = isActive(item.href);
@@ -174,8 +196,8 @@ export function AppNav({ role }: { role: AppNavRole }) {
                   onClick={() => setMobileOpen(false)}
                   className={
                     active
-                      ? "font-semibold text-[#424143]"
-                      : "font-medium text-[#7a7a7a] hover:text-[#424143]"
+                      ? "font-semibold text-[var(--bb-secondary)]"
+                      : "font-medium text-[var(--bb-text-secondary)] hover:text-[var(--bb-secondary)]"
                   }
                 >
                   {item.label}

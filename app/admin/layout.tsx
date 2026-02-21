@@ -11,7 +11,7 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
+    <div className="min-h-screen bg-[var(--bb-bg-card)] text-[var(--bb-secondary)]">
       <div className="relative px-4 pt-6 md:px-6 md:pt-8 lg:px-8 lg:pt-10">
         <AppNav role="admin" />
       </div>

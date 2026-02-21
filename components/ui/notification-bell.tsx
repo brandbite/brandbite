@@ -40,12 +40,12 @@ function relativeTime(iso: string): string {
 }
 
 const TYPE_ICONS: Record<string, string> = {
-  REVISION_SUBMITTED: "📤",
-  FEEDBACK_SUBMITTED: "💬",
-  TICKET_COMPLETED: "✅",
-  TICKET_ASSIGNED: "📋",
-  TICKET_STATUS_CHANGED: "🔄",
-  PIN_RESOLVED: "📌",
+  REVISION_SUBMITTED: "\u{1F4E4}",
+  FEEDBACK_SUBMITTED: "\u{1F4AC}",
+  TICKET_COMPLETED: "\u2705",
+  TICKET_ASSIGNED: "\u{1F4CB}",
+  TICKET_STATUS_CHANGED: "\u{1F504}",
+  PIN_RESOLVED: "\u{1F4CC}",
 };
 
 // ---------------------------------------------------------------------------
@@ -191,8 +191,10 @@ export function NotificationBell({ role }: { role: "customer" | "creative" }) {
         ref={buttonRef}
         type="button"
         onClick={handleToggle}
-        className="relative flex h-8 w-8 items-center justify-center rounded-lg text-[#7a7a7a] transition-colors hover:bg-[#f5f3f0] hover:text-[#424143]"
+        className="relative flex h-8 w-8 items-center justify-center rounded-lg text-[var(--bb-text-secondary)] transition-colors hover:bg-[var(--bb-bg-card)] hover:text-[var(--bb-secondary)]"
         aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
+        aria-expanded={open}
+        aria-haspopup="true"
       >
         {/* Bell SVG */}
         <svg
@@ -211,7 +213,7 @@ export function NotificationBell({ role }: { role: "customer" | "creative" }) {
 
         {/* Unread badge */}
         {unreadCount > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#f15b2b] px-1 text-[9px] font-bold text-white">
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[var(--bb-primary)] px-1 text-[9px] font-bold text-white">
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}
@@ -221,11 +223,12 @@ export function NotificationBell({ role }: { role: "customer" | "creative" }) {
       {open && (
         <div
           ref={panelRef}
-          className="absolute right-0 top-full z-50 mt-2 w-80 rounded-xl border border-[#e3e1dc] bg-white shadow-lg"
+          role="menu"
+          className="absolute right-0 top-full z-50 mt-2 w-80 rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] shadow-lg"
         >
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-[#f0eee9] px-4 py-3">
-            <span className="text-xs font-semibold text-[#424143]">
+          <div className="flex items-center justify-between border-b border-[var(--bb-border-subtle)] px-4 py-3">
+            <span className="text-xs font-semibold text-[var(--bb-secondary)]">
               Notifications
             </span>
             {unreadCount > 0 && (
@@ -233,7 +236,7 @@ export function NotificationBell({ role }: { role: "customer" | "creative" }) {
                 type="button"
                 onClick={handleMarkAllRead}
                 disabled={markingAll}
-                className="text-[10px] font-medium text-[#f15b2b] hover:underline disabled:opacity-50"
+                className="text-[10px] font-medium text-[var(--bb-primary)] hover:underline disabled:opacity-50"
               >
                 {markingAll ? "Marking..." : "Mark all as read"}
               </button>
@@ -244,14 +247,14 @@ export function NotificationBell({ role }: { role: "customer" | "creative" }) {
           <div className="max-h-80 overflow-y-auto">
             {loading && notifications.length === 0 && (
               <div className="px-4 py-8 text-center">
-                <p className="text-xs text-[#9a9892]">Loading...</p>
+                <p className="text-xs text-[var(--bb-text-tertiary)]">Loading...</p>
               </div>
             )}
 
             {!loading && notifications.length === 0 && (
               <div className="px-4 py-8 text-center">
-                <p className="text-sm text-[#9a9892]">You&apos;re all caught up!</p>
-                <p className="mt-0.5 text-[10px] text-[#b1afa9]">
+                <p className="text-sm text-[var(--bb-text-tertiary)]">You&apos;re all caught up!</p>
+                <p className="mt-0.5 text-[10px] text-[var(--bb-text-muted)]">
                   No notifications yet
                 </p>
               </div>
@@ -261,30 +264,31 @@ export function NotificationBell({ role }: { role: "customer" | "creative" }) {
               <button
                 key={notif.id}
                 type="button"
+                role="menuitem"
                 onClick={() => handleClickNotification(notif)}
-                className={`flex w-full items-start gap-2.5 px-4 py-3 text-left transition-colors hover:bg-[#f5f3f0] ${
-                  !notif.read ? "bg-[#f15b2b]/[0.03]" : ""
+                className={`flex w-full items-start gap-2.5 px-4 py-3 text-left transition-colors hover:bg-[var(--bb-bg-card)] ${
+                  !notif.read ? "bg-[var(--bb-primary)]/[0.03]" : ""
                 }`}
               >
                 {/* Icon */}
-                <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#f5f3f0] text-sm">
-                  {TYPE_ICONS[notif.type] ?? "🔔"}
+                <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--bb-bg-card)] text-sm">
+                  {TYPE_ICONS[notif.type] ?? "\u{1F514}"}
                 </span>
 
                 {/* Content */}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
-                    <p className={`truncate text-[11px] ${!notif.read ? "font-semibold text-[#424143]" : "font-medium text-[#7a7a7a]"}`}>
+                    <p className={`truncate text-[11px] ${!notif.read ? "font-semibold text-[var(--bb-secondary)]" : "font-medium text-[var(--bb-text-secondary)]"}`}>
                       {notif.title}
                     </p>
                     {!notif.read && (
-                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#f15b2b]" />
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--bb-primary)]" />
                     )}
                   </div>
-                  <p className="mt-0.5 truncate text-[10px] text-[#9a9892]">
+                  <p className="mt-0.5 truncate text-[10px] text-[var(--bb-text-tertiary)]">
                     {notif.message}
                   </p>
-                  <p className="mt-0.5 text-[9px] text-[#b1afa9]">
+                  <p className="mt-0.5 text-[9px] text-[var(--bb-text-muted)]">
                     {relativeTime(notif.createdAt)}
                   </p>
                 </div>
