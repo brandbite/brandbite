@@ -204,7 +204,7 @@ export default function CreativeWithdrawalsPage() {
         <section className="mb-6 grid gap-4 md:grid-cols-[2fr_3fr]">
           {/* Summary cards */}
           <div className="space-y-3">
-            <div className="rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-4 shadow-sm">
+            <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
               <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
                 Available balance
               </p>
@@ -224,7 +224,7 @@ export default function CreativeWithdrawalsPage() {
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
-              <div className="rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-4 shadow-sm">
+              <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
                 <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
                   Total requested
                 </p>
@@ -240,7 +240,7 @@ export default function CreativeWithdrawalsPage() {
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-4 shadow-sm">
+              <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
                 <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
                   Pending requests
                 </p>
@@ -259,7 +259,7 @@ export default function CreativeWithdrawalsPage() {
           </div>
 
           {/* Request form */}
-          <div className="rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-4 shadow-sm">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
             <h2 className="text-sm font-semibold tracking-tight">
               Request a withdrawal
             </h2>
@@ -313,7 +313,7 @@ export default function CreativeWithdrawalsPage() {
         </section>
 
         {/* Withdrawals table */}
-        <section className="rounded-2xl border border-[var(--bb-border)] bg-white px-4 py-4 shadow-sm">
+        <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold tracking-tight">
               My withdrawal history

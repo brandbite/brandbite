@@ -337,7 +337,7 @@ export default function AdminJobTypesPage() {
             <h1 className="text-2xl font-semibold tracking-tight">
               Job types
             </h1>
-            <p className="mt-1 text-sm text-[#7a7a7a]">
+            <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
               Set estimated hours for each job type. Token cost and creative
               payout are calculated automatically.
             </p>
@@ -354,36 +354,36 @@ export default function AdminJobTypesPage() {
 
         {/* Summary cards */}
         <section className="mb-6 grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
               Total job types
             </p>
-            <p className="mt-2 text-3xl font-semibold text-[#424143]">
+            <p className="mt-2 text-3xl font-semibold text-[var(--bb-secondary)]">
               {loading ? "&mdash;" : jobTypes.length}
             </p>
-            <p className="mt-1 text-xs text-[#9a9892]">
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               All configured job types.
             </p>
           </div>
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
               Active
             </p>
-            <p className="mt-2 text-2xl font-semibold text-[#424143]">
+            <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
               {loading ? "&mdash;" : activeCount}
             </p>
-            <p className="mt-1 text-xs text-[#9a9892]">
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               Job types available to customers.
             </p>
           </div>
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
               Inactive
             </p>
-            <p className="mt-2 text-2xl font-semibold text-[#424143]">
+            <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
               {loading ? "&mdash;" : inactiveCount}
             </p>
-            <p className="mt-1 text-xs text-[#9a9892]">
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               Hidden job types kept for history.
             </p>
           </div>
@@ -392,12 +392,12 @@ export default function AdminJobTypesPage() {
         {/* Filter + table + form layout */}
         <section className="grid gap-4 md:grid-cols-[3fr_2fr]">
           {/* Left: table */}
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
             {/* Search bar */}
             <div className="mb-3">
               <div className="relative">
                 <svg
-                  className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9a9892]"
+                  className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--bb-text-tertiary)]"
                   fill="none"
                   viewBox="0 0 24 24"
                   strokeWidth={2}
@@ -414,13 +414,13 @@ export default function AdminJobTypesPage() {
                   placeholder="Search job types..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-lg border border-[#e3e1dc] bg-[#faf9f7] py-2 pl-10 pr-3 text-sm text-[#424143] outline-none placeholder:text-[#9a9892] transition-colors focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+                  className="w-full rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] py-2 pl-10 pr-3 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-tertiary)] transition-colors focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
                 />
                 {searchQuery && (
                   <button
                     type="button"
                     onClick={() => setSearchQuery("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9a9892] hover:text-[#424143]"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--bb-text-tertiary)] hover:text-[var(--bb-secondary)]"
                   >
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -467,7 +467,7 @@ export default function AdminJobTypesPage() {
                     ))}
                 </FormSelect>
               </div>
-              <p className="text-xs text-[#9a9892]">
+              <p className="text-xs text-[var(--bb-text-tertiary)]">
                 Showing {filteredJobTypes.length} of {jobTypes.length}
               </p>
             </div>
@@ -486,7 +486,7 @@ export default function AdminJobTypesPage() {
               <div className="max-h-[420px] overflow-y-auto overflow-x-auto">
                 <table className="min-w-full text-left text-sm">
                   <thead>
-                    <tr className="border-b border-[#e3e1dc] text-xs uppercase tracking-[0.08em] text-[#9a9892]">
+                    <tr className="border-b border-[var(--bb-border)] text-xs uppercase tracking-[0.08em] text-[var(--bb-text-tertiary)]">
                       <th className="px-2 py-2">Name</th>
                       <th className="px-2 py-2">Category</th>
                       <th className="px-2 py-2 text-right">Est. Hours</th>
@@ -498,22 +498,22 @@ export default function AdminJobTypesPage() {
                     {filteredJobTypes.map((jt) => (
                       <tr
                         key={jt.id}
-                        className={`border-b border-[#f0eeea] text-xs last:border-b-0 ${
+                        className={`border-b border-[var(--bb-border-subtle)] text-xs last:border-b-0 ${
                           selected?.id === jt.id
-                            ? "bg-[#fff5ef]"
-                            : "bg-white"
+                            ? "bg-[var(--bb-primary-light)]"
+                            : "bg-[var(--bb-bg-page)]"
                         } cursor-pointer`}
                         onClick={() => handleEditClick(jt)}
                       >
-                        <td className="px-2 py-2 align-top text-[11px] text-[#424143]">
+                        <td className="px-2 py-2 align-top text-[11px] text-[var(--bb-secondary)]">
                           <div className="font-semibold">{jt.name}</div>
                           {jt.description && (
-                            <div className="mt-0.5 text-[10px] text-[#7a7a7a] line-clamp-1">
+                            <div className="mt-0.5 text-[10px] text-[var(--bb-text-secondary)] line-clamp-1">
                               {jt.description}
                             </div>
                           )}
                         </td>
-                        <td className="px-2 py-2 align-top text-[11px] text-[#9a9892]">
+                        <td className="px-2 py-2 align-top text-[11px] text-[var(--bb-text-tertiary)]">
                           {getCategoryDisplay(jt) ? (
                             <span className="inline-flex items-center gap-1">
                               {jt.categoryRef?.icon && (
@@ -522,12 +522,12 @@ export default function AdminJobTypesPage() {
                               {getCategoryDisplay(jt)}
                             </span>
                           ) : (
-                            <span className="text-[#d4d2cc]">&mdash;</span>
+                            <span className="text-[var(--bb-border-input)]">&mdash;</span>
                           )}
                         </td>
-                        <td className="px-2 py-2 align-top text-right text-[11px] text-[#424143]">
+                        <td className="px-2 py-2 align-top text-right text-[11px] text-[var(--bb-secondary)]">
                           {jt.estimatedHours ?? jt.tokenCost}{" "}
-                          <span className="text-[10px] text-[#9a9892]">
+                          <span className="text-[10px] text-[var(--bb-text-tertiary)]">
                             hrs
                           </span>
                         </td>
@@ -535,7 +535,7 @@ export default function AdminJobTypesPage() {
                           {jt.hasQuantity ? (
                             <Badge variant="info">Yes</Badge>
                           ) : (
-                            <span className="text-[#9a9892]">&mdash;</span>
+                            <span className="text-[var(--bb-text-tertiary)]">&mdash;</span>
                           )}
                         </td>
                         <td className="px-2 py-2 align-top text-center text-[11px]">
@@ -552,11 +552,11 @@ export default function AdminJobTypesPage() {
           </div>
 
           {/* Right: form */}
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
             <h2 className="text-sm font-semibold tracking-tight">
               {selected ? "Edit job type" : "Create new job type"}
             </h2>
-            <p className="mt-1 text-xs text-[#7a7a7a]">
+            <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
               Enter estimated hours. Token cost and creative payout are
               calculated automatically (1 token = 1 hour, 60% base payout).
             </p>
@@ -577,7 +577,7 @@ export default function AdminJobTypesPage() {
               <div className="flex flex-col gap-1">
                 <label
                   htmlFor="job-name"
-                  className="text-xs font-medium text-[#424143]"
+                  className="text-xs font-medium text-[var(--bb-secondary)]"
                 >
                   Name
                 </label>
@@ -599,7 +599,7 @@ export default function AdminJobTypesPage() {
               <div className="flex flex-col gap-1">
                 <label
                   htmlFor="job-category"
-                  className="text-xs font-medium text-[#424143]"
+                  className="text-xs font-medium text-[var(--bb-secondary)]"
                 >
                   Category
                 </label>
@@ -618,11 +618,11 @@ export default function AdminJobTypesPage() {
                     ))}
                 </FormSelect>
                 {categoryOptions.length === 0 && !loading && (
-                  <p className="text-[10px] text-[#9a9892]">
+                  <p className="text-[10px] text-[var(--bb-text-tertiary)]">
                     No categories yet.{" "}
                     <a
                       href="/admin/job-type-categories"
-                      className="text-[#f15b2b] underline"
+                      className="text-[var(--bb-primary)] underline"
                     >
                       Create categories
                     </a>
@@ -633,7 +633,7 @@ export default function AdminJobTypesPage() {
               <div className="flex flex-col gap-1">
                 <label
                   htmlFor="job-description"
-                  className="text-xs font-medium text-[#424143]"
+                  className="text-xs font-medium text-[var(--bb-secondary)]"
                 >
                   Description
                 </label>
@@ -649,7 +649,7 @@ export default function AdminJobTypesPage() {
               <div className="flex flex-col gap-1">
                 <label
                   htmlFor="job-estimated-hours"
-                  className="text-xs font-medium text-[#424143]"
+                  className="text-xs font-medium text-[var(--bb-secondary)]"
                 >
                   Estimated hours
                 </label>
@@ -666,16 +666,16 @@ export default function AdminJobTypesPage() {
 
               {/* Derived values preview */}
               {derivedTokenCost > 0 && (
-                <div className="rounded-lg border border-[#e3e1dc] bg-[#faf9f7] px-3 py-2 text-xs text-[#7a7a7a]">
+                <div className="rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-2 text-xs text-[var(--bb-text-secondary)]">
                   <p>
-                    <span className="font-medium text-[#424143]">
+                    <span className="font-medium text-[var(--bb-secondary)]">
                       Token cost:
                     </span>{" "}
                     {derivedTokenCost} tokens{" "}
                     <span className="text-[10px]">(1 token = 1 hour)</span>
                   </p>
                   <p className="mt-0.5">
-                    <span className="font-medium text-[#424143]">
+                    <span className="font-medium text-[var(--bb-secondary)]">
                       Creative payout:
                     </span>{" "}
                     {derivedCreativePayout} tokens{" "}
@@ -685,23 +685,23 @@ export default function AdminJobTypesPage() {
               )}
 
               {/* Has Quantity */}
-              <label className="flex items-center gap-2 text-xs font-medium text-[#424143]">
+              <label className="flex items-center gap-2 text-xs font-medium text-[var(--bb-secondary)]">
                 <input
                   type="checkbox"
                   checked={formHasQuantity}
                   onChange={(e) => setFormHasQuantity(e.target.checked)}
-                  className="h-3 w-3 rounded border-[#d4d2cc] text-[#f15b2b] focus:ring-[#f15b2b]"
+                  className="h-3 w-3 rounded border-[var(--bb-border-input)] text-[var(--bb-primary)] focus:ring-[var(--bb-primary)]"
                 />
                 Has quantity (per-unit pricing)
               </label>
 
               {/* Quantity fields — visible when hasQuantity is checked */}
               {formHasQuantity && (
-                <div className="grid gap-3 md:grid-cols-2 border-l-2 border-[#f15b2b]/20 pl-4">
+                <div className="grid gap-3 md:grid-cols-2 border-l-2 border-[var(--bb-primary)]/20 pl-4">
                   <div className="flex flex-col gap-1">
                     <label
                       htmlFor="job-quantity-label"
-                      className="text-xs font-medium text-[#424143]"
+                      className="text-xs font-medium text-[var(--bb-secondary)]"
                     >
                       Quantity label
                     </label>
@@ -716,7 +716,7 @@ export default function AdminJobTypesPage() {
                   <div className="flex flex-col gap-1">
                     <label
                       htmlFor="job-default-quantity"
-                      className="text-xs font-medium text-[#424143]"
+                      className="text-xs font-medium text-[var(--bb-secondary)]"
                     >
                       Default quantity
                     </label>
@@ -733,12 +733,12 @@ export default function AdminJobTypesPage() {
               )}
 
               <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 text-xs font-medium text-[#424143]">
+                <label className="flex items-center gap-2 text-xs font-medium text-[var(--bb-secondary)]">
                   <input
                     type="checkbox"
                     checked={formIsActive}
                     onChange={(e) => setFormIsActive(e.target.checked)}
-                    className="h-3 w-3 rounded border-[#d4d2cc] text-[#f15b2b] focus:ring-[#f15b2b]"
+                    className="h-3 w-3 rounded border-[var(--bb-border-input)] text-[var(--bb-primary)] focus:ring-[var(--bb-primary)]"
                   />
                   Active
                 </label>

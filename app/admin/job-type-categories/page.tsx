@@ -228,7 +228,7 @@ export default function AdminJobTypeCategoriesPage() {
           <h1 className="text-2xl font-semibold tracking-tight">
             Job type categories
           </h1>
-          <p className="mt-1 text-sm text-[#7a7a7a]">
+          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
             Organize job types into categories. Categories appear in the
             service catalog and ticket creation form.
           </p>
@@ -265,29 +265,29 @@ export default function AdminJobTypeCategoriesPage() {
 
       {/* Summary */}
       <section className="mb-6 grid gap-4 md:grid-cols-3">
-        <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
             Total categories
           </p>
-          <p className="mt-2 text-3xl font-semibold text-[#424143]">
+          <p className="mt-2 text-3xl font-semibold text-[var(--bb-secondary)]">
             {loading ? "&mdash;" : categories.length}
           </p>
         </div>
-        <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
             Active
           </p>
-          <p className="mt-2 text-2xl font-semibold text-[#424143]">
+          <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
             {loading
               ? "&mdash;"
               : categories.filter((c) => c.isActive).length}
           </p>
         </div>
-        <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
             Total job types linked
           </p>
-          <p className="mt-2 text-2xl font-semibold text-[#424143]">
+          <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
             {loading
               ? "&mdash;"
               : categories.reduce((sum, c) => sum + c.jobTypeCount, 0)}
@@ -298,12 +298,12 @@ export default function AdminJobTypeCategoriesPage() {
       {/* Table + Form layout */}
       <section className="grid gap-4 md:grid-cols-[3fr_2fr]">
         {/* Left: Category list */}
-        <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
+        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold tracking-tight">
               Category list
             </h2>
-            <p className="text-xs text-[#9a9892]">
+            <p className="text-xs text-[var(--bb-text-tertiary)]">
               {categories.length} categories
             </p>
           </div>
@@ -316,7 +316,7 @@ export default function AdminJobTypeCategoriesPage() {
             <div className="max-h-[420px] overflow-y-auto">
               <table className="min-w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-[#e3e1dc] text-xs uppercase tracking-[0.08em] text-[#9a9892]">
+                  <tr className="border-b border-[var(--bb-border)] text-xs uppercase tracking-[0.08em] text-[var(--bb-text-tertiary)]">
                     <th className="px-2 py-2">Icon</th>
                     <th className="px-2 py-2">Name</th>
                     <th className="px-2 py-2 text-center">Order</th>
@@ -329,21 +329,21 @@ export default function AdminJobTypeCategoriesPage() {
                   {categories.map((cat) => (
                     <tr
                       key={cat.id}
-                      className={`border-b border-[#f0eeea] text-xs last:border-b-0 cursor-pointer ${
-                        selected?.id === cat.id ? "bg-[#fff5ef]" : "bg-white"
+                      className={`border-b border-[var(--bb-border-subtle)] text-xs last:border-b-0 cursor-pointer ${
+                        selected?.id === cat.id ? "bg-[var(--bb-primary-light)]" : "bg-[var(--bb-bg-page)]"
                       }`}
                       onClick={() => fillForm(cat)}
                     >
                       <td className="px-2 py-2 text-center text-base">
                         {cat.icon || "&mdash;"}
                       </td>
-                      <td className="px-2 py-2 text-[11px] font-semibold text-[#424143]">
+                      <td className="px-2 py-2 text-[11px] font-semibold text-[var(--bb-secondary)]">
                         {cat.name}
-                        <div className="text-[10px] font-normal text-[#9a9892]">
+                        <div className="text-[10px] font-normal text-[var(--bb-text-tertiary)]">
                           {cat.slug}
                         </div>
                       </td>
-                      <td className="px-2 py-2 text-center text-[11px] text-[#424143]">
+                      <td className="px-2 py-2 text-center text-[11px] text-[var(--bb-secondary)]">
                         {cat.sortOrder}
                       </td>
                       <td className="px-2 py-2 text-center text-[11px]">
@@ -363,7 +363,7 @@ export default function AdminJobTypeCategoriesPage() {
                             e.stopPropagation();
                             setDeleteConfirm(cat);
                           }}
-                          className="rounded p-1 text-[#9a9892] hover:bg-red-50 hover:text-red-600 transition-colors"
+                          className="rounded p-1 text-[var(--bb-text-tertiary)] hover:bg-red-50 hover:text-red-600 transition-colors"
                           title="Delete category"
                         >
                           <svg
@@ -390,11 +390,11 @@ export default function AdminJobTypeCategoriesPage() {
         </div>
 
         {/* Right: Form */}
-        <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
+        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
           <h2 className="text-sm font-semibold tracking-tight">
             {selected ? "Edit category" : "Create new category"}
           </h2>
-          <p className="mt-1 text-xs text-[#7a7a7a]">
+          <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
             Categories organize your job types into logical groups.
           </p>
 
@@ -402,7 +402,7 @@ export default function AdminJobTypeCategoriesPage() {
             <div className="flex flex-col gap-1">
               <label
                 htmlFor="cat-name"
-                className="text-xs font-medium text-[#424143]"
+                className="text-xs font-medium text-[var(--bb-secondary)]"
               >
                 Name
               </label>
@@ -420,7 +420,7 @@ export default function AdminJobTypeCategoriesPage() {
               <div className="flex flex-col gap-1">
                 <label
                   htmlFor="cat-icon"
-                  className="text-xs font-medium text-[#424143]"
+                  className="text-xs font-medium text-[var(--bb-secondary)]"
                 >
                   Icon (emoji)
                 </label>
@@ -436,7 +436,7 @@ export default function AdminJobTypeCategoriesPage() {
               <div className="flex flex-col gap-1">
                 <label
                   htmlFor="cat-sort"
-                  className="text-xs font-medium text-[#424143]"
+                  className="text-xs font-medium text-[var(--bb-secondary)]"
                 >
                   Sort order
                 </label>
@@ -452,12 +452,12 @@ export default function AdminJobTypeCategoriesPage() {
             </div>
 
             <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 text-xs font-medium text-[#424143]">
+              <label className="flex items-center gap-2 text-xs font-medium text-[var(--bb-secondary)]">
                 <input
                   type="checkbox"
                   checked={formIsActive}
                   onChange={(e) => setFormIsActive(e.target.checked)}
-                  className="h-3 w-3 rounded border-[#d4d2cc] text-[#f15b2b] focus:ring-[#f15b2b]"
+                  className="h-3 w-3 rounded border-[var(--bb-border-input)] text-[var(--bb-primary)] focus:ring-[var(--bb-primary)]"
                 />
                 Active
               </label>
@@ -484,11 +484,11 @@ export default function AdminJobTypeCategoriesPage() {
       {/* Delete confirmation modal */}
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="w-full max-w-sm rounded-2xl border border-[#e3e1dc] bg-white p-6 shadow-xl">
-            <h3 className="text-base font-semibold text-[#424143]">
+          <div className="w-full max-w-sm rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] p-6 shadow-xl">
+            <h3 className="text-base font-semibold text-[var(--bb-secondary)]">
               Delete category
             </h3>
-            <p className="mt-2 text-sm text-[#7a7a7a]">
+            <p className="mt-2 text-sm text-[var(--bb-text-secondary)]">
               Are you sure you want to delete{" "}
               <strong>{deleteConfirm.name}</strong>?
             </p>

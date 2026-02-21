@@ -93,7 +93,7 @@ function formatHours(hours: number): string {
 // ---------------------------------------------------------------------------
 
 const BAR_COLORS = [
-  "#f15b2b",
+  "var(--bb-primary)",
   "#3B82F6",
   "#22C55E",
   "#F59E0B",
@@ -205,10 +205,10 @@ export default function CreativeAnalyticsPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
       {/* Header */}
-      <h1 className="mb-1 text-xl font-bold text-[#424143]">
+      <h1 className="mb-1 text-xl font-bold text-[var(--bb-secondary)]">
         Creative Performance
       </h1>
-      <p className="mb-8 text-sm text-[#9a9892]">
+      <p className="mb-8 text-sm text-[var(--bb-text-tertiary)]">
         Per-creative metrics across completion rate, turnaround, revisions, and
         load.
       </p>
@@ -234,21 +234,21 @@ export default function CreativeAnalyticsPage() {
           {
             label: "Avg Turnaround",
             value: formatHours(summary.avgPlatformTurnaround),
-            accent: "#f15b2b",
+            accent: "var(--bb-primary)",
           },
         ].map((card) => (
           <div
             key={card.label}
-            className="relative overflow-hidden rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm"
+            className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm"
           >
             <div
               className="absolute left-0 top-0 h-1 w-full"
               style={{ background: card.accent }}
             />
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#b1afa9]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--bb-text-muted)]">
               {card.label}
             </p>
-            <p className="mt-1 text-2xl font-bold text-[#424143]">
+            <p className="mt-1 text-2xl font-bold text-[var(--bb-secondary)]">
               {card.value}
             </p>
           </div>
@@ -257,8 +257,8 @@ export default function CreativeAnalyticsPage() {
 
       {/* Chart — completed tickets per creative */}
       {chartData.length > 0 && (
-        <div className="mb-8 rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">
-          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#b1afa9]">
+        <div className="mb-8 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
+          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--bb-text-muted)]">
             Completed Tickets by Creative
           </p>
           <ResponsiveContainer width="100%" height={Math.max(200, chartData.length * 36)}>
@@ -267,18 +267,18 @@ export default function CreativeAnalyticsPage() {
               layout="vertical"
               margin={{ top: 4, right: 12, bottom: 0, left: 0 }}
             >
-              <XAxis type="number" tick={{ fontSize: 10, fill: "#9a9892" }} />
+              <XAxis type="number" tick={{ fontSize: 10, fill: "var(--bb-text-tertiary)" }} />
               <YAxis
                 type="category"
                 dataKey="name"
-                tick={{ fontSize: 11, fill: "#424143" }}
+                tick={{ fontSize: 11, fill: "var(--bb-secondary)" }}
                 width={100}
               />
               <Tooltip
                 contentStyle={{
                   fontSize: 11,
                   borderRadius: 8,
-                  border: "1px solid #e3e1dc",
+                  border: "1px solid var(--bb-border)",
                 }}
               />
               <Bar dataKey="completed" radius={[0, 4, 4, 0]} barSize={20}>
@@ -296,7 +296,7 @@ export default function CreativeAnalyticsPage() {
 
       {/* Sort control */}
       <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm font-semibold text-[#424143]">
+        <p className="text-sm font-semibold text-[var(--bb-secondary)]">
           All Creatives ({data.creatives.length})
         </p>
         <FormSelect
@@ -314,10 +314,10 @@ export default function CreativeAnalyticsPage() {
       </div>
 
       {/* Creative table */}
-      <div className="overflow-x-auto rounded-2xl border border-[#e3e1dc] bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] shadow-sm">
         <table className="w-full text-left text-xs">
           <thead>
-            <tr className="border-b border-[#f0eee9] bg-[#fbfaf8] text-[10px] font-semibold uppercase tracking-[0.12em] text-[#b1afa9]">
+            <tr className="border-b border-[var(--bb-border-subtle)] bg-[var(--bb-bg-page)] text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--bb-text-muted)]">
               <th className="px-4 py-3">Creative</th>
               <th className="px-3 py-3 text-center">Completed</th>
               <th className="px-3 py-3 text-center">Active</th>
@@ -332,18 +332,18 @@ export default function CreativeAnalyticsPage() {
             {sorted.map((d) => (
               <tr
                 key={d.id}
-                className="border-b border-[#f5f3f0] transition-colors hover:bg-[#fbfaf8]"
+                className="border-b border-[var(--bb-bg-card)] transition-colors hover:bg-[var(--bb-bg-page)]"
               >
                 <td className="px-4 py-3">
-                  <p className="font-medium text-[#424143]">
+                  <p className="font-medium text-[var(--bb-secondary)]">
                     {d.name || "—"}
                   </p>
-                  <p className="text-[10px] text-[#9a9892]">{d.email}</p>
+                  <p className="text-[10px] text-[var(--bb-text-tertiary)]">{d.email}</p>
                 </td>
-                <td className="px-3 py-3 text-center font-semibold text-[#424143]">
+                <td className="px-3 py-3 text-center font-semibold text-[var(--bb-secondary)]">
                   {d.completedTickets}
                 </td>
-                <td className="px-3 py-3 text-center text-[#9a9892]">
+                <td className="px-3 py-3 text-center text-[var(--bb-text-tertiary)]">
                   {d.activeTickets}
                 </td>
                 <td className="px-3 py-3 text-center">
@@ -353,21 +353,21 @@ export default function CreativeAnalyticsPage() {
                         ? "text-[#22C55E]"
                         : d.completionRate >= 50
                           ? "text-[#F59E0B]"
-                          : "text-[#9a9892]"
+                          : "text-[var(--bb-text-tertiary)]"
                     }`}
                   >
                     {d.completionRate}%
                   </span>
                 </td>
-                <td className="px-3 py-3 text-center text-[#424143]">
+                <td className="px-3 py-3 text-center text-[var(--bb-secondary)]">
                   {d.avgRevisionCount > 0 ? d.avgRevisionCount.toFixed(1) : "—"}
                 </td>
-                <td className="px-3 py-3 text-center text-[#424143]">
+                <td className="px-3 py-3 text-center text-[var(--bb-secondary)]">
                   {formatHours(d.avgTurnaroundHours)}
                 </td>
-                <td className="px-3 py-3 text-center font-medium text-[#424143]">
+                <td className="px-3 py-3 text-center font-medium text-[var(--bb-secondary)]">
                   {d.totalEarnings > 0 ? d.totalEarnings.toLocaleString() : "—"}
-                  <span className="ml-0.5 text-[10px] text-[#9a9892]">
+                  <span className="ml-0.5 text-[10px] text-[var(--bb-text-tertiary)]">
                     {d.totalEarnings > 0 ? "tkn" : ""}
                   </span>
                 </td>

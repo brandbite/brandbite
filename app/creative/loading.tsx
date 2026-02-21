@@ -7,14 +7,14 @@ export default function CreativeLoading() {
   return (
     <>
       <div className="mb-6">
-        <div className="h-7 w-40 animate-pulse rounded bg-[#e3e1dc]" />
-        <div className="mt-2 h-4 w-64 animate-pulse rounded bg-[#e3e1dc]" />
+        <div className="h-7 w-40 animate-pulse rounded bg-[var(--bb-border)]" />
+        <div className="mt-2 h-4 w-64 animate-pulse rounded bg-[var(--bb-border)]" />
       </div>
       <div className="grid gap-4 md:grid-cols-3">
         {Array.from({ length: 3 }).map((_, i) => (
           <div
             key={i}
-            className="h-28 animate-pulse rounded-2xl border border-[#e3e1dc] bg-white shadow-sm"
+            className="h-28 animate-pulse rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] shadow-sm"
           />
         ))}
       </div>

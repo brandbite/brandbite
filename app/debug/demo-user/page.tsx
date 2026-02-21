@@ -56,20 +56,20 @@ export default function DebugDemoUserPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
+    <div className="min-h-screen bg-[var(--bb-bg-card)] text-[var(--bb-secondary)]">
       <div className="mx-auto flex min-h-screen max-w-4xl flex-col items-center justify-center px-4 py-10">
-        <div className="w-full rounded-3xl bg-white/90 p-6 shadow-sm shadow-[#e3ded4] md:p-8">
-          <header className="mb-6 border-b border-[#f0ece4] pb-4">
-            <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#b8b6b1]">
+        <div className="w-full rounded-3xl bg-[var(--bb-bg-page)]/90 p-6 shadow-sm shadow-[var(--bb-border)] md:p-8">
+          <header className="mb-6 border-b border-[var(--bb-border-subtle)] pb-4">
+            <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--bb-text-muted)]">
               Debug
             </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#424143]">
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--bb-secondary)]">
               Browse Brandbite as…
             </h1>
-            <p className="mt-1 text-sm text-[#7a7a7a]">
+            <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
               Pick a persona to explore Brandbite from different perspectives.
               This will set a{" "}
-              <code className="rounded bg-[#f5f3f0] px-1 py-0.5 text-[11px]">
+              <code className="rounded bg-[var(--bb-bg-card)] px-1 py-0.5 text-[11px]">
                 bb-demo-user
               </code>{" "}
               cookie and then redirect you to a relevant dashboard.
@@ -91,17 +91,17 @@ export default function DebugDemoUserPage() {
                   type="button"
                   onClick={() => handleSelectPersona(p.id, p.redirectTo)}
                   disabled={isLoading}
-                  className="group flex flex-col rounded-xl border border-[#ece5d8] bg-[#fdfaf5] px-4 py-3 text-left shadow-sm transition hover:-translate-y-[1px] hover:border-[#f15b2b]/40 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-70"
+                  className="group flex flex-col rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-warm)] px-4 py-3 text-left shadow-sm transition hover:-translate-y-[1px] hover:border-[var(--bb-primary)]/40 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   <div className="mb-1 flex items-center justify-between">
-                    <span className="text-[13px] font-semibold text-[#424143]">
+                    <span className="text-[13px] font-semibold text-[var(--bb-secondary)]">
                       {p.label}
                     </span>
-                    <span className="text-[10px] uppercase tracking-[0.14em] text-[#b8b6b1]">
+                    <span className="text-[10px] uppercase tracking-[0.14em] text-[var(--bb-text-muted)]">
                       {isLoading ? "Switching…" : "Use"}
                     </span>
                   </div>
-                  <p className="mb-2 text-[11px] font-medium text-[#b8b6b1]">
+                  <p className="mb-2 text-[11px] font-medium text-[var(--bb-text-muted)]">
                     {p.role === "SITE_OWNER" || p.role === "SITE_ADMIN"
                       ? "Platform"
                       : p.role === "CUSTOMER"
@@ -110,13 +110,13 @@ export default function DebugDemoUserPage() {
                       ? "Creative"
                       : p.role}
                   </p>
-                  <p className="text-[12px] text-[#7a7a7a]">{p.description}</p>
+                  <p className="text-[12px] text-[var(--bb-text-secondary)]">{p.description}</p>
                 </button>
               );
             })}
           </div>
 
-          <p className="mt-4 text-xs text-[#b8b6b1]">
+          <p className="mt-4 text-xs text-[var(--bb-text-muted)]">
             This page is for local development and demos only. In production,
             this flow will be replaced by real authentication.
           </p>

@@ -110,14 +110,14 @@ export function RevisionImage({
   if (loading) {
     return (
       <div className="flex h-16 w-full items-center justify-center">
-        <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#e3e1dc] border-t-[#9a9892]" />
+        <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--bb-border)] border-t-[var(--bb-text-tertiary)]" />
       </div>
     );
   }
 
   if (error || !src) {
     return (
-      <div className="flex h-16 w-full items-center justify-center text-[9px] text-[#b1afa9]">
+      <div className="flex h-16 w-full items-center justify-center text-[9px] text-[var(--bb-text-muted)]">
         Image
       </div>
     );
@@ -162,7 +162,7 @@ function LightboxImage({
 
   if (error || !src) {
     return (
-      <div className="rounded-xl bg-white/10 px-6 py-10 text-sm text-white/60">
+      <div className="rounded-xl bg-[var(--bb-bg-page)]/10 px-6 py-10 text-sm text-white/60">
         Failed to load image
       </div>
     );
@@ -521,25 +521,25 @@ function ImageLightbox({
       {/* Discard confirmation overlay */}
       {showDiscardConfirm && (
         <div className="absolute inset-0 z-[110] flex items-center justify-center bg-black/50">
-          <div className="mx-4 max-w-sm rounded-2xl bg-white p-5 shadow-xl">
-            <p className="text-sm font-semibold text-[#424143]">
+          <div className="mx-4 max-w-sm rounded-2xl bg-[var(--bb-bg-page)] p-5 shadow-xl">
+            <p className="text-sm font-semibold text-[var(--bb-secondary)]">
               Discard revision notes?
             </p>
-            <p className="mt-1.5 text-xs text-[#9a9892]">
+            <p className="mt-1.5 text-xs text-[var(--bb-text-tertiary)]">
               You have unsaved pin annotations that will be lost.
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setShowDiscardConfirm(false)}
-                className="rounded-lg border border-[#e3e1dc] px-3.5 py-1.5 text-xs font-medium text-[#424143] hover:bg-[#f7f5f0]"
+                className="rounded-lg border border-[var(--bb-border)] px-3.5 py-1.5 text-xs font-medium text-[var(--bb-secondary)] hover:bg-[var(--bb-bg-warm)]"
               >
                 Keep editing
               </button>
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-lg bg-[#f15b2b] px-3.5 py-1.5 text-xs font-medium text-white hover:bg-[#d94e24]"
+                className="rounded-lg bg-[var(--bb-primary)] px-3.5 py-1.5 text-xs font-medium text-white hover:bg-[var(--bb-primary-hover)]"
               >
                 Discard
               </button>
@@ -552,7 +552,7 @@ function ImageLightbox({
       <div className="absolute left-0 right-0 top-0 z-20 flex items-center justify-between px-4 py-3">
         {/* Counter */}
         {hasMultiple ? (
-          <div className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/80">
+          <div className="rounded-full bg-[var(--bb-bg-page)]/10 px-3 py-1 text-xs font-medium text-white/80">
             {index + 1} / {assets.length}
           </div>
         ) : (
@@ -578,7 +578,7 @@ function ImageLightbox({
               }
             }}
             disabled={lightboxDownloading}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white/80 transition-colors hover:bg-white/20 hover:text-white disabled:opacity-50"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--bb-bg-page)]/10 text-white/80 transition-colors hover:bg-[var(--bb-bg-page)]/20 hover:text-white disabled:opacity-50"
             aria-label="Download"
             title={`Download ${asset.originalName || "image"}`}
           >
@@ -593,7 +593,7 @@ function ImageLightbox({
           <button
             type="button"
             onClick={handleClose}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-lg text-white/80 transition-colors hover:bg-white/20 hover:text-white"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--bb-bg-page)]/10 text-lg text-white/80 transition-colors hover:bg-[var(--bb-bg-page)]/20 hover:text-white"
             aria-label="Close"
           >
             &times;
@@ -614,7 +614,7 @@ function ImageLightbox({
               e.stopPropagation();
               goPrev();
             }}
-            className="z-10 hidden shrink-0 items-center justify-center rounded-full bg-white/10 text-xl text-white/80 transition-colors hover:bg-white/20 hover:text-white md:flex md:h-10 md:w-10"
+            className="z-10 hidden shrink-0 items-center justify-center rounded-full bg-[var(--bb-bg-page)]/10 text-xl text-white/80 transition-colors hover:bg-[var(--bb-bg-page)]/20 hover:text-white md:flex md:h-10 md:w-10"
             aria-label="Previous image"
           >
             &#8249;
@@ -667,7 +667,7 @@ function ImageLightbox({
               e.stopPropagation();
               goNext();
             }}
-            className="z-10 hidden shrink-0 items-center justify-center rounded-full bg-white/10 text-xl text-white/80 transition-colors hover:bg-white/20 hover:text-white md:flex md:h-10 md:w-10"
+            className="z-10 hidden shrink-0 items-center justify-center rounded-full bg-[var(--bb-bg-page)]/10 text-xl text-white/80 transition-colors hover:bg-[var(--bb-bg-page)]/20 hover:text-white md:flex md:h-10 md:w-10"
             aria-label="Next image"
           >
             &#8250;
@@ -684,7 +684,7 @@ function ImageLightbox({
               e.stopPropagation();
               goPrev();
             }}
-            className="absolute left-2 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-lg text-white/80 transition-colors hover:bg-white/20 md:hidden"
+            className="absolute left-2 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-[var(--bb-bg-page)]/10 text-lg text-white/80 transition-colors hover:bg-[var(--bb-bg-page)]/20 md:hidden"
             aria-label="Previous image"
           >
             &#8249;
@@ -695,7 +695,7 @@ function ImageLightbox({
               e.stopPropagation();
               goNext();
             }}
-            className="absolute right-2 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-lg text-white/80 transition-colors hover:bg-white/20 md:hidden"
+            className="absolute right-2 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-[var(--bb-bg-page)]/10 text-lg text-white/80 transition-colors hover:bg-[var(--bb-bg-page)]/20 md:hidden"
             aria-label="Next image"
           >
             &#8250;
@@ -705,7 +705,7 @@ function ImageLightbox({
 
       {/* Filename */}
       {asset.originalName && (
-        <div className="absolute bottom-16 left-1/2 z-10 max-w-[80vw] -translate-x-1/2 truncate rounded-full bg-white/10 px-3 py-1 text-xs text-white/70 md:bottom-4">
+        <div className="absolute bottom-16 left-1/2 z-10 max-w-[80vw] -translate-x-1/2 truncate rounded-full bg-[var(--bb-bg-page)]/10 px-3 py-1 text-xs text-white/70 md:bottom-4">
           {asset.originalName}
         </div>
       )}
@@ -763,7 +763,7 @@ export function RevisionImageGrid({
         {assets.map((asset, i) => (
           <div
             key={asset.id}
-            className="group relative overflow-hidden rounded-lg border border-[#e3e1dc] bg-[#f5f3f0]"
+            className="group relative overflow-hidden rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-card)]"
           >
             <RevisionImage
               assetId={asset.id}
@@ -796,7 +796,7 @@ export function RevisionImageGrid({
             </button>
             {/* Pin count badge */}
             {asset.pinCount != null && asset.pinCount > 0 && (
-              <div className="absolute left-1 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#f15b2b] px-1 text-[8px] font-bold text-white shadow-sm">
+              <div className="absolute left-1 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[var(--bb-primary)] px-1 text-[8px] font-bold text-white shadow-sm">
                 📌 {asset.pinCount}
               </div>
             )}
@@ -852,7 +852,7 @@ export function RevisionImageLarge({
         {assets.map((asset, i) => (
           <div
             key={asset.id}
-            className="group relative max-w-[600px] cursor-pointer overflow-hidden rounded-xl border border-[#e3e1dc] bg-[#f5f3f0]"
+            className="group relative max-w-[600px] cursor-pointer overflow-hidden rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)]"
             onClick={() => setLightboxIndex(i)}
           >
             <RevisionImage
@@ -886,7 +886,7 @@ export function RevisionImageLarge({
             </button>
             {/* Pin count badge */}
             {asset.pinCount != null && asset.pinCount > 0 && (
-              <div className="absolute left-2 top-2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#f15b2b] px-1.5 text-[9px] font-bold text-white shadow-sm">
+              <div className="absolute left-2 top-2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[var(--bb-primary)] px-1.5 text-[9px] font-bold text-white shadow-sm">
                 📌 {asset.pinCount}
               </div>
             )}
@@ -942,7 +942,7 @@ export function DownloadAllButton({
       type="button"
       onClick={handleClick}
       disabled={downloading}
-      className={`inline-flex items-center gap-1.5 rounded-full border border-[#d0cec9] bg-[#f9f8f6] px-3 py-1.5 text-xs font-medium text-[#666] transition-colors hover:border-[#f15b2b] hover:bg-[#fff5f2] hover:text-[#f15b2b] disabled:opacity-50 ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-full border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-1.5 text-xs font-medium text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-primary)] hover:bg-[var(--bb-primary-light)] hover:text-[var(--bb-primary)] disabled:opacity-50 ${className}`}
     >
       {downloading ? (
         <>
@@ -991,7 +991,7 @@ export function BriefThumbnailRow({
         {assets.map((asset, i) => (
           <div
             key={asset.id}
-            className="group/brief relative h-16 w-16 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-[#e3e1dc] bg-[#f5f3f0]"
+            className="group/brief relative h-16 w-16 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-card)]"
             onClick={() => setLightboxIndex(i)}
           >
             <RevisionImage

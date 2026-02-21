@@ -771,7 +771,7 @@ export default function CustomerTicketDetailPage() {
                 fromBoard ? "/customer/board" : "/customer/tickets",
               )
             }
-            className="mb-2 inline-flex items-center gap-1 text-xs text-[#7a7a7a] hover:text-[#424143]"
+            className="mb-2 inline-flex items-center gap-1 text-xs text-[var(--bb-text-secondary)] hover:text-[var(--bb-secondary)]"
           >
             <span className="text-lg leading-none">&larr;</span>
             <span>{fromBoard ? "Back to board" : "Back to tickets"}</span>
@@ -795,9 +795,9 @@ export default function CustomerTicketDetailPage() {
           </div>
 
           {ticket?.code && (
-            <p className="mt-1 text-xs text-[#9a9892]">
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               Ticket code:{" "}
-              <span className="font-medium text-[#424143]">
+              <span className="font-medium text-[var(--bb-secondary)]">
                 {ticket.code}
               </span>
             </p>
@@ -867,12 +867,12 @@ export default function CustomerTicketDetailPage() {
           <section className="space-y-4 md:col-span-2">
             {/* Status action banner — IN_REVIEW */}
             {ticket.status === "IN_REVIEW" && normalizedRole && (
-              <div className="flex items-center gap-3 rounded-xl border border-[#f5c4ad] bg-[#fff8f5] px-4 py-3">
+              <div className="flex items-center gap-3 rounded-xl border border-[var(--bb-primary-border)] bg-[var(--bb-primary-light)] px-4 py-3">
                 <div className="flex-1">
-                  <p className="text-sm font-semibold text-[#424143]">
+                  <p className="text-sm font-semibold text-[var(--bb-secondary)]">
                     This request is ready for your review
                   </p>
-                  <p className="mt-0.5 text-xs text-[#7a7a7a]">
+                  <p className="mt-0.5 text-xs text-[var(--bb-text-secondary)]">
                     Review the creative&apos;s work below, then approve it or
                     request changes.
                   </p>
@@ -904,15 +904,15 @@ export default function CustomerTicketDetailPage() {
 
             {/* Approval banner — DONE */}
             {ticket.status === "DONE" && ticket.completedAt && (
-              <div className="flex items-center gap-3 rounded-xl border border-[#a3e0bf] bg-[#f0faf4] px-4 py-3">
+              <div className="flex items-center gap-3 rounded-xl border border-[var(--bb-success-border)] bg-[var(--bb-success-bg)] px-4 py-3">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#32b37b] text-white">
                   &#10003;
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-semibold text-[#424143]">
+                  <p className="text-sm font-semibold text-[var(--bb-secondary)]">
                     Approved
                   </p>
-                  <p className="mt-0.5 text-xs text-[#7a7a7a]">
+                  <p className="mt-0.5 text-xs text-[var(--bb-text-secondary)]">
                     {ticket.completedBy?.name || ticket.completedBy?.email || "Customer"}{" "}
                     marked this as complete on{" "}
                     {formatBoardDate(ticket.completedAt)}
@@ -922,12 +922,12 @@ export default function CustomerTicketDetailPage() {
             )}
 
             {/* Brief card */}
-            <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
+            <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-sm font-semibold text-[#424143]">Brief</h2>
+                <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">Brief</h2>
                 {ticket.status === "TODO" && (
                   <div className="flex items-center gap-2">
-                    <label className="inline-flex cursor-pointer items-center rounded-full border border-[#d4d2cc] bg-white px-3 py-1 text-[11px] font-medium text-[#424143] hover:bg-[#f7f4f0] disabled:cursor-not-allowed disabled:opacity-60">
+                    <label className="inline-flex cursor-pointer items-center rounded-full border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-1 text-[11px] font-medium text-[var(--bb-secondary)] hover:bg-[var(--bb-bg-warm)] disabled:cursor-not-allowed disabled:opacity-60">
                       <input
                         type="file"
                         accept="image/*"
@@ -948,7 +948,7 @@ export default function CustomerTicketDetailPage() {
               {/* Description */}
               {editing ? (
                 <div className="mt-3 space-y-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--bb-text-muted)]">
                     Description
                   </p>
                   <RichTextEditor
@@ -966,10 +966,10 @@ export default function CustomerTicketDetailPage() {
               ) : ticket.description ? (
                 <SafeHtml
                   html={ticket.description}
-                  className="mt-2 text-sm text-[#7a7a7a]"
+                  className="mt-2 text-sm text-[var(--bb-text-secondary)]"
                 />
               ) : (
-                <p className="mt-2 text-xs text-[#9a9892]">
+                <p className="mt-2 text-xs text-[var(--bb-text-tertiary)]">
                   No description was provided for this ticket.
                 </p>
               )}
@@ -983,7 +983,7 @@ export default function CustomerTicketDetailPage() {
               {/* Brief attachments */}
               <div className="mt-4">
                 {uploadProgressText && (
-                  <div className="mb-2 rounded-md border border-[#eadfce] bg-[#fffaf1] px-3 py-2 text-[11px] text-[#6b6258]">
+                  <div className="mb-2 rounded-md border border-[var(--bb-border)] bg-[var(--bb-warning-bg)] px-3 py-2 text-[11px] text-[var(--bb-text-secondary)]">
                     {uploadProgressText}
                   </div>
                 )}
@@ -996,8 +996,8 @@ export default function CustomerTicketDetailPage() {
 
                 {briefAssetsLoading && (
                   <div className="flex items-center gap-2 py-3">
-                    <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#e3e1dc] border-t-[#9a9892]" />
-                    <p className="text-xs text-[#9a9892]">
+                    <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--bb-border)] border-t-[var(--bb-text-tertiary)]" />
+                    <p className="text-xs text-[var(--bb-text-tertiary)]">
                       Loading attachments…
                     </p>
                   </div>
@@ -1017,9 +1017,9 @@ export default function CustomerTicketDetailPage() {
                   briefAssetEntries.length > 0 && (
                     <div>
                       <div className="mb-1.5 flex items-center justify-between">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9]">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--bb-text-muted)]">
                           Brief attachments
-                          <span className="ml-1.5 text-[#9a9892]">
+                          <span className="ml-1.5 text-[var(--bb-text-tertiary)]">
                             ({briefAssetEntries.length})
                           </span>
                         </p>
@@ -1043,16 +1043,16 @@ export default function CustomerTicketDetailPage() {
 
             {/* Revision History */}
             {ticket.status !== "TODO" && (
-              <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
+              <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-[#424143]">
+                  <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">
                     Revision history
                   </h2>
                   {revisions && revisions.length >= 2 && (
                     <button
                       type="button"
                       onClick={() => setShowCompare(true)}
-                      className="inline-flex items-center gap-1 rounded-full border border-[#d0cec9] bg-[#f9f8f6] px-2.5 py-1 text-[11px] font-medium text-[#666] transition-colors hover:border-[#f15b2b] hover:bg-[#fff5f2] hover:text-[#f15b2b]"
+                      className="inline-flex items-center gap-1 rounded-full border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-2.5 py-1 text-[11px] font-medium text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-primary)] hover:bg-[var(--bb-primary-light)] hover:text-[var(--bb-primary)]"
                     >
                       &#8596; Compare
                     </button>
@@ -1061,8 +1061,8 @@ export default function CustomerTicketDetailPage() {
 
                 {revisionsLoading && (
                   <div className="mt-3 flex items-center gap-2 py-3">
-                    <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#e3e1dc] border-t-[#9a9892]" />
-                    <p className="text-xs text-[#9a9892]">
+                    <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--bb-border)] border-t-[var(--bb-text-tertiary)]" />
+                    <p className="text-xs text-[var(--bb-text-tertiary)]">
                       Loading revisions…
                     </p>
                   </div>
@@ -1106,26 +1106,26 @@ export default function CustomerTicketDetailPage() {
                         return (
                           <div key={rev.version}>
                             <div className="mb-2 flex items-center justify-between">
-                              <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#b1afa9]">
+                              <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--bb-text-muted)]">
                                 <span>Version {rev.version}</span>
                                 {isLatest && (
-                                  <span className="rounded-full bg-[#f15b2b] px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white">
+                                  <span className="rounded-full bg-[var(--bb-primary)] px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white">
                                     Current
                                   </span>
                                 )}
                                 {rev.submittedAt && (
-                                  <span className="font-normal normal-case tracking-normal text-[#9a9892]">
+                                  <span className="font-normal normal-case tracking-normal text-[var(--bb-text-tertiary)]">
                                     — {formatBoardDate(rev.submittedAt)}{" "}
                                     &middot; {revAssets.length} file
                                     {revAssets.length !== 1 ? "s" : ""}
                                   </span>
                                 )}
                                 {(totalOpen > 0 || totalResolved > 0) && (
-                                  <span className="flex items-center gap-1.5 font-normal normal-case tracking-normal text-[#9a9892]">
+                                  <span className="flex items-center gap-1.5 font-normal normal-case tracking-normal text-[var(--bb-text-tertiary)]">
                                     &middot;
                                     {totalOpen > 0 && (
                                       <span className="flex items-center gap-0.5">
-                                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#f15b2b]" />
+                                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--bb-primary)]" />
                                         {totalOpen} open
                                       </span>
                                     )}
@@ -1164,15 +1164,15 @@ export default function CustomerTicketDetailPage() {
 
                             {/* Feedback message */}
                             {rev.feedbackMessage && (
-                              <div className="mt-2 rounded-lg border border-[#f5c4ad] bg-[#fff8f5] px-3 py-2">
-                                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#d6471b]">
+                              <div className="mt-2 rounded-lg border border-[var(--bb-primary-border)] bg-[var(--bb-primary-light)] px-3 py-2">
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--bb-primary-hover)]">
                                   Your feedback
                                 </p>
-                                <p className="mt-1 text-xs text-[#424143]">
+                                <p className="mt-1 text-xs text-[var(--bb-secondary)]">
                                   {rev.feedbackMessage}
                                 </p>
                                 {rev.feedbackAt && (
-                                  <p className="mt-1 text-[10px] text-[#9a9892]">
+                                  <p className="mt-1 text-[10px] text-[var(--bb-text-tertiary)]">
                                     {formatBoardDate(rev.feedbackAt)}
                                   </p>
                                 )}
@@ -1192,14 +1192,14 @@ export default function CustomerTicketDetailPage() {
           {/* ============================================================= */}
           <aside className="space-y-4 md:col-span-1">
             {/* Details card */}
-            <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
+            <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
                 Details
               </h3>
               <div className="space-y-3 text-xs">
                 {/* Status */}
                 <div>
-                  <p className="text-[#9a9892]">Status</p>
+                  <p className="text-[var(--bb-text-tertiary)]">Status</p>
                   <div className="mt-0.5">
                     <Badge variant={statusBadgeVariant(ticket.status)}>
                       {STATUS_LABELS[ticket.status]}
@@ -1209,7 +1209,7 @@ export default function CustomerTicketDetailPage() {
 
                 {/* Priority */}
                 <div>
-                  <p className="text-[#9a9892]">Priority</p>
+                  <p className="text-[var(--bb-text-tertiary)]">Priority</p>
                   {editing ? (
                     <FormSelect
                       size="sm"
@@ -1230,7 +1230,7 @@ export default function CustomerTicketDetailPage() {
                       <option value="URGENT">Urgent</option>
                     </FormSelect>
                   ) : (
-                    <p className="mt-0.5 font-semibold text-[#424143]">
+                    <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
                       <span
                         className={priorityColorClass(ticket.priority)}
                       >
@@ -1243,7 +1243,7 @@ export default function CustomerTicketDetailPage() {
 
                 {/* Project */}
                 <div>
-                  <p className="text-[#9a9892]">Project</p>
+                  <p className="text-[var(--bb-text-tertiary)]">Project</p>
                   {editing ? (
                     <FormSelect
                       size="sm"
@@ -1267,7 +1267,7 @@ export default function CustomerTicketDetailPage() {
                       ))}
                     </FormSelect>
                   ) : (
-                    <p className="mt-0.5 font-semibold text-[#424143]">
+                    <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
                       {ticket.project?.name || "—"}
                     </p>
                   )}
@@ -1275,7 +1275,7 @@ export default function CustomerTicketDetailPage() {
 
                 {/* Job type */}
                 <div>
-                  <p className="text-[#9a9892]">Job type</p>
+                  <p className="text-[var(--bb-text-tertiary)]">Job type</p>
                   {editing ? (
                     <FormSelect
                       size="sm"
@@ -1298,7 +1298,7 @@ export default function CustomerTicketDetailPage() {
                       ))}
                     </FormSelect>
                   ) : (
-                    <p className="mt-0.5 font-semibold text-[#424143]">
+                    <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
                       {ticket.jobType?.name || "—"}
                     </p>
                   )}
@@ -1306,7 +1306,7 @@ export default function CustomerTicketDetailPage() {
 
                 {/* Tags */}
                 <div>
-                  <p className="text-[#9a9892]">Tags</p>
+                  <p className="text-[var(--bb-text-tertiary)]">Tags</p>
                   {editing ? (
                     <div className="mt-1">
                       <TagMultiSelect
@@ -1371,7 +1371,7 @@ export default function CustomerTicketDetailPage() {
                           />
                         ))
                       ) : (
-                        <p className="text-[11px] text-[#9a9892]">—</p>
+                        <p className="text-[11px] text-[var(--bb-text-tertiary)]">—</p>
                       )}
                     </div>
                   )}
@@ -1379,7 +1379,7 @@ export default function CustomerTicketDetailPage() {
 
                 {/* Due date */}
                 <div>
-                  <p className="text-[#9a9892]">Due date</p>
+                  <p className="text-[var(--bb-text-tertiary)]">Due date</p>
                   {editing ? (
                     <FormInput
                       type="date"
@@ -1398,7 +1398,7 @@ export default function CustomerTicketDetailPage() {
                   ) : (
                     <>
                       <p
-                        className={`mt-0.5 font-semibold ${isDueDateOverdue(ticket.dueDate) ? "text-[#b13832]" : "text-[#424143]"}`}
+                        className={`mt-0.5 font-semibold ${isDueDateOverdue(ticket.dueDate) ? "text-[var(--bb-danger-text)]" : "text-[var(--bb-secondary)]"}`}
                       >
                         {formatBoardDate(ticket.dueDate)}
                       </p>
@@ -1409,7 +1409,7 @@ export default function CustomerTicketDetailPage() {
                         if (!countdown) return null;
                         return (
                           <p
-                            className={`mt-0.5 text-[10px] font-medium ${countdown.overdue ? "text-[#b13832]" : "text-[#7a7a7a]"}`}
+                            className={`mt-0.5 text-[10px] font-medium ${countdown.overdue ? "text-[var(--bb-danger-text)]" : "text-[var(--bb-text-secondary)]"}`}
                           >
                             {countdown.label}
                           </p>
@@ -1422,8 +1422,8 @@ export default function CustomerTicketDetailPage() {
                 {/* Token cost */}
                 {ticket.effectiveCost != null && (
                   <div>
-                    <p className="text-[#9a9892]">Token cost</p>
-                    <p className="mt-0.5 font-semibold text-[#424143]">
+                    <p className="text-[var(--bb-text-tertiary)]">Token cost</p>
+                    <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
                       {ticket.quantity > 1 && ticket.jobType
                         ? `${ticket.jobType.tokenCost} × ${ticket.quantity} = ${ticket.effectiveCost} tokens`
                         : `${ticket.effectiveCost} tokens`}
@@ -1439,25 +1439,25 @@ export default function CustomerTicketDetailPage() {
                 {/* Quantity (when > 1) */}
                 {ticket.quantity > 1 && (
                   <div>
-                    <p className="text-[#9a9892]">Quantity</p>
-                    <p className="mt-0.5 font-semibold text-[#424143]">
+                    <p className="text-[var(--bb-text-tertiary)]">Quantity</p>
+                    <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
                       ×{ticket.quantity}
                     </p>
                   </div>
                 )}
 
                 {/* Created / Updated */}
-                <div className="border-t border-[#ece9e1] pt-3">
+                <div className="border-t border-[var(--bb-border-subtle)] pt-3">
                   <div className="space-y-2">
                     <div>
-                      <p className="text-[#9a9892]">Created</p>
-                      <p className="mt-0.5 font-semibold text-[#424143]">
+                      <p className="text-[var(--bb-text-tertiary)]">Created</p>
+                      <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
                         {formatBoardDate(ticket.createdAt)}
                       </p>
                     </div>
                     <div>
-                      <p className="text-[#9a9892]">Updated</p>
-                      <p className="mt-0.5 font-semibold text-[#424143]">
+                      <p className="text-[var(--bb-text-tertiary)]">Updated</p>
+                      <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
                         {formatBoardDate(ticket.updatedAt)}
                       </p>
                     </div>
@@ -1467,8 +1467,8 @@ export default function CustomerTicketDetailPage() {
             </div>
 
             {/* People card */}
-            <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
+            <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
                 People
               </h3>
               <div className="space-y-3">
@@ -1490,12 +1490,12 @@ export default function CustomerTicketDetailPage() {
                     )}
                   </div>
                   <div>
-                    <p className="text-xs font-semibold text-[#424143]">
+                    <p className="text-xs font-semibold text-[var(--bb-secondary)]">
                       {ticket.createdBy?.name ||
                         ticket.createdBy?.email ||
                         "—"}
                     </p>
-                    <p className="text-[10px] text-[#9a9892]">Requester</p>
+                    <p className="text-[10px] text-[var(--bb-text-tertiary)]">Requester</p>
                   </div>
                 </div>
 
@@ -1509,18 +1509,18 @@ export default function CustomerTicketDetailPage() {
                     {ticket.isAssigned ? "\u2713" : "\u2014"}
                   </div>
                   <div>
-                    <p className="text-xs font-semibold text-[#424143]">
+                    <p className="text-xs font-semibold text-[var(--bb-secondary)]">
                       {ticket.isAssigned ? "Assigned" : "Unassigned"}
                     </p>
-                    <p className="text-[10px] text-[#9a9892]">Creative team</p>
+                    <p className="text-[10px] text-[var(--bb-text-tertiary)]">Creative team</p>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Comments card */}
-            <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
+            <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
                 Comments
               </h3>
 
@@ -1532,7 +1532,7 @@ export default function CustomerTicketDetailPage() {
 
               <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
                 {commentsLoading && (
-                  <p className="text-[11px] text-[#9a9892]">
+                  <p className="text-[11px] text-[var(--bb-text-tertiary)]">
                     Loading comments…
                   </p>
                 )}
@@ -1550,17 +1550,17 @@ export default function CustomerTicketDetailPage() {
                   comments!.map((c) => (
                     <div
                       key={c.id}
-                      className="rounded-lg bg-[#f5f3f0] px-3 py-2 text-[11px]"
+                      className="rounded-lg bg-[var(--bb-bg-card)] px-3 py-2 text-[11px]"
                     >
                       <div className="mb-1 flex items-center justify-between">
-                        <span className="font-semibold text-[#424143]">
+                        <span className="font-semibold text-[var(--bb-secondary)]">
                           {c.author.name || c.author.email}
                         </span>
-                        <span className="text-[10px] text-[#9a9892]">
+                        <span className="text-[10px] text-[var(--bb-text-tertiary)]">
                           {formatDateTime(c.createdAt)}
                         </span>
                       </div>
-                      <p className="whitespace-pre-wrap text-[#424143]">
+                      <p className="whitespace-pre-wrap text-[var(--bb-secondary)]">
                         {c.body}
                       </p>
                     </div>
@@ -1568,8 +1568,8 @@ export default function CustomerTicketDetailPage() {
               </div>
 
               {/* Add comment form */}
-              <div className="mt-3 border-t border-[#ebe7df] pt-3">
-                <label className="mb-1 block text-[11px] font-medium text-[#424143]">
+              <div className="mt-3 border-t border-[var(--bb-border-subtle)] pt-3">
+                <label className="mb-1 block text-[11px] font-medium text-[var(--bb-secondary)]">
                   Add a comment
                 </label>
                 <textarea
@@ -1577,10 +1577,10 @@ export default function CustomerTicketDetailPage() {
                   onChange={(e) => setNewComment(e.target.value)}
                   rows={3}
                   placeholder="Share feedback, clarifications, or next steps for this ticket."
-                  className="w-full rounded-md border border-[#d4d2cc] bg-[#fbf8f4] px-3 py-2 text-[11px] text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+                  className="w-full rounded-md border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-2 text-[11px] text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
                 />
                 <div className="mt-2 flex items-center justify-between">
-                  <p className="text-[10px] text-[#9a9892]">
+                  <p className="text-[10px] text-[var(--bb-text-tertiary)]">
                     Comments are visible to your team and Brandbite creatives.
                   </p>
                   <button
@@ -1591,8 +1591,8 @@ export default function CustomerTicketDetailPage() {
                     onClick={handleSubmitComment}
                     className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-medium ${
                       submittingComment || !newComment.trim()
-                        ? "cursor-not-allowed bg-[#e3ded4] text-[#9a9892]"
-                        : "bg-[#f15b2b] text-white hover:bg-[#e44f22]"
+                        ? "cursor-not-allowed bg-[var(--bb-border)] text-[var(--bb-text-tertiary)]"
+                        : "bg-[var(--bb-primary)] text-white hover:bg-[var(--bb-primary-hover)]"
                     }`}
                   >
                     {submittingComment ? "Sending…" : "Add comment"}
@@ -1605,7 +1605,7 @@ export default function CustomerTicketDetailPage() {
       )}
 
       {!error && !ticket && (
-        <div className="mt-6 rounded-xl border border-amber-200 bg-[#fffaf2] px-4 py-3 text-sm text-amber-800">
+        <div className="mt-6 rounded-xl border border-amber-200 bg-[var(--bb-warning-bg)] px-4 py-3 text-sm text-amber-800">
           Ticket could not be loaded.
         </div>
       )}
@@ -1624,7 +1624,7 @@ export default function CustomerTicketDetailPage() {
         />
 
         <div>
-          <label className="block text-xs font-medium text-[#424143]">
+          <label className="block text-xs font-medium text-[var(--bb-secondary)]">
             Message for your creative
           </label>
           <textarea
@@ -1634,10 +1634,10 @@ export default function CustomerTicketDetailPage() {
               if (revisionMessageError) setRevisionMessageError(null);
             }}
             placeholder="For example: Could we make the hero headline larger and try a version with a darker background?"
-            className="mt-1.5 h-28 w-full rounded-xl border border-[#e3e1dc] bg-white px-3 py-2.5 text-xs text-[#424143] outline-none placeholder:text-[#b1afa9] focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+            className="mt-1.5 h-28 w-full rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-2.5 text-xs text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
           />
           {revisionMessageError && (
-            <p className="mt-1 text-[11px] text-[#b13832]">
+            <p className="mt-1 text-[11px] text-[var(--bb-danger-text)]">
               {revisionMessageError}
             </p>
           )}
@@ -1676,15 +1676,15 @@ export default function CustomerTicketDetailPage() {
           subtitle="Once you mark this request as done, your creative will get paid for this job, and the ticket will move to Done."
         />
 
-        <div className="rounded-xl bg-[#f7f5f0] px-3 py-3 text-xs text-[#424143]">
+        <div className="rounded-xl bg-[var(--bb-bg-warm)] px-3 py-3 text-xs text-[var(--bb-secondary)]">
           <p className="font-semibold">{ticket?.title}</p>
           {ticket?.project?.name && (
-            <p className="mt-1 text-[#7a7a7a]">
+            <p className="mt-1 text-[var(--bb-text-secondary)]">
               Project: {ticket.project.name}
             </p>
           )}
           {ticket?.jobType?.name && (
-            <p className="mt-0.5 text-[#7a7a7a]">
+            <p className="mt-0.5 text-[var(--bb-text-secondary)]">
               Job type: {ticket.jobType.name}
             </p>
           )}
@@ -1706,9 +1706,9 @@ export default function CustomerTicketDetailPage() {
 
           return (
             <div className="mt-3">
-              <p className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#b1afa9]">
+              <p className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--bb-text-muted)]">
                 <span>Final work</span>
-                <span className="font-normal normal-case tracking-normal text-[#9a9892]">
+                <span className="font-normal normal-case tracking-normal text-[var(--bb-text-tertiary)]">
                   — Version {latestRev.version} &middot;{" "}
                   {finalAssets.length} file
                   {finalAssets.length !== 1 ? "s" : ""}
@@ -1780,23 +1780,23 @@ function TicketDetailSkeleton() {
     <>
       {/* Header skeleton */}
       <div className="mb-4">
-        <div className="mb-2 h-4 w-24 rounded bg-[#e3ded4]" />
-        <div className="h-7 w-72 rounded bg-[#e3ded4]" />
-        <div className="mt-2 h-3 w-40 rounded bg-[#e3ded4]" />
+        <div className="mb-2 h-4 w-24 rounded bg-[var(--bb-border)]" />
+        <div className="h-7 w-72 rounded bg-[var(--bb-border)]" />
+        <div className="mt-2 h-3 w-40 rounded bg-[var(--bb-border)]" />
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
         {/* Left skeleton */}
         <div className="space-y-4 md:col-span-2">
-          <div className="h-48 rounded-2xl border border-[#e3e1dc] bg-white" />
-          <div className="h-32 rounded-2xl border border-[#e3e1dc] bg-white" />
+          <div className="h-48 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)]" />
+          <div className="h-32 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)]" />
         </div>
 
         {/* Right skeleton */}
         <div className="space-y-4 md:col-span-1">
-          <div className="h-64 rounded-2xl border border-[#e3e1dc] bg-white" />
-          <div className="h-24 rounded-2xl border border-[#e3e1dc] bg-white" />
-          <div className="h-40 rounded-2xl border border-[#e3e1dc] bg-white" />
+          <div className="h-64 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)]" />
+          <div className="h-24 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)]" />
+          <div className="h-40 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)]" />
         </div>
       </div>
     </>

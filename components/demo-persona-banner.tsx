@@ -95,10 +95,10 @@ export default function DemoPersonaBanner() {
   const { persona } = state;
 
   return (
-    <div className="w-full bg-[#f15b2b] text-[11px] text-white">
+    <div className="w-full bg-[var(--bb-primary)] text-[11px] text-white">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-2">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em]">
+          <span className="rounded-full bg-[var(--bb-bg-page)]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em]">
             Demo mode
           </span>
           <span className="opacity-90">
@@ -112,7 +112,7 @@ export default function DemoPersonaBanner() {
 
         <a
           href="/debug/demo-user"
-          className="rounded-full border border-white/40 px-3 py-1 text-[11px] font-medium hover:bg-white/10"
+          className="rounded-full border border-white/40 px-3 py-1 text-[11px] font-medium hover:bg-[var(--bb-bg-page)]/10"
         >
           Switch persona
         </a>

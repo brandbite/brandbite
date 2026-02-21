@@ -153,7 +153,7 @@ export default function AdminCompaniesPage() {
             <h1 className="text-2xl font-semibold tracking-tight">
               Companies overview
             </h1>
-            <p className="mt-1 text-sm text-[#7a7a7a]">
+            <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
               All companies using Brandbite, with token balance and high-level
               activity metrics.
             </p>
@@ -169,57 +169,57 @@ export default function AdminCompaniesPage() {
 
         {/* Summary cards */}
         <section className="mb-6 grid gap-4 md:grid-cols-4">
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
               Total companies
             </p>
-            <p className="mt-2 text-3xl font-semibold text-[#424143]">
+            <p className="mt-2 text-3xl font-semibold text-[var(--bb-secondary)]">
               {loading ? "—" : stats ? stats.totalCompanies : 0}
             </p>
-            <p className="mt-1 text-xs text-[#9a9892]">
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               All companies currently in the database.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
               Total token balance
             </p>
-            <p className="mt-2 text-2xl font-semibold text-[#424143]">
+            <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
               {loading ? "—" : stats ? stats.totalTokenBalance : 0}
             </p>
-            <p className="mt-1 text-xs text-[#9a9892]">
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               Sum of token balances across all companies.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
               Average balance
             </p>
-            <p className="mt-2 text-2xl font-semibold text-[#424143]">
+            <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
               {loading
                 ? "—"
                 : stats
                 ? Math.round(stats.avgTokenBalance)
                 : 0}
             </p>
-            <p className="mt-1 text-xs text-[#9a9892]">
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               Average tokens per company.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
               Projects & tickets
             </p>
-            <p className="mt-2 text-2xl font-semibold text-[#424143]">
+            <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
               {loading ? "—" : totalProjects}
-              <span className="ml-1 text-xs font-normal text-[#7a7a7a]">
+              <span className="ml-1 text-xs font-normal text-[var(--bb-text-secondary)]">
                 projects
               </span>
             </p>
-            <p className="mt-1 text-xs text-[#9a9892]">
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               {loading
                 ? ""
                 : `${totalTickets} tickets across all companies.`}
@@ -228,7 +228,7 @@ export default function AdminCompaniesPage() {
         </section>
 
         {/* Filter + table */}
-        <section className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
+        <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-semibold tracking-tight">
@@ -252,7 +252,7 @@ export default function AdminCompaniesPage() {
                 <option value="WITHOUT_PLAN">Without plan</option>
               </FormSelect>
             </div>
-            <p className="text-xs text-[#9a9892]">
+            <p className="text-xs text-[var(--bb-text-tertiary)]">
               Showing {filteredCompanies.length} of {companies.length}
             </p>
           </div>
@@ -276,13 +276,13 @@ export default function AdminCompaniesPage() {
                 {filteredCompanies.map((c) => (
                   <tr
                     key={c.id}
-                    className="border-b border-[#f0eeea] last:border-b-0"
+                    className="border-b border-[var(--bb-border-subtle)] last:border-b-0"
                   >
                     <TD>
                       <div className="font-semibold">
                         {c.name}
                       </div>
-                      <div className="text-[10px] text-[#9a9892]">
+                      <div className="text-[10px] text-[var(--bb-text-tertiary)]">
                         {c.slug}
                       </div>
                     </TD>
@@ -292,12 +292,12 @@ export default function AdminCompaniesPage() {
                           <div className="font-medium">
                             {c.plan.name}
                           </div>
-                          <div className="text-[10px] text-[#9a9892]">
+                          <div className="text-[10px] text-[var(--bb-text-tertiary)]">
                             {c.plan.monthlyTokens} tokens / month
                           </div>
                         </>
                       ) : (
-                        <span className="text-[11px] text-[#9a9892]">
+                        <span className="text-[11px] text-[var(--bb-text-tertiary)]">
                           No plan
                         </span>
                       )}
@@ -314,7 +314,7 @@ export default function AdminCompaniesPage() {
                     <TD align="right">
                       {c.counts.tickets}
                     </TD>
-                    <TD align="right" className="text-[#9a9892]">
+                    <TD align="right" className="text-[var(--bb-text-tertiary)]">
                       {formatDate(c.createdAt)}
                     </TD>
                   </tr>

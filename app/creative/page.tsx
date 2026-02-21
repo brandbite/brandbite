@@ -387,7 +387,7 @@ export default function CreativeDashboardPage() {
           {/* Row 1: Hero stat cards */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {/* Token balance card */}
-            <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-5 shadow-sm">
+            <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
               <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-[#F15B2B] to-[#f6a07a]" />
               <div className="flex items-center justify-between">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
@@ -425,7 +425,7 @@ export default function CreativeDashboardPage() {
             </section>
 
             {/* Active tickets card */}
-            <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-5 shadow-sm">
+            <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
               <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-[#3B82F6] to-[#93C5FD]" />
               <div className="flex items-center justify-between">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
@@ -467,7 +467,7 @@ export default function CreativeDashboardPage() {
             </section>
 
             {/* Earnings / Withdrawals card */}
-            <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-5 shadow-sm">
+            <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
               <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-[#22C55E] to-[#86EFAC]" />
               <div className="flex items-center justify-between">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
@@ -518,7 +518,7 @@ export default function CreativeDashboardPage() {
             </section>
 
             {/* Payout rate card */}
-            <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-5 shadow-sm">
+            <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
               <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-[#8B5CF6] to-[#C4B5FD]" />
               <div className="flex items-center justify-between">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
@@ -555,7 +555,7 @@ export default function CreativeDashboardPage() {
                     <p className="text-[10px] font-medium text-[var(--bb-text-secondary)]">
                       Next: {nextTier.name} ({nextTier.payoutPercent}%)
                     </p>
-                    <div className="mt-1.5 h-1.5 w-full rounded-full bg-[#e3e1dc]">
+                    <div className="mt-1.5 h-1.5 w-full rounded-full bg-[var(--bb-border)]">
                       <div
                         className="h-full rounded-full bg-[#8B5CF6] transition-all"
                         style={{ width: `${progress}%` }}
@@ -574,7 +574,7 @@ export default function CreativeDashboardPage() {
           {ticketStats && totalTickets > 0 && (
             <div className="grid gap-4 md:grid-cols-2">
               {/* Status distribution chart */}
-              <section className="rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-5 shadow-sm">
+              <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
                 <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
                   Ticket pipeline
                 </h2>
@@ -589,20 +589,20 @@ export default function CreativeDashboardPage() {
                     >
                       <XAxis
                         dataKey="name"
-                        tick={{ fontSize: 11, fill: "#9a9892" }}
+                        tick={{ fontSize: 11, fill: "var(--bb-text-tertiary)" }}
                         axisLine={false}
                         tickLine={false}
                       />
                       <YAxis
                         allowDecimals={false}
-                        tick={{ fontSize: 11, fill: "#9a9892" }}
+                        tick={{ fontSize: 11, fill: "var(--bb-text-tertiary)" }}
                         axisLine={false}
                         tickLine={false}
                       />
                       <Tooltip
                         contentStyle={{
                           borderRadius: 12,
-                          border: "1px solid #e3e1dc",
+                          border: "1px solid var(--bb-border)",
                           fontSize: 12,
                         }}
                       />
@@ -617,7 +617,7 @@ export default function CreativeDashboardPage() {
               </section>
 
               {/* Priority distribution chart */}
-              <section className="rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-5 shadow-sm">
+              <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
                 <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
                   Priority breakdown
                 </h2>
@@ -632,20 +632,20 @@ export default function CreativeDashboardPage() {
                     >
                       <XAxis
                         dataKey="name"
-                        tick={{ fontSize: 11, fill: "#9a9892" }}
+                        tick={{ fontSize: 11, fill: "var(--bb-text-tertiary)" }}
                         axisLine={false}
                         tickLine={false}
                       />
                       <YAxis
                         allowDecimals={false}
-                        tick={{ fontSize: 11, fill: "#9a9892" }}
+                        tick={{ fontSize: 11, fill: "var(--bb-text-tertiary)" }}
                         axisLine={false}
                         tickLine={false}
                       />
                       <Tooltip
                         contentStyle={{
                           borderRadius: 12,
-                          border: "1px solid #e3e1dc",
+                          border: "1px solid var(--bb-border)",
                           fontSize: 12,
                         }}
                       />
@@ -663,7 +663,7 @@ export default function CreativeDashboardPage() {
 
           {/* Row 2.5: Upcoming deadlines */}
           {creativeTickets.length > 0 && (
-            <section className="rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-5 shadow-sm">
+            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
               <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
                 Upcoming deadlines
               </h2>
@@ -731,7 +731,7 @@ export default function CreativeDashboardPage() {
           {/* Row 3: Load score + Latest withdrawal */}
           <div className="grid gap-4 md:grid-cols-2">
             {/* Load score card */}
-            <section className="rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-5 shadow-sm">
+            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
               <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
                 Load score
               </h2>
@@ -751,7 +751,7 @@ export default function CreativeDashboardPage() {
                       cy="18"
                       r="15.9155"
                       fill="none"
-                      stroke="#f5f3f0"
+                      stroke="var(--bb-bg-card)"
                       strokeWidth="3"
                     />
                     <circle
@@ -800,7 +800,7 @@ export default function CreativeDashboardPage() {
             </section>
 
             {/* Recent withdrawal card */}
-            <section className="rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-5 shadow-sm">
+            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
                   Recent withdrawals
@@ -834,12 +834,12 @@ export default function CreativeDashboardPage() {
                       <span
                         className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
                           w.status === "PAID"
-                            ? "bg-[#e8f6f0] text-[#16a34a]"
+                            ? "bg-[var(--bb-success-bg)] text-[var(--bb-success-text)]"
                             : w.status === "APPROVED"
-                            ? "bg-[#dbeafe] text-[#2563eb]"
+                            ? "bg-[var(--bb-info-bg)] text-[var(--bb-info-text)]"
                             : w.status === "REJECTED"
-                            ? "bg-[#fef2f2] text-[#dc2626]"
-                            : "bg-[#fef3c7] text-[#d97706]"
+                            ? "bg-[var(--bb-danger-bg)] text-[var(--bb-danger-text)]"
+                            : "bg-[var(--bb-warning-bg)] text-[var(--bb-warning-text)]"
                         }`}
                       >
                         {withdrawalStatusLabel(w.status)}

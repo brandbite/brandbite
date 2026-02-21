@@ -1090,15 +1090,15 @@ export default function CreativeBoardPage() {
     <>
       <div className="mt-4 grid gap-6 md:grid-cols-[240px_1fr] lg:grid-cols-[260px_1fr]">
           {/* Left workspace rail (creative-specific) */}
-          <aside className="flex flex-col rounded-2xl bg-white/60 p-4">
+          <aside className="flex flex-col rounded-2xl bg-[var(--bb-bg-page)]/60 p-4">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
                 Workspace
               </p>
-              <h2 className="mt-2 text-sm font-semibold text-[#424143]">
+              <h2 className="mt-2 text-sm font-semibold text-[var(--bb-secondary)]">
                 Your assigned work
               </h2>
-              <p className="mt-1 text-[11px] text-[#7a7a7a]">
+              <p className="mt-1 text-[11px] text-[var(--bb-text-secondary)]">
                 Tickets currently assigned to you across all customer projects.
               </p>
             </div>
@@ -1106,7 +1106,7 @@ export default function CreativeBoardPage() {
             {/* Projects list */}
             <div className="mt-4">
               <div className="mb-2 flex items-center justify-between">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9]">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--bb-text-muted)]">
                   Projects
                 </p>
               </div>
@@ -1116,15 +1116,15 @@ export default function CreativeBoardPage() {
                   onClick={() => setProjectFilter("ALL")}
                   className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-[11px] transition-colors ${
                     projectFilter === "ALL"
-                      ? "bg-[#f5f3f0] font-semibold text-[#424143]"
-                      : "text-[#7a7a7a] hover:bg-[#f5f3f0]/60"
+                      ? "bg-[var(--bb-bg-card)] font-semibold text-[var(--bb-secondary)]"
+                      : "text-[var(--bb-text-secondary)] hover:bg-[var(--bb-bg-card)]/60"
                   }`}
                 >
                   <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-[#9CA3AF] text-[9px] font-bold text-white">
                     All
                   </span>
                   <span className="flex-1 truncate">All projects</span>
-                  <span className="text-[10px] text-[#b1afa9]">{stats?.total ?? 0}</span>
+                  <span className="text-[10px] text-[var(--bb-text-muted)]">{stats?.total ?? 0}</span>
                 </button>
                 {projectsWithCounts.map((p, i) => (
                   <button
@@ -1135,8 +1135,8 @@ export default function CreativeBoardPage() {
                     }
                     className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-[11px] transition-colors ${
                       projectFilter === p.name
-                        ? "bg-[#f5f3f0] font-semibold text-[#424143]"
-                        : "text-[#7a7a7a] hover:bg-[#f5f3f0]/60"
+                        ? "bg-[var(--bb-bg-card)] font-semibold text-[var(--bb-secondary)]"
+                        : "text-[var(--bb-text-secondary)] hover:bg-[var(--bb-bg-card)]/60"
                     }`}
                   >
                     <span
@@ -1149,36 +1149,36 @@ export default function CreativeBoardPage() {
                       {p.name[0]?.toUpperCase()}
                     </span>
                     <span className="flex-1 truncate">{p.name}</span>
-                    <span className="text-[10px] text-[#b1afa9]">{p.count}</span>
+                    <span className="text-[10px] text-[var(--bb-text-muted)]">{p.count}</span>
                   </button>
                 ))}
               </div>
             </div>
 
             {/* Divider */}
-            <div className="my-3 border-t border-[#ece9e1]" />
+            <div className="my-3 border-t border-[var(--bb-border-subtle)]" />
 
             {/* Stats */}
             <div className="space-y-2">
-              <div className="rounded-xl border border-[#ece9e1] bg-[#f7f5f0] p-3">
+              <div className="rounded-xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-warm)] p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-[11px] font-semibold text-[#424143]">
+                    <p className="text-[11px] font-semibold text-[var(--bb-secondary)]">
                       All requests
                     </p>
-                    <p className="mt-0.5 text-[10px] text-[#9a9892]">
+                    <p className="mt-0.5 text-[10px] text-[var(--bb-text-tertiary)]">
                       Your active creative workspace.
                     </p>
                   </div>
                   {stats && (
-                    <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-[#424143]">
+                    <span className="rounded-full bg-[var(--bb-bg-page)] px-3 py-1 text-[11px] font-semibold text-[var(--bb-secondary)]">
                       {stats.total}
                     </span>
                   )}
                 </div>
               </div>
 
-              <div className="rounded-xl bg-[#f5f3f0] px-3 py-2 text-[10px] text-[#7a7a7a]">
+              <div className="rounded-xl bg-[var(--bb-bg-card)] px-3 py-2 text-[10px] text-[var(--bb-text-secondary)]">
                 <p>
                   Changes requested:{" "}
                   <span className="font-semibold">
@@ -1195,7 +1195,7 @@ export default function CreativeBoardPage() {
             {/* Header */}
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
                   Creative board
                 </p>
                 <h1 className="mt-1 text-2xl font-semibold tracking-tight">
@@ -1203,7 +1203,7 @@ export default function CreativeBoardPage() {
                 </h1>
               </div>
               {loading && (
-                <div className="rounded-full bg-[#f5f3f0] px-3 py-1 text-[11px] text-[#7a7a7a]">
+                <div className="rounded-full bg-[var(--bb-bg-card)] px-3 py-1 text-[11px] text-[var(--bb-text-secondary)]">
                   Loading tickets…
                 </div>
               )}
@@ -1233,7 +1233,7 @@ export default function CreativeBoardPage() {
                   placeholder="Search board"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full rounded-lg border border-[#e3e1dc] bg-white px-4 py-2 text-xs text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+                  className="w-full rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-2 text-xs text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
                 />
               </div>
 
@@ -1251,7 +1251,7 @@ export default function CreativeBoardPage() {
                     </div>
                   ))}
                   {uniqueCompanies.length > 5 && (
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[#e3e1dc] text-[9px] font-bold text-[#7a7a7a]">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[var(--bb-border)] text-[9px] font-bold text-[var(--bb-text-secondary)]">
                       +{uniqueCompanies.length - 5}
                     </div>
                   )}
@@ -1266,11 +1266,11 @@ export default function CreativeBoardPage() {
                 }
                 className={`flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs transition-colors ${
                   onlyChangesRequested
-                    ? "border-[#f15b2b] bg-[#fff5f0] text-[#d6471b]"
-                    : "border-[#e3e1dc] bg-white text-[#7a7a7a] hover:border-[#f15b2b]/60"
+                    ? "border-[var(--bb-primary)] bg-[var(--bb-primary-light)] text-[var(--bb-primary-hover)]"
+                    : "border-[var(--bb-border)] bg-[var(--bb-bg-page)] text-[var(--bb-text-secondary)] hover:border-[var(--bb-primary)]/60"
                 }`}
               >
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#f5a623]" />
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--bb-warning-text)]" />
                 Changes requested
                 <span className="rounded-full bg-black/5 px-1.5 text-xs font-semibold">
                   {changesRequestedCount}
@@ -1289,8 +1289,8 @@ export default function CreativeBoardPage() {
                 }}
                 className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors ${
                   selectionMode
-                    ? "border-[#f15b2b] bg-[#fff5f0] text-[#d6471b]"
-                    : "border-[#e3e1dc] bg-white text-[#7a7a7a] hover:border-[#f15b2b]/60"
+                    ? "border-[var(--bb-primary)] bg-[var(--bb-primary-light)] text-[var(--bb-primary-hover)]"
+                    : "border-[var(--bb-border)] bg-[var(--bb-bg-page)] text-[var(--bb-text-secondary)] hover:border-[var(--bb-primary)]/60"
                 }`}
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1314,8 +1314,8 @@ export default function CreativeBoardPage() {
                     key={status}
                     className={`w-80 shrink-0 snap-start overflow-hidden rounded-2xl transition-colors ${
                       isActiveDrop
-                        ? "bg-[#fff5f0] ring-2 ring-[#f15b2b]/60"
-                        : "bg-white/60"
+                        ? "bg-[var(--bb-primary-light)] ring-2 ring-[var(--bb-primary)]/60"
+                        : "bg-[var(--bb-bg-page)]/60"
                     }`}
                     onDragOver={(event) => handleColumnDragOver(event, status)}
                     onDrop={(event) => handleColumnDrop(event, status)}
@@ -1329,17 +1329,17 @@ export default function CreativeBoardPage() {
                     <div className="p-2">
                       {/* Column header */}
                       <div className="mb-2 flex items-center gap-1">
-                        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9a9892]">
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-tertiary)]">
                           {columnTitle}
                         </span>
-                        <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[11px] font-semibold text-[#7a7a7a]">
+                        <span className="rounded-full bg-[var(--bb-bg-card)] px-2 py-0.5 text-[11px] font-semibold text-[var(--bb-text-secondary)]">
                           {columnTickets.length}
                         </span>
                         {selectionMode && status !== "DONE" && columnTickets.length > 0 && (
                           <button
                             type="button"
                             onClick={() => selectAllInColumn(status)}
-                            className="ml-auto text-[10px] font-semibold text-[#f15b2b] hover:underline"
+                            className="ml-auto text-[10px] font-semibold text-[var(--bb-primary)] hover:underline"
                           >
                             Select all
                           </button>
@@ -1350,7 +1350,7 @@ export default function CreativeBoardPage() {
                       <div className="space-y-2">
                         {columnTickets.length === 0 ? (
                           isActiveDrop ? (
-                            <div className="flex h-20 items-center justify-center rounded-xl border-2 border-dashed border-[#f15b2b]/40 text-xs text-[#f15b2b]/60">
+                            <div className="flex h-20 items-center justify-center rounded-xl border-2 border-dashed border-[var(--bb-primary)]/40 text-xs text-[var(--bb-primary)]/60">
                               Drop here
                             </div>
                           ) : (
@@ -1386,9 +1386,9 @@ export default function CreativeBoardPage() {
                               return (
                                 <div
                                   key={t.id}
-                                  className={`cursor-pointer rounded-xl border border-[#e4e0da] bg-white p-3 shadow-sm transition-all duration-200 ${
+                                  className={`cursor-pointer rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] p-3 shadow-sm transition-all duration-200 ${
                                     isSelected
-                                      ? "ring-2 ring-[#f15b2b] ring-offset-1"
+                                      ? "ring-2 ring-[var(--bb-primary)] ring-offset-1"
                                       : isDragging
                                       ? "scale-[1.02] opacity-50 shadow-lg"
                                       : isUpdating
@@ -1437,8 +1437,8 @@ export default function CreativeBoardPage() {
                                       <div
                                         className={`flex h-4 w-4 items-center justify-center rounded border-2 transition-colors ${
                                           isSelected
-                                            ? "border-[#f15b2b] bg-[#f15b2b]"
-                                            : "border-[#d0cec9] bg-white"
+                                            ? "border-[var(--bb-primary)] bg-[var(--bb-primary)]"
+                                            : "border-[var(--bb-border-input)] bg-[var(--bb-bg-page)]"
                                         }`}
                                       >
                                         {isSelected && (
@@ -1447,20 +1447,20 @@ export default function CreativeBoardPage() {
                                           </svg>
                                         )}
                                       </div>
-                                      <span className="text-[10px] text-[#9a9892]">
+                                      <span className="text-[10px] text-[var(--bb-text-tertiary)]">
                                         {isSelected ? "Selected" : "Select"}
                                       </span>
                                     </div>
                                   )}
 
                                   {/* Title */}
-                                  <p className="text-sm font-semibold leading-snug text-[#424143]">
+                                  <p className="text-sm font-semibold leading-snug text-[var(--bb-secondary)]">
                                     {t.title}
                                   </p>
 
                                   {/* Description */}
                                   {t.description && (
-                                    <p className="mt-1 line-clamp-2 text-xs text-[#7a7a7a]">
+                                    <p className="mt-1 line-clamp-2 text-xs text-[var(--bb-text-secondary)]">
                                       {stripHtml(t.description)}
                                     </p>
                                   )}
@@ -1471,8 +1471,8 @@ export default function CreativeBoardPage() {
                                       <span
                                         className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
                                           overdue
-                                            ? "bg-[#fde8e7] text-[#b13832]"
-                                            : "bg-[#eaf4ff] text-[#1d72b8]"
+                                            ? "bg-[var(--bb-danger-bg)] text-[var(--bb-danger-text)]"
+                                            : "bg-[var(--bb-info-bg)] text-[var(--bb-info-text)]"
                                         }`}
                                       >
                                         <span className="text-[9px]">
@@ -1486,26 +1486,26 @@ export default function CreativeBoardPage() {
                                   {/* Changes requested badge + snippet */}
                                   {showFeedbackBadge && (
                                     <div className="mt-2">
-                                      <span className="inline-flex items-center gap-1 rounded-full bg-[#fff5f0] px-2 py-0.5 text-[10px] font-medium text-[#d6471b]">
-                                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#f5a623]" />
+                                      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--bb-primary-light)] px-2 py-0.5 text-[10px] font-medium text-[var(--bb-primary-hover)]">
+                                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--bb-warning-text)]" />
                                         Changes requested
                                       </span>
                                     </div>
                                   )}
                                   {t.latestRevisionHasFeedback &&
                                     t.latestRevisionFeedbackSnippet && (
-                                      <p className="mt-1 line-clamp-2 text-[10px] italic text-[#7a7a7a]">
+                                      <p className="mt-1 line-clamp-2 text-[10px] italic text-[var(--bb-text-secondary)]">
                                         &ldquo;{t.latestRevisionFeedbackSnippet}&rdquo;
                                       </p>
                                     )}
 
                                   {/* Footer separator */}
-                                  <div className="mt-2.5 border-t border-[#f0eee9] pt-2">
+                                  <div className="mt-2.5 border-t border-[var(--bb-border-subtle)] pt-2">
                                     <div className="flex items-center justify-between">
-                                      <div className="flex items-center gap-2 text-[10px] text-[#9a9892]">
+                                      <div className="flex items-center gap-2 text-[10px] text-[var(--bb-text-tertiary)]">
                                         <span className="font-medium">{ticketCode}</span>
                                         {showRevisionBadge && (
-                                          <span className="rounded bg-[#eaf4ff] px-1 py-0.5 text-[9px] font-semibold text-[#1d72b8]">
+                                          <span className="rounded bg-[var(--bb-info-bg)] px-1 py-0.5 text-[9px] font-semibold text-[var(--bb-info-text)]">
                                             v{t.revisionCount}
                                           </span>
                                         )}
@@ -1516,7 +1516,7 @@ export default function CreativeBoardPage() {
                                           {priorityIconMap[t.priority]}
                                         </span>
                                         {payoutTokens != null && (
-                                          <span className="rounded bg-[#e8f6f0] px-1 py-0.5 text-[9px] font-semibold text-[#22C55E]">
+                                          <span className="rounded bg-[var(--bb-success-bg)] px-1 py-0.5 text-[9px] font-semibold text-[#22C55E]">
                                             {payoutTokens}t
                                           </span>
                                         )}
@@ -1538,7 +1538,7 @@ export default function CreativeBoardPage() {
                             })}
                             {/* Drop here placeholder when column has items */}
                             {isActiveDrop && (
-                              <div className="flex h-16 items-center justify-center rounded-xl border-2 border-dashed border-[#f15b2b]/40 text-xs text-[#f15b2b]/60">
+                              <div className="flex h-16 items-center justify-center rounded-xl border-2 border-dashed border-[var(--bb-primary)]/40 text-xs text-[var(--bb-primary)]/60">
                                 Drop here
                               </div>
                             )}
@@ -1556,19 +1556,19 @@ export default function CreativeBoardPage() {
       {/* Floating bulk action bar */}
       {selectionMode && selectedTicketIds.size > 0 && (
         <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-[slideUp_200ms_ease-out]">
-          <div className="flex items-center gap-3 rounded-full bg-[#424143] px-5 py-2.5 shadow-2xl">
+          <div className="flex items-center gap-3 rounded-full bg-[var(--bb-secondary)] px-5 py-2.5 shadow-2xl">
             <span className="text-xs font-semibold text-white">
               {selectedTicketIds.size} ticket{selectedTicketIds.size > 1 ? "s" : ""} selected
             </span>
 
-            <div className="h-4 w-px bg-white/20" />
+            <div className="h-4 w-px bg-[var(--bb-bg-page)]/20" />
 
             {bulkTargetStatuses.includes("TODO") && (
               <button
                 type="button"
                 disabled={bulkUpdating}
                 onClick={() => handleBulkStatusChange("TODO")}
-                className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-white/20 disabled:opacity-50"
+                className="rounded-full bg-[var(--bb-bg-page)]/10 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-[var(--bb-bg-page)]/20 disabled:opacity-50"
               >
                 {bulkUpdating ? "Moving…" : "Move to Backlog"}
               </button>
@@ -1579,13 +1579,13 @@ export default function CreativeBoardPage() {
                 type="button"
                 disabled={bulkUpdating}
                 onClick={() => handleBulkStatusChange("IN_PROGRESS")}
-                className="rounded-full bg-[#f15b2b] px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-[#d6471b] disabled:opacity-50"
+                className="rounded-full bg-[var(--bb-primary)] px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-[var(--bb-primary-hover)] disabled:opacity-50"
               >
                 {bulkUpdating ? "Moving…" : "Start working"}
               </button>
             )}
 
-            <div className="h-4 w-px bg-white/20" />
+            <div className="h-4 w-px bg-[var(--bb-bg-page)]/20" />
 
             <button
               type="button"
@@ -1613,8 +1613,8 @@ export default function CreativeBoardPage() {
             {detailTicket.status === "IN_REVIEW" && (
               <div className={`mb-4 flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs ${
                 detailTicket.latestRevisionHasFeedback
-                  ? "bg-[#fff7e0] text-[#8a6b1f]"
-                  : "bg-[#eaf4ff] text-[#1d72b8]"
+                  ? "bg-[var(--bb-warning-bg)] text-[var(--bb-warning-text)]"
+                  : "bg-[var(--bb-info-bg)] text-[var(--bb-info-text)]"
               }`}>
                 <span className="text-sm">{detailTicket.latestRevisionHasFeedback ? "💬" : "⏳"}</span>
                 <span className="font-medium">
@@ -1632,12 +1632,12 @@ export default function CreativeBoardPage() {
                 {/* Description */}
                 {detailTicket.description && (
                   <div className="mb-5">
-                    <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9]">
+                    <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--bb-text-muted)]">
                       Description
                     </p>
                     <SafeHtml
                       html={detailTicket.description}
-                      className="rounded-xl bg-[#f7f5f0] px-4 py-3 text-xs leading-relaxed text-[#424143]"
+                      className="rounded-xl bg-[var(--bb-bg-warm)] px-4 py-3 text-xs leading-relaxed text-[var(--bb-secondary)]"
                     />
                   </div>
                 )}
@@ -1645,12 +1645,12 @@ export default function CreativeBoardPage() {
                 {/* Brief attachments */}
                 {detailBriefAssetsLoading && (
                   <div className="mb-5">
-                    <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9]">
+                    <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--bb-text-muted)]">
                       Brief attachments
                     </p>
                     <div className="flex items-center gap-2 py-3">
-                      <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#e3e1dc] border-t-[#9a9892]" />
-                      <p className="text-xs text-[#9a9892]">Loading attachments…</p>
+                      <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--bb-border)] border-t-[var(--bb-text-tertiary)]" />
+                      <p className="text-xs text-[var(--bb-text-tertiary)]">Loading attachments…</p>
                     </div>
                   </div>
                 )}
@@ -1662,9 +1662,9 @@ export default function CreativeBoardPage() {
                   return (
                     <div className="mb-5">
                       <div className="mb-1.5 flex items-center justify-between">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9]">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--bb-text-muted)]">
                           Brief attachments
-                          <span className="ml-1.5 text-[#9a9892]">({detailBriefAssets.length})</span>
+                          <span className="ml-1.5 text-[var(--bb-text-tertiary)]">({detailBriefAssets.length})</span>
                         </p>
                         <DownloadAllButton
                           assets={detailBriefAssets}
@@ -1685,16 +1685,16 @@ export default function CreativeBoardPage() {
 
                 {/* Divider between brief context and creative work */}
                 {(detailRevisions && detailRevisions.length > 0) && (
-                  <div className="mb-5 border-t border-[#ece9e1]" />
+                  <div className="mb-5 border-t border-[var(--bb-border-subtle)]" />
                 )}
 
                 {/* Revisions — loading / error / empty states */}
                 {detailRevisionsLoading && (
-                  <p className="text-xs text-[#9a9892]">Loading revisions…</p>
+                  <p className="text-xs text-[var(--bb-text-tertiary)]">Loading revisions…</p>
                 )}
 
                 {!detailRevisionsLoading && detailRevisionsError && (
-                  <p className="text-xs text-[#b13832]">{detailRevisionsError}</p>
+                  <p className="text-xs text-[var(--bb-danger-text)]">{detailRevisionsError}</p>
                 )}
 
                 {!detailRevisionsLoading &&
@@ -1716,19 +1716,19 @@ export default function CreativeBoardPage() {
                       <div className="space-y-5">
                         {/* ── Current version ── */}
                         <div>
-                          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9]">
+                          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--bb-text-muted)]">
                             Current version
                           </p>
-                          <div className={`rounded-xl border-2 bg-[#fbfaf8] px-4 py-4 ${
-                            latestRev.feedbackAt ? "border-[#f5a623]/40" : "border-[#4c8ef7]/40"
+                          <div className={`rounded-xl border-2 bg-[var(--bb-bg-page)] px-4 py-4 ${
+                            latestRev.feedbackAt ? "border-[var(--bb-warning-border)]/40" : "border-[var(--bb-info-border)]/40"
                           }`}>
                             <div className="flex items-center gap-2">
                               <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] text-white ${
-                                latestRev.feedbackAt ? "bg-[#f5a623]" : "bg-[#4c8ef7]"
+                                latestRev.feedbackAt ? "bg-[var(--bb-warning-text)]" : "bg-[var(--bb-info-text)]"
                               }`}>
                                 {latestRev.feedbackAt ? "✎" : "✓"}
                               </span>
-                              <p className="text-xs font-semibold text-[#424143]">
+                              <p className="text-xs font-semibold text-[var(--bb-secondary)]">
                                 Version {latestRev.version}
                               </p>
                               {latestRev.assets && latestRev.assets.length > 0 && (
@@ -1740,7 +1740,7 @@ export default function CreativeBoardPage() {
                             </div>
 
                             {latestRev.submittedAt && (
-                              <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-[#1d72b8]">
+                              <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-[var(--bb-info-text)]">
                                 <span className="text-[10px]">📤</span>
                                 You sent this for review on{" "}
                                 <span className="font-semibold">{formatBoardDate(latestRev.submittedAt)}</span>
@@ -1748,7 +1748,7 @@ export default function CreativeBoardPage() {
                             )}
 
                             {latestRev.feedbackAt && (
-                              <p className="mt-1 flex items-center gap-1.5 text-[11px] text-[#f5a623]">
+                              <p className="mt-1 flex items-center gap-1.5 text-[11px] text-[var(--bb-warning-text)]">
                                 <span className="text-[10px]">💬</span>
                                 Customer requested changes on{" "}
                                 <span className="font-semibold">{formatBoardDate(latestRev.feedbackAt)}</span>
@@ -1756,8 +1756,8 @@ export default function CreativeBoardPage() {
                             )}
 
                             {latestRev.feedbackMessage && (
-                              <div className="mt-2 rounded-lg bg-[#fff7e0] px-3 py-2">
-                                <p className="text-[11px] italic text-[#5a5953]">
+                              <div className="mt-2 rounded-lg bg-[var(--bb-warning-bg)] px-3 py-2">
+                                <p className="text-[11px] italic text-[var(--bb-text-tertiary)]">
                                   &ldquo;{latestRev.feedbackMessage}&rdquo;
                                 </p>
                               </div>
@@ -1765,8 +1765,8 @@ export default function CreativeBoardPage() {
 
                             {typeof latestRev.creativeMessage === "string" &&
                               latestRev.creativeMessage.trim().length > 0 && (
-                                <div className="mt-2 rounded-lg bg-[#eaf4ff] px-3 py-2">
-                                  <p className="text-[11px] text-[#424143]">
+                                <div className="mt-2 rounded-lg bg-[var(--bb-info-bg)] px-3 py-2">
+                                  <p className="text-[11px] text-[var(--bb-secondary)]">
                                     <span className="font-semibold">Your note:</span>{" "}
                                     {latestRev.creativeMessage}
                                   </p>
@@ -1793,7 +1793,7 @@ export default function CreativeBoardPage() {
                             <button
                               type="button"
                               onClick={() => setShowPreviousVersions((v) => !v)}
-                              className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9] transition-colors hover:text-[#7a7a7a]"
+                              className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--bb-text-muted)] transition-colors hover:text-[var(--bb-text-secondary)]"
                             >
                               <svg
                                 width="12"
@@ -1809,7 +1809,7 @@ export default function CreativeBoardPage() {
                                 <polyline points="9 18 15 12 9 6" />
                               </svg>
                               Previous versions
-                              <span className="text-[#9a9892]">({olderRevs.length})</span>
+                              <span className="text-[var(--bb-text-tertiary)]">({olderRevs.length})</span>
                             </button>
 
                             {showPreviousVersions && (
@@ -1817,15 +1817,15 @@ export default function CreativeBoardPage() {
                                 {olderRevs.map((rev) => (
                                   <div
                                     key={rev.version}
-                                    className="rounded-xl border border-[#e3e1dc] bg-[#fbfaf8] px-4 py-3"
+                                    className="rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-3"
                                   >
                                     <div className="flex items-center gap-2">
                                       <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] text-white ${
-                                        rev.feedbackAt ? "bg-[#f5a623]" : "bg-[#4c8ef7]"
+                                        rev.feedbackAt ? "bg-[var(--bb-warning-text)]" : "bg-[var(--bb-info-text)]"
                                       }`}>
                                         {rev.feedbackAt ? "✎" : "✓"}
                                       </span>
-                                      <p className="text-xs font-semibold text-[#424143]">
+                                      <p className="text-xs font-semibold text-[var(--bb-secondary)]">
                                         Version {rev.version}
                                       </p>
                                       {rev.assets && rev.assets.length > 0 && (
@@ -1837,7 +1837,7 @@ export default function CreativeBoardPage() {
                                     </div>
 
                                     {rev.submittedAt && (
-                                      <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-[#1d72b8]">
+                                      <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-[var(--bb-info-text)]">
                                         <span className="text-[10px]">📤</span>
                                         You sent this for review on{" "}
                                         <span className="font-semibold">{formatBoardDate(rev.submittedAt)}</span>
@@ -1845,7 +1845,7 @@ export default function CreativeBoardPage() {
                                     )}
 
                                     {rev.feedbackAt && (
-                                      <p className="mt-1 flex items-center gap-1.5 text-[11px] text-[#f5a623]">
+                                      <p className="mt-1 flex items-center gap-1.5 text-[11px] text-[var(--bb-warning-text)]">
                                         <span className="text-[10px]">💬</span>
                                         Customer requested changes on{" "}
                                         <span className="font-semibold">{formatBoardDate(rev.feedbackAt)}</span>
@@ -1853,8 +1853,8 @@ export default function CreativeBoardPage() {
                                     )}
 
                                     {rev.feedbackMessage && (
-                                      <div className="mt-2 rounded-lg bg-[#fff7e0] px-3 py-2">
-                                        <p className="text-[11px] italic text-[#5a5953]">
+                                      <div className="mt-2 rounded-lg bg-[var(--bb-warning-bg)] px-3 py-2">
+                                        <p className="text-[11px] italic text-[var(--bb-text-tertiary)]">
                                           &ldquo;{rev.feedbackMessage}&rdquo;
                                         </p>
                                       </div>
@@ -1862,8 +1862,8 @@ export default function CreativeBoardPage() {
 
                                     {typeof rev.creativeMessage === "string" &&
                                       rev.creativeMessage.trim().length > 0 && (
-                                        <div className="mt-2 rounded-lg bg-[#eaf4ff] px-3 py-2">
-                                          <p className="text-[11px] text-[#424143]">
+                                        <div className="mt-2 rounded-lg bg-[var(--bb-info-bg)] px-3 py-2">
+                                          <p className="text-[11px] text-[var(--bb-secondary)]">
                                             <span className="font-semibold">Your note:</span>{" "}
                                             {rev.creativeMessage}
                                           </p>
@@ -1889,16 +1889,16 @@ export default function CreativeBoardPage() {
               </div>
 
               {/* Right column — metadata sidebar (fixed while left scrolls) */}
-              <aside className="self-start overflow-y-auto rounded-xl bg-[#f7f5f0] p-4">
+              <aside className="self-start overflow-y-auto rounded-xl bg-[var(--bb-bg-warm)] p-4">
                 {/* Details */}
                 <div className="mb-5">
-                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9]">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--bb-text-muted)]">
                     Details
                   </p>
                   <div className="space-y-3 text-xs">
                     <div>
-                      <p className="text-[#9a9892]">Status</p>
-                      <div className="mt-0.5 flex items-center gap-1.5 font-semibold text-[#424143]">
+                      <p className="text-[var(--bb-text-tertiary)]">Status</p>
+                      <div className="mt-0.5 flex items-center gap-1.5 font-semibold text-[var(--bb-secondary)]">
                         <span
                           className="inline-block h-1.5 w-1.5 rounded-full"
                           style={{ backgroundColor: columnAccentColor[detailTicket.status] }}
@@ -1907,8 +1907,8 @@ export default function CreativeBoardPage() {
                       </div>
                     </div>
                     <div>
-                      <p className="text-[#9a9892]">Priority</p>
-                      <p className="mt-0.5 font-semibold text-[#424143]">
+                      <p className="text-[var(--bb-text-tertiary)]">Priority</p>
+                      <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
                         <span className={priorityColorClass(detailTicket.priority)}>
                           {priorityIconMap[detailTicket.priority]}
                         </span>
@@ -1916,21 +1916,21 @@ export default function CreativeBoardPage() {
                       </p>
                     </div>
                     <div>
-                      <p className="text-[#9a9892]">Project</p>
-                      <p className="mt-0.5 font-semibold text-[#424143]">
+                      <p className="text-[var(--bb-text-tertiary)]">Project</p>
+                      <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
                         {detailTicket.project?.name || "—"}
                       </p>
                     </div>
                     <div>
-                      <p className="text-[#9a9892]">Job type</p>
-                      <p className="mt-0.5 font-semibold text-[#424143]">
+                      <p className="text-[var(--bb-text-tertiary)]">Job type</p>
+                      <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
                         {detailTicket.jobType?.name || "—"}
                       </p>
                     </div>
                     {detailTicket.jobType && (
                       <div>
-                        <p className="text-[#9a9892]">Payout</p>
-                        <p className="mt-0.5 font-semibold text-[#424143]">
+                        <p className="text-[var(--bb-text-tertiary)]">Payout</p>
+                        <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
                           {detailTicket.jobType.creativePayoutTokens} tokens
                         </p>
                       </div>
@@ -1939,11 +1939,11 @@ export default function CreativeBoardPage() {
                 </div>
 
                 {/* Divider */}
-                <div className="mb-5 border-t border-[#ece9e1]" />
+                <div className="mb-5 border-t border-[var(--bb-border-subtle)]" />
 
                 {/* Company */}
                 <div className="mb-5">
-                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9]">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--bb-text-muted)]">
                     Company
                   </p>
                   <div className="flex items-center gap-2.5">
@@ -1954,45 +1954,45 @@ export default function CreativeBoardPage() {
                       {getInitials(detailTicket.company?.name || null, null)}
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-[#424143]">
+                      <p className="text-xs font-semibold text-[var(--bb-secondary)]">
                         {detailTicket.company?.name || "—"}
                       </p>
-                      <p className="text-[10px] text-[#9a9892]">Customer</p>
+                      <p className="text-[10px] text-[var(--bb-text-tertiary)]">Customer</p>
                     </div>
                   </div>
                 </div>
 
                 {/* Divider */}
-                <div className="mb-5 border-t border-[#ece9e1]" />
+                <div className="mb-5 border-t border-[var(--bb-border-subtle)]" />
 
                 {/* Dates */}
                 <div>
-                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9]">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--bb-text-muted)]">
                     Dates
                   </p>
                   <div className="space-y-2 text-xs">
                     <div>
-                      <p className="text-[#9a9892]">Created</p>
-                      <p className="mt-0.5 font-semibold text-[#424143]">
+                      <p className="text-[var(--bb-text-tertiary)]">Created</p>
+                      <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
                         {formatBoardDate(detailTicket.createdAt)}
                       </p>
                     </div>
                     <div>
-                      <p className="text-[#9a9892]">Updated</p>
-                      <p className="mt-0.5 font-semibold text-[#424143]">
+                      <p className="text-[var(--bb-text-tertiary)]">Updated</p>
+                      <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
                         {formatBoardDate(detailTicket.updatedAt)}
                       </p>
                     </div>
                     <div>
-                      <p className="text-[#9a9892]">Due date</p>
-                      <p className={`mt-0.5 font-semibold ${isDueDateOverdue(detailTicket.dueDate) ? "text-[#b13832]" : "text-[#424143]"}`}>
+                      <p className="text-[var(--bb-text-tertiary)]">Due date</p>
+                      <p className={`mt-0.5 font-semibold ${isDueDateOverdue(detailTicket.dueDate) ? "text-[var(--bb-danger-text)]" : "text-[var(--bb-secondary)]"}`}>
                         {formatBoardDate(detailTicket.dueDate)}
                       </p>
                       {(() => {
                         const countdown = formatDueDateCountdown(detailTicket.dueDate);
                         if (!countdown) return null;
                         return (
-                          <p className={`mt-0.5 text-[10px] font-medium ${countdown.overdue ? "text-[#b13832]" : "text-[#7a7a7a]"}`}>
+                          <p className={`mt-0.5 text-[10px] font-medium ${countdown.overdue ? "text-[var(--bb-danger-text)]" : "text-[var(--bb-text-secondary)]"}`}>
                             {countdown.label}
                           </p>
                         );
@@ -2005,7 +2005,7 @@ export default function CreativeBoardPage() {
 
             {/* Quick actions footer */}
             {detailTicket.status === "IN_PROGRESS" && (
-              <ModalFooter className="shrink-0 border-t border-[#f0eee9] pt-3">
+              <ModalFooter className="shrink-0 border-t border-[var(--bb-border-subtle)] pt-3">
                 <Button
                   size="sm"
                   onClick={() => {
@@ -2018,7 +2018,7 @@ export default function CreativeBoardPage() {
               </ModalFooter>
             )}
             {detailTicket.status === "IN_REVIEW" && (
-              <ModalFooter className="shrink-0 border-t border-[#f0eee9] pt-3">
+              <ModalFooter className="shrink-0 border-t border-[var(--bb-border-subtle)] pt-3">
                 <Button
                   variant="secondary"
                   size="sm"
@@ -2047,17 +2047,17 @@ export default function CreativeBoardPage() {
               {/* File upload area */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-[#424143]">
+                  <label className="text-xs font-medium text-[var(--bb-secondary)]">
                     Design files{" "}
-                    <span className="font-normal text-[#9a9892]">(optional)</span>
+                    <span className="font-normal text-[var(--bb-text-tertiary)]">(optional)</span>
                   </label>
-                  <span className="text-[11px] text-[#9a9892]">
+                  <span className="text-[11px] text-[var(--bb-text-tertiary)]">
                     {reviewFiles.length}/{MAX_REVIEW_FILES}
                   </span>
                 </div>
 
                 <div
-                  className="rounded-xl border-2 border-dashed border-[#d4d2cc] bg-[#fbfaf8] px-4 py-4 text-center transition-colors hover:border-[#f15b2b]/60"
+                  className="rounded-xl border-2 border-dashed border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-4 py-4 text-center transition-colors hover:border-[var(--bb-primary)]/60"
                   onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                   onDrop={(e) => {
                     e.preventDefault();
@@ -2065,18 +2065,18 @@ export default function CreativeBoardPage() {
                     handleAddReviewFiles(e.dataTransfer.files);
                   }}
                 >
-                  <p className="text-xs text-[#7a7a7a]">
+                  <p className="text-xs text-[var(--bb-text-secondary)]">
                     Drag & drop images here, or{" "}
                     <button
                       type="button"
-                      className="cursor-pointer font-semibold text-[#f15b2b] hover:underline"
+                      className="cursor-pointer font-semibold text-[var(--bb-primary)] hover:underline"
                       disabled={reviewUploading || reviewFiles.length >= MAX_REVIEW_FILES}
                       onClick={() => reviewFileInputRef.current?.click()}
                     >
                       browse
                     </button>
                   </p>
-                  <p className="mt-1 text-[10px] text-[#b1afa9]">PNG, JPG, WebP — up to {MAX_REVIEW_FILES} files</p>
+                  <p className="mt-1 text-[10px] text-[var(--bb-text-muted)]">PNG, JPG, WebP — up to {MAX_REVIEW_FILES} files</p>
                   <input
                     ref={reviewFileInputRef}
                     type="file"
@@ -2095,7 +2095,7 @@ export default function CreativeBoardPage() {
                 {reviewFiles.length > 0 && (
                   <div className="grid grid-cols-4 gap-2">
                     {reviewFiles.map((rf) => (
-                      <div key={rf.id} className="group relative overflow-hidden rounded-lg border border-[#e3e1dc]">
+                      <div key={rf.id} className="group relative overflow-hidden rounded-lg border border-[var(--bb-border)]">
                         <img
                           src={URL.createObjectURL(rf.file)}
                           alt={rf.file.name}
@@ -2110,7 +2110,7 @@ export default function CreativeBoardPage() {
                             &times;
                           </button>
                         )}
-                        <p className="truncate px-1.5 py-0.5 text-[9px] text-[#7a7a7a]">{rf.file.name}</p>
+                        <p className="truncate px-1.5 py-0.5 text-[9px] text-[var(--bb-text-secondary)]">{rf.file.name}</p>
                       </div>
                     ))}
                   </div>
@@ -2119,9 +2119,9 @@ export default function CreativeBoardPage() {
 
               {/* Creative note */}
               <div className="space-y-2">
-                <label className="text-xs font-medium text-[#424143]">
+                <label className="text-xs font-medium text-[var(--bb-secondary)]">
                   Note to your customer{" "}
-                  <span className="font-normal text-[#9a9892]">(optional)</span>
+                  <span className="font-normal text-[var(--bb-text-tertiary)]">(optional)</span>
                 </label>
                 <textarea
                   value={creativeNote}
@@ -2129,13 +2129,13 @@ export default function CreativeBoardPage() {
                   rows={3}
                   disabled={reviewUploading}
                   placeholder="Highlight what you changed, any open questions, or how they should review this version."
-                  className="w-full rounded-xl border border-[#e3e1dc] bg-white px-3 py-2.5 text-xs text-[#424143] outline-none placeholder:text-[#b1afa9] focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b] disabled:opacity-50"
+                  className="w-full rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-2.5 text-xs text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)] disabled:opacity-50"
                 />
               </div>
 
               {/* Upload progress */}
               {reviewUploadProgress && (
-                <div className="rounded-lg border border-[#eadfce] bg-[#fffaf1] px-3 py-2 text-xs text-[#6b6258]">
+                <div className="rounded-lg border border-[var(--bb-border)] bg-[var(--bb-warning-bg)] px-3 py-2 text-xs text-[var(--bb-text-secondary)]">
                   {reviewUploadProgress}
                 </div>
               )}

@@ -573,8 +573,8 @@ export default function NewTicketForm({
     <form onSubmit={handleSubmit} className="space-y-5">
       {/* Limited access banner for BILLING role */}
       {!companyRoleLoading && isLimitedAccess && (
-        <div className="rounded-lg border border-[#f6c89f] bg-[#fff4e6] px-3 py-2 text-xs text-[#7a7a7a]">
-          <p className="text-[11px] font-medium text-[#9a5b2b]">
+        <div className="rounded-lg border border-[var(--bb-warning-border)] bg-[var(--bb-warning-bg)] px-3 py-2 text-xs text-[var(--bb-text-secondary)]">
+          <p className="text-[11px] font-medium text-[var(--bb-warning-text)]">
             Limited access
           </p>
           <p className="mt-1">
@@ -585,26 +585,26 @@ export default function NewTicketForm({
       )}
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-[#fff7f7] px-3 py-2 text-sm text-red-700">
+        <div className="rounded-lg border border-red-200 bg-[var(--bb-danger-bg)] px-3 py-2 text-sm text-red-700">
           {error}
         </div>
       )}
 
       {successMessage && (
-        <div className="rounded-lg border border-emerald-200 bg-[#f0fff6] px-3 py-2 text-sm text-emerald-800">
+        <div className="rounded-lg border border-emerald-200 bg-[var(--bb-success-bg)] px-3 py-2 text-sm text-emerald-800">
           {successMessage}
         </div>
       )}
 
       {uploadProgressText && (
-        <div className="rounded-lg border border-[#eadfce] bg-[#fffaf1] px-3 py-2 text-xs text-[#6b6258]">
+        <div className="rounded-lg border border-[var(--bb-border)] bg-[var(--bb-warning-bg)] px-3 py-2 text-xs text-[var(--bb-text-secondary)]">
           {uploadProgressText}
         </div>
       )}
 
       {/* Title */}
       <div className="space-y-1">
-        <label className="text-xs font-medium text-[#424143]">Title</label>
+        <label className="text-xs font-medium text-[var(--bb-secondary)]">Title</label>
         <FormInput
           type="text"
           value={title}
@@ -612,14 +612,14 @@ export default function NewTicketForm({
           placeholder="Briefly describe what you need designed"
           disabled={isBusy}
         />
-        <p className="text-[11px] text-[#9a9892]">
+        <p className="text-[11px] text-[var(--bb-text-tertiary)]">
           This will be the main line your creative sees on the board.
         </p>
       </div>
 
       {/* Description */}
       <div className="space-y-1">
-        <label className="text-xs font-medium text-[#424143]">Details</label>
+        <label className="text-xs font-medium text-[var(--bb-secondary)]">Details</label>
         <RichTextEditor
           value={description}
           onChange={setDescription}
@@ -627,7 +627,7 @@ export default function NewTicketForm({
           disabled={isBusy}
           minHeight="60px"
         />
-        <p className="text-[11px] text-[#9a9892]">
+        <p className="text-[11px] text-[var(--bb-text-tertiary)]">
           You can always add more context later from the ticket view.
         </p>
       </div>
@@ -635,24 +635,24 @@ export default function NewTicketForm({
       {/* Brief attachments */}
       <div className="space-y-1">
         <div className="flex items-center justify-between">
-          <label className="text-xs font-medium text-[#424143]">
+          <label className="text-xs font-medium text-[var(--bb-secondary)]">
             Brief attachments (optional)
           </label>
-          <p className="text-[11px] text-[#9a9892]">
+          <p className="text-[11px] text-[var(--bb-text-tertiary)]">
             {briefFiles.length}/{maxBriefFiles}
           </p>
         </div>
 
-        <div className="rounded-md border border-dashed border-[#d4d2cc] bg-white px-3 py-3">
+        <div className="rounded-md border border-dashed border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-3">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-[11px] text-[#6b6258]">
+            <div className="text-[11px] text-[var(--bb-text-secondary)]">
               Attach reference images (logos, screenshots, inspiration).
-              <span className="ml-1 text-[#9a9892]">
+              <span className="ml-1 text-[var(--bb-text-tertiary)]">
                 Total: {formatBytes(totalBriefBytes)}
               </span>
             </div>
 
-            <label className="inline-flex cursor-pointer items-center justify-center rounded-full border border-[#d4d2cc] bg-white px-4 py-2 text-xs font-medium text-[#424143] hover:bg-[#f7f4f0] disabled:cursor-not-allowed disabled:opacity-60">
+            <label className="inline-flex cursor-pointer items-center justify-center rounded-full border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-4 py-2 text-xs font-medium text-[var(--bb-secondary)] hover:bg-[var(--bb-bg-warm)] disabled:cursor-not-allowed disabled:opacity-60">
               <input
                 type="file"
                 accept="image/*"
@@ -674,13 +674,13 @@ export default function NewTicketForm({
               {briefFiles.map((bf) => (
                 <div
                   key={bf.id}
-                  className="flex items-center justify-between rounded-md border border-[#eee7dc] bg-[#fffaf1] px-3 py-2"
+                  className="flex items-center justify-between rounded-md border border-[var(--bb-border)] bg-[var(--bb-warning-bg)] px-3 py-2"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-xs font-medium text-[#424143]">
+                    <p className="truncate text-xs font-medium text-[var(--bb-secondary)]">
                       {bf.file.name}
                     </p>
-                    <p className="text-[11px] text-[#9a9892]">
+                    <p className="text-[11px] text-[var(--bb-text-tertiary)]">
                       {formatBytes(bf.file.size)} • {bf.file.type || "file"}
                     </p>
                   </div>
@@ -689,13 +689,13 @@ export default function NewTicketForm({
                     type="button"
                     onClick={() => handleRemoveBriefFile(bf.id)}
                     disabled={isBusy}
-                    className="ml-3 rounded-full border border-[#d4d2cc] bg-white px-3 py-1.5 text-[11px] font-medium text-[#424143] hover:bg-[#f7f4f0] disabled:cursor-not-allowed disabled:opacity-60"
+                    className="ml-3 rounded-full border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-1.5 text-[11px] font-medium text-[var(--bb-secondary)] hover:bg-[var(--bb-bg-warm)] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     Remove
                   </button>
                 </div>
               ))}
-              <p className="text-[11px] text-[#9a9892]">
+              <p className="text-[11px] text-[var(--bb-text-tertiary)]">
                 Attachments will be uploaded right after the ticket is created.
               </p>
             </div>
@@ -705,7 +705,7 @@ export default function NewTicketForm({
 
       {/* Priority */}
       <div className="space-y-1">
-        <label className="text-xs font-medium text-[#424143]">
+        <label className="text-xs font-medium text-[var(--bb-secondary)]">
           Priority
         </label>
         <FormSelect
@@ -719,14 +719,14 @@ export default function NewTicketForm({
             </option>
           ))}
         </FormSelect>
-        <p className="text-[11px] text-[#9a9892]">
+        <p className="text-[11px] text-[var(--bb-text-tertiary)]">
           Higher priority requests are more likely to be picked up first.
         </p>
       </div>
 
       {/* Due date */}
       <div className="space-y-1">
-        <label className="text-xs font-medium text-[#424143]">
+        <label className="text-xs font-medium text-[var(--bb-secondary)]">
           Due date
         </label>
         <FormInput
@@ -737,14 +737,14 @@ export default function NewTicketForm({
           min={todayStr}
           max={maxDateStr}
         />
-        <p className="text-[11px] text-[#9a9892]">
+        <p className="text-[11px] text-[var(--bb-text-tertiary)]">
           Set a target date for delivery. Optional.
         </p>
       </div>
 
       {/* Project */}
       <div className="space-y-1">
-        <label className="text-xs font-medium text-[#424143]">
+        <label className="text-xs font-medium text-[var(--bb-secondary)]">
           Project
         </label>
         <FormSelect
@@ -759,14 +759,14 @@ export default function NewTicketForm({
             </option>
           ))}
         </FormSelect>
-        <p className="text-[11px] text-[#9a9892]">
+        <p className="text-[11px] text-[var(--bb-text-tertiary)]">
           Use projects to group related requests together.
         </p>
       </div>
 
       {/* Job type */}
       <div className="space-y-1">
-        <label className="text-xs font-medium text-[#424143]">
+        <label className="text-xs font-medium text-[var(--bb-secondary)]">
           Job type
         </label>
         <JobTypePicker
@@ -779,7 +779,7 @@ export default function NewTicketForm({
         {/* Quantity stepper — visible when a job type with hasQuantity is selected */}
         {selectedJobType?.hasQuantity && (
           <div className="flex items-center gap-2 pt-1">
-            <span className="text-[11px] text-[#9a9892]">
+            <span className="text-[11px] text-[var(--bb-text-tertiary)]">
               {selectedJobType.quantityLabel || "Quantity"}
             </span>
             <div className="inline-flex items-center rounded-md border border-[var(--bb-border-input)]">
@@ -787,24 +787,24 @@ export default function NewTicketForm({
                 type="button"
                 disabled={isBusy || quantity <= 1}
                 onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                className="flex h-7 w-7 items-center justify-center text-sm text-[#6b6258] hover:bg-[var(--bb-bg-warm)] disabled:opacity-40 disabled:cursor-not-allowed rounded-l-md"
+                className="flex h-7 w-7 items-center justify-center text-sm text-[var(--bb-text-secondary)] hover:bg-[var(--bb-bg-warm)] disabled:opacity-40 disabled:cursor-not-allowed rounded-l-md"
               >
                 −
               </button>
-              <span className="flex h-7 w-8 items-center justify-center border-x border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] text-xs font-semibold text-[#424143]">
+              <span className="flex h-7 w-8 items-center justify-center border-x border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] text-xs font-semibold text-[var(--bb-secondary)]">
                 {quantity}
               </span>
               <button
                 type="button"
                 disabled={isBusy || quantity >= 10}
                 onClick={() => setQuantity((q) => Math.min(10, q + 1))}
-                className="flex h-7 w-7 items-center justify-center text-sm text-[#6b6258] hover:bg-[var(--bb-bg-warm)] disabled:opacity-40 disabled:cursor-not-allowed rounded-r-md"
+                className="flex h-7 w-7 items-center justify-center text-sm text-[var(--bb-text-secondary)] hover:bg-[var(--bb-bg-warm)] disabled:opacity-40 disabled:cursor-not-allowed rounded-r-md"
               >
                 +
               </button>
             </div>
             {quantity > 1 && (
-              <span className="text-[11px] text-[#9a9892]">
+              <span className="text-[11px] text-[var(--bb-text-tertiary)]">
                 ×{quantity}
               </span>
             )}
@@ -816,22 +816,22 @@ export default function NewTicketForm({
           <div className="flex items-center gap-1.5 text-[11px]">
             {effectiveCost != null && selectedJobType?.tokenCost != null ? (
               <>
-                <span className="text-[#9a9892]">
+                <span className="text-[var(--bb-text-tertiary)]">
                   Cost:{" "}
-                  <span className="font-semibold text-[#424143]">
+                  <span className="font-semibold text-[var(--bb-secondary)]">
                     {quantity > 1
                       ? `${selectedJobType.tokenCost} × ${quantity} = ${effectiveCost} tokens`
                       : `${effectiveCost} tokens`}
                   </span>
                 </span>
-                <span className="text-[#d4d2cc]">·</span>
+                <span className="text-[var(--bb-border-input)]">·</span>
                 {(() => {
                   const remaining = tokenBalance - effectiveCost;
                   const isNegative = remaining < 0;
                   return (
-                    <span className={isNegative ? "text-[#b13832]" : "text-[#9a9892]"}>
+                    <span className={isNegative ? "text-[var(--bb-danger-text)]" : "text-[var(--bb-text-tertiary)]"}>
                       Remaining after:{" "}
-                      <span className={`font-semibold ${isNegative ? "text-[#b13832]" : "text-[#424143]"}`}>
+                      <span className={`font-semibold ${isNegative ? "text-[var(--bb-danger-text)]" : "text-[var(--bb-secondary)]"}`}>
                         {remaining.toLocaleString()} tokens
                       </span>
                     </span>
@@ -839,19 +839,19 @@ export default function NewTicketForm({
                 })()}
               </>
             ) : (
-              <span className="text-[#9a9892]">
-                Your balance: <span className="font-semibold text-[#424143]">{tokenBalance.toLocaleString()} tokens</span>
+              <span className="text-[var(--bb-text-tertiary)]">
+                Your balance: <span className="font-semibold text-[var(--bb-secondary)]">{tokenBalance.toLocaleString()} tokens</span>
               </span>
             )}
           </div>
         ) : (
-          <p className="text-[11px] text-[#9a9892]">
+          <p className="text-[11px] text-[var(--bb-text-tertiary)]">
             Job types are linked to token costs and creative payouts.
           </p>
         )}
 
         {insufficientTokens && (
-          <div className="mt-1.5 rounded-md border border-red-200 bg-[#fff7f7] px-2.5 py-1.5 text-[11px] text-red-700">
+          <div className="mt-1.5 rounded-md border border-red-200 bg-[var(--bb-danger-bg)] px-2.5 py-1.5 text-[11px] text-red-700">
             Not enough tokens to create this ticket. Choose a different job type or top up your balance.
           </div>
         )}
@@ -860,7 +860,7 @@ export default function NewTicketForm({
       {/* Tags */}
       {localTags.length > 0 || canCreateTagsProp ? (
         <div className="space-y-1">
-          <label className="text-xs font-medium text-[#424143]">Tags</label>
+          <label className="text-xs font-medium text-[var(--bb-secondary)]">Tags</label>
           <TagMultiSelect
             availableTags={localTags}
             selectedTagIds={selectedTagIds}
@@ -893,7 +893,7 @@ export default function NewTicketForm({
             canCreate={canCreateTagsProp ?? (companyRole !== null && canManageTagsCheck(companyRole))}
             disabled={isBusy}
           />
-          <p className="text-[11px] text-[#9a9892]">
+          <p className="text-[11px] text-[var(--bb-text-tertiary)]">
             Add up to 5 tags to categorize this request.
           </p>
         </div>

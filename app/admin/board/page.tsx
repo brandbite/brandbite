@@ -220,15 +220,15 @@ export default function AdminBoardPage() {
     <>
       <div className="mt-4 grid gap-6 md:grid-cols-[240px_1fr] lg:grid-cols-[260px_1fr]">
           {/* Left workspace / context rail */}
-          <aside className="flex flex-col rounded-2xl bg-white/60 p-4">
+          <aside className="flex flex-col rounded-2xl bg-[var(--bb-bg-page)]/60 p-4">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
                 Operations overview
               </p>
-              <h2 className="mt-2 text-sm font-semibold text-[#424143]">
+              <h2 className="mt-2 text-sm font-semibold text-[var(--bb-secondary)]">
                 Cross-company work
               </h2>
-              <p className="mt-1 text-[11px] text-[#7a7a7a]">
+              <p className="mt-1 text-[11px] text-[var(--bb-text-secondary)]">
                 Monitor every request across all customer workspaces.
               </p>
             </div>
@@ -236,7 +236,7 @@ export default function AdminBoardPage() {
             {/* Companies list */}
             <div className="mt-4">
               <div className="mb-2 flex items-center justify-between">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9]">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--bb-text-muted)]">
                   Companies
                 </p>
               </div>
@@ -246,15 +246,15 @@ export default function AdminBoardPage() {
                   onClick={() => setCompanyFilter("ALL")}
                   className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-[11px] transition-colors ${
                     companyFilter === "ALL"
-                      ? "bg-[#f5f3f0] font-semibold text-[#424143]"
-                      : "text-[#7a7a7a] hover:bg-[#f5f3f0]/60"
+                      ? "bg-[var(--bb-bg-card)] font-semibold text-[var(--bb-secondary)]"
+                      : "text-[var(--bb-text-secondary)] hover:bg-[var(--bb-bg-card)]/60"
                   }`}
                 >
                   <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-[#9CA3AF] text-[9px] font-bold text-white">
                     All
                   </span>
                   <span className="flex-1 truncate">All companies</span>
-                  <span className="text-[10px] text-[#b1afa9]">{stats.total}</span>
+                  <span className="text-[10px] text-[var(--bb-text-muted)]">{stats.total}</span>
                 </button>
                 {companiesWithCounts.map((c, i) => (
                   <button
@@ -265,8 +265,8 @@ export default function AdminBoardPage() {
                     }
                     className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-[11px] transition-colors ${
                       companyFilter === c.name
-                        ? "bg-[#f5f3f0] font-semibold text-[#424143]"
-                        : "text-[#7a7a7a] hover:bg-[#f5f3f0]/60"
+                        ? "bg-[var(--bb-bg-card)] font-semibold text-[var(--bb-secondary)]"
+                        : "text-[var(--bb-text-secondary)] hover:bg-[var(--bb-bg-card)]/60"
                     }`}
                   >
                     <span
@@ -279,7 +279,7 @@ export default function AdminBoardPage() {
                       {c.name[0]?.toUpperCase()}
                     </span>
                     <span className="flex-1 truncate">{c.name}</span>
-                    <span className="text-[10px] text-[#b1afa9]">{c.count}</span>
+                    <span className="text-[10px] text-[var(--bb-text-muted)]">{c.count}</span>
                   </button>
                 ))}
               </div>
@@ -287,23 +287,23 @@ export default function AdminBoardPage() {
 
             {/* Stats */}
             <div className="mt-4 space-y-2">
-              <div className="rounded-xl border border-[#ece9e1] bg-[#f7f5f0] p-3">
+              <div className="rounded-xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-warm)] p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-[11px] font-semibold text-[#424143]">
+                    <p className="text-[11px] font-semibold text-[var(--bb-secondary)]">
                       All tickets
                     </p>
-                    <p className="mt-0.5 text-[10px] text-[#9a9892]">
+                    <p className="mt-0.5 text-[10px] text-[var(--bb-text-tertiary)]">
                       Board across companies.
                     </p>
                   </div>
-                  <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-[#424143]">
+                  <span className="rounded-full bg-[var(--bb-bg-page)] px-3 py-1 text-[11px] font-semibold text-[var(--bb-secondary)]">
                     {stats.total}
                   </span>
                 </div>
               </div>
 
-              <div className="rounded-xl bg-[#f5f3f0] px-3 py-2 text-[10px] text-[#7a7a7a]">
+              <div className="rounded-xl bg-[var(--bb-bg-card)] px-3 py-2 text-[10px] text-[var(--bb-text-secondary)]">
                 <p>
                   Open tickets:{" "}
                   <span className="font-semibold">{stats.openTotal}</span>
@@ -311,7 +311,7 @@ export default function AdminBoardPage() {
               </div>
             </div>
 
-            <div className="mt-auto pt-4 text-[10px] text-[#9a9892]">
+            <div className="mt-auto pt-4 text-[10px] text-[var(--bb-text-tertiary)]">
               <p>You&apos;re viewing Brandbite in demo admin mode.</p>
             </div>
           </aside>
@@ -321,7 +321,7 @@ export default function AdminBoardPage() {
             {/* Header */}
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
                   Admin board
                 </p>
                 <h1 className="mt-1 text-2xl font-semibold tracking-tight">
@@ -329,7 +329,7 @@ export default function AdminBoardPage() {
                 </h1>
               </div>
               {loading && (
-                <div className="rounded-full bg-[#f5f3f0] px-3 py-1 text-[11px] text-[#7a7a7a]">
+                <div className="rounded-full bg-[var(--bb-bg-card)] px-3 py-1 text-[11px] text-[var(--bb-text-secondary)]">
                   Loading board…
                 </div>
               )}
@@ -350,7 +350,7 @@ export default function AdminBoardPage() {
                   placeholder="Search board"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full rounded-lg border border-[#e3e1dc] bg-white px-4 py-2 text-xs text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+                  className="w-full rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-2 text-xs text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
                 />
               </div>
               {/* Creative avatar circles */}
@@ -370,7 +370,7 @@ export default function AdminBoardPage() {
                     );
                   })}
                   {uniqueCreatives.length > 5 && (
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[#e3e1dc] text-[9px] font-bold text-[#7a7a7a]">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[var(--bb-border)] text-[9px] font-bold text-[var(--bb-text-secondary)]">
                       +{uniqueCreatives.length - 5}
                     </div>
                   )}
@@ -387,7 +387,7 @@ export default function AdminBoardPage() {
                 return (
                   <div
                     key={status}
-                    className="w-80 shrink-0 snap-start overflow-hidden rounded-2xl bg-white/60"
+                    className="w-80 shrink-0 snap-start overflow-hidden rounded-2xl bg-[var(--bb-bg-page)]/60"
                   >
                     {/* Accent bar */}
                     <div
@@ -398,10 +398,10 @@ export default function AdminBoardPage() {
                     <div className="p-2">
                       {/* Column header */}
                       <div className="mb-2 flex items-center gap-1">
-                        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9a9892]">
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-tertiary)]">
                           {columnTitle}
                         </span>
-                        <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[11px] font-semibold text-[#7a7a7a]">
+                        <span className="rounded-full bg-[var(--bb-bg-card)] px-2 py-0.5 text-[11px] font-semibold text-[var(--bb-text-secondary)]">
                           {columnTickets.length}
                         </span>
                       </div>
@@ -422,21 +422,21 @@ export default function AdminBoardPage() {
                             return (
                               <div
                                 key={t.id}
-                                className="rounded-xl bg-white p-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                                className="rounded-xl bg-[var(--bb-bg-page)] p-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
                               >
                                 {/* Company name */}
-                                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#9a9892]">
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--bb-text-tertiary)]">
                                   {companyName}
                                 </p>
                                 {/* Title */}
-                                <p className="mt-0.5 text-sm font-semibold leading-snug text-[#424143]">
+                                <p className="mt-0.5 text-sm font-semibold leading-snug text-[var(--bb-secondary)]">
                                   {t.title}
                                 </p>
 
                                 {/* Footer separator */}
-                                <div className="mt-2.5 border-t border-[#f0eee9] pt-2">
+                                <div className="mt-2.5 border-t border-[var(--bb-border-subtle)] pt-2">
                                   <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2 text-[10px] text-[#9a9892]">
+                                    <div className="flex items-center gap-2 text-[10px] text-[var(--bb-text-tertiary)]">
                                       {projectCode && (
                                         <span className="font-medium">{projectCode}</span>
                                       )}

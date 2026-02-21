@@ -250,7 +250,7 @@ export default function AdminPlansPage() {
             <h1 className="text-2xl font-semibold tracking-tight">
               Plans
             </h1>
-            <p className="mt-1 text-sm text-[#7a7a7a]">
+            <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
               Configure subscription plans with monthly tokens, pricing and Stripe mapping.
             </p>
           </div>
@@ -266,36 +266,36 @@ export default function AdminPlansPage() {
 
         {/* Summary cards */}
         <section className="mb-6 grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
               Total plans
             </p>
-            <p className="mt-2 text-3xl font-semibold text-[#424143]">
+            <p className="mt-2 text-3xl font-semibold text-[var(--bb-secondary)]">
               {loading ? "—" : plans.length}
             </p>
-            <p className="mt-1 text-xs text-[#9a9892]">
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               All configured plans.
             </p>
           </div>
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
               Active
             </p>
-            <p className="mt-2 text-2xl font-semibold text-[#424143]">
+            <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
               {loading ? "—" : activeCount}
             </p>
-            <p className="mt-1 text-xs text-[#9a9892]">
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               Plans currently available for assignment.
             </p>
           </div>
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
               Total monthly tokens
             </p>
-            <p className="mt-2 text-2xl font-semibold text-[#424143]">
+            <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
               {loading ? "—" : totalMonthlyTokens}
             </p>
-            <p className="mt-1 text-xs text-[#9a9892]">
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               Sum of monthly tokens across all plans.
             </p>
           </div>
@@ -304,12 +304,12 @@ export default function AdminPlansPage() {
         {/* Table + Form */}
         <section className="grid gap-4 md:grid-cols-[3fr_2fr]">
           {/* List */}
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-semibold tracking-tight">
                 Plan list
               </h2>
-              <p className="text-xs text-[#9a9892]">
+              <p className="text-xs text-[var(--bb-text-tertiary)]">
                 Click a row to edit.
               </p>
             </div>
@@ -333,10 +333,10 @@ export default function AdminPlansPage() {
                   {plans.map((p) => (
                     <tr
                       key={p.id}
-                      className={`border-b border-[#f0eeea] last:border-b-0 ${
+                      className={`border-b border-[var(--bb-border-subtle)] last:border-b-0 ${
                         selected?.id === p.id
-                          ? "bg-[#fff5ef]"
-                          : "bg-white"
+                          ? "bg-[var(--bb-primary-light)]"
+                          : "bg-[var(--bb-bg-page)]"
                       } cursor-pointer`}
                       onClick={() => handleClickPlan(p)}
                     >
@@ -357,17 +357,17 @@ export default function AdminPlansPage() {
                         </Badge>
                       </TD>
                       <TD>
-                        <div className="text-[#424143]">
+                        <div className="text-[var(--bb-secondary)]">
                           {p.stripeProductId || "—"}
                         </div>
-                        <div className="mt-0.5 text-[10px] text-[#9a9892]">
+                        <div className="mt-0.5 text-[10px] text-[var(--bb-text-tertiary)]">
                           {p.stripePriceId || "—"}
                         </div>
                       </TD>
                       <TD align="right">
                         {p.attachedCompanies}
                       </TD>
-                      <TD align="right" className="text-[#9a9892]">
+                      <TD align="right" className="text-[var(--bb-text-tertiary)]">
                         {formatDate(p.updatedAt)}
                       </TD>
                     </tr>
@@ -378,11 +378,11 @@ export default function AdminPlansPage() {
           </div>
 
           {/* Form */}
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
             <h2 className="text-sm font-semibold tracking-tight">
               {selected ? "Edit plan" : "Create new plan"}
             </h2>
-            <p className="mt-1 text-xs text-[#7a7a7a]">
+            <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
               Monthly tokens control how many tokens are added to the
               company every billing cycle.
             </p>
@@ -403,7 +403,7 @@ export default function AdminPlansPage() {
               <div className="flex flex-col gap-1">
                 <label
                   htmlFor="plan-name"
-                  className="text-xs font-medium text-[#424143]"
+                  className="text-xs font-medium text-[var(--bb-secondary)]"
                 >
                   Name
                 </label>
@@ -420,7 +420,7 @@ export default function AdminPlansPage() {
               <div className="flex flex-col gap-1">
                 <label
                   htmlFor="plan-monthly-tokens"
-                  className="text-xs font-medium text-[#424143]"
+                  className="text-xs font-medium text-[var(--bb-secondary)]"
                 >
                   Monthly tokens
                 </label>
@@ -438,7 +438,7 @@ export default function AdminPlansPage() {
               <div className="flex flex-col gap-1">
                 <label
                   htmlFor="plan-price-cents"
-                  className="text-xs font-medium text-[#424143]"
+                  className="text-xs font-medium text-[var(--bb-secondary)]"
                 >
                   Price (in cents, optional)
                 </label>
@@ -455,7 +455,7 @@ export default function AdminPlansPage() {
               <div className="flex flex-col gap-1">
                 <label
                   htmlFor="plan-stripe-product-id"
-                  className="text-xs font-medium text-[#424143]"
+                  className="text-xs font-medium text-[var(--bb-secondary)]"
                 >
                   Stripe product ID (optional)
                 </label>
@@ -471,7 +471,7 @@ export default function AdminPlansPage() {
               <div className="flex flex-col gap-1">
                 <label
                   htmlFor="plan-stripe-price-id"
-                  className="text-xs font-medium text-[#424143]"
+                  className="text-xs font-medium text-[var(--bb-secondary)]"
                 >
                   Stripe price ID (optional)
                 </label>
@@ -485,12 +485,12 @@ export default function AdminPlansPage() {
               </div>
 
               <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 text-xs font-medium text-[#424143]">
+                <label className="flex items-center gap-2 text-xs font-medium text-[var(--bb-secondary)]">
                   <input
                     type="checkbox"
                     checked={isActive}
                     onChange={(e) => setIsActive(e.target.checked)}
-                    className="h-3 w-3 rounded border-[#d4d2cc] text-[#f15b2b] focus:ring-[#f15b2b]"
+                    className="h-3 w-3 rounded border-[var(--bb-border-input)] text-[var(--bb-primary)] focus:ring-[var(--bb-primary)]"
                   />
                   Active
                 </label>

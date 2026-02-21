@@ -22,7 +22,7 @@ export function DataTable({
 }: DataTableProps) {
   return (
     <div
-      className={`overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-white shadow-sm ${className}`}
+      className={`overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] shadow-sm ${className}`}
     >
       <div
         className={`overflow-x-auto ${maxHeight ? `max-h-[${maxHeight}] overflow-y-auto` : ""}`}

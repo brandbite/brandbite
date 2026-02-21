@@ -18,8 +18,8 @@ type BadgeProps = {
 };
 
 const VARIANT_CLASSES: Record<BadgeVariant, string> = {
-  neutral: "bg-[var(--bb-bg-card)] text-[#5a5953] border border-[#d4d2ce]",
-  primary: "bg-[var(--bb-primary-light)] text-[#d6471b] border border-[var(--bb-primary-border)]",
+  neutral: "bg-[var(--bb-bg-card)] text-[var(--bb-text-tertiary)] border border-[var(--bb-border-input)]",
+  primary: "bg-[var(--bb-primary-light)] text-[var(--bb-primary-hover)] border border-[var(--bb-primary-border)]",
   info:    "bg-[var(--bb-info-bg)] text-[var(--bb-info-text)] border border-[var(--bb-info-border)]",
   success: "bg-[var(--bb-success-bg)] text-[var(--bb-success-text)] border border-[var(--bb-success-border)]",
   warning: "bg-[var(--bb-warning-bg)] text-[var(--bb-warning-text)] border border-[var(--bb-warning-border)]",

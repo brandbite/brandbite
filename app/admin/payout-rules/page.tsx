@@ -234,9 +234,9 @@ export default function AdminPayoutRulesPage() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Payout rules</h1>
-          <p className="mt-1 text-sm text-[#7a7a7a]">
+          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
             Configure milestone-based payout bonuses for creatives. Base rate is{" "}
-            <span className="font-semibold text-[#424143]">{basePayout}%</span>.
+            <span className="font-semibold text-[var(--bb-secondary)]">{basePayout}%</span>.
           </p>
         </div>
         <Button onClick={handleNewClick}>New rule</Button>
@@ -251,32 +251,32 @@ export default function AdminPayoutRulesPage() {
 
       {/* Summary cards */}
       <section className="mb-6 grid gap-4 md:grid-cols-3">
-        <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
             Total rules
           </p>
-          <p className="mt-2 text-3xl font-semibold text-[#424143]">
+          <p className="mt-2 text-3xl font-semibold text-[var(--bb-secondary)]">
             {loading ? "\u2014" : rules.length}
           </p>
-          <p className="mt-1 text-xs text-[#9a9892]">All configured payout rules.</p>
+          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">All configured payout rules.</p>
         </div>
-        <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
             Active rules
           </p>
-          <p className="mt-2 text-2xl font-semibold text-[#424143]">
+          <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
             {loading ? "\u2014" : activeCount}
           </p>
-          <p className="mt-1 text-xs text-[#9a9892]">Rules being evaluated for creatives.</p>
+          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">Rules being evaluated for creatives.</p>
         </div>
-        <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
             Highest active payout
           </p>
-          <p className="mt-2 text-2xl font-semibold text-[#424143]">
+          <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
             {loading ? "\u2014" : highestActive > 0 ? `${highestActive}%` : `${basePayout}%`}
           </p>
-          <p className="mt-1 text-xs text-[#9a9892]">
+          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
             {highestActive > 0 ? "Top tier payout rate." : "Only base rate active."}
           </p>
         </div>
@@ -285,7 +285,7 @@ export default function AdminPayoutRulesPage() {
       {/* Filter + table + form layout */}
       <section className="grid gap-4 md:grid-cols-[3fr_2fr]">
         {/* Left: table */}
-        <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
+        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-semibold tracking-tight">Rule list</h2>
@@ -300,7 +300,7 @@ export default function AdminPayoutRulesPage() {
                 <option value="INACTIVE">Inactive</option>
               </FormSelect>
             </div>
-            <p className="text-xs text-[#9a9892]">
+            <p className="text-xs text-[var(--bb-text-tertiary)]">
               Showing {filteredRules.length} of {rules.length}
             </p>
           </div>
@@ -313,7 +313,7 @@ export default function AdminPayoutRulesPage() {
             <div className="max-h-[420px] overflow-y-auto overflow-x-auto">
               <table className="min-w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-[#e3e1dc] text-xs uppercase tracking-[0.08em] text-[#9a9892]">
+                  <tr className="border-b border-[var(--bb-border)] text-xs uppercase tracking-[0.08em] text-[var(--bb-text-tertiary)]">
                     <th className="px-2 py-2">Name</th>
                     <th className="px-2 py-2 text-right">Min tickets</th>
                     <th className="px-2 py-2 text-right">Window</th>
@@ -326,26 +326,26 @@ export default function AdminPayoutRulesPage() {
                   {filteredRules.map((r) => (
                     <tr
                       key={r.id}
-                      className={`border-b border-[#f0eeea] text-xs last:border-b-0 ${
-                        selected?.id === r.id ? "bg-[#fff5ef]" : "bg-white"
+                      className={`border-b border-[var(--bb-border-subtle)] text-xs last:border-b-0 ${
+                        selected?.id === r.id ? "bg-[var(--bb-primary-light)]" : "bg-[var(--bb-bg-page)]"
                       } cursor-pointer`}
                       onClick={() => handleEditClick(r)}
                     >
-                      <td className="px-2 py-2 align-top text-[11px] text-[#424143]">
+                      <td className="px-2 py-2 align-top text-[11px] text-[var(--bb-secondary)]">
                         <div className="font-semibold">{r.name}</div>
                         {r.description && (
-                          <div className="mt-0.5 text-[10px] text-[#7a7a7a]">
+                          <div className="mt-0.5 text-[10px] text-[var(--bb-text-secondary)]">
                             {r.description}
                           </div>
                         )}
                       </td>
-                      <td className="px-2 py-2 align-top text-right text-[11px] text-[#424143]">
+                      <td className="px-2 py-2 align-top text-right text-[11px] text-[var(--bb-secondary)]">
                         {r.minCompletedTickets}
                       </td>
-                      <td className="px-2 py-2 align-top text-right text-[11px] text-[#424143]">
+                      <td className="px-2 py-2 align-top text-right text-[11px] text-[var(--bb-secondary)]">
                         {formatTimeWindow(r.timeWindowDays)}
                       </td>
-                      <td className="px-2 py-2 align-top text-right text-[11px] font-semibold text-[#424143]">
+                      <td className="px-2 py-2 align-top text-right text-[11px] font-semibold text-[var(--bb-secondary)]">
                         {r.payoutPercent}%
                       </td>
                       <td className="px-2 py-2 align-top text-center text-[11px]">
@@ -353,7 +353,7 @@ export default function AdminPayoutRulesPage() {
                           {r.isActive ? "Active" : "Inactive"}
                         </Badge>
                       </td>
-                      <td className="px-2 py-2 align-top text-right text-[11px] text-[#9a9892]">
+                      <td className="px-2 py-2 align-top text-right text-[11px] text-[var(--bb-text-tertiary)]">
                         {formatDate(r.updatedAt)}
                       </td>
                     </tr>
@@ -365,11 +365,11 @@ export default function AdminPayoutRulesPage() {
         </div>
 
         {/* Right: form */}
-        <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
+        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
           <h2 className="text-sm font-semibold tracking-tight">
             {selected ? "Edit payout rule" : "Create new payout rule"}
           </h2>
-          <p className="mt-1 text-xs text-[#7a7a7a]">
+          <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
             Creatives who meet the threshold earn the bonus payout rate. The highest
             qualifying rate is always applied.
           </p>
@@ -388,7 +388,7 @@ export default function AdminPayoutRulesPage() {
 
           <form className="mt-4 space-y-3" onSubmit={handleSubmit}>
             <div className="flex flex-col gap-1">
-              <label htmlFor="rule-name" className="text-xs font-medium text-[#424143]">
+              <label htmlFor="rule-name" className="text-xs font-medium text-[var(--bb-secondary)]">
                 Name
               </label>
               <FormInput
@@ -402,7 +402,7 @@ export default function AdminPayoutRulesPage() {
             </div>
 
             <div className="flex flex-col gap-1">
-              <label htmlFor="rule-description" className="text-xs font-medium text-[#424143]">
+              <label htmlFor="rule-description" className="text-xs font-medium text-[var(--bb-secondary)]">
                 Description
               </label>
               <FormTextarea
@@ -416,7 +416,7 @@ export default function AdminPayoutRulesPage() {
 
             <div className="grid gap-3 md:grid-cols-2">
               <div className="flex flex-col gap-1">
-                <label htmlFor="rule-min-tickets" className="text-xs font-medium text-[#424143]">
+                <label htmlFor="rule-min-tickets" className="text-xs font-medium text-[var(--bb-secondary)]">
                   Min completed tickets
                 </label>
                 <FormInput
@@ -431,7 +431,7 @@ export default function AdminPayoutRulesPage() {
               </div>
 
               <div className="flex flex-col gap-1">
-                <label htmlFor="rule-window" className="text-xs font-medium text-[#424143]">
+                <label htmlFor="rule-window" className="text-xs font-medium text-[var(--bb-secondary)]">
                   Time window (days)
                 </label>
                 <FormInput
@@ -443,7 +443,7 @@ export default function AdminPayoutRulesPage() {
                   required
                   placeholder="e.g. 180"
                 />
-                <p className="text-[10px] text-[#9a9892]">
+                <p className="text-[10px] text-[var(--bb-text-tertiary)]">
                   90 = 3 months, 180 = 6 months, 365 = 1 year
                 </p>
               </div>
@@ -451,7 +451,7 @@ export default function AdminPayoutRulesPage() {
 
             <div className="grid gap-3 md:grid-cols-2">
               <div className="flex flex-col gap-1">
-                <label htmlFor="rule-payout" className="text-xs font-medium text-[#424143]">
+                <label htmlFor="rule-payout" className="text-xs font-medium text-[var(--bb-secondary)]">
                   Payout percentage
                 </label>
                 <FormInput
@@ -464,13 +464,13 @@ export default function AdminPayoutRulesPage() {
                   required
                   placeholder="e.g. 70"
                 />
-                <p className="text-[10px] text-[#9a9892]">
+                <p className="text-[10px] text-[var(--bb-text-tertiary)]">
                   Must be above base rate ({basePayout}%)
                 </p>
               </div>
 
               <div className="flex flex-col gap-1">
-                <label htmlFor="rule-priority" className="text-xs font-medium text-[#424143]">
+                <label htmlFor="rule-priority" className="text-xs font-medium text-[var(--bb-secondary)]">
                   Priority
                 </label>
                 <FormInput
@@ -480,19 +480,19 @@ export default function AdminPayoutRulesPage() {
                   onChange={(e) => setFormPriority(e.target.value)}
                   placeholder="0"
                 />
-                <p className="text-[10px] text-[#9a9892]">
+                <p className="text-[10px] text-[var(--bb-text-tertiary)]">
                   Display ordering (optional)
                 </p>
               </div>
             </div>
 
             <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 text-xs font-medium text-[#424143]">
+              <label className="flex items-center gap-2 text-xs font-medium text-[var(--bb-secondary)]">
                 <input
                   type="checkbox"
                   checked={formIsActive}
                   onChange={(e) => setFormIsActive(e.target.checked)}
-                  className="h-3 w-3 rounded border-[#d4d2cc] text-[#f15b2b] focus:ring-[#f15b2b]"
+                  className="h-3 w-3 rounded border-[var(--bb-border-input)] text-[var(--bb-primary)] focus:ring-[var(--bb-primary)]"
                 />
                 Active
               </label>

@@ -227,18 +227,18 @@ export default function AutoAssignDebugPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f5f3f0] px-6 py-10 text-[#424143]">
+    <div className="min-h-screen bg-[var(--bb-bg-card)] px-6 py-10 text-[var(--bb-secondary)]">
       <div className="mx-auto max-w-5xl">
         {/* Header */}
         <header className="mb-6 flex items-start justify-between gap-4">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
               Debug panel
             </p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight">
               Auto-assign configuration
             </h1>
-            <p className="mt-1 text-xs text-[#9a9892]">
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               Manage how tickets are automatically assigned to creatives on each
               workspace and project. Only visible to site owners and admins.
             </p>
@@ -275,29 +275,29 @@ export default function AutoAssignDebugPage() {
               return (
                 <section
                   key={company.id}
-                  className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm"
+                  className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#b1afa9]">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--bb-text-muted)]">
                         Workspace
                       </p>
-                      <h2 className="text-sm font-semibold tracking-tight text-[#424143]">
+                      <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
                         {company.name}
                       </h2>
-                      <p className="text-[11px] text-[#9a9892]">
+                      <p className="text-[11px] text-[var(--bb-text-tertiary)]">
                         slug:{" "}
-                        <span className="font-mono text-[#7a7a7a]">
+                        <span className="font-mono text-[var(--bb-text-secondary)]">
                           {company.slug}
                         </span>
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <label className="flex cursor-pointer items-center gap-2 text-xs text-[#7a7a7a]">
+                      <label className="flex cursor-pointer items-center gap-2 text-xs text-[var(--bb-text-secondary)]">
                         <span>Default auto-assign</span>
                         <input
                           type="checkbox"
-                          className="h-4 w-4 rounded border-[#c4c2bc]"
+                          className="h-4 w-4 rounded border-[var(--bb-border-input)]"
                           checked={company.autoAssignDefaultEnabled}
                           onChange={(e) =>
                             handleToggleCompany(
@@ -309,7 +309,7 @@ export default function AutoAssignDebugPage() {
                         />
                       </label>
                       {isCompanyUpdating && (
-                        <span className="text-[11px] text-[#9a9892]">
+                        <span className="text-[11px] text-[var(--bb-text-tertiary)]">
                           Saving…
                         </span>
                       )}
@@ -317,8 +317,8 @@ export default function AutoAssignDebugPage() {
                   </div>
 
                   {/* Projects */}
-                  <div className="mt-4 border-t border-[#f1f0ea] pt-3">
-                    <p className="mb-2 text-[11px] font-medium text-[#7a7a7a]">
+                  <div className="mt-4 border-t border-[var(--bb-border-subtle)] pt-3">
+                    <p className="mb-2 text-[11px] font-medium text-[var(--bb-text-secondary)]">
                       Projects
                     </p>
                     {company.projects.length === 0 ? (
@@ -333,15 +333,15 @@ export default function AutoAssignDebugPage() {
                           return (
                             <div
                               key={project.id}
-                              className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[#f8f6f2] px-3 py-2"
+                              className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--bb-bg-warm)] px-3 py-2"
                             >
                               <div>
-                                <p className="text-xs font-medium text-[#424143]">
+                                <p className="text-xs font-medium text-[var(--bb-secondary)]">
                                   {project.name}
                                 </p>
-                                <p className="text-[11px] text-[#9a9892]">
+                                <p className="text-[11px] text-[var(--bb-text-tertiary)]">
                                   code:{" "}
-                                  <span className="font-mono text-[#7a7a7a]">
+                                  <span className="font-mono text-[var(--bb-text-secondary)]">
                                     {project.code ?? "—"}
                                   </span>
                                 </p>
@@ -367,7 +367,7 @@ export default function AutoAssignDebugPage() {
                                   <option value="OFF">Always off</option>
                                 </FormSelect>
                                 {isProjectUpdating && (
-                                  <span className="text-[11px] text-[#9a9892]">
+                                  <span className="text-[11px] text-[var(--bb-text-tertiary)]">
                                     Saving…
                                   </span>
                                 )}

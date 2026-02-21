@@ -153,7 +153,7 @@ export default function AdminLedgerPage() {
             <h1 className="text-2xl font-semibold tracking-tight">
               Global token ledger
             </h1>
-            <p className="mt-1 text-sm text-[#7a7a7a]">
+            <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
               All token movements across companies, jobs and creatives. Only
               visible to site admins.
             </p>
@@ -169,59 +169,59 @@ export default function AdminLedgerPage() {
 
         {/* Summary cards */}
         <section className="mb-6 grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
               Net tokens
             </p>
-            <p className="mt-2 text-3xl font-semibold text-[#f15b2b]">
+            <p className="mt-2 text-3xl font-semibold text-[var(--bb-primary)]">
               {loading
                 ? "—"
                 : data
                 ? data.stats.netTokens
                 : 0}
             </p>
-            <p className="mt-1 text-xs text-[#9a9892]">
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               Total credits minus total debits in the system.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
               Total credits
             </p>
-            <p className="mt-2 text-2xl font-semibold text-[#424143]">
+            <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
               {loading
                 ? "—"
                 : data
                 ? data.stats.totalCredits
                 : 0}
             </p>
-            <p className="mt-1 text-xs text-[#9a9892]">
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               Tokens added via plans, top-ups or adjustments.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
               Total debits
             </p>
-            <p className="mt-2 text-2xl font-semibold text-[#424143]">
+            <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
               {loading
                 ? "—"
                 : data
                 ? data.stats.totalDebits
                 : 0}
             </p>
-            <p className="mt-1 text-xs text-[#9a9892]">
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               Tokens spent on jobs, withdrawals and corrections.
             </p>
           </div>
         </section>
 
         {/* Filters */}
-        <section className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
+        <section className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
           <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-[#424143]">
+            <label className="text-xs font-medium text-[var(--bb-secondary)]">
               Company
             </label>
             <FormSelect
@@ -239,7 +239,7 @@ export default function AdminLedgerPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-[#424143]">
+            <label className="text-xs font-medium text-[var(--bb-secondary)]">
               Direction
             </label>
             <FormSelect
@@ -259,12 +259,12 @@ export default function AdminLedgerPage() {
         </section>
 
         {/* Table */}
-        <section className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
+        <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold tracking-tight">
               Recent token movements
             </h2>
-            <p className="text-xs text-[#9a9892]">
+            <p className="text-xs text-[var(--bb-text-tertiary)]">
               Showing up to {filteredEntries.length} entries.
             </p>
           </div>
@@ -294,9 +294,9 @@ export default function AdminLedgerPage() {
                   return (
                     <tr
                       key={e.id}
-                      className="border-b border-[#f0eeea] last:border-b-0"
+                      className="border-b border-[var(--bb-border-subtle)] last:border-b-0"
                     >
-                      <TD className="text-[#7a7a7a]">
+                      <TD className="text-[var(--bb-text-secondary)]">
                         {created.toLocaleDateString()}{" "}
                         {created.toLocaleTimeString([], {
                           hour: "2-digit",
@@ -309,7 +309,7 @@ export default function AdminLedgerPage() {
                             <div className="font-medium">
                               {e.company.name}
                             </div>
-                            <div className="text-[10px] text-[#9a9892]">
+                            <div className="text-[10px] text-[var(--bb-text-tertiary)]">
                               {e.company.slug}
                             </div>
                           </>
@@ -321,8 +321,8 @@ export default function AdminLedgerPage() {
                         <span
                           className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${
                             isCredit
-                              ? "bg-[#f0fff6] text-[#137a3a]"
-                              : "bg-[#fde8e7] text-[#b13832]"
+                              ? "bg-[var(--bb-success-bg)] text-[var(--bb-success-text)]"
+                              : "bg-[var(--bb-danger-bg)] text-[var(--bb-danger-text)]"
                           }`}
                         >
                           {isCredit ? "Credit" : "Debit"}
@@ -338,7 +338,7 @@ export default function AdminLedgerPage() {
                             <div className="font-medium">
                               {e.ticket.code ?? "—"}
                             </div>
-                            <div className="text-[10px] text-[#7a7a7a]">
+                            <div className="text-[10px] text-[var(--bb-text-secondary)]">
                               {e.ticket.title}
                             </div>
                           </>
@@ -352,7 +352,7 @@ export default function AdminLedgerPage() {
                             <div className="font-medium">
                               {e.user.name || e.user.email}
                             </div>
-                            <div className="text-[10px] text-[#9a9892]">
+                            <div className="text-[10px] text-[var(--bb-text-tertiary)]">
                               {formatRole(e.user.role as import("@prisma/client").UserRole)}
                             </div>
                           </>
@@ -363,10 +363,10 @@ export default function AdminLedgerPage() {
                       <TD>
                         {e.reason ?? "—"}
                       </TD>
-                      <TD className="text-[#7a7a7a]">
+                      <TD className="text-[var(--bb-text-secondary)]">
                         {e.notes ?? "—"}
                       </TD>
-                      <TD className="text-[#9a9892]">
+                      <TD className="text-[var(--bb-text-tertiary)]">
                         {e.balanceAfter != null
                           ? e.balanceAfter
                           : "—"}

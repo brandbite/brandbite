@@ -227,7 +227,7 @@ export default function AdminPlanAssignmentPage() {
             <h1 className="text-2xl font-semibold tracking-tight">
               Plan assignment
             </h1>
-            <p className="mt-1 text-sm text-[#7a7a7a]">
+            <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
               Link companies to subscription plans. This does not change
               balances automatically; it only controls which plan they
               belong to.
@@ -255,12 +255,12 @@ export default function AdminPlanAssignmentPage() {
         )}
 
         {/* Content */}
-        <section className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
+        <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold tracking-tight">
               Companies and plans
             </h2>
-            <p className="text-xs text-[#9a9892]">
+            <p className="text-xs text-[var(--bb-text-tertiary)]">
               Showing {companies.length} companies, {activePlans.length} active plans.
             </p>
           </div>
@@ -273,7 +273,7 @@ export default function AdminPlanAssignmentPage() {
             <div className="max-h-[480px] overflow-auto">
               <table className="min-w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-[#e3e1dc] text-xs uppercase tracking-[0.08em] text-[#9a9892]">
+                  <tr className="border-b border-[var(--bb-border)] text-xs uppercase tracking-[0.08em] text-[var(--bb-text-tertiary)]">
                     <th className="px-2 py-2">Company</th>
                     <th className="px-2 py-2 text-right">
                       Tokens
@@ -297,26 +297,26 @@ export default function AdminPlanAssignmentPage() {
                     return (
                       <tr
                         key={c.id}
-                        className="border-b border-[#f0eeea] text-xs last:border-b-0"
+                        className="border-b border-[var(--bb-border-subtle)] text-xs last:border-b-0"
                       >
-                        <td className="px-2 py-2 align-top text-[11px] text-[#424143]">
+                        <td className="px-2 py-2 align-top text-[11px] text-[var(--bb-secondary)]">
                           <div className="font-semibold">
                             {c.name}
                           </div>
-                          <div className="text-[10px] text-[#9a9892]">
+                          <div className="text-[10px] text-[var(--bb-text-tertiary)]">
                             {c.slug}
                           </div>
                         </td>
-                        <td className="px-2 py-2 align-top text-right text-[11px] text-[#424143]">
+                        <td className="px-2 py-2 align-top text-right text-[11px] text-[var(--bb-secondary)]">
                           {c.tokenBalance}
                         </td>
-                        <td className="px-2 py-2 align-top text-right text-[11px] text-[#424143]">
+                        <td className="px-2 py-2 align-top text-right text-[11px] text-[var(--bb-secondary)]">
                           {c.counts.projects}
                         </td>
-                        <td className="px-2 py-2 align-top text-right text-[11px] text-[#424143]">
+                        <td className="px-2 py-2 align-top text-right text-[11px] text-[var(--bb-secondary)]">
                           {c.counts.tickets}
                         </td>
-                        <td className="px-2 py-2 align-top text-[11px] text-[#424143]">
+                        <td className="px-2 py-2 align-top text-[11px] text-[var(--bb-secondary)]">
                           <div className="flex flex-col gap-1">
                             <select
                               disabled={isSaving || activePlans.length === 0}
@@ -327,7 +327,7 @@ export default function AdminPlanAssignmentPage() {
                                   e.target.value,
                                 )
                               }
-                              className="w-full rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-2 py-1 text-[11px] text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+                              className="w-full rounded-md border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-2 py-1 text-[11px] text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
                             >
                               <option value="">
                                 No plan assigned
@@ -339,7 +339,7 @@ export default function AdminPlanAssignmentPage() {
                               ))}
                             </select>
                             {c.plan && (
-                              <div className="text-[10px] text-[#9a9892]">
+                              <div className="text-[10px] text-[var(--bb-text-tertiary)]">
                                 {formatPrice(c.plan.priceCents)}
                                 {c.plan.isActive
                                   ? " • active"
@@ -347,13 +347,13 @@ export default function AdminPlanAssignmentPage() {
                               </div>
                             )}
                             {isSaving && (
-                              <div className="text-[10px] text-[#9a9892]">
+                              <div className="text-[10px] text-[var(--bb-text-tertiary)]">
                                 Saving…
                               </div>
                             )}
                           </div>
                         </td>
-                        <td className="px-2 py-2 align-top text-right text-[11px] text-[#9a9892]">
+                        <td className="px-2 py-2 align-top text-right text-[11px] text-[var(--bb-text-tertiary)]">
                           {formatDate(c.createdAt)}
                         </td>
                       </tr>

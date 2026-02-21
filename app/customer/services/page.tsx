@@ -144,10 +144,10 @@ export default function CustomerServicesPage() {
         <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--bb-secondary)]">
           Services
         </h1>
-        <p className="mt-1 text-sm text-[#7a7a7a]">
+        <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
           Browse our full service catalog.{" "}
           {!loading && !error && (
-            <span className="text-[#9a9892]">
+            <span className="text-[var(--bb-text-tertiary)]">
               {totalCount} services across {categoryCount} categories
             </span>
           )}
@@ -172,7 +172,7 @@ export default function CustomerServicesPage() {
             className={`rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors ${
               activeCategory === null
                 ? "bg-[var(--bb-primary)] text-white"
-                : "border border-[var(--bb-border)] bg-white text-[#7a7a7a] hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
+                : "border border-[var(--bb-border)] bg-[var(--bb-bg-page)] text-[var(--bb-text-secondary)] hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
             }`}
           >
             All ({totalCount})
@@ -188,7 +188,7 @@ export default function CustomerServicesPage() {
               className={`rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors ${
                 activeCategory === g.category
                   ? "bg-[var(--bb-primary)] text-white"
-                  : "border border-[var(--bb-border)] bg-white text-[#7a7a7a] hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
+                  : "border border-[var(--bb-border)] bg-[var(--bb-bg-page)] text-[var(--bb-text-secondary)] hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
               }`}
             >
               {g.icon ?? ""}{" "}
@@ -209,7 +209,7 @@ export default function CustomerServicesPage() {
                   {group.icon ?? ""}{" "}
                   {group.category}
                 </h2>
-                <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[10px] font-medium text-[#7a7a7a]">
+                <span className="rounded-full bg-[var(--bb-bg-card)] px-2 py-0.5 text-[10px] font-medium text-[var(--bb-text-secondary)]">
                   {group.services.length}
                 </span>
               </div>
@@ -234,7 +234,7 @@ export default function CustomerServicesPage() {
 
 function ServiceCard({ service }: { service: Service }) {
   return (
-    <div className="flex flex-col rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm transition-colors hover:border-[var(--bb-primary)]/30">
+    <div className="flex flex-col rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm transition-colors hover:border-[var(--bb-primary)]/30">
       {/* Name */}
       <h3 className="text-sm font-semibold text-[var(--bb-secondary)]">
         {service.name}
@@ -242,7 +242,7 @@ function ServiceCard({ service }: { service: Service }) {
 
       {/* Description */}
       {service.description && (
-        <p className="mt-1.5 line-clamp-2 text-[11px] leading-relaxed text-[#7a7a7a]">
+        <p className="mt-1.5 line-clamp-2 text-[11px] leading-relaxed text-[var(--bb-text-secondary)]">
           {service.description}
         </p>
       )}
@@ -250,20 +250,20 @@ function ServiceCard({ service }: { service: Service }) {
       {/* Meta row */}
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {/* Token cost */}
-        <span className="inline-flex items-center rounded-full bg-[#fff5ef] px-2.5 py-1 text-[10px] font-semibold text-[var(--bb-primary)]">
+        <span className="inline-flex items-center rounded-full bg-[var(--bb-primary-light)] px-2.5 py-1 text-[10px] font-semibold text-[var(--bb-primary)]">
           {service.tokenCost} {service.tokenCost === 1 ? "token" : "tokens"}
         </span>
 
         {/* Estimated hours */}
         {service.estimatedHours != null && (
-          <span className="text-[10px] text-[#9a9892]">
+          <span className="text-[10px] text-[var(--bb-text-tertiary)]">
             ~{service.estimatedHours}h
           </span>
         )}
 
         {/* Quantity indicator */}
         {service.hasQuantity && service.quantityLabel && (
-          <span className="text-[10px] text-[#b1afa9]">
+          <span className="text-[10px] text-[var(--bb-text-muted)]">
             {service.quantityLabel}
           </span>
         )}

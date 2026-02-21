@@ -37,7 +37,7 @@ export default async function CustomerNewTicketPage({
         <h1 className="text-2xl font-semibold tracking-tight">
           Company not found
         </h1>
-        <p className="mt-2 text-sm text-[#7a7a7a]">
+        <p className="mt-2 text-sm text-[var(--bb-text-secondary)]">
           Demo company with slug "{DEFAULT_COMPANY_SLUG}" was not found.
         </p>
       </div>
@@ -103,18 +103,18 @@ export default async function CustomerNewTicketPage({
 
   return (
     <div className="mx-auto max-w-3xl">
-      <main className="mt-4 rounded-2xl border border-[#e3e1dc] bg-white px-5 py-6 shadow-sm">
+      <main className="mt-4 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-6 shadow-sm">
           <div className="mb-4">
             <h1 className="text-2xl font-semibold tracking-tight">
               Create a new creative request
             </h1>
-            <p className="mt-1 text-sm text-[#7a7a7a]">
+            <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
               Describe what you need, pick a project and a job type. We will
               route this request to your creative team.
             </p>
-            <p className="mt-1 text-xs text-[#9a9892]">
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               Company:{" "}
-              <span className="font-medium text-[#424143]">
+              <span className="font-medium text-[var(--bb-secondary)]">
                 {company.name}
               </span>{" "}
               ({company.slug})

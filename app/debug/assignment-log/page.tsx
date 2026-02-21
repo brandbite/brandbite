@@ -86,12 +86,12 @@ export default async function AssignmentLogDebugPage() {
   // Only global admins/owners can access this debug view
   if (user.role !== "SITE_OWNER" && user.role !== "SITE_ADMIN") {
     return (
-      <div className="min-h-screen bg-[#f5f3f0] px-6 py-10 text-[#424143]">
+      <div className="min-h-screen bg-[var(--bb-bg-card)] px-6 py-10 text-[var(--bb-secondary)]">
         <div className="mx-auto max-w-5xl">
           <h1 className="text-2xl font-semibold tracking-tight">
             Assignment log
           </h1>
-          <p className="mt-2 text-sm text-[#9a9892]">
+          <p className="mt-2 text-sm text-[var(--bb-text-tertiary)]">
             This page is only available to site owners and admins.
           </p>
           <InlineAlert variant="error" className="mt-4">
@@ -138,23 +138,23 @@ export default async function AssignmentLogDebugPage() {
   });
 
   return (
-    <div className="min-h-screen bg-[#f5f3f0] px-6 py-10 text-[#424143]">
+    <div className="min-h-screen bg-[var(--bb-bg-card)] px-6 py-10 text-[var(--bb-secondary)]">
       <div className="mx-auto max-w-5xl">
         {/* Header */}
         <header className="mb-6 flex items-start justify-between gap-4">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
               Debug panel
             </p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight">
               Ticket assignment log
             </h1>
-            <p className="mt-1 text-xs text-[#9a9892]">
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               Last 50 assignment events across all workspaces: auto-assign,
               fallback and future strategies.
             </p>
           </div>
-          <div className="rounded-full bg-[#f5f3f0] px-3 py-1 text-[11px] text-[#7a7a7a]">
+          <div className="rounded-full bg-[var(--bb-bg-card)] px-3 py-1 text-[11px] text-[var(--bb-text-secondary)]">
             Showing {logs.length} events
           </div>
         </header>
@@ -166,11 +166,11 @@ export default async function AssignmentLogDebugPage() {
 
         {/* Log table */}
         {logs.length > 0 && (
-          <div className="overflow-hidden rounded-2xl border border-[#e3e1dc] bg-white shadow-sm">
-            <div className="border-b border-[#eeede7] bg-[#f8f6f2] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[#8a8984]">
+          <div className="overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] shadow-sm">
+            <div className="border-b border-[var(--bb-border-subtle)] bg-[var(--bb-bg-warm)] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--bb-text-tertiary)]">
               Assignment events
             </div>
-            <div className="divide-y divide-[#f1f0ea] text-xs">
+            <div className="divide-y divide-[var(--bb-border-subtle)] text-xs">
               {logs.map((log) => {
                 const ticket = log.ticket;
                 const creative = log.creative;
@@ -210,7 +210,7 @@ export default async function AssignmentLogDebugPage() {
                   >
                     {/* Left column: time + reason */}
                     <div className="w-full md:w-40">
-                      <p className="text-[11px] font-medium text-[#424143]">
+                      <p className="text-[11px] font-medium text-[var(--bb-secondary)]">
                         {formatDateTime(log.createdAt)}
                       </p>
                       <p className="mt-1">
@@ -222,26 +222,26 @@ export default async function AssignmentLogDebugPage() {
 
                     {/* Middle column: ticket info */}
                     <div className="flex-1">
-                      <p className="text-[11px] font-medium text-[#424143]">
+                      <p className="text-[11px] font-medium text-[var(--bb-secondary)]">
                         {code} ·{" "}
-                        <span className="text-[#7a7a7a]">
+                        <span className="text-[var(--bb-text-secondary)]">
                           {ticket?.title ?? "Unknown ticket"}
                         </span>
                       </p>
-                      <p className="mt-0.5 text-[11px] text-[#9a9892]">
+                      <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
                         {companyName}
                       </p>
                       {ticket && (
-                        <p className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-[#7a7a7a]">
-                          <span className="inline-flex items-center rounded-full bg-[#f4f4f0] px-2 py-0.5">
+                        <p className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-[var(--bb-text-secondary)]">
+                          <span className="inline-flex items-center rounded-full bg-[var(--bb-bg-card)] px-2 py-0.5">
                             Status:{" "}
-                            <span className="ml-1 font-medium text-[#424143]">
+                            <span className="ml-1 font-medium text-[var(--bb-secondary)]">
                               {formatStatusLabel(ticket.status)}
                             </span>
                           </span>
-                          <span className="inline-flex items-center rounded-full bg-[#fff4e6] px-2 py-0.5">
+                          <span className="inline-flex items-center rounded-full bg-[var(--bb-warning-bg)] px-2 py-0.5">
                             Priority:{" "}
-                            <span className="ml-1 font-medium text-[#9a5b2b]">
+                            <span className="ml-1 font-medium text-[var(--bb-warning-text)]">
                               {formatPriorityLabel(ticket.priority)}
                             </span>
                           </span>
@@ -251,7 +251,7 @@ export default async function AssignmentLogDebugPage() {
 
                     {/* Right column: creative + metadata */}
                     <div className="w-full md:w-64">
-                      <p className="text-[11px] font-medium text-[#424143]">
+                      <p className="text-[11px] font-medium text-[var(--bb-secondary)]">
                         {creative ? (
                           <>
                             Assigned to{" "}
@@ -260,19 +260,19 @@ export default async function AssignmentLogDebugPage() {
                             </span>
                           </>
                         ) : (
-                          <span className="text-[#b02a1d]">
+                          <span className="text-[var(--bb-danger-text)]">
                             Fallback / unassigned
                           </span>
                         )}
                       </p>
                       {creative && (
-                        <p className="mt-0.5 text-[10px] text-[#9a9892]">
+                        <p className="mt-0.5 text-[10px] text-[var(--bb-text-tertiary)]">
                           {creative.email}
                         </p>
                       )}
                       {metadataPreview && (
-                        <p className="mt-1 text-[10px] text-[#7a7a7a]">
-                          <span className="font-medium text-[#424143]">
+                        <p className="mt-1 text-[10px] text-[var(--bb-text-secondary)]">
+                          <span className="font-medium text-[var(--bb-secondary)]">
                             Metadata:
                           </span>{" "}
                           <span className="font-mono">

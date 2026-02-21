@@ -162,15 +162,15 @@ type NewTicketMetadataResponse = {
 const statusIndicatorColor = (status: TicketStatus): string => {
   switch (status) {
     case "TODO":
-      return "bg-[#b1afa9]";
+      return "bg-[var(--bb-text-muted)]";
     case "IN_PROGRESS":
-      return "bg-[#4c8ef7]";
+      return "bg-[var(--bb-info-text)]";
     case "IN_REVIEW":
-      return "bg-[#f5a623]";
+      return "bg-[var(--bb-warning-text)]";
     case "DONE":
       return "bg-[#32b37b]";
     default:
-      return "bg-[#b1afa9]";
+      return "bg-[var(--bb-text-muted)]";
   }
 };
 
@@ -1567,7 +1567,7 @@ export default function CustomerBoardPage() {
     return (
       <div
         key={ticket.id}
-        className={`group cursor-pointer rounded-xl border border-[#e4e0da] bg-white p-3.5 text-xs shadow-sm transition-all duration-200 ${
+        className={`group cursor-pointer rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] p-3.5 text-xs shadow-sm transition-all duration-200 ${
           isDragging ? "scale-[1.02] opacity-50 shadow-lg" : "hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--bb-primary-border)]"
         }`}
         draggable={canDragTicket && ticket.status === "IN_REVIEW"}
@@ -1579,20 +1579,20 @@ export default function CustomerBoardPage() {
         onMouseUp={(event) => handleMouseUp(event, ticket.id)}
       >
         {/* Title */}
-        <p className="text-sm font-semibold leading-snug text-[#424143]">
+        <p className="text-sm font-semibold leading-snug text-[var(--bb-secondary)]">
           {ticket.title}
         </p>
 
         {/* Description */}
         {ticket.description && (
-          <p className="mt-1 line-clamp-2 text-xs text-[#7a7a7a]">
+          <p className="mt-1 line-clamp-2 text-xs text-[var(--bb-text-secondary)]">
             {stripHtml(ticket.description)}
           </p>
         )}
 
         {/* Thumbnail */}
         {thumbSrc && (
-          <div className="mt-2 overflow-hidden rounded-lg bg-[#f5f3f0]">
+          <div className="mt-2 overflow-hidden rounded-lg bg-[var(--bb-bg-card)]">
             <img
               src={thumbSrc}
               alt=""
@@ -1608,8 +1608,8 @@ export default function CustomerBoardPage() {
             <span
               className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                 overdue
-                  ? "bg-[#fde8e7] text-[#b13832]"
-                  : "bg-[#eaf4ff] text-[#1d72b8]"
+                  ? "bg-[var(--bb-danger-bg)] text-[var(--bb-danger-text)]"
+                  : "bg-[var(--bb-info-bg)] text-[var(--bb-info-text)]"
               }`}
             >
               <span className="text-[9px]">📅</span>
@@ -1629,7 +1629,7 @@ export default function CustomerBoardPage() {
               />
             ))}
             {ticket.tags.length > 3 && (
-              <span className="inline-flex items-center text-[10px] text-[#9a9892]">
+              <span className="inline-flex items-center text-[10px] text-[var(--bb-text-tertiary)]">
                 +{ticket.tags.length - 3}
               </span>
             )}
@@ -1637,11 +1637,11 @@ export default function CustomerBoardPage() {
         )}
 
         {/* Footer: ticket code + priority icon + avatar */}
-        <div className="mt-3 flex items-center justify-between border-t border-[#f0eeea] pt-2.5 text-[10px] text-[#9a9892]">
+        <div className="mt-3 flex items-center justify-between border-t border-[var(--bb-border-subtle)] pt-2.5 text-[10px] text-[var(--bb-text-tertiary)]">
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-[#3B82F6]">✓</span>
             {ticket.code && (
-              <span className="font-medium text-[#7a7a7a]">
+              <span className="font-medium text-[var(--bb-text-secondary)]">
                 {ticket.code}
               </span>
             )}
@@ -1666,7 +1666,7 @@ export default function CustomerBoardPage() {
 
         {/* Updating indicator */}
         {isUpdating && (
-          <div className="mt-2 text-[10px] text-[#9a9892]">
+          <div className="mt-2 text-[10px] text-[var(--bb-text-tertiary)]">
             Updating status…
           </div>
         )}
@@ -1682,16 +1682,16 @@ export default function CustomerBoardPage() {
     <>
       <div className="mt-4 grid gap-6 md:grid-cols-[240px_1fr] lg:grid-cols-[260px_1fr]">
         {/* Left sidebar — Projects + workspace info */}
-        <aside className="flex flex-col rounded-2xl bg-white/60 p-4">
+        <aside className="flex flex-col rounded-2xl bg-[var(--bb-bg-page)]/60 p-4">
           {/* Projects header */}
           <div className="flex items-center justify-between">
-            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#9a9892]">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--bb-text-tertiary)]">
               Projects
             </p>
             <button
               type="button"
               onClick={openNewProjectModal}
-              className="flex h-6 w-6 items-center justify-center rounded-lg bg-[#f15b2b] text-sm font-bold text-white shadow-sm transition-all hover:bg-[#d94e22] hover:shadow-md active:scale-95"
+              className="flex h-6 w-6 items-center justify-center rounded-lg bg-[var(--bb-primary)] text-sm font-bold text-white shadow-sm transition-all hover:bg-[var(--bb-primary-hover)] hover:shadow-md active:scale-95"
               title="Create new project"
             >
               +
@@ -1701,7 +1701,7 @@ export default function CustomerBoardPage() {
           {/* Project items list */}
           <div className="mt-3 space-y-0.5">
             {sidebarProjects.length === 0 && (
-              <p className="px-2 py-2 text-[11px] text-[#b1afa9]">
+              <p className="px-2 py-2 text-[11px] text-[var(--bb-text-muted)]">
                 No projects yet.
               </p>
             )}
@@ -1720,8 +1720,8 @@ export default function CustomerBoardPage() {
                     }
                     className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[11px] transition-colors ${
                       isActive
-                        ? "bg-[#f5f3f0] font-semibold text-[#424143]"
-                        : "text-[#7a7a7a] hover:bg-[#f5f3f0]"
+                        ? "bg-[var(--bb-bg-card)] font-semibold text-[var(--bb-secondary)]"
+                        : "text-[var(--bb-text-secondary)] hover:bg-[var(--bb-bg-card)]"
                     }`}
                   >
                     <span
@@ -1733,7 +1733,7 @@ export default function CustomerBoardPage() {
                     <span className="min-w-0 flex-1 truncate">{proj.name}</span>
 
                     {/* Ticket count — hidden on hover when menu is available */}
-                    <span className={`flex-shrink-0 rounded-full bg-[#f0eee9] px-1.5 py-0.5 text-[10px] tabular-nums text-[#9a9892] ${showMenu ? "group-hover:hidden" : ""}`}>
+                    <span className={`flex-shrink-0 rounded-full bg-[var(--bb-border-subtle)] px-1.5 py-0.5 text-[10px] tabular-nums text-[var(--bb-text-tertiary)] ${showMenu ? "group-hover:hidden" : ""}`}>
                       {proj.ticketCount}
                     </span>
 
@@ -1746,7 +1746,7 @@ export default function CustomerBoardPage() {
                           e.stopPropagation();
                           setProjectMenuId(menuOpen ? null : proj.id);
                         }}
-                        className={`hidden flex-shrink-0 items-center justify-center rounded-md px-1 py-0.5 text-[13px] font-bold leading-none tracking-wider text-[#9a9892] transition-colors hover:bg-[#e3e1dc] hover:text-[#424143] group-hover:flex ${menuOpen ? "!flex bg-[#e3e1dc] text-[#424143]" : ""}`}
+                        className={`hidden flex-shrink-0 items-center justify-center rounded-md px-1 py-0.5 text-[13px] font-bold leading-none tracking-wider text-[var(--bb-text-tertiary)] transition-colors hover:bg-[var(--bb-border)] hover:text-[var(--bb-secondary)] group-hover:flex ${menuOpen ? "!flex bg-[var(--bb-border)] text-[var(--bb-secondary)]" : ""}`}
                       >
                         &#8943;
                       </span>
@@ -1757,20 +1757,20 @@ export default function CustomerBoardPage() {
                   {menuOpen && (
                     <div
                       ref={projectMenuRef}
-                      className="absolute left-full top-0 z-50 ml-1 min-w-[140px] rounded-xl border border-[#e3e1dc] bg-white py-1.5 shadow-xl"
+                      className="absolute left-full top-0 z-50 ml-1 min-w-[140px] rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] py-1.5 shadow-xl"
                     >
                       <button
                         type="button"
                         onClick={() => openRenameProject(proj)}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-medium text-[#424143] transition-colors hover:bg-[#f5f3f0]"
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-medium text-[var(--bb-secondary)] transition-colors hover:bg-[var(--bb-bg-card)]"
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3 w-3 text-[#9a9892]">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3 w-3 text-[var(--bb-text-tertiary)]">
                           <path d="M13.488 2.513a1.75 1.75 0 0 0-2.475 0L6.75 6.774a2.75 2.75 0 0 0-.596.892l-.848 2.047a.75.75 0 0 0 .98.98l2.047-.848a2.75 2.75 0 0 0 .892-.596l4.261-4.262a1.75 1.75 0 0 0 0-2.474Z" />
                           <path d="M4.75 3.5c-.69 0-1.25.56-1.25 1.25v6.5c0 .69.56 1.25 1.25 1.25h6.5c.69 0 1.25-.56 1.25-1.25V9A.75.75 0 0 1 14 9v2.25A2.75 2.75 0 0 1 11.25 14h-6.5A2.75 2.75 0 0 1 2 11.25v-6.5A2.75 2.75 0 0 1 4.75 2H7a.75.75 0 0 1 0 1.5H4.75Z" />
                         </svg>
                         Rename
                       </button>
-                      <div className="mx-2 my-1 border-t border-[#f0eee9]" />
+                      <div className="mx-2 my-1 border-t border-[var(--bb-border-subtle)]" />
                       <button
                         type="button"
                         onClick={() => openDeleteProject(proj)}
@@ -1793,7 +1793,7 @@ export default function CustomerBoardPage() {
             <button
               type="button"
               onClick={() => setProjectFilter("ALL")}
-              className="mt-2 text-left text-[10px] font-medium text-[#f15b2b] hover:underline"
+              className="mt-2 text-left text-[10px] font-medium text-[var(--bb-primary)] hover:underline"
             >
               View all projects
             </button>
@@ -1803,8 +1803,8 @@ export default function CustomerBoardPage() {
               onClick={() => setProjectFilter("ALL")}
               className={`mt-1 text-left text-[10px] font-medium transition-colors ${
                 projectFilter === "ALL"
-                  ? "text-[#424143]"
-                  : "text-[#b1afa9] hover:text-[#7a7a7a]"
+                  ? "text-[var(--bb-secondary)]"
+                  : "text-[var(--bb-text-muted)] hover:text-[var(--bb-text-secondary)]"
               }`}
             >
               All projects
@@ -1812,21 +1812,21 @@ export default function CustomerBoardPage() {
           ) : null}
 
           {/* Divider */}
-          <div className="my-4 border-t border-[#e3e1dc]" />
+          <div className="my-4 border-t border-[var(--bb-border)]" />
 
           {/* All requests card */}
-          <div className="rounded-xl border border-[#ece9e1] bg-[#f7f5f0] p-3">
+          <div className="rounded-xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-warm)] p-3">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold text-[#424143]">
+                <p className="text-[11px] font-semibold text-[var(--bb-secondary)]">
                   All requests
                 </p>
-                <p className="mt-0.5 text-[10px] text-[#9a9892]">
+                <p className="mt-0.5 text-[10px] text-[var(--bb-text-tertiary)]">
                   Board for your active company.
                 </p>
               </div>
               {currentStats && (
-                <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-[#424143]">
+                <span className="rounded-full bg-[var(--bb-bg-page)] px-3 py-1 text-[11px] font-semibold text-[var(--bb-secondary)]">
                   {currentStats.total}
                 </span>
               )}
@@ -1834,24 +1834,24 @@ export default function CustomerBoardPage() {
           </div>
 
           {/* Role display */}
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-[#7a7a7a]">
-            <span className="font-semibold text-[#424143]">Your role:</span>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-[var(--bb-text-secondary)]">
+            <span className="font-semibold text-[var(--bb-secondary)]">Your role:</span>
             {companyRoleLoading ? (
-              <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5">
+              <span className="rounded-full bg-[var(--bb-bg-card)] px-2 py-0.5">
                 Loading…
               </span>
             ) : companyRole ? (
-              <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 font-semibold text-[#424143]">
+              <span className="rounded-full bg-[var(--bb-bg-card)] px-2 py-0.5 font-semibold text-[var(--bb-secondary)]">
                 {companyRole}
               </span>
             ) : (
-              <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5">
+              <span className="rounded-full bg-[var(--bb-bg-card)] px-2 py-0.5">
                 Not set
               </span>
             )}
           </div>
 
-          <div className="mt-auto pt-4 text-[10px] text-[#9a9892]">
+          <div className="mt-auto pt-4 text-[10px] text-[var(--bb-text-tertiary)]">
             <p>Viewing creative requests for your workspace.</p>
           </div>
         </aside>
@@ -1882,7 +1882,7 @@ export default function CustomerBoardPage() {
                     </h1>
                     <button
                       type="button"
-                      className="mt-0.5 text-[10px] text-[#7a7a7a] hover:text-[#424143] hover:underline"
+                      className="mt-0.5 text-[10px] text-[var(--bb-text-secondary)] hover:text-[var(--bb-secondary)] hover:underline"
                     >
                       ⚙ Project settings
                     </button>
@@ -1890,7 +1890,7 @@ export default function CustomerBoardPage() {
                 </>
               ) : (
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
                     Customer board
                   </p>
                   <h1 className="mt-1 text-xl font-semibold tracking-tight">
@@ -1903,13 +1903,13 @@ export default function CustomerBoardPage() {
               <button
                 type="button"
                 onClick={openNewTicketModal}
-                className="inline-flex items-center gap-1 rounded-full bg-[#f15b2b] px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition-transform hover:-translate-y-0.5 hover:bg-[#e04f22]"
+                className="inline-flex items-center gap-1 rounded-full bg-[var(--bb-primary)] px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition-transform hover:-translate-y-0.5 hover:bg-[var(--bb-primary-hover)]"
               >
                 <span className="text-[13px]">+</span>
                 New ticket
               </button>
               {loading && (
-                <div className="rounded-full bg-[#f5f3f0] px-3 py-1 text-[11px] text-[#7a7a7a]">
+                <div className="rounded-full bg-[var(--bb-bg-card)] px-3 py-1 text-[11px] text-[var(--bb-text-secondary)]">
                   Loading board…
                 </div>
               )}
@@ -1944,9 +1944,9 @@ export default function CustomerBoardPage() {
                 value={search}
                 onChange={handleSearchChange}
                 placeholder="Search board"
-                className="w-full rounded-lg border border-[#e3e1dc] bg-white px-4 py-2 text-xs text-[#424143] outline-none placeholder:text-[#b1afa9] focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+                className="w-full rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-2 text-xs text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
               />
-              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-[#b1afa9]">
+              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-[var(--bb-text-muted)]">
                 🔍
               </span>
             </div>
@@ -1967,7 +1967,7 @@ export default function CustomerBoardPage() {
                   showToast({ type: "success", title: "Link copied to clipboard" });
                 });
               }}
-              className="inline-flex items-center gap-1 rounded-lg border border-[#e3e1dc] bg-white px-3 py-2 text-[11px] font-medium text-[#7a7a7a] transition-colors hover:border-[#424143] hover:text-[#424143]"
+              className="inline-flex items-center gap-1 rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-2 text-[11px] font-medium text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-secondary)] hover:text-[var(--bb-secondary)]"
             >
               ↗ Share
             </button>
@@ -1978,8 +1978,8 @@ export default function CustomerBoardPage() {
               onClick={() => setFilterOpen(!filterOpen)}
               className={`inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-[11px] font-medium transition-colors ${
                 filterOpen
-                  ? "border-[#f15b2b] bg-[#fff7f4] text-[#f15b2b]"
-                  : "border-[#e3e1dc] bg-white text-[#7a7a7a] hover:border-[#424143] hover:text-[#424143]"
+                  ? "border-[var(--bb-primary)] bg-[var(--bb-primary-light)] text-[var(--bb-primary)]"
+                  : "border-[var(--bb-border)] bg-[var(--bb-bg-page)] text-[var(--bb-text-secondary)] hover:border-[var(--bb-secondary)] hover:text-[var(--bb-secondary)]"
               }`}
             >
               ≡ Filter
@@ -1988,10 +1988,10 @@ export default function CustomerBoardPage() {
 
           {/* Collapsible filter dropdown */}
           {filterOpen && (
-            <div className="mb-3 flex items-center gap-2 rounded-lg border border-[#e3e1dc] bg-white px-3 py-2 text-[11px] text-[#7a7a7a]">
+            <div className="mb-3 flex items-center gap-2 rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-2 text-[11px] text-[var(--bb-text-secondary)]">
               <span className="font-medium">Project:</span>
               <select
-                className="rounded-md border border-[#e3e1dc] bg-[#f7f5f0] px-2 py-1 text-[11px] outline-none"
+                className="rounded-md border border-[var(--bb-border)] bg-[var(--bb-bg-warm)] px-2 py-1 text-[11px] outline-none"
                 value={projectFilter}
                 onChange={handleProjectFilterChange}
               >
@@ -2006,7 +2006,7 @@ export default function CustomerBoardPage() {
                 <button
                   type="button"
                   onClick={() => setProjectFilter("ALL")}
-                  className="ml-1 text-[10px] text-[#f15b2b] hover:underline"
+                  className="ml-1 text-[10px] text-[var(--bb-primary)] hover:underline"
                 >
                   Clear
                 </button>
@@ -2016,7 +2016,7 @@ export default function CustomerBoardPage() {
 
           {/* Columns */}
           {loading ? (
-            <div className="py-6 text-center text-sm text-[#7a7a7a]">
+            <div className="py-6 text-center text-sm text-[var(--bb-text-secondary)]">
               Loading your board…
             </div>
           ) : (
@@ -2032,8 +2032,8 @@ export default function CustomerBoardPage() {
                     id={`customer-board-column-${status}`}
                     className={`flex w-80 shrink-0 snap-start flex-col overflow-hidden rounded-xl transition-all duration-200 ${
                       isDropTargetActive
-                        ? "bg-[#fff5f0] ring-2 ring-[#f15b2b]/60"
-                        : "bg-white/60 ring-0"
+                        ? "bg-[var(--bb-primary-light)] ring-2 ring-[var(--bb-primary)]/60"
+                        : "bg-[var(--bb-bg-page)]/60 ring-0"
                     }`}
                     onDragOver={(event) => handleDragOver(event, status)}
                     onDrop={(event) => handleDrop(event, status)}
@@ -2046,10 +2046,10 @@ export default function CustomerBoardPage() {
 
                     {/* Column header */}
                     <div className="flex items-center justify-between px-3 pb-1 pt-2.5">
-                      <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#7a7a7a]">
+                      <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-[var(--bb-text-secondary)]">
                         {columnTitle}
                       </span>
-                      <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[10px] font-semibold text-[#7a7a7a]">
+                      <span className="rounded-full bg-[var(--bb-bg-card)] px-2 py-0.5 text-[10px] font-semibold text-[var(--bb-text-secondary)]">
                         {columnTickets.length}
                       </span>
                     </div>
@@ -2065,7 +2065,7 @@ export default function CustomerBoardPage() {
                       )}
                       {/* Drop placeholder */}
                       {isDropTargetActive && (
-                        <div className="animate-pulse rounded-xl border-2 border-dashed border-[#f15b2b]/40 bg-[#f15b2b]/5 px-3 py-4 text-center text-[11px] font-medium text-[#f15b2b]/60">
+                        <div className="animate-pulse rounded-xl border-2 border-dashed border-[var(--bb-primary)]/40 bg-[var(--bb-primary)]/5 px-3 py-4 text-center text-[11px] font-medium text-[var(--bb-primary)]/60">
                           Drop here
                         </div>
                       )}
@@ -2076,7 +2076,7 @@ export default function CustomerBoardPage() {
                       <button
                         type="button"
                         onClick={openNewTicketModal}
-                        className="mx-2 mb-2 flex items-center justify-center gap-1 rounded-lg border border-dashed border-[#d4d2cc] py-2 text-xs font-semibold text-[#9a9892] transition-colors hover:border-[#f15b2b] hover:text-[#f15b2b]"
+                        className="mx-2 mb-2 flex items-center justify-center gap-1 rounded-lg border border-dashed border-[var(--bb-border-input)] py-2 text-xs font-semibold text-[var(--bb-text-tertiary)] transition-colors hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
                       >
                         <span className="text-sm">+</span>
                         Create
@@ -2106,7 +2106,7 @@ export default function CustomerBoardPage() {
               )}
 
               {newTicketMetaLoading || !newTicketMeta ? (
-                <p className="text-[11px] text-[#7a7a7a]">
+                <p className="text-[11px] text-[var(--bb-text-secondary)]">
                   Loading form…
                 </p>
               ) : (
@@ -2161,7 +2161,7 @@ export default function CustomerBoardPage() {
             )}
 
             <div className="space-y-1">
-              <label className="text-xs font-medium text-[#424143]">
+              <label className="text-xs font-medium text-[var(--bb-secondary)]">
                 Project name
               </label>
               <FormInput
@@ -2178,7 +2178,7 @@ export default function CustomerBoardPage() {
                   }
                 }}
               />
-              <p className="text-[11px] text-[#9a9892]">
+              <p className="text-[11px] text-[var(--bb-text-tertiary)]">
                 A short code will be generated automatically from the name.
               </p>
             </div>
@@ -2222,7 +2222,7 @@ export default function CustomerBoardPage() {
             )}
 
             <div className="space-y-1">
-              <label className="text-xs font-medium text-[#424143]">
+              <label className="text-xs font-medium text-[var(--bb-secondary)]">
                 New name
               </label>
               <FormInput
@@ -2278,7 +2278,7 @@ export default function CustomerBoardPage() {
               </InlineAlert>
             )}
 
-            <p className="text-sm text-[#424143]">
+            <p className="text-sm text-[var(--bb-secondary)]">
               Are you sure you want to delete this project?
             </p>
 
@@ -2290,7 +2290,7 @@ export default function CustomerBoardPage() {
             )}
 
             {deleteProject && deleteProject.ticketCount === 0 && (
-              <p className="text-[11px] text-[#9a9892]">
+              <p className="text-[11px] text-[var(--bb-text-tertiary)]">
                 This project has no tickets.
               </p>
             )}
@@ -2333,7 +2333,7 @@ export default function CustomerBoardPage() {
                 <button
                   type="button"
                   onClick={startEditingDetail}
-                  className="mb-3 flex items-center gap-1.5 rounded-lg border border-[#e3e1dc] bg-white px-3 py-1.5 text-[11px] font-medium text-[#666] transition-colors hover:border-[#f15b2b] hover:text-[#f15b2b]"
+                  className="mb-3 flex items-center gap-1.5 rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-1.5 text-[11px] font-medium text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
                     <path d="m5.433 13.917 1.262-3.155A4 4 0 0 1 7.58 9.42l6.92-6.918a2.121 2.121 0 0 1 3 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 0 1-.65-.65Z" />
@@ -2374,7 +2374,7 @@ export default function CustomerBoardPage() {
 
                       {/* Title edit */}
                       <div className="space-y-1">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9]">Title</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--bb-text-muted)]">Title</p>
                         <FormInput
                           value={editForm.title}
                           onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
@@ -2386,7 +2386,7 @@ export default function CustomerBoardPage() {
 
                       {/* Description edit */}
                       <div className="space-y-1">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9]">Description</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--bb-text-muted)]">Description</p>
                         <RichTextEditor
                           value={editForm.description}
                           onChange={(html) =>
@@ -2420,12 +2420,12 @@ export default function CustomerBoardPage() {
                   ) : (
                     detailTicket.description && (
                       <div className="mb-5">
-                        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9]">
+                        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--bb-text-muted)]">
                           Description
                         </p>
                         <SafeHtml
                           html={detailTicket.description}
-                          className="rounded-xl bg-[#f7f5f0] px-4 py-3 text-xs leading-relaxed text-[#424143]"
+                          className="rounded-xl bg-[var(--bb-bg-warm)] px-4 py-3 text-xs leading-relaxed text-[var(--bb-secondary)]"
                         />
                       </div>
                     )
@@ -2434,12 +2434,12 @@ export default function CustomerBoardPage() {
                   {/* Brief attachments */}
                   {detailBriefAssetsLoading && (
                     <div className="mb-5">
-                      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9]">
+                      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--bb-text-muted)]">
                         Brief attachments
                       </p>
                       <div className="flex items-center gap-2 py-3">
-                        <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#e3e1dc] border-t-[#9a9892]" />
-                        <p className="text-xs text-[#9a9892]">Loading attachments…</p>
+                        <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--bb-border)] border-t-[var(--bb-text-tertiary)]" />
+                        <p className="text-xs text-[var(--bb-text-tertiary)]">Loading attachments…</p>
                       </div>
                     </div>
                   )}
@@ -2451,9 +2451,9 @@ export default function CustomerBoardPage() {
                     return (
                       <div className="mb-5">
                         <div className="mb-1.5 flex items-center justify-between">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9]">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--bb-text-muted)]">
                             Brief attachments
-                            <span className="ml-1.5 text-[#9a9892]">({detailBriefAssets.length})</span>
+                            <span className="ml-1.5 text-[var(--bb-text-tertiary)]">({detailBriefAssets.length})</span>
                           </p>
                           <DownloadAllButton
                             assets={detailBriefAssets}
@@ -2474,16 +2474,16 @@ export default function CustomerBoardPage() {
 
                   {/* Divider between brief context and creative work */}
                   {(detailRevisions && detailRevisions.length > 0) && (
-                    <div className="mb-5 border-t border-[#ece9e1]" />
+                    <div className="mb-5 border-t border-[var(--bb-border-subtle)]" />
                   )}
 
                   {/* Revisions — loading / error / empty states */}
                   {detailRevisionsLoading && (
-                    <p className="text-xs text-[#9a9892]">Loading revisions…</p>
+                    <p className="text-xs text-[var(--bb-text-tertiary)]">Loading revisions…</p>
                   )}
 
                   {!detailRevisionsLoading && detailRevisionsError && (
-                    <p className="text-xs text-[#b13832]">{detailRevisionsError}</p>
+                    <p className="text-xs text-[var(--bb-danger-text)]">{detailRevisionsError}</p>
                   )}
 
                   {!detailRevisionsLoading &&
@@ -2505,19 +2505,19 @@ export default function CustomerBoardPage() {
                         <div className="space-y-5">
                           {/* ── Current version ── */}
                           <div>
-                            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9]">
+                            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--bb-text-muted)]">
                               Current version
                             </p>
-                            <div className={`rounded-xl border-2 bg-[#fbfaf8] px-4 py-4 ${
-                              latestRev.feedbackAt ? "border-[#f5a623]/40" : "border-[#4c8ef7]/40"
+                            <div className={`rounded-xl border-2 bg-[var(--bb-bg-page)] px-4 py-4 ${
+                              latestRev.feedbackAt ? "border-[var(--bb-warning-border)]/40" : "border-[var(--bb-info-border)]/40"
                             }`}>
                               <div className="flex items-center gap-2">
                                 <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] text-white ${
-                                  latestRev.feedbackAt ? "bg-[#f5a623]" : "bg-[#4c8ef7]"
+                                  latestRev.feedbackAt ? "bg-[var(--bb-warning-text)]" : "bg-[var(--bb-info-text)]"
                                 }`}>
                                   {latestRev.feedbackAt ? "✎" : "✓"}
                                 </span>
-                                <p className="text-xs font-semibold text-[#424143]">
+                                <p className="text-xs font-semibold text-[var(--bb-secondary)]">
                                   Version {latestRev.version}
                                 </p>
                                 {latestRev.assets && latestRev.assets.length > 0 && (
@@ -2529,7 +2529,7 @@ export default function CustomerBoardPage() {
                               </div>
 
                               {latestRev.submittedAt && (
-                                <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-[#1d72b8]">
+                                <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-[var(--bb-info-text)]">
                                   <span className="text-[10px]">📤</span>
                                   Sent for review on{" "}
                                   <span className="font-semibold">{formatBoardDate(latestRev.submittedAt)}</span>
@@ -2537,7 +2537,7 @@ export default function CustomerBoardPage() {
                               )}
 
                               {latestRev.feedbackAt && (
-                                <p className="mt-1 flex items-center gap-1.5 text-[11px] text-[#f5a623]">
+                                <p className="mt-1 flex items-center gap-1.5 text-[11px] text-[var(--bb-warning-text)]">
                                   <span className="text-[10px]">💬</span>
                                   Changes requested on{" "}
                                   <span className="font-semibold">{formatBoardDate(latestRev.feedbackAt)}</span>
@@ -2545,8 +2545,8 @@ export default function CustomerBoardPage() {
                               )}
 
                               {latestRev.feedbackMessage && (
-                                <div className="mt-2 rounded-lg bg-[#fff7e0] px-3 py-2">
-                                  <p className="text-[11px] italic text-[#5a5953]">
+                                <div className="mt-2 rounded-lg bg-[var(--bb-warning-bg)] px-3 py-2">
+                                  <p className="text-[11px] italic text-[var(--bb-text-tertiary)]">
                                     &ldquo;{latestRev.feedbackMessage}&rdquo;
                                   </p>
                                 </div>
@@ -2578,7 +2578,7 @@ export default function CustomerBoardPage() {
                               <button
                                 type="button"
                                 onClick={() => setShowPreviousVersions((v) => !v)}
-                                className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9] transition-colors hover:text-[#7a7a7a]"
+                                className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--bb-text-muted)] transition-colors hover:text-[var(--bb-text-secondary)]"
                               >
                                 <svg
                                   width="12"
@@ -2594,7 +2594,7 @@ export default function CustomerBoardPage() {
                                   <polyline points="9 18 15 12 9 6" />
                                 </svg>
                                 Previous versions
-                                <span className="text-[#9a9892]">({olderRevs.length})</span>
+                                <span className="text-[var(--bb-text-tertiary)]">({olderRevs.length})</span>
                               </button>
 
                               {showPreviousVersions && (
@@ -2602,15 +2602,15 @@ export default function CustomerBoardPage() {
                                   {olderRevs.map((rev) => (
                                     <div
                                       key={rev.version}
-                                      className="rounded-xl border border-[#e3e1dc] bg-[#fbfaf8] px-4 py-3"
+                                      className="rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-3"
                                     >
                                       <div className="flex items-center gap-2">
                                         <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] text-white ${
-                                          rev.feedbackAt ? "bg-[#f5a623]" : "bg-[#4c8ef7]"
+                                          rev.feedbackAt ? "bg-[var(--bb-warning-text)]" : "bg-[var(--bb-info-text)]"
                                         }`}>
                                           {rev.feedbackAt ? "✎" : "✓"}
                                         </span>
-                                        <p className="text-xs font-semibold text-[#424143]">
+                                        <p className="text-xs font-semibold text-[var(--bb-secondary)]">
                                           Version {rev.version}
                                         </p>
                                         {rev.assets && rev.assets.length > 0 && (
@@ -2622,7 +2622,7 @@ export default function CustomerBoardPage() {
                                       </div>
 
                                       {rev.submittedAt && (
-                                        <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-[#1d72b8]">
+                                        <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-[var(--bb-info-text)]">
                                           <span className="text-[10px]">📤</span>
                                           Sent for review on{" "}
                                           <span className="font-semibold">{formatBoardDate(rev.submittedAt)}</span>
@@ -2630,7 +2630,7 @@ export default function CustomerBoardPage() {
                                       )}
 
                                       {rev.feedbackAt && (
-                                        <p className="mt-1 flex items-center gap-1.5 text-[11px] text-[#f5a623]">
+                                        <p className="mt-1 flex items-center gap-1.5 text-[11px] text-[var(--bb-warning-text)]">
                                           <span className="text-[10px]">💬</span>
                                           Changes requested on{" "}
                                           <span className="font-semibold">{formatBoardDate(rev.feedbackAt)}</span>
@@ -2638,8 +2638,8 @@ export default function CustomerBoardPage() {
                                       )}
 
                                       {rev.feedbackMessage && (
-                                        <div className="mt-2 rounded-lg bg-[#fff7e0] px-3 py-2">
-                                          <p className="text-[11px] italic text-[#5a5953]">
+                                        <div className="mt-2 rounded-lg bg-[var(--bb-warning-bg)] px-3 py-2">
+                                          <p className="text-[11px] italic text-[var(--bb-text-tertiary)]">
                                             &ldquo;{rev.feedbackMessage}&rdquo;
                                           </p>
                                         </div>
@@ -2664,16 +2664,16 @@ export default function CustomerBoardPage() {
                 </div>
 
                 {/* Right column — metadata sidebar (fixed while left scrolls) */}
-                <aside className="self-start overflow-y-auto rounded-xl bg-[#f7f5f0] p-4">
+                <aside className="self-start overflow-y-auto rounded-xl bg-[var(--bb-bg-warm)] p-4">
                   {/* Details */}
                   <div className="mb-5">
-                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9]">
+                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--bb-text-muted)]">
                       Details
                     </p>
                     <div className="space-y-3 text-xs">
                       <div>
-                        <p className="text-[#9a9892]">Status</p>
-                        <div className="mt-0.5 flex items-center gap-1.5 font-semibold text-[#424143]">
+                        <p className="text-[var(--bb-text-tertiary)]">Status</p>
+                        <div className="mt-0.5 flex items-center gap-1.5 font-semibold text-[var(--bb-secondary)]">
                           <span
                             className={`inline-block h-1.5 w-1.5 rounded-full ${statusIndicatorColor(
                               detailTicket.status,
@@ -2683,7 +2683,7 @@ export default function CustomerBoardPage() {
                         </div>
                       </div>
                       <div>
-                        <p className="text-[#9a9892]">Priority</p>
+                        <p className="text-[var(--bb-text-tertiary)]">Priority</p>
                         {isEditingDetail ? (
                           <FormSelect
                             size="sm"
@@ -2699,7 +2699,7 @@ export default function CustomerBoardPage() {
                             <option value="URGENT">Urgent</option>
                           </FormSelect>
                         ) : (
-                          <p className="mt-0.5 font-semibold text-[#424143]">
+                          <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
                             <span className={priorityColorClass(detailTicket.priority)}>
                               {priorityIconMap[detailTicket.priority]}
                             </span>
@@ -2708,7 +2708,7 @@ export default function CustomerBoardPage() {
                         )}
                       </div>
                       <div>
-                        <p className="text-[#9a9892]">Project</p>
+                        <p className="text-[var(--bb-text-tertiary)]">Project</p>
                         {isEditingDetail ? (
                           <FormSelect
                             size="sm"
@@ -2726,13 +2726,13 @@ export default function CustomerBoardPage() {
                             ))}
                           </FormSelect>
                         ) : (
-                          <p className="mt-0.5 font-semibold text-[#424143]">
+                          <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
                             {detailTicket.projectName || "—"}
                           </p>
                         )}
                       </div>
                       <div>
-                        <p className="text-[#9a9892]">Job type</p>
+                        <p className="text-[var(--bb-text-tertiary)]">Job type</p>
                         {isEditingDetail ? (
                           <FormSelect
                             size="sm"
@@ -2750,13 +2750,13 @@ export default function CustomerBoardPage() {
                             ))}
                           </FormSelect>
                         ) : (
-                          <p className="mt-0.5 font-semibold text-[#424143]">
+                          <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
                             {detailTicket.jobTypeName || "—"}
                           </p>
                         )}
                       </div>
                       <div>
-                        <p className="text-[#9a9892]">Tags</p>
+                        <p className="text-[var(--bb-text-tertiary)]">Tags</p>
                         {isEditingDetail ? (
                           <div className="mt-1">
                             <TagMultiSelect
@@ -2810,7 +2810,7 @@ export default function CustomerBoardPage() {
                                 />
                               ))
                             ) : (
-                              <p className="text-[11px] text-[#9a9892]">—</p>
+                              <p className="text-[11px] text-[var(--bb-text-tertiary)]">—</p>
                             )}
                           </div>
                         )}
@@ -2819,11 +2819,11 @@ export default function CustomerBoardPage() {
                   </div>
 
                   {/* Divider */}
-                  <div className="mb-5 border-t border-[#ece9e1]" />
+                  <div className="mb-5 border-t border-[var(--bb-border-subtle)]" />
 
                   {/* People */}
                   <div className="mb-5">
-                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9]">
+                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--bb-text-muted)]">
                       People
                     </p>
                     <div className="flex items-center gap-2.5">
@@ -2835,37 +2835,37 @@ export default function CustomerBoardPage() {
                         {detailTicket.isAssigned ? "\u2713" : "\u2014"}
                       </div>
                       <div>
-                        <p className="text-xs font-semibold text-[#424143]">
+                        <p className="text-xs font-semibold text-[var(--bb-secondary)]">
                           {detailTicket.isAssigned ? "Assigned" : "Unassigned"}
                         </p>
-                        <p className="text-[10px] text-[#9a9892]">Creative team</p>
+                        <p className="text-[10px] text-[var(--bb-text-tertiary)]">Creative team</p>
                       </div>
                     </div>
                   </div>
 
                   {/* Divider */}
-                  <div className="mb-5 border-t border-[#ece9e1]" />
+                  <div className="mb-5 border-t border-[var(--bb-border-subtle)]" />
 
                   {/* Dates */}
                   <div>
-                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b1afa9]">
+                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--bb-text-muted)]">
                       Dates
                     </p>
                     <div className="space-y-2 text-xs">
                       <div>
-                        <p className="text-[#9a9892]">Created</p>
-                        <p className="mt-0.5 font-semibold text-[#424143]">
+                        <p className="text-[var(--bb-text-tertiary)]">Created</p>
+                        <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
                           {formatBoardDate(detailTicket.createdAt)}
                         </p>
                       </div>
                       <div>
-                        <p className="text-[#9a9892]">Updated</p>
-                        <p className="mt-0.5 font-semibold text-[#424143]">
+                        <p className="text-[var(--bb-text-tertiary)]">Updated</p>
+                        <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
                           {formatBoardDate(detailTicket.updatedAt ?? null)}
                         </p>
                       </div>
                       <div>
-                        <p className="text-[#9a9892]">Due date</p>
+                        <p className="text-[var(--bb-text-tertiary)]">Due date</p>
                         {isEditingDetail ? (
                           <FormInput
                             type="date"
@@ -2878,14 +2878,14 @@ export default function CustomerBoardPage() {
                           />
                         ) : (
                           <>
-                            <p className={`mt-0.5 font-semibold ${isDueDateOverdue(detailTicket.dueDate) ? "text-[#b13832]" : "text-[#424143]"}`}>
+                            <p className={`mt-0.5 font-semibold ${isDueDateOverdue(detailTicket.dueDate) ? "text-[var(--bb-danger-text)]" : "text-[var(--bb-secondary)]"}`}>
                               {formatBoardDate(detailTicket.dueDate)}
                             </p>
                             {(() => {
                               const countdown = formatDueDateCountdown(detailTicket.dueDate);
                               if (!countdown) return null;
                               return (
-                                <p className={`mt-0.5 text-[10px] font-medium ${countdown.overdue ? "text-[#b13832]" : "text-[#7a7a7a]"}`}>
+                                <p className={`mt-0.5 text-[10px] font-medium ${countdown.overdue ? "text-[var(--bb-danger-text)]" : "text-[var(--bb-text-secondary)]"}`}>
                                   {countdown.label}
                                 </p>
                               );
@@ -2931,12 +2931,12 @@ export default function CustomerBoardPage() {
 
                 if (detailTicket.status === "DONE") {
                   return latestRevAssets.length > 0 ? (
-                    <ModalFooter className="shrink-0 border-t border-[#f0eee9] pt-3">
+                    <ModalFooter className="shrink-0 border-t border-[var(--bb-border-subtle)] pt-3">
                       <button
                         type="button"
                         disabled={detailFooterDownloading}
                         onClick={handleFooterDownload}
-                        className="ml-auto flex items-center gap-1.5 rounded-lg bg-[#f15b2b] px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#d94e22] disabled:opacity-60"
+                        className="ml-auto flex items-center gap-1.5 rounded-lg bg-[var(--bb-primary)] px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-[var(--bb-primary-hover)] disabled:opacity-60"
                       >
                         {detailFooterDownloading ? (
                           <>
@@ -2959,13 +2959,13 @@ export default function CustomerBoardPage() {
 
                 if (detailTicket.status === "IN_REVIEW") {
                   return (
-                    <ModalFooter className="shrink-0 border-t border-[#f0eee9] pt-3">
+                    <ModalFooter className="shrink-0 border-t border-[var(--bb-border-subtle)] pt-3">
                       {latestRevAssets.length > 0 && (
                         <button
                           type="button"
                           disabled={detailFooterDownloading}
                           onClick={handleFooterDownload}
-                          className="mr-auto flex items-center gap-1.5 rounded-lg border border-[#e3e1dc] bg-white px-3 py-1.5 text-[11px] font-medium text-[#666] transition-colors hover:border-[#f15b2b] hover:text-[#f15b2b] disabled:opacity-60"
+                          className="mr-auto flex items-center gap-1.5 rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-1.5 text-[11px] font-medium text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)] disabled:opacity-60"
                         >
                           {detailFooterDownloading ? (
                             <>
@@ -3021,7 +3021,7 @@ export default function CustomerBoardPage() {
           />
 
               <div>
-                <label className="block text-xs font-medium text-[#424143]">
+                <label className="block text-xs font-medium text-[var(--bb-secondary)]">
                   Message for your creative
                 </label>
                 <textarea
@@ -3033,10 +3033,10 @@ export default function CustomerBoardPage() {
                     }
                   }}
                   placeholder="For example: Could we make the hero headline larger and try a version with a darker background?"
-                  className="mt-1.5 h-28 w-full rounded-xl border border-[#e3e1dc] bg-white px-3 py-2.5 text-xs text-[#424143] outline-none placeholder:text-[#b1afa9] focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+                  className="mt-1.5 h-28 w-full rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-2.5 text-xs text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
                 />
                 {revisionMessageError && (
-                  <p className="mt-1 text-[11px] text-[#b13832]">
+                  <p className="mt-1 text-[11px] text-[var(--bb-danger-text)]">
                     {revisionMessageError}
                   </p>
                 )}
@@ -3055,10 +3055,10 @@ export default function CustomerBoardPage() {
             subtitle="Once you mark this request as done, your creative will get paid for this job, and the ticket will move to Done."
           />
 
-              <div className="rounded-xl bg-[#f7f5f0] px-3 py-3 text-xs text-[#424143]">
+              <div className="rounded-xl bg-[var(--bb-bg-warm)] px-3 py-3 text-xs text-[var(--bb-secondary)]">
                 <p className="font-semibold">{pendingDoneTicket?.title}</p>
                 {pendingDoneTicket?.projectName && (
-                  <p className="mt-1 text-[#7a7a7a]">
+                  <p className="mt-1 text-[var(--bb-text-secondary)]">
                     Project: {pendingDoneTicket.projectName}
                   </p>
                 )}
@@ -3067,7 +3067,7 @@ export default function CustomerBoardPage() {
               {/* Final work preview */}
               {pendingDoneRevisionsLoading && (
                 <div className="mt-3 flex items-center justify-center py-6">
-                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-[#e3e1dc] border-t-[#f15b2b]" />
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--bb-border)] border-t-[var(--bb-primary)]" />
                 </div>
               )}
 
@@ -3079,21 +3079,21 @@ export default function CustomerBoardPage() {
 
                 return (
                   <div className="mt-3">
-                    <p className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#b1afa9]">
+                    <p className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--bb-text-muted)]">
                       <span>Final work</span>
-                      <span className="font-normal normal-case tracking-normal text-[#9a9892]">
+                      <span className="font-normal normal-case tracking-normal text-[var(--bb-text-tertiary)]">
                         — Version {latestRev.version} • {finalAssets.length} file{finalAssets.length !== 1 ? "s" : ""}
                       </span>
                     </p>
 
                     {/* Thumbnail grid */}
-                    <div className={`grid gap-1.5 rounded-xl border border-[#e3e1dc] bg-[#fbfaf8] p-2 ${
+                    <div className={`grid gap-1.5 rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] p-2 ${
                       finalAssets.length === 1 ? "grid-cols-1" : "grid-cols-3"
                     }`}>
                       {finalAssets.slice(0, 6).map((asset) => (
                         <div
                           key={asset.id}
-                          className="relative overflow-hidden rounded-lg bg-[#f5f3f0]"
+                          className="relative overflow-hidden rounded-lg bg-[var(--bb-bg-card)]"
                           style={{ height: finalAssets.length === 1 ? "160px" : "80px" }}
                         >
                           <RevisionImage
@@ -3105,7 +3105,7 @@ export default function CustomerBoardPage() {
                         </div>
                       ))}
                       {finalAssets.length > 6 && (
-                        <div className="flex items-center justify-center rounded-lg bg-[#f0eee9] text-[11px] font-medium text-[#7a7a7a]" style={{ height: "80px" }}>
+                        <div className="flex items-center justify-center rounded-lg bg-[var(--bb-border-subtle)] text-[11px] font-medium text-[var(--bb-text-secondary)]" style={{ height: "80px" }}>
                           +{finalAssets.length - 6} more
                         </div>
                       )}
@@ -3135,7 +3135,7 @@ export default function CustomerBoardPage() {
                           setDoneModalDownloading(false);
                         }
                       }}
-                      className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#f15b2b] px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-[#d94e22] disabled:opacity-60"
+                      className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--bb-primary)] px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-[var(--bb-primary-hover)] disabled:opacity-60"
                     >
                       {doneModalDownloading ? (
                         <>

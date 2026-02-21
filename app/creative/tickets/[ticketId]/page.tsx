@@ -493,7 +493,7 @@ export default function CreativeTicketDetailPage() {
             <section className="md:col-span-2 space-y-4">
               {/* Approval banner — DONE */}
               {ticket.status === "DONE" && ticket.completedAt && (
-                <div className="flex items-center gap-3 rounded-xl border border-[#a3e0bf] bg-[#f0faf4] px-4 py-3">
+                <div className="flex items-center gap-3 rounded-xl border border-[var(--bb-success-border)] bg-[var(--bb-success-bg)] px-4 py-3">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#32b37b] text-white">
                     &#10003;
                   </div>
@@ -511,7 +511,7 @@ export default function CreativeTicketDetailPage() {
               )}
 
               {/* Brief */}
-              <div className="rounded-2xl border border-[var(--bb-border)] bg-white px-4 py-4 shadow-sm">
+              <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
                 <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">
                   Brief
                 </h2>
@@ -529,7 +529,7 @@ export default function CreativeTicketDetailPage() {
 
               {/* Meta */}
               <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-2xl border border-[var(--bb-border)] bg-white px-4 py-3 shadow-sm">
+                <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-3 shadow-sm">
                   <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
                     Project & job
                   </h3>
@@ -575,7 +575,7 @@ export default function CreativeTicketDetailPage() {
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-[var(--bb-border)] bg-white px-4 py-3 shadow-sm">
+                <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-3 shadow-sm">
                   <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
                     Dates
                   </h3>
@@ -604,7 +604,7 @@ export default function CreativeTicketDetailPage() {
 
               {/* Brief attachments */}
               {!briefAssetsLoading && briefAssets.length > 0 && (
-                <div className="rounded-2xl border border-[var(--bb-border)] bg-white px-4 py-4 shadow-sm">
+                <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
                   <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">
                     Brief attachments
                   </h2>
@@ -616,7 +616,7 @@ export default function CreativeTicketDetailPage() {
               )}
 
               {/* Revision history */}
-              <div className="rounded-2xl border border-[var(--bb-border)] bg-white px-4 py-4 shadow-sm">
+              <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
                 <div className="flex items-center justify-between">
                   <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">
                     Revision history
@@ -625,7 +625,7 @@ export default function CreativeTicketDetailPage() {
                     <button
                       type="button"
                       onClick={() => setShowCompare(true)}
-                      className="inline-flex items-center gap-1 rounded-full border border-[#d0cec9] bg-[#f9f8f6] px-2.5 py-1 text-[11px] font-medium text-[#666] transition-colors hover:border-[#f15b2b] hover:bg-[#fff5f2] hover:text-[#f15b2b]"
+                      className="inline-flex items-center gap-1 rounded-full border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-2.5 py-1 text-[11px] font-medium text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-primary)] hover:bg-[var(--bb-primary-light)] hover:text-[var(--bb-primary)]"
                     >
                       &#8596; Compare
                     </button>
@@ -699,7 +699,7 @@ export default function CreativeTicketDetailPage() {
                                   ·
                                   {totalOpen > 0 && (
                                     <span className="flex items-center gap-0.5">
-                                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#f15b2b]" />
+                                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--bb-primary)]" />
                                       {totalOpen} open
                                     </span>
                                   )}
@@ -782,7 +782,7 @@ export default function CreativeTicketDetailPage() {
 
             {/* Right: comments + people */}
             <section className="space-y-4">
-              <div className="rounded-2xl border border-[var(--bb-border)] bg-white px-4 py-3 shadow-sm">
+              <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-3 shadow-sm">
                 <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
                   Comments
                 </h3>
@@ -855,7 +855,7 @@ export default function CreativeTicketDetailPage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-[var(--bb-border)] bg-white px-4 py-3 shadow-sm">
+              <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-3 shadow-sm">
                 <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
                   People
                 </h3>
@@ -918,16 +918,16 @@ function TicketDetailSkeleton() {
       <div className="mb-6 h-3 w-32 animate-pulse rounded bg-[var(--bb-border)]" />
       <div className="grid gap-4 md:grid-cols-3">
         <div className="md:col-span-2 space-y-4">
-          <div className="h-32 animate-pulse rounded-2xl bg-white" />
+          <div className="h-32 animate-pulse rounded-2xl bg-[var(--bb-bg-page)]" />
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="h-32 animate-pulse rounded-2xl bg-white" />
-            <div className="h-32 animate-pulse rounded-2xl bg-white" />
+            <div className="h-32 animate-pulse rounded-2xl bg-[var(--bb-bg-page)]" />
+            <div className="h-32 animate-pulse rounded-2xl bg-[var(--bb-bg-page)]" />
           </div>
-          <div className="h-40 animate-pulse rounded-2xl bg-white" />
+          <div className="h-40 animate-pulse rounded-2xl bg-[var(--bb-bg-page)]" />
         </div>
         <div className="space-y-4">
-          <div className="h-40 animate-pulse rounded-2xl bg-white" />
-          <div className="h-32 animate-pulse rounded-2xl bg-white" />
+          <div className="h-40 animate-pulse rounded-2xl bg-[var(--bb-bg-page)]" />
+          <div className="h-32 animate-pulse rounded-2xl bg-[var(--bb-bg-page)]" />
         </div>
       </div>
     </>

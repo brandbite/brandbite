@@ -23,7 +23,7 @@ const VARIANT_CLASSES: Record<ButtonVariant, string> = {
   secondary:
     "border border-[var(--bb-border)] bg-[var(--bb-bg-warm)] text-[var(--bb-text-secondary)] hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)] focus-visible:ring-[var(--bb-primary)]",
   danger:
-    "border border-[#fde0de] bg-[#fff7f6] text-[var(--bb-danger-text)] hover:bg-[#fdecea] focus-visible:ring-[var(--bb-danger-text)]",
+    "border border-[var(--bb-danger-border)] bg-[var(--bb-danger-bg)] text-[var(--bb-danger-text)] hover:bg-[var(--bb-danger-bg)] focus-visible:ring-[var(--bb-danger-text)]",
   ghost:
     "text-[var(--bb-text-secondary)] hover:text-[var(--bb-secondary)] hover:bg-[var(--bb-bg-card)] focus-visible:ring-[var(--bb-primary)]",
 };

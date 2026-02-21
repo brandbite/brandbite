@@ -87,29 +87,29 @@ function CompareImage({
 
   if (loading) {
     return (
-      <div className="flex aspect-video w-full items-center justify-center rounded-lg border border-[#e3e1dc] bg-[#f5f3f0]">
-        <div className="h-5 w-5 animate-spin rounded-full border-2 border-[#e3e1dc] border-t-[#9a9892]" />
+      <div className="flex aspect-video w-full items-center justify-center rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-card)]">
+        <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--bb-border)] border-t-[var(--bb-text-tertiary)]" />
       </div>
     );
   }
 
   if (error || !src) {
     return (
-      <div className="flex aspect-video w-full items-center justify-center rounded-lg border border-[#e3e1dc] bg-[#f5f3f0] text-xs text-[#b1afa9]">
+      <div className="flex aspect-video w-full items-center justify-center rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-card)] text-xs text-[var(--bb-text-muted)]">
         Could not load image
       </div>
     );
   }
 
   return (
-    <div className="group relative overflow-hidden rounded-lg border border-[#e3e1dc] bg-[#f5f3f0]">
+    <div className="group relative overflow-hidden rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-card)]">
       <img
         src={src}
         alt={label}
         className="aspect-video w-full object-cover"
       />
       {asset.originalName && (
-        <p className="truncate px-2 py-1 text-[10px] text-[#9a9892]">
+        <p className="truncate px-2 py-1 text-[10px] text-[var(--bb-text-tertiary)]">
           {asset.originalName}
         </p>
       )}
@@ -123,7 +123,7 @@ function CompareImage({
 
 function EmptySlot() {
   return (
-    <div className="flex aspect-video w-full items-center justify-center rounded-lg border border-dashed border-[#e3e1dc] bg-[#faf9f7] text-xs text-[#b1afa9]">
+    <div className="flex aspect-video w-full items-center justify-center rounded-lg border border-dashed border-[var(--bb-border)] bg-[var(--bb-bg-page)] text-xs text-[var(--bb-text-muted)]">
       No corresponding file
     </div>
   );
@@ -187,17 +187,17 @@ export function RevisionCompare({
   return (
     <div className="fixed inset-0 z-[200] flex flex-col bg-black/60 backdrop-blur-sm">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-[#e3e1dc] bg-white px-4 py-3 md:px-6">
-        <h2 className="text-sm font-semibold text-[#424143]">
+      <div className="flex items-center justify-between border-b border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-3 md:px-6">
+        <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">
           Compare revisions
         </h2>
 
         <div className="flex items-center gap-3">
           {/* Desktop dropdowns */}
           <div className="hidden items-center gap-2 md:flex">
-            <label className="text-[11px] text-[#9a9892]">Left:</label>
+            <label className="text-[11px] text-[var(--bb-text-tertiary)]">Left:</label>
             <select
-              className="rounded-md border border-[#d0cec9] bg-white px-2 py-1 text-xs text-[#424143]"
+              className="rounded-md border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-2 py-1 text-xs text-[var(--bb-secondary)]"
               value={leftVersion}
               onChange={(e) => setLeftVersion(Number(e.target.value))}
             >
@@ -208,11 +208,11 @@ export function RevisionCompare({
               ))}
             </select>
 
-            <span className="text-xs text-[#b1afa9]">vs</span>
+            <span className="text-xs text-[var(--bb-text-muted)]">vs</span>
 
-            <label className="text-[11px] text-[#9a9892]">Right:</label>
+            <label className="text-[11px] text-[var(--bb-text-tertiary)]">Right:</label>
             <select
-              className="rounded-md border border-[#d0cec9] bg-white px-2 py-1 text-xs text-[#424143]"
+              className="rounded-md border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-2 py-1 text-xs text-[var(--bb-secondary)]"
               value={rightVersion}
               onChange={(e) => setRightVersion(Number(e.target.value))}
             >
@@ -227,7 +227,7 @@ export function RevisionCompare({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-[#9a9892] transition-colors hover:bg-[#f5f3f0] hover:text-[#424143]"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--bb-text-tertiary)] transition-colors hover:bg-[var(--bb-bg-card)] hover:text-[var(--bb-secondary)]"
             aria-label="Close comparison"
           >
             &#10005;
@@ -236,14 +236,14 @@ export function RevisionCompare({
       </div>
 
       {/* Mobile tabs + dropdowns */}
-      <div className="flex items-center justify-between border-b border-[#e3e1dc] bg-[#faf9f7] px-4 py-2 md:hidden">
+      <div className="flex items-center justify-between border-b border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-2 md:hidden">
         <div className="flex gap-1">
           <button
             type="button"
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
               activeTab === "left"
-                ? "bg-[#f15b2b] text-white"
-                : "bg-white text-[#424143] border border-[#d0cec9]"
+                ? "bg-[var(--bb-primary)] text-white"
+                : "bg-[var(--bb-bg-page)] text-[var(--bb-secondary)] border border-[var(--bb-border-input)]"
             }`}
             onClick={() => setActiveTab("left")}
           >
@@ -253,8 +253,8 @@ export function RevisionCompare({
             type="button"
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
               activeTab === "right"
-                ? "bg-[#f15b2b] text-white"
-                : "bg-white text-[#424143] border border-[#d0cec9]"
+                ? "bg-[var(--bb-primary)] text-white"
+                : "bg-[var(--bb-bg-page)] text-[var(--bb-secondary)] border border-[var(--bb-border-input)]"
             }`}
             onClick={() => setActiveTab("right")}
           >
@@ -264,7 +264,7 @@ export function RevisionCompare({
 
         <div className="flex items-center gap-2">
           <select
-            className="rounded-md border border-[#d0cec9] bg-white px-2 py-1 text-xs text-[#424143]"
+            className="rounded-md border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-2 py-1 text-xs text-[var(--bb-secondary)]"
             value={activeTab === "left" ? leftVersion : rightVersion}
             onChange={(e) => {
               const v = Number(e.target.value);
@@ -284,7 +284,7 @@ export function RevisionCompare({
       {/* Content area */}
       <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6">
         {maxAssets === 0 && (
-          <div className="flex h-40 items-center justify-center text-sm text-[#b1afa9]">
+          <div className="flex h-40 items-center justify-center text-sm text-[var(--bb-text-muted)]">
             No assets to compare.
           </div>
         )}
@@ -295,18 +295,18 @@ export function RevisionCompare({
             <div className="hidden md:block">
               {/* Column headers */}
               <div className="mb-3 grid grid-cols-2 gap-4">
-                <p className="text-xs font-semibold text-[#424143]">
+                <p className="text-xs font-semibold text-[var(--bb-secondary)]">
                   Version {leftVersion}
                   {leftRev?.submittedAt && (
-                    <span className="ml-2 font-normal text-[#9a9892]">
+                    <span className="ml-2 font-normal text-[var(--bb-text-tertiary)]">
                       {new Date(leftRev.submittedAt).toLocaleDateString()}
                     </span>
                   )}
                 </p>
-                <p className="text-xs font-semibold text-[#424143]">
+                <p className="text-xs font-semibold text-[var(--bb-secondary)]">
                   Version {rightVersion}
                   {rightRev?.submittedAt && (
-                    <span className="ml-2 font-normal text-[#9a9892]">
+                    <span className="ml-2 font-normal text-[var(--bb-text-tertiary)]">
                       {new Date(rightRev.submittedAt).toLocaleDateString()}
                     </span>
                   )}
@@ -345,7 +345,7 @@ export function RevisionCompare({
 
             {/* Mobile: single column, tab-switched */}
             <div className="md:hidden">
-              <p className="mb-3 text-xs font-semibold text-[#424143]">
+              <p className="mb-3 text-xs font-semibold text-[var(--bb-secondary)]">
                 Version{" "}
                 {activeTab === "left" ? leftVersion : rightVersion}
               </p>
@@ -362,7 +362,7 @@ export function RevisionCompare({
                 )}
                 {((activeTab === "left" ? leftRev : rightRev)?.assets
                   .length ?? 0) === 0 && (
-                  <div className="flex h-32 items-center justify-center text-xs text-[#b1afa9]">
+                  <div className="flex h-32 items-center justify-center text-xs text-[var(--bb-text-muted)]">
                     No assets in this version.
                   </div>
                 )}

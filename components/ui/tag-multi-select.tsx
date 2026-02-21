@@ -129,7 +129,7 @@ export function TagMultiSelect({
     <div ref={containerRef} className="relative">
       {/* Selected pills + trigger */}
       <div
-        className={`flex min-h-[36px] flex-wrap items-center gap-1.5 rounded-lg border border-[#e3e1dc] bg-white px-2.5 py-1.5 ${
+        className={`flex min-h-[36px] flex-wrap items-center gap-1.5 rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-2.5 py-1.5 ${
           disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"
         }`}
         onClick={() => {
@@ -147,18 +147,18 @@ export function TagMultiSelect({
           />
         ))}
         {selectedTags.length === 0 && (
-          <span className="text-[13px] text-[#9a9892]">Add tags…</span>
+          <span className="text-[13px] text-[var(--bb-text-tertiary)]">Add tags…</span>
         )}
         {!disabled && selectedTags.length > 0 && !atMax && (
-          <span className="text-[11px] text-[#9a9892]">+ Tag</span>
+          <span className="text-[11px] text-[var(--bb-text-tertiary)]">+ Tag</span>
         )}
       </div>
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-full min-w-[240px] rounded-lg border border-[#e3e1dc] bg-white shadow-lg">
+        <div className="absolute left-0 top-full z-50 mt-1 w-full min-w-[240px] rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] shadow-lg">
           {/* Search */}
-          <div className="border-b border-[#e3e1dc] px-3 py-2">
+          <div className="border-b border-[var(--bb-border)] px-3 py-2">
             <input
               ref={searchRef}
               type="text"
@@ -172,14 +172,14 @@ export function TagMultiSelect({
                   setSearch("");
                 }
               }}
-              className="w-full border-none bg-transparent text-[13px] text-[#424143] placeholder:text-[#9a9892] focus:outline-none"
+              className="w-full border-none bg-transparent text-[13px] text-[var(--bb-secondary)] placeholder:text-[var(--bb-text-tertiary)] focus:outline-none"
             />
           </div>
 
           {/* Tag list */}
           <div className="max-h-[200px] overflow-y-auto py-1">
             {filteredTags.length === 0 && (
-              <div className="px-3 py-2 text-center text-[12px] text-[#9a9892]">
+              <div className="px-3 py-2 text-center text-[12px] text-[var(--bb-text-tertiary)]">
                 No tags found
               </div>
             )}
@@ -196,15 +196,15 @@ export function TagMultiSelect({
                   className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] transition-colors ${
                     disabledItem
                       ? "cursor-not-allowed opacity-40"
-                      : "hover:bg-[#f5f3f0]"
+                      : "hover:bg-[var(--bb-bg-card)]"
                   }`}
                 >
                   {/* Checkbox indicator */}
                   <span
                     className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border ${
                       selected
-                        ? "border-[#f15b2b] bg-[#f15b2b]"
-                        : "border-[#d4d2ce] bg-white"
+                        ? "border-[var(--bb-primary)] bg-[var(--bb-primary)]"
+                        : "border-[var(--bb-border-input)] bg-[var(--bb-bg-page)]"
                     }`}
                   >
                     {selected && (
@@ -232,19 +232,19 @@ export function TagMultiSelect({
 
           {/* Max tags notice */}
           {atMax && (
-            <div className="border-t border-[#e3e1dc] px-3 py-1.5 text-center text-[11px] text-[#9a9892]">
+            <div className="border-t border-[var(--bb-border)] px-3 py-1.5 text-center text-[11px] text-[var(--bb-text-tertiary)]">
               Maximum {maxTags} tags reached
             </div>
           )}
 
           {/* Inline creation */}
           {canCreate && onCreateTag && (
-            <div className="border-t border-[#e3e1dc]">
+            <div className="border-t border-[var(--bb-border)]">
               {!creating ? (
                 <button
                   type="button"
                   onClick={() => setCreating(true)}
-                  className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-[12px] font-medium text-[#f15b2b] hover:bg-[#f5f3f0]"
+                  className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-[12px] font-medium text-[var(--bb-primary)] hover:bg-[var(--bb-bg-card)]"
                 >
                   <svg
                     width="12"
@@ -279,7 +279,7 @@ export function TagMultiSelect({
                         setNewName("");
                       }
                     }}
-                    className="w-full rounded border border-[#e3e1dc] px-2 py-1 text-[13px] text-[#424143] focus:border-[#f15b2b] focus:outline-none"
+                    className="w-full rounded border border-[var(--bb-border)] px-2 py-1 text-[13px] text-[var(--bb-secondary)] focus:border-[var(--bb-primary)] focus:outline-none"
                     autoFocus
                   />
                   {/* Color picker */}
@@ -291,7 +291,7 @@ export function TagMultiSelect({
                         onClick={() => setNewColor(key)}
                         className={`h-5 w-5 rounded-full border-2 transition-transform ${
                           newColor === key
-                            ? "scale-110 border-[#424143]"
+                            ? "scale-110 border-[var(--bb-secondary)]"
                             : "border-transparent hover:scale-105"
                         }`}
                         style={{ backgroundColor: TAG_COLORS[key].dot }}
@@ -304,7 +304,7 @@ export function TagMultiSelect({
                       type="button"
                       onClick={handleCreate}
                       disabled={!newName.trim() || saving}
-                      className="rounded bg-[#f15b2b] px-2.5 py-1 text-[12px] font-medium text-white hover:bg-[#d6471b] disabled:opacity-50"
+                      className="rounded bg-[var(--bb-primary)] px-2.5 py-1 text-[12px] font-medium text-white hover:bg-[var(--bb-primary-hover)] disabled:opacity-50"
                     >
                       {saving ? "Creating…" : "Create"}
                     </button>
@@ -314,7 +314,7 @@ export function TagMultiSelect({
                         setCreating(false);
                         setNewName("");
                       }}
-                      className="text-[12px] text-[#9a9892] hover:text-[#424143]"
+                      className="text-[12px] text-[var(--bb-text-tertiary)] hover:text-[var(--bb-secondary)]"
                     >
                       Cancel
                     </button>

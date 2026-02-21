@@ -136,7 +136,7 @@ export default function CreativeBalancePage() {
 
         {/* Summary cards */}
         <section className="mb-6 grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-4 shadow-sm">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
             <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
               Available balance
             </p>
@@ -151,7 +151,7 @@ export default function CreativeBalancePage() {
             </p>
           </div>
 
-          <div className="rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-4 shadow-sm">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
             <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
               Total credits
             </p>
@@ -163,7 +163,7 @@ export default function CreativeBalancePage() {
             </p>
           </div>
 
-          <div className="rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-4 shadow-sm">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
             <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
               Total debits
             </p>
@@ -177,7 +177,7 @@ export default function CreativeBalancePage() {
         </section>
 
         {/* Ledger table */}
-        <section className="rounded-2xl border border-[var(--bb-border)] bg-white px-4 py-4 shadow-sm">
+        <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold tracking-tight">
               Recent token activity

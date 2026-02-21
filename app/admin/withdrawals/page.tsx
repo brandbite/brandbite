@@ -282,7 +282,7 @@ export default function AdminWithdrawalsPage() {
             <h1 className="text-2xl font-semibold tracking-tight">
               Creative withdrawals
             </h1>
-            <p className="mt-1 text-sm text-[#7a7a7a]">
+            <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
               Review, approve and mark creative withdrawal requests as paid.
             </p>
           </div>
@@ -297,50 +297,50 @@ export default function AdminWithdrawalsPage() {
 
         {/* Summary cards */}
         <section className="mb-6 grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
               Total requested
             </p>
-            <p className="mt-2 text-3xl font-semibold text-[#f15b2b]">
+            <p className="mt-2 text-3xl font-semibold text-[var(--bb-primary)]">
               {loading ? "—" : stats ? stats.totalRequested : 0}
-              <span className="ml-1 text-base font-normal text-[#7a7a7a]">
+              <span className="ml-1 text-base font-normal text-[var(--bb-text-secondary)]">
                 tokens
               </span>
             </p>
-            <p className="mt-1 text-xs text-[#9a9892]">
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               Sum of all withdrawal requests.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
               Total paid
             </p>
-            <p className="mt-2 text-2xl font-semibold text-[#424143]">
+            <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
               {loading ? "—" : stats ? stats.totalPaid : 0}
             </p>
-            <p className="mt-1 text-xs text-[#9a9892]">
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               Tokens that have been paid out to creatives.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
               Pending requests
             </p>
-            <p className="mt-2 text-2xl font-semibold text-[#424143]">
+            <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
               {loading ? "—" : stats ? stats.pendingCount : 0}
             </p>
-            <p className="mt-1 text-xs text-[#9a9892]">
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               Waiting for approval from the admin team.
             </p>
           </div>
         </section>
 
         {/* Filters */}
-        <section className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
+        <section className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
           <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-[#424143]">
+            <label className="text-xs font-medium text-[var(--bb-secondary)]">
               Status
             </label>
             <FormSelect
@@ -359,7 +359,7 @@ export default function AdminWithdrawalsPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-[#424143]">
+            <label className="text-xs font-medium text-[var(--bb-secondary)]">
               Creative
             </label>
             <FormSelect
@@ -378,12 +378,12 @@ export default function AdminWithdrawalsPage() {
         </section>
 
         {/* Table */}
-        <section className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
+        <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold tracking-tight">
               Withdrawal requests
             </h2>
-            <p className="text-xs text-[#9a9892]">
+            <p className="text-xs text-[var(--bb-text-tertiary)]">
               Showing {filteredWithdrawals.length} entries.
             </p>
           </div>
@@ -414,14 +414,14 @@ export default function AdminWithdrawalsPage() {
                   return (
                     <tr
                       key={w.id}
-                      className="border-b border-[#f0eeea] last:border-b-0"
+                      className="border-b border-[var(--bb-border-subtle)] last:border-b-0"
                     >
-                      <TD className="text-[#7a7a7a]">
+                      <TD className="text-[var(--bb-text-secondary)]">
                         {formatDateTime(w.createdAt)}
                       </TD>
                       <TD>
                         <div className="font-medium">{creativeLabel}</div>
-                        <div className="text-[10px] text-[#9a9892]">
+                        <div className="text-[10px] text-[var(--bb-text-tertiary)]">
                           {w.creative.email}
                         </div>
                       </TD>
@@ -432,16 +432,16 @@ export default function AdminWithdrawalsPage() {
                         <div className="space-y-1">
                           {renderStatusBadge(w.status)}
                           {w.status === "REJECTED" && w.adminRejectReason && (
-                            <p className="text-[10px] text-[#b13832]">
+                            <p className="text-[10px] text-[var(--bb-danger-text)]">
                               {w.adminRejectReason}
                             </p>
                           )}
                         </div>
                       </TD>
-                      <TD className="text-[#7a7a7a]">
+                      <TD className="text-[var(--bb-text-secondary)]">
                         {formatDateTime(w.approvedAt)}
                       </TD>
-                      <TD className="text-[#7a7a7a]">
+                      <TD className="text-[var(--bb-text-secondary)]">
                         {formatDateTime(w.paidAt)}
                       </TD>
                       <TD>

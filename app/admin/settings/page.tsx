@@ -140,7 +140,7 @@ export default function AdminSettingsPage() {
       {/* Page header */}
         <div className="mb-6">
           <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-          <p className="mt-1 text-sm text-[#7a7a7a]">
+          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
             Global configuration for the Brandbite platform. Changes take effect
             immediately.
           </p>
@@ -168,17 +168,17 @@ export default function AdminSettingsPage() {
               return (
                 <div
                   key={key}
-                  className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm"
+                  className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm"
                 >
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                     <div className="flex-1">
                       <label
                         htmlFor={`setting-${key}`}
-                        className="text-sm font-semibold text-[#424143]"
+                        className="text-sm font-semibold text-[var(--bb-secondary)]"
                       >
                         {meta.label}
                       </label>
-                      <p className="mt-1 text-xs text-[#7a7a7a]">
+                      <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
                         {meta.description}
                       </p>
                       <FormInput
@@ -195,7 +195,7 @@ export default function AdminSettingsPage() {
                         className="mt-3 max-w-xs"
                       />
                       {currentValue && (
-                        <p className="mt-1.5 text-[11px] text-[#9a9892]">
+                        <p className="mt-1.5 text-[11px] text-[var(--bb-text-tertiary)]">
                           Current value:{" "}
                           <span className="font-semibold">{currentValue}</span>
                         </p>
@@ -219,22 +219,22 @@ export default function AdminSettingsPage() {
 
         {/* Debug tools */}
         <div className="mt-10">
-          <h2 className="text-lg font-semibold tracking-tight text-[#424143]">
+          <h2 className="text-lg font-semibold tracking-tight text-[var(--bb-secondary)]">
             Debug tools
           </h2>
-          <p className="mt-1 text-sm text-[#7a7a7a]">
+          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
             Internal tools for inspecting and configuring platform behaviour.
           </p>
 
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Link
               href="/debug/auto-assign"
-              className="group rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm transition-colors hover:border-[#f15b2b]/40 hover:bg-[#fff5ef]"
+              className="group rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm transition-colors hover:border-[var(--bb-primary)]/40 hover:bg-[var(--bb-primary-light)]"
             >
-              <h3 className="text-sm font-semibold text-[#424143] group-hover:text-[#f15b2b]">
+              <h3 className="text-sm font-semibold text-[var(--bb-secondary)] group-hover:text-[var(--bb-primary)]">
                 Auto-assign configuration
               </h3>
-              <p className="mt-1 text-xs text-[#7a7a7a]">
+              <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
                 View and toggle auto-assign settings at company and project
                 level. Inspect per-project modes (inherit, on, off).
               </p>
@@ -242,12 +242,12 @@ export default function AdminSettingsPage() {
 
             <Link
               href="/debug/assignment-log"
-              className="group rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm transition-colors hover:border-[#f15b2b]/40 hover:bg-[#fff5ef]"
+              className="group rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm transition-colors hover:border-[var(--bb-primary)]/40 hover:bg-[var(--bb-primary-light)]"
             >
-              <h3 className="text-sm font-semibold text-[#424143] group-hover:text-[#f15b2b]">
+              <h3 className="text-sm font-semibold text-[var(--bb-secondary)] group-hover:text-[var(--bb-primary)]">
                 Assignment log
               </h3>
-              <p className="mt-1 text-xs text-[#7a7a7a]">
+              <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
                 Review ticket assignment history and auto-assign decisions
                 across the platform.
               </p>
@@ -255,12 +255,12 @@ export default function AdminSettingsPage() {
 
             <Link
               href="/debug/demo-user"
-              className="group rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm transition-colors hover:border-[#f15b2b]/40 hover:bg-[#fff5ef]"
+              className="group rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm transition-colors hover:border-[var(--bb-primary)]/40 hover:bg-[var(--bb-primary-light)]"
             >
-              <h3 className="text-sm font-semibold text-[#424143] group-hover:text-[#f15b2b]">
+              <h3 className="text-sm font-semibold text-[var(--bb-secondary)] group-hover:text-[var(--bb-primary)]">
                 Demo user switcher
               </h3>
-              <p className="mt-1 text-xs text-[#7a7a7a]">
+              <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
                 Switch between demo personas to test different user roles and
                 permissions.
               </p>

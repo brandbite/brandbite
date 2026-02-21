@@ -104,13 +104,13 @@ function billingStatusClassName(
 ): string {
   switch (status) {
     case "ACTIVE":
-      return "bg-[#f0fff6] text-[#137a3a]";
+      return "bg-[var(--bb-success-bg)] text-[var(--bb-success-text)]";
     case "PAST_DUE":
-      return "bg-[#fff4e6] text-[#9a5b2b]";
+      return "bg-[var(--bb-warning-bg)] text-[var(--bb-warning-text)]";
     case "CANCELED":
-      return "bg-[#f5f3f0] text-[#9a9892]";
+      return "bg-[var(--bb-bg-card)] text-[var(--bb-text-tertiary)]";
     default:
-      return "bg-[#f5f3f0] text-[#9a9892]";
+      return "bg-[var(--bb-bg-card)] text-[var(--bb-text-tertiary)]";
   }
 }
 
@@ -588,7 +588,7 @@ export default function CustomerSettingsPage() {
             <h1 className="text-2xl font-semibold tracking-tight">
               Settings
             </h1>
-            <p className="mt-1 text-sm text-[#7a7a7a]">
+            <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
               Your account, company and subscription information.
             </p>
           </div>
@@ -619,7 +619,7 @@ export default function CustomerSettingsPage() {
 
         {/* Content */}
         {loading ? (
-          <div className="mt-6 text-sm text-[#7a7a7a]">
+          <div className="mt-6 text-sm text-[var(--bb-text-secondary)]">
             Loading settings…
           </div>
         ) : !data ? (
@@ -631,13 +631,13 @@ export default function CustomerSettingsPage() {
             {/* ============================================================ */}
             {/* Account card                                                  */}
             {/* ============================================================ */}
-            <section className="md:col-span-1 rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
+            <section className="md:col-span-1 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-sm font-semibold tracking-tight">
                     Account
                   </h2>
-                  <p className="mt-1 text-xs text-[#7a7a7a]">
+                  <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
                     Your personal profile inside Brandbite.
                   </p>
                 </div>
@@ -645,7 +645,7 @@ export default function CustomerSettingsPage() {
                   <button
                     type="button"
                     onClick={startEditingUser}
-                    className="inline-flex items-center gap-1 rounded-full border border-[#e3e1dc] px-2.5 py-1 text-[11px] font-medium text-[#7a7a7a] transition-colors hover:border-[#f15b2b] hover:text-[#f15b2b]"
+                    className="inline-flex items-center gap-1 rounded-full border border-[var(--bb-border)] px-2.5 py-1 text-[11px] font-medium text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
                   >
                     <PencilIcon />
                     Edit
@@ -653,10 +653,10 @@ export default function CustomerSettingsPage() {
                 )}
               </div>
 
-              <div className="mt-3 space-y-2 text-xs text-[#424143]">
+              <div className="mt-3 space-y-2 text-xs text-[var(--bb-secondary)]">
                 {/* Name — editable */}
                 <div>
-                  <p className="text-[11px] font-medium text-[#9a9892]">
+                  <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
                     Name
                   </p>
                   {editingUser ? (
@@ -680,7 +680,7 @@ export default function CustomerSettingsPage() {
 
                 {/* Email — always read-only */}
                 <div>
-                  <p className="text-[11px] font-medium text-[#9a9892]">
+                  <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
                     Email
                   </p>
                   <p className="mt-0.5">{user?.email}</p>
@@ -688,7 +688,7 @@ export default function CustomerSettingsPage() {
 
                 {/* Role — always read-only */}
                 <div>
-                  <p className="text-[11px] font-medium text-[#9a9892]">
+                  <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
                     Role
                   </p>
                   <p className="mt-0.5">
@@ -698,7 +698,7 @@ export default function CustomerSettingsPage() {
 
                 {/* Company role — always read-only */}
                 <div>
-                  <p className="text-[11px] font-medium text-[#9a9892]">
+                  <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
                     Company role
                   </p>
                   <p className="mt-0.5">
@@ -734,13 +734,13 @@ export default function CustomerSettingsPage() {
             {/* ============================================================ */}
             {/* Company card                                                  */}
             {/* ============================================================ */}
-            <section className="md:col-span-1 rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
+            <section className="md:col-span-1 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-sm font-semibold tracking-tight">
                     Company
                   </h2>
-                  <p className="mt-1 text-xs text-[#7a7a7a]">
+                  <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
                     The workspace your requests belong to.
                   </p>
                 </div>
@@ -748,7 +748,7 @@ export default function CustomerSettingsPage() {
                   <button
                     type="button"
                     onClick={startEditingCompany}
-                    className="inline-flex items-center gap-1 rounded-full border border-[#e3e1dc] px-2.5 py-1 text-[11px] font-medium text-[#7a7a7a] transition-colors hover:border-[#f15b2b] hover:text-[#f15b2b]"
+                    className="inline-flex items-center gap-1 rounded-full border border-[var(--bb-border)] px-2.5 py-1 text-[11px] font-medium text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
                   >
                     <PencilIcon />
                     Edit
@@ -756,10 +756,10 @@ export default function CustomerSettingsPage() {
                 )}
               </div>
 
-              <div className="mt-3 space-y-2 text-xs text-[#424143]">
+              <div className="mt-3 space-y-2 text-xs text-[var(--bb-secondary)]">
                 {/* Name — editable (OWNER + PM) */}
                 <div>
-                  <p className="text-[11px] font-medium text-[#9a9892]">
+                  <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
                     Name
                   </p>
                   {editingCompany ? (
@@ -781,7 +781,7 @@ export default function CustomerSettingsPage() {
 
                 {/* Slug — always read-only */}
                 <div>
-                  <p className="text-[11px] font-medium text-[#9a9892]">
+                  <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
                     Slug
                   </p>
                   <p className="mt-0.5">{company?.slug}</p>
@@ -789,7 +789,7 @@ export default function CustomerSettingsPage() {
 
                 {/* Website — editable (OWNER + PM) */}
                 <div>
-                  <p className="text-[11px] font-medium text-[#9a9892]">
+                  <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
                     Website
                   </p>
                   {editingCompany ? (
@@ -809,7 +809,7 @@ export default function CustomerSettingsPage() {
                       href={company.website}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="mt-0.5 inline-block text-[#f15b2b] underline decoration-[#f15b2b]/30 hover:decoration-[#f15b2b]"
+                      className="mt-0.5 inline-block text-[var(--bb-primary)] underline decoration-[var(--bb-primary)]/30 hover:decoration-[var(--bb-primary)]"
                     >
                       {company.website}
                     </a>
@@ -821,7 +821,7 @@ export default function CustomerSettingsPage() {
                 {/* Counts — always read-only */}
                 <div className="grid grid-cols-3 gap-2">
                   <div>
-                    <p className="text-[11px] font-medium text-[#9a9892]">
+                    <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
                       Members
                     </p>
                     <p className="mt-0.5">
@@ -829,7 +829,7 @@ export default function CustomerSettingsPage() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-[11px] font-medium text-[#9a9892]">
+                    <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
                       Projects
                     </p>
                     <p className="mt-0.5">
@@ -837,7 +837,7 @@ export default function CustomerSettingsPage() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-[11px] font-medium text-[#9a9892]">
+                    <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
                       Tickets
                     </p>
                     <p className="mt-0.5">
@@ -848,7 +848,7 @@ export default function CustomerSettingsPage() {
 
                 {/* Created at — always read-only */}
                 <div>
-                  <p className="text-[11px] font-medium text-[#9a9892]">
+                  <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
                     Created at
                   </p>
                   <p className="mt-0.5">
@@ -886,19 +886,19 @@ export default function CustomerSettingsPage() {
             {/* ============================================================ */}
             {/* Plan card                                                     */}
             {/* ============================================================ */}
-            <section className="md:col-span-1 rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
+            <section className="md:col-span-1 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
               <h2 className="text-sm font-semibold tracking-tight">
                 Subscription plan
               </h2>
-              <p className="mt-1 text-xs text-[#7a7a7a]">
+              <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
                 The plan that defines your monthly token allowance.
               </p>
 
               {plan ? (
-                <div className="mt-3 space-y-2 text-xs text-[#424143]">
+                <div className="mt-3 space-y-2 text-xs text-[var(--bb-secondary)]">
                   {!canManagePlan && (
-                    <div className="rounded-lg border border-[#f6c89f] bg-[#fff4e6] px-3 py-2 text-[11px] text-[#7a7a7a]">
-                      <p className="text-[11px] font-medium text-[#9a5b2b]">
+                    <div className="rounded-lg border border-[var(--bb-warning-border)] bg-[var(--bb-warning-bg)] px-3 py-2 text-[11px] text-[var(--bb-text-secondary)]">
+                      <p className="text-[11px] font-medium text-[var(--bb-warning-text)]">
                         Limited access
                       </p>
                       <p className="mt-1">
@@ -910,13 +910,13 @@ export default function CustomerSettingsPage() {
                     </div>
                   )}
                   <div>
-                    <p className="text-[11px] font-medium text-[#9a9892]">
+                    <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
                       Plan name
                     </p>
                     <p className="mt-0.5">{plan.name}</p>
                   </div>
                   <div>
-                    <p className="text-[11px] font-medium text-[#9a9892]">
+                    <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
                       Monthly tokens
                     </p>
                     <p className="mt-0.5">
@@ -924,7 +924,7 @@ export default function CustomerSettingsPage() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-[11px] font-medium text-[#9a9892]">
+                    <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
                       Price
                     </p>
                     <p className="mt-0.5">
@@ -933,7 +933,7 @@ export default function CustomerSettingsPage() {
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <div>
-                      <p className="text-[11px] font-medium text-[#9a9892]">
+                      <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
                         Subscription status
                       </p>
                       <div className="mt-1">
@@ -960,7 +960,7 @@ export default function CustomerSettingsPage() {
                   )}
 
                   <div className="mt-2 flex items-center justify-between gap-2">
-                    <div className="rounded-lg bg-[#fbfaf8] px-3 py-2 text-[11px] text-[#7a7a7a]">
+                    <div className="rounded-lg bg-[var(--bb-bg-page)] px-3 py-2 text-[11px] text-[var(--bb-text-secondary)]">
                       {canManagePlan ? (
                         <>
                           Use the button on the right to manage your
@@ -981,7 +981,7 @@ export default function CustomerSettingsPage() {
                         type="button"
                         onClick={handleStartBillingCheckout}
                         disabled={billingLoading || !plan.isActive}
-                        className="inline-flex flex-shrink-0 items-center justify-center rounded-full bg-[#f15b2b] px-3 py-2 text-[11px] font-semibold text-white shadow-sm disabled:opacity-60"
+                        className="inline-flex flex-shrink-0 items-center justify-center rounded-full bg-[var(--bb-primary)] px-3 py-2 text-[11px] font-semibold text-white shadow-sm disabled:opacity-60"
                       >
                         {billingLoading
                           ? "Redirecting\u2026"
@@ -991,7 +991,7 @@ export default function CustomerSettingsPage() {
                   </div>
                 </div>
               ) : (
-                <div className="mt-3 rounded-lg bg-[#fbfaf8] px-3 py-2 text-[11px] text-[#7a7a7a]">
+                <div className="mt-3 rounded-lg bg-[var(--bb-bg-page)] px-3 py-2 text-[11px] text-[var(--bb-text-secondary)]">
                   No subscription plan is assigned to your company yet.
                   Please contact support if this does not look correct.
                 </div>
@@ -1002,24 +1002,24 @@ export default function CustomerSettingsPage() {
 
         {/* Notification preferences */}
         {!loading && data && (
-          <div className="mt-6 rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">
-            <h2 className="text-sm font-semibold text-[#424143]">
+          <div className="mt-6 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
+            <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">
               Notification preferences
             </h2>
-            <p className="mt-0.5 text-[11px] text-[#9a9892]">
+            <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
               Choose which events you want to be notified about
             </p>
 
             {notifPrefsLoading ? (
-              <p className="mt-4 text-xs text-[#9a9892]">Loading preferences...</p>
+              <p className="mt-4 text-xs text-[var(--bb-text-tertiary)]">Loading preferences...</p>
             ) : (
               <div className="mt-4">
                 {/* Column headers */}
                 <div className="flex items-center justify-end gap-4 px-3 pb-2">
-                  <span className="w-9 text-center text-[10px] font-medium uppercase tracking-wider text-[#9a9892]">
+                  <span className="w-9 text-center text-[10px] font-medium uppercase tracking-wider text-[var(--bb-text-tertiary)]">
                     In-app
                   </span>
-                  <span className="w-9 text-center text-[10px] font-medium uppercase tracking-wider text-[#9a9892]">
+                  <span className="w-9 text-center text-[10px] font-medium uppercase tracking-wider text-[var(--bb-text-tertiary)]">
                     Email
                   </span>
                 </div>
@@ -1034,11 +1034,11 @@ export default function CustomerSettingsPage() {
                   return (
                     <div
                       key={pref.type}
-                      className="flex items-center justify-between rounded-xl px-3 py-3 transition-colors hover:bg-[#f5f3f0]/50"
+                      className="flex items-center justify-between rounded-xl px-3 py-3 transition-colors hover:bg-[var(--bb-bg-card)]/50"
                     >
                       <div className="mr-4 min-w-0 flex-1">
-                        <p className="text-xs font-medium text-[#424143]">{pref.label}</p>
-                        <p className="mt-0.5 text-[10px] text-[#9a9892]">{pref.description}</p>
+                        <p className="text-xs font-medium text-[var(--bb-secondary)]">{pref.label}</p>
+                        <p className="mt-0.5 text-[10px] text-[var(--bb-text-tertiary)]">{pref.description}</p>
                       </div>
                       <div className="flex items-center gap-4">
                         {/* In-app toggle */}
@@ -1050,11 +1050,11 @@ export default function CustomerSettingsPage() {
                           disabled={isTogglingInApp}
                           onClick={() => handleTogglePref(pref.type, "enabled", enabled)}
                           className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
-                            enabled ? "bg-[#f15b2b]" : "bg-[#d0cec9]"
+                            enabled ? "bg-[var(--bb-primary)]" : "bg-[var(--bb-border-input)]"
                           }`}
                         >
                           <span
-                            className={`pointer-events-none inline-block h-4 w-4 translate-y-0.5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                            className={`pointer-events-none inline-block h-4 w-4 translate-y-0.5 rounded-full bg-[var(--bb-bg-page)] shadow-sm transition-transform duration-200 ${
                               enabled ? "translate-x-[18px]" : "translate-x-0.5"
                             }`}
                           />
@@ -1068,11 +1068,11 @@ export default function CustomerSettingsPage() {
                           disabled={isTogglingEmail}
                           onClick={() => handleTogglePref(pref.type, "emailEnabled", emailEnabled)}
                           className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
-                            emailEnabled ? "bg-[#f15b2b]" : "bg-[#d0cec9]"
+                            emailEnabled ? "bg-[var(--bb-primary)]" : "bg-[var(--bb-border-input)]"
                           }`}
                         >
                           <span
-                            className={`pointer-events-none inline-block h-4 w-4 translate-y-0.5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                            className={`pointer-events-none inline-block h-4 w-4 translate-y-0.5 rounded-full bg-[var(--bb-bg-page)] shadow-sm transition-transform duration-200 ${
                               emailEnabled ? "translate-x-[18px]" : "translate-x-0.5"
                             }`}
                           />
@@ -1089,20 +1089,20 @@ export default function CustomerSettingsPage() {
 
         {/* Tag management — OWNER + PM only */}
         {!loading && data && canEditCompany && (
-          <div className="mt-6 rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">
-            <h2 className="text-sm font-semibold text-[#424143]">Tags</h2>
-            <p className="mt-0.5 text-[11px] text-[#9a9892]">
+          <div className="mt-6 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
+            <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">Tags</h2>
+            <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
               Manage tags used to categorize creative requests across your
               company.
             </p>
 
             {tagsLoading ? (
-              <p className="mt-4 text-xs text-[#9a9892]">Loading tags…</p>
+              <p className="mt-4 text-xs text-[var(--bb-text-tertiary)]">Loading tags…</p>
             ) : (
               <>
                 {/* Existing tags */}
                 {tags.length === 0 ? (
-                  <p className="mt-4 text-xs text-[#9a9892]">
+                  <p className="mt-4 text-xs text-[var(--bb-text-tertiary)]">
                     No tags yet. Create your first tag below.
                   </p>
                 ) : (
@@ -1110,7 +1110,7 @@ export default function CustomerSettingsPage() {
                     {tags.map((tag) => (
                       <div
                         key={tag.id}
-                        className="flex items-center justify-between rounded-xl bg-[#f7f5f0] px-3 py-2"
+                        className="flex items-center justify-between rounded-xl bg-[var(--bb-bg-warm)] px-3 py-2"
                       >
                         {editingTagId === tag.id ? (
                           <div className="flex flex-1 flex-wrap items-center gap-2">
@@ -1121,7 +1121,7 @@ export default function CustomerSettingsPage() {
                                 setEditTagName(e.target.value)
                               }
                               maxLength={30}
-                              className="w-32 rounded border border-[#e3e1dc] px-2 py-1 text-[12px] text-[#424143] focus:border-[#f15b2b] focus:outline-none"
+                              className="w-32 rounded border border-[var(--bb-border)] px-2 py-1 text-[12px] text-[var(--bb-secondary)] focus:border-[var(--bb-primary)] focus:outline-none"
                               autoFocus
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") {
@@ -1139,7 +1139,7 @@ export default function CustomerSettingsPage() {
                                   onClick={() => setEditTagColor(key)}
                                   className={`h-6 w-6 rounded-full border-2 ${
                                     editTagColor === key
-                                      ? "border-[#424143] scale-110"
+                                      ? "border-[var(--bb-secondary)] scale-110"
                                       : "border-transparent"
                                   }`}
                                   style={{
@@ -1161,7 +1161,7 @@ export default function CustomerSettingsPage() {
                             <button
                               type="button"
                               onClick={cancelEditingTag}
-                              className="text-[11px] text-[#9a9892] hover:text-[#424143]"
+                              className="text-[11px] text-[var(--bb-text-tertiary)] hover:text-[var(--bb-secondary)]"
                             >
                               Cancel
                             </button>
@@ -1176,7 +1176,7 @@ export default function CustomerSettingsPage() {
                               <button
                                 type="button"
                                 onClick={() => startEditingTag(tag)}
-                                className="rounded p-1 text-[#9a9892] hover:text-[#424143]"
+                                className="rounded p-1 text-[var(--bb-text-tertiary)] hover:text-[var(--bb-secondary)]"
                                 title="Edit tag"
                               >
                                 <PencilIcon />
@@ -1185,7 +1185,7 @@ export default function CustomerSettingsPage() {
                                 type="button"
                                 onClick={() => setTagToDelete(tag.id)}
                                 disabled={deletingTagId === tag.id}
-                                className="rounded p-1 text-[#9a9892] hover:text-[#b13832] disabled:opacity-50"
+                                className="rounded p-1 text-[var(--bb-text-tertiary)] hover:text-[var(--bb-danger-text)] disabled:opacity-50"
                                 title="Delete tag"
                               >
                                 <svg
@@ -1213,8 +1213,8 @@ export default function CustomerSettingsPage() {
                 )}
 
                 {/* Add new tag */}
-                <div className="mt-4 rounded-xl border border-dashed border-[#d4d2ce] bg-white px-3 py-3">
-                  <p className="mb-2 text-[11px] font-medium text-[#9a9892]">
+                <div className="mt-4 rounded-xl border border-dashed border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-3">
+                  <p className="mb-2 text-[11px] font-medium text-[var(--bb-text-tertiary)]">
                     Add a new tag
                   </p>
                   <div className="flex flex-wrap items-center gap-2">
@@ -1224,7 +1224,7 @@ export default function CustomerSettingsPage() {
                       onChange={(e) => setNewTagName(e.target.value)}
                       placeholder="Tag name"
                       maxLength={30}
-                      className="w-40 rounded border border-[#e3e1dc] px-2 py-1.5 text-[12px] text-[#424143] placeholder:text-[#9a9892] focus:border-[#f15b2b] focus:outline-none"
+                      className="w-40 rounded border border-[var(--bb-border)] px-2 py-1.5 text-[12px] text-[var(--bb-secondary)] placeholder:text-[var(--bb-text-tertiary)] focus:border-[var(--bb-primary)] focus:outline-none"
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           e.preventDefault();
@@ -1240,7 +1240,7 @@ export default function CustomerSettingsPage() {
                           onClick={() => setNewTagColor(key)}
                           className={`h-6 w-6 rounded-full border-2 transition-transform ${
                             newTagColor === key
-                              ? "scale-110 border-[#424143]"
+                              ? "scale-110 border-[var(--bb-secondary)]"
                               : "border-transparent hover:scale-105"
                           }`}
                           style={{

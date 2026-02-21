@@ -203,9 +203,9 @@ export function PauseControl() {
 
   return (
     <>
-      <div className="mb-4 rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">
-        <h2 className="text-sm font-semibold text-[#424143]">Availability</h2>
-        <p className="mt-0.5 text-[11px] text-[#9a9892]">
+      <div className="mb-4 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
+        <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">Availability</h2>
+        <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
           Pause to stop receiving new ticket assignments. Your existing work is
           not affected.
         </p>
@@ -242,7 +242,7 @@ export function PauseControl() {
             {PAUSE_OPTIONS.map((opt) => (
               <label
                 key={opt.value}
-                className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-[#f5f3f0]/50"
+                className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-[var(--bb-bg-card)]/50"
               >
                 <input
                   type="radio"
@@ -250,13 +250,13 @@ export function PauseControl() {
                   value={opt.value}
                   checked={selectedType === opt.value}
                   onChange={() => setSelectedType(opt.value)}
-                  className="h-4 w-4 accent-[#f15b2b]"
+                  className="h-4 w-4 accent-[var(--bb-primary)]"
                 />
                 <div>
-                  <p className="text-xs font-medium text-[#424143]">
+                  <p className="text-xs font-medium text-[var(--bb-secondary)]">
                     {opt.label}
                   </p>
-                  <p className="text-[10px] text-[#9a9892]">
+                  <p className="text-[10px] text-[var(--bb-text-tertiary)]">
                     {opt.description}
                   </p>
                 </div>

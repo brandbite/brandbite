@@ -170,13 +170,13 @@ export default function AdminDashboardPage() {
       {/* Header */}
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b1afa9]">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
             Admin
           </p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">
             Dashboard
           </h1>
-          <p className="mt-1 text-xs text-[#9a9892]">
+          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
             Platform-wide analytics and health overview.
           </p>
         </div>
@@ -198,15 +198,15 @@ export default function AdminDashboardPage() {
           {/* Row 1: Platform overview cards */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {/* Companies */}
-            <section className="relative overflow-hidden rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">
+            <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
               <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-[#6366F1] to-[#A5B4FC]" />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#b1afa9]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
                 Companies
               </p>
-              <p className="mt-2 text-3xl font-bold text-[#424143]">
+              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">
                 {platform?.totalCompanies ?? "\u2014"}
               </p>
-              <p className="text-[11px] text-[#9a9892]">
+              <p className="text-[11px] text-[var(--bb-text-tertiary)]">
                 <span className="font-semibold text-[#6366F1]">
                   {platform?.activeCompanies ?? 0}
                 </span>{" "}
@@ -215,27 +215,27 @@ export default function AdminDashboardPage() {
             </section>
 
             {/* Creatives */}
-            <section className="relative overflow-hidden rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">
+            <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
               <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-[#F15B2B] to-[#f6a07a]" />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#b1afa9]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
                 Creatives
               </p>
-              <p className="mt-2 text-3xl font-bold text-[#424143]">
+              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">
                 {platform?.totalCreatives ?? "\u2014"}
               </p>
-              <p className="text-[11px] text-[#9a9892]">registered on platform</p>
+              <p className="text-[11px] text-[var(--bb-text-tertiary)]">registered on platform</p>
             </section>
 
             {/* Tickets */}
-            <section className="relative overflow-hidden rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">
+            <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
               <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-[#3B82F6] to-[#93C5FD]" />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#b1afa9]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
                 Tickets
               </p>
-              <p className="mt-2 text-3xl font-bold text-[#424143]">
+              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">
                 {platform?.totalTickets ?? "\u2014"}
               </p>
-              <div className="flex gap-3 text-[11px] text-[#9a9892]">
+              <div className="flex gap-3 text-[11px] text-[var(--bb-text-tertiary)]">
                 <span>
                   <span className="font-semibold text-[#22C55E]">
                     +{platform?.ticketsCreatedLast30Days ?? 0}
@@ -252,17 +252,17 @@ export default function AdminDashboardPage() {
             </section>
 
             {/* Tokens */}
-            <section className="relative overflow-hidden rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">
+            <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
               <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-[#22C55E] to-[#86EFAC]" />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#b1afa9]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
                 Token economy
               </p>
-              <p className="mt-2 text-3xl font-bold text-[#424143]">
+              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">
                 {tokens?.totalCompanyBalances?.toLocaleString() ?? "\u2014"}
               </p>
-              <p className="text-[11px] text-[#9a9892]">total company balances</p>
+              <p className="text-[11px] text-[var(--bb-text-tertiary)]">total company balances</p>
               {tokens && (
-                <div className="mt-2 flex gap-3 text-[11px] text-[#9a9892]">
+                <div className="mt-2 flex gap-3 text-[11px] text-[var(--bb-text-tertiary)]">
                   <span>
                     Credits{" "}
                     <span className="font-semibold text-[#22C55E]">
@@ -284,11 +284,11 @@ export default function AdminDashboardPage() {
           {platform && platform.totalTickets > 0 && (
             <div className="grid gap-4 md:grid-cols-2">
               {/* Ticket distribution chart */}
-              <section className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">
-                <h2 className="text-sm font-semibold tracking-tight text-[#424143]">
+              <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
+                <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
                   Ticket distribution
                 </h2>
-                <p className="mt-0.5 text-[11px] text-[#9a9892]">
+                <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
                   All tickets by workflow status
                 </p>
                 <div className="mt-4 h-48">
@@ -299,20 +299,20 @@ export default function AdminDashboardPage() {
                     >
                       <XAxis
                         dataKey="name"
-                        tick={{ fontSize: 11, fill: "#9a9892" }}
+                        tick={{ fontSize: 11, fill: "var(--bb-text-tertiary)" }}
                         axisLine={false}
                         tickLine={false}
                       />
                       <YAxis
                         allowDecimals={false}
-                        tick={{ fontSize: 11, fill: "#9a9892" }}
+                        tick={{ fontSize: 11, fill: "var(--bb-text-tertiary)" }}
                         axisLine={false}
                         tickLine={false}
                       />
                       <Tooltip
                         contentStyle={{
                           borderRadius: 12,
-                          border: "1px solid #e3e1dc",
+                          border: "1px solid var(--bb-border)",
                           fontSize: 12,
                         }}
                       />
@@ -327,11 +327,11 @@ export default function AdminDashboardPage() {
               </section>
 
               {/* Priority distribution chart */}
-              <section className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">
-                <h2 className="text-sm font-semibold tracking-tight text-[#424143]">
+              <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
+                <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
                   Priority distribution
                 </h2>
-                <p className="mt-0.5 text-[11px] text-[#9a9892]">
+                <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
                   All tickets by priority level
                 </p>
                 <div className="mt-4 h-48">
@@ -342,20 +342,20 @@ export default function AdminDashboardPage() {
                     >
                       <XAxis
                         dataKey="name"
-                        tick={{ fontSize: 11, fill: "#9a9892" }}
+                        tick={{ fontSize: 11, fill: "var(--bb-text-tertiary)" }}
                         axisLine={false}
                         tickLine={false}
                       />
                       <YAxis
                         allowDecimals={false}
-                        tick={{ fontSize: 11, fill: "#9a9892" }}
+                        tick={{ fontSize: 11, fill: "var(--bb-text-tertiary)" }}
                         axisLine={false}
                         tickLine={false}
                       />
                       <Tooltip
                         contentStyle={{
                           borderRadius: 12,
-                          border: "1px solid #e3e1dc",
+                          border: "1px solid var(--bb-border)",
                           fontSize: 12,
                         }}
                       />
@@ -374,7 +374,7 @@ export default function AdminDashboardPage() {
           {/* Row 3: Health indicators + metrics */}
           <div className="grid gap-4 md:grid-cols-3">
             {/* Health: Low balance companies */}
-            <section className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">
+            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
               <div className="flex items-center gap-2">
                 <span
                   className={`inline-flex h-2.5 w-2.5 rounded-full ${
@@ -385,20 +385,20 @@ export default function AdminDashboardPage() {
                   aria-label={(health?.companiesLowBalance ?? 0) > 0 ? "Attention needed" : "All clear"}
                   title={(health?.companiesLowBalance ?? 0) > 0 ? "Attention needed" : "All clear"}
                 />
-                <h2 className="text-sm font-semibold tracking-tight text-[#424143]">
+                <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
                   Low balance
                 </h2>
               </div>
-              <p className="mt-2 text-3xl font-bold text-[#424143]">
+              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">
                 {health?.companiesLowBalance ?? 0}
               </p>
-              <p className="text-[11px] text-[#9a9892]">
+              <p className="text-[11px] text-[var(--bb-text-tertiary)]">
                 companies with &lt; 5 tokens
               </p>
             </section>
 
             {/* Health: Overdue tickets */}
-            <section className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">
+            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
               <div className="flex items-center gap-2">
                 <span
                   className={`inline-flex h-2.5 w-2.5 rounded-full ${
@@ -409,20 +409,20 @@ export default function AdminDashboardPage() {
                   aria-label={(health?.overdueTickets ?? 0) > 0 ? "Attention needed" : "All clear"}
                   title={(health?.overdueTickets ?? 0) > 0 ? "Attention needed" : "All clear"}
                 />
-                <h2 className="text-sm font-semibold tracking-tight text-[#424143]">
+                <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
                   Overdue tickets
                 </h2>
               </div>
-              <p className="mt-2 text-3xl font-bold text-[#424143]">
+              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">
                 {health?.overdueTickets ?? 0}
               </p>
-              <p className="text-[11px] text-[#9a9892]">
+              <p className="text-[11px] text-[var(--bb-text-tertiary)]">
                 past due date, not completed
               </p>
             </section>
 
             {/* Health: Stale tickets */}
-            <section className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">
+            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
               <div className="flex items-center gap-2">
                 <span
                   className={`inline-flex h-2.5 w-2.5 rounded-full ${
@@ -433,14 +433,14 @@ export default function AdminDashboardPage() {
                   aria-label={(health?.staleTickets ?? 0) > 0 ? "Attention needed" : "All clear"}
                   title={(health?.staleTickets ?? 0) > 0 ? "Attention needed" : "All clear"}
                 />
-                <h2 className="text-sm font-semibold tracking-tight text-[#424143]">
+                <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
                   Stale tickets
                 </h2>
               </div>
-              <p className="mt-2 text-3xl font-bold text-[#424143]">
+              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">
                 {health?.staleTickets ?? 0}
               </p>
-              <p className="text-[11px] text-[#9a9892]">
+              <p className="text-[11px] text-[var(--bb-text-tertiary)]">
                 in progress &gt; 7 days without update
               </p>
             </section>
@@ -449,45 +449,45 @@ export default function AdminDashboardPage() {
           {/* Row 4: Additional metrics + Quick links */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {/* Avg revisions */}
-            <section className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#b1afa9]">
+            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
                 Avg. revisions
               </p>
-              <p className="mt-2 text-2xl font-bold text-[#424143]">
+              <p className="mt-2 text-2xl font-bold text-[var(--bb-secondary)]">
                 {platform?.avgRevisionCount ?? "\u2014"}
               </p>
-              <p className="text-[11px] text-[#9a9892]">
+              <p className="text-[11px] text-[var(--bb-text-tertiary)]">
                 per completed ticket
               </p>
             </section>
 
             {/* Pending withdrawals */}
-            <section className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#b1afa9]">
+            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
                 Pending payouts
               </p>
-              <p className="mt-2 text-2xl font-bold text-[#424143]">
+              <p className="mt-2 text-2xl font-bold text-[var(--bb-secondary)]">
                 {withdrawals?.pendingCount ?? 0}
               </p>
-              <p className="text-[11px] text-[#9a9892]">
+              <p className="text-[11px] text-[var(--bb-text-tertiary)]">
                 {withdrawals?.pendingAmount?.toLocaleString() ?? 0} tokens total
               </p>
             </section>
 
             {/* Total paid */}
-            <section className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#b1afa9]">
+            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
                 Total paid out
               </p>
-              <p className="mt-2 text-2xl font-bold text-[#424143]">
+              <p className="mt-2 text-2xl font-bold text-[var(--bb-secondary)]">
                 {withdrawals?.totalPaid?.toLocaleString() ?? 0}
               </p>
-              <p className="text-[11px] text-[#9a9892]">tokens to creatives</p>
+              <p className="text-[11px] text-[var(--bb-text-tertiary)]">tokens to creatives</p>
             </section>
 
             {/* Net tokens */}
-            <section className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#b1afa9]">
+            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
                 Net token flow
               </p>
               <p className={`mt-2 text-2xl font-bold ${
@@ -496,7 +496,7 @@ export default function AdminDashboardPage() {
                 {(tokens?.globalNet ?? 0) >= 0 ? "+" : ""}
                 {tokens?.globalNet?.toLocaleString() ?? 0}
               </p>
-              <p className="text-[11px] text-[#9a9892]">credits minus debits</p>
+              <p className="text-[11px] text-[var(--bb-text-tertiary)]">credits minus debits</p>
             </section>
           </div>
 
@@ -504,17 +504,17 @@ export default function AdminDashboardPage() {
           <div className="grid gap-4 md:grid-cols-3">
             <Link
               href="/admin/withdrawals"
-              className="group rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm transition-colors hover:border-[#F15B2B]"
+              className="group rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm transition-colors hover:border-[#F15B2B]"
             >
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-[#424143]">
+                <h3 className="text-sm font-semibold text-[var(--bb-secondary)]">
                   Withdrawal queue
                 </h3>
                 <span className="text-xs text-[#F15B2B] opacity-0 transition-opacity group-hover:opacity-100">
                   Open &rarr;
                 </span>
               </div>
-              <p className="mt-1 text-[11px] text-[#9a9892]">
+              <p className="mt-1 text-[11px] text-[var(--bb-text-tertiary)]">
                 {withdrawals?.pendingCount ?? 0} pending request
                 {(withdrawals?.pendingCount ?? 0) !== 1 ? "s" : ""}
               </p>
@@ -522,34 +522,34 @@ export default function AdminDashboardPage() {
 
             <Link
               href="/admin/token-analytics"
-              className="group rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm transition-colors hover:border-[#F15B2B]"
+              className="group rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm transition-colors hover:border-[#F15B2B]"
             >
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-[#424143]">
+                <h3 className="text-sm font-semibold text-[var(--bb-secondary)]">
                   Token analytics
                 </h3>
                 <span className="text-xs text-[#F15B2B] opacity-0 transition-opacity group-hover:opacity-100">
                   Open &rarr;
                 </span>
               </div>
-              <p className="mt-1 text-[11px] text-[#9a9892]">
+              <p className="mt-1 text-[11px] text-[var(--bb-text-tertiary)]">
                 Detailed per-company token breakdowns
               </p>
             </Link>
 
             <Link
               href="/admin/companies"
-              className="group rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm transition-colors hover:border-[#F15B2B]"
+              className="group rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm transition-colors hover:border-[#F15B2B]"
             >
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-[#424143]">
+                <h3 className="text-sm font-semibold text-[var(--bb-secondary)]">
                   All companies
                 </h3>
                 <span className="text-xs text-[#F15B2B] opacity-0 transition-opacity group-hover:opacity-100">
                   Open &rarr;
                 </span>
               </div>
-              <p className="mt-1 text-[11px] text-[#9a9892]">
+              <p className="mt-1 text-[11px] text-[var(--bb-text-tertiary)]">
                 {platform?.totalCompanies ?? 0} companies registered
               </p>
             </Link>

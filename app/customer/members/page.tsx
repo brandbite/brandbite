@@ -394,23 +394,23 @@ export default function CustomerMembersPage() {
             <h1 className="text-2xl font-semibold tracking-tight">
               Company members
             </h1>
-            <p className="mt-1 text-sm text-[#7a7a7a]">
+            <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
               See who is part of your Brandbite workspace and what they
               can do.
             </p>
             {company && (
-              <p className="mt-1 text-xs text-[#9a9892]">
+              <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
                 Company:{" "}
-                <span className="font-medium text-[#424143]">
+                <span className="font-medium text-[var(--bb-secondary)]">
                   {company.name}
                 </span>{" "}
                 ({company.slug})
               </p>
             )}
             {currentUserRole && (
-              <p className="mt-1 text-xs text-[#9a9892]">
+              <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
                 You are browsing as{" "}
-                <span className="font-medium text-[#424143]">
+                <span className="font-medium text-[var(--bb-secondary)]">
                   {formatCompanyRole(currentUserRole)}
                 </span>
                 .
@@ -428,7 +428,7 @@ export default function CustomerMembersPage() {
           >
             <p>{error}</p>
             {isPermissionError && (
-              <p className="mt-2 text-xs text-[#7a7a7a]">
+              <p className="mt-2 text-xs text-[var(--bb-text-secondary)]">
                 Only company owners and project managers can view and
                 manage the members list and invites for this workspace.
               </p>
@@ -447,11 +447,11 @@ export default function CustomerMembersPage() {
         {!error && (
           <>
             {/* Invite form */}
-            <section className="mt-4 rounded-2xl border border-[#ece5d8] bg-white px-4 py-4 shadow-sm">
-              <h2 className="text-sm font-semibold text-[#424143]">
+            <section className="mt-4 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
+              <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">
                 Invite a new member
               </h2>
-              <p className="mt-1 text-xs text-[#7a7a7a]">
+              <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
                 Send an invite to someone on your team. They will join
                 with the selected role once they accept the invitation.
               </p>
@@ -479,7 +479,7 @@ export default function CustomerMembersPage() {
                 className="mt-3 flex flex-col gap-3 md:flex-row md:items-end"
               >
                 <div className="flex-1">
-                  <label className="text-[11px] font-medium text-[#7a7a7a]">
+                  <label className="text-[11px] font-medium text-[var(--bb-text-secondary)]">
                     Email
                   </label>
                   <FormInput
@@ -495,7 +495,7 @@ export default function CustomerMembersPage() {
                 </div>
 
                 <div className="w-full md:w-44">
-                  <label className="text-[11px] font-medium text-[#7a7a7a]">
+                  <label className="text-[11px] font-medium text-[var(--bb-text-secondary)]">
                     Role
                   </label>
                   <FormSelect
@@ -528,10 +528,10 @@ export default function CustomerMembersPage() {
 
             {/* Pending invites */}
             <section className="mt-6">
-              <h2 className="mb-2 text-sm font-semibold text-[#424143]">
+              <h2 className="mb-2 text-sm font-semibold text-[var(--bb-secondary)]">
                 Pending invites
               </h2>
-              <p className="mb-3 text-xs text-[#7a7a7a]">
+              <p className="mb-3 text-xs text-[var(--bb-text-secondary)]">
                 These people have been invited but have not joined yet.
               </p>
 
@@ -547,13 +547,13 @@ export default function CustomerMembersPage() {
                     return (
                       <article
                         key={invite.id}
-                        className="flex items-center justify-between rounded-2xl border border-[#ece5d8] bg-white px-4 py-3 text-sm shadow-sm"
+                        className="flex items-center justify-between rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-3 text-sm shadow-sm"
                       >
                         <div>
-                          <p className="font-semibold text-[#424143]">
+                          <p className="font-semibold text-[var(--bb-secondary)]">
                             {invite.email}
                           </p>
-                          <p className="text-[11px] text-[#7a7a7a]">
+                          <p className="text-[11px] text-[var(--bb-text-secondary)]">
                             {formatCompanyRole(
                               invite.roleInCompany,
                             )}{" "}
@@ -567,7 +567,7 @@ export default function CustomerMembersPage() {
                             })}
                           </p>
                           {invite.invitedByEmail && (
-                            <p className="mt-1 text-[11px] text-[#9a9892]">
+                            <p className="mt-1 text-[11px] text-[var(--bb-text-tertiary)]">
                               Invited by{" "}
                               {invite.invitedByName ||
                                 invite.invitedByEmail}
@@ -612,25 +612,25 @@ export default function CustomerMembersPage() {
                 return (
                   <article
                     key={member.id}
-                    className="flex flex-col rounded-2xl border border-[#ece5d8] bg-white px-4 py-3 shadow-sm"
+                    className="flex flex-col rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-3 shadow-sm"
                   >
                     <div className="mb-2 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f15b2b]/10 text-sm font-semibold text-[#f15b2b]">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--bb-primary)]/10 text-sm font-semibold text-[var(--bb-primary)]">
                           {initialsForName(
                             member.name ?? member.email,
                           )}
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-[#424143]">
+                          <p className="text-sm font-semibold text-[var(--bb-secondary)]">
                             {member.name || "Unnamed member"}
                             {isYou && (
-                              <span className="ml-1 text-[11px] font-medium text-[#f15b2b]">
+                              <span className="ml-1 text-[11px] font-medium text-[var(--bb-primary)]">
                                 (You)
                               </span>
                             )}
                           </p>
-                          <p className="text-xs text-[#7a7a7a]">
+                          <p className="text-xs text-[var(--bb-text-secondary)]">
                             {member.email}
                           </p>
                         </div>
@@ -638,7 +638,7 @@ export default function CustomerMembersPage() {
 
                       {canEditThisMember ? (
                         <select
-                          className="rounded-full border border-[#e1d9cc] bg-[#f5f3f0] px-2 py-0.5 text-[11px] font-medium text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]/40"
+                          className="rounded-full border border-[var(--bb-border)] bg-[var(--bb-bg-card)] px-2 py-0.5 text-[11px] font-medium text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]/40"
                           value={member.roleInCompany}
                           disabled={isUpdating || isRemoving}
                           onChange={(e) =>
@@ -654,14 +654,14 @@ export default function CustomerMembersPage() {
                           <option value="BILLING">Billing</option>
                         </select>
                       ) : (
-                        <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[11px] font-medium text-[#7a7a7a]">
+                        <span className="rounded-full bg-[var(--bb-bg-card)] px-2 py-0.5 text-[11px] font-medium text-[var(--bb-text-secondary)]">
                           {formatCompanyRole(member.roleInCompany)}
                         </span>
                       )}
                     </div>
 
                     <div className="mt-1 flex items-center justify-between gap-2">
-                      <p className="text-xs text-[#9a9892]">
+                      <p className="text-xs text-[var(--bb-text-tertiary)]">
                         Joined{" "}
                         {new Date(
                           member.joinedAt,
@@ -682,7 +682,7 @@ export default function CustomerMembersPage() {
                               name: member.name || member.email,
                             })
                           }
-                          className="text-[11px] font-medium text-[#c5431a] hover:text-[#a83a16]"
+                          className="text-[11px] font-medium text-[var(--bb-danger-text)] hover:text-[var(--bb-danger-text)]"
                         >
                           {isRemoving ? "Removing…" : "Remove"}
                         </button>
@@ -740,25 +740,25 @@ export default function CustomerMembersPage() {
 function CustomerMembersSkeleton() {
   return (
     <>
-      <div className="mb-4 h-5 w-40 rounded bg-[#e3ded4]" />
-      <div className="mb-2 h-3 w-72 rounded bg-[#e3ded4]" />
-      <div className="h-3 w-48 rounded bg-[#e3ded4]" />
+      <div className="mb-4 h-5 w-40 rounded bg-[var(--bb-border)]" />
+      <div className="mb-2 h-3 w-72 rounded bg-[var(--bb-border)]" />
+      <div className="h-3 w-48 rounded bg-[var(--bb-border)]" />
 
       <div className="mt-6 grid gap-4 md:grid-cols-2">
         {Array.from({ length: 4 }).map((_, idx) => (
           <div
             key={idx}
-            className="rounded-2xl border border-[#ece5d8] bg-white px-4 py-3"
+            className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-3"
           >
             <div className="mb-3 flex items-center gap-3">
-              <div className="h-9 w-9 rounded-full bg-[#f5f3f0]" />
+              <div className="h-9 w-9 rounded-full bg-[var(--bb-bg-card)]" />
               <div className="flex-1 space-y-2">
-                <div className="h-3 w-32 rounded bg-[#f5f3f0]" />
-                <div className="h-3 w-40 rounded bg-[#f5f3f0]" />
+                <div className="h-3 w-32 rounded bg-[var(--bb-bg-card)]" />
+                <div className="h-3 w-40 rounded bg-[var(--bb-bg-card)]" />
               </div>
-              <div className="h-5 w-16 rounded-full bg-[#f5f3f0]" />
+              <div className="h-5 w-16 rounded-full bg-[var(--bb-bg-card)]" />
             </div>
-            <div className="h-3 w-28 rounded bg-[#f5f3f0]" />
+            <div className="h-3 w-28 rounded bg-[var(--bb-bg-card)]" />
           </div>
         ))}
       </div>

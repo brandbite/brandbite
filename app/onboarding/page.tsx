@@ -148,13 +148,13 @@ export default function OnboardingPage() {
   // ---------------------------------------------------------------------------
 
   return (
-    <div className="flex min-h-screen flex-col bg-white">
+    <div className="flex min-h-screen flex-col bg-[var(--bb-bg-page)]">
       {/* Header */}
-      <header className="flex items-center justify-between border-b border-[#f0eee9] px-6 py-4">
-        <p className="text-lg font-bold text-[#424143]">
-          <span className="text-[#f15b2b]">b</span>randbite
+      <header className="flex items-center justify-between border-b border-[var(--bb-border-subtle)] px-6 py-4">
+        <p className="text-lg font-bold text-[var(--bb-secondary)]">
+          <span className="text-[var(--bb-primary)]">b</span>randbite
         </p>
-        <p className="text-xs text-[#9a9892]">Setting up your workspace</p>
+        <p className="text-xs text-[var(--bb-text-tertiary)]">Setting up your workspace</p>
       </header>
 
       {/* Content */}
@@ -171,8 +171,8 @@ export default function OnboardingPage() {
                   <div
                     className={`h-0.5 w-8 ${
                       isCompleted || isActive
-                        ? "bg-[#f15b2b]"
-                        : "bg-[#e3e1dc]"
+                        ? "bg-[var(--bb-primary)]"
+                        : "bg-[var(--bb-border)]"
                     }`}
                   />
                 )}
@@ -180,10 +180,10 @@ export default function OnboardingPage() {
                   <div
                     className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition-colors ${
                       isActive
-                        ? "bg-[#f15b2b] text-white"
+                        ? "bg-[var(--bb-primary)] text-white"
                         : isCompleted
                           ? "bg-[#22C55E] text-white"
-                          : "bg-[#f0eee9] text-[#9a9892]"
+                          : "bg-[var(--bb-border-subtle)] text-[var(--bb-text-tertiary)]"
                     }`}
                   >
                     {isCompleted ? (
@@ -197,10 +197,10 @@ export default function OnboardingPage() {
                   <span
                     className={`text-[10px] font-medium ${
                       isActive
-                        ? "text-[#f15b2b]"
+                        ? "text-[var(--bb-primary)]"
                         : isCompleted
                           ? "text-[#22C55E]"
-                          : "text-[#b1afa9]"
+                          : "text-[var(--bb-text-muted)]"
                     }`}
                   >
                     {label}
@@ -214,21 +214,21 @@ export default function OnboardingPage() {
         {/* ----- Step 1: Company ----- */}
         {step === 1 && (
           <div className="flex flex-col">
-            <h1 className="text-center text-2xl font-bold text-[#424143]">
+            <h1 className="text-center text-2xl font-bold text-[var(--bb-secondary)]">
               Welcome to Brandbite
             </h1>
-            <p className="mt-1 text-center text-sm font-medium text-[#7a7a7a]">
+            <p className="mt-1 text-center text-sm font-medium text-[var(--bb-text-secondary)]">
               Let&apos;s set up your workspace.
             </p>
-            <p className="mt-2 text-center text-xs text-[#9a9892]">
+            <p className="mt-2 text-center text-xs text-[var(--bb-text-tertiary)]">
               We&apos;ll use these details to tailor your dashboard and assign
               your first creative team.
             </p>
 
             <div className="mt-8 space-y-5">
               <div>
-                <label htmlFor="onb-company-name" className="mb-1 block text-xs font-semibold text-[#424143]">
-                  Company Name <span className="text-[#f15b2b]">*</span>
+                <label htmlFor="onb-company-name" className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]">
+                  Company Name <span className="text-[var(--bb-primary)]">*</span>
                 </label>
                 <input
                   id="onb-company-name"
@@ -236,11 +236,11 @@ export default function OnboardingPage() {
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
                   placeholder="e.g. Nova Labs, Horizon Agency"
-                  className="w-full rounded-xl border border-[#e3e1dc] px-3.5 py-2.5 text-sm text-[#424143] outline-none placeholder:text-[#b1afa9] focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+                  className="w-full rounded-xl border border-[var(--bb-border)] px-3.5 py-2.5 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
                 />
               </div>
               <div>
-                <label htmlFor="onb-website" className="mb-1 block text-xs font-semibold text-[#424143]">
+                <label htmlFor="onb-website" className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]">
                   Website
                 </label>
                 <input
@@ -249,18 +249,18 @@ export default function OnboardingPage() {
                   value={website}
                   onChange={(e) => setWebsite(e.target.value)}
                   placeholder="https://www.yourcompany.com"
-                  className="w-full rounded-xl border border-[#e3e1dc] px-3.5 py-2.5 text-sm text-[#424143] outline-none placeholder:text-[#b1afa9] focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+                  className="w-full rounded-xl border border-[var(--bb-border)] px-3.5 py-2.5 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
                 />
               </div>
             </div>
 
-            <p className="mt-5 text-center text-[11px] text-[#9a9892]">
+            <p className="mt-5 text-center text-[11px] text-[var(--bb-text-tertiary)]">
               Don&apos;t worry, you can always update this later from your
               profile settings.
             </p>
 
             {companyError && (
-              <p className="mt-3 text-center text-xs font-medium text-[#b13832]">
+              <p className="mt-3 text-center text-xs font-medium text-[var(--bb-danger-text)]">
                 {companyError}
               </p>
             )}
@@ -270,14 +270,14 @@ export default function OnboardingPage() {
                 type="button"
                 disabled={companyLoading}
                 onClick={handleCreateCompany}
-                className="rounded-xl bg-[#f15b2b] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#d94e22] disabled:opacity-60"
+                className="rounded-xl bg-[var(--bb-primary)] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--bb-primary-hover)] disabled:opacity-60"
               >
                 {companyLoading ? "Creating…" : "Create Company"}
               </button>
               <button
                 type="button"
                 onClick={handleFinish}
-                className="rounded-xl border border-[#e3e1dc] px-5 py-2.5 text-sm font-medium text-[#7a7a7a] transition-colors hover:border-[#9a9892] hover:text-[#424143]"
+                className="rounded-xl border border-[var(--bb-border)] px-5 py-2.5 text-sm font-medium text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-text-tertiary)] hover:text-[var(--bb-secondary)]"
               >
                 Skip for now
               </button>
@@ -288,10 +288,10 @@ export default function OnboardingPage() {
         {/* ----- Step 2: Invite Team ----- */}
         {step === 2 && (
           <div className="flex flex-col">
-            <h1 className="text-center text-2xl font-bold text-[#424143]">
+            <h1 className="text-center text-2xl font-bold text-[var(--bb-secondary)]">
               Invite your team
             </h1>
-            <p className="mt-1 text-center text-xs text-[#9a9892]">
+            <p className="mt-1 text-center text-xs text-[var(--bb-text-tertiary)]">
               Add team members so they can submit tickets and review creative work.
               You can always invite more people later.
             </p>
@@ -305,7 +305,7 @@ export default function OnboardingPage() {
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
                   placeholder="colleague@company.com"
-                  className="flex-1 rounded-xl border border-[#e3e1dc] px-3.5 py-2.5 text-sm text-[#424143] outline-none placeholder:text-[#b1afa9] focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+                  className="flex-1 rounded-xl border border-[var(--bb-border)] px-3.5 py-2.5 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handleInvite();
                   }}
@@ -315,7 +315,7 @@ export default function OnboardingPage() {
                   id="onb-invite-role"
                   value={inviteRole}
                   onChange={(e) => setInviteRole(e.target.value)}
-                  className="rounded-xl border border-[#e3e1dc] px-3 py-2.5 text-sm text-[#424143] outline-none focus:border-[#f15b2b]"
+                  className="rounded-xl border border-[var(--bb-border)] px-3 py-2.5 text-sm text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)]"
                 >
                   <option value="MEMBER">Member</option>
                   <option value="PM">Project Manager</option>
@@ -327,27 +327,27 @@ export default function OnboardingPage() {
                 type="button"
                 disabled={inviteLoading}
                 onClick={handleInvite}
-                className="w-full rounded-xl border border-[#e3e1dc] py-2.5 text-sm font-medium text-[#424143] transition-colors hover:border-[#f15b2b] hover:text-[#f15b2b] disabled:opacity-60"
+                className="w-full rounded-xl border border-[var(--bb-border)] py-2.5 text-sm font-medium text-[var(--bb-secondary)] transition-colors hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)] disabled:opacity-60"
               >
                 {inviteLoading ? "Sending…" : "+ Send invite"}
               </button>
 
               {inviteError && (
-                <p className="text-xs font-medium text-[#b13832]">
+                <p className="text-xs font-medium text-[var(--bb-danger-text)]">
                   {inviteError}
                 </p>
               )}
 
               {invitedEmails.length > 0 && (
-                <div className="mt-2 rounded-xl bg-[#f7f5f0] px-4 py-3">
-                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#b1afa9]">
+                <div className="mt-2 rounded-xl bg-[var(--bb-bg-warm)] px-4 py-3">
+                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--bb-text-muted)]">
                     Invited ({invitedEmails.length})
                   </p>
                   <div className="space-y-1">
                     {invitedEmails.map((email) => (
                       <div
                         key={email}
-                        className="flex items-center gap-2 text-xs text-[#424143]"
+                        className="flex items-center gap-2 text-xs text-[var(--bb-secondary)]"
                       >
                         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#22C55E] text-[9px] text-white">
                           ✓
@@ -364,7 +364,7 @@ export default function OnboardingPage() {
               <button
                 type="button"
                 onClick={() => setStep(3)}
-                className="rounded-xl bg-[#f15b2b] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#d94e22]"
+                className="rounded-xl bg-[var(--bb-primary)] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--bb-primary-hover)]"
               >
                 {invitedEmails.length > 0 ? "Next" : "Skip"}
               </button>
@@ -375,17 +375,17 @@ export default function OnboardingPage() {
         {/* ----- Step 3: Create Project ----- */}
         {step === 3 && (
           <div className="flex flex-col">
-            <h1 className="text-center text-2xl font-bold text-[#424143]">
+            <h1 className="text-center text-2xl font-bold text-[var(--bb-secondary)]">
               Create your first project
             </h1>
-            <p className="mt-1 text-center text-xs text-[#9a9892]">
+            <p className="mt-1 text-center text-xs text-[var(--bb-text-tertiary)]">
               Projects help you organize tickets by brand, campaign, or client.
               You can always create more later.
             </p>
 
             <div className="mt-8 space-y-5">
               <div>
-                <label htmlFor="onb-project-name" className="mb-1 block text-xs font-semibold text-[#424143]">
+                <label htmlFor="onb-project-name" className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]">
                   Project Name
                 </label>
                 <input
@@ -394,13 +394,13 @@ export default function OnboardingPage() {
                   value={projectName}
                   onChange={(e) => setProjectName(e.target.value)}
                   placeholder="e.g. Website Redesign, Social Media Q1"
-                  className="w-full rounded-xl border border-[#e3e1dc] px-3.5 py-2.5 text-sm text-[#424143] outline-none placeholder:text-[#b1afa9] focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+                  className="w-full rounded-xl border border-[var(--bb-border)] px-3.5 py-2.5 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
                 />
               </div>
             </div>
 
             {projectError && (
-              <p className="mt-3 text-center text-xs font-medium text-[#b13832]">
+              <p className="mt-3 text-center text-xs font-medium text-[var(--bb-danger-text)]">
                 {projectError}
               </p>
             )}
@@ -410,14 +410,14 @@ export default function OnboardingPage() {
                 type="button"
                 disabled={projectLoading}
                 onClick={handleCreateProject}
-                className="rounded-xl bg-[#f15b2b] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#d94e22] disabled:opacity-60"
+                className="rounded-xl bg-[var(--bb-primary)] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--bb-primary-hover)] disabled:opacity-60"
               >
                 {projectLoading ? "Creating…" : "Create Project"}
               </button>
               <button
                 type="button"
                 onClick={() => setStep(4)}
-                className="rounded-xl border border-[#e3e1dc] px-5 py-2.5 text-sm font-medium text-[#7a7a7a] transition-colors hover:border-[#9a9892] hover:text-[#424143]"
+                className="rounded-xl border border-[var(--bb-border)] px-5 py-2.5 text-sm font-medium text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-text-tertiary)] hover:text-[var(--bb-secondary)]"
               >
                 Skip
               </button>
@@ -443,55 +443,55 @@ export default function OnboardingPage() {
               </svg>
             </div>
 
-            <h1 className="mt-5 text-2xl font-bold text-[#424143]">
+            <h1 className="mt-5 text-2xl font-bold text-[var(--bb-secondary)]">
               You&apos;re all set!
             </h1>
-            <p className="mt-2 text-sm text-[#7a7a7a]">
+            <p className="mt-2 text-sm text-[var(--bb-text-secondary)]">
               Your workspace is ready. Here&apos;s a summary of what we set up:
             </p>
 
             <div className="mt-6 w-full max-w-sm space-y-2.5">
               {companyCreated && (
-                <div className="flex items-center gap-3 rounded-xl bg-[#f7f5f0] px-4 py-3 text-left">
+                <div className="flex items-center gap-3 rounded-xl bg-[var(--bb-bg-warm)] px-4 py-3 text-left">
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#22C55E] text-[10px] text-white">
                     ✓
                   </span>
                   <div>
-                    <p className="text-xs font-semibold text-[#424143]">
+                    <p className="text-xs font-semibold text-[var(--bb-secondary)]">
                       Company created
                     </p>
-                    <p className="text-[11px] text-[#9a9892]">
+                    <p className="text-[11px] text-[var(--bb-text-tertiary)]">
                       {companyName}
                     </p>
                   </div>
                 </div>
               )}
               {invitedEmails.length > 0 && (
-                <div className="flex items-center gap-3 rounded-xl bg-[#f7f5f0] px-4 py-3 text-left">
+                <div className="flex items-center gap-3 rounded-xl bg-[var(--bb-bg-warm)] px-4 py-3 text-left">
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#22C55E] text-[10px] text-white">
                     ✓
                   </span>
                   <div>
-                    <p className="text-xs font-semibold text-[#424143]">
+                    <p className="text-xs font-semibold text-[var(--bb-secondary)]">
                       {invitedEmails.length} team member
                       {invitedEmails.length > 1 ? "s" : ""} invited
                     </p>
-                    <p className="text-[11px] text-[#9a9892]">
+                    <p className="text-[11px] text-[var(--bb-text-tertiary)]">
                       {invitedEmails.join(", ")}
                     </p>
                   </div>
                 </div>
               )}
               {projectCreated && (
-                <div className="flex items-center gap-3 rounded-xl bg-[#f7f5f0] px-4 py-3 text-left">
+                <div className="flex items-center gap-3 rounded-xl bg-[var(--bb-bg-warm)] px-4 py-3 text-left">
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#22C55E] text-[10px] text-white">
                     ✓
                   </span>
                   <div>
-                    <p className="text-xs font-semibold text-[#424143]">
+                    <p className="text-xs font-semibold text-[var(--bb-secondary)]">
                       Project created
                     </p>
-                    <p className="text-[11px] text-[#9a9892]">
+                    <p className="text-[11px] text-[var(--bb-text-tertiary)]">
                       {projectCreated}
                     </p>
                   </div>
@@ -503,7 +503,7 @@ export default function OnboardingPage() {
               type="button"
               disabled={finishLoading}
               onClick={handleFinish}
-              className="mt-8 rounded-xl bg-[#f15b2b] px-8 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#d94e22] disabled:opacity-60"
+              className="mt-8 rounded-xl bg-[var(--bb-primary)] px-8 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--bb-primary-hover)] disabled:opacity-60"
             >
               {finishLoading ? "Finishing…" : "Go to Dashboard"}
             </button>
@@ -512,7 +512,7 @@ export default function OnboardingPage() {
       </div>
 
       {/* Footer */}
-      <footer className="bg-[#f15b2b] px-6 py-3">
+      <footer className="bg-[var(--bb-primary)] px-6 py-3">
         <div className="mx-auto flex max-w-5xl items-center justify-between text-[11px] text-white/70">
           <p>&copy; 2025 Brandbite Inc. All rights reserved.</p>
           <div className="flex gap-4">

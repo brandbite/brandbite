@@ -204,8 +204,8 @@ export default function CreativeSettingsPage() {
   return (
     <div className="mx-auto max-w-2xl">
       <div className="mb-6">
-        <h1 className="text-lg font-semibold text-[#424143]">Settings</h1>
-        <p className="mt-1 text-xs text-[#9a9892]">
+        <h1 className="text-lg font-semibold text-[var(--bb-secondary)]">Settings</h1>
+        <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
           Manage your creative account preferences
         </p>
       </div>
@@ -214,25 +214,25 @@ export default function CreativeSettingsPage() {
       <PauseControl />
 
       {/* Skills & expertise */}
-      <div className="mb-4 rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">
+      <div className="mb-4 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-[#424143]">
+            <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">
               Skills &amp; expertise
             </h2>
-            <p className="mt-0.5 text-[11px] text-[#9a9892]">
+            <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
               Select the job types you can handle. You will only be
               auto-assigned tickets that match your skills.
             </p>
           </div>
           {savingSkills && (
-            <span className="text-[10px] text-[#9a9892]">Saving...</span>
+            <span className="text-[10px] text-[var(--bb-text-tertiary)]">Saving...</span>
           )}
         </div>
 
         <div className="mt-4 space-y-1">
           {jobTypes.length === 0 && (
-            <p className="px-3 py-3 text-xs text-[#9a9892]">
+            <p className="px-3 py-3 text-xs text-[var(--bb-text-tertiary)]">
               No job types available yet.
             </p>
           )}
@@ -241,20 +241,20 @@ export default function CreativeSettingsPage() {
             return (
               <label
                 key={jt.id}
-                className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-[#f5f3f0]/50"
+                className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-[var(--bb-bg-card)]/50"
               >
                 <input
                   type="checkbox"
                   checked={checked}
                   onChange={() => handleSkillToggle(jt.id)}
-                  className="h-4 w-4 shrink-0 rounded border-[#d0cec9] text-[#f15b2b] accent-[#f15b2b] focus:ring-[#f15b2b]"
+                  className="h-4 w-4 shrink-0 rounded border-[var(--bb-border-input)] text-[var(--bb-primary)] accent-[var(--bb-primary)] focus:ring-[var(--bb-primary)]"
                 />
                 <div className="min-w-0">
-                  <p className="text-xs font-medium text-[#424143]">
+                  <p className="text-xs font-medium text-[var(--bb-secondary)]">
                     {jt.name}
                   </p>
                   {jt.description && (
-                    <p className="mt-0.5 text-[10px] text-[#9a9892]">
+                    <p className="mt-0.5 text-[10px] text-[var(--bb-text-tertiary)]">
                       {jt.description}
                     </p>
                   )}
@@ -266,14 +266,14 @@ export default function CreativeSettingsPage() {
       </div>
 
       {/* Payout tiers */}
-      <div className="mb-4 rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">
+      <div className="mb-4 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-[#424143]">Payout tiers</h2>
-            <p className="mt-0.5 text-[11px] text-[#9a9892]">
+            <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">Payout tiers</h2>
+            <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
               Complete more tickets to unlock higher payout rates. Your current rate
               is{" "}
-              <span className="font-semibold text-[#424143]">
+              <span className="font-semibold text-[var(--bb-secondary)]">
                 {currentPayoutPercent}%
               </span>
               {currentTierName && (
@@ -292,19 +292,19 @@ export default function CreativeSettingsPage() {
           <div
             className={`flex items-center justify-between rounded-xl px-3 py-3 transition-colors ${
               !currentTierName
-                ? "border border-[#8B5CF6]/30 bg-[#f5f0ff]"
-                : "bg-[#f5f3f0]/50"
+                ? "border border-[#8B5CF6]/30 bg-purple-50 dark:bg-purple-950/30"
+                : "bg-[var(--bb-bg-card)]/50"
             }`}
           >
             <div className="min-w-0">
-              <p className="text-xs font-medium text-[#424143]">Base Rate</p>
-              <p className="mt-0.5 text-[10px] text-[#9a9892]">
+              <p className="text-xs font-medium text-[var(--bb-secondary)]">Base Rate</p>
+              <p className="mt-0.5 text-[10px] text-[var(--bb-text-tertiary)]">
                 Default payout for all creatives
               </p>
             </div>
             <span
               className={`text-sm font-bold ${
-                !currentTierName ? "text-[#8B5CF6]" : "text-[#9a9892]"
+                !currentTierName ? "text-[#8B5CF6]" : "text-[var(--bb-text-tertiary)]"
               }`}
             >
               {basePayoutPercent}%
@@ -330,14 +330,14 @@ export default function CreativeSettingsPage() {
                 key={tier.id}
                 className={`rounded-xl px-3 py-3 transition-colors ${
                   tier.qualified
-                    ? "border border-[#8B5CF6]/30 bg-[#f5f0ff]"
-                    : "bg-[#f5f3f0]/50"
+                    ? "border border-[#8B5CF6]/30 bg-purple-50 dark:bg-purple-950/30"
+                    : "bg-[var(--bb-bg-card)]/50"
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="text-xs font-medium text-[#424143]">
+                      <p className="text-xs font-medium text-[var(--bb-secondary)]">
                         {tier.name}
                       </p>
                       {tier.qualified && (
@@ -346,13 +346,13 @@ export default function CreativeSettingsPage() {
                         </span>
                       )}
                     </div>
-                    <p className="mt-0.5 text-[10px] text-[#9a9892]">
+                    <p className="mt-0.5 text-[10px] text-[var(--bb-text-tertiary)]">
                       {tier.minCompletedTickets} tickets in {windowLabel}
                     </p>
                   </div>
                   <span
                     className={`text-sm font-bold ${
-                      tier.qualified ? "text-[#8B5CF6]" : "text-[#9a9892]"
+                      tier.qualified ? "text-[#8B5CF6]" : "text-[var(--bb-text-tertiary)]"
                     }`}
                   >
                     {tier.payoutPercent}%
@@ -362,13 +362,13 @@ export default function CreativeSettingsPage() {
                 {/* Progress bar */}
                 {!tier.qualified && (
                   <div className="mt-2">
-                    <div className="h-1.5 w-full rounded-full bg-[#e3e1dc]">
+                    <div className="h-1.5 w-full rounded-full bg-[var(--bb-border)]">
                       <div
                         className="h-full rounded-full bg-[#8B5CF6] transition-all"
                         style={{ width: `${progress}%` }}
                       />
                     </div>
-                    <p className="mt-1 text-[10px] text-[#9a9892]">
+                    <p className="mt-1 text-[10px] text-[var(--bb-text-tertiary)]">
                       {tier.completedInWindow} / {tier.minCompletedTickets}{" "}
                       tickets completed
                     </p>
@@ -379,7 +379,7 @@ export default function CreativeSettingsPage() {
           })}
 
           {payoutTiers.length === 0 && (
-            <p className="px-3 py-3 text-xs text-[#9a9892]">
+            <p className="px-3 py-3 text-xs text-[var(--bb-text-tertiary)]">
               No payout tiers configured yet.
             </p>
           )}
@@ -387,11 +387,11 @@ export default function CreativeSettingsPage() {
       </div>
 
       {/* Notification preferences */}
-      <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-5 shadow-sm">
-        <h2 className="text-sm font-semibold text-[#424143]">
+      <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
+        <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">
           Notification preferences
         </h2>
-        <p className="mt-0.5 text-[11px] text-[#9a9892]">
+        <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
           Choose which events you want to be notified about
         </p>
 
@@ -403,13 +403,13 @@ export default function CreativeSettingsPage() {
             return (
               <div
                 key={pref.type}
-                className="flex items-center justify-between rounded-xl px-3 py-3 transition-colors hover:bg-[#f5f3f0]/50"
+                className="flex items-center justify-between rounded-xl px-3 py-3 transition-colors hover:bg-[var(--bb-bg-card)]/50"
               >
                 <div className="mr-4 min-w-0">
-                  <p className="text-xs font-medium text-[#424143]">
+                  <p className="text-xs font-medium text-[var(--bb-secondary)]">
                     {pref.label}
                   </p>
-                  <p className="mt-0.5 text-[10px] text-[#9a9892]">
+                  <p className="mt-0.5 text-[10px] text-[var(--bb-text-tertiary)]">
                     {pref.description}
                   </p>
                 </div>
@@ -423,11 +423,11 @@ export default function CreativeSettingsPage() {
                   disabled={isToggling}
                   onClick={() => handleToggle(pref.type, enabled)}
                   className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
-                    enabled ? "bg-[#f15b2b]" : "bg-[#d0cec9]"
+                    enabled ? "bg-[var(--bb-primary)]" : "bg-[var(--bb-border-input)]"
                   }`}
                 >
                   <span
-                    className={`pointer-events-none inline-block h-4 w-4 translate-y-0.5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                    className={`pointer-events-none inline-block h-4 w-4 translate-y-0.5 rounded-full bg-[var(--bb-bg-page)] shadow-sm transition-transform duration-200 ${
                       enabled ? "translate-x-[18px]" : "translate-x-0.5"
                     }`}
                   />

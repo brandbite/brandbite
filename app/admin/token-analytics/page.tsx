@@ -151,7 +151,7 @@ export default function AdminTokenAnalyticsPage() {
             <h1 className="text-2xl font-semibold tracking-tight">
               Token analytics
             </h1>
-            <p className="mt-1 text-sm text-[#7a7a7a]">
+            <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
               High-level overview of token movements across all
               companies.
             </p>
@@ -167,75 +167,75 @@ export default function AdminTokenAnalyticsPage() {
 
         {/* Summary cards */}
         <section className="mb-6 grid gap-4 md:grid-cols-4">
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
               Net tokens
             </p>
-            <p className="mt-2 text-3xl font-semibold text-[#f15b2b]">
+            <p className="mt-2 text-3xl font-semibold text-[var(--bb-primary)]">
               {loading
                 ? "—"
                 : stats
                 ? stats.globalNet
                 : 0}
             </p>
-            <p className="mt-1 text-xs text-[#9a9892]">
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               Total credits minus debits across all companies.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
               Total credits
             </p>
-            <p className="mt-2 text-2xl font-semibold text-[#424143]">
+            <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
               {loading
                 ? "—"
                 : stats
                 ? stats.globalCredits
                 : 0}
             </p>
-            <p className="mt-1 text-xs text-[#9a9892]">
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               Tokens added via plans, top-ups, bonuses, etc.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
               Total debits
             </p>
-            <p className="mt-2 text-2xl font-semibold text-[#424143]">
+            <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
               {loading
                 ? "—"
                 : stats
                 ? stats.globalDebits
                 : 0}
             </p>
-            <p className="mt-1 text-xs text-[#9a9892]">
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               Tokens spent on jobs, withdrawals and corrections.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
               Companies with activity
             </p>
-            <p className="mt-2 text-2xl font-semibold text-[#424143]">
+            <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
               {loading
                 ? "—"
                 : stats
                 ? stats.companiesWithLedger
                 : 0}
             </p>
-            <p className="mt-1 text-xs text-[#9a9892]">
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               Companies that have at least one ledger entry.
             </p>
           </div>
         </section>
 
         {/* Filter bar */}
-        <section className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
+        <section className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
           <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-[#424143]">
+            <label className="text-xs font-medium text-[var(--bb-secondary)]">
               Company
             </label>
             <FormSelect
@@ -256,12 +256,12 @@ export default function AdminTokenAnalyticsPage() {
         {/* Chart + table */}
         <section className="grid gap-4 md:grid-cols-[3fr_4fr]">
           {/* Chart */}
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-semibold tracking-tight">
                 Net tokens by company
               </h2>
-              <p className="text-xs text-[#9a9892]">
+              <p className="text-xs text-[var(--bb-text-tertiary)]">
                 Shows filtered companies only.
               </p>
             </div>
@@ -296,12 +296,12 @@ export default function AdminTokenAnalyticsPage() {
           </div>
 
           {/* Table */}
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-semibold tracking-tight">
                 Companies overview
               </h2>
-              <p className="text-xs text-[#9a9892]">
+              <p className="text-xs text-[var(--bb-text-tertiary)]">
                 Sorted by net tokens (descending).
               </p>
             </div>
@@ -314,7 +314,7 @@ export default function AdminTokenAnalyticsPage() {
               <div className="max-h-80 overflow-auto">
                 <table className="min-w-full text-left text-sm">
                   <thead>
-                    <tr className="border-b border-[#e3e1dc] text-xs uppercase tracking-[0.08em] text-[#9a9892]">
+                    <tr className="border-b border-[var(--bb-border)] text-xs uppercase tracking-[0.08em] text-[var(--bb-text-tertiary)]">
                       <th className="px-2 py-2">Company</th>
                       <th className="px-2 py-2 text-right">
                         Credits
@@ -334,15 +334,15 @@ export default function AdminTokenAnalyticsPage() {
                     {filteredCompanies.map((c) => (
                       <tr
                         key={c.companyId}
-                        className="border-b border-[#f0eeea] text-xs last:border-b-0"
+                        className="border-b border-[var(--bb-border-subtle)] text-xs last:border-b-0"
                       >
-                        <td className="px-2 py-2 align-top text-[11px] text-[#424143]">
+                        <td className="px-2 py-2 align-top text-[11px] text-[var(--bb-secondary)]">
                           {c.company ? (
                             <>
                               <div className="font-medium">
                                 {c.company.name}
                               </div>
-                              <div className="text-[10px] text-[#9a9892]">
+                              <div className="text-[10px] text-[var(--bb-text-tertiary)]">
                                 {c.company.slug}
                               </div>
                             </>
@@ -350,16 +350,16 @@ export default function AdminTokenAnalyticsPage() {
                             "—"
                           )}
                         </td>
-                        <td className="px-2 py-2 align-top text-right text-[11px] text-[#424143]">
+                        <td className="px-2 py-2 align-top text-right text-[11px] text-[var(--bb-secondary)]">
                           {c.totalCredits}
                         </td>
-                        <td className="px-2 py-2 align-top text-right text-[11px] text-[#424143]">
+                        <td className="px-2 py-2 align-top text-right text-[11px] text-[var(--bb-secondary)]">
                           {c.totalDebits}
                         </td>
-                        <td className="px-2 py-2 align-top text-right text-[11px] text-[#424143]">
+                        <td className="px-2 py-2 align-top text-right text-[11px] text-[var(--bb-secondary)]">
                           {c.netTokens}
                         </td>
-                        <td className="px-2 py-2 align-top text-right text-[11px] text-[#9a9892]">
+                        <td className="px-2 py-2 align-top text-right text-[11px] text-[var(--bb-text-tertiary)]">
                           {c.entriesCount}
                         </td>
                       </tr>

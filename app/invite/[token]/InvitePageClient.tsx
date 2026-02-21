@@ -173,15 +173,15 @@ export default function InvitePageClient({ token }: InvitePageClientProps) {
 
   if (state.status === "error") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f5f3f0] text-[#424143]">
-        <div className="max-w-md rounded-3xl bg-white px-6 py-5 text-center shadow-sm shadow-[#e3ded4]">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--bb-bg-card)] text-[var(--bb-secondary)]">
+        <div className="max-w-md rounded-3xl bg-[var(--bb-bg-page)] px-6 py-5 text-center shadow-sm shadow-[var(--bb-border)]">
           <h1 className="text-lg font-semibold">Something went wrong</h1>
-          <p className="mt-2 text-sm text-[#7a7a7a]">
+          <p className="mt-2 text-sm text-[var(--bb-text-secondary)]">
             {state.message}
           </p>
           <a
             href="/"
-            className="mt-4 inline-flex items-center justify-center rounded-full bg-[#f15b2b] px-4 py-2 text-sm font-medium text-white hover:bg-[#e44f20]"
+            className="mt-4 inline-flex items-center justify-center rounded-full bg-[var(--bb-primary)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--bb-primary-hover)]"
           >
             Go to Brandbite
           </a>
@@ -201,18 +201,18 @@ export default function InvitePageClient({ token }: InvitePageClientProps) {
     : "Not signed in";
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f5f3f0] text-[#424143]">
-      <div className="mx-4 w-full max-w-md rounded-3xl bg-white px-6 py-6 shadow-sm shadow-[#e3ded4]">
-        <header className="mb-4 border-b border-[#f0ece4] pb-3">
-          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#b8b6b1]">
+    <div className="flex min-h-screen items-center justify-center bg-[var(--bb-bg-card)] text-[var(--bb-secondary)]">
+      <div className="mx-4 w-full max-w-md rounded-3xl bg-[var(--bb-bg-page)] px-6 py-6 shadow-sm shadow-[var(--bb-border)]">
+        <header className="mb-4 border-b border-[var(--bb-border-subtle)] pb-3">
+          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--bb-text-muted)]">
             Invite
           </p>
-          <h1 className="mt-1 text-xl font-semibold tracking-tight text-[#424143]">
+          <h1 className="mt-1 text-xl font-semibold tracking-tight text-[var(--bb-secondary)]">
             Join {company.name} on Brandbite
           </h1>
-          <p className="mt-1 text-xs text-[#7a7a7a]">
+          <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
             You have been invited to join{" "}
-            <span className="font-medium text-[#424143]">
+            <span className="font-medium text-[var(--bb-secondary)]">
               {company.name}
             </span>{" "}
             as a {roleLabel}.
@@ -221,33 +221,33 @@ export default function InvitePageClient({ token }: InvitePageClientProps) {
 
         <section className="space-y-2 text-sm">
           <div className="flex items-center justify-between">
-            <span className="text-[#7a7a7a]">Invite status</span>
-            <span className="rounded-full bg-[#f5f3f0] px-2 py-0.5 text-[11px] font-medium text-[#7a7a7a]">
+            <span className="text-[var(--bb-text-secondary)]">Invite status</span>
+            <span className="rounded-full bg-[var(--bb-bg-card)] px-2 py-0.5 text-[11px] font-medium text-[var(--bb-text-secondary)]">
               {statusLabel}
             </span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-[#7a7a7a]">Invited email</span>
-            <span className="text-[11px] font-medium text-[#424143]">
+            <span className="text-[var(--bb-text-secondary)]">Invited email</span>
+            <span className="text-[11px] font-medium text-[var(--bb-secondary)]">
               {invite.email}
             </span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-[#7a7a7a]">You are browsing as</span>
-            <span className="text-[11px] font-medium text-[#424143]">
+            <span className="text-[var(--bb-text-secondary)]">You are browsing as</span>
+            <span className="text-[11px] font-medium text-[var(--bb-secondary)]">
               {viewerLabel}
             </span>
           </div>
         </section>
 
         {acceptError && (
-          <div className="mt-3 rounded-lg border border-red-200 bg-[#fff7f7] px-3 py-2 text-xs text-red-700">
+          <div className="mt-3 rounded-lg border border-red-200 bg-[var(--bb-danger-bg)] px-3 py-2 text-xs text-red-700">
             {acceptError}
           </div>
         )}
 
         {acceptSuccess && (
-          <div className="mt-3 rounded-lg border border-emerald-200 bg-[#f0fbf4] px-3 py-2 text-xs text-emerald-700">
+          <div className="mt-3 rounded-lg border border-emerald-200 bg-[var(--bb-success-bg)] px-3 py-2 text-xs text-emerald-700">
             You have joined{" "}
             <span className="font-semibold">{company.name}</span>. You
             can now access its workspace.
@@ -256,26 +256,26 @@ export default function InvitePageClient({ token }: InvitePageClientProps) {
 
         <div className="mt-4 flex flex-col gap-2">
           {invite.status !== "PENDING" && (
-            <p className="text-xs text-[#9a9892]">
+            <p className="text-xs text-[var(--bb-text-tertiary)]">
               This invite is no longer pending (
               {statusLabel.toLowerCase()}).
             </p>
           )}
 
           {invite.status === "PENDING" && alreadyMember && (
-            <p className="text-xs text-[#9a9892]">
+            <p className="text-xs text-[var(--bb-text-tertiary)]">
               You are already a member of this company. Accepting is not
               necessary.
             </p>
           )}
 
           {invite.status === "PENDING" && !viewer && (
-            <p className="text-xs text-[#9a9892]">
+            <p className="text-xs text-[var(--bb-text-tertiary)]">
               To accept this invite, you need to browse Brandbite as a
               user. In this demo, use the{" "}
               <a
                 href="/debug/demo-user"
-                className="font-medium text-[#f15b2b] underline"
+                className="font-medium text-[var(--bb-primary)] underline"
               >
                 demo personas
               </a>{" "}
@@ -290,7 +290,7 @@ export default function InvitePageClient({ token }: InvitePageClientProps) {
                 type="button"
                 disabled={!canAccept || acceptStatus === "submitting"}
                 onClick={handleAccept}
-                className="mt-1 inline-flex items-center justify-center rounded-full bg-[#f15b2b] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[#e44f20] disabled:opacity-70"
+                className="mt-1 inline-flex items-center justify-center rounded-full bg-[var(--bb-primary)] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[var(--bb-primary-hover)] disabled:opacity-70"
               >
                 {acceptStatus === "submitting"
                   ? "Joining…"
@@ -301,7 +301,7 @@ export default function InvitePageClient({ token }: InvitePageClientProps) {
           <button
             type="button"
             onClick={() => router.push("/")}
-            className="mt-1 inline-flex items-center justify-center rounded-full border border-[#ece5d8] px-4 py-2 text-[11px] font-medium text-[#7a7a7a] hover:bg-[#f5f3f0]"
+            className="mt-1 inline-flex items-center justify-center rounded-full border border-[var(--bb-border)] px-4 py-2 text-[11px] font-medium text-[var(--bb-text-secondary)] hover:bg-[var(--bb-bg-card)]"
           >
             Back to Brandbite
           </button>
@@ -313,19 +313,19 @@ export default function InvitePageClient({ token }: InvitePageClientProps) {
 
 function InviteSkeleton() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f5f3f0] text-[#424143]">
-      <div className="mx-4 w-full max-w-md rounded-3xl bg-white px-6 py-6 shadow-sm shadow-[#e3ded4]">
-        <div className="mb-4 border-b border-[#f0ece4] pb-3">
-          <div className="h-3 w-16 rounded bg-[#e3ded4]" />
-          <div className="mt-2 h-5 w-48 rounded bg-[#e3ded4]" />
-          <div className="mt-2 h-3 w-64 rounded bg-[#e3ded4]" />
+    <div className="flex min-h-screen items-center justify-center bg-[var(--bb-bg-card)] text-[var(--bb-secondary)]">
+      <div className="mx-4 w-full max-w-md rounded-3xl bg-[var(--bb-bg-page)] px-6 py-6 shadow-sm shadow-[var(--bb-border)]">
+        <div className="mb-4 border-b border-[var(--bb-border-subtle)] pb-3">
+          <div className="h-3 w-16 rounded bg-[var(--bb-border)]" />
+          <div className="mt-2 h-5 w-48 rounded bg-[var(--bb-border)]" />
+          <div className="mt-2 h-3 w-64 rounded bg-[var(--bb-border)]" />
         </div>
         <div className="space-y-3">
-          <div className="h-4 w-full rounded bg-[#f5f3f0]" />
-          <div className="h-4 w-3/4 rounded bg-[#f5f3f0]" />
-          <div className="h-4 w-2/3 rounded bg-[#f5f3f0]" />
+          <div className="h-4 w-full rounded bg-[var(--bb-bg-card)]" />
+          <div className="h-4 w-3/4 rounded bg-[var(--bb-bg-card)]" />
+          <div className="h-4 w-2/3 rounded bg-[var(--bb-bg-card)]" />
         </div>
-        <div className="mt-5 h-9 w-full rounded-full bg-[#f5f3f0]" />
+        <div className="mt-5 h-9 w-full rounded-full bg-[var(--bb-bg-card)]" />
       </div>
     </div>
   );

@@ -287,7 +287,7 @@ export default function CreativeTicketsPage() {
 
         {/* Summary cards */}
         <section className="mb-6 grid gap-4 md:grid-cols-4">
-          <div className="rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-4 shadow-sm">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
             <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
               Total
             </p>
@@ -303,7 +303,7 @@ export default function CreativeTicketsPage() {
             .map((status) => (
               <div
                 key={status}
-                className="rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-4 shadow-sm"
+                className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm"
               >
                 <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
                   {STATUS_LABELS[status]}
@@ -323,7 +323,7 @@ export default function CreativeTicketsPage() {
         </section>
 
         {/* Filters */}
-        <section className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--bb-border)] bg-white px-5 py-4 shadow-sm">
+        <section className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
           <div className="flex items-center gap-2">
             <label className="text-xs font-medium text-[var(--bb-secondary)]">
               Status

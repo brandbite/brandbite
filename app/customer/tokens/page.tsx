@@ -145,9 +145,9 @@ export default function CustomerTokensPage() {
     const base =
       "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium";
     if (direction === "CREDIT") {
-      return `${base} bg-[#f0fff6] text-[#137a3a]`;
+      return `${base} bg-[var(--bb-success-bg)] text-[var(--bb-success-text)]`;
     }
-    return `${base} bg-[#fde8e7] text-[#b13832]`;
+    return `${base} bg-[var(--bb-danger-bg)] text-[var(--bb-danger-text)]`;
   };
 
   const directionLabel = (direction: LedgerDirection) =>
@@ -161,14 +161,14 @@ export default function CustomerTokensPage() {
             <h1 className="text-2xl font-semibold tracking-tight">
               Tokens overview
             </h1>
-            <p className="mt-1 text-sm text-[#7a7a7a]">
+            <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
               Your company&apos;s token balance and recent usage across creative
               requests.
             </p>
             {company && (
-              <p className="mt-1 text-xs text-[#9a9892]">
+              <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
                 Company:{" "}
-                <span className="font-medium text-[#424143]">
+                <span className="font-medium text-[var(--bb-secondary)]">
                   {company.name}
                 </span>{" "}
                 ({company.slug})
@@ -182,8 +182,8 @@ export default function CustomerTokensPage() {
           companyRole &&
           companyRole !== "OWNER" &&
           companyRole !== "BILLING" && (
-            <div className="mb-4 rounded-xl border border-[#f6c89f] bg-[#fff4e6] px-4 py-3 text-xs text-[#7a7a7a]">
-              <p className="text-[11px] font-medium text-[#9a5b2b]">
+            <div className="mb-4 rounded-xl border border-[var(--bb-warning-border)] bg-[var(--bb-warning-bg)] px-4 py-3 text-xs text-[var(--bb-text-secondary)]">
+              <p className="text-[11px] font-medium text-[var(--bb-warning-text)]">
                 Limited access
               </p>
               <p className="mt-1">
@@ -203,41 +203,41 @@ export default function CustomerTokensPage() {
 
         {/* Summary cards */}
         <section className="mb-6 grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
               Current balance
             </p>
-            <p className="mt-2 text-3xl font-semibold text-[#f15b2b]">
+            <p className="mt-2 text-3xl font-semibold text-[var(--bb-primary)]">
               {loading ? "—" : data ? data.company.tokenBalance : "0"}
-              <span className="ml-1 text-base font-normal text-[#7a7a7a]">
+              <span className="ml-1 text-base font-normal text-[var(--bb-text-secondary)]">
                 tokens
               </span>
             </p>
-            <p className="mt-1 text-xs text-[#9a9892]">
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               This is the balance after all debits and credits.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
               Total credits
             </p>
-            <p className="mt-2 text-2xl font-semibold text-[#424143]">
+            <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
               {loading ? "—" : data ? data.stats.totalCredits : "0"}
             </p>
-            <p className="mt-1 text-xs text-[#9a9892]">
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               Tokens added by plan renewals, manual top-ups or adjustments.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#9a9892]">
+          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
               Total debits
             </p>
-            <p className="mt-2 text-2xl font-semibold text-[#424143]">
+            <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
               {loading ? "—" : data ? data.stats.totalDebits : "0"}
             </p>
-            <p className="mt-1 text-xs text-[#9a9892]">
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               Tokens consumed by ticket work and other debits.
             </p>
           </div>
@@ -249,20 +249,20 @@ export default function CustomerTokensPage() {
             <h2 className="text-sm font-semibold tracking-tight">
               Token ledger
             </h2>
-            <p className="mt-1 text-xs text-[#9a9892]">
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               A chronological view of how tokens have moved in or out of your
               balance.
             </p>
           </div>
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-[#7a7a7a]">Filter:</span>
-            <div className="inline-flex overflow-hidden rounded-full border border-[#e3e1dc] bg-white">
+            <span className="text-[var(--bb-text-secondary)]">Filter:</span>
+            <div className="inline-flex overflow-hidden rounded-full border border-[var(--bb-border)] bg-[var(--bb-bg-page)]">
               <button
                 type="button"
                 className={`px-3 py-1 text-xs ${
                   directionFilter === "ALL"
-                    ? "bg-[#f5f3f0] font-medium text-[#424143]"
-                    : "text-[#7a7a7a]"
+                    ? "bg-[var(--bb-bg-card)] font-medium text-[var(--bb-secondary)]"
+                    : "text-[var(--bb-text-secondary)]"
                 }`}
                 onClick={() => setDirectionFilter("ALL")}
               >
@@ -270,10 +270,10 @@ export default function CustomerTokensPage() {
               </button>
               <button
                 type="button"
-                className={`border-l border-[#e3e1dc] px-3 py-1 text-xs ${
+                className={`border-l border-[var(--bb-border)] px-3 py-1 text-xs ${
                   directionFilter === "CREDIT"
-                    ? "bg-[#f5f3f0] font-medium text-[#424143]"
-                    : "text-[#7a7a7a]"
+                    ? "bg-[var(--bb-bg-card)] font-medium text-[var(--bb-secondary)]"
+                    : "text-[var(--bb-text-secondary)]"
                 }`}
                 onClick={() => setDirectionFilter("CREDIT")}
               >
@@ -281,10 +281,10 @@ export default function CustomerTokensPage() {
               </button>
               <button
                 type="button"
-                className={`border-l border-[#e3e1dc] px-3 py-1 text-xs ${
+                className={`border-l border-[var(--bb-border)] px-3 py-1 text-xs ${
                   directionFilter === "DEBIT"
-                    ? "bg-[#f5f3f0] font-medium text-[#424143]"
-                    : "text-[#7a7a7a]"
+                    ? "bg-[var(--bb-bg-card)] font-medium text-[var(--bb-secondary)]"
+                    : "text-[var(--bb-text-secondary)]"
                 }`}
                 onClick={() => setDirectionFilter("DEBIT")}
               >
@@ -295,12 +295,12 @@ export default function CustomerTokensPage() {
         </section>
 
         {/* Ledger table */}
-        <section className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
+        <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold tracking-tight">
               Recent token activity
             </h2>
-            <p className="text-xs text-[#9a9892]">
+            <p className="text-xs text-[var(--bb-text-tertiary)]">
               Showing the 50 most recent movements.
             </p>
           </div>
@@ -313,7 +313,7 @@ export default function CustomerTokensPage() {
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-[#ebe7df] text-[11px] uppercase tracking-[0.12em] text-[#9a9892]">
+                  <tr className="border-b border-[var(--bb-border-subtle)] text-[11px] uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
                     <th className="py-2 pr-4">Date</th>
                     <th className="py-2 pr-4">Direction</th>
                     <th className="py-2 pr-4">Amount</th>
@@ -327,9 +327,9 @@ export default function CustomerTokensPage() {
                   {filteredLedger.map((entry) => (
                     <tr
                       key={entry.id}
-                      className="border-b border-[#f1eee8] last:border-none"
+                      className="border-b border-[var(--bb-border-subtle)] last:border-none"
                     >
-                      <td className="py-2 pr-4 align-top text-[11px] text-[#7a7a7a]">
+                      <td className="py-2 pr-4 align-top text-[11px] text-[var(--bb-text-secondary)]">
                         {formatDateTime(entry.createdAt)}
                       </td>
                       <td className="py-2 pr-4 align-top">
@@ -337,26 +337,26 @@ export default function CustomerTokensPage() {
                           {directionLabel(entry.direction)}
                         </span>
                       </td>
-                      <td className="py-2 pr-4 align-top text-[11px] text-[#424143]">
+                      <td className="py-2 pr-4 align-top text-[11px] text-[var(--bb-secondary)]">
                         {formatAmount(entry.amount)}
                       </td>
-                      <td className="py-2 pr-4 align-top text-[11px] text-[#7a7a7a]">
+                      <td className="py-2 pr-4 align-top text-[11px] text-[var(--bb-text-secondary)]">
                         {entry.reason || "—"}
                         {entry.notes ? (
-                          <span className="ml-1 text-[#9a9892]">
+                          <span className="ml-1 text-[var(--bb-text-tertiary)]">
                             ({entry.notes})
                           </span>
                         ) : null}
                       </td>
-                      <td className="py-2 pr-4 align-top text-[11px] text-[#7a7a7a]">
+                      <td className="py-2 pr-4 align-top text-[11px] text-[var(--bb-text-secondary)]">
                         {entry.ticketCode || "—"}
                       </td>
-                      <td className="py-2 pr-4 align-top text-[11px] text-[#7a7a7a]">
+                      <td className="py-2 pr-4 align-top text-[11px] text-[var(--bb-text-secondary)]">
                         {entry.balanceBefore != null
                           ? entry.balanceBefore
                           : "—"}
                       </td>
-                      <td className="py-2 pr-4 align-top text-[11px] text-[#7a7a7a]">
+                      <td className="py-2 pr-4 align-top text-[11px] text-[var(--bb-text-secondary)]">
                         {entry.balanceAfter != null
                           ? entry.balanceAfter
                           : "—"}

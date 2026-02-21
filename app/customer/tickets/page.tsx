@@ -283,14 +283,14 @@ export default function CustomerTicketsPage() {
             <h1 className="text-2xl font-semibold tracking-tight">
               My tickets
             </h1>
-            <p className="mt-1 text-sm text-[#7a7a7a]">
+            <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
               All creative requests created for your company, with project,
               status, and creative information.
             </p>
             {company && (
-              <p className="mt-1 text-xs text-[#9a9892]">
+              <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
                 Company:{" "}
-                <span className="font-medium text-[#424143]">
+                <span className="font-medium text-[var(--bb-secondary)]">
                   {company.name}
                 </span>{" "}
                 ({company.slug})
@@ -304,8 +304,8 @@ export default function CustomerTicketsPage() {
               disabled={!canCreateNewTicket}
               className={`inline-flex items-center justify-center rounded-full px-4 py-1.5 text-[11px] font-medium ${
                 canCreateNewTicket
-                  ? "bg-[#f15b2b] text-white hover:bg-[#e14e22]"
-                  : "cursor-not-allowed bg-[#f0eee9] text-[#b8b7b1]"
+                  ? "bg-[var(--bb-primary)] text-white hover:bg-[var(--bb-primary-hover)]"
+                  : "cursor-not-allowed bg-[var(--bb-border-subtle)] text-[var(--bb-text-muted)]"
               }`}
               onClick={() => {
                 if (!canCreateNewTicket) return;
@@ -316,7 +316,7 @@ export default function CustomerTicketsPage() {
             </button>
 
             {!loading && pagination && (
-              <div className="rounded-full bg-[#f5f3f0] px-3 py-1 text-xs text-[#7a7a7a]">
+              <div className="rounded-full bg-[var(--bb-bg-card)] px-3 py-1 text-xs text-[var(--bb-text-secondary)]">
                 {pagination.total} ticket
                 {pagination.total === 1 ? "" : "s"} total
               </div>
@@ -328,8 +328,8 @@ export default function CustomerTicketsPage() {
         {!error &&
           !companyRoleLoading &&
           companyRole === "BILLING" && (
-            <div className="mb-4 rounded-xl border border-[#f6c89f] bg-[#fff4e6] px-4 py-3 text-xs text-[#7a7a7a]">
-              <p className="text-[11px] font-medium text-[#9a5b2b]">
+            <div className="mb-4 rounded-xl border border-[var(--bb-warning-border)] bg-[var(--bb-warning-bg)] px-4 py-3 text-xs text-[var(--bb-text-secondary)]">
+              <p className="text-[11px] font-medium text-[var(--bb-warning-text)]">
                 Limited access
               </p>
               <p className="mt-1">
@@ -349,7 +349,7 @@ export default function CustomerTicketsPage() {
         {/* Filters */}
         <section className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div className="flex-1">
-            <label className="block text-xs font-medium text-[#424143]">
+            <label className="block text-xs font-medium text-[var(--bb-secondary)]">
               Search
             </label>
             <FormInput
@@ -363,7 +363,7 @@ export default function CustomerTicketsPage() {
           </div>
           <div className="flex flex-wrap gap-3">
             <div className="flex items-center gap-2">
-              <label className="text-xs font-medium text-[#424143]">
+              <label className="text-xs font-medium text-[var(--bb-secondary)]">
                 Status
               </label>
               <FormSelect
@@ -383,7 +383,7 @@ export default function CustomerTicketsPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              <label className="text-xs font-medium text-[#424143]">
+              <label className="text-xs font-medium text-[var(--bb-secondary)]">
                 Project
               </label>
               <FormSelect
@@ -402,7 +402,7 @@ export default function CustomerTicketsPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              <label className="text-xs font-medium text-[#424143]">
+              <label className="text-xs font-medium text-[var(--bb-secondary)]">
                 Priority
               </label>
               <FormSelect
@@ -423,7 +423,7 @@ export default function CustomerTicketsPage() {
 
             {availableTags.length > 0 && (
               <div className="flex items-center gap-2">
-                <label className="text-xs font-medium text-[#424143]">
+                <label className="text-xs font-medium text-[var(--bb-secondary)]">
                   Tag
                 </label>
                 <FormSelect
@@ -450,13 +450,13 @@ export default function CustomerTicketsPage() {
         )}
 
         {!loading && tickets.length > 0 && (
-          <section className="rounded-2xl border border-[#e3e1dc] bg-white px-4 py-4 shadow-sm">
+          <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-semibold tracking-tight">
                 Tickets
               </h2>
               {pagination && (
-                <p className="text-xs text-[#9a9892]">
+                <p className="text-xs text-[var(--bb-text-tertiary)]">
                   Showing {page * PAGE_SIZE + 1}–{totalShown} of{" "}
                   {pagination.total} tickets
                 </p>
@@ -503,26 +503,26 @@ export default function CustomerTicketsPage() {
                 {tickets.map((t) => (
                   <tr
                     key={t.id}
-                    className="border-b border-[#f0eeea] last:border-b-0 cursor-pointer transition-colors hover:bg-[var(--bb-bg-warm)]"
+                    className="border-b border-[var(--bb-border-subtle)] last:border-b-0 cursor-pointer transition-colors hover:bg-[var(--bb-bg-warm)]"
                     onClick={() =>
                       (window.location.href =
                         `/customer/tickets/${t.id}`)
                     }
                   >
                     <TD>
-                      <div className="font-medium text-[#424143]">
+                      <div className="font-medium text-[var(--bb-secondary)]">
                         {t.code}
                       </div>
-                      <div className="text-[11px] text-[#7a7a7a]">
+                      <div className="text-[11px] text-[var(--bb-text-secondary)]">
                         {t.title}
                       </div>
                     </TD>
                     <TD>
-                      <div className="text-[11px] font-medium text-[#424143]">
+                      <div className="text-[11px] font-medium text-[var(--bb-secondary)]">
                         {t.projectName ?? "-"}
                       </div>
                       {t.projectCode && (
-                        <div className="text-[11px] text-[#9a9892]">
+                        <div className="text-[11px] text-[var(--bb-text-tertiary)]">
                           {t.projectCode}
                         </div>
                       )}
@@ -538,16 +538,16 @@ export default function CustomerTicketsPage() {
                       </Badge>
                     </TD>
                     <TD className="hidden md:table-cell">
-                      <div className="text-[11px] text-[#424143]">
+                      <div className="text-[11px] text-[var(--bb-secondary)]">
                         {t.isAssigned ? "Yes" : "-"}
                       </div>
                     </TD>
                     <TD className="hidden md:table-cell">
-                      <div className="text-[11px] text-[#424143]">
+                      <div className="text-[11px] text-[var(--bb-secondary)]">
                         {t.jobTypeName ?? "-"}
                       </div>
                     </TD>
-                    <TD className="hidden md:table-cell text-[#7a7a7a]">
+                    <TD className="hidden md:table-cell text-[var(--bb-text-secondary)]">
                       {formatDate(t.createdAt)}
                     </TD>
                     <TD>
@@ -558,13 +558,13 @@ export default function CustomerTicketsPage() {
                               ? "font-semibold text-[var(--bb-danger-text)]"
                               : isDueDateSoon(t.dueDate)
                                 ? "font-semibold text-[var(--bb-warning-text)]"
-                                : "text-[#7a7a7a]"
+                                : "text-[var(--bb-text-secondary)]"
                           }
                         >
                           {formatDate(t.dueDate)}
                         </span>
                       ) : (
-                        <span className="text-[#7a7a7a]">-</span>
+                        <span className="text-[var(--bb-text-secondary)]">-</span>
                       )}
                     </TD>
                   </tr>
@@ -574,8 +574,8 @@ export default function CustomerTicketsPage() {
 
             {/* Pagination controls */}
             {pagination && pagination.total > PAGE_SIZE && (
-              <div className="mt-4 flex items-center justify-between border-t border-[#f0eeea] pt-3">
-                <p className="text-xs text-[#9a9892]">
+              <div className="mt-4 flex items-center justify-between border-t border-[var(--bb-border-subtle)] pt-3">
+                <p className="text-xs text-[var(--bb-text-tertiary)]">
                   Page {page + 1} of {Math.ceil(pagination.total / PAGE_SIZE)}
                 </p>
                 <div className="flex gap-2">
@@ -583,7 +583,7 @@ export default function CustomerTicketsPage() {
                     type="button"
                     disabled={page === 0}
                     onClick={() => setPage((p) => Math.max(0, p - 1))}
-                    className="rounded-full border border-[#e3e1dc] px-3 py-1 text-[11px] font-medium text-[#424143] transition-colors hover:bg-[#f5f3f0] disabled:cursor-not-allowed disabled:opacity-40"
+                    className="rounded-full border border-[var(--bb-border)] px-3 py-1 text-[11px] font-medium text-[var(--bb-secondary)] transition-colors hover:bg-[var(--bb-bg-card)] disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     ← Previous
                   </button>
@@ -591,7 +591,7 @@ export default function CustomerTicketsPage() {
                     type="button"
                     disabled={!pagination.hasMore}
                     onClick={() => setPage((p) => p + 1)}
-                    className="rounded-full border border-[#e3e1dc] px-3 py-1 text-[11px] font-medium text-[#424143] transition-colors hover:bg-[#f5f3f0] disabled:cursor-not-allowed disabled:opacity-40"
+                    className="rounded-full border border-[var(--bb-border)] px-3 py-1 text-[11px] font-medium text-[var(--bb-secondary)] transition-colors hover:bg-[var(--bb-bg-card)] disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     Next →
                   </button>
@@ -602,7 +602,7 @@ export default function CustomerTicketsPage() {
         )}
 
         {loading && (
-          <section className="rounded-2xl border border-[#e3e1dc] bg-white px-4 shadow-sm">
+          <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 shadow-sm">
             <LoadingState message="Loading tickets..." />
           </section>
         )}

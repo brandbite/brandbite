@@ -384,7 +384,7 @@ export function JobTypePicker({
               onClick={() => handleCategoryClick(null)}
               className={`rounded-lg px-3 py-2 text-left text-xs font-medium transition-colors ${
                 activeCategory === null
-                  ? "bg-[var(--bb-primary-light)] text-[#d6471b]"
+                  ? "bg-[var(--bb-primary-light)] text-[var(--bb-primary-hover)]"
                   : "text-[var(--bb-text-secondary)] hover:bg-[var(--bb-bg-card)]"
               }`}
             >
@@ -403,7 +403,7 @@ export function JobTypePicker({
                   onClick={() => handleCategoryClick(cat)}
                   className={`rounded-lg px-3 py-2 text-left text-xs font-medium transition-colors ${
                     activeCategory === cat
-                      ? "bg-[var(--bb-primary-light)] text-[#d6471b]"
+                      ? "bg-[var(--bb-primary-light)] text-[var(--bb-primary-hover)]"
                       : count === 0
                         ? "text-[var(--bb-text-muted)] opacity-40"
                         : "text-[var(--bb-text-secondary)] hover:bg-[var(--bb-bg-card)]"
@@ -425,7 +425,7 @@ export function JobTypePicker({
               onClick={() => handleCategoryClick(null)}
               className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-semibold transition-colors ${
                 activeCategory === null
-                  ? "bg-[var(--bb-primary-light)] text-[#d6471b] border border-[var(--bb-primary-border)]"
+                  ? "bg-[var(--bb-primary-light)] text-[var(--bb-primary-hover)] border border-[var(--bb-primary-border)]"
                   : "bg-[var(--bb-bg-card)] text-[var(--bb-text-secondary)] border border-[var(--bb-border)]"
               }`}
             >
@@ -441,7 +441,7 @@ export function JobTypePicker({
                   onClick={() => handleCategoryClick(cat)}
                   className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-semibold transition-colors ${
                     activeCategory === cat
-                      ? "bg-[var(--bb-primary-light)] text-[#d6471b] border border-[var(--bb-primary-border)]"
+                      ? "bg-[var(--bb-primary-light)] text-[var(--bb-primary-hover)] border border-[var(--bb-primary-border)]"
                       : count === 0
                         ? "bg-[var(--bb-bg-card)] text-[var(--bb-text-muted)] border border-[var(--bb-border)] opacity-40"
                         : "bg-[var(--bb-bg-card)] text-[var(--bb-text-secondary)] border border-[var(--bb-border)]"
@@ -497,11 +497,11 @@ export function JobTypePicker({
                           className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
                             isSelected
                               ? "border-[var(--bb-primary)] bg-[var(--bb-primary)]"
-                              : "border-[var(--bb-border)] bg-white"
+                              : "border-[var(--bb-border)] bg-[var(--bb-bg-page)]"
                           }`}
                         >
                           {isSelected && (
-                            <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                            <span className="h-1.5 w-1.5 rounded-full bg-[var(--bb-bg-page)]" />
                           )}
                         </span>
 

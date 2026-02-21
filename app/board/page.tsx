@@ -37,10 +37,10 @@ const STATUS_COLUMNS: { id: TicketStatus; label: string }[] = [
 ];
 
 const PRIORITY_COLORS: Record<TicketPriority, string> = {
-  LOW: "bg-[#f2f1ed] text-[#7a7a7a]",
-  MEDIUM: "bg-[#e1f0ff] text-[#245c9b]",
-  HIGH: "bg-[#fff5dd] text-[#8a6000]",
-  URGENT: "bg-[#fde8e7] text-[#b13832]",
+  LOW: "bg-[var(--bb-bg-card)] text-[var(--bb-text-secondary)]",
+  MEDIUM: "bg-[var(--bb-info-bg)] text-[var(--bb-info-text)]",
+  HIGH: "bg-[var(--bb-warning-bg)] text-[var(--bb-warning-text)]",
+  URGENT: "bg-[var(--bb-danger-bg)] text-[var(--bb-danger-text)]",
 };
 
 export default function BoardPage() {
@@ -132,22 +132,22 @@ export default function BoardPage() {
   }, [filteredTickets]);
 
   return (
-    <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
+    <div className="min-h-screen bg-[var(--bb-bg-card)] text-[var(--bb-secondary)]">
       <div className="mx-auto max-w-6xl px-6 py-10">
         {/* Top navigation (Brandbite style) */}
         <header className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f15b2b] text-sm font-semibold text-white">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--bb-primary)] text-sm font-semibold text-white">
               B
             </div>
             <span className="text-lg font-semibold tracking-tight">
               Brandbite
             </span>
           </div>
-          <nav className="hidden items-center gap-6 text-sm text-[#7a7a7a] md:flex">
-            <button className="font-medium text-[#424143]">Board</button>
-            <button className="font-medium text-[#7a7a7a]">Creatives</button>
-            <button className="font-medium text-[#7a7a7a]">Tokens</button>
+          <nav className="hidden items-center gap-6 text-sm text-[var(--bb-text-secondary)] md:flex">
+            <button className="font-medium text-[var(--bb-secondary)]">Board</button>
+            <button className="font-medium text-[var(--bb-text-secondary)]">Creatives</button>
+            <button className="font-medium text-[var(--bb-text-secondary)]">Tokens</button>
           </nav>
         </header>
 
@@ -157,7 +157,7 @@ export default function BoardPage() {
             <h1 className="text-2xl font-semibold tracking-tight">
               Tickets board
             </h1>
-            <p className="mt-1 text-sm text-[#7a7a7a]">
+            <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
               Visual overview of all active creative requests. This view is now
               powered by real Ticket records from the database.
             </p>
@@ -166,16 +166,16 @@ export default function BoardPage() {
 
         {/* Error / empty states */}
         {error && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-white px-4 py-3 text-sm text-red-700">
+          <div className="mb-4 rounded-xl border border-red-200 bg-[var(--bb-bg-page)] px-4 py-3 text-sm text-red-700">
             <p className="font-medium">Error</p>
             <p className="mt-1">{error}</p>
           </div>
         )}
 
         {/* Filters */}
-        <section className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[#e3e1dc] bg-white px-5 py-4 shadow-sm">
+        <section className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
           <div className="flex flex-1 items-center gap-2">
-            <label className="text-xs font-medium text-[#424143]">
+            <label className="text-xs font-medium text-[var(--bb-secondary)]">
               Search
             </label>
             <input
@@ -183,17 +183,17 @@ export default function BoardPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by ticket, project, company, creative..."
-              className="w-full rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+              className="w-full rounded-md border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-2 text-sm text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
             />
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-[#424143]">
+            <label className="text-xs font-medium text-[var(--bb-secondary)]">
               Project
             </label>
             <select
               value={projectFilter}
               onChange={(e) => setProjectFilter(e.target.value)}
-              className="rounded-md border border-[#d4d2cc] bg-[#fbfaf8] px-3 py-2 text-sm text-[#424143] outline-none focus:border-[#f15b2b] focus:ring-1 focus:ring-[#f15b2b]"
+              className="rounded-md border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-2 text-sm text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
             >
               <option value="ALL">All projects</option>
               {projects.map((p) => (
@@ -207,7 +207,7 @@ export default function BoardPage() {
 
         {/* Loading state */}
         {loading && (
-          <div className="rounded-2xl border border-dashed border-[#e3e1dc] bg-white px-5 py-6 text-sm text-[#7a7a7a]">
+          <div className="rounded-2xl border border-dashed border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-6 text-sm text-[var(--bb-text-secondary)]">
             Loading board tickets…
           </div>
         )}
@@ -217,8 +217,8 @@ export default function BoardPage() {
           <section
             className="
               board-frame
-              mt-4 flex gap-4 overflow-x-auto rounded-2xl border border-[#e3e1dc]
-              bg-[#f8f6f3] px-4 py-4 shadow-sm
+              mt-4 flex gap-4 overflow-x-auto rounded-2xl border border-[var(--bb-border)]
+              bg-[var(--bb-bg-warm)] px-4 py-4 shadow-sm
             "
           >
             {STATUS_COLUMNS.map((column) => {
@@ -232,37 +232,37 @@ export default function BoardPage() {
                   {/* Column header */}
                   <div className="mb-3 flex items-center justify-between">
                     <div>
-                      <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-[#9a9892]">
+                      <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
                         {column.label}
                       </h2>
-                      <p className="text-xs text-[#b8b6b1]">
+                      <p className="text-xs text-[var(--bb-text-muted)]">
                         {columnTickets.length} item
                         {columnTickets.length !== 1 ? "s" : ""}
                       </p>
                     </div>
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#f2f1ed] text-[11px] text-[#7a7a7a]">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--bb-bg-card)] text-[11px] text-[var(--bb-text-secondary)]">
                       {column.label[0]}
                     </div>
                   </div>
 
                   {/* Column body */}
-                  <div className="flex min-h-[320px] flex-1 flex-col gap-3 rounded-2xl bg-[#fdfbf8] p-3">
+                  <div className="flex min-h-[320px] flex-1 flex-col gap-3 rounded-2xl bg-[var(--bb-bg-page)] p-3">
                     {columnTickets.length === 0 ? (
-                      <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-[#e3e1dc] bg-white/60 px-3 py-4 text-center text-xs text-[#b8b6b1]">
+                      <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-[var(--bb-border)] bg-[var(--bb-bg-page)]/60 px-3 py-4 text-center text-xs text-[var(--bb-text-muted)]">
                         No tickets in this column.
                       </div>
                     ) : (
                       columnTickets.map((ticket) => (
                         <article
                           key={ticket.id}
-                          className="group rounded-xl border border-[#e3e1dc] bg-white px-3 py-3 text-xs shadow-sm transition hover:-translate-y-[1px] hover:shadow-md"
+                          className="group rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-3 text-xs shadow-sm transition hover:-translate-y-[1px] hover:shadow-md"
                         >
                           <header className="mb-2 flex items-start justify-between gap-2">
                             <div>
-                              <div className="text-[11px] font-medium text-[#7a7a7a]">
+                              <div className="text-[11px] font-medium text-[var(--bb-text-secondary)]">
                                 {ticket.code}
                               </div>
-                              <h3 className="mt-0.5 text-[13px] font-semibold leading-snug text-[#424143]">
+                              <h3 className="mt-0.5 text-[13px] font-semibold leading-snug text-[var(--bb-secondary)]">
                                 {ticket.title}
                               </h3>
                             </div>
@@ -275,20 +275,20 @@ export default function BoardPage() {
                             </span>
                           </header>
 
-                          <div className="mb-2 space-y-1 text-[11px] text-[#7a7a7a]">
+                          <div className="mb-2 space-y-1 text-[11px] text-[var(--bb-text-secondary)]">
                             {ticket.projectName && (
                               <div className="flex items-center gap-1">
-                                <span className="text-[10px] uppercase tracking-wide text-[#b8b6b1]">
+                                <span className="text-[10px] uppercase tracking-wide text-[var(--bb-text-muted)]">
                                   Project
                                 </span>
-                                <span className="font-medium text-[#424143]">
+                                <span className="font-medium text-[var(--bb-secondary)]">
                                   {ticket.projectName}
                                 </span>
                               </div>
                             )}
                             {ticket.companyName && (
                               <div className="flex items-center gap-1">
-                                <span className="text-[10px] uppercase tracking-wide text-[#b8b6b1]">
+                                <span className="text-[10px] uppercase tracking-wide text-[var(--bb-text-muted)]">
                                   Company
                                 </span>
                                 <span>{ticket.companyName}</span>
@@ -296,7 +296,7 @@ export default function BoardPage() {
                             )}
                             {ticket.creativeName && (
                               <div className="flex items-center gap-1">
-                                <span className="text-[10px] uppercase tracking-wide text-[#b8b6b1]">
+                                <span className="text-[10px] uppercase tracking-wide text-[var(--bb-text-muted)]">
                                   Creative
                                 </span>
                                 <span>{ticket.creativeName}</span>
@@ -304,10 +304,10 @@ export default function BoardPage() {
                             )}
                           </div>
 
-                          <footer className="flex items-center justify-between pt-1 text-[10px] text-[#9a9892]">
+                          <footer className="flex items-center justify-between pt-1 text-[10px] text-[var(--bb-text-tertiary)]">
                             <div className="flex items-center gap-2">
                               {ticket.tokenCost != null && (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-[#f2f1ed] px-2 py-0.5 font-medium text-[#424143]">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--bb-bg-card)] px-2 py-0.5 font-medium text-[var(--bb-secondary)]">
                                   <span className="text-[9px]">Tokens</span>
                                   <span className="text-[11px]">
                                     {ticket.tokenCost}

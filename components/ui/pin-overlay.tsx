@@ -149,7 +149,7 @@ export function PinOverlay({
             key={`pin-${pin.order}`}
             data-pin
             className={`absolute z-10 flex items-center justify-center rounded-full font-bold text-white shadow-lg transition-all
-              ${isResolved ? "bg-[#32b37b]" : "bg-[#f15b2b]"}
+              ${isResolved ? "bg-[#32b37b]" : "bg-[var(--bb-primary)]"}
               ${isActive ? "ring-2 ring-white ring-offset-1 ring-offset-transparent animate-pin-pulse md:h-7 md:w-7 h-6 w-6" : "md:h-6 md:w-6 h-5 w-5"}
               ${mode === "edit" ? "cursor-pointer hover:scale-110" : ""}
               ${resolveMode && !isResolved ? "cursor-pointer hover:scale-110 hover:ring-2 hover:ring-[#32b37b]/40" : ""}
@@ -174,9 +174,9 @@ export function PinOverlay({
 
             {/* Mobile long-press tooltip */}
             {longPressPin === pin.order && pin.label && (
-              <div className="absolute bottom-full left-1/2 z-20 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-[#424143] px-2.5 py-1.5 text-[10px] font-normal text-white shadow-lg md:hidden">
+              <div className="absolute bottom-full left-1/2 z-20 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-[var(--bb-secondary)] px-2.5 py-1.5 text-[10px] font-normal text-white shadow-lg md:hidden">
                 <div className="max-w-[200px] truncate">{pin.label}</div>
-                <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-[#424143]" />
+                <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-[var(--bb-secondary)]" />
               </div>
             )}
           </div>
