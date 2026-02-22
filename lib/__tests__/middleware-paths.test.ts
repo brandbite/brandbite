@@ -1,22 +1,20 @@
 // -----------------------------------------------------------------------------
 // @file: lib/__tests__/middleware-paths.test.ts
-// @purpose: Unit tests for middleware path matching logic
+// @purpose: Unit tests for proxy path matching logic
 // -----------------------------------------------------------------------------
 
 import { describe, it, expect } from "vitest";
 
-// Recreate the path matching logic from middleware.ts to test it in isolation
+// Recreate the path matching logic from proxy.ts to test it in isolation
 const PUBLIC_PATHS = [
   "/",
   "/login",
   "/reset-password",
   "/onboarding",
   "/invite",
-  "/board",
   "/api/auth",
   "/api/billing/webhook",
   "/api/invite",
-  "/api/board",
   "/api/session",
 ];
 

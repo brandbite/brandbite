@@ -1,8 +1,8 @@
 // -----------------------------------------------------------------------------
-// @file: middleware.ts
+// @file: proxy.ts
 // @purpose: Auth gateway — redirect unauthenticated users from protected routes.
 //           Dual mode: demo cookie (DEMO_MODE=true) or BetterAuth session cookie.
-// @version: v1.1.0
+// @version: v1.2.0
 // @status: active
 // @lastUpdate: 2026-02-22
 // -----------------------------------------------------------------------------
@@ -40,7 +40,7 @@ function isDemoOnlyPath(pathname: string): boolean {
   return DEMO_ONLY_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Block debug routes in production (non-demo) mode
