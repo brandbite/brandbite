@@ -50,8 +50,7 @@ export default function InvitePageClient({ token }: InvitePageClientProps) {
   const router = useRouter();
 
   const [state, setState] = useState<ViewState>({ status: "loading" });
-  const [acceptStatus, setAcceptStatus] =
-    useState<"idle" | "submitting">("idle");
+  const [acceptStatus, setAcceptStatus] = useState<"idle" | "submitting">("idle");
   const [acceptError, setAcceptError] = useState<string | null>(null);
   const [acceptSuccess, setAcceptSuccess] = useState(false);
 
@@ -70,8 +69,7 @@ export default function InvitePageClient({ token }: InvitePageClientProps) {
         const json = await res.json().catch(() => null);
 
         if (!res.ok) {
-          const msg =
-            json?.error || `Request failed with status ${res.status}`;
+          const msg = json?.error || `Request failed with status ${res.status}`;
           if (!cancelled) {
             setState({ status: "error", message: msg });
           }
@@ -119,8 +117,7 @@ export default function InvitePageClient({ token }: InvitePageClientProps) {
       const json = await res.json().catch(() => null);
 
       if (!res.ok) {
-        const msg =
-          json?.error || `Request failed with status ${res.status}`;
+        const msg = json?.error || `Request failed with status ${res.status}`;
         setState({ status: "error", message: msg });
         return;
       }
@@ -151,8 +148,7 @@ export default function InvitePageClient({ token }: InvitePageClientProps) {
       const json = await res.json().catch(() => null);
 
       if (!res.ok) {
-        const msg =
-          json?.error || `Request failed with status ${res.status}`;
+        const msg = json?.error || `Request failed with status ${res.status}`;
         setAcceptError(msg);
         return;
       }
@@ -174,11 +170,9 @@ export default function InvitePageClient({ token }: InvitePageClientProps) {
   if (state.status === "error") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--bb-bg-card)] text-[var(--bb-secondary)]">
-        <div className="max-w-md rounded-3xl bg-[var(--bb-bg-page)] px-6 py-5 text-center shadow-sm shadow-[var(--bb-border)]">
+        <div className="max-w-md rounded-3xl bg-[var(--bb-bg-page)] px-6 py-5 text-center shadow-[var(--bb-border)] shadow-sm">
           <h1 className="text-lg font-semibold">Something went wrong</h1>
-          <p className="mt-2 text-sm text-[var(--bb-text-secondary)]">
-            {state.message}
-          </p>
+          <p className="mt-2 text-sm text-[var(--bb-text-secondary)]">{state.message}</p>
           <a
             href="/"
             className="mt-4 inline-flex items-center justify-center rounded-full bg-[var(--bb-primary)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--bb-primary-hover)]"
@@ -190,21 +184,18 @@ export default function InvitePageClient({ token }: InvitePageClientProps) {
     );
   }
 
-  const { invite, company, viewer, canAccept, alreadyMember } =
-    state.data;
+  const { invite, company, viewer, canAccept, alreadyMember } = state.data;
 
   const statusLabel = formatInviteStatus(invite.status);
   const roleLabel = formatCompanyRole(invite.roleInCompany);
 
-  const viewerLabel = viewer
-    ? `${viewer.email} (${viewer.role.toLowerCase()})`
-    : "Not signed in";
+  const viewerLabel = viewer ? `${viewer.email} (${viewer.role.toLowerCase()})` : "Not signed in";
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--bb-bg-card)] text-[var(--bb-secondary)]">
-      <div className="mx-4 w-full max-w-md rounded-3xl bg-[var(--bb-bg-page)] px-6 py-6 shadow-sm shadow-[var(--bb-border)]">
+      <div className="mx-4 w-full max-w-md rounded-3xl bg-[var(--bb-bg-page)] px-6 py-6 shadow-[var(--bb-border)] shadow-sm">
         <header className="mb-4 border-b border-[var(--bb-border-subtle)] pb-3">
-          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--bb-text-muted)]">
+          <p className="text-[11px] font-medium tracking-[0.2em] text-[var(--bb-text-muted)] uppercase">
             Invite
           </p>
           <h1 className="mt-1 text-xl font-semibold tracking-tight text-[var(--bb-secondary)]">
@@ -212,10 +203,8 @@ export default function InvitePageClient({ token }: InvitePageClientProps) {
           </h1>
           <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
             You have been invited to join{" "}
-            <span className="font-medium text-[var(--bb-secondary)]">
-              {company.name}
-            </span>{" "}
-            as a {roleLabel}.
+            <span className="font-medium text-[var(--bb-secondary)]">{company.name}</span> as a{" "}
+            {roleLabel}.
           </p>
         </header>
 
@@ -248,55 +237,63 @@ export default function InvitePageClient({ token }: InvitePageClientProps) {
 
         {acceptSuccess && (
           <div className="mt-3 rounded-lg border border-emerald-200 bg-[var(--bb-success-bg)] px-3 py-2 text-xs text-emerald-700">
-            You have joined{" "}
-            <span className="font-semibold">{company.name}</span>. You
-            can now access its workspace.
+            You have joined <span className="font-semibold">{company.name}</span>. You can now
+            access its workspace.
           </div>
         )}
 
         <div className="mt-4 flex flex-col gap-2">
           {invite.status !== "PENDING" && (
             <p className="text-xs text-[var(--bb-text-tertiary)]">
-              This invite is no longer pending (
-              {statusLabel.toLowerCase()}).
+              This invite is no longer pending ({statusLabel.toLowerCase()}).
             </p>
           )}
 
           {invite.status === "PENDING" && alreadyMember && (
             <p className="text-xs text-[var(--bb-text-tertiary)]">
-              You are already a member of this company. Accepting is not
-              necessary.
+              You are already a member of this company. Accepting is not necessary.
             </p>
           )}
 
           {invite.status === "PENDING" && !viewer && (
             <p className="text-xs text-[var(--bb-text-tertiary)]">
-              To accept this invite, you need to browse Brandbite as a
-              user. In this demo, use the{" "}
-              <a
-                href="/debug/demo-user"
-                className="font-medium text-[var(--bb-primary)] underline"
-              >
-                demo personas
-              </a>{" "}
-              to simulate the invited person.
+              {process.env.NEXT_PUBLIC_DEMO_MODE === "true" ? (
+                <>
+                  To accept this invite, you need to browse Brandbite as a user. In this demo, use
+                  the{" "}
+                  <a
+                    href="/debug/demo-user"
+                    className="font-medium text-[var(--bb-primary)] underline"
+                  >
+                    demo personas
+                  </a>{" "}
+                  to simulate the invited person.
+                </>
+              ) : (
+                <>
+                  To accept this invite, please{" "}
+                  <a
+                    href={`/login?redirect=/invite/${token}`}
+                    className="font-medium text-[var(--bb-primary)] underline"
+                  >
+                    sign in or create an account
+                  </a>{" "}
+                  first.
+                </>
+              )}
             </p>
           )}
 
-          {invite.status === "PENDING" &&
-            viewer &&
-            !alreadyMember && (
-              <button
-                type="button"
-                disabled={!canAccept || acceptStatus === "submitting"}
-                onClick={handleAccept}
-                className="mt-1 inline-flex items-center justify-center rounded-full bg-[var(--bb-primary)] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[var(--bb-primary-hover)] disabled:opacity-70"
-              >
-                {acceptStatus === "submitting"
-                  ? "Joining…"
-                  : `Join ${company.name}`}
-              </button>
-            )}
+          {invite.status === "PENDING" && viewer && !alreadyMember && (
+            <button
+              type="button"
+              disabled={!canAccept || acceptStatus === "submitting"}
+              onClick={handleAccept}
+              className="mt-1 inline-flex items-center justify-center rounded-full bg-[var(--bb-primary)] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[var(--bb-primary-hover)] disabled:opacity-70"
+            >
+              {acceptStatus === "submitting" ? "Joining…" : `Join ${company.name}`}
+            </button>
+          )}
 
           <button
             type="button"
@@ -314,7 +311,7 @@ export default function InvitePageClient({ token }: InvitePageClientProps) {
 function InviteSkeleton() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--bb-bg-card)] text-[var(--bb-secondary)]">
-      <div className="mx-4 w-full max-w-md rounded-3xl bg-[var(--bb-bg-page)] px-6 py-6 shadow-sm shadow-[var(--bb-border)]">
+      <div className="mx-4 w-full max-w-md rounded-3xl bg-[var(--bb-bg-page)] px-6 py-6 shadow-[var(--bb-border)] shadow-sm">
         <div className="mb-4 border-b border-[var(--bb-border-subtle)] pb-3">
           <div className="h-3 w-16 rounded bg-[var(--bb-border)]" />
           <div className="mt-2 h-5 w-48 rounded bg-[var(--bb-border)]" />

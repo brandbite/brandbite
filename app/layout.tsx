@@ -44,11 +44,9 @@ const themeScript = `
 })();
 `;
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -59,7 +57,7 @@ export default function RootLayout({
       >
         <ThemeProvider>
           <ToastProvider>
-            <DemoPersonaBanner />
+            {isDemoMode && <DemoPersonaBanner />}
             {children}
           </ToastProvider>
         </ThemeProvider>

@@ -1,22 +1,32 @@
 // -----------------------------------------------------------------------------
 // @file: middleware.ts
-// @purpose: Auth gateway — redirect unauthenticated users from protected routes
+// @purpose: Auth gateway — redirect unauthenticated users from protected routes.
+//           Dual mode: demo cookie (DEMO_MODE=true) or BetterAuth session cookie.
+// @version: v1.1.0
+// @status: active
+// @lastUpdate: 2026-02-22
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
 
+const isDemoMode = process.env.DEMO_MODE === "true";
+
 // Routes that do NOT require authentication
 const PUBLIC_PATHS = [
   "/",
+  "/login",
   "/onboarding",
   "/invite", // covers /invite/[token]
   "/board", // public board view
+  "/api/auth", // BetterAuth catch-all (sign-up, sign-in, etc.)
   "/api/billing/webhook",
-  "/api/debug", // demo-only — remove when BetterAuth is live
   "/api/invite",
   "/api/board", // public board API
   "/api/session", // session check itself must be accessible
 ];
+
+// Debug routes are only accessible in demo mode
+const DEMO_ONLY_PATHS = ["/api/debug", "/debug"];
 
 function isPublicPath(pathname: string): boolean {
   if (pathname === "/") return true;
@@ -27,20 +37,41 @@ function isPublicPath(pathname: string): boolean {
   });
 }
 
+function isDemoOnlyPath(pathname: string): boolean {
+  return DEMO_ONLY_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Block debug routes in production (non-demo) mode
+  if (!isDemoMode && isDemoOnlyPath(pathname)) {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
+
+  // Demo-only paths are public when in demo mode
+  if (isDemoMode && isDemoOnlyPath(pathname)) {
+    return NextResponse.next();
+  }
 
   // Public routes — no auth required
   if (isPublicPath(pathname)) {
     return NextResponse.next();
   }
 
-  // Protected routes — check for demo auth cookie
-  // When BetterAuth is active, replace with session token validation
-  const demoCookie = request.cookies.get("bb-demo-user")?.value;
-  if (!demoCookie) {
-    const loginUrl = new URL("/", request.url);
-    return NextResponse.redirect(loginUrl);
+  // Protected routes — check for auth cookie
+  if (isDemoMode) {
+    // Demo mode: check bb-demo-user cookie
+    const demoCookie = request.cookies.get("bb-demo-user")?.value;
+    if (!demoCookie) {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
+  } else {
+    // BetterAuth mode: check session cookie presence (no DB call)
+    const sessionCookie = request.cookies.get("better-auth.session_token")?.value;
+    if (!sessionCookie) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
   }
 
   // Cookie exists — allow through

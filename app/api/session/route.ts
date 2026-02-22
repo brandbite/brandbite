@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/session/route.ts
-// @purpose: Expose current demo persona + session user info for client UI
-// @version: v1.0.0
+// @purpose: Expose current session user info (+ demo persona when in demo mode)
+// @version: v1.1.0
 // @status: active
-// @lastUpdate: 2025-11-16
+// @lastUpdate: 2026-02-22
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
@@ -22,9 +22,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 });
     }
 
-    const cookieStore = await cookies();
-    const personaIdRaw = cookieStore.get("bb-demo-user")?.value ?? null;
-
+    // Demo persona summary (only in demo mode)
     let demoPersonaSummary: {
       id: DemoPersonaId;
       label: string;
@@ -32,15 +30,20 @@ export async function GET(req: NextRequest) {
       roleLabel: string;
     } | null = null;
 
-    if (personaIdRaw && isValidDemoPersona(personaIdRaw)) {
-      const persona = getDemoPersonaById(personaIdRaw as DemoPersonaId);
-      if (persona) {
-        demoPersonaSummary = {
-          id: persona.id,
-          label: persona.label,
-          role: persona.role,
-          roleLabel: formatRole(persona.role),
-        };
+    if (process.env.DEMO_MODE === "true") {
+      const cookieStore = await cookies();
+      const personaIdRaw = cookieStore.get("bb-demo-user")?.value ?? null;
+
+      if (personaIdRaw && isValidDemoPersona(personaIdRaw)) {
+        const persona = getDemoPersonaById(personaIdRaw as DemoPersonaId);
+        if (persona) {
+          demoPersonaSummary = {
+            id: persona.id,
+            label: persona.label,
+            role: persona.role,
+            roleLabel: formatRole(persona.role),
+          };
+        }
       }
     }
 

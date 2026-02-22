@@ -1,12 +1,14 @@
 // -----------------------------------------------------------------------------
 // @file: lib/auth.ts
-// @purpose: Auth integration boundary for Brandbite (demo session + future BetterAuth)
-// @version: v0.5.2
+// @purpose: Auth integration boundary — dual mode (demo cookie + BetterAuth).
+//           DEMO_MODE=true  → demo persona cookie → email → UserAccount
+//           DEMO_MODE=false → BetterAuth session → authUserId → UserAccount
+// @version: v1.0.0
 // @status: active
-// @lastUpdate: 2025-12-27
+// @lastUpdate: 2026-02-22
 // -----------------------------------------------------------------------------
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import type { SessionUser } from "./roles";
 import {
@@ -15,62 +17,119 @@ import {
   type DemoPersonaId,
 } from "@/lib/demo-personas";
 
-/**
- * NOTE (2025-11-16):
- *
- * Bu dosya şu an "demo auth layer" mantığını uygular:
- *
- *   - Cookie adı: bb-demo-user
- *   - Değer: demo persona id'lerinden biri (lib/demo-personas.ts içindeki DemoPersonaId)
- *   - Persona id -> email çözümü, DEMO_PERSONAS config'i üzerinden yapılır.
- *   - Email ile UserAccount bulunur, sonra ilk CompanyMember kaydından
- *     activeCompanyId ve companyRole türetilir.
- *
- * Gelecekte BetterAuth (veya başka bir provider) burada devreye girip
- * getCurrentUser() içindeki logic'i gerçek session mekanizmasıyla
- * değiştirecek. Uygulamanın geri kalanı sadece lib/roles.ts içindeki
- * SessionUser tipini kullanacak.
- */
+const isDemoMode = () => process.env.DEMO_MODE === "true";
+
+// ---------------------------------------------------------------------------
+// Public API (unchanged signatures — used by all 59 API routes)
+// ---------------------------------------------------------------------------
 
 /**
- * Resolve the current user from the demo cookie and database.
- *
- * - If there is no bb-demo-user cookie, this returns null.
- * - If the persona or user is not found, this returns null.
- * - activeCompanyId and companyRole are taken from the first CompanyMember record.
+ * Resolve the current authenticated user.
+ * Returns null if not authenticated. The underlying mechanism depends on
+ * DEMO_MODE: demo cookie in dev, BetterAuth session in production.
  */
 export async function getCurrentUser(): Promise<SessionUser | null> {
-  // Next sürümünde cookies() Promise<ReadonlyRequestCookies> döndüğü için
-  // .get() çağırmadan önce await etmemiz gerekiyor.
+  if (isDemoMode()) {
+    return getCurrentUserFromDemo();
+  }
+  return getCurrentUserFromBetterAuth();
+}
+
+/**
+ * Helper that throws if there is no current user.
+ */
+export async function getCurrentUserOrThrow(): Promise<SessionUser> {
+  const user = await getCurrentUser();
+  if (!user) {
+    const error: Error & { code?: string } = new Error("UNAUTHENTICATED");
+    error.code = "UNAUTHENTICATED";
+    throw error;
+  }
+  return user;
+}
+
+/**
+ * Helper that throws if the current user has no active company.
+ */
+export async function getActiveCompanyIdOrThrow(): Promise<string> {
+  const user = await getCurrentUserOrThrow();
+  if (!user.activeCompanyId) {
+    const error: Error & { code?: string } = new Error("NO_ACTIVE_COMPANY");
+    error.code = "NO_ACTIVE_COMPANY";
+    throw error;
+  }
+  return user.activeCompanyId;
+}
+
+// ---------------------------------------------------------------------------
+// Demo mode: bb-demo-user cookie → persona → email → UserAccount
+// ---------------------------------------------------------------------------
+
+async function getCurrentUserFromDemo(): Promise<SessionUser | null> {
   const cookieStore = await cookies();
   const personaRaw = cookieStore.get("bb-demo-user")?.value;
 
-  if (!personaRaw) {
+  if (!personaRaw || !isValidDemoPersona(personaRaw)) {
     return null;
   }
 
-  // Persona id geçerli değilse kullanıcı yokmuş gibi davran
-  if (!isValidDemoPersona(personaRaw)) {
-    return null;
-  }
+  const email = getEmailForDemoPersona(personaRaw as DemoPersonaId);
+  if (!email) return null;
 
-  const personaId = personaRaw as DemoPersonaId;
-  const email = getEmailForDemoPersona(personaId);
+  return resolveSessionUserByEmail(email);
+}
 
-  if (!email) {
-    // Config ile DB seed'i uyumsuzsa da kullanıcı yokmuş gibi davranıyoruz
-    return null;
-  }
+// ---------------------------------------------------------------------------
+// BetterAuth mode: session → authUserId → UserAccount
+// ---------------------------------------------------------------------------
 
-  const user = await prisma.userAccount.findUnique({
-    where: { email },
-    include: {
-      companies: true, // CompanyMember[]
-    },
+async function getCurrentUserFromBetterAuth(): Promise<SessionUser | null> {
+  // Dynamic import to avoid loading BetterAuth when in demo mode
+  const { auth } = await import("@/lib/better-auth");
+
+  const session = await auth.api.getSession({
+    headers: await headers(),
   });
 
+  if (!session?.user) return null;
+
+  const authUserId = session.user.id;
+  const authEmail = session.user.email;
+  const authName = session.user.name;
+
+  // Look up our app's UserAccount by the BetterAuth user ID
+  let user = await prisma.userAccount.findUnique({
+    where: { authUserId },
+    include: { companies: true },
+  });
+
+  // Auto-create or link UserAccount on first BetterAuth login
   if (!user) {
-    return null;
+    // Check if a UserAccount exists with this email (e.g. from invite pre-creation)
+    const existingByEmail = await prisma.userAccount.findUnique({
+      where: { email: authEmail },
+      include: { companies: true },
+    });
+
+    if (existingByEmail) {
+      // Link existing UserAccount to this BetterAuth user
+      user = await prisma.userAccount.update({
+        where: { id: existingByEmail.id },
+        data: { authUserId },
+        include: { companies: true },
+      });
+    } else {
+      // Create new UserAccount — default to CUSTOMER for self-service signups
+      user = await prisma.userAccount.create({
+        data: {
+          authUserId,
+          email: authEmail,
+          name: authName || null,
+          role: "CUSTOMER",
+        },
+        include: { companies: true },
+      });
+    }
   }
 
   const primaryMembership = user.companies[0] ?? null;
@@ -85,30 +144,26 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   };
 }
 
-/**
- * Helper that throws if there is no current user.
- * This is useful in API routes where you want hard guarantees.
- */
-export async function getCurrentUserOrThrow(): Promise<SessionUser> {
-  const user = await getCurrentUser();
-  if (!user) {
-    const error: Error & { code?: string } = new Error("UNAUTHENTICATED");
-    error.code = "UNAUTHENTICATED";
-    throw error;
-  }
-  return user;
-}
+// ---------------------------------------------------------------------------
+// Shared helper
+// ---------------------------------------------------------------------------
 
-/**
- * Helper that throws if the current user has no active company.
- * Useful for API routes that are scoped to a company (tickets, assets, etc.).
- */
-export async function getActiveCompanyIdOrThrow(): Promise<string> {
-  const user = await getCurrentUserOrThrow();
-  if (!user.activeCompanyId) {
-    const error: Error & { code?: string } = new Error("NO_ACTIVE_COMPANY");
-    error.code = "NO_ACTIVE_COMPANY";
-    throw error;
-  }
-  return user.activeCompanyId;
+async function resolveSessionUserByEmail(email: string): Promise<SessionUser | null> {
+  const user = await prisma.userAccount.findUnique({
+    where: { email },
+    include: { companies: true },
+  });
+
+  if (!user) return null;
+
+  const primaryMembership = user.companies[0] ?? null;
+
+  return {
+    id: user.id,
+    email: user.email,
+    role: user.role,
+    name: user.name,
+    activeCompanyId: primaryMembership?.companyId ?? null,
+    companyRole: primaryMembership?.roleInCompany ?? null,
+  };
 }

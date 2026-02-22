@@ -85,6 +85,7 @@ const QUICK_STEPS = [
 export default function HomePage() {
   const [session, setSession] = useState<SessionResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
   useEffect(() => {
     const load = async () => {
@@ -105,6 +106,7 @@ export default function HomePage() {
 
   const activePersona = session?.demoPersona;
   const activeUser = session?.user;
+  const hasSession = isDemoMode ? !!activePersona : !!activeUser;
 
   const roleLabel =
     activeUser?.role === "SITE_OWNER" || activeUser?.role === "SITE_ADMIN"
@@ -113,31 +115,29 @@ export default function HomePage() {
         ? "Customer"
         : activeUser?.role === "DESIGNER"
           ? "Creative"
-          : activeUser?.role ?? "";
+          : (activeUser?.role ?? "");
 
   return (
     <div className="min-h-screen bg-[var(--bb-bg-card)] text-[var(--bb-secondary)]">
-      <div className="mx-auto max-w-5xl px-6 pb-16 pt-12">
+      <div className="mx-auto max-w-5xl px-6 pt-12 pb-16">
         {/* ----------------------------------------------------------------- */}
         {/* Hero section                                                      */}
         {/* ----------------------------------------------------------------- */}
         <div className="mb-12 flex flex-col items-center text-center">
-          <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--bb-primary)] text-2xl font-bold text-white shadow-lg shadow-[var(--bb-primary)]/20">
+          <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--bb-primary)] text-2xl font-bold text-white shadow-[var(--bb-primary)]/20 shadow-lg">
             B
           </div>
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-            Brandbite
-          </h1>
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Brandbite</h1>
           <p className="mt-2 max-w-md text-sm text-[var(--bb-text-secondary)]">
-            Creative-as-a-service platform. Submit requests, track progress, and
-            manage your creative pipeline — all in one place.
+            Creative-as-a-service platform. Submit requests, track progress, and manage your
+            creative pipeline — all in one place.
           </p>
         </div>
 
         {/* ----------------------------------------------------------------- */}
         {/* Session card                                                      */}
         {/* ----------------------------------------------------------------- */}
-        {!loading && activePersona && activeUser && (
+        {!loading && hasSession && activeUser && (
           <div className="mx-auto mb-10 max-w-xl">
             <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
               <div className="flex items-center justify-between gap-4">
@@ -155,21 +155,21 @@ export default function HomePage() {
                   </div>
                 </div>
                 <a
-                  href="/debug/demo-user"
+                  href={isDemoMode ? "/debug/demo-user" : "/login"}
                   className="rounded-full border border-[var(--bb-border)] bg-[var(--bb-bg-warm)] px-3 py-1.5 text-[11px] font-semibold text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
                 >
-                  Switch
+                  {isDemoMode ? "Switch" : "Sign out"}
                 </a>
               </div>
             </div>
           </div>
         )}
 
-        {!loading && !activePersona && (
+        {!loading && !hasSession && (
           <div className="mx-auto mb-10 max-w-xl">
             <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
               <div className="flex flex-col items-center gap-3 text-center">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-50 text-sm">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-50 text-sm dark:bg-amber-900/20">
                   ?
                 </div>
                 <div>
@@ -177,15 +177,16 @@ export default function HomePage() {
                     No active session
                   </p>
                   <p className="mt-0.5 text-[11px] text-[var(--bb-text-secondary)]">
-                    Pick a demo persona to start exploring Brandbite from
-                    different perspectives.
+                    {isDemoMode
+                      ? "Pick a demo persona to start exploring Brandbite from different perspectives."
+                      : "Sign in or create an account to get started with Brandbite."}
                   </p>
                 </div>
                 <a
-                  href="/debug/demo-user"
+                  href={isDemoMode ? "/debug/demo-user" : "/login"}
                   className="rounded-full bg-[var(--bb-primary)] px-5 py-2 text-sm font-semibold text-white shadow-sm transition-shadow hover:shadow-md"
                 >
-                  Choose persona
+                  {isDemoMode ? "Choose persona" : "Sign in"}
                 </a>
               </div>
             </div>
@@ -197,7 +198,7 @@ export default function HomePage() {
         {/* ----------------------------------------------------------------- */}
         <div className="mb-12">
           <div className="mb-5 flex items-center gap-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
+            <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--bb-text-muted)] uppercase">
               Dashboards
             </p>
             <div className="h-px flex-1 bg-[var(--bb-border)]" />
@@ -248,7 +249,7 @@ export default function HomePage() {
         {/* ----------------------------------------------------------------- */}
         <div className="mb-12">
           <div className="mb-5 flex items-center gap-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
+            <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--bb-text-muted)] uppercase">
               Getting started
             </p>
             <div className="h-px flex-1 bg-[var(--bb-border)]" />
@@ -263,9 +264,7 @@ export default function HomePage() {
                 <span className="mb-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-[var(--bb-bg-card)] text-[11px] font-bold text-[var(--bb-text-tertiary)]">
                   {s.step}
                 </span>
-                <h3 className="mt-2 text-sm font-semibold text-[var(--bb-secondary)]">
-                  {s.title}
-                </h3>
+                <h3 className="mt-2 text-sm font-semibold text-[var(--bb-secondary)]">{s.title}</h3>
                 <p className="mt-1 text-[11px] leading-relaxed text-[var(--bb-text-secondary)]">
                   {s.description}
                 </p>
@@ -282,9 +281,7 @@ export default function HomePage() {
             <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--bb-primary)] text-[10px] font-bold text-white">
               B
             </div>
-            <span className="text-xs font-semibold text-[var(--bb-text-tertiary)]">
-              Brandbite
-            </span>
+            <span className="text-xs font-semibold text-[var(--bb-text-tertiary)]">Brandbite</span>
           </div>
           <p className="text-[10px] text-[var(--bb-text-muted)]">
             Creative subscription platform &middot; Demo environment
