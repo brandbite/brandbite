@@ -47,40 +47,50 @@ export function Modal({
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const labelId = useId();
 
-  // Escape key handler + focus trap
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+  // Keep a stable ref for onClose so the keydown listener doesn't need
+  // to be recreated when the parent re-renders with a new callback identity.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
-      if (e.key === "Tab" && modalRef.current) {
-        const focusableEls = modalRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
-        if (focusableEls.length === 0) return;
+  // Escape key handler + focus trap (stable — no dependency on onClose)
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === "Escape") onCloseRef.current();
 
-        const first = focusableEls[0];
-        const last = focusableEls[focusableEls.length - 1];
+    if (e.key === "Tab" && modalRef.current) {
+      const focusableEls = modalRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+      if (focusableEls.length === 0) return;
 
-        if (e.shiftKey) {
-          if (document.activeElement === first) {
-            e.preventDefault();
-            last.focus();
-          }
-        } else {
-          if (document.activeElement === last) {
-            e.preventDefault();
-            first.focus();
-          }
+      const first = focusableEls[0];
+      const last = focusableEls[focusableEls.length - 1];
+
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
         }
       }
-    },
-    [onClose],
-  );
+    }
+  }, []);
 
-  // Save previous focus, set up listeners, focus first element
+  // Keydown listener — only depends on `open` (handleKeyDown is stable)
+  useEffect(() => {
+    if (!open) return;
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open, handleKeyDown]);
+
+  // Focus management — only runs on open/close transitions
   useEffect(() => {
     if (!open) return;
 
     previousFocusRef.current = document.activeElement as HTMLElement | null;
-    document.addEventListener("keydown", handleKeyDown);
 
     // Focus first focusable element inside modal
     requestAnimationFrame(() => {
@@ -91,11 +101,10 @@ export function Modal({
     });
 
     return () => {
-      document.removeEventListener("keydown", handleKeyDown);
       // Restore focus on close
       previousFocusRef.current?.focus();
     };
-  }, [open, handleKeyDown]);
+  }, [open]);
 
   if (!open) return null;
 
@@ -159,19 +168,17 @@ export function ModalHeader({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           {eyebrow && (
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
+            <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--bb-text-muted)] uppercase">
               {eyebrow}
             </p>
           )}
           <h2
             id={_labelId}
-            className={`${eyebrow ? "mt-1 " : ""}text-lg font-semibold text-[var(--bb-secondary)]`}
+            className={`${eyebrow ? "mt-1" : ""}text-lg font-semibold text-[var(--bb-secondary)]`}
           >
             {title}
           </h2>
-          {subtitle && (
-            <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">{subtitle}</p>
-          )}
+          {subtitle && <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">{subtitle}</p>}
         </div>
         {onClose && (
           <button
@@ -198,9 +205,5 @@ type ModalFooterProps = {
 };
 
 export function ModalFooter({ children, className = "" }: ModalFooterProps) {
-  return (
-    <div className={`mt-4 flex items-center justify-end gap-2 ${className}`}>
-      {children}
-    </div>
-  );
+  return <div className={`mt-4 flex items-center justify-end gap-2 ${className}`}>{children}</div>;
 }

@@ -228,8 +228,10 @@ export default function CreativeBoardPage() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement).tagName;
+      const el = e.target as HTMLElement;
+      const tag = el.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (el.isContentEditable || el.closest?.('[contenteditable="true"]')) return;
       if (e.key === "/") {
         e.preventDefault();
         searchRef.current?.focus();
