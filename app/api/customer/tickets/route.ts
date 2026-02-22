@@ -21,6 +21,8 @@ import { getCurrentUserOrThrow } from "@/lib/auth";
 import { canCreateTickets } from "@/lib/permissions/companyRoles";
 import { createNotification } from "@/lib/notifications";
 import { isCreativePaused } from "@/lib/creative-availability";
+import { parseBody } from "@/lib/schemas/helpers";
+import { createTicketSchema } from "@/lib/schemas/ticket.schemas";
 
 // -----------------------------------------------------------------------------
 // Helpers
@@ -54,10 +56,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (!user.activeCompanyId) {
-      return NextResponse.json(
-        { error: "User has no active company" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "User has no active company" }, { status: 400 });
     }
 
     const company = await prisma.company.findUnique({
@@ -65,10 +64,7 @@ export async function GET(req: NextRequest) {
     });
 
     if (!company) {
-      return NextResponse.json(
-        { error: "Company not found for current user" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Company not found for current user" }, { status: 404 });
     }
 
     // ── Parse query params ──────────────────────────────────────────────
@@ -80,29 +76,17 @@ export async function GET(req: NextRequest) {
     const tagId = url.searchParams.get("tag") || "";
     const sortBy = url.searchParams.get("sortBy") || "createdAt";
     const sortDir = url.searchParams.get("sortDir") || "desc";
-    const limit = Math.min(
-      Math.max(parseInt(url.searchParams.get("limit") || "50", 10), 1),
-      200,
-    );
-    const offset = Math.max(
-      parseInt(url.searchParams.get("offset") || "0", 10),
-      0,
-    );
+    const limit = Math.min(Math.max(parseInt(url.searchParams.get("limit") || "50", 10), 1), 200);
+    const offset = Math.max(parseInt(url.searchParams.get("offset") || "0", 10), 0);
 
     // ── Build where clause ──────────────────────────────────────────────
     const where: any = { companyId: company.id };
 
-    if (
-      status &&
-      ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"].includes(status)
-    ) {
+    if (status && ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"].includes(status)) {
       where.status = status;
     }
 
-    if (
-      priority &&
-      ["LOW", "MEDIUM", "HIGH", "URGENT"].includes(priority)
-    ) {
+    if (priority && ["LOW", "MEDIUM", "HIGH", "URGENT"].includes(priority)) {
       where.priority = priority;
     }
 
@@ -181,8 +165,8 @@ export async function GET(req: NextRequest) {
         t.project?.code && t.companyTicketNumber != null
           ? `${t.project.code}-${t.companyTicketNumber}`
           : t.companyTicketNumber != null
-          ? `#${t.companyTicketNumber}`
-          : t.id;
+            ? `#${t.companyTicketNumber}`
+            : t.id;
 
       return {
         id: t.id,
@@ -225,17 +209,11 @@ export async function GET(req: NextRequest) {
     });
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[customer.tickets] GET error", error);
-    return NextResponse.json(
-      { error: "Failed to load customer tickets" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load customer tickets" }, { status: 500 });
   }
 }
 
@@ -248,17 +226,11 @@ export async function POST(req: NextRequest) {
     const user = await getCurrentUserOrThrow();
 
     if (user.role !== "CUSTOMER") {
-      return NextResponse.json(
-        { error: "Only customers can create tickets" },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Only customers can create tickets" }, { status: 403 });
     }
 
     if (!user.activeCompanyId) {
-      return NextResponse.json(
-        { error: "User has no active company" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "User has no active company" }, { status: 400 });
     }
 
     const company = await prisma.company.findUnique({
@@ -266,10 +238,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!company) {
-      return NextResponse.json(
-        { error: "Company not found for current user" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Company not found for current user" }, { status: 404 });
     }
 
     // Company-level permission check: who can create tickets
@@ -283,107 +252,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json().catch(() => null);
-
-    if (!body || typeof body !== "object") {
-      return NextResponse.json(
-        { error: "Invalid request body" },
-        { status: 400 },
-      );
-    }
-
-    const raw = body as Record<string, unknown>;
-
-    const title = String(raw.title ?? "").trim();
-    const description =
-      typeof raw.description === "string" ? raw.description.trim() : "";
-    const projectId =
-      typeof raw.projectId === "string" && raw.projectId.length > 0
-        ? (raw.projectId as string)
-        : null;
-    const jobTypeId =
-      typeof raw.jobTypeId === "string" && raw.jobTypeId.length > 0
-        ? (raw.jobTypeId as string)
-        : null;
-
-    // Parse quantity (integer 1–10, default 1)
-    const rawQuantity =
-      typeof raw.quantity === "number"
-        ? raw.quantity
-        : typeof raw.quantity === "string"
-        ? parseInt(raw.quantity, 10)
-        : 1;
-    const quantity = Math.max(1, Math.min(10, Math.floor(rawQuantity) || 1));
-
-    const priorityRaw =
-      typeof raw.priority === "string"
-        ? raw.priority.toUpperCase()
-        : "MEDIUM";
-
-    let selectedPriority: TicketPriority;
-    switch (priorityRaw) {
-      case "LOW":
-        selectedPriority = TicketPriority.LOW;
-        break;
-      case "HIGH":
-        selectedPriority = TicketPriority.HIGH;
-        break;
-      case "URGENT":
-        selectedPriority = TicketPriority.URGENT;
-        break;
-      case "MEDIUM":
-      default:
-        selectedPriority = TicketPriority.MEDIUM;
-        break;
-    }
-
-    // Parse optional dueDate (ISO 8601 string or YYYY-MM-DD)
-    let parsedDueDate: Date | null = null;
-    if (typeof raw.dueDate === "string" && raw.dueDate.trim().length > 0) {
-      const d = new Date(raw.dueDate.trim());
-      if (Number.isNaN(d.getTime())) {
-        return NextResponse.json(
-          { error: "Invalid due date format." },
-          { status: 400 },
-        );
-      }
-
-      // Reject past dates (compare date-only, ignoring time)
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      if (d < today) {
-        return NextResponse.json(
-          { error: "Due date cannot be in the past." },
-          { status: 400 },
-        );
-      }
-
-      // Reject dates more than 2 years in the future
-      const maxDate = new Date();
-      maxDate.setFullYear(maxDate.getFullYear() + 2);
-      if (d > maxDate) {
-        return NextResponse.json(
-          { error: "Due date cannot be more than 2 years in the future." },
-          { status: 400 },
-        );
-      }
-
-      parsedDueDate = d;
-    }
-
-    // Parse optional tagIds (max 5)
-    const rawTagIds: string[] = Array.isArray(raw.tagIds)
-      ? (raw.tagIds as unknown[])
-          .filter((id): id is string => typeof id === "string" && id.length > 0)
-          .slice(0, 5)
-      : [];
-
-    if (!title) {
-      return NextResponse.json(
-        { error: "Title is required" },
-        { status: 400 },
-      );
-    }
+    const parsed = await parseBody(req, createTicketSchema);
+    if (!parsed.success) return parsed.response;
+    const {
+      title,
+      description,
+      projectId,
+      jobTypeId,
+      quantity,
+      priority: selectedPriority,
+      dueDate: parsedDueDate,
+      tagIds: rawTagIds,
+    } = parsed.data;
 
     // For now, pick a default "requester" from company members:
     // Prefer PM, otherwise OWNER.
@@ -405,8 +285,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Optional: validate project belongs to company (and read autoAssignMode)
-    let project: { id: string; autoAssignMode: AutoAssignMode } | null =
-      null;
+    let project: { id: string; autoAssignMode: AutoAssignMode } | null = null;
 
     if (projectId) {
       project = await prisma.project.findFirst({
@@ -421,10 +300,7 @@ export async function POST(req: NextRequest) {
       });
 
       if (!project) {
-        return NextResponse.json(
-          { error: "Project not found for this company" },
-          { status: 400 },
-        );
+        return NextResponse.json({ error: "Project not found for this company" }, { status: 400 });
       }
     }
 
@@ -437,10 +313,7 @@ export async function POST(req: NextRequest) {
       });
 
       if (!jobType) {
-        return NextResponse.json(
-          { error: "Job type not found" },
-          { status: 400 },
-        );
+        return NextResponse.json({ error: "Job type not found" }, { status: 400 });
       }
     }
 
@@ -449,17 +322,13 @@ export async function POST(req: NextRequest) {
     const effectiveCost = jobType ? jobType.tokenCost * quantity : 0;
 
     if (jobType && company.tokenBalance < effectiveCost) {
-      return NextResponse.json(
-        { error: "Not enough tokens for this job type" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Not enough tokens for this job type" }, { status: 400 });
     }
 
     // -------------------------------------------------------------------------
     // Auto-assign effective flag (company + project)
     // -------------------------------------------------------------------------
-    const companyAutoAssignDefault =
-      company.autoAssignDefaultEnabled ?? false;
+    const companyAutoAssignDefault = company.autoAssignDefaultEnabled ?? false;
     const projectAutoAssignMode = project?.autoAssignMode ?? null;
 
     const autoAssignEffective = isAutoAssignEnabled(
@@ -474,7 +343,7 @@ export async function POST(req: NextRequest) {
     //  - Create ticket
     //  - (Optional) debit tokens + ledger
     //  - (Optional) write TicketAssignmentLog (AUTO_ASSIGN / FALLBACK)
-// -------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
     const ticket = await prisma.$transaction(async (tx) => {
       // 1) Next company ticket number
       const lastTicket = await tx.ticket.findFirst({
@@ -483,17 +352,12 @@ export async function POST(req: NextRequest) {
         select: { companyTicketNumber: true },
       });
 
-      const nextCompanyTicketNumber =
-        (lastTicket?.companyTicketNumber ?? 100) + 1;
+      const nextCompanyTicketNumber = (lastTicket?.companyTicketNumber ?? 100) + 1;
 
       // 2) Decide creative assignment based on settings
       let assignedCreativeId: string | null = null;
       let assignmentReason: "AUTO_ASSIGN" | "FALLBACK" | null = null;
-      let fallbackMode:
-        | "settings_disabled"
-        | "no_creatives"
-        | "no_skilled_creatives"
-        | null = null;
+      let fallbackMode: "settings_disabled" | "no_creatives" | "no_skilled_creatives" | null = null;
       let skillFiltered = false;
       let skilledCreativeCount = 0;
       let pausedCreativeCount = 0;
@@ -532,9 +396,7 @@ export async function POST(req: NextRequest) {
           });
 
           const pausedIds = new Set(
-            creativePauseStates
-              .filter((d) => isCreativePaused(d))
-              .map((d) => d.id),
+            creativePauseStates.filter((d) => isCreativePaused(d)).map((d) => d.id),
           );
 
           pausedCreativeCount = pausedIds.size;
@@ -549,11 +411,7 @@ export async function POST(req: NextRequest) {
             where: {
               creativeId: { in: creativeIds },
               status: {
-                in: [
-                  TicketStatus.TODO,
-                  TicketStatus.IN_PROGRESS,
-                  TicketStatus.IN_REVIEW,
-                ],
+                in: [TicketStatus.TODO, TicketStatus.IN_PROGRESS, TicketStatus.IN_REVIEW],
               },
             },
             select: {
@@ -587,10 +445,7 @@ export async function POST(req: NextRequest) {
             const tokenCost = (t.jobType?.tokenCost ?? 1) * (t.quantity ?? 1);
             const delta = weight * tokenCost;
 
-            loadByCreative.set(
-              t.creativeId,
-              (loadByCreative.get(t.creativeId) ?? 0) + delta,
-            );
+            loadByCreative.set(t.creativeId, (loadByCreative.get(t.creativeId) ?? 0) + delta);
           }
 
           assignedCreativeId = creativeIds.reduce(
@@ -718,8 +573,8 @@ export async function POST(req: NextRequest) {
                 fallbackMode === "settings_disabled"
                   ? "Auto-assign disabled by company/project settings."
                   : fallbackMode === "no_skilled_creatives"
-                  ? "No creatives with matching skill found; ticket left unassigned for admin."
-                  : "No active creatives available in pool at assignment time.",
+                    ? "No creatives with matching skill found; ticket left unassigned for admin."
+                    : "No active creatives available in pool at assignment time.",
             },
           },
         });
@@ -750,8 +605,8 @@ export async function POST(req: NextRequest) {
         ticket.project?.code && ticket.companyTicketNumber != null
           ? `${ticket.project.code}-${ticket.companyTicketNumber}`
           : ticket.companyTicketNumber != null
-          ? `#${ticket.companyTicketNumber}`
-          : ticket.id;
+            ? `#${ticket.companyTicketNumber}`
+            : ticket.id;
       createNotification({
         userId: ticket.creativeId,
         type: "TICKET_ASSIGNED",
@@ -766,8 +621,8 @@ export async function POST(req: NextRequest) {
       ticket.project?.code && ticket.companyTicketNumber != null
         ? `${ticket.project.code}-${ticket.companyTicketNumber}`
         : ticket.companyTicketNumber != null
-        ? `#${ticket.companyTicketNumber}`
-        : ticket.id;
+          ? `#${ticket.companyTicketNumber}`
+          : ticket.id;
 
     return NextResponse.json(
       {
@@ -787,16 +642,10 @@ export async function POST(req: NextRequest) {
     );
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[customer.tickets] POST error", error);
-    return NextResponse.json(
-      { error: "Failed to create customer ticket" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to create customer ticket" }, { status: 500 });
   }
 }

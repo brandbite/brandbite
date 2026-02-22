@@ -9,6 +9,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { parseBody } from "@/lib/schemas/helpers";
+import { createPlanSchema, updatePlanSchema } from "@/lib/schemas/plan.schemas";
 
 type PlanResponseItem = {
   id: string;
@@ -84,23 +86,14 @@ export async function GET() {
     return NextResponse.json(payload, { status: 200 });
   } catch (error: any) {
     if (error?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
     if (error?.code === "FORBIDDEN") {
-      return NextResponse.json(
-        { error: error.message },
-        { status: error.status ?? 403 },
-      );
+      return NextResponse.json({ error: error.message }, { status: error.status ?? 403 });
     }
 
     console.error("[admin.plans] GET error", error);
-    return NextResponse.json(
-      { error: "Failed to load plans." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load plans." }, { status: 500 });
   }
 }
 
@@ -113,60 +106,10 @@ export async function POST(req: NextRequest) {
     const user = await getCurrentUserOrThrow();
     requireAdmin(user.role);
 
-    const body = (await req.json()) as PlanPayload;
-
-    const name = body.name?.trim();
-    const monthlyTokens = body.monthlyTokens;
-    const isActive =
-      typeof body.isActive === "boolean" ? body.isActive : true;
-    const priceCents =
-      typeof body.priceCents === "number"
-        ? body.priceCents
-        : body.priceCents === null
-        ? null
-        : null;
-
-    if (!name) {
-      return NextResponse.json(
-        { error: "Plan name is required." },
-        { status: 400 },
-      );
-    }
-
-    if (
-      typeof monthlyTokens !== "number" ||
-      !Number.isFinite(monthlyTokens) ||
-      monthlyTokens <= 0
-    ) {
-      return NextResponse.json(
-        { error: "Monthly tokens must be a positive number." },
-        { status: 400 },
-      );
-    }
-
-    if (priceCents != null) {
-      if (!Number.isFinite(priceCents) || priceCents < 0) {
-        return NextResponse.json(
-          {
-            error:
-              "Price (cents) must be null or a non-negative number.",
-          },
-          { status: 400 },
-        );
-      }
-    }
-
-    const stripeProductId =
-      typeof body.stripeProductId === "string" &&
-      body.stripeProductId.trim() !== ""
-        ? body.stripeProductId.trim()
-        : null;
-
-    const stripePriceId =
-      typeof body.stripePriceId === "string" &&
-      body.stripePriceId.trim() !== ""
-        ? body.stripePriceId.trim()
-        : null;
+    const parsed = await parseBody(req, createPlanSchema);
+    if (!parsed.success) return parsed.response;
+    const { name, monthlyTokens, priceCents, isActive, stripeProductId, stripePriceId } =
+      parsed.data;
 
     const created = await prisma.plan.create({
       data: {
@@ -187,23 +130,14 @@ export async function POST(req: NextRequest) {
     );
   } catch (error: any) {
     if (error?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
     if (error?.code === "FORBIDDEN") {
-      return NextResponse.json(
-        { error: error.message },
-        { status: error.status ?? 403 },
-      );
+      return NextResponse.json({ error: error.message }, { status: error.status ?? 403 });
     }
 
     console.error("[admin.plans] POST error", error);
-    return NextResponse.json(
-      { error: "Failed to create plan." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to create plan." }, { status: 500 });
   }
 }
 
@@ -216,100 +150,25 @@ export async function PATCH(req: NextRequest) {
     const user = await getCurrentUserOrThrow();
     requireAdmin(user.role);
 
-    const body = (await req.json()) as PlanPayload;
-
-    const id = body.id;
-    if (!id) {
-      return NextResponse.json(
-        { error: "Plan id is required for update." },
-        { status: 400 },
-      );
-    }
+    const parsed = await parseBody(req, updatePlanSchema);
+    if (!parsed.success) return parsed.response;
+    const { id, ...fields } = parsed.data;
 
     const existing = await prisma.plan.findUnique({
       where: { id },
     });
 
     if (!existing) {
-      return NextResponse.json(
-        { error: "Plan not found." },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Plan not found." }, { status: 404 });
     }
 
-    const updateData: any = {};
-
-    if (typeof body.name === "string") {
-      const name = body.name.trim();
-      if (!name) {
-        return NextResponse.json(
-          { error: "Plan name cannot be empty." },
-          { status: 400 },
-        );
-      }
-      updateData.name = name;
-    }
-
-    if (typeof body.monthlyTokens === "number") {
-      if (
-        !Number.isFinite(body.monthlyTokens) ||
-        body.monthlyTokens <= 0
-      ) {
-        return NextResponse.json(
-          {
-            error:
-              "Monthly tokens must be a positive number when provided.",
-          },
-          { status: 400 },
-        );
-      }
-      updateData.monthlyTokens = body.monthlyTokens;
-    }
-
-    if (body.priceCents !== undefined) {
-      const priceCents =
-        typeof body.priceCents === "number"
-          ? body.priceCents
-          : body.priceCents === null
-          ? null
-          : null;
-
-      if (priceCents != null) {
-        if (!Number.isFinite(priceCents) || priceCents < 0) {
-          return NextResponse.json(
-            {
-              error:
-                "Price (cents) must be null or a non-negative number.",
-            },
-            { status: 400 },
-          );
-        }
-      }
-
-      updateData.priceCents = priceCents ?? 0;
-    }
-
-    if (typeof body.isActive === "boolean") {
-      updateData.isActive = body.isActive;
-    }
-
-    if (body.stripeProductId !== undefined) {
-      const productId =
-        typeof body.stripeProductId === "string" &&
-        body.stripeProductId.trim() !== ""
-          ? body.stripeProductId.trim()
-          : null;
-      updateData.stripeProductId = productId;
-    }
-
-    if (body.stripePriceId !== undefined) {
-      const priceId =
-        typeof body.stripePriceId === "string" &&
-        body.stripePriceId.trim() !== ""
-          ? body.stripePriceId.trim()
-          : null;
-      updateData.stripePriceId = priceId;
-    }
+    const updateData: Record<string, unknown> = {};
+    if (fields.name !== undefined) updateData.name = fields.name;
+    if (fields.monthlyTokens !== undefined) updateData.monthlyTokens = fields.monthlyTokens;
+    if (fields.priceCents !== undefined) updateData.priceCents = fields.priceCents ?? 0;
+    if (fields.isActive !== undefined) updateData.isActive = fields.isActive;
+    if (fields.stripeProductId !== undefined) updateData.stripeProductId = fields.stripeProductId;
+    if (fields.stripePriceId !== undefined) updateData.stripePriceId = fields.stripePriceId;
 
     const updated = await prisma.plan.update({
       where: { id },
@@ -324,22 +183,13 @@ export async function PATCH(req: NextRequest) {
     );
   } catch (error: any) {
     if (error?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
     if (error?.code === "FORBIDDEN") {
-      return NextResponse.json(
-        { error: error.message },
-        { status: error.status ?? 403 },
-      );
+      return NextResponse.json({ error: error.message }, { status: error.status ?? 403 });
     }
 
     console.error("[admin.plans] PATCH error", error);
-    return NextResponse.json(
-      { error: "Failed to update plan." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to update plan." }, { status: 500 });
   }
 }

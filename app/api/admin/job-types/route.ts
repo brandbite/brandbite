@@ -11,6 +11,8 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { isSiteAdminRole } from "@/lib/roles";
 import { BASE_PAYOUT_PERCENT } from "@/lib/token-engine";
+import { parseBody } from "@/lib/schemas/helpers";
+import { createJobTypeSchema, updateJobTypeSchema } from "@/lib/schemas/job-type.schemas";
 
 // -----------------------------------------------------------------------------
 // GET: list all job types
@@ -21,10 +23,7 @@ export async function GET(_req: NextRequest) {
     const user = await getCurrentUserOrThrow();
 
     if (!isSiteAdminRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only site admins can access job types" },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Only site admins can access job types" }, { status: 403 });
     }
 
     const jobTypes = await prisma.jobType.findMany({
@@ -64,17 +63,11 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json({ jobTypes: items });
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[admin.job-types] GET error", error);
-    return NextResponse.json(
-      { error: "Failed to load job types" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load job types" }, { status: 500 });
   }
 }
 
@@ -87,55 +80,26 @@ export async function POST(req: NextRequest) {
     const user = await getCurrentUserOrThrow();
 
     if (!isSiteAdminRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only site admins can create job types" },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Only site admins can create job types" }, { status: 403 });
     }
 
-    const body = await req.json().catch(() => null);
-
-    const name = (body?.name as string | undefined)?.trim();
-    const category = (body?.category as string | undefined)?.trim() || null;
-    const categoryId = (body?.categoryId as string | undefined) || null;
-    const description = (body?.description as string | undefined)?.trim();
-    const estimatedHoursRaw = body?.estimatedHours;
-    const isActiveRaw = body?.isActive;
-    const hasQuantity = typeof body?.hasQuantity === "boolean" ? body.hasQuantity : false;
-    const quantityLabel = (body?.quantityLabel as string | undefined)?.trim() || null;
-    const defaultQuantity = typeof body?.defaultQuantity === "number" ? Math.max(1, body.defaultQuantity) : 1;
-
-    if (!name) {
-      return NextResponse.json(
-        { error: "Job type name is required" },
-        { status: 400 },
-      );
-    }
-
-    const estimatedHours =
-      typeof estimatedHoursRaw === "string"
-        ? parseInt(estimatedHoursRaw, 10)
-        : estimatedHoursRaw;
-
-    if (
-      typeof estimatedHours !== "number" ||
-      !Number.isFinite(estimatedHours) ||
-      estimatedHours <= 0
-    ) {
-      return NextResponse.json(
-        { error: "estimatedHours must be a positive integer" },
-        { status: 400 },
-      );
-    }
+    const parsed = await parseBody(req, createJobTypeSchema);
+    if (!parsed.success) return parsed.response;
+    const {
+      name,
+      category,
+      categoryId,
+      description,
+      estimatedHours,
+      isActive,
+      hasQuantity,
+      quantityLabel,
+      defaultQuantity,
+    } = parsed.data;
 
     // Derive token values from estimated hours
     const tokenCost = estimatedHours;
-    const creativePayoutTokens = Math.round(
-      estimatedHours * (BASE_PAYOUT_PERCENT / 100),
-    );
-
-    const isActive =
-      typeof isActiveRaw === "boolean" ? isActiveRaw : true;
+    const creativePayoutTokens = Math.round(estimatedHours * (BASE_PAYOUT_PERCENT / 100));
 
     const created = await prisma.jobType.create({
       data: {
@@ -187,17 +151,11 @@ export async function POST(req: NextRequest) {
     );
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[admin.job-types] POST error", error);
-    return NextResponse.json(
-      { error: "Failed to create job type" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to create job type" }, { status: 500 });
   }
 }
 
@@ -210,110 +168,32 @@ export async function PATCH(req: NextRequest) {
     const user = await getCurrentUserOrThrow();
 
     if (!isSiteAdminRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only site admins can update job types" },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Only site admins can update job types" }, { status: 403 });
     }
 
-    const body = await req.json().catch(() => null);
+    const parsed = await parseBody(req, updateJobTypeSchema);
+    if (!parsed.success) return parsed.response;
+    const { id, ...fields } = parsed.data;
 
-    const id = body?.id as string | undefined;
-    if (!id) {
-      return NextResponse.json(
-        { error: "Job type id is required" },
-        { status: 400 },
-      );
-    }
+    const data: Record<string, unknown> = {};
 
-    const data: {
-      name?: string;
-      category?: string | null;
-      categoryId?: string | null;
-      description?: string | null;
-      estimatedHours?: number;
-      tokenCost?: number;
-      creativePayoutTokens?: number;
-      hasQuantity?: boolean;
-      quantityLabel?: string | null;
-      defaultQuantity?: number;
-      isActive?: boolean;
-    } = {};
+    if (fields.name !== undefined) data.name = fields.name;
+    if (fields.description !== undefined) data.description = fields.description;
+    if (fields.category !== undefined) data.category = fields.category;
+    if (fields.categoryId !== undefined) data.categoryId = fields.categoryId;
+    if (fields.hasQuantity !== undefined) data.hasQuantity = fields.hasQuantity;
+    if (fields.quantityLabel !== undefined) data.quantityLabel = fields.quantityLabel;
+    if (fields.defaultQuantity !== undefined) data.defaultQuantity = fields.defaultQuantity;
+    if (fields.isActive !== undefined) data.isActive = fields.isActive;
 
-    if (typeof body?.name === "string") {
-      const trimmed = body.name.trim();
-      if (!trimmed) {
-        return NextResponse.json(
-          { error: "Job type name cannot be empty" },
-          { status: 400 },
-        );
-      }
-      data.name = trimmed;
-    }
-
-    if (body?.description === null) {
-      data.description = null;
-    } else if (typeof body?.description === "string") {
-      data.description = body.description.trim() || null;
-    }
-
-    if (body?.estimatedHours !== undefined) {
-      const estimatedHours =
-        typeof body.estimatedHours === "string"
-          ? parseInt(body.estimatedHours, 10)
-          : body.estimatedHours;
-      if (
-        typeof estimatedHours !== "number" ||
-        !Number.isFinite(estimatedHours) ||
-        estimatedHours <= 0
-      ) {
-        return NextResponse.json(
-          { error: "estimatedHours must be a positive integer" },
-          { status: 400 },
-        );
-      }
-      data.estimatedHours = estimatedHours;
-      data.tokenCost = estimatedHours;
-      data.creativePayoutTokens = Math.round(
-        estimatedHours * (BASE_PAYOUT_PERCENT / 100),
-      );
-    }
-
-    if (body?.category === null) {
-      data.category = null;
-    } else if (typeof body?.category === "string") {
-      data.category = body.category.trim() || null;
-    }
-
-    if (body?.categoryId === null) {
-      data.categoryId = null;
-    } else if (typeof body?.categoryId === "string") {
-      data.categoryId = body.categoryId;
-    }
-
-    if (typeof body?.hasQuantity === "boolean") {
-      data.hasQuantity = body.hasQuantity;
-    }
-
-    if (body?.quantityLabel === null) {
-      data.quantityLabel = null;
-    } else if (typeof body?.quantityLabel === "string") {
-      data.quantityLabel = body.quantityLabel.trim() || null;
-    }
-
-    if (typeof body?.defaultQuantity === "number" && body.defaultQuantity >= 1) {
-      data.defaultQuantity = body.defaultQuantity;
-    }
-
-    if (typeof body?.isActive === "boolean") {
-      data.isActive = body.isActive;
+    if (fields.estimatedHours !== undefined) {
+      data.estimatedHours = fields.estimatedHours;
+      data.tokenCost = fields.estimatedHours;
+      data.creativePayoutTokens = Math.round(fields.estimatedHours * (BASE_PAYOUT_PERCENT / 100));
     }
 
     if (Object.keys(data).length === 0) {
-      return NextResponse.json(
-        { error: "No fields to update" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
 
     const updated = await prisma.jobType.update({
@@ -347,16 +227,10 @@ export async function PATCH(req: NextRequest) {
     });
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[admin.job-types] PATCH error", error);
-    return NextResponse.json(
-      { error: "Failed to update job type" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to update job type" }, { status: 500 });
   }
 }

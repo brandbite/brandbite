@@ -11,6 +11,8 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { isSiteAdminRole } from "@/lib/roles";
 import { BASE_PAYOUT_PERCENT } from "@/lib/token-engine";
+import { parseBody } from "@/lib/schemas/helpers";
+import { createPayoutRuleSchema, updatePayoutRuleSchema } from "@/lib/schemas/payout-rule.schemas";
 
 // -----------------------------------------------------------------------------
 // GET: list all payout rules
@@ -69,35 +71,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json().catch(() => null);
+    const parsed = await parseBody(req, createPayoutRuleSchema);
+    if (!parsed.success) return parsed.response;
+    const {
+      name,
+      description,
+      minCompletedTickets,
+      timeWindowDays,
+      payoutPercent,
+      priority,
+      isActive,
+    } = parsed.data;
 
-    const name = (body?.name as string | undefined)?.trim();
-    const description = (body?.description as string | undefined)?.trim() || null;
-    const minCompletedTickets = typeof body?.minCompletedTickets === "number" ? body.minCompletedTickets : NaN;
-    const timeWindowDays = typeof body?.timeWindowDays === "number" ? body.timeWindowDays : NaN;
-    const payoutPercent = typeof body?.payoutPercent === "number" ? body.payoutPercent : NaN;
-    const priority = typeof body?.priority === "number" ? body.priority : 0;
-    const isActive = typeof body?.isActive === "boolean" ? body.isActive : true;
-
-    if (!name) {
-      return NextResponse.json({ error: "Rule name is required" }, { status: 400 });
-    }
-
-    if (!Number.isFinite(minCompletedTickets) || minCompletedTickets < 1) {
-      return NextResponse.json(
-        { error: "minCompletedTickets must be a positive integer" },
-        { status: 400 },
-      );
-    }
-
-    if (!Number.isFinite(timeWindowDays) || timeWindowDays < 1) {
-      return NextResponse.json(
-        { error: "timeWindowDays must be a positive integer" },
-        { status: 400 },
-      );
-    }
-
-    if (!Number.isFinite(payoutPercent) || payoutPercent <= BASE_PAYOUT_PERCENT || payoutPercent > 100) {
+    // Business rule: payoutPercent must be > BASE_PAYOUT_PERCENT
+    if (payoutPercent <= BASE_PAYOUT_PERCENT) {
       return NextResponse.json(
         { error: `payoutPercent must be between ${BASE_PAYOUT_PERCENT + 1} and 100` },
         { status: 400 },
@@ -108,10 +95,10 @@ export async function POST(req: NextRequest) {
       data: {
         name,
         description,
-        minCompletedTickets: Math.round(minCompletedTickets),
-        timeWindowDays: Math.round(timeWindowDays),
-        payoutPercent: Math.round(payoutPercent),
-        priority: Math.round(priority),
+        minCompletedTickets,
+        timeWindowDays,
+        payoutPercent,
+        priority,
         isActive,
       },
     });
@@ -157,78 +144,27 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    const body = await req.json().catch(() => null);
+    const parsed = await parseBody(req, updatePayoutRuleSchema);
+    if (!parsed.success) return parsed.response;
+    const { id, ...fields } = parsed.data;
 
-    const id = body?.id as string | undefined;
-    if (!id) {
-      return NextResponse.json({ error: "Payout rule id is required" }, { status: 400 });
+    // Business rule: payoutPercent must be > BASE_PAYOUT_PERCENT
+    if (fields.payoutPercent !== undefined && fields.payoutPercent <= BASE_PAYOUT_PERCENT) {
+      return NextResponse.json(
+        { error: `payoutPercent must be between ${BASE_PAYOUT_PERCENT + 1} and 100` },
+        { status: 400 },
+      );
     }
 
-    const data: {
-      name?: string;
-      description?: string | null;
-      minCompletedTickets?: number;
-      timeWindowDays?: number;
-      payoutPercent?: number;
-      priority?: number;
-      isActive?: boolean;
-    } = {};
-
-    if (typeof body?.name === "string") {
-      const trimmed = body.name.trim();
-      if (!trimmed) {
-        return NextResponse.json({ error: "Rule name cannot be empty" }, { status: 400 });
-      }
-      data.name = trimmed;
-    }
-
-    if (body?.description === null) {
-      data.description = null;
-    } else if (typeof body?.description === "string") {
-      data.description = body.description.trim() || null;
-    }
-
-    if (typeof body?.minCompletedTickets === "number") {
-      if (!Number.isFinite(body.minCompletedTickets) || body.minCompletedTickets < 1) {
-        return NextResponse.json(
-          { error: "minCompletedTickets must be a positive integer" },
-          { status: 400 },
-        );
-      }
-      data.minCompletedTickets = Math.round(body.minCompletedTickets);
-    }
-
-    if (typeof body?.timeWindowDays === "number") {
-      if (!Number.isFinite(body.timeWindowDays) || body.timeWindowDays < 1) {
-        return NextResponse.json(
-          { error: "timeWindowDays must be a positive integer" },
-          { status: 400 },
-        );
-      }
-      data.timeWindowDays = Math.round(body.timeWindowDays);
-    }
-
-    if (typeof body?.payoutPercent === "number") {
-      if (
-        !Number.isFinite(body.payoutPercent) ||
-        body.payoutPercent <= BASE_PAYOUT_PERCENT ||
-        body.payoutPercent > 100
-      ) {
-        return NextResponse.json(
-          { error: `payoutPercent must be between ${BASE_PAYOUT_PERCENT + 1} and 100` },
-          { status: 400 },
-        );
-      }
-      data.payoutPercent = Math.round(body.payoutPercent);
-    }
-
-    if (typeof body?.priority === "number") {
-      data.priority = Math.round(body.priority);
-    }
-
-    if (typeof body?.isActive === "boolean") {
-      data.isActive = body.isActive;
-    }
+    const data: Record<string, unknown> = {};
+    if (fields.name !== undefined) data.name = fields.name;
+    if (fields.description !== undefined) data.description = fields.description;
+    if (fields.minCompletedTickets !== undefined)
+      data.minCompletedTickets = fields.minCompletedTickets;
+    if (fields.timeWindowDays !== undefined) data.timeWindowDays = fields.timeWindowDays;
+    if (fields.payoutPercent !== undefined) data.payoutPercent = fields.payoutPercent;
+    if (fields.priority !== undefined) data.priority = fields.priority;
+    if (fields.isActive !== undefined) data.isActive = fields.isActive;
 
     if (Object.keys(data).length === 0) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });

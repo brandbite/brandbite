@@ -9,10 +9,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
-import {
-  normalizeCompanyRole,
-  canEditCompanyProfile,
-} from "@/lib/permissions/companyRoles";
+import { normalizeCompanyRole, canEditCompanyProfile } from "@/lib/permissions/companyRoles";
+import { parseBody } from "@/lib/schemas/helpers";
+import { updateCustomerSettingsSchema } from "@/lib/schemas/settings.schemas";
 
 type UserRole = "SITE_OWNER" | "SITE_ADMIN" | "DESIGNER" | "CUSTOMER";
 type CompanyRole = "OWNER" | "PM" | "BILLING" | "MEMBER";
@@ -57,8 +56,7 @@ export async function GET(_req: NextRequest) {
     if (user.role !== "CUSTOMER") {
       return NextResponse.json(
         {
-          error:
-            "You must be a customer to access customer settings.",
+          error: "You must be a customer to access customer settings.",
         },
         { status: 403 },
       );
@@ -88,8 +86,7 @@ export async function GET(_req: NextRequest) {
     if (!company) {
       return NextResponse.json(
         {
-          error:
-            "Active company not found. It may have been deleted.",
+          error: "Active company not found. It may have been deleted.",
         },
         { status: 404 },
       );
@@ -109,8 +106,7 @@ export async function GET(_req: NextRequest) {
         slug: company.slug,
         website: company.website ?? null,
         tokenBalance: company.tokenBalance,
-        billingStatus:
-          (company.billingStatus as BillingStatus | null) ?? null,
+        billingStatus: (company.billingStatus as BillingStatus | null) ?? null,
         createdAt: company.createdAt.toISOString(),
         updatedAt: company.updatedAt.toISOString(),
         counts: {
@@ -133,17 +129,11 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json(payload, { status: 200 });
   } catch (error: any) {
     if (error?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[customer.settings] GET error", error);
-    return NextResponse.json(
-      { error: "Failed to load customer settings." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load customer settings." }, { status: 500 });
   }
 }
 
@@ -157,26 +147,16 @@ export async function PATCH(req: NextRequest) {
     const user = await getCurrentUserOrThrow();
 
     if (user.role !== "CUSTOMER") {
-      return NextResponse.json(
-        { error: "Only customers can update settings." },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Only customers can update settings." }, { status: 403 });
     }
 
     if (!user.activeCompanyId) {
-      return NextResponse.json(
-        { error: "No active company selected." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "No active company selected." }, { status: 400 });
     }
 
-    const body = await req.json().catch(() => null);
-    if (!body || typeof body !== "object") {
-      return NextResponse.json(
-        { error: "Request body is required." },
-        { status: 400 },
-      );
-    }
+    const parsed = await parseBody(req, updateCustomerSettingsSchema);
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data;
 
     const updates: { userUpdated: boolean; companyUpdated: boolean } = {
       userUpdated: false,
@@ -184,62 +164,29 @@ export async function PATCH(req: NextRequest) {
     };
 
     // --- User profile update (any customer can edit their own name) ---
-    if (body.user && typeof body.user === "object") {
-      const userName = body.user.name;
-      if (userName !== undefined) {
-        const trimmed =
-          typeof userName === "string" ? userName.trim() : null;
-        if (trimmed !== null && trimmed.length < 1) {
-          return NextResponse.json(
-            { error: "User name cannot be empty." },
-            { status: 400 },
-          );
-        }
-        await prisma.userAccount.update({
-          where: { id: user.id },
-          data: { name: trimmed || null },
-        });
-        updates.userUpdated = true;
-      }
+    if (body.user?.name !== undefined) {
+      await prisma.userAccount.update({
+        where: { id: user.id },
+        data: { name: body.user.name || null },
+      });
+      updates.userUpdated = true;
     }
 
     // --- Company profile update (OWNER + PM only) ---
-    if (body.company && typeof body.company === "object") {
+    if (body.company) {
       const companyRole = normalizeCompanyRole(user.companyRole);
       if (!canEditCompanyProfile(companyRole)) {
         return NextResponse.json(
           {
-            error:
-              "Only company owners or project managers can edit company profile.",
+            error: "Only company owners or project managers can edit company profile.",
           },
           { status: 403 },
         );
       }
 
       const companyData: Record<string, unknown> = {};
-
-      if (body.company.name !== undefined) {
-        const companyName =
-          typeof body.company.name === "string"
-            ? body.company.name.trim()
-            : "";
-        if (companyName.length < 2) {
-          return NextResponse.json(
-            { error: "Company name must be at least 2 characters." },
-            { status: 400 },
-          );
-        }
-        companyData.name = companyName;
-      }
-
-      if (body.company.website !== undefined) {
-        const website =
-          typeof body.company.website === "string"
-            ? body.company.website.trim()
-            : null;
-        // Allow clearing the website (null/empty)
-        companyData.website = website || null;
-      }
+      if (body.company.name !== undefined) companyData.name = body.company.name;
+      if (body.company.website !== undefined) companyData.website = body.company.website;
 
       if (Object.keys(companyData).length > 0) {
         await prisma.company.update({
@@ -253,16 +200,10 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ ok: true, ...updates });
   } catch (error: any) {
     if (error?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[customer.settings] PATCH error", error);
-    return NextResponse.json(
-      { error: "Failed to update settings." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to update settings." }, { status: 500 });
   }
 }

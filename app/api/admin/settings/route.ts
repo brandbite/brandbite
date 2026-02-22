@@ -8,6 +8,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { getAppSetting, setAppSetting } from "@/lib/app-settings";
+import { parseBody } from "@/lib/schemas/helpers";
+import { updateAdminSettingSchema } from "@/lib/schemas/admin-settings.schemas";
 
 function requireAdmin(userRole: string) {
   if (userRole !== "SITE_OWNER" && userRole !== "SITE_ADMIN") {
@@ -41,10 +43,7 @@ export async function GET(req: NextRequest) {
 
     if (key) {
       if (!isAllowedKey(key)) {
-        return NextResponse.json(
-          { error: `Unknown setting key: ${key}` },
-          { status: 400 },
-        );
+        return NextResponse.json({ error: `Unknown setting key: ${key}` }, { status: 400 });
       }
       const value = await getAppSetting(key);
       return NextResponse.json({ key, value });
@@ -61,16 +60,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
     if (error?.code === "FORBIDDEN") {
-      return NextResponse.json(
-        { error: error.message },
-        { status: error.status ?? 403 },
-      );
+      return NextResponse.json({ error: error.message }, { status: error.status ?? 403 });
     }
     console.error("[admin.settings] GET error", error);
-    return NextResponse.json(
-      { error: "Failed to load settings" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load settings" }, { status: 500 });
   }
 }
 
@@ -84,41 +77,21 @@ export async function PATCH(req: NextRequest) {
     const user = await getCurrentUserOrThrow();
     requireAdmin(user.role);
 
-    const body = await req.json().catch(() => null);
-    const key = body?.key;
-    const value = body?.value;
+    const parsed = await parseBody(req, updateAdminSettingSchema);
+    if (!parsed.success) return parsed.response;
+    const { key, value } = parsed.data;
 
-    if (typeof key !== "string" || !isAllowedKey(key)) {
-      return NextResponse.json(
-        { error: `Invalid or unknown setting key.` },
-        { status: 400 },
-      );
-    }
+    await setAppSetting(key, value);
 
-    if (typeof value !== "string" || value.trim() === "") {
-      return NextResponse.json(
-        { error: "Setting value must be a non-empty string." },
-        { status: 400 },
-      );
-    }
-
-    await setAppSetting(key, value.trim());
-
-    return NextResponse.json({ key, value: value.trim() });
+    return NextResponse.json({ key, value });
   } catch (error: any) {
     if (error?.code === "UNAUTHENTICATED") {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
     if (error?.code === "FORBIDDEN") {
-      return NextResponse.json(
-        { error: error.message },
-        { status: error.status ?? 403 },
-      );
+      return NextResponse.json({ error: error.message }, { status: error.status ?? 403 });
     }
     console.error("[admin.settings] PATCH error", error);
-    return NextResponse.json(
-      { error: "Failed to update setting" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to update setting" }, { status: 500 });
   }
 }

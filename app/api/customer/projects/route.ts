@@ -9,6 +9,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { parseBody } from "@/lib/schemas/helpers";
+import { createProjectSchema } from "@/lib/schemas/project.schemas";
 import crypto from "crypto";
 
 // ---------------------------------------------------------------------------
@@ -76,15 +78,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json().catch(() => null);
-    const name = (body?.name as string)?.trim();
-
-    if (!name || name.length < 2) {
-      return NextResponse.json(
-        { error: "Project name is required (min 2 characters)." },
-        { status: 400 },
-      );
-    }
+    const parsed = await parseBody(req, createProjectSchema);
+    if (!parsed.success) return parsed.response;
+    const { name } = parsed.data;
 
     // Generate project code from company slug + project name initials
     const company = await prisma.company.findUnique({

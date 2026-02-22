@@ -10,6 +10,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { isSiteAdminRole } from "@/lib/roles";
+import { parseBody } from "@/lib/schemas/helpers";
+import { createJobTypeCategorySchema } from "@/lib/schemas/job-type-category.schemas";
 
 // ---------------------------------------------------------------------------
 // GET: List all job type categories (with job type counts)
@@ -48,17 +50,11 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json({ categories: items });
   } catch (error: any) {
     if (error?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[admin.job-type-categories] GET error", error);
-    return NextResponse.json(
-      { error: "Failed to load categories" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load categories" }, { status: 500 });
   }
 }
 
@@ -77,29 +73,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json().catch(() => null);
+    const parsed = await parseBody(req, createJobTypeCategorySchema);
+    if (!parsed.success) return parsed.response;
+    const { name, icon, sortOrder } = parsed.data;
 
-    const name = (body?.name as string | undefined)?.trim();
-    if (!name || name.length < 2) {
-      return NextResponse.json(
-        { error: "Category name is required (min 2 characters)." },
-        { status: 400 },
-      );
-    }
-
-    // Generate slug from name
+    // Generate slug from name (or use provided)
     const slug =
-      (body?.slug as string | undefined)?.trim() ||
+      parsed.data.slug ||
       name
         .toLowerCase()
         .replace(/[^a-z0-9\s-]/g, "")
         .replace(/\s+/g, "-")
         .replace(/-+/g, "-")
         .slice(0, 50);
-
-    const icon = (body?.icon as string | undefined)?.trim() || null;
-    const sortOrder =
-      typeof body?.sortOrder === "number" ? body.sortOrder : 0;
 
     try {
       const category = await prisma.jobTypeCategory.create({
@@ -131,16 +117,10 @@ export async function POST(req: NextRequest) {
     }
   } catch (error: any) {
     if (error?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[admin.job-type-categories] POST error", error);
-    return NextResponse.json(
-      { error: "Failed to create category" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to create category" }, { status: 500 });
   }
 }

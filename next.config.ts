@@ -34,7 +34,7 @@ const securityHeaders = [
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: blob: https://*.r2.cloudflarestorage.com",
+      "img-src 'self' data: blob: https://*.r2.cloudflarestorage.com https://placehold.co",
       "connect-src 'self' https://api.stripe.com https://*.ingest.sentry.io",
       "frame-src https://js.stripe.com",
       "object-src 'none'",

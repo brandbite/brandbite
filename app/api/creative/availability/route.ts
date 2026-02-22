@@ -12,10 +12,11 @@ import { TicketStatus } from "@prisma/client";
 import { createNotification } from "@/lib/notifications";
 import {
   isCreativePaused,
-  isValidPauseType,
   calculatePauseExpiry,
   formatPauseStatus,
 } from "@/lib/creative-availability";
+import { parseBody } from "@/lib/schemas/helpers";
+import { updateAvailabilitySchema } from "@/lib/schemas/availability.schemas";
 
 // ---------------------------------------------------------------------------
 // GET — current pause status + active ticket count
@@ -51,10 +52,7 @@ export async function GET(_req: NextRequest) {
     ]);
 
     if (!creative) {
-      return NextResponse.json(
-        { error: "Creative not found" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Creative not found" }, { status: 404 });
     }
 
     // Opportunistic cleanup: if DB says paused but expiry has passed, clear it
@@ -80,17 +78,11 @@ export async function GET(_req: NextRequest) {
     });
   } catch (error: any) {
     if (error?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[creative.availability] GET error", error);
-    return NextResponse.json(
-      { error: "Failed to load availability" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load availability" }, { status: 500 });
   }
 }
 
@@ -109,34 +101,13 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    const body = await req.json().catch(() => null);
-    if (!body || typeof body !== "object") {
-      return NextResponse.json(
-        { error: "Invalid request body" },
-        { status: 400 },
-      );
-    }
-
-    const { action, pauseType } = body as {
-      action?: string;
-      pauseType?: string;
-    };
-
-    if (action !== "pause" && action !== "resume") {
-      return NextResponse.json(
-        { error: "action must be 'pause' or 'resume'" },
-        { status: 400 },
-      );
-    }
+    const parsed = await parseBody(req, updateAvailabilitySchema);
+    if (!parsed.success) return parsed.response;
+    const { action } = parsed.data;
 
     // ----- PAUSE -----
     if (action === "pause") {
-      if (!pauseType || !isValidPauseType(pauseType)) {
-        return NextResponse.json(
-          { error: "pauseType must be '1_HOUR', '7_DAYS', or 'MANUAL'" },
-          { status: 400 },
-        );
-      }
+      const { pauseType } = parsed.data;
 
       const pauseExpiresAt = calculatePauseExpiry(pauseType);
       const now = new Date();
@@ -200,16 +171,10 @@ export async function PATCH(req: NextRequest) {
     });
   } catch (error: any) {
     if (error?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[creative.availability] PATCH error", error);
-    return NextResponse.json(
-      { error: "Failed to update availability" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to update availability" }, { status: 500 });
   }
 }

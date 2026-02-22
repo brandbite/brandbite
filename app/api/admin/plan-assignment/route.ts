@@ -10,37 +10,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { isSiteAdminRole } from "@/lib/roles";
+import { parseBody } from "@/lib/schemas/helpers";
+import { assignPlanSchema } from "@/lib/schemas/plan-assignment.schemas";
 
 export async function PATCH(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
 
     if (!isSiteAdminRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only site admins can assign plans" },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Only site admins can assign plans" }, { status: 403 });
     }
 
-    const body = await req.json().catch(() => null);
-
-    const companyId = body?.companyId as string | undefined;
-    const planIdRaw = body?.planId as string | null | undefined;
-
-    if (!companyId) {
-      return NextResponse.json(
-        { error: "companyId is required" },
-        { status: 400 },
-      );
-    }
-
-    // planId can be null (remove plan) or a string (assign)
-    let planId: string | null = null;
-    if (planIdRaw && typeof planIdRaw === "string") {
-      planId = planIdRaw.trim() || null;
-    } else if (planIdRaw === null) {
-      planId = null;
-    }
+    const parsed = await parseBody(req, assignPlanSchema);
+    if (!parsed.success) return parsed.response;
+    const { companyId, planId } = parsed.data;
 
     // Validate company exists
     const company = await prisma.company.findUnique({
@@ -49,10 +32,7 @@ export async function PATCH(req: NextRequest) {
     });
 
     if (!company) {
-      return NextResponse.json(
-        { error: "Company not found" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Company not found" }, { status: 404 });
     }
 
     // If planId provided, validate plan exists
@@ -63,10 +43,7 @@ export async function PATCH(req: NextRequest) {
       });
 
       if (!plan) {
-        return NextResponse.json(
-          { error: "Plan not found" },
-          { status: 404 },
-        );
+        return NextResponse.json({ error: "Plan not found" }, { status: 404 });
       }
       // İstersen burada aktif olmayan plana atamayı da engelleyebiliriz;
       // şimdilik sadece var olması yeterli.
@@ -115,16 +92,10 @@ export async function PATCH(req: NextRequest) {
     });
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[admin.plan-assignment] PATCH error", error);
-    return NextResponse.json(
-      { error: "Failed to assign plan" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to assign plan" }, { status: 500 });
   }
 }

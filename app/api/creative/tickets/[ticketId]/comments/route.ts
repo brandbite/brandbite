@@ -9,6 +9,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { parseBody } from "@/lib/schemas/helpers";
+import { createCommentSchema } from "@/lib/schemas/comment.schemas";
 
 type RouteContext = {
   params: Promise<{
@@ -37,10 +39,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
     const { ticketId } = await params;
 
     if (!ticketId) {
-      return NextResponse.json(
-        { error: "Missing ticketId in route params" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Missing ticketId in route params" }, { status: 400 });
     }
 
     // Ticket gerçekten bu creativea mı ait?
@@ -95,20 +94,11 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
     );
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
-    console.error(
-      "[GET /api/creative/tickets/[ticketId]/comments] error",
-      error,
-    );
-    return NextResponse.json(
-      { error: "Failed to load comments" },
-      { status: 500 },
-    );
+    console.error("[GET /api/creative/tickets/[ticketId]/comments] error", error);
+    return NextResponse.json({ error: "Failed to load comments" }, { status: 500 });
   }
 }
 
@@ -131,36 +121,12 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     const { ticketId } = await params;
 
     if (!ticketId) {
-      return NextResponse.json(
-        { error: "Missing ticketId in route params" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Missing ticketId in route params" }, { status: 400 });
     }
 
-    const bodyJson = await req.json().catch(() => null);
-
-    if (!bodyJson || typeof bodyJson !== "object") {
-      return NextResponse.json(
-        { error: "Invalid request body" },
-        { status: 400 },
-      );
-    }
-
-    const rawBody = String((bodyJson as any).body ?? "").trim();
-
-    if (!rawBody) {
-      return NextResponse.json(
-        { error: "Comment body is required" },
-        { status: 400 },
-      );
-    }
-
-    if (rawBody.length > 2000) {
-      return NextResponse.json(
-        { error: "Comment is too long (max 2000 characters)" },
-        { status: 400 },
-      );
-    }
+    const parsed = await parseBody(req, createCommentSchema);
+    if (!parsed.success) return parsed.response;
+    const rawBody = parsed.data.body;
 
     // Ticket gerçekten bu creativea mı ait?
     const ticket = await prisma.ticket.findFirst({
@@ -219,19 +185,10 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     );
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
-    console.error(
-      "[POST /api/creative/tickets/[ticketId]/comments] error",
-      error,
-    );
-    return NextResponse.json(
-      { error: "Failed to add comment" },
-      { status: 500 },
-    );
+    console.error("[POST /api/creative/tickets/[ticketId]/comments] error", error);
+    return NextResponse.json({ error: "Failed to add comment" }, { status: 500 });
   }
 }

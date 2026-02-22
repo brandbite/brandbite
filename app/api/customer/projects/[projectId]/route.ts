@@ -9,10 +9,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
-import {
-  normalizeCompanyRole,
-  canManageProjects,
-} from "@/lib/permissions/companyRoles";
+import { normalizeCompanyRole, canManageProjects } from "@/lib/permissions/companyRoles";
+import { parseBody } from "@/lib/schemas/helpers";
+import { createProjectSchema } from "@/lib/schemas/project.schemas";
 
 type RouteContext = { params: Promise<{ projectId: string }> };
 
@@ -25,25 +24,18 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
     const user = await getCurrentUserOrThrow();
 
     if (user.role !== "CUSTOMER") {
-      return NextResponse.json(
-        { error: "Only customers can update projects." },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Only customers can update projects." }, { status: 403 });
     }
 
     if (!user.activeCompanyId) {
-      return NextResponse.json(
-        { error: "No active company selected." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "No active company selected." }, { status: 400 });
     }
 
     const companyRole = normalizeCompanyRole(user.companyRole);
     if (!canManageProjects(companyRole)) {
       return NextResponse.json(
         {
-          error:
-            "Only company owners or project managers can edit projects.",
+          error: "Only company owners or project managers can edit projects.",
         },
         { status: 403 },
       );
@@ -57,29 +49,12 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
     });
 
     if (!existing) {
-      return NextResponse.json(
-        { error: "Project not found." },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Project not found." }, { status: 404 });
     }
 
-    const body = await req.json().catch(() => null);
-    if (!body || typeof body !== "object") {
-      return NextResponse.json(
-        { error: "Request body is required." },
-        { status: 400 },
-      );
-    }
-
-    const name =
-      typeof body.name === "string" ? body.name.trim() : "";
-
-    if (name.length < 2) {
-      return NextResponse.json(
-        { error: "Project name must be at least 2 characters." },
-        { status: 400 },
-      );
-    }
+    const parsed = await parseBody(req, createProjectSchema);
+    if (!parsed.success) return parsed.response;
+    const { name } = parsed.data;
 
     const project = await prisma.project.update({
       where: { id: projectId },
@@ -90,17 +65,11 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
     return NextResponse.json({ project }, { status: 200 });
   } catch (error: any) {
     if (error?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[customer.projects.projectId] PATCH error", error);
-    return NextResponse.json(
-      { error: "Failed to update project." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to update project." }, { status: 500 });
   }
 }
 
@@ -113,25 +82,18 @@ export async function DELETE(_req: NextRequest, ctx: RouteContext) {
     const user = await getCurrentUserOrThrow();
 
     if (user.role !== "CUSTOMER") {
-      return NextResponse.json(
-        { error: "Only customers can delete projects." },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Only customers can delete projects." }, { status: 403 });
     }
 
     if (!user.activeCompanyId) {
-      return NextResponse.json(
-        { error: "No active company selected." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "No active company selected." }, { status: 400 });
     }
 
     const companyRole = normalizeCompanyRole(user.companyRole);
     if (!canManageProjects(companyRole)) {
       return NextResponse.json(
         {
-          error:
-            "Only company owners or project managers can delete projects.",
+          error: "Only company owners or project managers can delete projects.",
         },
         { status: 403 },
       );
@@ -146,10 +108,7 @@ export async function DELETE(_req: NextRequest, ctx: RouteContext) {
     });
 
     if (!existing) {
-      return NextResponse.json(
-        { error: "Project not found." },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Project not found." }, { status: 404 });
     }
 
     const unlinkedTickets = existing._count.tickets;
@@ -172,22 +131,13 @@ export async function DELETE(_req: NextRequest, ctx: RouteContext) {
       where: { id: projectId },
     });
 
-    return NextResponse.json(
-      { success: true, unlinkedTickets },
-      { status: 200 },
-    );
+    return NextResponse.json({ success: true, unlinkedTickets }, { status: 200 });
   } catch (error: any) {
     if (error?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[customer.projects.projectId] DELETE error", error);
-    return NextResponse.json(
-      { error: "Failed to delete project." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to delete project." }, { status: 500 });
   }
 }

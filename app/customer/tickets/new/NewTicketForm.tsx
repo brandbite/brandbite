@@ -10,6 +10,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { createTicketSchema } from "@/lib/schemas/ticket.schemas";
 import {
   type CompanyRole,
   normalizeCompanyRole,
@@ -102,9 +103,7 @@ function formatBytes(bytes: number): string {
   return `${v.toFixed(precision)} ${units[i]}`;
 }
 
-async function getImageDimensions(
-  file: File,
-): Promise<{ width: number; height: number } | null> {
+async function getImageDimensions(file: File): Promise<{ width: number; height: number } | null> {
   // Only attempt for images
   if (!file.type.startsWith("image/")) return null;
 
@@ -175,21 +174,17 @@ export default function NewTicketForm({
 
   // Derive selected job type for token cost display
   const selectedJobType = useMemo(
-    () => (jobTypeId ? jobTypes.find((jt) => jt.id === jobTypeId) ?? null : null),
+    () => (jobTypeId ? (jobTypes.find((jt) => jt.id === jobTypeId) ?? null) : null),
     [jobTypeId, jobTypes],
   );
 
   // Effective cost = unit cost × quantity
   const effectiveCost =
-    selectedJobType?.tokenCost != null
-      ? selectedJobType.tokenCost * quantity
-      : null;
+    selectedJobType?.tokenCost != null ? selectedJobType.tokenCost * quantity : null;
 
   // True when a job type is selected and its cost exceeds the company balance
   const insufficientTokens =
-    tokenBalance != null &&
-    effectiveCost != null &&
-    tokenBalance < effectiveCost;
+    tokenBalance != null && effectiveCost != null && tokenBalance < effectiveCost;
 
   // Due date constraints: today → 2 years from now (YYYY-MM-DD format)
   const todayStr = useMemo(() => {
@@ -205,9 +200,7 @@ export default function NewTicketForm({
 
   const [submitting, setSubmitting] = useState(false);
   const [uploadingBriefs, setUploadingBriefs] = useState(false);
-  const [uploadProgressText, setUploadProgressText] = useState<string | null>(
-    null,
-  );
+  const [uploadProgressText, setUploadProgressText] = useState<string | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -217,8 +210,7 @@ export default function NewTicketForm({
   // ---------------------------------------------------------------------------
 
   const [companyRole, setCompanyRole] = useState<CompanyRole | null>(null);
-  const [companyRoleLoading, setCompanyRoleLoading] =
-    useState<boolean>(true);
+  const [companyRoleLoading, setCompanyRoleLoading] = useState<boolean>(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -239,10 +231,7 @@ export default function NewTicketForm({
           setCompanyRole(role);
         }
       } catch (err) {
-        console.error(
-          "[NewTicketForm] Failed to load company role from settings endpoint",
-          err,
-        );
+        console.error("[NewTicketForm] Failed to load company role from settings endpoint", err);
       } finally {
         if (!cancelled) {
           setCompanyRoleLoading(false);
@@ -257,8 +246,7 @@ export default function NewTicketForm({
     };
   }, []);
 
-  const isLimitedAccess =
-    companyRole !== null && isBillingReadOnly(companyRole);
+  const isLimitedAccess = companyRole !== null && isBillingReadOnly(companyRole);
 
   // ---------------------------------------------------------------------------
   // Brief uploads (selected locally, uploaded after ticket creation)
@@ -332,9 +320,7 @@ export default function NewTicketForm({
       const file = entry.file;
 
       try {
-        setUploadProgressText(
-          `Uploading attachment ${i + 1} of ${briefFiles.length}...`,
-        );
+        setUploadProgressText(`Uploading attachment ${i + 1} of ${briefFiles.length}...`);
 
         // 1) Presign
         const presignRes = await fetch("/api/uploads/r2/presign", {
@@ -437,18 +423,29 @@ export default function NewTicketForm({
       return;
     }
 
-    if (!title.trim()) {
-      setError("Please enter a title for your request.");
+    // Schema validation (title, dueDate, quantity, priority, etc.)
+    const validation = createTicketSchema.safeParse({
+      title,
+      description,
+      projectId: projectId || null,
+      jobTypeId: jobTypeId || null,
+      quantity,
+      priority,
+      dueDate: dueDate || null,
+      tagIds: selectedTagIds,
+    });
+
+    if (!validation.success) {
+      setError(validation.error.issues[0]?.message ?? "Validation failed");
       return;
     }
 
-    // Güvenlik olarak rolesi henüz yüklenmediyse create'e izin vermeyelim
+    // Permission & balance guards (depend on client state, not payload)
     if (companyRoleLoading) {
       setError("We are still loading your permissions. Please wait a moment.");
       return;
     }
 
-    // İleride MEMBER'ı kısıtlamak istersek tek yerden değiştirebiliriz
     if (companyRole !== null && !canCreateTickets(companyRole)) {
       setError(
         "You don't have permission to create tickets. Please ask your company owner or project manager.",
@@ -456,24 +453,11 @@ export default function NewTicketForm({
       return;
     }
 
-    // Token balance guard — prevent submission when cost exceeds balance
     if (insufficientTokens) {
       setError(
         `Not enough tokens. This request costs ${effectiveCost} tokens but your balance is ${tokenBalance} tokens.`,
       );
       return;
-    }
-
-    // Due date validation — reject past dates and dates beyond 2 years
-    if (dueDate) {
-      if (dueDate < todayStr) {
-        setError("Due date cannot be in the past.");
-        return;
-      }
-      if (dueDate > maxDateStr) {
-        setError("Due date cannot be more than 2 years in the future.");
-        return;
-      }
     }
 
     setSubmitting(true);
@@ -574,12 +558,10 @@ export default function NewTicketForm({
       {/* Limited access banner for BILLING role */}
       {!companyRoleLoading && isLimitedAccess && (
         <div className="rounded-lg border border-[var(--bb-warning-border)] bg-[var(--bb-warning-bg)] px-3 py-2 text-xs text-[var(--bb-text-secondary)]">
-          <p className="text-[11px] font-medium text-[var(--bb-warning-text)]">
-            Limited access
-          </p>
+          <p className="text-[11px] font-medium text-[var(--bb-warning-text)]">Limited access</p>
           <p className="mt-1">
-            You can review existing tickets, but only your company owner or
-            project manager can create new tickets for this workspace.
+            You can review existing tickets, but only your company owner or project manager can
+            create new tickets for this workspace.
           </p>
         </div>
       )}
@@ -705,9 +687,7 @@ export default function NewTicketForm({
 
       {/* Priority */}
       <div className="space-y-1">
-        <label className="text-xs font-medium text-[var(--bb-secondary)]">
-          Priority
-        </label>
+        <label className="text-xs font-medium text-[var(--bb-secondary)]">Priority</label>
         <FormSelect
           value={priority}
           onChange={(e) => setPriority(e.target.value as TicketPriorityValue)}
@@ -726,9 +706,7 @@ export default function NewTicketForm({
 
       {/* Due date */}
       <div className="space-y-1">
-        <label className="text-xs font-medium text-[var(--bb-secondary)]">
-          Due date
-        </label>
+        <label className="text-xs font-medium text-[var(--bb-secondary)]">Due date</label>
         <FormInput
           type="date"
           value={dueDate}
@@ -744,9 +722,7 @@ export default function NewTicketForm({
 
       {/* Project */}
       <div className="space-y-1">
-        <label className="text-xs font-medium text-[var(--bb-secondary)]">
-          Project
-        </label>
+        <label className="text-xs font-medium text-[var(--bb-secondary)]">Project</label>
         <FormSelect
           value={projectId}
           onChange={(e) => setProjectId(e.target.value)}
@@ -766,9 +742,7 @@ export default function NewTicketForm({
 
       {/* Job type */}
       <div className="space-y-1">
-        <label className="text-xs font-medium text-[var(--bb-secondary)]">
-          Job type
-        </label>
+        <label className="text-xs font-medium text-[var(--bb-secondary)]">Job type</label>
         <JobTypePicker
           jobTypes={jobTypes}
           value={jobTypeId}
@@ -787,7 +761,7 @@ export default function NewTicketForm({
                 type="button"
                 disabled={isBusy || quantity <= 1}
                 onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                className="flex h-7 w-7 items-center justify-center text-sm text-[var(--bb-text-secondary)] hover:bg-[var(--bb-bg-warm)] disabled:opacity-40 disabled:cursor-not-allowed rounded-l-md"
+                className="flex h-7 w-7 items-center justify-center rounded-l-md text-sm text-[var(--bb-text-secondary)] hover:bg-[var(--bb-bg-warm)] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 −
               </button>
@@ -798,15 +772,13 @@ export default function NewTicketForm({
                 type="button"
                 disabled={isBusy || quantity >= 10}
                 onClick={() => setQuantity((q) => Math.min(10, q + 1))}
-                className="flex h-7 w-7 items-center justify-center text-sm text-[var(--bb-text-secondary)] hover:bg-[var(--bb-bg-warm)] disabled:opacity-40 disabled:cursor-not-allowed rounded-r-md"
+                className="flex h-7 w-7 items-center justify-center rounded-r-md text-sm text-[var(--bb-text-secondary)] hover:bg-[var(--bb-bg-warm)] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 +
               </button>
             </div>
             {quantity > 1 && (
-              <span className="text-[11px] text-[var(--bb-text-tertiary)]">
-                ×{quantity}
-              </span>
+              <span className="text-[11px] text-[var(--bb-text-tertiary)]">×{quantity}</span>
             )}
           </div>
         )}
@@ -829,9 +801,17 @@ export default function NewTicketForm({
                   const remaining = tokenBalance - effectiveCost;
                   const isNegative = remaining < 0;
                   return (
-                    <span className={isNegative ? "text-[var(--bb-danger-text)]" : "text-[var(--bb-text-tertiary)]"}>
+                    <span
+                      className={
+                        isNegative
+                          ? "text-[var(--bb-danger-text)]"
+                          : "text-[var(--bb-text-tertiary)]"
+                      }
+                    >
                       Remaining after:{" "}
-                      <span className={`font-semibold ${isNegative ? "text-[var(--bb-danger-text)]" : "text-[var(--bb-secondary)]"}`}>
+                      <span
+                        className={`font-semibold ${isNegative ? "text-[var(--bb-danger-text)]" : "text-[var(--bb-secondary)]"}`}
+                      >
                         {remaining.toLocaleString()} tokens
                       </span>
                     </span>
@@ -840,7 +820,10 @@ export default function NewTicketForm({
               </>
             ) : (
               <span className="text-[var(--bb-text-tertiary)]">
-                Your balance: <span className="font-semibold text-[var(--bb-secondary)]">{tokenBalance.toLocaleString()} tokens</span>
+                Your balance:{" "}
+                <span className="font-semibold text-[var(--bb-secondary)]">
+                  {tokenBalance.toLocaleString()} tokens
+                </span>
               </span>
             )}
           </div>
@@ -852,7 +835,8 @@ export default function NewTicketForm({
 
         {insufficientTokens && (
           <div className="mt-1.5 rounded-md border border-red-200 bg-[var(--bb-danger-bg)] px-2.5 py-1.5 text-[11px] text-red-700">
-            Not enough tokens to create this ticket. Choose a different job type or top up your balance.
+            Not enough tokens to create this ticket. Choose a different job type or top up your
+            balance.
           </div>
         )}
       </div>
@@ -879,9 +863,7 @@ export default function NewTicketForm({
                 }
                 const created = json.tag as TagOption;
                 setLocalTags((prev) =>
-                  [...prev, created].sort((a, b) =>
-                    a.name.localeCompare(b.name),
-                  ),
+                  [...prev, created].sort((a, b) => a.name.localeCompare(b.name)),
                 );
                 onTagCreated?.(created);
                 return created;
@@ -890,7 +872,9 @@ export default function NewTicketForm({
                 return null;
               }
             }}
-            canCreate={canCreateTagsProp ?? (companyRole !== null && canManageTagsCheck(companyRole))}
+            canCreate={
+              canCreateTagsProp ?? (companyRole !== null && canManageTagsCheck(companyRole))
+            }
             disabled={isBusy}
           />
           <p className="text-[11px] text-[var(--bb-text-tertiary)]">
