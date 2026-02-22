@@ -53,6 +53,7 @@ type Props = {
   onTagCreated?: (tag: TagOption) => void;
   redirectTo?: string;
   onCreated?: (ticket: { id: string; code?: string | null }) => void;
+  onCancel?: () => void;
   initialJobTypeId?: string;
 };
 
@@ -142,6 +143,7 @@ export default function NewTicketForm({
   onTagCreated,
   redirectTo,
   onCreated,
+  onCancel,
   initialJobTypeId,
 }: Props) {
   const router = useRouter();
@@ -889,7 +891,13 @@ export default function NewTicketForm({
           type="button"
           variant="secondary"
           size="sm"
-          onClick={() => router.push(redirectTo ?? "/customer/tickets")}
+          onClick={() => {
+            if (onCancel) {
+              onCancel();
+            } else {
+              router.push(redirectTo ?? "/customer/tickets");
+            }
+          }}
           disabled={isBusy}
         >
           Cancel
