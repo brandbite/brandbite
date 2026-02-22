@@ -5,14 +5,7 @@
 
 "use client";
 
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -49,9 +42,7 @@ export function useTheme(): ThemeContextValue {
 
 function getSystemTheme(): ResolvedTheme {
   if (typeof window === "undefined") return "light";
-  return window.matchMedia("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
 function resolveTheme(theme: Theme): ResolvedTheme {
@@ -63,18 +54,10 @@ function resolveTheme(theme: Theme): ResolvedTheme {
 // ---------------------------------------------------------------------------
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    if (typeof window === "undefined") return "system";
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "light" || stored === "dark" || stored === "system") {
-      return stored;
-    }
-    return "system";
-  });
-
-  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
-    resolveTheme(theme),
-  );
+  // Always initialise with "system" so server & client match during hydration.
+  // The real stored value is read in the mount effect below.
+  const [theme, setThemeState] = useState<Theme>("system");
+  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>("light");
 
   // Apply .dark class to <html>
   const applyTheme = useCallback((resolved: ResolvedTheme) => {
@@ -85,6 +68,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       root.classList.remove("dark");
     }
     setResolvedTheme(resolved);
+  }, []);
+
+  // On mount, read the persisted theme from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored === "light" || stored === "dark" || stored === "system") {
+      setThemeState(stored);
+    }
   }, []);
 
   // When theme changes, resolve and apply
@@ -116,7 +107,5 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     [theme, resolvedTheme, setTheme],
   );
 
-  return (
-    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
-  );
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

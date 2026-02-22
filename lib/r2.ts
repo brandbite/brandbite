@@ -45,15 +45,28 @@ export function createR2Client(): S3Client {
 }
 
 /**
+ * Returns true when the URL looks like a presigned S3/R2 URL
+ * (contains X-Amz-Signature or X-Amz-Credential query params).
+ * These URLs expire and must be regenerated on every request.
+ */
+function isPresignedUrl(url: string): boolean {
+  return url.includes("X-Amz-Signature=") || url.includes("X-Amz-Credential=");
+}
+
+/**
  * Resolve a displayable URL for an asset. Returns the public URL if
  * R2_PUBLIC_BASE_URL is configured, otherwise generates a short-lived
  * presigned download URL. Returns null only when R2 is not configured.
+ *
+ * NOTE: presigned URLs stored in the DB are always regenerated because
+ * they expire after a short TTL.
  */
 export async function resolveAssetUrl(
   storageKey: string,
   existingUrl: string | null,
 ): Promise<string | null> {
-  if (existingUrl) return existingUrl;
+  // If it's a stable (non-presigned) URL, return as-is
+  if (existingUrl && !isPresignedUrl(existingUrl)) return existingUrl;
 
   const base = getR2PublicBaseUrl();
   if (base) {
@@ -61,7 +74,7 @@ export async function resolveAssetUrl(
     return `${trimmed}/${storageKey}`;
   }
 
-  // Fallback: generate a presigned GET URL (valid for 15 minutes)
+  // Generate a fresh presigned GET URL (valid for 15 minutes)
   try {
     const r2 = createR2Client();
     const bucket = getR2BucketName();

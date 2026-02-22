@@ -9,7 +9,7 @@
 
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CompanyRole,
   normalizeCompanyRole,
@@ -329,6 +329,8 @@ export default function CustomerBoardPage() {
   type BriefAsset = { id: string; url: string | null; originalName: string | null };
   const [detailBriefAssets, setDetailBriefAssets] = useState<BriefAsset[]>([]);
   const [detailBriefAssetsLoading, setDetailBriefAssetsLoading] = useState(false);
+  const [uploadingBriefs, setUploadingBriefs] = useState(false);
+  const [uploadBriefsProgress, setUploadBriefsProgress] = useState<string | null>(null);
 
   const [pendingDoneTicketId, setPendingDoneTicketId] = useState<string | null>(null);
   const [pendingDoneRevisions, setPendingDoneRevisions] = useState<TicketRevisionEntry[] | null>(
@@ -819,8 +821,31 @@ export default function CustomerBoardPage() {
   }, [pendingDoneTicketId]);
 
   // ---------------------------------------------------------------------------
-  // Detail ticket brief attachments load
+  // Detail ticket brief attachments — load + upload
   // ---------------------------------------------------------------------------
+
+  const loadDetailBriefAssets = useCallback(async (ticketId: string) => {
+    setDetailBriefAssetsLoading(true);
+    try {
+      const res = await fetch(`/api/customer/tickets/${ticketId}/assets?kind=BRIEF_INPUT`, {
+        cache: "no-store",
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && Array.isArray((json as any)?.assets)) {
+        setDetailBriefAssets(
+          (json as any).assets.map((a: any) => ({
+            id: a.id,
+            url: a.url ?? null,
+            originalName: a.originalName ?? null,
+          })),
+        );
+      }
+    } catch {
+      // Silently fail — brief assets are supplementary
+    } finally {
+      setDetailBriefAssetsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!detailTicketId) {
@@ -829,37 +854,72 @@ export default function CustomerBoardPage() {
       return;
     }
 
-    let cancelled = false;
+    loadDetailBriefAssets(detailTicketId);
+  }, [detailTicketId, loadDetailBriefAssets]);
 
-    const loadBriefAssets = async () => {
-      setDetailBriefAssetsLoading(true);
-      try {
-        const res = await fetch(`/api/customer/tickets/${detailTicketId}/assets?kind=BRIEF_INPUT`, {
-          cache: "no-store",
-        });
-        const json = await res.json().catch(() => null);
-        if (!cancelled && res.ok && Array.isArray((json as any)?.assets)) {
-          setDetailBriefAssets(
-            (json as any).assets.map((a: any) => ({
-              id: a.id,
-              url: a.url ?? null,
-              originalName: a.originalName ?? null,
-            })),
-          );
+  // Helper — read image dimensions from a File
+  async function getImageDimensionsForBoard(
+    file: File,
+  ): Promise<{ width: number; height: number } | null> {
+    if (!file.type.startsWith("image/")) return null;
+    return await new Promise((resolve) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const w = Number(img.naturalWidth) || 0;
+        const h = Number(img.naturalHeight) || 0;
+        URL.revokeObjectURL(url);
+        if (w > 0 && h > 0) resolve({ width: w, height: h });
+        else resolve(null);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(null);
+      };
+      img.src = url;
+    });
+  }
+
+  const handleUploadBriefFromBoard = useCallback(
+    async (files: FileList | null) => {
+      if (!detailTicketId) return;
+      if (!files || files.length === 0) return;
+      const accepted = Array.from(files).filter((f) => f.type.startsWith("image/"));
+      if (accepted.length === 0) return;
+
+      setUploadingBriefs(true);
+      setUploadBriefsProgress("Preparing uploads...");
+
+      let failed = 0;
+      for (let i = 0; i < accepted.length; i += 1) {
+        const file = accepted[i];
+        try {
+          setUploadBriefsProgress(`Uploading ${i + 1} of ${accepted.length}...`);
+          const dims = await getImageDimensionsForBoard(file);
+
+          const body = new FormData();
+          body.append("file", file);
+          body.append("ticketId", detailTicketId);
+          body.append("kind", "BRIEF_INPUT");
+          if (dims?.width) body.append("width", String(dims.width));
+          if (dims?.height) body.append("height", String(dims.height));
+
+          const res = await fetch("/api/uploads/r2/upload", {
+            method: "POST",
+            body,
+          });
+          if (!res.ok) failed += 1;
+        } catch {
+          failed += 1;
         }
-      } catch {
-        // Silently fail — brief assets are supplementary
-      } finally {
-        if (!cancelled) setDetailBriefAssetsLoading(false);
       }
-    };
 
-    loadBriefAssets();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [detailTicketId]);
+      setUploadBriefsProgress(null);
+      setUploadingBriefs(false);
+      await loadDetailBriefAssets(detailTicketId);
+    },
+    [detailTicketId, loadDetailBriefAssets],
+  );
 
   // ---------------------------------------------------------------------------
   // Derived values
@@ -1300,6 +1360,8 @@ export default function CustomerBoardPage() {
     setShowPreviousVersions(false);
     setDetailBriefAssets([]);
     setDetailBriefAssetsLoading(false);
+    setUploadingBriefs(false);
+    setUploadBriefsProgress(null);
     setIsEditingDetail(false);
     setEditError(null);
   };
@@ -2357,31 +2419,66 @@ export default function CustomerBoardPage() {
                 )}
 
                 {!detailBriefAssetsLoading &&
-                  detailBriefAssets.length > 0 &&
                   (() => {
+                    const hasAssets = detailBriefAssets.length > 0;
                     const hasCreativeWork =
                       detailRevisions &&
                       detailRevisions.length > 0 &&
                       detailRevisions.some((r) => r.assets && r.assets.length > 0);
+                    const canAddImages = detailTicket?.status === "TODO";
+
+                    // Show the section when there are attachments OR the user can add images
+                    if (!hasAssets && !canAddImages) return null;
 
                     return (
                       <div className="mb-5">
                         <div className="mb-1.5 flex items-center justify-between">
                           <p className="text-[11px] font-semibold tracking-[0.16em] text-[var(--bb-text-muted)] uppercase">
                             Brief attachments
-                            <span className="ml-1.5 text-[var(--bb-text-tertiary)]">
-                              ({detailBriefAssets.length})
-                            </span>
+                            {hasAssets && (
+                              <span className="ml-1.5 text-[var(--bb-text-tertiary)]">
+                                ({detailBriefAssets.length})
+                              </span>
+                            )}
                           </p>
-                          <DownloadAllButton
-                            assets={detailBriefAssets}
-                            zipFilename="brief-attachments.zip"
-                          />
+                          <div className="flex items-center gap-2">
+                            {canAddImages && (
+                              <label className="inline-flex cursor-pointer items-center rounded-full border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-1 text-[11px] font-medium text-[var(--bb-secondary)] hover:bg-[var(--bb-bg-warm)] disabled:cursor-not-allowed disabled:opacity-60">
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  multiple
+                                  className="hidden"
+                                  disabled={uploadingBriefs}
+                                  onChange={(e) => {
+                                    void handleUploadBriefFromBoard(e.target.files);
+                                    e.currentTarget.value = "";
+                                  }}
+                                />
+                                Add images
+                              </label>
+                            )}
+                            {hasAssets && (
+                              <DownloadAllButton
+                                assets={detailBriefAssets}
+                                zipFilename="brief-attachments.zip"
+                              />
+                            )}
+                          </div>
                         </div>
-                        {hasCreativeWork ? (
-                          <BriefThumbnailRow assets={detailBriefAssets} />
-                        ) : (
-                          <RevisionImageLarge assets={detailBriefAssets} pinMode="view" />
+                        {uploadBriefsProgress && (
+                          <p className="mb-2 text-xs text-[var(--bb-text-tertiary)]">
+                            {uploadBriefsProgress}
+                          </p>
+                        )}
+                        {hasAssets && (
+                          <>
+                            {hasCreativeWork ? (
+                              <BriefThumbnailRow assets={detailBriefAssets} />
+                            ) : (
+                              <RevisionImageLarge assets={detailBriefAssets} pinMode="view" />
+                            )}
+                          </>
                         )}
                       </div>
                     );

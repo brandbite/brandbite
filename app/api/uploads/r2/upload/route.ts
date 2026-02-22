@@ -16,7 +16,7 @@ import { AssetKind } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
-import { createR2Client, getR2BucketName } from "@/lib/r2";
+import { createR2Client, getR2BucketName, getR2PublicBaseUrl } from "@/lib/r2";
 import { resolveAssetUrl } from "@/lib/r2";
 import { isCompanyAdminRole } from "@/lib/permissions/companyRoles";
 
@@ -164,7 +164,11 @@ export async function POST(req: Request) {
     const width = widthStr ? parseInt(widthStr, 10) || null : null;
     const height = heightStr ? parseInt(heightStr, 10) || null : null;
 
-    const url = await resolveAssetUrl(storageKey, null);
+    // Store the public URL if available, otherwise null.
+    // Presigned URLs are short-lived and should NOT be persisted —
+    // they are generated on-the-fly by the asset-serving endpoints.
+    const publicBase = getR2PublicBaseUrl();
+    const url = publicBase ? `${publicBase.replace(/\/$/, "")}/${storageKey}` : null;
 
     const asset = await prisma.asset.create({
       data: {
