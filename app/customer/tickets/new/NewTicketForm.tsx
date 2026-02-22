@@ -324,74 +324,25 @@ export default function NewTicketForm({
       try {
         setUploadProgressText(`Uploading attachment ${i + 1} of ${briefFiles.length}...`);
 
-        // 1) Presign
-        const presignRes = await fetch("/api/uploads/r2/presign", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ticketId,
-            kind: "BRIEF_INPUT",
-            contentType: file.type || "application/octet-stream",
-            bytes: file.size,
-            originalName: file.name,
-          }),
-        });
-
-        const presignJson = await presignRes.json().catch(() => null);
-
-        if (!presignRes.ok) {
-          failed += 1;
-          console.error("[NewTicketForm] Presign failed:", presignJson);
-          continue;
-        }
-
-        const uploadUrl: string | undefined = presignJson?.uploadUrl;
-        const storageKey: string | undefined = presignJson?.storageKey;
-
-        if (!uploadUrl || !storageKey) {
-          failed += 1;
-          console.error("[NewTicketForm] Presign missing uploadUrl/storageKey");
-          continue;
-        }
-
-        // 2) PUT to R2
-        const putRes = await fetch(uploadUrl, {
-          method: "PUT",
-          headers: {
-            "Content-Type": file.type || "application/octet-stream",
-          },
-          body: file,
-        });
-
-        if (!putRes.ok) {
-          failed += 1;
-          console.error("[NewTicketForm] R2 PUT failed:", putRes.status);
-          continue;
-        }
-
-        // 3) Register in DB
         const dims = await getImageDimensions(file);
 
-        const registerRes = await fetch("/api/assets/register", {
+        const body = new FormData();
+        body.append("file", file);
+        body.append("ticketId", ticketId);
+        body.append("kind", "BRIEF_INPUT");
+        if (dims?.width) body.append("width", String(dims.width));
+        if (dims?.height) body.append("height", String(dims.height));
+
+        const res = await fetch("/api/uploads/r2/upload", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ticketId,
-            kind: "BRIEF_INPUT",
-            storageKey,
-            mimeType: file.type || "application/octet-stream",
-            bytes: file.size,
-            width: dims?.width ?? null,
-            height: dims?.height ?? null,
-            originalName: file.name,
-          }),
+          body,
         });
 
-        const registerJson = await registerRes.json().catch(() => null);
+        const json = await res.json().catch(() => null);
 
-        if (!registerRes.ok) {
+        if (!res.ok) {
           failed += 1;
-          console.error("[NewTicketForm] Asset register failed:", registerJson);
+          console.error("[NewTicketForm] Upload failed:", json);
           continue;
         }
 

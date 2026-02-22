@@ -957,54 +957,21 @@ export default function CreativeBoardPage() {
       setReviewUploadProgress(`Uploading file ${i + 1} of ${reviewFiles.length}...`);
 
       try {
-        // Presign
-        const presignRes = await fetch("/api/uploads/r2/presign", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ticketId: ticket.id,
-            kind: "OUTPUT_IMAGE",
-            revisionId: result.revisionId,
-            contentType: entry.file.type || "application/octet-stream",
-            bytes: entry.file.size,
-            originalName: entry.file.name,
-          }),
-        });
-        const presignJson = await presignRes.json().catch(() => null);
-        if (!presignRes.ok || !presignJson?.uploadUrl || !presignJson?.storageKey) {
-          failed++;
-          continue;
-        }
-
-        // PUT to R2
-        const putRes = await fetch(presignJson.uploadUrl, {
-          method: "PUT",
-          headers: { "Content-Type": entry.file.type || "application/octet-stream" },
-          body: entry.file,
-        });
-        if (!putRes.ok) {
-          failed++;
-          continue;
-        }
-
-        // Register
         const dims = await getImageDimensions(entry.file);
-        const registerRes = await fetch("/api/assets/register", {
+
+        const body = new FormData();
+        body.append("file", entry.file);
+        body.append("ticketId", ticket.id);
+        body.append("kind", "OUTPUT_IMAGE");
+        body.append("revisionId", result.revisionId);
+        if (dims?.width) body.append("width", String(dims.width));
+        if (dims?.height) body.append("height", String(dims.height));
+
+        const res = await fetch("/api/uploads/r2/upload", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ticketId: ticket.id,
-            kind: "OUTPUT_IMAGE",
-            revisionId: result.revisionId,
-            storageKey: presignJson.storageKey,
-            mimeType: entry.file.type || "application/octet-stream",
-            bytes: entry.file.size,
-            width: dims?.width ?? null,
-            height: dims?.height ?? null,
-            originalName: entry.file.name,
-          }),
+          body,
         });
-        if (!registerRes.ok) {
+        if (!res.ok) {
           failed++;
           continue;
         }

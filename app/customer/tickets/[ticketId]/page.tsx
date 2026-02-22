@@ -51,10 +51,7 @@ import {
   canManageTags,
   canMarkTicketsDoneForCompany,
 } from "@/lib/permissions/companyRoles";
-import {
-  downloadSingleAsset,
-  downloadAssetsAsZip,
-} from "@/lib/download-helpers";
+import { downloadSingleAsset, downloadAssetsAsZip } from "@/lib/download-helpers";
 import { RevisionCompare } from "@/components/ui/revision-compare";
 
 // ---------------------------------------------------------------------------
@@ -167,9 +164,7 @@ function formatBytes(bytes: number): string {
   return `${v.toFixed(precision)} ${units[i]}`;
 }
 
-async function getImageDimensions(
-  file: File,
-): Promise<{ width: number; height: number } | null> {
+async function getImageDimensions(file: File): Promise<{ width: number; height: number } | null> {
   if (!file.type.startsWith("image/")) return null;
   return await new Promise((resolve) => {
     const url = URL.createObjectURL(file);
@@ -219,14 +214,10 @@ export default function CustomerTicketDetailPage() {
   const [briefAssetsLoading, setBriefAssetsLoading] = useState(false);
   const [briefAssetsError, setBriefAssetsError] = useState<string | null>(null);
   const [uploadingBriefs, setUploadingBriefs] = useState(false);
-  const [uploadProgressText, setUploadProgressText] = useState<string | null>(
-    null,
-  );
+  const [uploadProgressText, setUploadProgressText] = useState<string | null>(null);
 
   // Revisions
-  const [revisions, setRevisions] = useState<TicketRevisionEntry[] | null>(
-    null,
-  );
+  const [revisions, setRevisions] = useState<TicketRevisionEntry[] | null>(null);
   const [revisionsLoading, setRevisionsLoading] = useState(false);
   const [revisionsError, setRevisionsError] = useState<string | null>(null);
   const [showCompare, setShowCompare] = useState(false);
@@ -234,9 +225,7 @@ export default function CustomerTicketDetailPage() {
   // Status action modals
   const [showRevisionModal, setShowRevisionModal] = useState(false);
   const [revisionMessage, setRevisionMessage] = useState("");
-  const [revisionMessageError, setRevisionMessageError] = useState<
-    string | null
-  >(null);
+  const [revisionMessageError, setRevisionMessageError] = useState<string | null>(null);
   const [showDoneModal, setShowDoneModal] = useState(false);
   const [statusSaving, setStatusSaving] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
@@ -277,10 +266,7 @@ export default function CustomerTicketDetailPage() {
     () => canMarkTicketsDoneForCompany("CUSTOMER", normalizedRole),
     [normalizedRole],
   );
-  const userCanManageTags = useMemo(
-    () => canManageTags(normalizedRole),
-    [normalizedRole],
-  );
+  const userCanManageTags = useMemo(() => canManageTags(normalizedRole), [normalizedRole]);
 
   // Brief assets converted to AssetEntry for shared components
   const briefAssetEntries: AssetEntry[] = useMemo(
@@ -310,23 +296,17 @@ export default function CustomerTicketDetailPage() {
     let cancelled = false;
     const resolvedTicketId =
       (typeof ticketIdFromParams === "string" && ticketIdFromParams) ||
-      (typeof window !== "undefined"
-        ? window.location.pathname.split("/").pop() ?? ""
-        : "");
+      (typeof window !== "undefined" ? (window.location.pathname.split("/").pop() ?? "") : "");
 
     if (!resolvedTicketId) return;
 
     const load = async () => {
       setState({ status: "loading" });
       try {
-        const res = await fetch(
-          `/api/customer/tickets/${resolvedTicketId}`,
-          { cache: "no-store" },
-        );
+        const res = await fetch(`/api/customer/tickets/${resolvedTicketId}`, { cache: "no-store" });
         const json = await res.json().catch(() => null);
         if (!res.ok) {
-          const msg =
-            json?.error || `Request failed with status ${res.status}`;
+          const msg = json?.error || `Request failed with status ${res.status}`;
           if (!cancelled) setState({ status: "error", message: msg });
           return;
         }
@@ -360,9 +340,7 @@ export default function CustomerTicketDetailPage() {
         if (!res.ok) return;
         const json = (await res.json()) as { role: string | null };
         if (!cancelled) {
-          setCompanyRole(
-            json.role ? (normalizeCompanyRole(json.role) as CompanyRole) : null,
-          );
+          setCompanyRole(json.role ? (normalizeCompanyRole(json.role) as CompanyRole) : null);
         }
       } catch (err) {
         console.error("Company role fetch error:", err);
@@ -382,23 +360,19 @@ export default function CustomerTicketDetailPage() {
       setCommentsLoading(true);
       setCommentsError(null);
       try {
-        const res = await fetch(
-          `/api/customer/tickets/${ticketId}/comments`,
-          { cache: "no-store" },
-        );
+        const res = await fetch(`/api/customer/tickets/${ticketId}/comments`, {
+          cache: "no-store",
+        });
         const json = await res.json().catch(() => null);
         if (!res.ok) {
           if (!cancelled)
-            setCommentsError(
-              json?.error || `Request failed with status ${res.status}`,
-            );
+            setCommentsError(json?.error || `Request failed with status ${res.status}`);
           return;
         }
         if (!cancelled) setComments((json?.comments as TicketComment[]) ?? []);
       } catch (err) {
         console.error("Ticket comments fetch error:", err);
-        if (!cancelled)
-          setCommentsError("Unexpected error while loading comments.");
+        if (!cancelled) setCommentsError("Unexpected error while loading comments.");
       } finally {
         if (!cancelled) setCommentsLoading(false);
       }
@@ -414,15 +388,12 @@ export default function CustomerTicketDetailPage() {
     setBriefAssetsLoading(true);
     setBriefAssetsError(null);
     try {
-      const res = await fetch(
-        `/api/customer/tickets/${id}/assets?kind=BRIEF_INPUT`,
-        { cache: "no-store" },
-      );
+      const res = await fetch(`/api/customer/tickets/${id}/assets?kind=BRIEF_INPUT`, {
+        cache: "no-store",
+      });
       const json = await res.json().catch(() => null);
       if (!res.ok) {
-        setBriefAssetsError(
-          json?.error || `Request failed with status ${res.status}`,
-        );
+        setBriefAssetsError(json?.error || `Request failed with status ${res.status}`);
         return;
       }
       setBriefAssets((json?.assets as TicketAsset[]) ?? []);
@@ -450,27 +421,21 @@ export default function CustomerTicketDetailPage() {
       setRevisionsLoading(true);
       setRevisionsError(null);
       try {
-        const res = await fetch(
-          `/api/customer/tickets/${ticketId}/revisions`,
-          { cache: "no-store" },
-        );
+        const res = await fetch(`/api/customer/tickets/${ticketId}/revisions`, {
+          cache: "no-store",
+        });
         const json = await res.json().catch(() => null);
         if (!res.ok) {
           if (!cancelled)
-            setRevisionsError(
-              json?.error || `Request failed with status ${res.status}`,
-            );
+            setRevisionsError(json?.error || `Request failed with status ${res.status}`);
           return;
         }
         if (!cancelled) {
-          setRevisions(
-            ((json as any)?.revisions ?? []) as TicketRevisionEntry[],
-          );
+          setRevisions(((json as any)?.revisions ?? []) as TicketRevisionEntry[]);
         }
       } catch (err) {
         console.error("Revisions fetch error:", err);
-        if (!cancelled)
-          setRevisionsError("Unexpected error while loading revisions.");
+        if (!cancelled) setRevisionsError("Unexpected error while loading revisions.");
       } finally {
         if (!cancelled) setRevisionsLoading(false);
       }
@@ -527,9 +492,7 @@ export default function CustomerTicketDetailPage() {
         });
         const json = await res.json().catch(() => null);
         if (!res.ok) {
-          const msg =
-            json?.error ||
-            "We couldn't update this request. Please try again.";
+          const msg = json?.error || "We couldn't update this request. Please try again.";
           setStatusError(typeof msg === "string" ? msg : String(msg));
           return;
         }
@@ -631,19 +594,14 @@ export default function CustomerTicketDetailPage() {
     setSubmittingComment(true);
     setCommentsError(null);
     try {
-      const res = await fetch(
-        `/api/customer/tickets/${ticketId}/comments`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ body: trimmed }),
-        },
-      );
+      const res = await fetch(`/api/customer/tickets/${ticketId}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: trimmed }),
+      });
       const json = await res.json().catch(() => null);
       if (!res.ok) {
-        setCommentsError(
-          json?.error || `Request failed with status ${res.status}`,
-        );
+        setCommentsError(json?.error || `Request failed with status ${res.status}`);
         return;
       }
       const created = json?.comment as TicketComment | undefined;
@@ -677,58 +635,21 @@ export default function CustomerTicketDetailPage() {
       for (let i = 0; i < accepted.length; i += 1) {
         const file = accepted[i];
         try {
-          setUploadProgressText(
-            `Uploading ${i + 1} of ${accepted.length}...`,
-          );
-          const presignRes = await fetch("/api/uploads/r2/presign", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              ticketId,
-              kind: "BRIEF_INPUT",
-              contentType: file.type || "application/octet-stream",
-              bytes: file.size,
-              originalName: file.name,
-            }),
-          });
-          const presignJson = await presignRes.json().catch(() => null);
-          if (!presignRes.ok) {
-            failed += 1;
-            continue;
-          }
-          const uploadUrl: string | undefined = presignJson?.uploadUrl;
-          const storageKey: string | undefined = presignJson?.storageKey;
-          if (!uploadUrl || !storageKey) {
-            failed += 1;
-            continue;
-          }
-          const putRes = await fetch(uploadUrl, {
-            method: "PUT",
-            headers: {
-              "Content-Type": file.type || "application/octet-stream",
-            },
-            body: file,
-          });
-          if (!putRes.ok) {
-            failed += 1;
-            continue;
-          }
+          setUploadProgressText(`Uploading ${i + 1} of ${accepted.length}...`);
           const dims = await getImageDimensions(file);
-          const registerRes = await fetch("/api/assets/register", {
+
+          const body = new FormData();
+          body.append("file", file);
+          body.append("ticketId", ticketId);
+          body.append("kind", "BRIEF_INPUT");
+          if (dims?.width) body.append("width", String(dims.width));
+          if (dims?.height) body.append("height", String(dims.height));
+
+          const res = await fetch("/api/uploads/r2/upload", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              ticketId,
-              kind: "BRIEF_INPUT",
-              storageKey,
-              mimeType: file.type || "application/octet-stream",
-              bytes: file.size,
-              width: dims?.width ?? null,
-              height: dims?.height ?? null,
-              originalName: file.name,
-            }),
+            body,
           });
-          if (!registerRes.ok) {
+          if (!res.ok) {
             failed += 1;
           }
         } catch {
@@ -739,9 +660,7 @@ export default function CustomerTicketDetailPage() {
       setUploadingBriefs(false);
       await loadBriefAssets(ticketId);
       if (failed > 0) {
-        setBriefAssetsError(
-          `Some uploads failed (${failed}). You can try again.`,
-        );
+        setBriefAssetsError(`Some uploads failed (${failed}). You can try again.`);
       }
     },
     [ticketId, loadBriefAssets],
@@ -766,11 +685,7 @@ export default function CustomerTicketDetailPage() {
         <div>
           <button
             type="button"
-            onClick={() =>
-              router.push(
-                fromBoard ? "/customer/board" : "/customer/tickets",
-              )
-            }
+            onClick={() => router.push(fromBoard ? "/customer/board" : "/customer/tickets")}
             className="mb-2 inline-flex items-center gap-1 text-xs text-[var(--bb-text-secondary)] hover:text-[var(--bb-secondary)]"
           >
             <span className="text-lg leading-none">&larr;</span>
@@ -788,18 +703,14 @@ export default function CustomerTicketDetailPage() {
                 className="text-2xl font-semibold"
               />
             ) : (
-              <h1 className="text-2xl font-semibold tracking-tight">
-                {ticket?.title ?? "Ticket"}
-              </h1>
+              <h1 className="text-2xl font-semibold tracking-tight">{ticket?.title ?? "Ticket"}</h1>
             )}
           </div>
 
           {ticket?.code && (
             <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               Ticket code:{" "}
-              <span className="font-medium text-[var(--bb-secondary)]">
-                {ticket.code}
-              </span>
+              <span className="font-medium text-[var(--bb-secondary)]">{ticket.code}</span>
             </p>
           )}
         </div>
@@ -824,20 +735,10 @@ export default function CustomerTicketDetailPage() {
           )}
           {editing && (
             <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                onClick={saveEdits}
-                loading={editSaving}
-                loadingText="Saving…"
-              >
+              <Button size="sm" onClick={saveEdits} loading={editSaving} loadingText="Saving…">
                 Save changes
               </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={cancelEditing}
-                disabled={editSaving}
-              >
+              <Button variant="secondary" size="sm" onClick={cancelEditing} disabled={editSaving}>
                 Cancel
               </Button>
             </div>
@@ -873,8 +774,7 @@ export default function CustomerTicketDetailPage() {
                     This request is ready for your review
                   </p>
                   <p className="mt-0.5 text-xs text-[var(--bb-text-secondary)]">
-                    Review the creative&apos;s work below, then approve it or
-                    request changes.
+                    Review the creative&apos;s work below, then approve it or request changes.
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -909,13 +809,10 @@ export default function CustomerTicketDetailPage() {
                   &#10003;
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-semibold text-[var(--bb-secondary)]">
-                    Approved
-                  </p>
+                  <p className="text-sm font-semibold text-[var(--bb-secondary)]">Approved</p>
                   <p className="mt-0.5 text-xs text-[var(--bb-text-secondary)]">
-                    {ticket.completedBy?.name || ticket.completedBy?.email || "Customer"}{" "}
-                    marked this as complete on{" "}
-                    {formatBoardDate(ticket.completedAt)}
+                    {ticket.completedBy?.name || ticket.completedBy?.email || "Customer"} marked
+                    this as complete on {formatBoardDate(ticket.completedAt)}
                   </p>
                 </div>
               </div>
@@ -948,7 +845,7 @@ export default function CustomerTicketDetailPage() {
               {/* Description */}
               {editing ? (
                 <div className="mt-3 space-y-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--bb-text-muted)]">
+                  <p className="text-[11px] font-semibold tracking-[0.16em] text-[var(--bb-text-muted)] uppercase">
                     Description
                   </p>
                   <RichTextEditor
@@ -997,47 +894,38 @@ export default function CustomerTicketDetailPage() {
                 {briefAssetsLoading && (
                   <div className="flex items-center gap-2 py-3">
                     <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--bb-border)] border-t-[var(--bb-text-tertiary)]" />
-                    <p className="text-xs text-[var(--bb-text-tertiary)]">
-                      Loading attachments…
-                    </p>
+                    <p className="text-xs text-[var(--bb-text-tertiary)]">Loading attachments…</p>
                   </div>
                 )}
 
-                {!briefAssetsLoading &&
-                  !briefAssetsError &&
-                  briefAssetEntries.length === 0 && (
-                    <EmptyState
-                      title="No attachments yet."
-                      description="Add reference images to help your creative."
-                    />
-                  )}
+                {!briefAssetsLoading && !briefAssetsError && briefAssetEntries.length === 0 && (
+                  <EmptyState
+                    title="No attachments yet."
+                    description="Add reference images to help your creative."
+                  />
+                )}
 
-                {!briefAssetsLoading &&
-                  !briefAssetsError &&
-                  briefAssetEntries.length > 0 && (
-                    <div>
-                      <div className="mb-1.5 flex items-center justify-between">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--bb-text-muted)]">
-                          Brief attachments
-                          <span className="ml-1.5 text-[var(--bb-text-tertiary)]">
-                            ({briefAssetEntries.length})
-                          </span>
-                        </p>
-                        <DownloadAllButton
-                          assets={briefAssetEntries}
-                          zipFilename="brief-attachments.zip"
-                        />
-                      </div>
-                      {hasCreativeWork ? (
-                        <BriefThumbnailRow assets={briefAssetEntries} />
-                      ) : (
-                        <RevisionImageLarge
-                          assets={briefAssetEntries}
-                          pinMode="view"
-                        />
-                      )}
+                {!briefAssetsLoading && !briefAssetsError && briefAssetEntries.length > 0 && (
+                  <div>
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <p className="text-[11px] font-semibold tracking-[0.16em] text-[var(--bb-text-muted)] uppercase">
+                        Brief attachments
+                        <span className="ml-1.5 text-[var(--bb-text-tertiary)]">
+                          ({briefAssetEntries.length})
+                        </span>
+                      </p>
+                      <DownloadAllButton
+                        assets={briefAssetEntries}
+                        zipFilename="brief-attachments.zip"
+                      />
                     </div>
-                  )}
+                    {hasCreativeWork ? (
+                      <BriefThumbnailRow assets={briefAssetEntries} />
+                    ) : (
+                      <RevisionImageLarge assets={briefAssetEntries} pinMode="view" />
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1062,9 +950,7 @@ export default function CustomerTicketDetailPage() {
                 {revisionsLoading && (
                   <div className="mt-3 flex items-center gap-2 py-3">
                     <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--bb-border)] border-t-[var(--bb-text-tertiary)]" />
-                    <p className="text-xs text-[var(--bb-text-tertiary)]">
-                      Loading revisions…
-                    </p>
+                    <p className="text-xs text-[var(--bb-text-tertiary)]">Loading revisions…</p>
                   </div>
                 )}
 
@@ -1074,115 +960,111 @@ export default function CustomerTicketDetailPage() {
                   </InlineAlert>
                 )}
 
-                {!revisionsLoading &&
-                  !revisionsError &&
-                  (!revisions || revisions.length === 0) && (
-                    <div className="mt-3">
-                      <EmptyState
-                        title="No revisions yet."
-                        description="Once your creative sends this ticket for review, you'll see each version and your feedback here."
-                      />
-                    </div>
-                  )}
+                {!revisionsLoading && !revisionsError && (!revisions || revisions.length === 0) && (
+                  <div className="mt-3">
+                    <EmptyState
+                      title="No revisions yet."
+                      description="Once your creative sends this ticket for review, you'll see each version and your feedback here."
+                    />
+                  </div>
+                )}
 
-                {!revisionsLoading &&
-                  !revisionsError &&
-                  revisions &&
-                  revisions.length > 0 && (
-                    <div className="mt-3 space-y-6">
-                      {[...revisions].reverse().map((rev, idx) => {
-                        const isLatest = idx === 0;
-                        const revAssets: AssetEntry[] = rev.assets.map(
-                          (a) => ({
-                            id: a.id,
-                            url: a.url,
-                            originalName: a.originalName,
-                            pinCount: a.pinCount,
-                          }),
-                        );
-                        const totalOpen = rev.assets.reduce((sum, a) => sum + (a.openPins ?? 0), 0);
-                        const totalResolved = rev.assets.reduce((sum, a) => sum + (a.resolvedPins ?? 0), 0);
+                {!revisionsLoading && !revisionsError && revisions && revisions.length > 0 && (
+                  <div className="mt-3 space-y-6">
+                    {[...revisions].reverse().map((rev, idx) => {
+                      const isLatest = idx === 0;
+                      const revAssets: AssetEntry[] = rev.assets.map((a) => ({
+                        id: a.id,
+                        url: a.url,
+                        originalName: a.originalName,
+                        pinCount: a.pinCount,
+                      }));
+                      const totalOpen = rev.assets.reduce((sum, a) => sum + (a.openPins ?? 0), 0);
+                      const totalResolved = rev.assets.reduce(
+                        (sum, a) => sum + (a.resolvedPins ?? 0),
+                        0,
+                      );
 
-                        return (
-                          <div key={rev.version}>
-                            <div className="mb-2 flex items-center justify-between">
-                              <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--bb-text-muted)]">
-                                <span>Version {rev.version}</span>
-                                {isLatest && (
-                                  <span className="rounded-full bg-[var(--bb-primary)] px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white">
-                                    Current
-                                  </span>
-                                )}
-                                {rev.submittedAt && (
-                                  <span className="font-normal normal-case tracking-normal text-[var(--bb-text-tertiary)]">
-                                    — {formatBoardDate(rev.submittedAt)}{" "}
-                                    &middot; {revAssets.length} file
-                                    {revAssets.length !== 1 ? "s" : ""}
-                                  </span>
-                                )}
-                                {(totalOpen > 0 || totalResolved > 0) && (
-                                  <span className="flex items-center gap-1.5 font-normal normal-case tracking-normal text-[var(--bb-text-tertiary)]">
-                                    &middot;
-                                    {totalOpen > 0 && (
-                                      <span className="flex items-center gap-0.5">
-                                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--bb-primary)]" />
-                                        {totalOpen} open
-                                      </span>
-                                    )}
-                                    {totalResolved > 0 && (
-                                      <span className="flex items-center gap-0.5">
-                                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#32b37b]" />
-                                        {totalResolved} resolved
-                                      </span>
-                                    )}
-                                  </span>
-                                )}
-                              </p>
-                              {revAssets.length > 0 && (
-                                <DownloadAllButton
+                      return (
+                        <div key={rev.version}>
+                          <div className="mb-2 flex items-center justify-between">
+                            <p className="flex items-center gap-2 text-[11px] font-semibold tracking-[0.14em] text-[var(--bb-text-muted)] uppercase">
+                              <span>Version {rev.version}</span>
+                              {isLatest && (
+                                <span className="rounded-full bg-[var(--bb-primary)] px-2 py-0.5 text-[8px] font-bold tracking-wider text-white uppercase">
+                                  Current
+                                </span>
+                              )}
+                              {rev.submittedAt && (
+                                <span className="font-normal tracking-normal text-[var(--bb-text-tertiary)] normal-case">
+                                  — {formatBoardDate(rev.submittedAt)} &middot; {revAssets.length}{" "}
+                                  file
+                                  {revAssets.length !== 1 ? "s" : ""}
+                                </span>
+                              )}
+                              {(totalOpen > 0 || totalResolved > 0) && (
+                                <span className="flex items-center gap-1.5 font-normal tracking-normal text-[var(--bb-text-tertiary)] normal-case">
+                                  &middot;
+                                  {totalOpen > 0 && (
+                                    <span className="flex items-center gap-0.5">
+                                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--bb-primary)]" />
+                                      {totalOpen} open
+                                    </span>
+                                  )}
+                                  {totalResolved > 0 && (
+                                    <span className="flex items-center gap-0.5">
+                                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#32b37b]" />
+                                      {totalResolved} resolved
+                                    </span>
+                                  )}
+                                </span>
+                              )}
+                            </p>
+                            {revAssets.length > 0 && (
+                              <DownloadAllButton
+                                assets={revAssets}
+                                zipFilename={`revision-v${rev.version}.zip`}
+                              />
+                            )}
+                          </div>
+
+                          {revAssets.length > 0 && (
+                            <div className="mb-2">
+                              {revAssets.length === 1 ? (
+                                <RevisionImageLarge
                                   assets={revAssets}
-                                  zipFilename={`revision-v${rev.version}.zip`}
+                                  pinMode={ticket.status === "IN_REVIEW" ? "review" : "view"}
+                                />
+                              ) : (
+                                <RevisionImageGrid
+                                  assets={revAssets}
+                                  pinMode={ticket.status === "IN_REVIEW" ? "review" : "view"}
                                 />
                               )}
                             </div>
+                          )}
 
-                            {revAssets.length > 0 && (
-                              <div className="mb-2">
-                                {revAssets.length === 1 ? (
-                                  <RevisionImageLarge
-                                    assets={revAssets}
-                                    pinMode={ticket.status === "IN_REVIEW" ? "review" : "view"}
-                                  />
-                                ) : (
-                                  <RevisionImageGrid
-                                    assets={revAssets}
-                                    pinMode={ticket.status === "IN_REVIEW" ? "review" : "view"}
-                                  />
-                                )}
-                              </div>
-                            )}
-
-                            {/* Feedback message */}
-                            {rev.feedbackMessage && (
-                              <div className="mt-2 rounded-lg border border-[var(--bb-primary-border)] bg-[var(--bb-primary-light)] px-3 py-2">
-                                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--bb-primary-hover)]">
-                                  Your feedback
+                          {/* Feedback message */}
+                          {rev.feedbackMessage && (
+                            <div className="mt-2 rounded-lg border border-[var(--bb-primary-border)] bg-[var(--bb-primary-light)] px-3 py-2">
+                              <p className="text-[10px] font-semibold tracking-[0.12em] text-[var(--bb-primary-hover)] uppercase">
+                                Your feedback
+                              </p>
+                              <p className="mt-1 text-xs text-[var(--bb-secondary)]">
+                                {rev.feedbackMessage}
+                              </p>
+                              {rev.feedbackAt && (
+                                <p className="mt-1 text-[10px] text-[var(--bb-text-tertiary)]">
+                                  {formatBoardDate(rev.feedbackAt)}
                                 </p>
-                                <p className="mt-1 text-xs text-[var(--bb-secondary)]">
-                                  {rev.feedbackMessage}
-                                </p>
-                                {rev.feedbackAt && (
-                                  <p className="mt-1 text-[10px] text-[var(--bb-text-tertiary)]">
-                                    {formatBoardDate(rev.feedbackAt)}
-                                  </p>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </section>
@@ -1193,7 +1075,7 @@ export default function CustomerTicketDetailPage() {
           <aside className="space-y-4 md:col-span-1">
             {/* Details card */}
             <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
+              <h3 className="mb-3 text-xs font-semibold tracking-[0.18em] text-[var(--bb-text-muted)] uppercase">
                 Details
               </h3>
               <div className="space-y-3 text-xs">
@@ -1214,9 +1096,7 @@ export default function CustomerTicketDetailPage() {
                     <FormSelect
                       size="sm"
                       value={editForm.priority}
-                      onChange={(
-                        e: React.ChangeEvent<HTMLSelectElement>,
-                      ) =>
+                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
                         setEditForm((f) => ({
                           ...f,
                           priority: e.target.value,
@@ -1231,9 +1111,7 @@ export default function CustomerTicketDetailPage() {
                     </FormSelect>
                   ) : (
                     <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
-                      <span
-                        className={priorityColorClass(ticket.priority)}
-                      >
+                      <span className={priorityColorClass(ticket.priority)}>
                         {priorityIconMap[ticket.priority]}
                       </span>{" "}
                       {PRIORITY_LABELS[ticket.priority]}
@@ -1248,9 +1126,7 @@ export default function CustomerTicketDetailPage() {
                     <FormSelect
                       size="sm"
                       value={editForm.projectId}
-                      onChange={(
-                        e: React.ChangeEvent<HTMLSelectElement>,
-                      ) =>
+                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
                         setEditForm((f) => ({
                           ...f,
                           projectId: e.target.value,
@@ -1280,9 +1156,7 @@ export default function CustomerTicketDetailPage() {
                     <FormSelect
                       size="sm"
                       value={editForm.jobTypeId}
-                      onChange={(
-                        e: React.ChangeEvent<HTMLSelectElement>,
-                      ) =>
+                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
                         setEditForm((f) => ({
                           ...f,
                           jobTypeId: e.target.value,
@@ -1310,28 +1184,19 @@ export default function CustomerTicketDetailPage() {
                   {editing ? (
                     <div className="mt-1">
                       <TagMultiSelect
-                        availableTags={
-                          (editMeta?.tags ?? []) as TagOption[]
-                        }
+                        availableTags={(editMeta?.tags ?? []) as TagOption[]}
                         selectedTagIds={editForm.tagIds}
-                        onChange={(tagIds) =>
-                          setEditForm((f) => ({ ...f, tagIds }))
-                        }
+                        onChange={(tagIds) => setEditForm((f) => ({ ...f, tagIds }))}
                         onCreateTag={async (name, color) => {
                           try {
-                            const res = await fetch(
-                              "/api/customer/tags",
-                              {
-                                method: "POST",
-                                headers: {
-                                  "Content-Type": "application/json",
-                                },
-                                body: JSON.stringify({ name, color }),
+                            const res = await fetch("/api/customer/tags", {
+                              method: "POST",
+                              headers: {
+                                "Content-Type": "application/json",
                               },
-                            );
-                            const json = await res
-                              .json()
-                              .catch(() => null);
+                              body: JSON.stringify({ name, color }),
+                            });
+                            const json = await res.json().catch(() => null);
                             if (!res.ok) {
                               setEditError(json?.error || "Failed to create tag");
                               return null;
@@ -1341,10 +1206,7 @@ export default function CustomerTicketDetailPage() {
                               prev
                                 ? {
                                     ...prev,
-                                    tags: [
-                                      ...(prev.tags ?? []),
-                                      created,
-                                    ].sort((a, b) =>
+                                    tags: [...(prev.tags ?? []), created].sort((a, b) =>
                                       a.name.localeCompare(b.name),
                                     ),
                                   }
@@ -1364,11 +1226,7 @@ export default function CustomerTicketDetailPage() {
                     <div className="mt-1 flex flex-wrap gap-1">
                       {ticket.tags && ticket.tags.length > 0 ? (
                         ticket.tags.map((tag) => (
-                          <TagBadge
-                            key={tag.id}
-                            name={tag.name}
-                            color={tag.color as TagColorKey}
-                          />
+                          <TagBadge key={tag.id} name={tag.name} color={tag.color as TagColorKey} />
                         ))
                       ) : (
                         <p className="text-[11px] text-[var(--bb-text-tertiary)]">—</p>
@@ -1385,9 +1243,7 @@ export default function CustomerTicketDetailPage() {
                       type="date"
                       size="sm"
                       value={editForm.dueDate}
-                      onChange={(
-                        e: React.ChangeEvent<HTMLInputElement>,
-                      ) =>
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                         setEditForm((f) => ({
                           ...f,
                           dueDate: e.target.value,
@@ -1403,9 +1259,7 @@ export default function CustomerTicketDetailPage() {
                         {formatBoardDate(ticket.dueDate)}
                       </p>
                       {(() => {
-                        const countdown = formatDueDateCountdown(
-                          ticket.dueDate,
-                        );
+                        const countdown = formatDueDateCountdown(ticket.dueDate);
                         if (!countdown) return null;
                         return (
                           <p
@@ -1468,7 +1322,7 @@ export default function CustomerTicketDetailPage() {
 
             {/* People card */}
             <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
+              <h3 className="mb-3 text-xs font-semibold tracking-[0.18em] text-[var(--bb-text-muted)] uppercase">
                 People
               </h3>
               <div className="space-y-3">
@@ -1478,22 +1332,15 @@ export default function CustomerTicketDetailPage() {
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
                     style={{
                       backgroundColor: avatarColor(
-                        ticket.createdBy?.name ||
-                          ticket.createdBy?.email ||
-                          "Unknown",
+                        ticket.createdBy?.name || ticket.createdBy?.email || "Unknown",
                       ),
                     }}
                   >
-                    {getInitials(
-                      ticket.createdBy?.name ?? null,
-                      ticket.createdBy?.email ?? null,
-                    )}
+                    {getInitials(ticket.createdBy?.name ?? null, ticket.createdBy?.email ?? null)}
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-[var(--bb-secondary)]">
-                      {ticket.createdBy?.name ||
-                        ticket.createdBy?.email ||
-                        "—"}
+                      {ticket.createdBy?.name || ticket.createdBy?.email || "—"}
                     </p>
                     <p className="text-[10px] text-[var(--bb-text-tertiary)]">Requester</p>
                   </div>
@@ -1520,7 +1367,7 @@ export default function CustomerTicketDetailPage() {
 
             {/* Comments card */}
             <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
+              <h3 className="mb-3 text-xs font-semibold tracking-[0.18em] text-[var(--bb-text-muted)] uppercase">
                 Comments
               </h3>
 
@@ -1532,18 +1379,14 @@ export default function CustomerTicketDetailPage() {
 
               <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
                 {commentsLoading && (
-                  <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-                    Loading comments…
-                  </p>
+                  <p className="text-[11px] text-[var(--bb-text-tertiary)]">Loading comments…</p>
                 )}
-                {!commentsLoading &&
-                  !commentsError &&
-                  (comments?.length ?? 0) === 0 && (
-                    <EmptyState
-                      title="No comments yet."
-                      description="Use the form below to start a thread with your team and the creative."
-                    />
-                  )}
+                {!commentsLoading && !commentsError && (comments?.length ?? 0) === 0 && (
+                  <EmptyState
+                    title="No comments yet."
+                    description="Use the form below to start a thread with your team and the creative."
+                  />
+                )}
                 {!commentsLoading &&
                   !commentsError &&
                   (comments?.length ?? 0) > 0 &&
@@ -1560,9 +1403,7 @@ export default function CustomerTicketDetailPage() {
                           {formatDateTime(c.createdAt)}
                         </span>
                       </div>
-                      <p className="whitespace-pre-wrap text-[var(--bb-secondary)]">
-                        {c.body}
-                      </p>
+                      <p className="whitespace-pre-wrap text-[var(--bb-secondary)]">{c.body}</p>
                     </div>
                   ))}
               </div>
@@ -1585,9 +1426,7 @@ export default function CustomerTicketDetailPage() {
                   </p>
                   <button
                     type="button"
-                    disabled={
-                      submittingComment || !newComment.trim() || !ticketId
-                    }
+                    disabled={submittingComment || !newComment.trim() || !ticketId}
                     onClick={handleSubmitComment}
                     className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-medium ${
                       submittingComment || !newComment.trim()
@@ -1613,11 +1452,7 @@ export default function CustomerTicketDetailPage() {
       {/* ================================================================= */}
       {/* Request Changes Modal                                             */}
       {/* ================================================================= */}
-      <Modal
-        open={showRevisionModal}
-        onClose={handleCancelRevision}
-        size="md"
-      >
+      <Modal open={showRevisionModal} onClose={handleCancelRevision} size="md">
         <ModalHeader
           title="Send this request back to your creative?"
           subtitle="Your creative will see your message and continue working on this request. The status will move back to In progress."
@@ -1637,9 +1472,7 @@ export default function CustomerTicketDetailPage() {
             className="mt-1.5 h-28 w-full rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-2.5 text-xs text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
           />
           {revisionMessageError && (
-            <p className="mt-1 text-[11px] text-[var(--bb-danger-text)]">
-              {revisionMessageError}
-            </p>
+            <p className="mt-1 text-[11px] text-[var(--bb-danger-text)]">{revisionMessageError}</p>
           )}
         </div>
 
@@ -1666,11 +1499,7 @@ export default function CustomerTicketDetailPage() {
       {/* ================================================================= */}
       {/* Mark as Done Modal                                                */}
       {/* ================================================================= */}
-      <Modal
-        open={showDoneModal}
-        onClose={() => setShowDoneModal(false)}
-        size="md"
-      >
+      <Modal open={showDoneModal} onClose={() => setShowDoneModal(false)} size="md">
         <ModalHeader
           title="Mark this request as done?"
           subtitle="Once you mark this request as done, your creative will get paid for this job, and the ticket will move to Done."
@@ -1679,9 +1508,7 @@ export default function CustomerTicketDetailPage() {
         <div className="rounded-xl bg-[var(--bb-bg-warm)] px-3 py-3 text-xs text-[var(--bb-secondary)]">
           <p className="font-semibold">{ticket?.title}</p>
           {ticket?.project?.name && (
-            <p className="mt-1 text-[var(--bb-text-secondary)]">
-              Project: {ticket.project.name}
-            </p>
+            <p className="mt-1 text-[var(--bb-text-secondary)]">Project: {ticket.project.name}</p>
           )}
           {ticket?.jobType?.name && (
             <p className="mt-0.5 text-[var(--bb-text-secondary)]">
@@ -1706,25 +1533,18 @@ export default function CustomerTicketDetailPage() {
 
           return (
             <div className="mt-3">
-              <p className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--bb-text-muted)]">
+              <p className="mb-2 flex items-center gap-2 text-[11px] font-semibold tracking-[0.14em] text-[var(--bb-text-muted)] uppercase">
                 <span>Final work</span>
-                <span className="font-normal normal-case tracking-normal text-[var(--bb-text-tertiary)]">
-                  — Version {latestRev.version} &middot;{" "}
-                  {finalAssets.length} file
+                <span className="font-normal tracking-normal text-[var(--bb-text-tertiary)] normal-case">
+                  — Version {latestRev.version} &middot; {finalAssets.length} file
                   {finalAssets.length !== 1 ? "s" : ""}
                 </span>
               </p>
 
               {finalAssets.length === 1 ? (
-                <RevisionImageLarge
-                  assets={assetEntries}
-                  pinMode="view"
-                />
+                <RevisionImageLarge assets={assetEntries} pinMode="view" />
               ) : (
-                <RevisionImageGrid
-                  assets={assetEntries}
-                  pinMode="view"
-                />
+                <RevisionImageGrid assets={assetEntries} pinMode="view" />
               )}
             </div>
           );
