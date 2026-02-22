@@ -11,6 +11,7 @@ import { prisma } from "@/lib/prisma";
 import { LedgerDirection } from "@prisma/client";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { isSiteAdminRole } from "@/lib/roles";
+import { buildTicketCode } from "@/lib/ticket-code";
 
 /**
  * Admin ledger endpoint
@@ -74,15 +75,15 @@ export async function GET(_req: NextRequest) {
       const company = entry.company;
       const actor = entry.user;
 
-      const ticketCode =
-        project?.code && ticket?.companyTicketNumber != null
-          ? `${project.code}-${ticket.companyTicketNumber}`
-          : ticket?.companyTicketNumber != null
-          ? `#${ticket.companyTicketNumber}`
-          : ticket?.id ?? null;
+      const ticketCode = ticket
+        ? buildTicketCode({
+            projectCode: project?.code,
+            companyTicketNumber: ticket.companyTicketNumber,
+            ticketId: ticket.id,
+          })
+        : null;
 
-      const directionLabel =
-        entry.direction === LedgerDirection.CREDIT ? "CREDIT" : "DEBIT";
+      const directionLabel = entry.direction === LedgerDirection.CREDIT ? "CREDIT" : "DEBIT";
 
       return {
         id: entry.id,
@@ -140,16 +141,10 @@ export async function GET(_req: NextRequest) {
     });
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[admin.ledger] GET error", error);
-    return NextResponse.json(
-      { error: "Failed to load admin ledger" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load admin ledger" }, { status: 500 });
   }
 }

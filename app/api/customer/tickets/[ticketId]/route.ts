@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { TicketStatus, CompanyRole } from "@prisma/client";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { buildTicketCode } from "@/lib/ticket-code";
 import {
   updateTicketStatusSchema,
   updateTicketFieldsSchema,
@@ -103,12 +104,11 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: "Ticket not found for current company" }, { status: 404 });
     }
 
-    const code =
-      ticket.project?.code && ticket.companyTicketNumber != null
-        ? `${ticket.project.code}-${ticket.companyTicketNumber}`
-        : ticket.companyTicketNumber != null
-          ? `#${ticket.companyTicketNumber}`
-          : ticket.id;
+    const code = buildTicketCode({
+      projectCode: ticket.project?.code,
+      companyTicketNumber: ticket.companyTicketNumber,
+      ticketId: ticket.id,
+    });
 
     // Effective cost/payout (quantity × base, with possible override)
     const qty = ticket.quantity ?? 1;
@@ -439,12 +439,11 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
         });
       });
 
-      const code =
-        updated.project?.code && updated.companyTicketNumber != null
-          ? `${updated.project.code}-${updated.companyTicketNumber}`
-          : updated.companyTicketNumber != null
-            ? `#${updated.companyTicketNumber}`
-            : updated.id;
+      const code = buildTicketCode({
+        projectCode: updated.project?.code,
+        companyTicketNumber: updated.companyTicketNumber,
+        ticketId: updated.id,
+      });
 
       return NextResponse.json(
         {

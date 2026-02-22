@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { buildTicketCode } from "@/lib/ticket-code";
 
 type CompletedJob = {
   ticketId: string;
@@ -97,12 +98,11 @@ export async function GET(_req: NextRequest) {
     });
 
     const jobs: CompletedJob[] = tickets.map((t) => {
-      const code =
-        t.project?.code && t.companyTicketNumber != null
-          ? `${t.project.code}-${t.companyTicketNumber}`
-          : t.companyTicketNumber != null
-          ? `#${t.companyTicketNumber}`
-          : t.id;
+      const code = buildTicketCode({
+        projectCode: t.project?.code,
+        companyTicketNumber: t.companyTicketNumber,
+        ticketId: t.id,
+      });
 
       const hasPayoutEntry = (t.ledgerEntries?.length ?? 0) > 0;
       const payoutLedgerCreatedAt = hasPayoutEntry
@@ -132,16 +132,10 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json(response, { status: 200 });
   } catch (error: any) {
     if (error?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[admin.completed-jobs] GET error", error);
-    return NextResponse.json(
-      { error: "Failed to load completed jobs" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load completed jobs" }, { status: 500 });
   }
 }

@@ -11,6 +11,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { parseBody } from "@/lib/schemas/helpers";
 import { createProjectSchema } from "@/lib/schemas/project.schemas";
+import { generateUniqueProjectCode } from "@/lib/abbreviation";
 import crypto from "crypto";
 
 // ---------------------------------------------------------------------------
@@ -80,31 +81,24 @@ export async function POST(req: NextRequest) {
 
     const parsed = await parseBody(req, createProjectSchema);
     if (!parsed.success) return parsed.response;
-    const { name } = parsed.data;
+    const { name, code: userCode } = parsed.data;
 
-    // Generate project code from company slug + project name initials
-    const company = await prisma.company.findUnique({
-      where: { id: user.activeCompanyId },
-      select: { slug: true },
-    });
-
-    const prefix = (company?.slug || "PRJ")
-      .toUpperCase()
-      .replace(/[^A-Z]/g, "")
-      .slice(0, 4);
-    const nameInitials = name
-      .split(/\s+/)
-      .map((w) => w[0]?.toUpperCase() || "")
-      .join("")
-      .slice(0, 3);
-    const baseCode = `${prefix}-${nameInitials || "PRJ"}`;
-
-    // Ensure code uniqueness
-    let code = baseCode;
-    let suffix = 0;
-    while (await prisma.project.findUnique({ where: { code } })) {
-      suffix += 1;
-      code = `${baseCode}${suffix}`;
+    // Use user-provided code or auto-generate a 3-char project code
+    let code: string;
+    if (userCode) {
+      // Check per-company uniqueness
+      const existing = await prisma.project.findFirst({
+        where: { companyId: user.activeCompanyId!, code: userCode },
+      });
+      if (existing) {
+        return NextResponse.json(
+          { error: `Project code "${userCode}" is already in use.` },
+          { status: 409 },
+        );
+      }
+      code = userCode;
+    } else {
+      code = await generateUniqueProjectCode(name, user.activeCompanyId!, prisma);
     }
 
     const project = await prisma.project.create({

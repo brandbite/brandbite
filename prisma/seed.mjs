@@ -270,7 +270,7 @@ async function main() {
       id: crypto.randomUUID(),
       companyId: company.id,
       name: "Website revamp",
-      code: "ACME-WEB",
+      code: "WEB",
     },
   });
 
@@ -279,7 +279,7 @@ async function main() {
       id: crypto.randomUUID(),
       companyId: company.id,
       name: "Onboarding visuals",
-      code: "ACME-ONB",
+      code: "ONB",
     },
   });
 
@@ -328,63 +328,429 @@ async function main() {
 
   const JOB_TYPE_DATA = [
     // ── Brand Strategy & Creative Direction ──
-    { name: "Brand Strategy Deck – Simple", category: "Brand Strategy & Creative Direction", description: "Archetype overview, light tone of voice, 1 persona, short competitor scan, 10-15 page deck", estimatedHours: 18, tokenCost: 18, creativePayoutTokens: 11 },
-    { name: "Brand Strategy Deck – Detailed", category: "Brand Strategy & Creative Direction", description: "Full archetype system, full tone of voice guide, 2-3 detailed personas, extended competitor audit, opportunity mapping, 25-30 page deck", estimatedHours: 30, tokenCost: 30, creativePayoutTokens: 18 },
-    { name: "Brand Archetype Development", category: "Brand Strategy & Creative Direction", description: "Define brand archetype and personality framework", estimatedHours: 5, tokenCost: 5, creativePayoutTokens: 3 },
-    { name: "Tone of Voice Framework", category: "Brand Strategy & Creative Direction", description: "Comprehensive tone of voice guidelines", estimatedHours: 5, tokenCost: 5, creativePayoutTokens: 3 },
-    { name: "Target Audience & Personas", category: "Brand Strategy & Creative Direction", description: "Audience research and persona development", estimatedHours: 10, tokenCost: 10, creativePayoutTokens: 6 },
-    { name: "Competitor & Category Analysis", category: "Brand Strategy & Creative Direction", description: "In-depth competitive landscape analysis", estimatedHours: 12, tokenCost: 12, creativePayoutTokens: 7 },
-    { name: "Moodboards", category: "Brand Strategy & Creative Direction", description: "Visual direction and mood exploration boards", estimatedHours: 5, tokenCost: 5, creativePayoutTokens: 3 },
+    {
+      name: "Brand Strategy Deck – Simple",
+      category: "Brand Strategy & Creative Direction",
+      description:
+        "Archetype overview, light tone of voice, 1 persona, short competitor scan, 10-15 page deck",
+      estimatedHours: 18,
+      tokenCost: 18,
+      creativePayoutTokens: 11,
+    },
+    {
+      name: "Brand Strategy Deck – Detailed",
+      category: "Brand Strategy & Creative Direction",
+      description:
+        "Full archetype system, full tone of voice guide, 2-3 detailed personas, extended competitor audit, opportunity mapping, 25-30 page deck",
+      estimatedHours: 30,
+      tokenCost: 30,
+      creativePayoutTokens: 18,
+    },
+    {
+      name: "Brand Archetype Development",
+      category: "Brand Strategy & Creative Direction",
+      description: "Define brand archetype and personality framework",
+      estimatedHours: 5,
+      tokenCost: 5,
+      creativePayoutTokens: 3,
+    },
+    {
+      name: "Tone of Voice Framework",
+      category: "Brand Strategy & Creative Direction",
+      description: "Comprehensive tone of voice guidelines",
+      estimatedHours: 5,
+      tokenCost: 5,
+      creativePayoutTokens: 3,
+    },
+    {
+      name: "Target Audience & Personas",
+      category: "Brand Strategy & Creative Direction",
+      description: "Audience research and persona development",
+      estimatedHours: 10,
+      tokenCost: 10,
+      creativePayoutTokens: 6,
+    },
+    {
+      name: "Competitor & Category Analysis",
+      category: "Brand Strategy & Creative Direction",
+      description: "In-depth competitive landscape analysis",
+      estimatedHours: 12,
+      tokenCost: 12,
+      creativePayoutTokens: 7,
+    },
+    {
+      name: "Moodboards",
+      category: "Brand Strategy & Creative Direction",
+      description: "Visual direction and mood exploration boards",
+      estimatedHours: 5,
+      tokenCost: 5,
+      creativePayoutTokens: 3,
+    },
 
     // ── Copywriting & Creative Writing ──
-    { name: "Slogan Development", category: "Copywriting & Creative Writing", description: "Brand slogan creation and refinement", estimatedHours: 5, tokenCost: 5, creativePayoutTokens: 3 },
-    { name: "Press Release Writing", category: "Copywriting & Creative Writing", description: "Professional press release drafting", estimatedHours: 5, tokenCost: 5, creativePayoutTokens: 3 },
-    { name: "Thought Leadership Article", category: "Copywriting & Creative Writing", description: "350-400 words thought leadership content", estimatedHours: 9, tokenCost: 9, creativePayoutTokens: 5 },
-    { name: "Research-Based Article", category: "Copywriting & Creative Writing", description: "350-400 words research-backed article", estimatedHours: 14, tokenCost: 14, creativePayoutTokens: 8 },
-    { name: "Storytelling / Brand Narrative", category: "Copywriting & Creative Writing", description: "Brand story and narrative development", estimatedHours: 6, tokenCost: 6, creativePayoutTokens: 4 },
-    { name: "Website Copy", category: "Copywriting & Creative Writing", description: "Website copy per page", estimatedHours: 4, tokenCost: 4, creativePayoutTokens: 2, hasQuantity: true, quantityLabel: "Number of pages", defaultQuantity: 1 },
-    { name: "Landing Page Copy", category: "Copywriting & Creative Writing", description: "Conversion-focused landing page copy", estimatedHours: 7, tokenCost: 7, creativePayoutTokens: 4 },
-    { name: "Email Copy", category: "Copywriting & Creative Writing", description: "Email copywriting per email", estimatedHours: 3, tokenCost: 3, creativePayoutTokens: 2, hasQuantity: true, quantityLabel: "Number of emails", defaultQuantity: 1 },
-    { name: "Ad Copy Set (FB/Google)", category: "Copywriting & Creative Writing", description: "Facebook or Google ad copy set", estimatedHours: 2, tokenCost: 2, creativePayoutTokens: 1 },
-    { name: "Video Script", category: "Copywriting & Creative Writing", description: "Script writing for video content", estimatedHours: 8, tokenCost: 8, creativePayoutTokens: 5 },
+    {
+      name: "Slogan Development",
+      category: "Copywriting & Creative Writing",
+      description: "Brand slogan creation and refinement",
+      estimatedHours: 5,
+      tokenCost: 5,
+      creativePayoutTokens: 3,
+    },
+    {
+      name: "Press Release Writing",
+      category: "Copywriting & Creative Writing",
+      description: "Professional press release drafting",
+      estimatedHours: 5,
+      tokenCost: 5,
+      creativePayoutTokens: 3,
+    },
+    {
+      name: "Thought Leadership Article",
+      category: "Copywriting & Creative Writing",
+      description: "350-400 words thought leadership content",
+      estimatedHours: 9,
+      tokenCost: 9,
+      creativePayoutTokens: 5,
+    },
+    {
+      name: "Research-Based Article",
+      category: "Copywriting & Creative Writing",
+      description: "350-400 words research-backed article",
+      estimatedHours: 14,
+      tokenCost: 14,
+      creativePayoutTokens: 8,
+    },
+    {
+      name: "Storytelling / Brand Narrative",
+      category: "Copywriting & Creative Writing",
+      description: "Brand story and narrative development",
+      estimatedHours: 6,
+      tokenCost: 6,
+      creativePayoutTokens: 4,
+    },
+    {
+      name: "Website Copy",
+      category: "Copywriting & Creative Writing",
+      description: "Website copy per page",
+      estimatedHours: 4,
+      tokenCost: 4,
+      creativePayoutTokens: 2,
+      hasQuantity: true,
+      quantityLabel: "Number of pages",
+      defaultQuantity: 1,
+    },
+    {
+      name: "Landing Page Copy",
+      category: "Copywriting & Creative Writing",
+      description: "Conversion-focused landing page copy",
+      estimatedHours: 7,
+      tokenCost: 7,
+      creativePayoutTokens: 4,
+    },
+    {
+      name: "Email Copy",
+      category: "Copywriting & Creative Writing",
+      description: "Email copywriting per email",
+      estimatedHours: 3,
+      tokenCost: 3,
+      creativePayoutTokens: 2,
+      hasQuantity: true,
+      quantityLabel: "Number of emails",
+      defaultQuantity: 1,
+    },
+    {
+      name: "Ad Copy Set (FB/Google)",
+      category: "Copywriting & Creative Writing",
+      description: "Facebook or Google ad copy set",
+      estimatedHours: 2,
+      tokenCost: 2,
+      creativePayoutTokens: 1,
+    },
+    {
+      name: "Video Script",
+      category: "Copywriting & Creative Writing",
+      description: "Script writing for video content",
+      estimatedHours: 8,
+      tokenCost: 8,
+      creativePayoutTokens: 5,
+    },
 
     // ── Visual Design & Brand Identity ──
-    { name: "Logo Design", category: "Visual Design & Brand Identity", description: "Full logo design process", estimatedHours: 16, tokenCost: 16, creativePayoutTokens: 10 },
-    { name: "Brand ID Guide", category: "Visual Design & Brand Identity", description: "Comprehensive brand identity guide, 20-30 pages", estimatedHours: 30, tokenCost: 30, creativePayoutTokens: 18 },
-    { name: "Business Card", category: "Visual Design & Brand Identity", description: "Business card design", estimatedHours: 2, tokenCost: 2, creativePayoutTokens: 1 },
-    { name: "Brochure", category: "Visual Design & Brand Identity", description: "Brochure design, 6-8 pages", estimatedHours: 12, tokenCost: 12, creativePayoutTokens: 7 },
-    { name: "Presentation Deck (With Copywriting)", category: "Visual Design & Brand Identity", description: "Presentation deck with copywriting, no animation, up to 20 slides", estimatedHours: 28, tokenCost: 28, creativePayoutTokens: 17 },
-    { name: "Presentation Deck (Without Copywriting)", category: "Visual Design & Brand Identity", description: "Presentation deck without copywriting, no animation, up to 20 slides", estimatedHours: 18, tokenCost: 18, creativePayoutTokens: 11 },
-    { name: "Upgrading Existing Presentation", category: "Visual Design & Brand Identity", description: "Refresh existing presentation, no animation, up to 20 slides", estimatedHours: 12, tokenCost: 12, creativePayoutTokens: 7 },
-    { name: "Adding Animation to Presentation", category: "Visual Design & Brand Identity", description: "Add animation to existing presentation, up to 20 slides", estimatedHours: 10, tokenCost: 10, creativePayoutTokens: 6 },
-    { name: "Pitchdeck (Without Copywriting)", category: "Visual Design & Brand Identity", description: "Pitch deck design without copy", estimatedHours: 18, tokenCost: 18, creativePayoutTokens: 11 },
-    { name: "Catalogue", category: "Visual Design & Brand Identity", description: "Product catalogue design, 20-40 pages", estimatedHours: 24, tokenCost: 24, creativePayoutTokens: 14 },
-    { name: "Packaging / Label – Single", category: "Visual Design & Brand Identity", description: "Single packaging or label design", estimatedHours: 5, tokenCost: 5, creativePayoutTokens: 3, hasQuantity: true, quantityLabel: "Number of items", defaultQuantity: 1 },
-    { name: "Packaging System", category: "Visual Design & Brand Identity", description: "Complete packaging system design", estimatedHours: 15, tokenCost: 15, creativePayoutTokens: 9 },
-    { name: "Social Media Template Set", category: "Visual Design & Brand Identity", description: "Reusable social media template system", estimatedHours: 8, tokenCost: 8, creativePayoutTokens: 5 },
-    { name: "Social Media Post", category: "Visual Design & Brand Identity", description: "Single social media post design", estimatedHours: 2, tokenCost: 2, creativePayoutTokens: 1, hasQuantity: true, quantityLabel: "Number of designs", defaultQuantity: 1 },
-    { name: "Static Banner Set", category: "Visual Design & Brand Identity", description: "Static display banner set", estimatedHours: 5, tokenCost: 5, creativePayoutTokens: 3, hasQuantity: true, quantityLabel: "Number of sizes", defaultQuantity: 6 },
-    { name: "HTML5 Banner Set", category: "Visual Design & Brand Identity", description: "Animated HTML5 display banner set", estimatedHours: 10, tokenCost: 10, creativePayoutTokens: 6 },
-    { name: "Poster", category: "Visual Design & Brand Identity", description: "Poster design", estimatedHours: 8, tokenCost: 8, creativePayoutTokens: 5 },
-    { name: "Roll-up Banner / Photo Backdrop", category: "Visual Design & Brand Identity", description: "Roll-up banner, photo backdrop or similar large format", estimatedHours: 4, tokenCost: 4, creativePayoutTokens: 2 },
+    {
+      name: "Logo Design",
+      category: "Visual Design & Brand Identity",
+      description: "Full logo design process",
+      estimatedHours: 16,
+      tokenCost: 16,
+      creativePayoutTokens: 10,
+    },
+    {
+      name: "Brand ID Guide",
+      category: "Visual Design & Brand Identity",
+      description: "Comprehensive brand identity guide, 20-30 pages",
+      estimatedHours: 30,
+      tokenCost: 30,
+      creativePayoutTokens: 18,
+    },
+    {
+      name: "Business Card",
+      category: "Visual Design & Brand Identity",
+      description: "Business card design",
+      estimatedHours: 2,
+      tokenCost: 2,
+      creativePayoutTokens: 1,
+    },
+    {
+      name: "Brochure",
+      category: "Visual Design & Brand Identity",
+      description: "Brochure design, 6-8 pages",
+      estimatedHours: 12,
+      tokenCost: 12,
+      creativePayoutTokens: 7,
+    },
+    {
+      name: "Presentation Deck (With Copywriting)",
+      category: "Visual Design & Brand Identity",
+      description: "Presentation deck with copywriting, no animation, up to 20 slides",
+      estimatedHours: 28,
+      tokenCost: 28,
+      creativePayoutTokens: 17,
+    },
+    {
+      name: "Presentation Deck (Without Copywriting)",
+      category: "Visual Design & Brand Identity",
+      description: "Presentation deck without copywriting, no animation, up to 20 slides",
+      estimatedHours: 18,
+      tokenCost: 18,
+      creativePayoutTokens: 11,
+    },
+    {
+      name: "Upgrading Existing Presentation",
+      category: "Visual Design & Brand Identity",
+      description: "Refresh existing presentation, no animation, up to 20 slides",
+      estimatedHours: 12,
+      tokenCost: 12,
+      creativePayoutTokens: 7,
+    },
+    {
+      name: "Adding Animation to Presentation",
+      category: "Visual Design & Brand Identity",
+      description: "Add animation to existing presentation, up to 20 slides",
+      estimatedHours: 10,
+      tokenCost: 10,
+      creativePayoutTokens: 6,
+    },
+    {
+      name: "Pitchdeck (Without Copywriting)",
+      category: "Visual Design & Brand Identity",
+      description: "Pitch deck design without copy",
+      estimatedHours: 18,
+      tokenCost: 18,
+      creativePayoutTokens: 11,
+    },
+    {
+      name: "Catalogue",
+      category: "Visual Design & Brand Identity",
+      description: "Product catalogue design, 20-40 pages",
+      estimatedHours: 24,
+      tokenCost: 24,
+      creativePayoutTokens: 14,
+    },
+    {
+      name: "Packaging / Label – Single",
+      category: "Visual Design & Brand Identity",
+      description: "Single packaging or label design",
+      estimatedHours: 5,
+      tokenCost: 5,
+      creativePayoutTokens: 3,
+      hasQuantity: true,
+      quantityLabel: "Number of items",
+      defaultQuantity: 1,
+    },
+    {
+      name: "Packaging System",
+      category: "Visual Design & Brand Identity",
+      description: "Complete packaging system design",
+      estimatedHours: 15,
+      tokenCost: 15,
+      creativePayoutTokens: 9,
+    },
+    {
+      name: "Social Media Template Set",
+      category: "Visual Design & Brand Identity",
+      description: "Reusable social media template system",
+      estimatedHours: 8,
+      tokenCost: 8,
+      creativePayoutTokens: 5,
+    },
+    {
+      name: "Social Media Post",
+      category: "Visual Design & Brand Identity",
+      description: "Single social media post design",
+      estimatedHours: 2,
+      tokenCost: 2,
+      creativePayoutTokens: 1,
+      hasQuantity: true,
+      quantityLabel: "Number of designs",
+      defaultQuantity: 1,
+    },
+    {
+      name: "Static Banner Set",
+      category: "Visual Design & Brand Identity",
+      description: "Static display banner set",
+      estimatedHours: 5,
+      tokenCost: 5,
+      creativePayoutTokens: 3,
+      hasQuantity: true,
+      quantityLabel: "Number of sizes",
+      defaultQuantity: 6,
+    },
+    {
+      name: "HTML5 Banner Set",
+      category: "Visual Design & Brand Identity",
+      description: "Animated HTML5 display banner set",
+      estimatedHours: 10,
+      tokenCost: 10,
+      creativePayoutTokens: 6,
+    },
+    {
+      name: "Poster",
+      category: "Visual Design & Brand Identity",
+      description: "Poster design",
+      estimatedHours: 8,
+      tokenCost: 8,
+      creativePayoutTokens: 5,
+    },
+    {
+      name: "Roll-up Banner / Photo Backdrop",
+      category: "Visual Design & Brand Identity",
+      description: "Roll-up banner, photo backdrop or similar large format",
+      estimatedHours: 4,
+      tokenCost: 4,
+      creativePayoutTokens: 2,
+    },
 
     // ── Digital Content & Marketing ──
-    { name: "Social Media Strategy", category: "Digital Content & Marketing", description: "Social media strategy and planning", estimatedHours: 12, tokenCost: 12, creativePayoutTokens: 7 },
-    { name: "Single Social Media Copywriting (Standard)", category: "Digital Content & Marketing", description: "Standard social media post copy", estimatedHours: 1, tokenCost: 1, creativePayoutTokens: 1, hasQuantity: true, quantityLabel: "Number of posts", defaultQuantity: 1 },
-    { name: "Single Social Media Copywriting (LinkedIn)", category: "Digital Content & Marketing", description: "LinkedIn research-based post copy", estimatedHours: 2, tokenCost: 2, creativePayoutTokens: 1 },
-    { name: "Static Post Design", category: "Digital Content & Marketing", description: "Single static image post design", estimatedHours: 2, tokenCost: 2, creativePayoutTokens: 1, hasQuantity: true, quantityLabel: "Number of designs", defaultQuantity: 1 },
-    { name: "Carousel Post Design (up to 10 visuals)", category: "Digital Content & Marketing", description: "Carousel post with up to 10 visual slides", estimatedHours: 8, tokenCost: 8, creativePayoutTokens: 5 },
-    { name: "Carousel Post Design (up to 20 visuals)", category: "Digital Content & Marketing", description: "Carousel post with up to 20 visual slides", estimatedHours: 12, tokenCost: 12, creativePayoutTokens: 7 },
-    { name: "Motion Graphic Reel", category: "Digital Content & Marketing", description: "Motion graphic reel, up to 30 seconds", estimatedHours: 18, tokenCost: 18, creativePayoutTokens: 11 },
-    { name: "SEO Blog Article", category: "Digital Content & Marketing", description: "SEO-optimized blog article, 350-400 words", estimatedHours: 9, tokenCost: 9, creativePayoutTokens: 5 },
-    { name: "Influencer Campaign Concepting", category: "Digital Content & Marketing", description: "Influencer campaign concept and planning", estimatedHours: 10, tokenCost: 10, creativePayoutTokens: 6 },
-    { name: "Landing Page Copywriting", category: "Digital Content & Marketing", description: "Conversion-focused landing page copy", estimatedHours: 7, tokenCost: 7, creativePayoutTokens: 4 },
+    {
+      name: "Social Media Strategy",
+      category: "Digital Content & Marketing",
+      description: "Social media strategy and planning",
+      estimatedHours: 12,
+      tokenCost: 12,
+      creativePayoutTokens: 7,
+    },
+    {
+      name: "Single Social Media Copywriting (Standard)",
+      category: "Digital Content & Marketing",
+      description: "Standard social media post copy",
+      estimatedHours: 1,
+      tokenCost: 1,
+      creativePayoutTokens: 1,
+      hasQuantity: true,
+      quantityLabel: "Number of posts",
+      defaultQuantity: 1,
+    },
+    {
+      name: "Single Social Media Copywriting (LinkedIn)",
+      category: "Digital Content & Marketing",
+      description: "LinkedIn research-based post copy",
+      estimatedHours: 2,
+      tokenCost: 2,
+      creativePayoutTokens: 1,
+    },
+    {
+      name: "Static Post Design",
+      category: "Digital Content & Marketing",
+      description: "Single static image post design",
+      estimatedHours: 2,
+      tokenCost: 2,
+      creativePayoutTokens: 1,
+      hasQuantity: true,
+      quantityLabel: "Number of designs",
+      defaultQuantity: 1,
+    },
+    {
+      name: "Carousel Post Design (up to 10 visuals)",
+      category: "Digital Content & Marketing",
+      description: "Carousel post with up to 10 visual slides",
+      estimatedHours: 8,
+      tokenCost: 8,
+      creativePayoutTokens: 5,
+    },
+    {
+      name: "Carousel Post Design (up to 20 visuals)",
+      category: "Digital Content & Marketing",
+      description: "Carousel post with up to 20 visual slides",
+      estimatedHours: 12,
+      tokenCost: 12,
+      creativePayoutTokens: 7,
+    },
+    {
+      name: "Motion Graphic Reel",
+      category: "Digital Content & Marketing",
+      description: "Motion graphic reel, up to 30 seconds",
+      estimatedHours: 18,
+      tokenCost: 18,
+      creativePayoutTokens: 11,
+    },
+    {
+      name: "SEO Blog Article",
+      category: "Digital Content & Marketing",
+      description: "SEO-optimized blog article, 350-400 words",
+      estimatedHours: 9,
+      tokenCost: 9,
+      creativePayoutTokens: 5,
+    },
+    {
+      name: "Influencer Campaign Concepting",
+      category: "Digital Content & Marketing",
+      description: "Influencer campaign concept and planning",
+      estimatedHours: 10,
+      tokenCost: 10,
+      creativePayoutTokens: 6,
+    },
+    {
+      name: "Landing Page Copywriting",
+      category: "Digital Content & Marketing",
+      description: "Conversion-focused landing page copy",
+      estimatedHours: 7,
+      tokenCost: 7,
+      creativePayoutTokens: 4,
+    },
 
     // ── Video & Motion Production ──
-    { name: "Short-Form Motion Video", category: "Video & Motion Production", description: "Short-form motion video, 10-30 seconds", estimatedHours: 18, tokenCost: 18, creativePayoutTokens: 11 },
-    { name: "Motion Explainer", category: "Video & Motion Production", description: "Motion explainer video, 30-45 seconds", estimatedHours: 24, tokenCost: 24, creativePayoutTokens: 14 },
-    { name: "AI Video Production (Including Script)", category: "Video & Motion Production", description: "AI-assisted video production with script writing", estimatedHours: 18, tokenCost: 18, creativePayoutTokens: 11 },
-    { name: "AI Video Production (Without Script)", category: "Video & Motion Production", description: "AI-assisted video production without script", estimatedHours: 12, tokenCost: 12, creativePayoutTokens: 7 },
+    {
+      name: "Short-Form Motion Video",
+      category: "Video & Motion Production",
+      description: "Short-form motion video, 10-30 seconds",
+      estimatedHours: 18,
+      tokenCost: 18,
+      creativePayoutTokens: 11,
+    },
+    {
+      name: "Motion Explainer",
+      category: "Video & Motion Production",
+      description: "Motion explainer video, 30-45 seconds",
+      estimatedHours: 24,
+      tokenCost: 24,
+      creativePayoutTokens: 14,
+    },
+    {
+      name: "AI Video Production (Including Script)",
+      category: "Video & Motion Production",
+      description: "AI-assisted video production with script writing",
+      estimatedHours: 18,
+      tokenCost: 18,
+      creativePayoutTokens: 11,
+    },
+    {
+      name: "AI Video Production (Without Script)",
+      category: "Video & Motion Production",
+      description: "AI-assisted video production without script",
+      estimatedHours: 12,
+      tokenCost: 12,
+      creativePayoutTokens: 7,
+    },
   ];
 
   // Bulk-create all job types
@@ -428,14 +794,14 @@ async function main() {
   // Ada: Visual Design specialist + some copywriting
   // Liam: Digital Content & Motion specialist
   const adaSkillJobs = createdJobTypes.filter((j) =>
-    ["Visual Design & Brand Identity", "Brand Strategy & Creative Direction"].includes(j.category)
+    ["Visual Design & Brand Identity", "Brand Strategy & Creative Direction"].includes(j.category),
   );
   const liamSkillJobs = createdJobTypes.filter((j) =>
-    ["Digital Content & Marketing", "Video & Motion Production"].includes(j.category)
+    ["Digital Content & Marketing", "Video & Motion Production"].includes(j.category),
   );
   // Both overlap on Copywriting
-  const copywritingJobs = createdJobTypes.filter((j) =>
-    j.category === "Copywriting & Creative Writing"
+  const copywritingJobs = createdJobTypes.filter(
+    (j) => j.category === "Copywriting & Creative Writing",
   );
 
   await prisma.creativeSkill.createMany({
@@ -520,8 +886,7 @@ async function main() {
   const ticket1 = await prisma.ticket.create({
     data: {
       title: "Logo redesign for homepage",
-      description:
-        "Update logo to match new brand identity and color scheme.",
+      description: "Update logo to match new brand identity and color scheme.",
       status: TicketStatus.IN_PROGRESS,
       priority: TicketPriority.HIGH,
       dueDate: daysFromNow(5),
@@ -537,8 +902,7 @@ async function main() {
   const ticket2 = await prisma.ticket.create({
     data: {
       title: "Social media carousel post",
-      description:
-        "Create a 10-slide carousel post for product launch.",
+      description: "Create a 10-slide carousel post for product launch.",
       status: TicketStatus.TODO,
       priority: TicketPriority.MEDIUM,
       dueDate: daysFromNow(-3),
@@ -554,8 +918,7 @@ async function main() {
   const ticket3 = await prisma.ticket.create({
     data: {
       title: "Motion explainer for onboarding",
-      description:
-        "Create a 30-45 second motion explainer video for the onboarding flow.",
+      description: "Create a 30-45 second motion explainer video for the onboarding flow.",
       status: TicketStatus.IN_REVIEW,
       priority: TicketPriority.HIGH,
       dueDate: daysFromNow(12),
@@ -571,8 +934,7 @@ async function main() {
   const ticket4 = await prisma.ticket.create({
     data: {
       title: "Product brochure design",
-      description:
-        "Design a 6-page product brochure for trade show materials.",
+      description: "Design a 6-page product brochure for trade show materials.",
       status: TicketStatus.TODO,
       priority: TicketPriority.LOW,
       dueDate: daysFromNow(25),
@@ -632,7 +994,8 @@ async function main() {
       creativeMessage: "Initial motion concepts — 3 scene options for the onboarding flow.",
       feedbackByCustomerId: customerOwner.id,
       feedbackAt: daysFromNow(-6),
-      feedbackMessage: "Love option B but the intro text needs to be larger and the background should be darker.",
+      feedbackMessage:
+        "Love option B but the intro text needs to be larger and the background should be darker.",
     },
   });
 
@@ -642,7 +1005,8 @@ async function main() {
       version: 2,
       submittedByCreativeId: creativeLiam.id,
       submittedAt: daysFromNow(-3),
-      creativeMessage: "Applied larger text and darker background per feedback. Also refined transitions.",
+      creativeMessage:
+        "Applied larger text and darker background per feedback. Also refined transitions.",
       // No customer feedback yet — this is the IN_REVIEW version
     },
   });
@@ -657,7 +1021,8 @@ async function main() {
       creativeMessage: "First logo concepts — 3 directions exploring different styles.",
       feedbackByCustomerId: customerPM.id,
       feedbackAt: daysFromNow(-2),
-      feedbackMessage: "Logo looks great but needs more contrast on dark backgrounds. Direction A is preferred.",
+      feedbackMessage:
+        "Logo looks great but needs more contrast on dark backgrounds. Direction A is preferred.",
     },
   });
 
@@ -668,7 +1033,8 @@ async function main() {
       version: 1,
       submittedByCreativeId: creativeAda.id,
       submittedAt: daysFromNow(-3),
-      creativeMessage: "Brand strategy deck covering archetype, tone of voice, and competitor scan.",
+      creativeMessage:
+        "Brand strategy deck covering archetype, tone of voice, and competitor scan.",
       // Approved — no changes requested
     },
   });
@@ -973,8 +1339,7 @@ async function main() {
         direction: LedgerDirection.CREDIT,
         amount: jobMotionExplainer.creativePayoutTokens,
         reason: "JOB_IN_REVIEW",
-        notes:
-          "Partial payout for motion explainer (in review).",
+        notes: "Partial payout for motion explainer (in review).",
         metadata: {
           ticketId: ticket3.id,
         },

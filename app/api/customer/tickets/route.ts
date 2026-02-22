@@ -23,6 +23,7 @@ import { createNotification } from "@/lib/notifications";
 import { isCreativePaused } from "@/lib/creative-availability";
 import { parseBody } from "@/lib/schemas/helpers";
 import { createTicketSchema } from "@/lib/schemas/ticket.schemas";
+import { buildTicketCode } from "@/lib/ticket-code";
 
 // -----------------------------------------------------------------------------
 // Helpers
@@ -161,12 +162,11 @@ export async function GET(req: NextRequest) {
     ]);
 
     const payload = tickets.map((t) => {
-      const code =
-        t.project?.code && t.companyTicketNumber != null
-          ? `${t.project.code}-${t.companyTicketNumber}`
-          : t.companyTicketNumber != null
-            ? `#${t.companyTicketNumber}`
-            : t.id;
+      const code = buildTicketCode({
+        projectCode: t.project?.code,
+        companyTicketNumber: t.companyTicketNumber,
+        ticketId: t.id,
+      });
 
       return {
         id: t.id,
@@ -601,12 +601,11 @@ export async function POST(req: NextRequest) {
 
     // Fire notification to assigned creative (fire-and-forget)
     if (ticket.creativeId) {
-      const code =
-        ticket.project?.code && ticket.companyTicketNumber != null
-          ? `${ticket.project.code}-${ticket.companyTicketNumber}`
-          : ticket.companyTicketNumber != null
-            ? `#${ticket.companyTicketNumber}`
-            : ticket.id;
+      const code = buildTicketCode({
+        projectCode: ticket.project?.code,
+        companyTicketNumber: ticket.companyTicketNumber,
+        ticketId: ticket.id,
+      });
       createNotification({
         userId: ticket.creativeId,
         type: "TICKET_ASSIGNED",
@@ -617,12 +616,11 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const code =
-      ticket.project?.code && ticket.companyTicketNumber != null
-        ? `${ticket.project.code}-${ticket.companyTicketNumber}`
-        : ticket.companyTicketNumber != null
-          ? `#${ticket.companyTicketNumber}`
-          : ticket.id;
+    const code = buildTicketCode({
+      projectCode: ticket.project?.code,
+      companyTicketNumber: ticket.companyTicketNumber,
+      ticketId: ticket.id,
+    });
 
     return NextResponse.json(
       {

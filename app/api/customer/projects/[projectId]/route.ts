@@ -11,7 +11,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { normalizeCompanyRole, canManageProjects } from "@/lib/permissions/companyRoles";
 import { parseBody } from "@/lib/schemas/helpers";
-import { createProjectSchema } from "@/lib/schemas/project.schemas";
+import { updateProjectSchema } from "@/lib/schemas/project.schemas";
 
 type RouteContext = { params: Promise<{ projectId: string }> };
 
@@ -46,19 +46,37 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
     // Verify project belongs to company
     const existing = await prisma.project.findFirst({
       where: { id: projectId, companyId: user.activeCompanyId },
+      select: { id: true, code: true },
     });
 
     if (!existing) {
       return NextResponse.json({ error: "Project not found." }, { status: 404 });
     }
 
-    const parsed = await parseBody(req, createProjectSchema);
+    const parsed = await parseBody(req, updateProjectSchema);
     if (!parsed.success) return parsed.response;
-    const { name } = parsed.data;
+    const { name, code } = parsed.data;
+
+    // If code is being changed, check per-company uniqueness
+    if (code && code !== existing.code) {
+      const collision = await prisma.project.findFirst({
+        where: { companyId: user.activeCompanyId!, code, id: { not: projectId } },
+      });
+      if (collision) {
+        return NextResponse.json(
+          { error: `Project code "${code}" is already in use.` },
+          { status: 409 },
+        );
+      }
+    }
+
+    const data: { name?: string; code?: string } = {};
+    if (name) data.name = name;
+    if (code) data.code = code;
 
     const project = await prisma.project.update({
       where: { id: projectId },
-      data: { name },
+      data,
       select: { id: true, name: true, code: true },
     });
 

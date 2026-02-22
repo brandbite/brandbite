@@ -10,6 +10,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { buildTicketCode } from "@/lib/ticket-code";
 import { DataTable, THead, TH, TD } from "@/components/ui/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FormSelect } from "@/components/ui/form-field";
@@ -124,7 +125,6 @@ export default function CreativeTicketsPage() {
     return () => {
       cancelled = true;
     };
-     
   }, []);
 
   const tickets = data?.tickets ?? [];
@@ -364,12 +364,11 @@ export default function CreativeTicketsPage() {
             <tbody>
               {sortedTickets.map((t) => {
                 const statusLabel = STATUS_LABELS[t.status];
-                const ticketCode =
-                  t.project?.code && t.companyTicketNumber != null
-                    ? `${t.project.code}-${t.companyTicketNumber}`
-                    : t.companyTicketNumber != null
-                      ? `#${t.companyTicketNumber}`
-                      : t.id;
+                const ticketCode = buildTicketCode({
+                  projectCode: t.project?.code,
+                  companyTicketNumber: t.companyTicketNumber,
+                  ticketId: t.id,
+                });
 
                 const payoutTokens = t.jobType?.creativePayoutTokens ?? 0;
 

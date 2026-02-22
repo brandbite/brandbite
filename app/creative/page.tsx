@@ -10,6 +10,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { buildTicketCode } from "@/lib/ticket-code";
 import { isDueDateOverdue, isDueDateSoon, formatDueDateCountdown } from "@/lib/board";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { LoadingState } from "@/components/ui/loading-state";
@@ -706,12 +707,11 @@ export default function CreativeDashboardPage() {
                     const countdown = formatDueDateCountdown(t.dueDate);
                     const overdue = isDueDateOverdue(t.dueDate);
                     const soon = isDueDateSoon(t.dueDate);
-                    const code =
-                      t.project?.code && t.companyTicketNumber != null
-                        ? `${t.project.code}-${t.companyTicketNumber}`
-                        : t.companyTicketNumber != null
-                          ? `#${t.companyTicketNumber}`
-                          : "";
+                    const code = buildTicketCode({
+                      projectCode: t.project?.code,
+                      companyTicketNumber: t.companyTicketNumber,
+                      ticketId: t.id,
+                    });
                     return (
                       <Link
                         key={t.id}

@@ -11,6 +11,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { generateAbbreviation } from "@/lib/abbreviation";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -35,6 +36,8 @@ export default function OnboardingPage() {
 
   // Step 3 — Project
   const [projectName, setProjectName] = useState("");
+  const [projectCode, setProjectCode] = useState("");
+  const [projectCodeEdited, setProjectCodeEdited] = useState(false);
   const [projectError, setProjectError] = useState<string | null>(null);
   const [projectLoading, setProjectLoading] = useState(false);
   const [projectCreated, setProjectCreated] = useState<string | null>(null);
@@ -108,10 +111,14 @@ export default function OnboardingPage() {
     setProjectError(null);
     setProjectLoading(true);
     try {
+      const body: { name: string; code?: string } = { name: projectName.trim() };
+      if (projectCode.trim().length === 3) {
+        body.code = projectCode.trim().toUpperCase();
+      }
       const res = await fetch("/api/customer/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: projectName.trim() }),
+        body: JSON.stringify(body),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -402,10 +409,43 @@ export default function OnboardingPage() {
                   id="onb-project-name"
                   type="text"
                   value={projectName}
-                  onChange={(e) => setProjectName(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setProjectName(val);
+                    if (!projectCodeEdited && val.trim()) {
+                      setProjectCode(generateAbbreviation(val));
+                    }
+                  }}
                   placeholder="e.g. Website Redesign, Social Media Q1"
                   className="w-full rounded-xl border border-[var(--bb-border)] px-3.5 py-2.5 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
                 />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="onb-project-code"
+                  className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
+                >
+                  Project Code
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="onb-project-code"
+                    type="text"
+                    maxLength={3}
+                    value={projectCode}
+                    onChange={(e) => {
+                      const val = e.target.value.toUpperCase().replace(/[^A-Z]/g, "");
+                      setProjectCode(val);
+                      setProjectCodeEdited(true);
+                    }}
+                    placeholder="e.g. WEB"
+                    className="w-24 rounded-xl border border-[var(--bb-border)] px-3.5 py-2.5 font-mono text-sm tracking-wider text-[var(--bb-secondary)] uppercase outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
+                  />
+                  <span className="text-[10px] text-[var(--bb-text-muted)]">
+                    3-letter code for ticket IDs (e.g. WEB-101)
+                  </span>
+                </div>
               </div>
             </div>
 

@@ -310,7 +310,7 @@ model Project {
   company   Company @relation(fields: [companyId], references: [id])
 
   name String
-  code String? @unique
+  code String? // 3-char uppercase abbreviation (e.g. "WEB")
 
   autoAssignMode AutoAssignMode @default(INHERIT)
 
@@ -320,6 +320,7 @@ model Project {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([companyId, code])
   @@index([companyId])
 }
 

@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { LedgerDirection } from "@prisma/client";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { buildTicketCode } from "@/lib/ticket-code";
 
 // -----------------------------------------------------------------------------
 // GET: token balance + recent ledger entries for current customer's company
@@ -27,10 +28,7 @@ export async function GET(_req: NextRequest) {
     }
 
     if (!user.activeCompanyId) {
-      return NextResponse.json(
-        { error: "User has no active company" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "User has no active company" }, { status: 400 });
     }
 
     const company = await prisma.company.findUnique({
@@ -38,10 +36,7 @@ export async function GET(_req: NextRequest) {
     });
 
     if (!company) {
-      return NextResponse.json(
-        { error: "Company not found for current user" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Company not found for current user" }, { status: 404 });
     }
 
     const ledger = await prisma.tokenLedger.findMany({
@@ -69,12 +64,13 @@ export async function GET(_req: NextRequest) {
 
     const entries = ledger.map((entry) => {
       const ticket = entry.ticket;
-      const ticketCode =
-        ticket?.project?.code && ticket?.companyTicketNumber != null
-          ? `${ticket.project.code}-${ticket.companyTicketNumber}`
-          : ticket?.companyTicketNumber != null
-          ? `#${ticket.companyTicketNumber}`
-          : ticket?.id ?? null;
+      const ticketCode = ticket
+        ? buildTicketCode({
+            projectCode: ticket.project?.code,
+            companyTicketNumber: ticket.companyTicketNumber,
+            ticketId: ticket.id,
+          })
+        : null;
 
       return {
         id: entry.id,
@@ -112,16 +108,10 @@ export async function GET(_req: NextRequest) {
     });
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[customer.tokens] GET error", error);
-    return NextResponse.json(
-      { error: "Failed to load customer tokens" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load customer tokens" }, { status: 500 });
   }
 }

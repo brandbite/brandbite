@@ -7,6 +7,7 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { buildTicketCode } from "@/lib/ticket-code";
 
 export async function GET() {
   try {
@@ -47,13 +48,11 @@ export async function GET() {
     });
 
     const payload = tickets.map((t) => {
-      // Display code: PROJECTCODE-123, #123 or fallback to id
-      const code =
-        t.project?.code && t.companyTicketNumber != null
-          ? `${t.project.code}-${t.companyTicketNumber}`
-          : t.companyTicketNumber != null
-          ? `#${t.companyTicketNumber}`
-          : t.id;
+      const code = buildTicketCode({
+        projectCode: t.project?.code,
+        companyTicketNumber: t.companyTicketNumber,
+        ticketId: t.id,
+      });
 
       return {
         id: t.id,
@@ -72,9 +71,6 @@ export async function GET() {
     return NextResponse.json({ tickets: payload });
   } catch (error) {
     console.error("[board.tickets] GET error", error);
-    return NextResponse.json(
-      { error: "Failed to load board tickets" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to load board tickets" }, { status: 500 });
   }
 }

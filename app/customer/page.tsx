@@ -10,6 +10,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { buildTicketCode } from "@/lib/ticket-code";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import {
   type CompanyRole,
@@ -17,20 +18,8 @@ import {
   canManagePlan,
   canCreateTickets,
 } from "@/lib/permissions/companyRoles";
-import {
-  isDueDateOverdue,
-  isDueDateSoon,
-  formatDueDateCountdown,
-} from "@/lib/board";
-import {
-  Bar,
-  BarChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-  Cell,
-} from "recharts";
+import { isDueDateOverdue, isDueDateSoon, formatDueDateCountdown } from "@/lib/board";
+import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from "recharts";
 
 type UserRole = "SITE_OWNER" | "SITE_ADMIN" | "DESIGNER" | "CUSTOMER";
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
@@ -187,15 +176,13 @@ export default function CustomerDashboardPage() {
 
         if (!tokensRes.ok) {
           const message =
-            (tokensJson as any)?.error ||
-            `Tokens request failed with status ${tokensRes.status}`;
+            (tokensJson as any)?.error || `Tokens request failed with status ${tokensRes.status}`;
           throw new Error(message);
         }
 
         if (!boardRes.ok) {
           const message =
-            (boardJson as any)?.error ||
-            `Board request failed with status ${boardRes.status}`;
+            (boardJson as any)?.error || `Board request failed with status ${boardRes.status}`;
           throw new Error(message);
         }
 
@@ -214,9 +201,7 @@ export default function CustomerDashboardPage() {
         if (!cancelled) {
           setState({
             status: "error",
-            message:
-              err?.message ||
-              "Failed to load customer overview. Please try again.",
+            message: err?.message || "Failed to load customer overview. Please try again.",
           });
         }
       }
@@ -252,10 +237,7 @@ export default function CustomerDashboardPage() {
     () =>
       boardTickets
         .filter((t) => t.dueDate != null && t.status !== "DONE")
-        .sort(
-          (a, b) =>
-            new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime(),
-        )
+        .sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime())
         .slice(0, 5),
     [boardTickets],
   );
@@ -286,18 +268,13 @@ export default function CustomerDashboardPage() {
       {/* Header */}
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
+          <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--bb-text-muted)] uppercase">
             Customer workspace
           </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-            Overview
-          </h1>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Overview</h1>
           {company && (
             <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-              Company{" "}
-              <span className="font-medium text-[var(--bb-secondary)]">
-                {company.name}
-              </span>{" "}
+              Company <span className="font-medium text-[var(--bb-secondary)]">{company.name}</span>{" "}
               ({company.slug})
             </p>
           )}
@@ -342,9 +319,9 @@ export default function CustomerDashboardPage() {
           <div className="grid gap-4 md:grid-cols-3">
             {/* Token balance card */}
             <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-[#F15B2B] to-[#f6a07a]" />
+              <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-[#F15B2B] to-[#f6a07a]" />
               <div className="flex items-center justify-between">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
+                <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
                   Token balance
                 </p>
                 <Link
@@ -392,9 +369,9 @@ export default function CustomerDashboardPage() {
 
             {/* Open tickets card */}
             <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-[#3B82F6] to-[#93C5FD]" />
+              <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-[#3B82F6] to-[#93C5FD]" />
               <div className="flex items-center justify-between">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
+                <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
                   Open tickets
                 </p>
                 <Link
@@ -404,9 +381,7 @@ export default function CustomerDashboardPage() {
                   Open board
                 </Link>
               </div>
-              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">
-                {openTickets}
-              </p>
+              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">{openTickets}</p>
               <p className="text-[11px] text-[var(--bb-text-tertiary)]">
                 of {boardStats?.total ?? 0} total
               </p>
@@ -432,20 +407,19 @@ export default function CustomerDashboardPage() {
 
             {/* Completed tickets card */}
             <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-[#22C55E] to-[#86EFAC]" />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
+              <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-[#22C55E] to-[#86EFAC]" />
+              <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
                 Completed
               </p>
-              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">
-                {doneTickets}
-              </p>
+              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">{doneTickets}</p>
               <p className="text-[11px] text-[var(--bb-text-tertiary)]">
                 of {boardStats?.total ?? 0} total
               </p>
 
               {/* Completion rate */}
-              {boardStats && boardStats.total > 0 && (
-                doneTickets > 0 ? (
+              {boardStats &&
+                boardStats.total > 0 &&
+                (doneTickets > 0 ? (
                   <div className="mt-4">
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="text-[var(--bb-text-tertiary)]">Completion rate</span>
@@ -466,8 +440,7 @@ export default function CustomerDashboardPage() {
                   <p className="mt-4 text-[11px] text-[var(--bb-text-tertiary)]">
                     Complete your first ticket to see progress here.
                   </p>
-                )
-              )}
+                ))}
             </section>
           </div>
 
@@ -535,24 +508,21 @@ export default function CustomerDashboardPage() {
                     const countdown = formatDueDateCountdown(t.dueDate);
                     const overdue = isDueDateOverdue(t.dueDate);
                     const soon = isDueDateSoon(t.dueDate);
-                    const code =
-                      t.project?.code && t.companyTicketNumber != null
-                        ? `${t.project.code}-${t.companyTicketNumber}`
-                        : t.companyTicketNumber != null
-                          ? `#${t.companyTicketNumber}`
-                          : "";
+                    const code = buildTicketCode({
+                      projectCode: t.project?.code,
+                      companyTicketNumber: t.companyTicketNumber,
+                      ticketId: t.id,
+                    });
                     return (
                       <Link
                         key={t.id}
                         href={`/customer/tickets/${t.id}`}
-                        className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0 transition-opacity hover:opacity-80"
+                        className="flex items-center justify-between py-2.5 transition-opacity first:pt-0 last:pb-0 hover:opacity-80"
                       >
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-xs font-medium text-[var(--bb-secondary)]">
                             {code && (
-                              <span className="mr-1.5 text-[var(--bb-text-tertiary)]">
-                                {code}
-                              </span>
+                              <span className="mr-1.5 text-[var(--bb-text-tertiary)]">{code}</span>
                             )}
                             {t.title}
                           </p>
@@ -610,9 +580,7 @@ export default function CustomerDashboardPage() {
                         key={item.label}
                         className="rounded-xl bg-[var(--bb-bg-card)] px-3 py-2.5 text-center"
                       >
-                        <p className="text-lg font-bold text-[var(--bb-secondary)]">
-                          {item.value}
-                        </p>
+                        <p className="text-lg font-bold text-[var(--bb-secondary)]">{item.value}</p>
                         <p className="text-[10px] text-[var(--bb-text-tertiary)]">{item.label}</p>
                       </div>
                     ))}
