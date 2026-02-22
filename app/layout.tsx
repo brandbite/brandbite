@@ -13,6 +13,7 @@ import { Josefin_Sans, Inter } from "next/font/google";
 import DemoPersonaBanner from "../components/demo-persona-banner";
 import { ToastProvider } from "@/components/ui/toast-provider";
 import { ThemeProvider } from "@/components/theme-provider";
+import { AuthGuard } from "@/components/auth-guard";
 
 const josefin = Josefin_Sans({
   subsets: ["latin"],
@@ -83,6 +84,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       >
         <ThemeProvider>
           <ToastProvider>
+            <AuthGuard />
             {isDemoMode && <DemoPersonaBanner />}
             {children}
           </ToastProvider>

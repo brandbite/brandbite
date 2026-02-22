@@ -31,12 +31,13 @@ export async function GET(_req: NextRequest) {
       );
     }
 
-    const [balance, withdrawals] = await Promise.all([
+    const [balance, withdrawals, minWithdrawalTokens] = await Promise.all([
       getUserTokenBalance(user.id),
       prisma.withdrawal.findMany({
         where: { creativeId: user.id },
         orderBy: { createdAt: "desc" },
       }),
+      getAppSettingInt("MIN_WITHDRAWAL_TOKENS", DEFAULT_MIN_WITHDRAWAL_TOKENS),
     ]);
 
     const totalRequested = withdrawals.reduce((sum, w) => sum + w.amountTokens, 0);
@@ -56,6 +57,7 @@ export async function GET(_req: NextRequest) {
         totalRequested,
         pendingCount,
         withdrawalsCount: items.length,
+        minWithdrawalTokens,
       },
       withdrawals: items,
     });
@@ -137,5 +139,50 @@ export async function POST(req: NextRequest) {
 
     console.error("[creative.withdrawals] POST error", error);
     return NextResponse.json({ error: "Failed to create withdrawal" }, { status: 500 });
+  }
+}
+
+// -----------------------------------------------------------------------------
+// DELETE: cancel a PENDING withdrawal request
+// -----------------------------------------------------------------------------
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const user = await getCurrentUserOrThrow();
+
+    if (user.role !== "DESIGNER") {
+      return NextResponse.json({ error: "Only creatives can cancel withdrawals" }, { status: 403 });
+    }
+
+    const { id } = await req.json();
+    if (!id || typeof id !== "string") {
+      return NextResponse.json({ error: "Missing withdrawal id" }, { status: 400 });
+    }
+
+    const withdrawal = await prisma.withdrawal.findUnique({
+      where: { id },
+    });
+
+    if (!withdrawal || withdrawal.creativeId !== user.id) {
+      return NextResponse.json({ error: "Withdrawal not found" }, { status: 404 });
+    }
+
+    if (withdrawal.status !== "PENDING") {
+      return NextResponse.json(
+        { error: "Only pending withdrawals can be cancelled" },
+        { status: 400 },
+      );
+    }
+
+    await prisma.withdrawal.delete({ where: { id } });
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    if ((error as any)?.code === "UNAUTHENTICATED") {
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    }
+
+    console.error("[creative.withdrawals] DELETE error", error);
+    return NextResponse.json({ error: "Failed to cancel withdrawal" }, { status: 500 });
   }
 }

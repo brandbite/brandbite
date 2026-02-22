@@ -55,21 +55,15 @@ type CustomerSettingsResponse = {
   } | null;
 };
 
-function hasPlanManagementAccess(
-  role: CompanyRole | null | undefined,
-): boolean {
+function hasPlanManagementAccess(role: CompanyRole | null | undefined): boolean {
   return role === "OWNER" || role === "BILLING";
 }
 
-function hasCompanyEditAccess(
-  role: CompanyRole | null | undefined,
-): boolean {
+function hasCompanyEditAccess(role: CompanyRole | null | undefined): boolean {
   return role === "OWNER" || role === "PM";
 }
 
-function prettyCompanyRole(
-  role: CompanyRole | null | undefined,
-): string {
+function prettyCompanyRole(role: CompanyRole | null | undefined): string {
   switch (role) {
     case "OWNER":
       return "Owner";
@@ -84,9 +78,7 @@ function prettyCompanyRole(
   }
 }
 
-function prettyBillingStatus(
-  status: BillingStatus | null | undefined,
-): string {
+function prettyBillingStatus(status: BillingStatus | null | undefined): string {
   switch (status) {
     case "ACTIVE":
       return "Active";
@@ -99,9 +91,7 @@ function prettyBillingStatus(
   }
 }
 
-function billingStatusClassName(
-  status: BillingStatus | null | undefined,
-): string {
+function billingStatusClassName(status: BillingStatus | null | undefined): string {
   switch (status) {
     case "ACTIVE":
       return "bg-[var(--bb-success-bg)] text-[var(--bb-success-text)]";
@@ -117,10 +107,26 @@ function billingStatusClassName(
 type PreferenceEntry = { type: string; enabled: boolean; emailEnabled: boolean };
 
 const CUSTOMER_PREFS: { type: string; label: string; description: string }[] = [
-  { type: "REVISION_SUBMITTED", label: "Creative submitted a new revision", description: "Get notified when your creative uploads new work for review" },
-  { type: "TICKET_STATUS_CHANGED", label: "Ticket status changed", description: "Get notified when a ticket's status is updated" },
-  { type: "PIN_RESOLVED", label: "Feedback note resolved", description: "Get notified when a creative resolves one of your revision notes" },
-  { type: "TICKET_COMPLETED", label: "Ticket completed", description: "Get notified when a ticket is marked as done" },
+  {
+    type: "REVISION_SUBMITTED",
+    label: "Creative submitted a new revision",
+    description: "Get notified when your creative uploads new work for review",
+  },
+  {
+    type: "TICKET_STATUS_CHANGED",
+    label: "Ticket status changed",
+    description: "Get notified when a ticket's status is updated",
+  },
+  {
+    type: "PIN_RESOLVED",
+    label: "Feedback note resolved",
+    description: "Get notified when a creative resolves one of your revision notes",
+  },
+  {
+    type: "TICKET_COMPLETED",
+    label: "Ticket completed",
+    description: "Get notified when a ticket is marked as done",
+  },
 ];
 
 /** Pencil icon (inline SVG, 14x14) */
@@ -140,8 +146,7 @@ function PencilIcon() {
 
 export default function CustomerSettingsPage() {
   const { showToast } = useToast();
-  const [data, setData] =
-    useState<CustomerSettingsResponse | null>(null);
+  const [data, setData] = useState<CustomerSettingsResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [notifPrefs, setNotifPrefs] = useState<PreferenceEntry[]>([]);
@@ -173,11 +178,8 @@ export default function CustomerSettingsPage() {
   const [deletingTagId, setDeletingTagId] = useState<string | null>(null);
   const [tagToDelete, setTagToDelete] = useState<string | null>(null);
 
-  const [billingError, setBillingError] = useState<string | null>(
-    null,
-  );
-  const [billingLoading, setBillingLoading] =
-    useState<boolean>(false);
+  const [billingError, setBillingError] = useState<string | null>(null);
+  const [billingLoading, setBillingLoading] = useState<boolean>(false);
 
   const searchParams = useSearchParams();
   const billingStatusParam = searchParams.get("billing");
@@ -196,8 +198,7 @@ export default function CustomerSettingsPage() {
         const json = await res.json().catch(() => null);
 
         if (!res.ok) {
-          const msg =
-            json?.error || `Request failed with status ${res.status}`;
+          const msg = json?.error || `Request failed with status ${res.status}`;
           throw new Error(msg);
         }
 
@@ -207,9 +208,7 @@ export default function CustomerSettingsPage() {
       } catch (err: any) {
         console.error("Customer settings fetch error:", err);
         if (!cancelled) {
-          setError(
-            err?.message || "Failed to load settings.",
-          );
+          setError(err?.message || "Failed to load settings.");
         }
       } finally {
         if (!cancelled) {
@@ -241,21 +240,17 @@ export default function CustomerSettingsPage() {
         if (!cancelled) setNotifPrefsLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleTogglePref = useCallback(
-    async (
-      type: string,
-      channel: "enabled" | "emailEnabled",
-      currentValue: boolean,
-    ) => {
+    async (type: string, channel: "enabled" | "emailEnabled", currentValue: boolean) => {
       setTogglingType(`${type}:${channel}`);
       const newValue = !currentValue;
       setNotifPrefs((prev) =>
-        prev.map((p) =>
-          p.type === type ? { ...p, [channel]: newValue } : p,
-        ),
+        prev.map((p) => (p.type === type ? { ...p, [channel]: newValue } : p)),
       );
       try {
         const res = await fetch("/api/notifications/preferences", {
@@ -266,9 +261,7 @@ export default function CustomerSettingsPage() {
         if (!res.ok) throw new Error();
       } catch {
         setNotifPrefs((prev) =>
-          prev.map((p) =>
-            p.type === type ? { ...p, [channel]: currentValue } : p,
-          ),
+          prev.map((p) => (p.type === type ? { ...p, [channel]: currentValue } : p)),
         );
         showToast({ type: "error", title: "Failed to update preference" });
       } finally {
@@ -294,9 +287,7 @@ export default function CustomerSettingsPage() {
       });
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(json?.error || "Failed to update");
-      setData((prev) =>
-        prev ? { ...prev, user: { ...prev.user, name: trimmed } } : prev,
-      );
+      setData((prev) => (prev ? { ...prev, user: { ...prev.user, name: trimmed } } : prev));
       setEditingUser(false);
       showToast({ type: "success", title: "Profile updated" });
     } catch (err: any) {
@@ -361,17 +352,13 @@ export default function CustomerSettingsPage() {
   const company = data?.company;
   const plan = data?.plan;
 
-  const canManagePlan = hasPlanManagementAccess(
-    user?.companyRole ?? null,
-  );
-  const canEditCompany = hasCompanyEditAccess(
-    user?.companyRole ?? null,
-  );
+  const canManagePlan = hasPlanManagementAccess(user?.companyRole ?? null);
+  const canEditCompany = hasCompanyEditAccess(user?.companyRole ?? null);
 
   const formatPrice = (priceCents: number | null) => {
     if (priceCents == null) return "\u2014";
-    const euros = priceCents / 100;
-    return `\u20AC${euros.toFixed(2)}`;
+    const dollars = priceCents / 100;
+    return `$${dollars.toFixed(2)}`;
   };
 
   const formatDate = (iso: string) => {
@@ -411,8 +398,7 @@ export default function CustomerSettingsPage() {
       const json = await res.json().catch(() => null);
 
       if (!res.ok || !json?.url) {
-        const msg =
-          json?.error || `Request failed with status ${res.status}`;
+        const msg = json?.error || `Request failed with status ${res.status}`;
         throw new Error(msg);
       }
 
@@ -420,9 +406,7 @@ export default function CustomerSettingsPage() {
       window.location.href = json.url as string;
     } catch (err: any) {
       console.error("Billing checkout error:", err);
-      setBillingError(
-        err?.message || "Failed to start billing checkout.",
-      );
+      setBillingError(err?.message || "Failed to start billing checkout.");
     } finally {
       setBillingLoading(false);
     }
@@ -473,7 +457,9 @@ export default function CustomerSettingsPage() {
         if (!cancelled) setTagsLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [data]);
 
   const handleAddTag = useCallback(async () => {
@@ -495,9 +481,7 @@ export default function CustomerSettingsPage() {
         return;
       }
       setTags((prev) =>
-        [...prev, json.tag as SettingsTag].sort((a, b) =>
-          a.name.localeCompare(b.name),
-        ),
+        [...prev, json.tag as SettingsTag].sort((a, b) => a.name.localeCompare(b.name)),
       );
       setNewTagName("");
       setNewTagColor("BLUE");
@@ -528,11 +512,7 @@ export default function CustomerSettingsPage() {
         });
         return;
       }
-      setTags((prev) =>
-        prev.map((t) =>
-          t.id === editingTagId ? (json.tag as SettingsTag) : t,
-        ),
-      );
+      setTags((prev) => prev.map((t) => (t.id === editingTagId ? (json.tag as SettingsTag) : t)));
       setEditingTagId(null);
       showToast({ type: "success", title: "Tag updated" });
     } catch {
@@ -584,446 +564,385 @@ export default function CustomerSettingsPage() {
     <>
       {/* Page header */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Settings
-            </h1>
-            <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-              Your account, company and subscription information.
-            </p>
-          </div>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
+            Your account, company and subscription information.
+          </p>
         </div>
+      </div>
 
-        {/* Error */}
-        {error && (
-          <InlineAlert variant="error" title="Something went wrong" className="mb-4">
-            {error}
-          </InlineAlert>
-        )}
+      {/* Error */}
+      {error && (
+        <InlineAlert variant="error" title="Something went wrong" className="mb-4">
+          {error}
+        </InlineAlert>
+      )}
 
-        {/* Billing status banner (after Stripe redirect) */}
-        {!loading && billingStatusParam === "success" && (
-          <InlineAlert variant="success" title="Billing updated" className="mb-4">
-            Your subscription has been updated successfully. If the
-            changes are not reflected immediately, they will appear
-            after the next refresh.
-          </InlineAlert>
-        )}
+      {/* Billing status banner (after Stripe redirect) */}
+      {!loading && billingStatusParam === "success" && (
+        <InlineAlert variant="success" title="Billing updated" className="mb-4">
+          Your subscription has been updated successfully. If the changes are not reflected
+          immediately, they will appear after the next refresh.
+        </InlineAlert>
+      )}
 
-        {!loading && billingStatusParam === "cancelled" && (
-          <InlineAlert variant="warning" title="Checkout cancelled" className="mb-4">
-            You cancelled the Stripe checkout. No changes were made to
-            your current subscription.
-          </InlineAlert>
-        )}
+      {!loading && billingStatusParam === "cancelled" && (
+        <InlineAlert variant="warning" title="Checkout cancelled" className="mb-4">
+          You cancelled the Stripe checkout. No changes were made to your current subscription.
+        </InlineAlert>
+      )}
 
-        {/* Content */}
-        {loading ? (
-          <div className="mt-6 text-sm text-[var(--bb-text-secondary)]">
-            Loading settings…
-          </div>
-        ) : !data ? (
-          <div className="mt-6">
-            <EmptyState title="No settings data found." description="We couldn't load your account information. Please try refreshing the page." />
-          </div>
-        ) : (
-          <div className="mt-4 grid gap-4 md:grid-cols-3">
-            {/* ============================================================ */}
-            {/* Account card                                                  */}
-            {/* ============================================================ */}
-            <section className="md:col-span-1 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-sm font-semibold tracking-tight">
-                    Account
-                  </h2>
-                  <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
-                    Your personal profile inside Brandbite.
-                  </p>
-                </div>
-                {!editingUser && (
-                  <button
-                    type="button"
-                    onClick={startEditingUser}
-                    className="inline-flex items-center gap-1 rounded-full border border-[var(--bb-border)] px-2.5 py-1 text-[11px] font-medium text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
+      {/* Content */}
+      {loading ? (
+        <div className="mt-6 text-sm text-[var(--bb-text-secondary)]">Loading settings…</div>
+      ) : !data ? (
+        <div className="mt-6">
+          <EmptyState
+            title="No settings data found."
+            description="We couldn't load your account information. Please try refreshing the page."
+          />
+        </div>
+      ) : (
+        <div className="mt-4 grid gap-4 md:grid-cols-3">
+          {/* ============================================================ */}
+          {/* Account card                                                  */}
+          {/* ============================================================ */}
+          <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm md:col-span-1">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-semibold tracking-tight">Account</h2>
+                <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
+                  Your personal profile inside Brandbite.
+                </p>
+              </div>
+              {!editingUser && (
+                <button
+                  type="button"
+                  onClick={startEditingUser}
+                  className="inline-flex items-center gap-1 rounded-full border border-[var(--bb-border)] px-2.5 py-1 text-[11px] font-medium text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
+                >
+                  <PencilIcon />
+                  Edit
+                </button>
+              )}
+            </div>
+
+            <div className="mt-3 space-y-2 text-xs text-[var(--bb-secondary)]">
+              {/* Name — editable */}
+              <div>
+                <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">Name</p>
+                {editingUser ? (
+                  <FormInput
+                    size="sm"
+                    value={draftUserName}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setDraftUserName(e.target.value)
+                    }
+                    placeholder="Your name"
+                    disabled={savingUser}
+                    className="mt-1"
+                    autoFocus
+                  />
+                ) : (
+                  <p className="mt-0.5">{user?.name || "\u2014"}</p>
+                )}
+              </div>
+
+              {/* Email — always read-only */}
+              <div>
+                <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">Email</p>
+                <p className="mt-0.5">{user?.email}</p>
+              </div>
+
+              {/* Role — always read-only */}
+              <div>
+                <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">Role</p>
+                <p className="mt-0.5">{user ? prettyRole(user.role) : "\u2014"}</p>
+              </div>
+
+              {/* Company role — always read-only */}
+              <div>
+                <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
+                  Company role
+                </p>
+                <p className="mt-0.5">{prettyCompanyRole(user?.companyRole ?? null)}</p>
+              </div>
+
+              {/* Save / Cancel buttons */}
+              {editingUser && (
+                <div className="flex items-center gap-2 pt-1">
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    loading={savingUser}
+                    loadingText="Saving…"
+                    onClick={handleSaveUser}
                   >
-                    <PencilIcon />
-                    Edit
-                  </button>
-                )}
-              </div>
-
-              <div className="mt-3 space-y-2 text-xs text-[var(--bb-secondary)]">
-                {/* Name — editable */}
-                <div>
-                  <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
-                    Name
-                  </p>
-                  {editingUser ? (
-                    <FormInput
-                      size="sm"
-                      value={draftUserName}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setDraftUserName(e.target.value)
-                      }
-                      placeholder="Your name"
-                      disabled={savingUser}
-                      className="mt-1"
-                      autoFocus
-                    />
-                  ) : (
-                    <p className="mt-0.5">
-                      {user?.name || "\u2014"}
-                    </p>
-                  )}
-                </div>
-
-                {/* Email — always read-only */}
-                <div>
-                  <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
-                    Email
-                  </p>
-                  <p className="mt-0.5">{user?.email}</p>
-                </div>
-
-                {/* Role — always read-only */}
-                <div>
-                  <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
-                    Role
-                  </p>
-                  <p className="mt-0.5">
-                    {user ? prettyRole(user.role) : "\u2014"}
-                  </p>
-                </div>
-
-                {/* Company role — always read-only */}
-                <div>
-                  <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
-                    Company role
-                  </p>
-                  <p className="mt-0.5">
-                    {prettyCompanyRole(user?.companyRole ?? null)}
-                  </p>
-                </div>
-
-                {/* Save / Cancel buttons */}
-                {editingUser && (
-                  <div className="flex items-center gap-2 pt-1">
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      loading={savingUser}
-                      loadingText="Saving…"
-                      onClick={handleSaveUser}
-                    >
-                      Save
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={cancelEditingUser}
-                      disabled={savingUser}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </section>
-
-            {/* ============================================================ */}
-            {/* Company card                                                  */}
-            {/* ============================================================ */}
-            <section className="md:col-span-1 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-sm font-semibold tracking-tight">
-                    Company
-                  </h2>
-                  <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
-                    The workspace your requests belong to.
-                  </p>
-                </div>
-                {canEditCompany && !editingCompany && (
-                  <button
-                    type="button"
-                    onClick={startEditingCompany}
-                    className="inline-flex items-center gap-1 rounded-full border border-[var(--bb-border)] px-2.5 py-1 text-[11px] font-medium text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
+                    Save
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={cancelEditingUser}
+                    disabled={savingUser}
                   >
-                    <PencilIcon />
-                    Edit
-                  </button>
-                )}
-              </div>
-
-              <div className="mt-3 space-y-2 text-xs text-[var(--bb-secondary)]">
-                {/* Name — editable (OWNER + PM) */}
-                <div>
-                  <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
-                    Name
-                  </p>
-                  {editingCompany ? (
-                    <FormInput
-                      size="sm"
-                      value={draftCompanyName}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setDraftCompanyName(e.target.value)
-                      }
-                      placeholder="Company name"
-                      disabled={savingCompany}
-                      className="mt-1"
-                      autoFocus
-                    />
-                  ) : (
-                    <p className="mt-0.5">{company?.name}</p>
-                  )}
-                </div>
-
-                {/* Slug — always read-only */}
-                <div>
-                  <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
-                    Slug
-                  </p>
-                  <p className="mt-0.5">{company?.slug}</p>
-                </div>
-
-                {/* Website — editable (OWNER + PM) */}
-                <div>
-                  <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
-                    Website
-                  </p>
-                  {editingCompany ? (
-                    <FormInput
-                      size="sm"
-                      type="url"
-                      value={draftWebsite}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setDraftWebsite(e.target.value)
-                      }
-                      placeholder="https://example.com"
-                      disabled={savingCompany}
-                      className="mt-1"
-                    />
-                  ) : company?.website ? (
-                    <a
-                      href={company.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-0.5 inline-block text-[var(--bb-primary)] underline decoration-[var(--bb-primary)]/30 hover:decoration-[var(--bb-primary)]"
-                    >
-                      {company.website}
-                    </a>
-                  ) : (
-                    <p className="mt-0.5">{"\u2014"}</p>
-                  )}
-                </div>
-
-                {/* Counts — always read-only */}
-                <div className="grid grid-cols-3 gap-2">
-                  <div>
-                    <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
-                      Members
-                    </p>
-                    <p className="mt-0.5">
-                      {company?.counts.members ?? 0}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
-                      Projects
-                    </p>
-                    <p className="mt-0.5">
-                      {company?.counts.projects ?? 0}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
-                      Tickets
-                    </p>
-                    <p className="mt-0.5">
-                      {company?.counts.tickets ?? 0}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Created at — always read-only */}
-                <div>
-                  <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
-                    Created at
-                  </p>
-                  <p className="mt-0.5">
-                    {company
-                      ? formatDate(company.createdAt)
-                      : "\u2014"}
-                  </p>
-                </div>
-
-                {/* Save / Cancel buttons */}
-                {editingCompany && (
-                  <div className="flex items-center gap-2 pt-1">
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      loading={savingCompany}
-                      loadingText="Saving…"
-                      onClick={handleSaveCompany}
-                    >
-                      Save
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={cancelEditingCompany}
-                      disabled={savingCompany}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </section>
-
-            {/* ============================================================ */}
-            {/* Plan card                                                     */}
-            {/* ============================================================ */}
-            <section className="md:col-span-1 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-              <h2 className="text-sm font-semibold tracking-tight">
-                Subscription plan
-              </h2>
-              <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
-                The plan that defines your monthly token allowance.
-              </p>
-
-              {plan ? (
-                <div className="mt-3 space-y-2 text-xs text-[var(--bb-secondary)]">
-                  {!canManagePlan && (
-                    <div className="rounded-lg border border-[var(--bb-warning-border)] bg-[var(--bb-warning-bg)] px-3 py-2 text-[11px] text-[var(--bb-text-secondary)]">
-                      <p className="text-[11px] font-medium text-[var(--bb-warning-text)]">
-                        Limited access
-                      </p>
-                      <p className="mt-1">
-                        You don&apos;t have permission to manage billing for
-                        this company. You can see the current plan, but
-                        only the owner or billing manager can request
-                        changes.
-                      </p>
-                    </div>
-                  )}
-                  <div>
-                    <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
-                      Plan name
-                    </p>
-                    <p className="mt-0.5">{plan.name}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
-                      Monthly tokens
-                    </p>
-                    <p className="mt-0.5">
-                      {plan.monthlyTokens} tokens
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
-                      Price
-                    </p>
-                    <p className="mt-0.5">
-                      {formatPrice(plan.priceCents)}
-                    </p>
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
-                        Subscription status
-                      </p>
-                      <div className="mt-1">
-                        <span
-                          className={
-                            "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold " +
-                            billingStatusClassName(
-                              company?.billingStatus ?? null,
-                            )
-                          }
-                        >
-                          {prettyBillingStatus(
-                            company?.billingStatus ?? null,
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {billingError && (
-                    <InlineAlert variant="error" size="sm" className="mt-2">
-                      {billingError}
-                    </InlineAlert>
-                  )}
-
-                  <div className="mt-2 flex items-center justify-between gap-2">
-                    <div className="rounded-lg bg-[var(--bb-bg-page)] px-3 py-2 text-[11px] text-[var(--bb-text-secondary)]">
-                      {canManagePlan ? (
-                        <>
-                          Use the button on the right to manage your
-                          subscription and billing details through
-                          Stripe.
-                        </>
-                      ) : (
-                        <>
-                          Need to change something? Ask your company
-                          owner or billing manager to manage the
-                          subscription.
-                        </>
-                      )}
-                    </div>
-
-                    {canManagePlan && (
-                      <button
-                        type="button"
-                        onClick={handleStartBillingCheckout}
-                        disabled={billingLoading || !plan.isActive}
-                        className="inline-flex flex-shrink-0 items-center justify-center rounded-full bg-[var(--bb-primary)] px-3 py-2 text-[11px] font-semibold text-white shadow-sm disabled:opacity-60"
-                      >
-                        {billingLoading
-                          ? "Redirecting\u2026"
-                          : "Manage billing"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-3 rounded-lg bg-[var(--bb-bg-page)] px-3 py-2 text-[11px] text-[var(--bb-text-secondary)]">
-                  No subscription plan is assigned to your company yet.
-                  Please contact support if this does not look correct.
+                    Cancel
+                  </Button>
                 </div>
               )}
-            </section>
-          </div>
-        )}
+            </div>
+          </section>
 
-        {/* Notification preferences */}
-        {!loading && data && (
-          <div className="mt-6 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-            <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">
-              Notification preferences
-            </h2>
-            <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
-              Choose which events you want to be notified about
+          {/* ============================================================ */}
+          {/* Company card                                                  */}
+          {/* ============================================================ */}
+          <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm md:col-span-1">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-semibold tracking-tight">Company</h2>
+                <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
+                  The workspace your requests belong to.
+                </p>
+              </div>
+              {canEditCompany && !editingCompany && (
+                <button
+                  type="button"
+                  onClick={startEditingCompany}
+                  className="inline-flex items-center gap-1 rounded-full border border-[var(--bb-border)] px-2.5 py-1 text-[11px] font-medium text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
+                >
+                  <PencilIcon />
+                  Edit
+                </button>
+              )}
+            </div>
+
+            <div className="mt-3 space-y-2 text-xs text-[var(--bb-secondary)]">
+              {/* Name — editable (OWNER + PM) */}
+              <div>
+                <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">Name</p>
+                {editingCompany ? (
+                  <FormInput
+                    size="sm"
+                    value={draftCompanyName}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setDraftCompanyName(e.target.value)
+                    }
+                    placeholder="Company name"
+                    disabled={savingCompany}
+                    className="mt-1"
+                    autoFocus
+                  />
+                ) : (
+                  <p className="mt-0.5">{company?.name}</p>
+                )}
+              </div>
+
+              {/* Slug — always read-only */}
+              <div>
+                <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">Slug</p>
+                <p className="mt-0.5">{company?.slug}</p>
+              </div>
+
+              {/* Website — editable (OWNER + PM) */}
+              <div>
+                <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">Website</p>
+                {editingCompany ? (
+                  <FormInput
+                    size="sm"
+                    type="url"
+                    value={draftWebsite}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setDraftWebsite(e.target.value)
+                    }
+                    placeholder="https://example.com"
+                    disabled={savingCompany}
+                    className="mt-1"
+                  />
+                ) : company?.website ? (
+                  <a
+                    href={company.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-0.5 inline-block text-[var(--bb-primary)] underline decoration-[var(--bb-primary)]/30 hover:decoration-[var(--bb-primary)]"
+                  >
+                    {company.website}
+                  </a>
+                ) : (
+                  <p className="mt-0.5">{"\u2014"}</p>
+                )}
+              </div>
+
+              {/* Counts — always read-only */}
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">Members</p>
+                  <p className="mt-0.5">{company?.counts.members ?? 0}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">Projects</p>
+                  <p className="mt-0.5">{company?.counts.projects ?? 0}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">Tickets</p>
+                  <p className="mt-0.5">{company?.counts.tickets ?? 0}</p>
+                </div>
+              </div>
+
+              {/* Created at — always read-only */}
+              <div>
+                <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">Created at</p>
+                <p className="mt-0.5">{company ? formatDate(company.createdAt) : "\u2014"}</p>
+              </div>
+
+              {/* Save / Cancel buttons */}
+              {editingCompany && (
+                <div className="flex items-center gap-2 pt-1">
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    loading={savingCompany}
+                    loadingText="Saving…"
+                    onClick={handleSaveCompany}
+                  >
+                    Save
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={cancelEditingCompany}
+                    disabled={savingCompany}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* ============================================================ */}
+          {/* Plan card                                                     */}
+          {/* ============================================================ */}
+          <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm md:col-span-1">
+            <h2 className="text-sm font-semibold tracking-tight">Subscription plan</h2>
+            <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
+              The plan that defines your monthly token allowance.
             </p>
 
-            {notifPrefsLoading ? (
-              <p className="mt-4 text-xs text-[var(--bb-text-tertiary)]">Loading preferences...</p>
-            ) : (
-              <div className="mt-4">
-                {/* Column headers */}
-                <div className="flex items-center justify-end gap-4 px-3 pb-2">
-                  <span className="w-9 text-center text-[10px] font-medium uppercase tracking-wider text-[var(--bb-text-tertiary)]">
-                    In-app
-                  </span>
-                  <span className="w-9 text-center text-[10px] font-medium uppercase tracking-wider text-[var(--bb-text-tertiary)]">
-                    Email
-                  </span>
+            {plan ? (
+              <div className="mt-3 space-y-2 text-xs text-[var(--bb-secondary)]">
+                {!canManagePlan && (
+                  <div className="rounded-lg border border-[var(--bb-warning-border)] bg-[var(--bb-warning-bg)] px-3 py-2 text-[11px] text-[var(--bb-text-secondary)]">
+                    <p className="text-[11px] font-medium text-[var(--bb-warning-text)]">
+                      Limited access
+                    </p>
+                    <p className="mt-1">
+                      You don&apos;t have permission to manage billing for this company. You can see
+                      the current plan, but only the owner or billing manager can request changes.
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
+                    Plan name
+                  </p>
+                  <p className="mt-0.5">{plan.name}</p>
                 </div>
-                <div className="space-y-1">
+                <div>
+                  <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
+                    Monthly tokens
+                  </p>
+                  <p className="mt-0.5">{plan.monthlyTokens} tokens</p>
+                </div>
+                <div>
+                  <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">Price</p>
+                  <p className="mt-0.5">{formatPrice(plan.priceCents)}</p>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
+                      Subscription status
+                    </p>
+                    <div className="mt-1">
+                      <span
+                        className={
+                          "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold " +
+                          billingStatusClassName(company?.billingStatus ?? null)
+                        }
+                      >
+                        {prettyBillingStatus(company?.billingStatus ?? null)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {billingError && (
+                  <InlineAlert variant="error" size="sm" className="mt-2">
+                    {billingError}
+                  </InlineAlert>
+                )}
+
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <div className="rounded-lg bg-[var(--bb-bg-page)] px-3 py-2 text-[11px] text-[var(--bb-text-secondary)]">
+                    {canManagePlan ? (
+                      <>
+                        Use the button on the right to manage your subscription and billing details
+                        through Stripe.
+                      </>
+                    ) : (
+                      <>
+                        Need to change something? Ask your company owner or billing manager to
+                        manage the subscription.
+                      </>
+                    )}
+                  </div>
+
+                  {canManagePlan && (
+                    <button
+                      type="button"
+                      onClick={handleStartBillingCheckout}
+                      disabled={billingLoading || !plan.isActive}
+                      className="inline-flex flex-shrink-0 items-center justify-center rounded-full bg-[var(--bb-primary)] px-3 py-2 text-[11px] font-semibold text-white shadow-sm disabled:opacity-60"
+                    >
+                      {billingLoading ? "Redirecting\u2026" : "Manage billing"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="mt-3 rounded-lg bg-[var(--bb-bg-page)] px-3 py-2 text-[11px] text-[var(--bb-text-secondary)]">
+                No subscription plan is assigned to your company yet. Please contact support if this
+                does not look correct.
+              </div>
+            )}
+          </section>
+        </div>
+      )}
+
+      {/* Notification preferences */}
+      {!loading && data && (
+        <div className="mt-6 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">
+            Notification preferences
+          </h2>
+          <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
+            Choose which events you want to be notified about
+          </p>
+
+          {notifPrefsLoading ? (
+            <p className="mt-4 text-xs text-[var(--bb-text-tertiary)]">Loading preferences...</p>
+          ) : (
+            <div className="mt-4">
+              {/* Column headers */}
+              <div className="flex items-center justify-end gap-4 px-3 pb-2">
+                <span className="w-9 text-center text-[10px] font-medium tracking-wider text-[var(--bb-text-tertiary)] uppercase">
+                  In-app
+                </span>
+                <span className="w-9 text-center text-[10px] font-medium tracking-wider text-[var(--bb-text-tertiary)] uppercase">
+                  Email
+                </span>
+              </div>
+              <div className="space-y-1">
                 {CUSTOMER_PREFS.map((pref) => {
                   const prefData = notifPrefs.find((p) => p.type === pref.type);
                   const enabled = prefData?.enabled ?? true;
@@ -1037,8 +956,12 @@ export default function CustomerSettingsPage() {
                       className="flex items-center justify-between rounded-xl px-3 py-3 transition-colors hover:bg-[var(--bb-bg-card)]/50"
                     >
                       <div className="mr-4 min-w-0 flex-1">
-                        <p className="text-xs font-medium text-[var(--bb-secondary)]">{pref.label}</p>
-                        <p className="mt-0.5 text-[10px] text-[var(--bb-text-tertiary)]">{pref.description}</p>
+                        <p className="text-xs font-medium text-[var(--bb-secondary)]">
+                          {pref.label}
+                        </p>
+                        <p className="mt-0.5 text-[10px] text-[var(--bb-text-tertiary)]">
+                          {pref.description}
+                        </p>
                       </div>
                       <div className="flex items-center gap-4">
                         {/* In-app toggle */}
@@ -1081,190 +1004,184 @@ export default function CustomerSettingsPage() {
                     </div>
                   );
                 })}
-                </div>
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
+      )}
 
-        {/* Tag management — OWNER + PM only */}
-        {!loading && data && canEditCompany && (
-          <div className="mt-6 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-            <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">Tags</h2>
-            <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
-              Manage tags used to categorize creative requests across your
-              company.
-            </p>
+      {/* Tag management — OWNER + PM only */}
+      {!loading && data && canEditCompany && (
+        <div className="mt-6 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">Tags</h2>
+          <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
+            Manage tags used to categorize creative requests across your company.
+          </p>
 
-            {tagsLoading ? (
-              <p className="mt-4 text-xs text-[var(--bb-text-tertiary)]">Loading tags…</p>
-            ) : (
-              <>
-                {/* Existing tags */}
-                {tags.length === 0 ? (
-                  <p className="mt-4 text-xs text-[var(--bb-text-tertiary)]">
-                    No tags yet. Create your first tag below.
-                  </p>
-                ) : (
-                  <div className="mt-4 space-y-2">
-                    {tags.map((tag) => (
-                      <div
-                        key={tag.id}
-                        className="flex items-center justify-between rounded-xl bg-[var(--bb-bg-warm)] px-3 py-2"
-                      >
-                        {editingTagId === tag.id ? (
-                          <div className="flex flex-1 flex-wrap items-center gap-2">
-                            <input
-                              type="text"
-                              value={editTagName}
-                              onChange={(e) =>
-                                setEditTagName(e.target.value)
+          {tagsLoading ? (
+            <p className="mt-4 text-xs text-[var(--bb-text-tertiary)]">Loading tags…</p>
+          ) : (
+            <>
+              {/* Existing tags */}
+              {tags.length === 0 ? (
+                <p className="mt-4 text-xs text-[var(--bb-text-tertiary)]">
+                  No tags yet. Create your first tag below.
+                </p>
+              ) : (
+                <div className="mt-4 space-y-2">
+                  {tags.map((tag) => (
+                    <div
+                      key={tag.id}
+                      className="flex items-center justify-between rounded-xl bg-[var(--bb-bg-warm)] px-3 py-2"
+                    >
+                      {editingTagId === tag.id ? (
+                        <div className="flex flex-1 flex-wrap items-center gap-2">
+                          <input
+                            type="text"
+                            value={editTagName}
+                            onChange={(e) => setEditTagName(e.target.value)}
+                            maxLength={30}
+                            className="w-32 rounded border border-[var(--bb-border)] px-2 py-1 text-[12px] text-[var(--bb-secondary)] focus:border-[var(--bb-primary)] focus:outline-none"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                handleSaveTag();
                               }
-                              maxLength={30}
-                              className="w-32 rounded border border-[var(--bb-border)] px-2 py-1 text-[12px] text-[var(--bb-secondary)] focus:border-[var(--bb-primary)] focus:outline-none"
-                              autoFocus
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  handleSaveTag();
-                                }
-                                if (e.key === "Escape") cancelEditingTag();
-                              }}
-                            />
-                            <div className="flex gap-1">
-                              {TAG_COLOR_KEYS.map((key) => (
-                                <button
-                                  key={key}
-                                  type="button"
-                                  onClick={() => setEditTagColor(key)}
-                                  className={`h-6 w-6 rounded-full border-2 ${
-                                    editTagColor === key
-                                      ? "border-[var(--bb-secondary)] scale-110"
-                                      : "border-transparent"
-                                  }`}
-                                  style={{
-                                    backgroundColor: TAG_COLORS[key].dot,
-                                  }}
-                                  title={TAG_COLORS[key].label}
-                                />
-                              ))}
-                            </div>
-                            <Button
-                              size="sm"
-                              onClick={handleSaveTag}
-                              loading={savingTag}
-                              loadingText="…"
-                              disabled={!editTagName.trim()}
-                            >
-                              Save
-                            </Button>
+                              if (e.key === "Escape") cancelEditingTag();
+                            }}
+                          />
+                          <div className="flex gap-1">
+                            {TAG_COLOR_KEYS.map((key) => (
+                              <button
+                                key={key}
+                                type="button"
+                                onClick={() => setEditTagColor(key)}
+                                className={`h-6 w-6 rounded-full border-2 ${
+                                  editTagColor === key
+                                    ? "scale-110 border-[var(--bb-secondary)]"
+                                    : "border-transparent"
+                                }`}
+                                style={{
+                                  backgroundColor: TAG_COLORS[key].dot,
+                                }}
+                                title={TAG_COLORS[key].label}
+                              />
+                            ))}
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={handleSaveTag}
+                            loading={savingTag}
+                            loadingText="…"
+                            disabled={!editTagName.trim()}
+                          >
+                            Save
+                          </Button>
+                          <button
+                            type="button"
+                            onClick={cancelEditingTag}
+                            className="text-[11px] text-[var(--bb-text-tertiary)] hover:text-[var(--bb-secondary)]"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <TagBadge name={tag.name} color={tag.color} />
+                          <div className="flex items-center gap-1.5">
                             <button
                               type="button"
-                              onClick={cancelEditingTag}
-                              className="text-[11px] text-[var(--bb-text-tertiary)] hover:text-[var(--bb-secondary)]"
+                              onClick={() => startEditingTag(tag)}
+                              className="rounded p-1 text-[var(--bb-text-tertiary)] hover:text-[var(--bb-secondary)]"
+                              title="Edit tag"
                             >
-                              Cancel
+                              <PencilIcon />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setTagToDelete(tag.id)}
+                              disabled={deletingTagId === tag.id}
+                              className="rounded p-1 text-[var(--bb-text-tertiary)] hover:text-[var(--bb-danger-text)] disabled:opacity-50"
+                              title="Delete tag"
+                            >
+                              <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 14 14"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <path
+                                  d="M10.5 3.5L3.5 10.5M3.5 3.5L10.5 10.5"
+                                  stroke="currentColor"
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
                             </button>
                           </div>
-                        ) : (
-                          <>
-                            <TagBadge
-                              name={tag.name}
-                              color={tag.color}
-                            />
-                            <div className="flex items-center gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => startEditingTag(tag)}
-                                className="rounded p-1 text-[var(--bb-text-tertiary)] hover:text-[var(--bb-secondary)]"
-                                title="Edit tag"
-                              >
-                                <PencilIcon />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setTagToDelete(tag.id)}
-                                disabled={deletingTagId === tag.id}
-                                className="rounded p-1 text-[var(--bb-text-tertiary)] hover:text-[var(--bb-danger-text)] disabled:opacity-50"
-                                title="Delete tag"
-                              >
-                                <svg
-                                  width="14"
-                                  height="14"
-                                  viewBox="0 0 14 14"
-                                  fill="none"
-                                  xmlns="http://www.w3.org/2000/svg"
-                                >
-                                  <path
-                                    d="M10.5 3.5L3.5 10.5M3.5 3.5L10.5 10.5"
-                                    stroke="currentColor"
-                                    strokeWidth="1.5"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                  />
-                                </svg>
-                              </button>
-                            </div>
-                          </>
-                        )}
-                      </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add new tag */}
+              <div className="mt-4 rounded-xl border border-dashed border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-3">
+                <p className="mb-2 text-[11px] font-medium text-[var(--bb-text-tertiary)]">
+                  Add a new tag
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="text"
+                    value={newTagName}
+                    onChange={(e) => setNewTagName(e.target.value)}
+                    placeholder="Tag name"
+                    maxLength={30}
+                    className="w-40 rounded border border-[var(--bb-border)] px-2 py-1.5 text-[12px] text-[var(--bb-secondary)] placeholder:text-[var(--bb-text-tertiary)] focus:border-[var(--bb-primary)] focus:outline-none"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddTag();
+                      }
+                    }}
+                  />
+                  <div className="flex gap-1.5">
+                    {TAG_COLOR_KEYS.map((key) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setNewTagColor(key)}
+                        className={`h-6 w-6 rounded-full border-2 transition-transform ${
+                          newTagColor === key
+                            ? "scale-110 border-[var(--bb-secondary)]"
+                            : "border-transparent hover:scale-105"
+                        }`}
+                        style={{
+                          backgroundColor: TAG_COLORS[key].dot,
+                        }}
+                        title={TAG_COLORS[key].label}
+                      />
                     ))}
                   </div>
-                )}
-
-                {/* Add new tag */}
-                <div className="mt-4 rounded-xl border border-dashed border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-3">
-                  <p className="mb-2 text-[11px] font-medium text-[var(--bb-text-tertiary)]">
-                    Add a new tag
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <input
-                      type="text"
-                      value={newTagName}
-                      onChange={(e) => setNewTagName(e.target.value)}
-                      placeholder="Tag name"
-                      maxLength={30}
-                      className="w-40 rounded border border-[var(--bb-border)] px-2 py-1.5 text-[12px] text-[var(--bb-secondary)] placeholder:text-[var(--bb-text-tertiary)] focus:border-[var(--bb-primary)] focus:outline-none"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          handleAddTag();
-                        }
-                      }}
-                    />
-                    <div className="flex gap-1.5">
-                      {TAG_COLOR_KEYS.map((key) => (
-                        <button
-                          key={key}
-                          type="button"
-                          onClick={() => setNewTagColor(key)}
-                          className={`h-6 w-6 rounded-full border-2 transition-transform ${
-                            newTagColor === key
-                              ? "scale-110 border-[var(--bb-secondary)]"
-                              : "border-transparent hover:scale-105"
-                          }`}
-                          style={{
-                            backgroundColor: TAG_COLORS[key].dot,
-                          }}
-                          title={TAG_COLORS[key].label}
-                        />
-                      ))}
-                    </div>
-                    <Button
-                      size="sm"
-                      onClick={handleAddTag}
-                      loading={addingTag}
-                      loadingText="Adding…"
-                      disabled={!newTagName.trim()}
-                    >
-                      Add tag
-                    </Button>
-                  </div>
+                  <Button
+                    size="sm"
+                    onClick={handleAddTag}
+                    loading={addingTag}
+                    loadingText="Adding…"
+                    disabled={!newTagName.trim()}
+                  >
+                    Add tag
+                  </Button>
                 </div>
-              </>
-            )}
-          </div>
-        )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Delete tag confirmation */}
       <ConfirmDialog

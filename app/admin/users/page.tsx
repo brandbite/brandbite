@@ -69,6 +69,7 @@ export default function AdminUsersPage() {
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [pendingRole, setPendingRole] = useState("");
   const [saving, setSaving] = useState(false);
+  const [togglingNotesId, setTogglingNotesId] = useState<string | null>(null);
 
   // Debounce search
   useEffect(() => {
@@ -131,6 +132,38 @@ export default function AdminUsersPage() {
       showToast({ title: "Failed to update role", type: "error" });
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Toggle revision notes
+  const handleToggleRevisionNotes = async (userId: string, currentValue: boolean) => {
+    setTogglingNotesId(userId);
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, creativeRevisionNotesEnabled: !currentValue }),
+      });
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        showToast({ title: json?.error || "Failed to update setting", type: "error" });
+        return;
+      }
+
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === userId ? { ...u, creativeRevisionNotesEnabled: !currentValue } : u,
+        ),
+      );
+      showToast({
+        title: `Revision notes ${!currentValue ? "enabled" : "disabled"}`,
+        type: "success",
+      });
+    } catch {
+      showToast({ title: "Failed to update setting", type: "error" });
+    } finally {
+      setTogglingNotesId(null);
     }
   };
 
@@ -252,46 +285,74 @@ export default function AdminUsersPage() {
 
                   {/* Actions */}
                   <td className="px-4 py-3">
-                    {editingUserId === u.id ? (
-                      <div className="flex items-center gap-2">
-                        <select
-                          value={pendingRole}
-                          onChange={(e) => setPendingRole(e.target.value)}
-                          disabled={saving}
-                          className="rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-card)] px-2 py-1 text-xs text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)]"
-                        >
-                          {ROLE_OPTIONS.map((r) => (
-                            <option key={r.value} value={r.value}>
-                              {r.label}
-                            </option>
-                          ))}
-                        </select>
+                    <div className="flex flex-col gap-1.5">
+                      {editingUserId === u.id ? (
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={pendingRole}
+                            onChange={(e) => setPendingRole(e.target.value)}
+                            disabled={saving}
+                            className="rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-card)] px-2 py-1 text-xs text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)]"
+                          >
+                            {ROLE_OPTIONS.map((r) => (
+                              <option key={r.value} value={r.value}>
+                                {r.label}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={() => handleRoleChange(u.id, pendingRole)}
+                            disabled={saving || pendingRole === u.role}
+                            className="rounded-lg bg-[var(--bb-primary)] px-2.5 py-1 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                          >
+                            {saving ? "..." : "Save"}
+                          </button>
+                          <button
+                            onClick={() => setEditingUserId(null)}
+                            disabled={saving}
+                            className="text-xs text-[var(--bb-text-muted)] hover:text-[var(--bb-secondary)]"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
                         <button
-                          onClick={() => handleRoleChange(u.id, pendingRole)}
-                          disabled={saving || pendingRole === u.role}
-                          className="rounded-lg bg-[var(--bb-primary)] px-2.5 py-1 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                          onClick={() => {
+                            setEditingUserId(u.id);
+                            setPendingRole(u.role);
+                          }}
+                          className="rounded-lg border border-[var(--bb-border)] px-2.5 py-1 text-xs font-medium text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
                         >
-                          {saving ? "..." : "Save"}
+                          Change role
                         </button>
+                      )}
+                      {u.role === "DESIGNER" && (
                         <button
-                          onClick={() => setEditingUserId(null)}
-                          disabled={saving}
-                          className="text-xs text-[var(--bb-text-muted)] hover:text-[var(--bb-secondary)]"
+                          onClick={() =>
+                            handleToggleRevisionNotes(u.id, u.creativeRevisionNotesEnabled)
+                          }
+                          disabled={togglingNotesId === u.id}
+                          className="flex items-center gap-1.5 text-[10px] text-[var(--bb-text-muted)] transition-colors hover:text-[var(--bb-secondary)] disabled:opacity-50"
                         >
-                          Cancel
+                          <span
+                            className={`inline-block h-3 w-5 rounded-full transition-colors ${
+                              u.creativeRevisionNotesEnabled
+                                ? "bg-[var(--bb-primary)]"
+                                : "bg-[var(--bb-border)]"
+                            }`}
+                          >
+                            <span
+                              className={`block h-2.5 w-2.5 translate-y-[1px] rounded-full bg-white transition-transform ${
+                                u.creativeRevisionNotesEnabled
+                                  ? "translate-x-[9px]"
+                                  : "translate-x-[1px]"
+                              }`}
+                            />
+                          </span>
+                          Revision notes
                         </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          setEditingUserId(u.id);
-                          setPendingRole(u.role);
-                        }}
-                        className="rounded-lg border border-[var(--bb-border)] px-2.5 py-1 text-xs font-medium text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
-                      >
-                        Change role
-                      </button>
-                    )}
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

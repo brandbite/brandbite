@@ -10,23 +10,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import {
-  isDueDateOverdue,
-  isDueDateSoon,
-  formatDueDateCountdown,
-} from "@/lib/board";
+import { isDueDateOverdue, isDueDateSoon, formatDueDateCountdown } from "@/lib/board";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { LoadingState } from "@/components/ui/loading-state";
 import { PauseBanner } from "@/components/creative/pause-banner";
-import {
-  Bar,
-  BarChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-  Cell,
-} from "recharts";
+import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from "recharts";
 
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -135,6 +123,7 @@ type CreativeDashboardData = {
   tickets: CreativeTicketsResponse;
   withdrawals: CreativeWithdrawalsResponse;
   payoutTier: PayoutTierResponse | null;
+  skillCount: number;
 };
 
 type DashboardState =
@@ -206,19 +195,23 @@ export default function CreativeDashboardPage() {
       setState({ status: "loading" });
 
       try {
-        const [balanceRes, ticketsRes, withdrawalsRes, payoutTierRes] = await Promise.all([
-          fetch("/api/creative/balance"),
-          fetch("/api/creative/tickets"),
-          fetch("/api/creative/withdrawals"),
-          fetch("/api/creative/payout-tier"),
-        ]);
+        const [balanceRes, ticketsRes, withdrawalsRes, payoutTierRes, skillsRes] =
+          await Promise.all([
+            fetch("/api/creative/balance"),
+            fetch("/api/creative/tickets"),
+            fetch("/api/creative/withdrawals"),
+            fetch("/api/creative/payout-tier"),
+            fetch("/api/creative/skills"),
+          ]);
 
-        const [balanceJson, ticketsJson, withdrawalsJson, payoutTierJson] = await Promise.all([
-          balanceRes.json().catch(() => null),
-          ticketsRes.json().catch(() => null),
-          withdrawalsRes.json().catch(() => null),
-          payoutTierRes.json().catch(() => null),
-        ]);
+        const [balanceJson, ticketsJson, withdrawalsJson, payoutTierJson, skillsJson] =
+          await Promise.all([
+            balanceRes.json().catch(() => null),
+            ticketsRes.json().catch(() => null),
+            withdrawalsRes.json().catch(() => null),
+            payoutTierRes.json().catch(() => null),
+            skillsRes.json().catch(() => null),
+          ]);
 
         if (!balanceRes.ok) {
           const message =
@@ -243,6 +236,8 @@ export default function CreativeDashboardPage() {
 
         if (cancelled) return;
 
+        const selectedSkills = skillsRes.ok ? ((skillsJson as any)?.selectedJobTypeIds ?? []) : [];
+
         setState({
           status: "ready",
           data: {
@@ -250,6 +245,7 @@ export default function CreativeDashboardPage() {
             tickets: ticketsJson as CreativeTicketsResponse,
             withdrawals: withdrawalsJson as CreativeWithdrawalsResponse,
             payoutTier: payoutTierRes.ok ? (payoutTierJson as PayoutTierResponse) : null,
+            skillCount: selectedSkills.length,
           },
         });
       } catch (err: any) {
@@ -257,9 +253,7 @@ export default function CreativeDashboardPage() {
         if (!cancelled) {
           setState({
             status: "error",
-            message:
-              err?.message ||
-              "Failed to load creative overview. Please try again.",
+            message: err?.message || "Failed to load creative overview. Please try again.",
           });
         }
       }
@@ -284,9 +278,7 @@ export default function CreativeDashboardPage() {
 
   const tokenBalance = balanceData?.balance ?? null;
   const lastLedgerEntry =
-    balanceData && balanceData.ledger.length > 0
-      ? balanceData.ledger[0]
-      : null;
+    balanceData && balanceData.ledger.length > 0 ? balanceData.ledger[0] : null;
 
   const ticketStats = ticketsData?.stats ?? null;
   const totalTickets = ticketStats?.total ?? 0;
@@ -296,8 +288,8 @@ export default function CreativeDashboardPage() {
     ticketStats?.openTotal != null
       ? ticketStats.openTotal
       : totalTickets > 0
-      ? totalTickets - doneTickets
-      : 0;
+        ? totalTickets - doneTickets
+        : 0;
 
   const loadScore = ticketStats?.loadScore ?? 0;
   const priorityStats = ticketStats?.byPriority ?? null;
@@ -307,15 +299,13 @@ export default function CreativeDashboardPage() {
     () =>
       creativeTickets
         .filter((t) => t.dueDate != null && t.status !== "DONE")
-        .sort(
-          (a, b) =>
-            new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime(),
-        )
+        .sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime())
         .slice(0, 5),
     [creativeTickets],
   );
 
   const payoutTierData = data?.payoutTier ?? null;
+  const skillCount = data?.skillCount ?? null;
 
   const withdrawalsStats = withdrawalsData?.stats ?? null;
   const latestWithdrawal =
@@ -342,20 +332,17 @@ export default function CreativeDashboardPage() {
     : [];
 
   /* Load score color */
-  const loadScoreColor =
-    loadScore >= 80 ? "#EF4444" : loadScore >= 50 ? "#F59E0B" : "#22C55E";
+  const loadScoreColor = loadScore >= 80 ? "#EF4444" : loadScore >= 50 ? "#F59E0B" : "#22C55E";
 
   return (
     <>
       {/* Header */}
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
+          <p className="text-xs font-semibold tracking-[0.18em] text-[var(--bb-text-muted)] uppercase">
             Creative workspace
           </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-            Overview
-          </h1>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Overview</h1>
           {user && (
             <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               Signed in as{" "}
@@ -366,13 +353,67 @@ export default function CreativeDashboardPage() {
             </p>
           )}
         </div>
-        {isLoading && (
-          <LoadingState display="inline" message="Loading overview..." />
-        )}
+        {isLoading && <LoadingState display="inline" message="Loading overview..." />}
       </div>
 
       {/* Pause banner */}
       <PauseBanner />
+
+      {/* Welcome / setup guide for new creatives */}
+      {skillCount === 0 && !isLoading && !isError && (
+        <div className="mb-4 rounded-2xl border border-[var(--bb-primary)]/30 bg-[var(--bb-primary)]/5 p-5">
+          <h2 className="text-base font-semibold text-[var(--bb-secondary)]">
+            Welcome to Brandbite!
+          </h2>
+          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
+            Set up your profile to start receiving ticket assignments:
+          </p>
+          <ol className="mt-3 space-y-2 text-sm text-[var(--bb-text-secondary)]">
+            <li className="flex items-start gap-2">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--bb-primary)] text-xs font-bold text-white">
+                1
+              </span>
+              <span>
+                <Link
+                  href="/creative/settings"
+                  className="font-medium text-[var(--bb-primary)] hover:underline"
+                >
+                  Select your skills
+                </Link>{" "}
+                so we can match you with the right tickets
+              </span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--bb-bg-page)] text-xs font-bold text-[var(--bb-text-muted)] ring-1 ring-[var(--bb-border)]">
+                2
+              </span>
+              <span>
+                Wait for ticket assignments to appear on your{" "}
+                <Link
+                  href="/creative/board"
+                  className="font-medium text-[var(--bb-primary)] hover:underline"
+                >
+                  board
+                </Link>
+              </span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--bb-bg-page)] text-xs font-bold text-[var(--bb-text-muted)] ring-1 ring-[var(--bb-border)]">
+                3
+              </span>
+              <span>
+                Complete tickets, earn tokens, and request{" "}
+                <Link
+                  href="/creative/withdrawals"
+                  className="font-medium text-[var(--bb-primary)] hover:underline"
+                >
+                  withdrawals
+                </Link>
+              </span>
+            </li>
+          </ol>
+        </div>
+      )}
 
       {/* Error */}
       {isError && (
@@ -388,9 +429,9 @@ export default function CreativeDashboardPage() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {/* Token balance card */}
             <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-[#F15B2B] to-[#f6a07a]" />
+              <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-[#F15B2B] to-[#f6a07a]" />
               <div className="flex items-center justify-between">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
+                <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
                   Token balance
                 </p>
                 <Link
@@ -408,17 +449,11 @@ export default function CreativeDashboardPage() {
               {/* Last activity */}
               {lastLedgerEntry && (
                 <div className="mt-4 rounded-xl bg-[var(--bb-bg-card)] px-3 py-2.5 text-[11px] text-[var(--bb-text-secondary)]">
-                  <p className="font-medium text-[var(--bb-secondary)]">
-                    Last activity
-                  </p>
+                  <p className="font-medium text-[var(--bb-secondary)]">Last activity</p>
                   <p className="mt-1">
-                    {lastLedgerEntry.direction === "CREDIT"
-                      ? "Credited"
-                      : "Debited"}{" "}
-                    <span className="font-semibold">
-                      {lastLedgerEntry.amount} tokens
-                    </span>{" "}
-                    on {formatDate(lastLedgerEntry.createdAt)}.
+                    {lastLedgerEntry.direction === "CREDIT" ? "Credited" : "Debited"}{" "}
+                    <span className="font-semibold">{lastLedgerEntry.amount} tokens</span> on{" "}
+                    {formatDate(lastLedgerEntry.createdAt)}.
                   </p>
                 </div>
               )}
@@ -426,9 +461,9 @@ export default function CreativeDashboardPage() {
 
             {/* Active tickets card */}
             <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-[#3B82F6] to-[#93C5FD]" />
+              <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-[#3B82F6] to-[#93C5FD]" />
               <div className="flex items-center justify-between">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
+                <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
                   Active tickets
                 </p>
                 <Link
@@ -438,12 +473,8 @@ export default function CreativeDashboardPage() {
                   Open board
                 </Link>
               </div>
-              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">
-                {openTickets}
-              </p>
-              <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-                of {totalTickets} total
-              </p>
+              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">{openTickets}</p>
+              <p className="text-[11px] text-[var(--bb-text-tertiary)]">of {totalTickets} total</p>
 
               {/* Status breakdown dots */}
               {ticketStats && (
@@ -454,9 +485,7 @@ export default function CreativeDashboardPage() {
                         className="inline-block h-2 w-2 rounded-full"
                         style={{ backgroundColor: STATUS_COLORS[s] }}
                       />
-                      <span className="text-[var(--bb-text-tertiary)]">
-                        {STATUS_LABELS[s]}
-                      </span>
+                      <span className="text-[var(--bb-text-tertiary)]">{STATUS_LABELS[s]}</span>
                       <span className="font-semibold text-[var(--bb-secondary)]">
                         {ticketStats.byStatus[s] ?? 0}
                       </span>
@@ -468,9 +497,9 @@ export default function CreativeDashboardPage() {
 
             {/* Earnings / Withdrawals card */}
             <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-[#22C55E] to-[#86EFAC]" />
+              <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-[#22C55E] to-[#86EFAC]" />
               <div className="flex items-center justify-between">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
+                <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
                   Earnings
                 </p>
                 <Link
@@ -493,25 +522,19 @@ export default function CreativeDashboardPage() {
                     <p className="text-sm font-bold text-[var(--bb-secondary)]">
                       {withdrawalsStats.pendingCount}
                     </p>
-                    <p className="text-[10px] text-[var(--bb-text-tertiary)]">
-                      Pending
-                    </p>
+                    <p className="text-[10px] text-[var(--bb-text-tertiary)]">Pending</p>
                   </div>
                   <div className="flex-1 rounded-xl bg-[var(--bb-bg-card)] px-3 py-2 text-center">
                     <p className="text-sm font-bold text-[var(--bb-secondary)]">
                       {withdrawalsStats.totalRequested}
                     </p>
-                    <p className="text-[10px] text-[var(--bb-text-tertiary)]">
-                      Total requested
-                    </p>
+                    <p className="text-[10px] text-[var(--bb-text-tertiary)]">Total requested</p>
                   </div>
                   <div className="flex-1 rounded-xl bg-[var(--bb-bg-card)] px-3 py-2 text-center">
                     <p className="text-sm font-bold text-[var(--bb-secondary)]">
                       {withdrawalsStats.withdrawalsCount}
                     </p>
-                    <p className="text-[10px] text-[var(--bb-text-tertiary)]">
-                      All time
-                    </p>
+                    <p className="text-[10px] text-[var(--bb-text-tertiary)]">All time</p>
                   </div>
                 </div>
               )}
@@ -519,9 +542,9 @@ export default function CreativeDashboardPage() {
 
             {/* Payout rate card */}
             <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-[#8B5CF6] to-[#C4B5FD]" />
+              <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-[#8B5CF6] to-[#C4B5FD]" />
               <div className="flex items-center justify-between">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
+                <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
                   Payout rate
                 </p>
                 <Link
@@ -539,34 +562,37 @@ export default function CreativeDashboardPage() {
               </p>
 
               {/* Next tier progress */}
-              {payoutTierData && payoutTierData.tiers.length > 0 && (() => {
-                const nextTier = payoutTierData.tiers.find((t) => !t.qualified);
-                if (!nextTier) return (
-                  <div className="mt-4 rounded-xl bg-[var(--bb-bg-card)] px-3 py-2.5 text-[11px] text-[var(--bb-text-secondary)]">
-                    <p className="font-medium text-[#8B5CF6]">Max tier reached</p>
-                  </div>
-                );
-                const progress = Math.min(
-                  Math.round((nextTier.completedInWindow / nextTier.minCompletedTickets) * 100),
-                  100,
-                );
-                return (
-                  <div className="mt-4 rounded-xl bg-[var(--bb-bg-card)] px-3 py-2.5">
-                    <p className="text-[10px] font-medium text-[var(--bb-text-secondary)]">
-                      Next: {nextTier.name} ({nextTier.payoutPercent}%)
-                    </p>
-                    <div className="mt-1.5 h-1.5 w-full rounded-full bg-[var(--bb-border)]">
-                      <div
-                        className="h-full rounded-full bg-[#8B5CF6] transition-all"
-                        style={{ width: `${progress}%` }}
-                      />
+              {payoutTierData &&
+                payoutTierData.tiers.length > 0 &&
+                (() => {
+                  const nextTier = payoutTierData.tiers.find((t) => !t.qualified);
+                  if (!nextTier)
+                    return (
+                      <div className="mt-4 rounded-xl bg-[var(--bb-bg-card)] px-3 py-2.5 text-[11px] text-[var(--bb-text-secondary)]">
+                        <p className="font-medium text-[#8B5CF6]">Max tier reached</p>
+                      </div>
+                    );
+                  const progress = Math.min(
+                    Math.round((nextTier.completedInWindow / nextTier.minCompletedTickets) * 100),
+                    100,
+                  );
+                  return (
+                    <div className="mt-4 rounded-xl bg-[var(--bb-bg-card)] px-3 py-2.5">
+                      <p className="text-[10px] font-medium text-[var(--bb-text-secondary)]">
+                        Next: {nextTier.name} ({nextTier.payoutPercent}%)
+                      </p>
+                      <div className="mt-1.5 h-1.5 w-full rounded-full bg-[var(--bb-border)]">
+                        <div
+                          className="h-full rounded-full bg-[#8B5CF6] transition-all"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                      <p className="mt-1 text-[10px] text-[var(--bb-text-tertiary)]">
+                        {nextTier.completedInWindow}/{nextTier.minCompletedTickets} tickets
+                      </p>
                     </div>
-                    <p className="mt-1 text-[10px] text-[var(--bb-text-tertiary)]">
-                      {nextTier.completedInWindow}/{nextTier.minCompletedTickets} tickets
-                    </p>
-                  </div>
-                );
-              })()}
+                  );
+                })()}
             </section>
           </div>
 
@@ -690,14 +716,12 @@ export default function CreativeDashboardPage() {
                       <Link
                         key={t.id}
                         href={`/creative/tickets/${t.id}`}
-                        className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0 transition-opacity hover:opacity-80"
+                        className="flex items-center justify-between py-2.5 transition-opacity first:pt-0 last:pb-0 hover:opacity-80"
                       >
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-xs font-medium text-[var(--bb-secondary)]">
                             {code && (
-                              <span className="mr-1.5 text-[var(--bb-text-tertiary)]">
-                                {code}
-                              </span>
+                              <span className="mr-1.5 text-[var(--bb-text-tertiary)]">{code}</span>
                             )}
                             {t.title}
                           </p>
@@ -736,16 +760,14 @@ export default function CreativeDashboardPage() {
                 Load score
               </h2>
               <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
-                Your current workload capacity indicator.
+                Your current workload capacity indicator. Based on your active tickets vs. maximum
+                capacity. Below 50 is light, 50-80 is moderate, above 80 is heavy.
               </p>
 
               <div className="mt-4 flex items-center gap-4">
                 {/* Circular gauge */}
                 <div className="relative flex h-20 w-20 flex-shrink-0 items-center justify-center">
-                  <svg
-                    className="h-full w-full -rotate-90"
-                    viewBox="0 0 36 36"
-                  >
+                  <svg className="h-full w-full -rotate-90" viewBox="0 0 36 36">
                     <circle
                       cx="18"
                       cy="18"
@@ -776,18 +798,13 @@ export default function CreativeDashboardPage() {
                 {ticketStats && (
                   <div className="flex-1 space-y-1.5">
                     {STATUS_ORDER.map((s) => (
-                      <div
-                        key={s}
-                        className="flex items-center justify-between text-[11px]"
-                      >
+                      <div key={s} className="flex items-center justify-between text-[11px]">
                         <div className="flex items-center gap-1.5">
                           <span
                             className="inline-block h-2 w-2 rounded-full"
                             style={{ backgroundColor: STATUS_COLORS[s] }}
                           />
-                          <span className="text-[var(--bb-text-tertiary)]">
-                            {STATUS_LABELS[s]}
-                          </span>
+                          <span className="text-[var(--bb-text-tertiary)]">{STATUS_LABELS[s]}</span>
                         </div>
                         <span className="font-semibold text-[var(--bb-secondary)]">
                           {ticketStats.byStatus[s] ?? 0}
@@ -836,10 +853,10 @@ export default function CreativeDashboardPage() {
                           w.status === "PAID"
                             ? "bg-[var(--bb-success-bg)] text-[var(--bb-success-text)]"
                             : w.status === "APPROVED"
-                            ? "bg-[var(--bb-info-bg)] text-[var(--bb-info-text)]"
-                            : w.status === "REJECTED"
-                            ? "bg-[var(--bb-danger-bg)] text-[var(--bb-danger-text)]"
-                            : "bg-[var(--bb-warning-bg)] text-[var(--bb-warning-text)]"
+                              ? "bg-[var(--bb-info-bg)] text-[var(--bb-info-text)]"
+                              : w.status === "REJECTED"
+                                ? "bg-[var(--bb-danger-bg)] text-[var(--bb-danger-text)]"
+                                : "bg-[var(--bb-warning-bg)] text-[var(--bb-warning-text)]"
                         }`}
                       >
                         {withdrawalStatusLabel(w.status)}

@@ -19,7 +19,12 @@ type Status = "idle" | "submitting" | "magic-link-sent" | "error";
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirect");
+  const rawRedirect = searchParams.get("redirect");
+  // Prevent open redirect: only allow internal paths (starts with / but not //)
+  const redirectTo =
+    rawRedirect && rawRedirect.startsWith("/") && !rawRedirect.startsWith("//")
+      ? rawRedirect
+      : null;
 
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
@@ -135,7 +140,7 @@ export default function LoginPage() {
     try {
       const { error: mlError } = await authClient.signIn.magicLink({
         email: email.trim(),
-        callbackURL: redirectTo || "/login?callback=true",
+        callbackURL: "/login?callback=true",
       });
 
       if (mlError) {

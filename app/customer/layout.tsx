@@ -9,23 +9,23 @@ import { AppNav } from "@/components/navigation/app-nav";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-export default async function CustomerLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default async function CustomerLayout({ children }: { children: React.ReactNode }) {
   // If the user's company hasn't completed onboarding, redirect to /onboarding
   // (which lives outside the /customer route group to avoid layout loops).
   try {
     const user = await getCurrentUser();
-    if (user?.activeCompanyId) {
-      const company = await prisma.company.findUnique({
-        where: { id: user.activeCompanyId },
-        select: { onboardingCompletedAt: true },
-      });
-      if (company && !company.onboardingCompletedAt) {
-        redirect("/onboarding");
-      }
+
+    // No active company → send to onboarding to create/select one
+    if (!user?.activeCompanyId) {
+      redirect("/onboarding");
+    }
+
+    const company = await prisma.company.findUnique({
+      where: { id: user.activeCompanyId },
+      select: { onboardingCompletedAt: true },
+    });
+    if (company && !company.onboardingCompletedAt) {
+      redirect("/onboarding");
     }
   } catch (err: any) {
     // redirect() throws a NEXT_REDIRECT error — re-throw it

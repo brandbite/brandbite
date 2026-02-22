@@ -6,22 +6,27 @@
 // @lastUpdate: 2025-11-22
 // -----------------------------------------------------------------------------
 
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUserOrThrow } from "@/lib/auth";
 import NewTicketForm from "./NewTicketForm";
 import type { TagOption } from "@/components/ui/tag-multi-select";
-
-
-const DEFAULT_COMPANY_SLUG = "acme-studio";
 
 export default async function CustomerNewTicketPage({
   searchParams,
 }: {
   searchParams: Promise<{ jobTypeId?: string }>;
 }) {
+  const user = await getCurrentUserOrThrow();
+
+  if (!user.activeCompanyId) {
+    redirect("/onboarding");
+  }
+
   const params = await searchParams;
   const initialJobTypeId = params.jobTypeId ?? undefined;
   const company = await prisma.company.findUnique({
-    where: { slug: DEFAULT_COMPANY_SLUG },
+    where: { id: user.activeCompanyId },
     select: {
       id: true,
       name: true,
@@ -31,17 +36,7 @@ export default async function CustomerNewTicketPage({
   });
 
   if (!company) {
-    // Simple fallback; in a real app this would be a proper error page.
-    return (
-      <div className="mx-auto max-w-3xl">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Company not found
-        </h1>
-        <p className="mt-2 text-sm text-[var(--bb-text-secondary)]">
-          Demo company with slug "{DEFAULT_COMPANY_SLUG}" was not found.
-        </p>
-      </div>
-    );
+    redirect("/onboarding");
   }
 
   const projects = await prisma.project.findMany({
@@ -104,32 +99,27 @@ export default async function CustomerNewTicketPage({
   return (
     <div className="mx-auto max-w-3xl">
       <main className="mt-4 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-6 shadow-sm">
-          <div className="mb-4">
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Create a new creative request
-            </h1>
-            <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-              Describe what you need, pick a project and a job type. We will
-              route this request to your creative team.
-            </p>
-            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-              Company:{" "}
-              <span className="font-medium text-[var(--bb-secondary)]">
-                {company.name}
-              </span>{" "}
-              ({company.slug})
-            </p>
-          </div>
+        <div className="mb-4">
+          <h1 className="text-2xl font-semibold tracking-tight">Create a new creative request</h1>
+          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
+            Describe what you need, pick a project and a job type. We will route this request to
+            your creative team.
+          </p>
+          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
+            Company: <span className="font-medium text-[var(--bb-secondary)]">{company.name}</span>{" "}
+            ({company.slug})
+          </p>
+        </div>
 
-          <NewTicketForm
-            companySlug={company.slug}
-            projects={projects}
-            jobTypes={jobTypes}
-            tokenBalance={company.tokenBalance}
-            tags={tags as unknown as TagOption[]}
-            initialJobTypeId={initialJobTypeId}
-          />
-        </main>
+        <NewTicketForm
+          companySlug={company.slug}
+          projects={projects}
+          jobTypes={jobTypes}
+          tokenBalance={company.tokenBalance}
+          tags={tags as unknown as TagOption[]}
+          initialJobTypeId={initialJobTypeId}
+        />
+      </main>
     </div>
   );
 }

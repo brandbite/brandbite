@@ -277,7 +277,7 @@ export default function OnboardingPage() {
               </p>
             )}
 
-            <div className="mt-6 flex items-center justify-center gap-3">
+            <div className="mt-6 flex items-center justify-center">
               <button
                 type="button"
                 disabled={companyLoading}
@@ -285,13 +285,6 @@ export default function OnboardingPage() {
                 className="rounded-xl bg-[var(--bb-primary)] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--bb-primary-hover)] disabled:opacity-60"
               >
                 {companyLoading ? "Creating…" : "Create Company"}
-              </button>
-              <button
-                type="button"
-                onClick={handleFinish}
-                className="rounded-xl border border-[var(--bb-border)] px-5 py-2.5 text-sm font-medium text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-text-tertiary)] hover:text-[var(--bb-secondary)]"
-              >
-                Skip for now
               </button>
             </div>
           </div>

@@ -52,7 +52,7 @@ const TYPE_ICONS: Record<string, string> = {
 // NotificationBell
 // ---------------------------------------------------------------------------
 
-export function NotificationBell({ role }: { role: "customer" | "creative" }) {
+export function NotificationBell({ role }: { role: "customer" | "creative" | "admin" }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -157,7 +157,9 @@ export function NotificationBell({ role }: { role: "customer" | "creative" }) {
       if (notif.ticketId) {
         setOpen(false);
         if (role === "creative") {
-          router.push(`/creative/board`);
+          router.push(`/creative/tickets/${notif.ticketId}`);
+        } else if (role === "admin") {
+          router.push(`/admin/board`);
         } else {
           router.push(`/customer/tickets/${notif.ticketId}`);
         }
@@ -213,7 +215,7 @@ export function NotificationBell({ role }: { role: "customer" | "creative" }) {
 
         {/* Unread badge */}
         {unreadCount > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[var(--bb-primary)] px-1 text-[9px] font-bold text-white">
+          <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[var(--bb-primary)] px-1 text-[9px] font-bold text-white">
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}
@@ -224,13 +226,11 @@ export function NotificationBell({ role }: { role: "customer" | "creative" }) {
         <div
           ref={panelRef}
           role="menu"
-          className="absolute right-0 top-full z-50 mt-2 w-80 rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] shadow-lg"
+          className="absolute top-full right-0 z-50 mt-2 w-80 rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] shadow-lg"
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-[var(--bb-border-subtle)] px-4 py-3">
-            <span className="text-xs font-semibold text-[var(--bb-secondary)]">
-              Notifications
-            </span>
+            <span className="text-xs font-semibold text-[var(--bb-secondary)]">Notifications</span>
             {unreadCount > 0 && (
               <button
                 type="button"
@@ -278,7 +278,9 @@ export function NotificationBell({ role }: { role: "customer" | "creative" }) {
                 {/* Content */}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
-                    <p className={`truncate text-[11px] ${!notif.read ? "font-semibold text-[var(--bb-secondary)]" : "font-medium text-[var(--bb-text-secondary)]"}`}>
+                    <p
+                      className={`truncate text-[11px] ${!notif.read ? "font-semibold text-[var(--bb-secondary)]" : "font-medium text-[var(--bb-text-secondary)]"}`}
+                    >
                       {notif.title}
                     </p>
                     {!notif.read && (

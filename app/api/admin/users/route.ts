@@ -85,11 +85,40 @@ export async function PATCH(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { userId, role } = body as { userId?: string; role?: string };
+    const { userId, role, creativeRevisionNotesEnabled } = body as {
+      userId?: string;
+      role?: string;
+      creativeRevisionNotesEnabled?: boolean;
+    };
 
     if (!userId || typeof userId !== "string") {
       return NextResponse.json({ error: "userId is required" }, { status: 400 });
     }
+
+    const target = await prisma.userAccount.findUnique({ where: { id: userId } });
+    if (!target) {
+      return NextResponse.json({ error: "User not found." }, { status: 404 });
+    }
+
+    // Toggle creativeRevisionNotesEnabled (designer only)
+    if (typeof creativeRevisionNotesEnabled === "boolean") {
+      if (target.role !== "DESIGNER") {
+        return NextResponse.json(
+          { error: "Revision notes toggle only applies to creatives." },
+          { status: 400 },
+        );
+      }
+
+      const updated = await prisma.userAccount.update({
+        where: { id: userId },
+        data: { creativeRevisionNotesEnabled },
+        select: { id: true, creativeRevisionNotesEnabled: true },
+      });
+
+      return NextResponse.json({ user: updated });
+    }
+
+    // Role change
     if (!role || !VALID_ROLES.includes(role)) {
       return NextResponse.json(
         { error: `Invalid role. Must be one of: ${VALID_ROLES.join(", ")}` },
@@ -108,11 +137,6 @@ export async function PATCH(req: NextRequest) {
         { error: "Only site owners can assign admin roles." },
         { status: 403 },
       );
-    }
-
-    const target = await prisma.userAccount.findUnique({ where: { id: userId } });
-    if (!target) {
-      return NextResponse.json({ error: "User not found." }, { status: 404 });
     }
 
     // Prevent demoting a SITE_OWNER unless you're also a SITE_OWNER

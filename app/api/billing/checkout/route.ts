@@ -37,10 +37,7 @@ export async function POST(req: NextRequest) {
     const planId = body.planId;
 
     if (!planId) {
-      return NextResponse.json(
-        { error: "planId is required." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "planId is required." }, { status: 400 });
     }
 
     const plan = await prisma.plan.findUnique({
@@ -48,17 +45,13 @@ export async function POST(req: NextRequest) {
     });
 
     if (!plan || !plan.isActive) {
-      return NextResponse.json(
-        { error: "Plan not found or not active." },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Plan not found or not active." }, { status: 404 });
     }
 
     if (!plan.stripePriceId) {
       return NextResponse.json(
         {
-          error:
-            "This plan is not yet linked to a Stripe price. Please contact support.",
+          error: "This plan is not yet linked to a Stripe price. Please contact support.",
         },
         { status: 400 },
       );
@@ -66,7 +59,6 @@ export async function POST(req: NextRequest) {
 
     const baseUrl = getAppBaseUrl();
 
-    // Stripe Checkout Session oluşturma
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       payment_method_types: ["card"],
@@ -76,7 +68,6 @@ export async function POST(req: NextRequest) {
           quantity: 1,
         },
       ],
-      // Checkout sonrası geri dönüş adresleri
       success_url: `${baseUrl}/customer/settings?billing=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/customer/settings?billing=cancelled`,
       metadata: {
@@ -84,15 +75,12 @@ export async function POST(req: NextRequest) {
         companyId: user.activeCompanyId,
         userId: user.id,
       },
-      // Eğer customer sistemin Stripe tarafında yoksa, Stripe kendi customer kaydını yaratır.
-      // İleride user.companyId ile eşleştirmek için webhook'ta metadata kullanacağız.
     });
 
     if (!session.url) {
       return NextResponse.json(
         {
-          error:
-            "Checkout session created but no URL was returned by Stripe.",
+          error: "Checkout session created but no URL was returned by Stripe.",
         },
         { status: 500 },
       );
@@ -106,16 +94,10 @@ export async function POST(req: NextRequest) {
     );
   } catch (error: unknown) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[billing.checkout] POST error", error);
-    return NextResponse.json(
-      { error: "Failed to create checkout session." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to create checkout session." }, { status: 500 });
   }
 }

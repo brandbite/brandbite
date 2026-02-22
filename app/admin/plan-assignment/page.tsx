@@ -70,9 +70,7 @@ export default function AdminPlanAssignmentPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [savingCompanyId, setSavingCompanyId] = useState<string | null>(
-    null,
-  );
+  const [savingCompanyId, setSavingCompanyId] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -94,52 +92,35 @@ export default function AdminPlanAssignmentPage() {
 
         if (!companiesRes.ok) {
           if (companiesRes.status === 401) {
-            throw new Error(
-              "You must be signed in as an admin to view this page.",
-            );
+            throw new Error("You must be signed in as an admin to view this page.");
           }
           if (companiesRes.status === 403) {
-            throw new Error(
-              "You do not have permission to view companies.",
-            );
+            throw new Error("You do not have permission to view companies.");
           }
           const msg =
-            companiesJson?.error ||
-            `Companies request failed with status ${companiesRes.status}`;
+            companiesJson?.error || `Companies request failed with status ${companiesRes.status}`;
           throw new Error(msg);
         }
 
         if (!plansRes.ok) {
           if (plansRes.status === 401) {
-            throw new Error(
-              "You must be signed in as an admin to view plans.",
-            );
+            throw new Error("You must be signed in as an admin to view plans.");
           }
           if (plansRes.status === 403) {
-            throw new Error(
-              "You do not have permission to view plans.",
-            );
+            throw new Error("You do not have permission to view plans.");
           }
-          const msg =
-            plansJson?.error ||
-            `Plans request failed with status ${plansRes.status}`;
+          const msg = plansJson?.error || `Plans request failed with status ${plansRes.status}`;
           throw new Error(msg);
         }
 
         if (!cancelled) {
-          setCompanies(
-            (companiesJson as AdminCompaniesResponse)
-              .companies ?? [],
-          );
+          setCompanies((companiesJson as AdminCompaniesResponse).companies ?? []);
           setPlans((plansJson as PlansResponse).plans ?? []);
         }
       } catch (err: any) {
         console.error("Admin plan assignment fetch error:", err);
         if (!cancelled) {
-          setError(
-            err?.message ||
-              "Failed to load companies or plans.",
-          );
+          setError(err?.message || "Failed to load companies or plans.");
         }
       } finally {
         if (!cancelled) {
@@ -155,15 +136,12 @@ export default function AdminPlanAssignmentPage() {
     };
   }, []);
 
-  const activePlans = useMemo(
-    () => plans.filter((p) => p.isActive),
-    [plans],
-  );
+  const activePlans = useMemo(() => plans.filter((p) => p.isActive), [plans]);
 
   const formatPrice = (priceCents: number | null) => {
     if (priceCents == null) return "—";
-    const euros = priceCents / 100;
-    return `€${euros.toFixed(2)}`;
+    const dollars = priceCents / 100;
+    return `$${dollars.toFixed(2)}`;
   };
 
   const formatDate = (iso: string) => {
@@ -171,10 +149,7 @@ export default function AdminPlanAssignmentPage() {
     return d.toLocaleDateString();
   };
 
-  const handleChangePlan = async (
-    companyId: string,
-    newPlanId: string,
-  ) => {
+  const handleChangePlan = async (companyId: string, newPlanId: string) => {
     setSavingCompanyId(companyId);
     setSaveMessage(null);
     setSaveError(null);
@@ -196,24 +171,19 @@ export default function AdminPlanAssignmentPage() {
       const json = await res.json().catch(() => null);
 
       if (!res.ok) {
-        const msg =
-          json?.error || `Request failed with status ${res.status}`;
+        const msg = json?.error || `Request failed with status ${res.status}`;
         throw new Error(msg);
       }
 
       const updated = json?.company as AdminCompany | undefined;
       if (updated) {
-        setCompanies((prev) =>
-          prev.map((c) => (c.id === updated.id ? updated : c)),
-        );
+        setCompanies((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
       }
 
       setSaveMessage("Plan updated successfully.");
     } catch (err: any) {
       console.error("Plan assignment save error:", err);
-      setSaveError(
-        err?.message || "Failed to update plan.",
-      );
+      setSaveError(err?.message || "Failed to update plan.");
     } finally {
       setSavingCompanyId(null);
     }
@@ -221,149 +191,126 @@ export default function AdminPlanAssignmentPage() {
 
   return (
     <>
-        {/* Page header */}
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Plan assignment
-            </h1>
-            <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-              Link companies to subscription plans. This does not change
-              balances automatically; it only controls which plan they
-              belong to.
-            </p>
-          </div>
+      {/* Page header */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Plan assignment</h1>
+          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
+            Link companies to subscription plans. This does not change balances automatically; it
+            only controls which plan they belong to.
+          </p>
+        </div>
+      </div>
+
+      {/* Error */}
+      {error && (
+        <InlineAlert variant="error" title="Something went wrong" className="mb-4">
+          {error}
+        </InlineAlert>
+      )}
+
+      {/* Info / status */}
+      {saveMessage && (
+        <InlineAlert variant="success" className="mb-4">
+          {saveMessage}
+        </InlineAlert>
+      )}
+      {saveError && (
+        <InlineAlert variant="error" className="mb-4">
+          {saveError}
+        </InlineAlert>
+      )}
+
+      {/* Content */}
+      <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold tracking-tight">Companies and plans</h2>
+          <p className="text-xs text-[var(--bb-text-tertiary)]">
+            Showing {companies.length} companies, {activePlans.length} active plans.
+          </p>
         </div>
 
-        {/* Error */}
-        {error && (
-          <InlineAlert variant="error" title="Something went wrong" className="mb-4">
-            {error}
-          </InlineAlert>
-        )}
+        {loading ? (
+          <LoadingState message="Loading companies and plans…" />
+        ) : companies.length === 0 ? (
+          <EmptyState
+            title="No companies found."
+            description="Once companies are created, they will appear here for plan assignment."
+          />
+        ) : (
+          <div className="max-h-[480px] overflow-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-[var(--bb-border)] text-xs tracking-[0.08em] text-[var(--bb-text-tertiary)] uppercase">
+                  <th className="px-2 py-2">Company</th>
+                  <th className="px-2 py-2 text-right">Tokens</th>
+                  <th className="px-2 py-2 text-right">Projects</th>
+                  <th className="px-2 py-2 text-right">Tickets</th>
+                  <th className="px-2 py-2">Current plan</th>
+                  <th className="px-2 py-2 text-right">Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                {companies.map((c) => {
+                  const isSaving = savingCompanyId === c.id;
 
-        {/* Info / status */}
-        {saveMessage && (
-          <InlineAlert variant="success" className="mb-4">
-            {saveMessage}
-          </InlineAlert>
-        )}
-        {saveError && (
-          <InlineAlert variant="error" className="mb-4">
-            {saveError}
-          </InlineAlert>
-        )}
-
-        {/* Content */}
-        <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold tracking-tight">
-              Companies and plans
-            </h2>
-            <p className="text-xs text-[var(--bb-text-tertiary)]">
-              Showing {companies.length} companies, {activePlans.length} active plans.
-            </p>
-          </div>
-
-          {loading ? (
-            <LoadingState message="Loading companies and plans…" />
-          ) : companies.length === 0 ? (
-            <EmptyState title="No companies found." description="Once companies are created, they will appear here for plan assignment." />
-          ) : (
-            <div className="max-h-[480px] overflow-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-[var(--bb-border)] text-xs uppercase tracking-[0.08em] text-[var(--bb-text-tertiary)]">
-                    <th className="px-2 py-2">Company</th>
-                    <th className="px-2 py-2 text-right">
-                      Tokens
-                    </th>
-                    <th className="px-2 py-2 text-right">
-                      Projects
-                    </th>
-                    <th className="px-2 py-2 text-right">
-                      Tickets
-                    </th>
-                    <th className="px-2 py-2">Current plan</th>
-                    <th className="px-2 py-2 text-right">
-                      Created
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {companies.map((c) => {
-                    const isSaving = savingCompanyId === c.id;
-
-                    return (
-                      <tr
-                        key={c.id}
-                        className="border-b border-[var(--bb-border-subtle)] text-xs last:border-b-0"
-                      >
-                        <td className="px-2 py-2 align-top text-[11px] text-[var(--bb-secondary)]">
-                          <div className="font-semibold">
-                            {c.name}
-                          </div>
-                          <div className="text-[10px] text-[var(--bb-text-tertiary)]">
-                            {c.slug}
-                          </div>
-                        </td>
-                        <td className="px-2 py-2 align-top text-right text-[11px] text-[var(--bb-secondary)]">
-                          {c.tokenBalance}
-                        </td>
-                        <td className="px-2 py-2 align-top text-right text-[11px] text-[var(--bb-secondary)]">
-                          {c.counts.projects}
-                        </td>
-                        <td className="px-2 py-2 align-top text-right text-[11px] text-[var(--bb-secondary)]">
-                          {c.counts.tickets}
-                        </td>
-                        <td className="px-2 py-2 align-top text-[11px] text-[var(--bb-secondary)]">
-                          <div className="flex flex-col gap-1">
-                            <select
-                              disabled={isSaving || activePlans.length === 0}
-                              value={c.plan?.id ?? ""}
-                              onChange={(e) =>
-                                handleChangePlan(
-                                  c.id,
-                                  e.target.value,
-                                )
-                              }
-                              className="w-full rounded-md border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-2 py-1 text-[11px] text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
-                            >
-                              <option value="">
-                                No plan assigned
+                  return (
+                    <tr
+                      key={c.id}
+                      className="border-b border-[var(--bb-border-subtle)] text-xs last:border-b-0"
+                    >
+                      <td className="px-2 py-2 align-top text-[11px] text-[var(--bb-secondary)]">
+                        <div className="font-semibold">{c.name}</div>
+                        <div className="text-[10px] text-[var(--bb-text-tertiary)]">{c.slug}</div>
+                      </td>
+                      <td className="px-2 py-2 text-right align-top text-[11px] text-[var(--bb-secondary)]">
+                        {c.tokenBalance}
+                      </td>
+                      <td className="px-2 py-2 text-right align-top text-[11px] text-[var(--bb-secondary)]">
+                        {c.counts.projects}
+                      </td>
+                      <td className="px-2 py-2 text-right align-top text-[11px] text-[var(--bb-secondary)]">
+                        {c.counts.tickets}
+                      </td>
+                      <td className="px-2 py-2 align-top text-[11px] text-[var(--bb-secondary)]">
+                        <div className="flex flex-col gap-1">
+                          <select
+                            disabled={isSaving || activePlans.length === 0}
+                            value={c.plan?.id ?? ""}
+                            onChange={(e) => handleChangePlan(c.id, e.target.value)}
+                            className="w-full rounded-md border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-2 py-1 text-[11px] text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
+                          >
+                            <option value="">No plan assigned</option>
+                            {activePlans.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name} ({p.monthlyTokens} tokens)
                               </option>
-                              {activePlans.map((p) => (
-                                <option key={p.id} value={p.id}>
-                                  {p.name} ({p.monthlyTokens} tokens)
-                                </option>
-                              ))}
-                            </select>
-                            {c.plan && (
-                              <div className="text-[10px] text-[var(--bb-text-tertiary)]">
-                                {formatPrice(c.plan.priceCents)}
-                                {c.plan.isActive
-                                  ? " • active"
-                                  : " • inactive"}
-                              </div>
-                            )}
-                            {isSaving && (
-                              <div className="text-[10px] text-[var(--bb-text-tertiary)]">
-                                Saving…
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-2 py-2 align-top text-right text-[11px] text-[var(--bb-text-tertiary)]">
-                          {formatDate(c.createdAt)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+                            ))}
+                          </select>
+                          {c.plan && (
+                            <div className="text-[10px] text-[var(--bb-text-tertiary)]">
+                              {formatPrice(c.plan.priceCents)}
+                              {c.plan.isActive ? " • active" : " • inactive"}
+                            </div>
+                          )}
+                          {isSaving && (
+                            <div className="text-[10px] text-[var(--bb-text-tertiary)]">
+                              Saving…
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-2 py-2 text-right align-top text-[11px] text-[var(--bb-text-tertiary)]">
+                        {formatDate(c.createdAt)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </>
   );
 }

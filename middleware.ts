@@ -18,11 +18,9 @@ const PUBLIC_PATHS = [
   "/reset-password",
   "/onboarding",
   "/invite", // covers /invite/[token]
-  "/board", // public board view
   "/api/auth", // BetterAuth catch-all (sign-up, sign-in, etc.)
   "/api/billing/webhook",
   "/api/invite",
-  "/api/board", // public board API
   "/api/session", // session check itself must be accessible
 ];
 
@@ -65,7 +63,7 @@ export function middleware(request: NextRequest) {
     // Demo mode: check bb-demo-user cookie
     const demoCookie = request.cookies.get("bb-demo-user")?.value;
     if (!demoCookie) {
-      return NextResponse.redirect(new URL("/", request.url));
+      return NextResponse.redirect(new URL("/login", request.url));
     }
   } else {
     // BetterAuth mode: check session cookie presence (no DB call)

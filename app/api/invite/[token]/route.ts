@@ -22,13 +22,9 @@ type RouteContext = {
 // Show invite details for the current viewer (does not require auth)
 // -----------------------------------------------------------------------------
 export async function GET(_req: NextRequest, context: RouteContext) {
-  const { token } = await context.params; // ✅ BURASI ÖNEMLİ
-
+  const { token } = await context.params;
   if (!token) {
-    return NextResponse.json(
-      { error: "Missing invite token in route params" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Missing invite token in route params" }, { status: 400 });
   }
 
   try {
@@ -40,10 +36,7 @@ export async function GET(_req: NextRequest, context: RouteContext) {
     });
 
     if (!invite) {
-      return NextResponse.json(
-        { error: "Invite not found" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Invite not found" }, { status: 404 });
     }
 
     const viewer = await getCurrentUser();
@@ -63,10 +56,7 @@ export async function GET(_req: NextRequest, context: RouteContext) {
       alreadyMember = !!member;
     }
 
-    const canAccept =
-      !!viewer &&
-      invite.status === InviteStatus.PENDING &&
-      !alreadyMember;
+    const canAccept = !!viewer && invite.status === InviteStatus.PENDING && !alreadyMember;
 
     return NextResponse.json(
       {
@@ -97,10 +87,7 @@ export async function GET(_req: NextRequest, context: RouteContext) {
     );
   } catch (error) {
     console.error("[GET /api/invite/:token] error:", error);
-    return NextResponse.json(
-      { error: "Failed to load invite" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load invite" }, { status: 500 });
   }
 }
 
@@ -109,13 +96,9 @@ export async function GET(_req: NextRequest, context: RouteContext) {
 // Accept invite as current authenticated user (CUSTOMER)
 // -----------------------------------------------------------------------------
 export async function POST(_req: NextRequest, context: RouteContext) {
-  const { token } = await context.params; // ✅ BURASI DA
-
+  const { token } = await context.params;
   if (!token) {
-    return NextResponse.json(
-      { error: "Missing invite token in route params" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Missing invite token in route params" }, { status: 400 });
   }
 
   try {
@@ -133,16 +116,18 @@ export async function POST(_req: NextRequest, context: RouteContext) {
     });
 
     if (!invite) {
-      return NextResponse.json(
-        { error: "Invite not found" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Invite not found" }, { status: 404 });
     }
 
     if (invite.status !== InviteStatus.PENDING) {
+      return NextResponse.json({ error: "Only pending invites can be accepted" }, { status: 400 });
+    }
+
+    // Verify the logged-in user's email matches the invite email
+    if (user.email.toLowerCase() !== invite.email.toLowerCase()) {
       return NextResponse.json(
-        { error: "Only pending invites can be accepted" },
-        { status: 400 },
+        { error: "This invite was sent to a different email address" },
+        { status: 403 },
       );
     }
 
@@ -194,9 +179,6 @@ export async function POST(_req: NextRequest, context: RouteContext) {
     }
 
     console.error("[POST /api/invite/:token] error:", error);
-    return NextResponse.json(
-      { error: "Failed to accept invite" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to accept invite" }, { status: 500 });
   }
 }

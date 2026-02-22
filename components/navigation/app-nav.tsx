@@ -156,7 +156,7 @@ export function AppNav({ role }: { role: AppNavRole }) {
           })}
         </nav>
         <ThemeToggle />
-        {(role === "customer" || role === "creative") && <NotificationBell role={role} />}
+        <NotificationBell role={role} />
         <button
           onClick={handleSignOut}
           className="rounded-lg px-3 py-1.5 text-xs font-medium text-[var(--bb-text-secondary)] transition-colors hover:bg-[var(--bb-bg-page)] hover:text-[var(--bb-secondary)]"
@@ -168,7 +168,7 @@ export function AppNav({ role }: { role: AppNavRole }) {
       {/* Mobile: notification bell + hamburger */}
       <div className="flex items-center gap-2 md:hidden">
         <ThemeToggle />
-        {(role === "customer" || role === "creative") && <NotificationBell role={role} />}
+        <NotificationBell role={role} />
 
         {/* Mobile hamburger */}
         <button

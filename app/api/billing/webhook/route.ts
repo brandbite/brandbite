@@ -71,8 +71,8 @@ export async function POST(req: NextRequest) {
   try {
     switch (event.type) {
       // -----------------------------------------------------------
-      // 1) Checkout tamamlandı → company’ye plan + subscription bağla,
-      //    gerekiyorsa ilk token credit yap.
+      // 1) Checkout completed → link plan + subscription to company,
+      //    credit initial tokens if first subscription.
       // -----------------------------------------------------------
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
           break;
         }
 
-        // Customer & subscription id'lerini session'dan al
+        // Extract customer & subscription IDs from session
         let stripeCustomerId: string | null = null;
         if (typeof session.customer === "string") {
           stripeCustomerId = session.customer;
@@ -178,11 +178,11 @@ export async function POST(req: NextRequest) {
       }
 
       // -----------------------------------------------------------
-      // 2) Fatura başarıyla ödendi → her cycle’da token ekle
+      // 2) Invoice paid → credit monthly tokens on each renewal
       // -----------------------------------------------------------
       case "invoice.payment_succeeded": {
-        // Stripe'ın type tanımında subscription alanı eksik olabilir,
-        // bu yüzden intersection type ile genişletiyoruz.
+        // Stripe’s type definition may lack the subscription field,
+        // so we extend with an intersection type.
         const invoice = event.data.object as Stripe.Invoice & {
           subscription?: string | Stripe.Subscription | null;
         };
@@ -197,8 +197,8 @@ export async function POST(req: NextRequest) {
           break;
         }
 
-        // İlk fatura genelde subscription_create; biz ilk credit'i
-        // checkout.session.completed'da yaptığımız için burada atlayabiliriz.
+        // The first invoice is typically subscription_create; we already
+        // credited initial tokens in checkout.session.completed, so skip here.
         if (invoice.billing_reason === "subscription_create") {
           console.log(
             "[billing.webhook] invoice.payment_succeeded (subscription_create) -> skipping extra credit to avoid double.",
@@ -273,7 +273,50 @@ export async function POST(req: NextRequest) {
       }
 
       // -----------------------------------------------------------
-      // 3) Subscription status değişti / silindi → billingStatus güncelle
+      // 3) Invoice payment failed → mark company as PAST_DUE
+      // -----------------------------------------------------------
+      case "invoice.payment_failed": {
+        const invoice = event.data.object as Stripe.Invoice & {
+          subscription?: string | Stripe.Subscription | null;
+        };
+
+        let subscriptionId: string | null = null;
+        if (typeof invoice.subscription === "string") {
+          subscriptionId = invoice.subscription;
+        }
+
+        if (!subscriptionId) {
+          console.warn("[billing.webhook] invoice.payment_failed without subscription id.");
+          break;
+        }
+
+        const company = await prisma.company.findFirst({
+          where: { stripeSubscriptionId: subscriptionId },
+        });
+
+        if (!company) {
+          console.warn("[billing.webhook] No company found for invoice.payment_failed", {
+            subscriptionId,
+          });
+          break;
+        }
+
+        await prisma.company.update({
+          where: { id: company.id },
+          data: { billingStatus: "PAST_DUE" },
+        });
+
+        console.log("[billing.webhook] invoice.payment_failed handled", {
+          companyId: company.id,
+          subscriptionId,
+          invoiceId: invoice.id,
+        });
+
+        break;
+      }
+
+      // -----------------------------------------------------------
+      // 4) Subscription status changed / deleted → update billingStatus
       // -----------------------------------------------------------
       case "customer.subscription.updated":
       case "customer.subscription.deleted": {
