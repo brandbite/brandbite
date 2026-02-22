@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { resolveAssetUrl } from "@/lib/r2";
 
 type RouteParams = {
   ticketId: string;
@@ -16,9 +17,7 @@ type RouteParams = {
 
 // Next 15+ bazen params'i Promise olarak geçirebiliyor, o yüzden ikisini de
 // destekleyecek şekilde type tanımlıyoruz.
-type RouteContext =
-  | { params: RouteParams }
-  | { params: Promise<RouteParams> };
+type RouteContext = { params: RouteParams } | { params: Promise<RouteParams> };
 
 // Küçük helper: params Promise ise await et, değilse direkt al
 async function resolveParams(context: RouteContext): Promise<RouteParams> {
@@ -57,10 +56,7 @@ export async function GET(_req: NextRequest, context: RouteContext) {
     const { ticketId } = await resolveParams(context);
 
     if (!ticketId) {
-      return NextResponse.json(
-        { error: "Ticket id is required." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Ticket id is required." }, { status: 400 });
     }
 
     // Ticket bu creativea mı ait, onu doğrula
@@ -75,10 +71,7 @@ export async function GET(_req: NextRequest, context: RouteContext) {
     });
 
     if (!ticket) {
-      return NextResponse.json(
-        { error: "Ticket not found for this creative." },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Ticket not found for this creative." }, { status: 404 });
     }
 
     const revisions = await prisma.ticketRevision.findMany({
@@ -98,6 +91,7 @@ export async function GET(_req: NextRequest, context: RouteContext) {
           select: {
             id: true,
             url: true,
+            storageKey: true,
             mimeType: true,
             bytes: true,
             width: true,
@@ -109,19 +103,18 @@ export async function GET(_req: NextRequest, context: RouteContext) {
       },
     });
 
-    return NextResponse.json(
-      {
-        revisions: revisions.map((r) => ({
-          version: r.version,
-          submittedAt: r.submittedAt
-            ? r.submittedAt.toISOString()
-            : null,
-          feedbackAt: r.feedbackAt ? r.feedbackAt.toISOString() : null,
-          feedbackMessage: r.feedbackMessage ?? null,
-          creativeMessage: r.creativeMessage ?? null,
-          assets: (r as any).assets?.map((a: any) => ({
+    // Resolve presigned URLs for revision assets that don't have a public URL
+    const enrichedRevisions = await Promise.all(
+      revisions.map(async (r) => ({
+        version: r.version,
+        submittedAt: r.submittedAt ? r.submittedAt.toISOString() : null,
+        feedbackAt: r.feedbackAt ? r.feedbackAt.toISOString() : null,
+        feedbackMessage: r.feedbackMessage ?? null,
+        creativeMessage: r.creativeMessage ?? null,
+        assets: await Promise.all(
+          ((r as any).assets ?? []).map(async (a: any) => ({
             id: a.id,
-            url: a.url,
+            url: await resolveAssetUrl(a.storageKey, a.url),
             mimeType: a.mimeType,
             bytes: a.bytes,
             width: a.width,
@@ -130,27 +123,19 @@ export async function GET(_req: NextRequest, context: RouteContext) {
             pinCount: a.pins?.length ?? 0,
             openPins: a.pins?.filter((p: any) => p.status === "OPEN").length ?? 0,
             resolvedPins: a.pins?.filter((p: any) => p.status === "RESOLVED").length ?? 0,
-          })) ?? [],
-        })),
-      },
-      { status: 200 },
+          })),
+        ),
+      })),
     );
+
+    return NextResponse.json({ revisions: enrichedRevisions }, { status: 200 });
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
-    console.error(
-      "[GET /api/creative/tickets/[ticketId]/revisions] error",
-      error,
-    );
+    console.error("[GET /api/creative/tickets/[ticketId]/revisions] error", error);
 
-    return NextResponse.json(
-      { error: "Failed to load revision history." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load revision history." }, { status: 500 });
   }
 }

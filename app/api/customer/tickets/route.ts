@@ -24,6 +24,7 @@ import { isCreativePaused } from "@/lib/creative-availability";
 import { parseBody } from "@/lib/schemas/helpers";
 import { createTicketSchema } from "@/lib/schemas/ticket.schemas";
 import { buildTicketCode } from "@/lib/ticket-code";
+import { resolveAssetUrl } from "@/lib/r2";
 
 // -----------------------------------------------------------------------------
 // Helpers
@@ -141,6 +142,7 @@ export async function GET(req: NextRequest) {
             select: {
               id: true,
               url: true,
+              storageKey: true,
               mimeType: true,
             },
             orderBy: { createdAt: "asc" },
@@ -161,37 +163,42 @@ export async function GET(req: NextRequest) {
       prisma.ticket.count({ where }),
     ]);
 
-    const payload = tickets.map((t) => {
-      const code = buildTicketCode({
-        projectCode: t.project?.code,
-        companyTicketNumber: t.companyTicketNumber,
-        ticketId: t.id,
-      });
+    const payload = await Promise.all(
+      tickets.map(async (t) => {
+        const code = buildTicketCode({
+          projectCode: t.project?.code,
+          companyTicketNumber: t.companyTicketNumber,
+          ticketId: t.id,
+        });
 
-      return {
-        id: t.id,
-        code,
-        title: t.title,
-        description: t.description ?? null,
-        status: t.status,
-        priority: t.priority,
-        projectId: t.project?.id ?? null,
-        projectName: t.project?.name ?? null,
-        projectCode: t.project?.code ?? null,
-        isAssigned: t.creativeId != null,
-        jobTypeId: t.jobType?.id ?? null,
-        jobTypeName: t.jobType?.name ?? null,
-        createdAt: t.createdAt.toISOString(),
-        dueDate: t.dueDate ? t.dueDate.toISOString() : null,
-        thumbnailUrl: t.assets?.[0]?.url ?? null,
-        thumbnailAssetId: t.assets?.[0]?.id ?? null,
-        tags: t.tagAssignments.map((ta: any) => ({
-          id: ta.tag.id,
-          name: ta.tag.name,
-          color: ta.tag.color,
-        })),
-      };
-    });
+        const asset = t.assets?.[0];
+        const thumbnailUrl = asset ? await resolveAssetUrl(asset.storageKey, asset.url) : null;
+
+        return {
+          id: t.id,
+          code,
+          title: t.title,
+          description: t.description ?? null,
+          status: t.status,
+          priority: t.priority,
+          projectId: t.project?.id ?? null,
+          projectName: t.project?.name ?? null,
+          projectCode: t.project?.code ?? null,
+          isAssigned: t.creativeId != null,
+          jobTypeId: t.jobType?.id ?? null,
+          jobTypeName: t.jobType?.name ?? null,
+          createdAt: t.createdAt.toISOString(),
+          dueDate: t.dueDate ? t.dueDate.toISOString() : null,
+          thumbnailUrl,
+          thumbnailAssetId: asset?.id ?? null,
+          tags: t.tagAssignments.map((ta: any) => ({
+            id: ta.tag.id,
+            name: ta.tag.name,
+            color: ta.tag.color,
+          })),
+        };
+      }),
+    );
 
     return NextResponse.json({
       company: {

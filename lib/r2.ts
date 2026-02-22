@@ -6,7 +6,8 @@
 // @lastUpdate: 2025-12-27
 // -----------------------------------------------------------------------------
 
-import { S3Client } from "@aws-sdk/client-s3";
+import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 function requireEnv(name: string): string {
   const v = process.env[name];
@@ -41,4 +42,32 @@ export function createR2Client(): S3Client {
       secretAccessKey,
     },
   });
+}
+
+/**
+ * Resolve a displayable URL for an asset. Returns the public URL if
+ * R2_PUBLIC_BASE_URL is configured, otherwise generates a short-lived
+ * presigned download URL. Returns null only when R2 is not configured.
+ */
+export async function resolveAssetUrl(
+  storageKey: string,
+  existingUrl: string | null,
+): Promise<string | null> {
+  if (existingUrl) return existingUrl;
+
+  const base = getR2PublicBaseUrl();
+  if (base) {
+    const trimmed = base.endsWith("/") ? base.slice(0, -1) : base;
+    return `${trimmed}/${storageKey}`;
+  }
+
+  // Fallback: generate a presigned GET URL (valid for 15 minutes)
+  try {
+    const r2 = createR2Client();
+    const bucket = getR2BucketName();
+    const cmd = new GetObjectCommand({ Bucket: bucket, Key: storageKey });
+    return await getSignedUrl(r2, cmd, { expiresIn: 60 * 15 });
+  } catch {
+    return null;
+  }
 }

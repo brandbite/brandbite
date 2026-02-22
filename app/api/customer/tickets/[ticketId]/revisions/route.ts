@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { resolveAssetUrl } from "@/lib/r2";
 
 export async function GET(
   _req: NextRequest,
@@ -30,10 +31,7 @@ export async function GET(
   const { ticketId } = await params;
 
   if (!ticketId) {
-    return NextResponse.json(
-      { error: "Ticket id is required." },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Ticket id is required." }, { status: 400 });
   }
 
   const activeCompanyId = user.activeCompanyId;
@@ -53,10 +51,7 @@ export async function GET(
   });
 
   if (!ticket) {
-    return NextResponse.json(
-      { error: "Ticket not found for your company." },
-      { status: 404 },
-    );
+    return NextResponse.json({ error: "Ticket not found for your company." }, { status: 404 });
   }
 
   const revisions = await prisma.ticketRevision.findMany({
@@ -77,6 +72,7 @@ export async function GET(
         select: {
           id: true,
           url: true,
+          storageKey: true,
           mimeType: true,
           bytes: true,
           width: true,
@@ -88,25 +84,32 @@ export async function GET(
     },
   });
 
-  return NextResponse.json({
-    ticketId,
-    revisions: revisions.map((rev) => ({
+  // Resolve presigned URLs for revision assets that don't have a public URL
+  const enrichedRevisions = await Promise.all(
+    revisions.map(async (rev) => ({
       version: rev.version,
       submittedAt: rev.submittedAt ? rev.submittedAt.toISOString() : null,
       feedbackAt: rev.feedbackAt ? rev.feedbackAt.toISOString() : null,
       feedbackMessage: rev.feedbackMessage ?? null,
-      assets: (rev as any).assets?.map((a: any) => ({
-        id: a.id,
-        url: a.url,
-        mimeType: a.mimeType,
-        bytes: a.bytes,
-        width: a.width,
-        height: a.height,
-        originalName: a.originalName,
-        pinCount: a.pins?.length ?? 0,
-        openPins: a.pins?.filter((p: any) => p.status === "OPEN").length ?? 0,
-        resolvedPins: a.pins?.filter((p: any) => p.status === "RESOLVED").length ?? 0,
-      })) ?? [],
+      assets: await Promise.all(
+        ((rev as any).assets ?? []).map(async (a: any) => ({
+          id: a.id,
+          url: await resolveAssetUrl(a.storageKey, a.url),
+          mimeType: a.mimeType,
+          bytes: a.bytes,
+          width: a.width,
+          height: a.height,
+          originalName: a.originalName,
+          pinCount: a.pins?.length ?? 0,
+          openPins: a.pins?.filter((p: any) => p.status === "OPEN").length ?? 0,
+          resolvedPins: a.pins?.filter((p: any) => p.status === "RESOLVED").length ?? 0,
+        })),
+      ),
     })),
+  );
+
+  return NextResponse.json({
+    ticketId,
+    revisions: enrichedRevisions,
   });
 }

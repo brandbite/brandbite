@@ -11,11 +11,9 @@ import { AssetKind } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { resolveAssetUrl } from "@/lib/r2";
 
-export async function GET(
-  _req: Request,
-  ctx: { params: Promise<{ ticketId: string }> },
-) {
+export async function GET(_req: Request, ctx: { params: Promise<{ ticketId: string }> }) {
   try {
     const user = await getCurrentUserOrThrow();
     const { ticketId } = await ctx.params;
@@ -79,7 +77,15 @@ export async function GET(
       },
     });
 
-    return NextResponse.json({ assets });
+    // Resolve displayable URLs for assets that don't have a public URL
+    const enriched = await Promise.all(
+      assets.map(async (a) => ({
+        ...a,
+        url: await resolveAssetUrl(a.storageKey, a.url),
+      })),
+    );
+
+    return NextResponse.json({ assets: enriched });
   } catch (err: any) {
     const code = err?.code ?? "UNKNOWN";
     if (code === "UNAUTHENTICATED") {
