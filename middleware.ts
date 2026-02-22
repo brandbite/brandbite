@@ -15,6 +15,7 @@ const isDemoMode = process.env.DEMO_MODE === "true";
 const PUBLIC_PATHS = [
   "/",
   "/login",
+  "/reset-password",
   "/onboarding",
   "/invite", // covers /invite/[token]
   "/board", // public board view

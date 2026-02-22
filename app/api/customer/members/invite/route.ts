@@ -14,6 +14,7 @@ import { canManageMembers, normalizeCompanyRole } from "@/lib/permissions/compan
 import { randomUUID } from "crypto";
 import { parseBody } from "@/lib/schemas/helpers";
 import { createInviteSchema } from "@/lib/schemas/member.schemas";
+import { sendNotificationEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
   try {
@@ -79,19 +80,56 @@ export async function POST(req: NextRequest) {
 
     const token = randomUUID();
 
-    const invite = await prisma.companyInvite.create({
-      data: {
-        companyId: user.activeCompanyId,
-        email,
-        roleInCompany,
-        invitedByUserId: user.id,
-        token,
-        status: InviteStatus.PENDING,
-      },
-    });
+    const [invite, company] = await Promise.all([
+      prisma.companyInvite.create({
+        data: {
+          companyId: user.activeCompanyId,
+          email,
+          roleInCompany,
+          invitedByUserId: user.id,
+          token,
+          status: InviteStatus.PENDING,
+        },
+      }),
+      prisma.company.findUnique({
+        where: { id: user.activeCompanyId },
+        select: { name: true },
+      }),
+    ]);
 
-    // Frontend şu anda sadece "ok" olup olmadığıyla ilgileniyor
-    // ama ileride kullanmak üzere invite'ı da geri döndürüyoruz.
+    // Send invite email (fire-and-forget)
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const inviteUrl = `${baseUrl}/invite/${token}`;
+    const companyName = company?.name || "a team";
+    const inviterName = user.name || user.email;
+
+    sendNotificationEmail(
+      email,
+      `You've been invited to join ${companyName} on Brandbite`,
+      [
+        "<div style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto;\">",
+        '<div style="background: #f15b2b; padding: 20px 24px; border-radius: 12px 12px 0 0;">',
+        '<span style="font-size: 20px; font-weight: 700; color: #fff;">brandbite</span>',
+        "</div>",
+        '<div style="background: #fff; padding: 28px 24px; border: 1px solid #e3e1dc; border-top: none;">',
+        `<p style="margin: 0 0 16px; font-size: 14px; color: #424143;">Hi,</p>`,
+        `<p style="margin: 0 0 16px; font-size: 14px; color: #424143;"><strong>${inviterName}</strong> has invited you to join <strong>${companyName}</strong> on Brandbite as a ${roleInCompany.toLowerCase()}.</p>`,
+        '<table role="presentation" cellpadding="0" cellspacing="0" style="margin: 24px 0;">',
+        "<tr>",
+        '<td style="border-radius: 8px; background: #f15b2b;">',
+        `<a href="${inviteUrl}" target="_blank" style="display: inline-block; padding: 12px 28px; font-size: 14px; font-weight: 600; color: #fff; text-decoration: none; border-radius: 8px;">Accept Invite</a>`,
+        "</td>",
+        "</tr>",
+        "</table>",
+        '<p style="margin: 0; font-size: 13px; color: #7a7a7a;">If you weren\'t expecting this invitation, you can safely ignore this email.</p>',
+        "</div>",
+        '<div style="background: #faf9f7; padding: 16px 24px; border-radius: 0 0 12px 12px; border: 1px solid #e3e1dc; border-top: none;">',
+        '<p style="margin: 0; font-size: 11px; color: #9a9892; text-align: center;">Brandbite &mdash; Creative-as-a-service platform</p>',
+        "</div>",
+        "</div>",
+      ].join("\n"),
+    );
+
     return NextResponse.json(
       {
         invite: {

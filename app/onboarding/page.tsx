@@ -84,7 +84,7 @@ export default function OnboardingPage() {
       const res = await fetch("/api/customer/members/invite", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole }),
+        body: JSON.stringify({ email: inviteEmail.trim(), roleInCompany: inviteRole }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -170,9 +170,7 @@ export default function OnboardingPage() {
                 {i > 0 && (
                   <div
                     className={`h-0.5 w-8 ${
-                      isCompleted || isActive
-                        ? "bg-[var(--bb-primary)]"
-                        : "bg-[var(--bb-border)]"
+                      isCompleted || isActive ? "bg-[var(--bb-primary)]" : "bg-[var(--bb-border)]"
                     }`}
                   />
                 )}
@@ -187,8 +185,17 @@ export default function OnboardingPage() {
                     }`}
                   >
                     {isCompleted ? (
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-                        <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                        className="h-4 w-4"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z"
+                          clipRule="evenodd"
+                        />
                       </svg>
                     ) : (
                       stepNum
@@ -221,13 +228,16 @@ export default function OnboardingPage() {
               Let&apos;s set up your workspace.
             </p>
             <p className="mt-2 text-center text-xs text-[var(--bb-text-tertiary)]">
-              We&apos;ll use these details to tailor your dashboard and assign
-              your first creative team.
+              We&apos;ll use these details to tailor your dashboard and assign your first creative
+              team.
             </p>
 
             <div className="mt-8 space-y-5">
               <div>
-                <label htmlFor="onb-company-name" className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]">
+                <label
+                  htmlFor="onb-company-name"
+                  className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
+                >
                   Company Name <span className="text-[var(--bb-primary)]">*</span>
                 </label>
                 <input
@@ -240,7 +250,10 @@ export default function OnboardingPage() {
                 />
               </div>
               <div>
-                <label htmlFor="onb-website" className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]">
+                <label
+                  htmlFor="onb-website"
+                  className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
+                >
                   Website
                 </label>
                 <input
@@ -255,8 +268,7 @@ export default function OnboardingPage() {
             </div>
 
             <p className="mt-5 text-center text-[11px] text-[var(--bb-text-tertiary)]">
-              Don&apos;t worry, you can always update this later from your
-              profile settings.
+              Don&apos;t worry, you can always update this later from your profile settings.
             </p>
 
             {companyError && (
@@ -292,13 +304,15 @@ export default function OnboardingPage() {
               Invite your team
             </h1>
             <p className="mt-1 text-center text-xs text-[var(--bb-text-tertiary)]">
-              Add team members so they can submit tickets and review creative work.
-              You can always invite more people later.
+              Add team members so they can submit tickets and review creative work. You can always
+              invite more people later.
             </p>
 
             <div className="mt-8 space-y-4">
               <div className="flex gap-2">
-                <label htmlFor="onb-invite-email" className="sr-only">Email address</label>
+                <label htmlFor="onb-invite-email" className="sr-only">
+                  Email address
+                </label>
                 <input
                   id="onb-invite-email"
                   type="email"
@@ -310,7 +324,9 @@ export default function OnboardingPage() {
                     if (e.key === "Enter") handleInvite();
                   }}
                 />
-                <label htmlFor="onb-invite-role" className="sr-only">Role</label>
+                <label htmlFor="onb-invite-role" className="sr-only">
+                  Role
+                </label>
                 <select
                   id="onb-invite-role"
                   value={inviteRole}
@@ -333,14 +349,12 @@ export default function OnboardingPage() {
               </button>
 
               {inviteError && (
-                <p className="text-xs font-medium text-[var(--bb-danger-text)]">
-                  {inviteError}
-                </p>
+                <p className="text-xs font-medium text-[var(--bb-danger-text)]">{inviteError}</p>
               )}
 
               {invitedEmails.length > 0 && (
                 <div className="mt-2 rounded-xl bg-[var(--bb-bg-warm)] px-4 py-3">
-                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--bb-text-muted)]">
+                  <p className="mb-2 text-[10px] font-semibold tracking-[0.12em] text-[var(--bb-text-muted)] uppercase">
                     Invited ({invitedEmails.length})
                   </p>
                   <div className="space-y-1">
@@ -379,13 +393,16 @@ export default function OnboardingPage() {
               Create your first project
             </h1>
             <p className="mt-1 text-center text-xs text-[var(--bb-text-tertiary)]">
-              Projects help you organize tickets by brand, campaign, or client.
-              You can always create more later.
+              Projects help you organize tickets by brand, campaign, or client. You can always
+              create more later.
             </p>
 
             <div className="mt-8 space-y-5">
               <div>
-                <label htmlFor="onb-project-name" className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]">
+                <label
+                  htmlFor="onb-project-name"
+                  className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
+                >
                   Project Name
                 </label>
                 <input
@@ -460,9 +477,7 @@ export default function OnboardingPage() {
                     <p className="text-xs font-semibold text-[var(--bb-secondary)]">
                       Company created
                     </p>
-                    <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-                      {companyName}
-                    </p>
+                    <p className="text-[11px] text-[var(--bb-text-tertiary)]">{companyName}</p>
                   </div>
                 </div>
               )}
@@ -491,9 +506,7 @@ export default function OnboardingPage() {
                     <p className="text-xs font-semibold text-[var(--bb-secondary)]">
                       Project created
                     </p>
-                    <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-                      {projectCreated}
-                    </p>
+                    <p className="text-[11px] text-[var(--bb-text-tertiary)]">{projectCreated}</p>
                   </div>
                 </div>
               )}
@@ -516,12 +529,8 @@ export default function OnboardingPage() {
         <div className="mx-auto flex max-w-5xl items-center justify-between text-[11px] text-white/70">
           <p>&copy; 2025 Brandbite Inc. All rights reserved.</p>
           <div className="flex gap-4">
-            <span className="cursor-pointer hover:text-white">
-              Terms of Service
-            </span>
-            <span className="cursor-pointer hover:text-white">
-              Privacy Policy
-            </span>
+            <span className="cursor-pointer hover:text-white">Terms of Service</span>
+            <span className="cursor-pointer hover:text-white">Privacy Policy</span>
             <span className="cursor-pointer hover:text-white">Cookies</span>
           </div>
         </div>

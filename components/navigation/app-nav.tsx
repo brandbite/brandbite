@@ -35,6 +35,7 @@ const NAV_CONFIG: Record<AppNavRole, { items: NavItem[]; brandLabel: string; rol
         { href: "/admin/ledger", label: "Ledger" },
         { href: "/admin/token-analytics", label: "Analytics" },
         { href: "/admin/creative-analytics", label: "Creatives" },
+        { href: "/admin/users", label: "Users" },
         { href: "/admin/withdrawals", label: "Withdrawals" },
         { href: "/admin/settings", label: "Settings" },
       ],

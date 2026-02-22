@@ -33,10 +33,7 @@ const SUBJECT_MAP: Record<NotificationType, string> = {
   PIN_RESOLVED: "Feedback note resolved",
 };
 
-export function getSubjectForType(
-  type: NotificationType,
-  title: string,
-): string {
+export function getSubjectForType(type: NotificationType, title: string): string {
   const base = SUBJECT_MAP[type] || "Notification from BrandBite";
   return title ? `${base}: ${title}` : base;
 }
@@ -96,10 +93,7 @@ const TYPE_EMOJI: Record<NotificationType, string> = {
 // Settings / unsubscribe URL
 // ---------------------------------------------------------------------------
 
-function getSettingsUrl(
-  baseUrl: string,
-  recipientRole: "customer" | "creative" | "admin",
-): string {
+function getSettingsUrl(baseUrl: string, recipientRole: "customer" | "creative" | "admin"): string {
   if (recipientRole === "customer") return `${baseUrl}/customer/settings`;
   if (recipientRole === "creative") return `${baseUrl}/creative/settings`;
   return `${baseUrl}/admin/settings`;
@@ -109,28 +103,19 @@ function getSettingsUrl(
 // HTML template builder
 // ---------------------------------------------------------------------------
 
-export function buildNotificationEmailHtml(
-  params: EmailTemplateParams,
-): string {
-  const baseUrl =
-    process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+export function buildNotificationEmailHtml(params: EmailTemplateParams): string {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
-  const {
-    recipientName,
-    type,
-    title,
-    message,
-    ticketId,
-    actorName,
-    recipientRole,
-  } = params;
+  const { recipientName, type, title, message, ticketId, actorName, recipientRole } = params;
 
   const greeting = recipientName ? `Hi ${recipientName},` : "Hi,";
   const emoji = TYPE_EMOJI[type] || "";
   const ctaUrl = getCTAUrl(baseUrl, type, ticketId, recipientRole);
   const ctaLabel = CTA_LABELS[type] || "View in BrandBite";
   const settingsUrl = getSettingsUrl(baseUrl, recipientRole);
-  const actorLine = actorName ? `<p style="margin:0 0 12px;font-size:13px;color:#7a7a7a;">By ${actorName}</p>` : "";
+  const actorLine = actorName
+    ? `<p style="margin:0 0 12px;font-size:13px;color:#7a7a7a;">By ${actorName}</p>`
+    : "";
 
   return `<!DOCTYPE html>
 <html lang="en">

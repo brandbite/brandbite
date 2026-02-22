@@ -26,7 +26,6 @@ export const stripe = new Stripe(secretKey, {
  * Falls back to localhost in dev.
  */
 export function getAppBaseUrl(): string {
-  // Tercihen NEXT_PUBLIC_APP_URL tanımlarsın (örn: https://app.brandbite.com)
   const fromEnv = process.env.NEXT_PUBLIC_APP_URL;
   if (fromEnv && fromEnv.startsWith("http")) {
     return fromEnv.replace(/\/+$/, "");

@@ -28,9 +28,35 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
+const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
 export const metadata: Metadata = {
-  title: "Brandbite",
-  description: "Creative Subscription Portal",
+  title: {
+    default: "Brandbite",
+    template: "%s | Brandbite",
+  },
+  description:
+    "Creative-as-a-service platform. Submit requests, track progress, and manage your creative pipeline.",
+  metadataBase: new URL(appUrl),
+  openGraph: {
+    title: "Brandbite",
+    description:
+      "Creative-as-a-service platform. Submit requests, track progress, and manage your creative pipeline.",
+    url: appUrl,
+    siteName: "Brandbite",
+    type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary",
+    title: "Brandbite",
+    description:
+      "Creative-as-a-service platform. Submit requests, track progress, and manage your creative pipeline.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 // Inline script to prevent FOUC — reads localStorage before paint

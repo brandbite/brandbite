@@ -314,6 +314,14 @@ export default function LoginPage() {
                 autoComplete={mode === "signup" ? "new-password" : "current-password"}
                 className="w-full rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] px-3.5 py-2.5 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
               />
+              {mode === "signin" && (
+                <Link
+                  href="/reset-password"
+                  className="mt-1 block text-right text-xs font-medium text-[var(--bb-primary)] hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              )}
             </div>
 
             {/* Error message */}
