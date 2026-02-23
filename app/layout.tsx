@@ -61,11 +61,12 @@ export const metadata: Metadata = {
 };
 
 // Inline script to prevent FOUC — reads localStorage before paint
+// Default to light mode when no preference is stored (marketing pages use light backgrounds)
 const themeScript = `
 (function(){
   try {
     var t = localStorage.getItem("bb-theme");
-    var dark = t === "dark" || (t !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    var dark = t === "dark" || (t === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
     if (dark) document.documentElement.classList.add("dark");
   } catch(e) {}
 })();
