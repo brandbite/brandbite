@@ -16,9 +16,9 @@ import { useState } from "react";
 const NAV_LINKS = [
   { href: "/how-it-works", label: "How it works?" },
   { href: "/pricing", label: "Pricing" },
-  { href: "/#showcase", label: "Showcase" },
+  { href: "/showcase", label: "Showcase" },
   { href: "/#faq", label: "FAQs" },
-  { href: "#", label: "Blog" },
+  { href: "/blog", label: "Blog" },
 ];
 
 const STEPS = [

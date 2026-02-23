@@ -25,6 +25,7 @@ type RichTextEditorProps = {
   disabled?: boolean;
   className?: string;
   minHeight?: string;
+  enableHeadings?: boolean;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -53,8 +54,8 @@ function ToolbarButton({
       className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
         active
           ? "bg-[var(--bb-bg-card)] text-[var(--bb-secondary)]"
-          : "text-[var(--bb-text-muted)] hover:text-[var(--bb-secondary)] hover:bg-[var(--bb-bg-warm)]"
-      } disabled:opacity-40 disabled:cursor-not-allowed`}
+          : "text-[var(--bb-text-muted)] hover:bg-[var(--bb-bg-warm)] hover:text-[var(--bb-secondary)]"
+      } disabled:cursor-not-allowed disabled:opacity-40`}
     >
       {children}
     </button>
@@ -68,9 +69,11 @@ function ToolbarButton({
 function Toolbar({
   editor,
   disabled,
+  enableHeadings = false,
 }: {
   editor: ReturnType<typeof useEditor>;
   disabled: boolean;
+  enableHeadings?: boolean;
 }) {
   if (!editor) return null;
 
@@ -92,16 +95,35 @@ function Toolbar({
     // Add https:// if no protocol
     const href = /^https?:\/\//i.test(url) ? url : `https://${url}`;
 
-    editor
-      .chain()
-      .focus()
-      .extendMarkRange("link")
-      .setLink({ href })
-      .run();
+    editor.chain().focus().extendMarkRange("link").setLink({ href }).run();
   };
 
   return (
     <div className="flex items-center gap-0.5 border-b border-[var(--bb-border-subtle)] px-2 py-1.5">
+      {enableHeadings && (
+        <>
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+            active={editor.isActive("heading", { level: 2 })}
+            disabled={disabled}
+            title="Heading 2"
+          >
+            H2
+          </ToolbarButton>
+
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+            active={editor.isActive("heading", { level: 3 })}
+            disabled={disabled}
+            title="Heading 3"
+          >
+            H3
+          </ToolbarButton>
+
+          <div className="mx-1 h-4 w-px bg-[var(--bb-border-subtle)]" />
+        </>
+      )}
+
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleBold().run()}
         active={editor.isActive("bold")}
@@ -165,11 +187,12 @@ export function RichTextEditor({
   disabled = false,
   className = "",
   minHeight = "100px",
+  enableHeadings = false,
 }: RichTextEditorProps) {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        heading: false,
+        heading: enableHeadings ? { levels: [2, 3] } : false,
         codeBlock: false,
         blockquote: false,
         horizontalRule: false,
@@ -227,10 +250,7 @@ export function RichTextEditor({
         <div className="border-b border-[var(--bb-border-subtle)] px-2 py-1.5">
           <div className="h-6" />
         </div>
-        <div
-          className="px-3 py-2 text-sm text-[var(--bb-text-muted)]"
-          style={{ minHeight }}
-        >
+        <div className="px-3 py-2 text-sm text-[var(--bb-text-muted)]" style={{ minHeight }}>
           {placeholder}
         </div>
       </div>
@@ -240,10 +260,10 @@ export function RichTextEditor({
   return (
     <div
       className={`bb-rich-text rounded-md border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] transition-colors focus-within:border-[var(--bb-primary)] focus-within:ring-1 focus-within:ring-[var(--bb-primary)] ${
-        disabled ? "opacity-50 cursor-not-allowed" : ""
+        disabled ? "cursor-not-allowed opacity-50" : ""
       } ${className}`}
     >
-      <Toolbar editor={editor} disabled={disabled} />
+      <Toolbar editor={editor} disabled={disabled} enableHeadings={enableHeadings} />
       <div className="px-3 py-2 text-sm text-[var(--bb-secondary)]" style={{ minHeight }}>
         <EditorContent editor={editor} />
       </div>

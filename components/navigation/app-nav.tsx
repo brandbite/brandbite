@@ -73,6 +73,13 @@ const NAV_CONFIG: Record<
           { href: "/admin/users", label: "Users" },
         ],
       },
+      {
+        label: "Content",
+        children: [
+          { href: "/admin/showcase", label: "Showcase" },
+          { href: "/admin/blog", label: "Blog" },
+        ],
+      },
       { href: "/admin/settings", label: "Settings" },
     ],
     brandLabel: "Brandbite",
