@@ -116,8 +116,8 @@ export default function HomePage() {
           : activeUser?.role ?? "";
 
   return (
-    <div className="min-h-screen bg-[#f5f3f0] text-[#424143]">
-      <div className="mx-auto max-w-5xl px-6 pb-16 pt-12">
+    <div className="flex min-h-screen flex-col bg-[#f5f3f0] text-[#424143]">
+      <div className="mx-auto flex max-w-5xl flex-1 flex-col px-6 pb-16 pt-12">
         {/* ----------------------------------------------------------------- */}
         {/* Hero section                                                      */}
         {/* ----------------------------------------------------------------- */}
@@ -277,7 +277,7 @@ export default function HomePage() {
         {/* ----------------------------------------------------------------- */}
         {/* Footer                                                            */}
         {/* ----------------------------------------------------------------- */}
-        <footer className="flex flex-col items-center gap-2 border-t border-[#e3e1dc] pt-6 text-center">
+        <footer className="mt-auto flex flex-col items-center gap-2 border-t border-[#e3e1dc] pt-6 text-center">
           <div className="flex items-center gap-2">
             <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[#f15b2b] text-[10px] font-bold text-white">
               B
