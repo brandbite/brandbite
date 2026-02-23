@@ -124,25 +124,23 @@ export default function BlogPostPage() {
             {/* Back link */}
             <Link
               href="/blog"
-              className="inline-block text-sm font-medium text-[var(--bb-primary)] transition-colors hover:underline"
+              className="inline-flex items-center gap-1 text-sm font-medium text-[var(--bb-primary)] transition-colors hover:underline"
             >
               &larr; Back to Blog
             </Link>
 
-            {/* Category badge */}
-            {post.category && (
-              <span className="mt-4 inline-block rounded-full bg-[var(--bb-primary-light)] px-2.5 py-0.5 text-xs font-medium text-[var(--bb-primary)]">
-                {post.category}
-              </span>
-            )}
-
             {/* Title */}
-            <h1 className="font-brand mt-4 text-3xl font-bold text-[var(--bb-secondary)] sm:text-4xl lg:text-5xl">
+            <h1 className="font-brand mt-8 text-3xl font-bold text-[var(--bb-secondary)] sm:text-4xl lg:text-5xl">
               {post.title}
             </h1>
 
-            {/* Meta row */}
-            <div className="mt-4 flex items-center gap-3 text-sm text-[var(--bb-text-secondary)]">
+            {/* Meta row: category + author + date */}
+            <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-[var(--bb-text-secondary)]">
+              {post.category && (
+                <span className="rounded-full bg-[var(--bb-primary-light)] px-2.5 py-0.5 text-xs font-medium text-[var(--bb-primary)]">
+                  {post.category}
+                </span>
+              )}
               {post.authorName && (
                 <>
                   <span className="font-medium">{post.authorName}</span>
