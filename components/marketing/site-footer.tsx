@@ -9,25 +9,25 @@ const FOOTER_COLS = [
   {
     title: "Platform",
     links: [
+      { label: "How It Works", href: "/how-it-works" },
       { label: "Plans & Pricing", href: "/pricing" },
-      { label: "Personal AI Manager", href: "#" },
-      { label: "AI Business Writer", href: "#" },
+      { label: "Showcase", href: "/showcase" },
     ],
   },
   {
     title: "Company",
     links: [
+      { label: "About", href: "/about" },
       { label: "Blog", href: "/blog" },
-      { label: "Careers", href: "#" },
-      { label: "News", href: "#" },
+      { label: "Contact", href: "/contact" },
     ],
   },
   {
     title: "Resources",
     links: [
-      { label: "Documentation", href: "#" },
-      { label: "Papers", href: "#" },
-      { label: "Press Conferences", href: "#" },
+      { label: "Documentation", href: "/documentation" },
+      { label: "FAQs", href: "/faq" },
+      { label: "News", href: "/news" },
     ],
   },
 ];

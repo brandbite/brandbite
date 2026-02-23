@@ -76,8 +76,10 @@ const NAV_CONFIG: Record<
       {
         label: "Content",
         children: [
+          { href: "/admin/pages", label: "Pages" },
           { href: "/admin/showcase", label: "Showcase" },
           { href: "/admin/blog", label: "Blog" },
+          { href: "/admin/news", label: "News" },
         ],
       },
       { href: "/admin/settings", label: "Settings" },

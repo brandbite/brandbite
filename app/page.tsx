@@ -17,7 +17,7 @@ const NAV_LINKS = [
   { href: "#how-it-works", label: "How it works?" },
   { href: "#pricing", label: "Pricing" },
   { href: "/showcase", label: "Showcase" },
-  { href: "#faq", label: "FAQs" },
+  { href: "/faq", label: "FAQs" },
   { href: "/blog", label: "Blog" },
 ];
 
@@ -105,12 +105,27 @@ const FAQS = [
 const FOOTER_COLS = [
   {
     title: "Platform",
-    links: ["Plans & Pricing", "Personal AI Manager", "AI Business Writer"],
+    links: [
+      { label: "How It Works", href: "/how-it-works" },
+      { label: "Plans & Pricing", href: "/pricing" },
+      { label: "Showcase", href: "/showcase" },
+    ],
   },
-  { title: "Company", links: ["Blog", "Careers", "News"] },
+  {
+    title: "Company",
+    links: [
+      { label: "About", href: "/about" },
+      { label: "Blog", href: "/blog" },
+      { label: "Contact", href: "/contact" },
+    ],
+  },
   {
     title: "Resources",
-    links: ["Documentation", "Papers", "Press Conferences"],
+    links: [
+      { label: "Documentation", href: "/documentation" },
+      { label: "FAQs", href: "/faq" },
+      { label: "News", href: "/news" },
+    ],
   },
 ];
 
@@ -680,12 +695,12 @@ function SiteFooter() {
               </h4>
               <ul className="space-y-2">
                 {col.links.map((link) => (
-                  <li key={link}>
+                  <li key={link.label}>
                     <a
-                      href="#"
+                      href={link.href}
                       className="text-sm text-gray-300 transition-colors hover:text-white"
                     >
-                      {link}
+                      {link.label}
                     </a>
                   </li>
                 ))}

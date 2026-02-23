@@ -22,12 +22,19 @@ const PUBLIC_PATHS = [
   "/pricing",
   "/showcase", // marketing pages
   "/blog", // marketing pages
+  "/faq", // marketing pages
+  "/about", // marketing pages
+  "/contact", // marketing pages
+  "/documentation", // marketing pages
+  "/news", // marketing pages
   "/api/auth", // BetterAuth catch-all (sign-up, sign-in, etc.)
   "/api/billing/webhook",
   "/api/invite",
   "/api/session", // session check itself must be accessible
   "/api/showcase", // public CMS read
   "/api/blog", // public CMS read
+  "/api/pages", // public CMS page read
+  "/api/news", // public CMS news read
 ];
 
 // Debug routes are only accessible in demo mode
