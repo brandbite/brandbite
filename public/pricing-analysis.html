@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BrandBite — Pricing Analysis 2026</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+  :root {
+    --bb-orange: #E8601C;
+    --bb-orange-light: #FFF3ED;
+    --bb-dark: #1A1A1A;
+    --bb-gray-700: #374151;
+    --bb-gray-500: #6B7280;
+    --bb-gray-300: #D1D5DB;
+    --bb-gray-100: #F3F4F6;
+    --bb-green: #059669;
+    --bb-blue: #2563EB;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--bb-dark);
+    line-height: 1.6;
+    background: #fff;
+  }
+
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page-break { page-break-before: always; }
+    .no-break { page-break-inside: avoid; }
+    @page { margin: 0.6in 0.7in; size: A4; }
+  }
+
+  .container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 40px 32px;
+  }
+
+  /* Cover / Header */
+  .cover {
+    text-align: center;
+    padding: 60px 0 40px;
+    border-bottom: 3px solid var(--bb-orange);
+    margin-bottom: 40px;
+  }
+  .cover-logo {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: var(--bb-dark);
+  }
+  .cover-logo span { color: var(--bb-orange); }
+  .cover h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--bb-dark);
+    margin-top: 24px;
+    letter-spacing: -0.3px;
+  }
+  .cover .subtitle {
+    font-size: 15px;
+    color: var(--bb-gray-500);
+    margin-top: 8px;
+  }
+  .cover .date {
+    display: inline-block;
+    margin-top: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--bb-gray-500);
+    background: var(--bb-gray-100);
+    padding: 4px 14px;
+    border-radius: 20px;
+  }
+
+  /* Sections */
+  .section {
+    margin-bottom: 36px;
+  }
+  .section h2 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--bb-dark);
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--bb-orange-light);
+  }
+  .section h2 .num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    background: var(--bb-orange);
+    color: #fff;
+    border-radius: 50%;
+    font-size: 13px;
+    font-weight: 700;
+    margin-right: 10px;
+    position: relative;
+    top: -1px;
+  }
+  .section h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--bb-gray-700);
+    margin: 16px 0 8px;
+  }
+  .section p, .section li {
+    font-size: 13px;
+    color: var(--bb-gray-700);
+    line-height: 1.7;
+  }
+  .section ul {
+    padding-left: 20px;
+    margin-bottom: 12px;
+  }
+  .section li { margin-bottom: 4px; }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 16px;
+    font-size: 12.5px;
+  }
+  thead th {
+    background: var(--bb-gray-100);
+    text-align: left;
+    padding: 8px 12px;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--bb-gray-500);
+    border-bottom: 2px solid var(--bb-gray-300);
+  }
+  thead th:not(:first-child) { text-align: right; }
+  tbody td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #f0f0f0;
+    color: var(--bb-gray-700);
+  }
+  tbody td:not(:first-child) { text-align: right; }
+  tbody tr:hover { background: #FAFAFA; }
+  .highlight-row { background: var(--bb-orange-light) !important; font-weight: 600; }
+  .highlight-row td { color: var(--bb-dark); }
+
+  /* Callout boxes */
+  .callout {
+    background: var(--bb-orange-light);
+    border-left: 4px solid var(--bb-orange);
+    border-radius: 0 8px 8px 0;
+    padding: 14px 18px;
+    margin: 16px 0;
+    font-size: 13px;
+    color: var(--bb-gray-700);
+  }
+  .callout strong { color: var(--bb-dark); }
+  .callout-blue {
+    background: #EFF6FF;
+    border-left-color: var(--bb-blue);
+  }
+  .callout-green {
+    background: #ECFDF5;
+    border-left-color: var(--bb-green);
+  }
+
+  /* Formula box */
+  .formula {
+    background: var(--bb-dark);
+    color: #E5E7EB;
+    border-radius: 8px;
+    padding: 16px 20px;
+    font-family: 'Courier New', monospace;
+    font-size: 12.5px;
+    line-height: 1.8;
+    margin: 12px 0 16px;
+    overflow-x: auto;
+  }
+  .formula .comment { color: #6B7280; }
+  .formula .val { color: #FCD34D; }
+  .formula .op { color: #93C5FD; }
+
+  /* Waterfall chart */
+  .waterfall {
+    margin: 16px 0;
+  }
+  .waterfall-bar {
+    display: flex;
+    align-items: center;
+    margin-bottom: 6px;
+    font-size: 12px;
+  }
+  .waterfall-label {
+    width: 180px;
+    flex-shrink: 0;
+    color: var(--bb-gray-700);
+    font-weight: 500;
+  }
+  .waterfall-track {
+    flex: 1;
+    height: 24px;
+    background: var(--bb-gray-100);
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+  }
+  .waterfall-fill {
+    height: 100%;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    padding-left: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #fff;
+  }
+  .waterfall-amount {
+    width: 80px;
+    text-align: right;
+    flex-shrink: 0;
+    margin-left: 8px;
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--bb-gray-700);
+  }
+
+  /* Pricing cards */
+  .pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .pricing-card {
+    border: 1.5px solid var(--bb-gray-300);
+    border-radius: 10px;
+    padding: 16px 14px;
+    text-align: center;
+  }
+  .pricing-card.featured {
+    border-color: var(--bb-orange);
+    background: var(--bb-orange-light);
+    position: relative;
+  }
+  .pricing-card .plan-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--bb-dark);
+    margin-bottom: 2px;
+  }
+  .pricing-card .tokens {
+    font-size: 11px;
+    color: var(--bb-gray-500);
+    margin-bottom: 10px;
+  }
+  .pricing-card .price {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--bb-dark);
+    letter-spacing: -0.5px;
+  }
+  .pricing-card .price-unit {
+    font-size: 11px;
+    color: var(--bb-gray-500);
+    font-weight: 400;
+  }
+  .pricing-card .per-token {
+    font-size: 11px;
+    color: var(--bb-orange);
+    font-weight: 600;
+    margin-top: 4px;
+  }
+  .pricing-card .badge {
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bb-orange);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 10px;
+    border-radius: 10px;
+  }
+
+  /* Competitive positioning */
+  .positioning-bar {
+    display: flex;
+    align-items: center;
+    height: 8px;
+    background: linear-gradient(90deg, #D1FAE5 0%, #FEF3C7 50%, #FECACA 100%);
+    border-radius: 4px;
+    position: relative;
+    margin: 24px 0 40px;
+  }
+  .positioning-marker {
+    position: absolute;
+    transform: translateX(-50%);
+    text-align: center;
+  }
+  .positioning-marker .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin: 0 auto 4px;
+    position: relative;
+    top: -1px;
+  }
+  .positioning-marker .marker-label {
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--bb-gray-500);
+    white-space: nowrap;
+  }
+  .positioning-marker .marker-price {
+    font-size: 8px;
+    color: var(--bb-gray-500);
+  }
+
+  /* Footer */
+  .footer {
+    margin-top: 40px;
+    padding-top: 16px;
+    border-top: 1px solid var(--bb-gray-300);
+    text-align: center;
+    font-size: 11px;
+    color: var(--bb-gray-500);
+  }
+
+  /* Two-column layout */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- COVER -->
+  <div class="cover">
+    <div class="cover-logo"><span>b</span>randbite</div>
+    <h1>Pricing Analysis & Token Valuation</h1>
+    <p class="subtitle">Package pricing based on token economy, infrastructure costs,<br>creative payouts, and European market rates</p>
+    <div class="date">February 2026 &middot; Confidential</div>
+  </div>
+
+  <!-- 1. EXECUTIVE SUMMARY -->
+  <div class="section no-break">
+    <h2><span class="num">1</span>Executive Summary</h2>
+    <p>BrandBite operates a token-based creative-as-a-service model where <strong>1 token &asymp; 1 hour</strong> of European creative work. This document derives package pricing from three inputs: designer payout obligations, platform infrastructure costs, and competitive market positioning.</p>
+    <div class="callout">
+      <strong>Key finding:</strong> At a blended European creative rate of &euro;28/hr and a 60% base payout, the break-even token price is &euro;46.67. With volume discounts across four tiers, recommended retail prices range from <strong>&euro;30&ndash;&euro;45 per token</strong>, yielding plan prices of <strong>&euro;2,250&ndash;&euro;15,000/month</strong>.
+    </div>
+  </div>
+
+  <!-- 2. TOKEN ECONOMY FUNDAMENTALS -->
+  <div class="section no-break">
+    <h2><span class="num">2</span>Token Economy Fundamentals</h2>
+    <p>Every job in BrandBite has a fixed token cost charged to the customer and a payout amount credited to the assigned creative. The ratio follows a 60/40 split at the base tier.</p>
+    <table>
+      <thead>
+        <tr><th>Parameter</th><th>Value</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>1 token represents</td><td>~1 hour of creative work</td></tr>
+        <tr><td>Base designer payout</td><td>60% of token cost</td></tr>
+        <tr><td>BrandBite gross margin</td><td>40% of token cost</td></tr>
+        <tr><td>Token cost range (jobs)</td><td>1&ndash;30 tokens</td></tr>
+        <tr><td>Jobs with quantity multiplier</td><td>10 job types</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 3. EUROPEAN CREATIVE RATES -->
+  <div class="section no-break">
+    <h2><span class="num">3</span>European Creative Hourly Rates</h2>
+    <p>BrandBite sources talent across European regions. The blended rate accounts for a mix of skill levels and geographies:</p>
+    <table>
+      <thead>
+        <tr><th>Region</th><th>Hourly Range</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Western EU (DE, FR, NL, BE)</td><td>&euro;35&ndash;60</td></tr>
+        <tr><td>Southern EU (ES, IT, PT, GR)</td><td>&euro;25&ndash;40</td></tr>
+        <tr><td>Eastern EU (PL, RO, BG, CZ)</td><td>&euro;15&ndash;30</td></tr>
+        <tr><td>Nordic (SE, DK, FI)</td><td>&euro;40&ndash;70</td></tr>
+        <tr class="highlight-row"><td>Blended target rate</td><td>&euro;28/hr</td></tr>
+      </tbody>
+    </table>
+    <div class="callout-blue callout">
+      <strong>Note:</strong> The &euro;28/hr blended rate positions BrandBite competitively &mdash; above mass-market outsourcing (&euro;5&ndash;15/hr) but accessible enough to attract quality mid-career European creatives.
+    </div>
+  </div>
+
+  <!-- 4. GAMIFICATION TIERS -->
+  <div class="section no-break">
+    <h2><span class="num">4</span>Gamification Payout Tiers</h2>
+    <p>Designer payout percentage increases with performance milestones, affecting per-token margins:</p>
+    <table>
+      <thead>
+        <tr><th>Tier</th><th>Requirement</th><th>Payout %</th><th>Designer &euro;/hr</th><th>Net Margin</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Base</td><td>Default</td><td>60%</td><td>&euro;28.00</td><td>~26%</td></tr>
+        <tr><td>Silver</td><td>50 tickets / 90 days</td><td>65%</td><td>&euro;30.33</td><td>~21%</td></tr>
+        <tr><td>Gold</td><td>100 tickets / 180 days</td><td>70%</td><td>&euro;32.67</td><td>~16%</td></tr>
+        <tr><td>Platinum</td><td>200 tickets / 180 days</td><td>75%</td><td>&euro;35.00</td><td>~11%</td></tr>
+      </tbody>
+    </table>
+    <p>Most designers are expected to operate at 60&ndash;65%, yielding a <strong>blended effective margin of 23&ndash;26%</strong>.</p>
+  </div>
+
+  <div class="page-break"></div>
+
+  <!-- 5. INFRASTRUCTURE COSTS -->
+  <div class="section no-break">
+    <h2><span class="num">5</span>Infrastructure &amp; Operational Costs</h2>
+    <div class="two-col">
+      <div>
+        <h3>Server &amp; Services (monthly)</h3>
+        <table>
+          <thead><tr><th>Item</th><th>Cost</th></tr></thead>
+          <tbody>
+            <tr><td>Hosting (Vercel Pro)</td><td>&euro;20</td></tr>
+            <tr><td>Database (managed PG)</td><td>&euro;25</td></tr>
+            <tr><td>Cloudflare R2 storage</td><td>&euro;10</td></tr>
+            <tr><td>Email service</td><td>&euro;20</td></tr>
+            <tr><td>Monitoring &amp; tools</td><td>&euro;10</td></tr>
+            <tr><td>Domain &amp; misc</td><td>&euro;5</td></tr>
+            <tr class="highlight-row"><td>Total</td><td>&euro;90</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <h3>Per-customer amortisation</h3>
+        <table>
+          <thead><tr><th>Scale</th><th>Cost/customer</th></tr></thead>
+          <tbody>
+            <tr><td>10 customers</td><td>&euro;9.00/mo</td></tr>
+            <tr><td>25 customers</td><td>&euro;3.60/mo</td></tr>
+            <tr><td>50 customers</td><td>&euro;1.80/mo</td></tr>
+            <tr><td>100 customers</td><td>&euro;0.90/mo</td></tr>
+          </tbody>
+        </table>
+        <div class="callout-green callout" style="margin-top:12px">
+          Infrastructure is <strong>&lt;2%</strong> of revenue &mdash; designer payouts dominate the cost structure.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. TOKEN PRICE DERIVATION -->
+  <div class="section no-break">
+    <h2><span class="num">6</span>Token Price Derivation</h2>
+    <div class="formula">
+      <span class="comment">-- Working backwards from designer hourly rate</span><br>
+      <br>
+      Designer target rate&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= <span class="val">&euro;28.00</span>/hr<br>
+      Base payout percentage&nbsp;&nbsp;&nbsp;= <span class="val">60%</span><br>
+      <br>
+      Token retail price&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= Designer rate <span class="op">&divide;</span> Payout %<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= <span class="val">&euro;28.00</span> <span class="op">&divide;</span> <span class="val">0.60</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= <span class="val">&euro;46.67</span> <span class="comment">(base, before volume discount)</span><br>
+      <br>
+      <span class="comment">-- Full cost breakdown per token</span><br>
+      Designer payout (60%)&nbsp;&nbsp;&nbsp;&nbsp;= <span class="val">&euro;28.00</span><br>
+      Stripe fees (~3%)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= <span class="val">&euro;1.40</span><br>
+      Infrastructure (~1%)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= <span class="val">&euro;0.50</span><br>
+      Ops &amp; overhead (~10%)&nbsp;&nbsp;&nbsp;&nbsp;= <span class="val">&euro;4.67</span><br>
+      <span style="color:#34D399;">Net profit (~26%)</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= <span class="val">&euro;12.10</span>
+    </div>
+  </div>
+
+  <!-- 7. MARGIN WATERFALL -->
+  <div class="section no-break">
+    <h2><span class="num">7</span>Revenue Waterfall (per &euro;4,800 Growth plan)</h2>
+    <div class="waterfall">
+      <div class="waterfall-bar">
+        <div class="waterfall-label">Revenue</div>
+        <div class="waterfall-track"><div class="waterfall-fill" style="width:100%;background:var(--bb-blue);">&euro;4,800</div></div>
+        <div class="waterfall-amount">&euro;4,800</div>
+      </div>
+      <div class="waterfall-bar">
+        <div class="waterfall-label">Designer payouts (60%)</div>
+        <div class="waterfall-track"><div class="waterfall-fill" style="width:60%;background:#EF4444;">&ndash;&euro;2,880</div></div>
+        <div class="waterfall-amount">&ndash;&euro;2,880</div>
+      </div>
+      <div class="waterfall-bar">
+        <div class="waterfall-label">Stripe fees (3%)</div>
+        <div class="waterfall-track"><div class="waterfall-fill" style="width:3%;background:#F59E0B;"></div></div>
+        <div class="waterfall-amount">&ndash;&euro;144</div>
+      </div>
+      <div class="waterfall-bar">
+        <div class="waterfall-label">Infrastructure (~1%)</div>
+        <div class="waterfall-track"><div class="waterfall-fill" style="width:1%;background:#8B5CF6;"></div></div>
+        <div class="waterfall-amount">&ndash;&euro;50</div>
+      </div>
+      <div class="waterfall-bar">
+        <div class="waterfall-label">Ops &amp; overhead (10%)</div>
+        <div class="waterfall-track"><div class="waterfall-fill" style="width:10%;background:#6B7280;"></div></div>
+        <div class="waterfall-amount">&ndash;&euro;480</div>
+      </div>
+      <div class="waterfall-bar">
+        <div class="waterfall-label" style="font-weight:700;color:var(--bb-green);">Net profit (26%)</div>
+        <div class="waterfall-track"><div class="waterfall-fill" style="width:26%;background:var(--bb-green);">&euro;1,246</div></div>
+        <div class="waterfall-amount" style="color:var(--bb-green);">&euro;1,246</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-break"></div>
+
+  <!-- 8. RECOMMENDED PRICING -->
+  <div class="section">
+    <h2><span class="num">8</span>Recommended Pricing</h2>
+
+    <h3>Monthly Plans</h3>
+    <div class="pricing-grid">
+      <div class="pricing-card">
+        <div class="plan-name">Starter</div>
+        <div class="tokens">50 tokens/mo</div>
+        <div class="price">&euro;2,250<span class="price-unit">/mo</span></div>
+        <div class="per-token">&euro;45/token</div>
+      </div>
+      <div class="pricing-card featured">
+        <div class="badge">Popular</div>
+        <div class="plan-name">Growth</div>
+        <div class="tokens">120 tokens/mo</div>
+        <div class="price">&euro;4,800<span class="price-unit">/mo</span></div>
+        <div class="per-token">&euro;40/token</div>
+      </div>
+      <div class="pricing-card">
+        <div class="plan-name">Business</div>
+        <div class="tokens">250 tokens/mo</div>
+        <div class="price">&euro;8,750<span class="price-unit">/mo</span></div>
+        <div class="per-token">&euro;35/token</div>
+      </div>
+      <div class="pricing-card">
+        <div class="plan-name">Enterprise</div>
+        <div class="tokens">500+ tokens/mo</div>
+        <div class="price">&euro;15,000<span class="price-unit">+/mo</span></div>
+        <div class="per-token">&euro;30/token</div>
+      </div>
+    </div>
+
+    <h3>Annual Plans (20% discount)</h3>
+    <table>
+      <thead>
+        <tr><th>Plan</th><th>Tokens/mo</th><th>Per Token</th><th>Monthly (billed yearly)</th><th>Annual Total</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Starter</td><td>50</td><td>&euro;36</td><td>&euro;1,800</td><td>&euro;21,600</td></tr>
+        <tr class="highlight-row"><td>Growth</td><td>120</td><td>&euro;32</td><td>&euro;3,840</td><td>&euro;46,080</td></tr>
+        <tr><td>Business</td><td>250</td><td>&euro;28</td><td>&euro;7,000</td><td>&euro;84,000</td></tr>
+        <tr><td>Enterprise</td><td>500+</td><td>&euro;24</td><td>&euro;12,000+</td><td>&euro;144,000+</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Yearly Discount Sensitivity</h3>
+    <table>
+      <thead>
+        <tr><th>Discount</th><th>Growth monthly (yearly)</th><th>Net Margin</th><th>Recommendation</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>15%</td><td>&euro;4,080</td><td>~16.5%</td><td>Conservative</td></tr>
+        <tr class="highlight-row"><td>20%</td><td>&euro;3,840</td><td>~10.7%</td><td>Balanced</td></tr>
+        <tr><td>25%</td><td>&euro;3,600</td><td>~4.9%</td><td>Aggressive</td></tr>
+      </tbody>
+    </table>
+    <div class="callout">
+      <strong>Recommendation:</strong> A 15&ndash;20% yearly discount strikes the best balance between churn reduction and margin preservation.
+    </div>
+  </div>
+
+  <div class="page-break"></div>
+
+  <!-- 9. WHAT CUSTOMERS GET -->
+  <div class="section no-break">
+    <h2><span class="num">9</span>What Customers Get</h2>
+    <p>Translating tokens into tangible deliverables customers can expect each month:</p>
+
+    <table>
+      <thead>
+        <tr><th>Deliverable</th><th>Tokens</th><th>Starter (50)</th><th>Growth (120)</th><th>Business (250)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Social Media Post (design)</td><td>2</td><td>8 posts</td><td>12 posts</td><td>20 posts</td></tr>
+        <tr><td>Carousel Post (10 visuals)</td><td>8</td><td>1</td><td>2</td><td>4</td></tr>
+        <tr><td>SEO Blog Article</td><td>9</td><td>2</td><td>4</td><td>6</td></tr>
+        <tr><td>Email Copy</td><td>3</td><td>&mdash;</td><td>4</td><td>6</td></tr>
+        <tr><td>Ad Copy Set</td><td>2</td><td>4</td><td>4</td><td>6</td></tr>
+        <tr><td>Presentation Deck</td><td>18</td><td>&mdash;</td><td>1</td><td>2</td></tr>
+        <tr><td>Brochure (6&ndash;8 pages)</td><td>12</td><td>&mdash;</td><td>1</td><td>2</td></tr>
+        <tr><td>Logo Design</td><td>16</td><td>&mdash;</td><td>&mdash;</td><td>1</td></tr>
+        <tr><td>Brand Strategy Deck</td><td>30</td><td>&mdash;</td><td>&mdash;</td><td>1</td></tr>
+        <tr><td>Motion Graphic Reel</td><td>18</td><td>&mdash;</td><td>&mdash;</td><td>1</td></tr>
+        <tr class="highlight-row"><td>Approximate total tokens</td><td></td><td>50</td><td>120</td><td>250</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 10. JOB TYPE TOKEN COSTS -->
+  <div class="section no-break">
+    <h2><span class="num">10</span>Complete Job Type Pricing Reference</h2>
+
+    <h3>Brand Strategy &amp; Creative Direction</h3>
+    <table>
+      <thead><tr><th>Job Type</th><th>Tokens</th><th>Designer Payout</th><th>Customer Cost (@&euro;40)</th></tr></thead>
+      <tbody>
+        <tr><td>Brand Strategy Deck &ndash; Simple</td><td>18</td><td>11</td><td>&euro;720</td></tr>
+        <tr><td>Brand Strategy Deck &ndash; Detailed</td><td>30</td><td>18</td><td>&euro;1,200</td></tr>
+        <tr><td>Brand Archetype Development</td><td>5</td><td>3</td><td>&euro;200</td></tr>
+        <tr><td>Tone of Voice Framework</td><td>5</td><td>3</td><td>&euro;200</td></tr>
+        <tr><td>Target Audience &amp; Personas</td><td>10</td><td>6</td><td>&euro;400</td></tr>
+        <tr><td>Competitor Analysis</td><td>12</td><td>7</td><td>&euro;480</td></tr>
+        <tr><td>Moodboards</td><td>5</td><td>3</td><td>&euro;200</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Visual Design &amp; Brand Identity</h3>
+    <table>
+      <thead><tr><th>Job Type</th><th>Tokens</th><th>Designer Payout</th><th>Customer Cost (@&euro;40)</th></tr></thead>
+      <tbody>
+        <tr><td>Logo Design</td><td>16</td><td>10</td><td>&euro;640</td></tr>
+        <tr><td>Brand ID Guide (20&ndash;30 pages)</td><td>30</td><td>18</td><td>&euro;1,200</td></tr>
+        <tr><td>Business Card</td><td>2</td><td>1</td><td>&euro;80</td></tr>
+        <tr><td>Brochure (6&ndash;8 pages)</td><td>12</td><td>7</td><td>&euro;480</td></tr>
+        <tr><td>Presentation Deck (w/ copy)</td><td>28</td><td>17</td><td>&euro;1,120</td></tr>
+        <tr><td>Presentation Deck (no copy)</td><td>18</td><td>11</td><td>&euro;720</td></tr>
+        <tr><td>Catalogue (20&ndash;40 pages)</td><td>24</td><td>14</td><td>&euro;960</td></tr>
+        <tr><td>Social Media Post (per design)</td><td>2</td><td>1</td><td>&euro;80</td></tr>
+        <tr><td>Social Media Template Set</td><td>8</td><td>5</td><td>&euro;320</td></tr>
+        <tr><td>Poster</td><td>8</td><td>5</td><td>&euro;320</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Copywriting &amp; Content</h3>
+    <table>
+      <thead><tr><th>Job Type</th><th>Tokens</th><th>Designer Payout</th><th>Customer Cost (@&euro;40)</th></tr></thead>
+      <tbody>
+        <tr><td>Slogan Development</td><td>5</td><td>3</td><td>&euro;200</td></tr>
+        <tr><td>Thought Leadership Article</td><td>9</td><td>5</td><td>&euro;360</td></tr>
+        <tr><td>SEO Blog Article</td><td>9</td><td>5</td><td>&euro;360</td></tr>
+        <tr><td>Website Copy (per page)</td><td>4</td><td>2</td><td>&euro;160</td></tr>
+        <tr><td>Landing Page Copy</td><td>7</td><td>4</td><td>&euro;280</td></tr>
+        <tr><td>Email Copy (per email)</td><td>3</td><td>2</td><td>&euro;120</td></tr>
+        <tr><td>Video Script</td><td>8</td><td>5</td><td>&euro;320</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Video &amp; Motion</h3>
+    <table>
+      <thead><tr><th>Job Type</th><th>Tokens</th><th>Designer Payout</th><th>Customer Cost (@&euro;40)</th></tr></thead>
+      <tbody>
+        <tr><td>Short-Form Motion Video (10&ndash;30s)</td><td>18</td><td>11</td><td>&euro;720</td></tr>
+        <tr><td>Motion Explainer (30&ndash;45s)</td><td>24</td><td>14</td><td>&euro;960</td></tr>
+        <tr><td>AI Video Production (w/ script)</td><td>18</td><td>11</td><td>&euro;720</td></tr>
+        <tr><td>AI Video Production (no script)</td><td>12</td><td>7</td><td>&euro;480</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="page-break"></div>
+
+  <!-- 11. COMPETITIVE POSITIONING -->
+  <div class="section no-break">
+    <h2><span class="num">11</span>Competitive Positioning</h2>
+    <p>BrandBite sits between mass-market design subscriptions and traditional agencies:</p>
+    <table>
+      <thead>
+        <tr><th>Service</th><th>Price/mo</th><th>Model</th><th>Quality Tier</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Design Pickle</td><td>~&euro;460</td><td>Unlimited, 1 at a time</td><td>Budget</td></tr>
+        <tr><td>ManyPixels</td><td>&euro;549&ndash;1,049</td><td>Unlimited, 1&ndash;2 concurrent</td><td>Mid-range</td></tr>
+        <tr><td>Penji</td><td>&euro;460&ndash;1,000</td><td>Unlimited, 1&ndash;2 projects</td><td>Mid-range</td></tr>
+        <tr class="highlight-row"><td>BrandBite Starter</td><td>&euro;2,250</td><td>50 tokens, scoped</td><td>Premium EU</td></tr>
+        <tr class="highlight-row"><td>BrandBite Growth</td><td>&euro;4,800</td><td>120 tokens, scoped</td><td>Premium EU</td></tr>
+        <tr><td>Traditional Agency</td><td>&euro;5,000&ndash;15,000+</td><td>Project-based, retainer</td><td>Premium</td></tr>
+      </tbody>
+    </table>
+    <div class="callout-blue callout">
+      <strong>Positioning advantage:</strong> BrandBite offers agency-quality European talent with subscription predictability. The token model gives precise cost control that "unlimited" platforms cannot match, while being 30&ndash;60% more affordable than traditional agencies.
+    </div>
+  </div>
+
+  <!-- 12. KEY FORMULAS -->
+  <div class="section no-break">
+    <h2><span class="num">12</span>Key Formulas</h2>
+    <div class="formula">
+      <span class="comment">-- Token retail price</span><br>
+      token_price <span class="op">=</span> designer_hourly_rate <span class="op">&divide;</span> payout_percent<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span> <span class="val">&euro;28</span> <span class="op">&divide;</span> <span class="val">0.60</span> <span class="op">=</span> <span class="val">&euro;46.67</span> (before volume discount)<br>
+      <br>
+      <span class="comment">-- Monthly plan price</span><br>
+      plan_monthly <span class="op">=</span> tokens <span class="op">&times;</span> discounted_per_token_rate<br>
+      <br>
+      <span class="comment">-- Annual plan price</span><br>
+      plan_annual <span class="op">=</span> plan_monthly <span class="op">&times;</span> <span class="val">12</span> <span class="op">&times;</span> (<span class="val">1</span> <span class="op">&minus;</span> yearly_discount)<br>
+      <br>
+      <span class="comment">-- Designer payout per job</span><br>
+      payout <span class="op">=</span> token_cost <span class="op">&times;</span> quantity <span class="op">&times;</span> (payout_percent <span class="op">&divide;</span> <span class="val">100</span>)<br>
+      <br>
+      <span class="comment">-- Net margin per token</span><br>
+      margin <span class="op">=</span> token_price <span class="op">&minus;</span> designer <span class="op">&minus;</span> stripe <span class="op">&minus;</span> infra <span class="op">&minus;</span> overhead
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="cover-logo" style="font-size:16px;margin-bottom:4px;"><span style="color:var(--bb-orange);">b</span>randbite</div>
+    Confidential &middot; Pricing Analysis &middot; February 2026<br>
+    This document is for internal planning purposes only.
+  </div>
+
+</div>
+</body>
+</html>
