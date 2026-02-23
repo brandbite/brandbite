@@ -15,6 +15,7 @@ import DOMPurify from "isomorphic-dompurify";
 /* -------------------------------------------------------------------------- */
 
 const ALLOWED_TAGS = ["p", "br", "strong", "em", "ul", "ol", "li", "a"];
+const ALLOWED_TAGS_WITH_HEADINGS = [...ALLOWED_TAGS, "h2", "h3", "h4"];
 const ALLOWED_ATTR = ["href", "target", "rel"];
 
 /* -------------------------------------------------------------------------- */
@@ -55,14 +56,16 @@ export function stripHtml(html: string): string {
 type SafeHtmlProps = {
   html: string;
   className?: string;
+  /** Allow h2/h3/h4 heading tags (default false) */
+  allowHeadings?: boolean;
 };
 
-export function SafeHtml({ html, className = "" }: SafeHtmlProps) {
+export function SafeHtml({ html, className = "", allowHeadings = false }: SafeHtmlProps) {
   // Backwards compat: convert plain text (no HTML) to HTML with preserved line breaks
   const source = isPlainText(html) ? plainTextToHtml(html) : html;
 
   const clean = DOMPurify.sanitize(source, {
-    ALLOWED_TAGS,
+    ALLOWED_TAGS: allowHeadings ? ALLOWED_TAGS_WITH_HEADINGS : ALLOWED_TAGS,
     ALLOWED_ATTR,
   });
 

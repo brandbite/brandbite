@@ -120,6 +120,14 @@ enum TagColor {
   YELLOW
 }
 
+// --- Help Center ---
+
+enum HelpTargetRole {
+  CUSTOMER
+  DESIGNER
+  ALL
+}
+
 // -----------------------------------------------------------------------------
 // Core User & Auth
 // -----------------------------------------------------------------------------
@@ -780,4 +788,46 @@ model TicketAssignmentLog {
   @@index([ticketId, createdAt])
   @@index([designerId, createdAt])
   @@index([reason, createdAt])
+}
+
+// -----------------------------------------------------------------------------
+// Help Center (categories + articles)
+// -----------------------------------------------------------------------------
+
+model HelpCategory {
+  id          String         @id @default(cuid())
+  name        String
+  slug        String         @unique
+  description String?
+  icon        String?
+  sortOrder   Int            @default(0)
+  targetRole  HelpTargetRole @default(ALL)
+  published   Boolean        @default(true)
+
+  articles HelpArticle[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([targetRole, published, sortOrder])
+}
+
+model HelpArticle {
+  id         String         @id @default(cuid())
+  title      String
+  slug       String         @unique
+  excerpt    String?
+  content    String
+  categoryId String
+  category   HelpCategory   @relation(fields: [categoryId], references: [id])
+  targetRole HelpTargetRole @default(ALL)
+  published  Boolean        @default(true)
+  sortOrder  Int            @default(0)
+  viewCount  Int            @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoryId, published, sortOrder])
+  @@index([targetRole, published])
 }

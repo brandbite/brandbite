@@ -25,6 +25,8 @@ type RichTextEditorProps = {
   disabled?: boolean;
   className?: string;
   minHeight?: string;
+  /** Enable h2/h3 heading buttons in toolbar (default false) */
+  enableHeadings?: boolean;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -68,9 +70,11 @@ function ToolbarButton({
 function Toolbar({
   editor,
   disabled,
+  enableHeadings = false,
 }: {
   editor: ReturnType<typeof useEditor>;
   disabled: boolean;
+  enableHeadings?: boolean;
 }) {
   if (!editor) return null;
 
@@ -102,6 +106,27 @@ function Toolbar({
 
   return (
     <div className="flex items-center gap-0.5 border-b border-[var(--bb-border-subtle)] px-2 py-1.5">
+      {enableHeadings && (
+        <>
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+            active={editor.isActive("heading", { level: 2 })}
+            disabled={disabled}
+            title="Heading 2"
+          >
+            H2
+          </ToolbarButton>
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+            active={editor.isActive("heading", { level: 3 })}
+            disabled={disabled}
+            title="Heading 3"
+          >
+            H3
+          </ToolbarButton>
+          <div className="mx-1 h-4 w-px bg-[var(--bb-border-subtle)]" />
+        </>
+      )}
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleBold().run()}
         active={editor.isActive("bold")}
@@ -165,11 +190,12 @@ export function RichTextEditor({
   disabled = false,
   className = "",
   minHeight = "100px",
+  enableHeadings = false,
 }: RichTextEditorProps) {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        heading: false,
+        heading: enableHeadings ? { levels: [2, 3] } : false,
         codeBlock: false,
         blockquote: false,
         horizontalRule: false,
@@ -243,7 +269,7 @@ export function RichTextEditor({
         disabled ? "opacity-50 cursor-not-allowed" : ""
       } ${className}`}
     >
-      <Toolbar editor={editor} disabled={disabled} />
+      <Toolbar editor={editor} disabled={disabled} enableHeadings={enableHeadings} />
       <div className="px-3 py-2 text-sm text-[var(--bb-secondary)]" style={{ minHeight }}>
         <EditorContent editor={editor} />
       </div>
