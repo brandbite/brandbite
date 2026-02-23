@@ -7,7 +7,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 // ---------------------------------------------------------------------------
 // Data
@@ -113,8 +113,6 @@ const FOOTER_COLS = [
     links: ["Documentation", "Papers", "Press Conferences"],
   },
 ];
-
-const SHOWCASE_LABELS = ["Brand identity", "Social campaigns", "Packaging", "Web design"];
 
 // ---------------------------------------------------------------------------
 // Component
@@ -408,6 +406,24 @@ function PricingSection() {
 // ===========================================================================
 
 function ShowcaseSection() {
+  const [works, setWorks] = useState<
+    {
+      id: string;
+      title: string;
+      slug: string;
+      subtitle: string | null;
+      category: string | null;
+      thumbnailUrl: string | null;
+    }[]
+  >([]);
+
+  useEffect(() => {
+    fetch("/api/showcase")
+      .then((r) => (r.ok ? r.json() : { works: [] }))
+      .then((d) => setWorks((d.works ?? []).slice(0, 4)))
+      .catch(() => {});
+  }, []);
+
   return (
     <section id="showcase" className="bg-[var(--bb-bg-page)] px-6 py-20 sm:py-24">
       <div className="mx-auto max-w-5xl">
@@ -419,8 +435,8 @@ function ShowcaseSection() {
               Creatives that speak louder than words.
             </p>
           </div>
-          <a
-            href="#showcase"
+          <Link
+            href="/showcase"
             className="inline-flex items-center gap-1 rounded-full bg-[var(--bb-secondary)] px-5 py-2.5 text-xs font-bold text-white transition-colors hover:bg-[#333]"
           >
             View the full gallery
@@ -436,38 +452,51 @@ function ShowcaseSection() {
             >
               <path d="M5 12h14M12 5l7 7-7 7" />
             </svg>
-          </a>
+          </Link>
         </div>
 
         {/* Grid */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          {SHOWCASE_LABELS.map((label, i) => (
-            <div
-              key={i}
+          {works.map((work) => (
+            <Link
+              key={work.id}
+              href={`/showcase/${work.slug}`}
               className="group relative aspect-[4/3] overflow-hidden rounded-xl bg-[#e8dff5] transition-shadow hover:shadow-lg"
             >
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-[var(--bb-border-subtle)]">
-                    <svg
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="var(--bb-text-muted)"
-                      strokeWidth="1.5"
-                    >
-                      <rect x="3" y="3" width="18" height="18" rx="2" />
-                      <circle cx="8.5" cy="8.5" r="1.5" />
-                      <path d="M21 15l-5-5L5 21" />
-                    </svg>
+              {work.thumbnailUrl ? (
+                <img
+                  src={work.thumbnailUrl}
+                  alt={work.title}
+                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-[var(--bb-border-subtle)]">
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="var(--bb-text-muted)"
+                        strokeWidth="1.5"
+                      >
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <circle cx="8.5" cy="8.5" r="1.5" />
+                        <path d="M21 15l-5-5L5 21" />
+                      </svg>
+                    </div>
                   </div>
-                  <span className="text-[11px] font-medium text-[var(--bb-text-muted)]">
-                    {label}
-                  </span>
                 </div>
+              )}
+              {/* Overlay with title */}
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-3 pt-8">
+                <h3 className="text-sm font-semibold text-white">{work.title}</h3>
+                {work.category && (
+                  <span className="mt-0.5 block text-[11px] text-white/70">{work.category}</span>
+                )}
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       </div>

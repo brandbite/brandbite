@@ -18,10 +18,16 @@ const PUBLIC_PATHS = [
   "/reset-password",
   "/onboarding",
   "/invite", // covers /invite/[token]
+  "/how-it-works",
+  "/pricing",
+  "/showcase", // marketing pages
+  "/blog", // marketing pages
   "/api/auth", // BetterAuth catch-all (sign-up, sign-in, etc.)
   "/api/billing/webhook",
   "/api/invite",
   "/api/session", // session check itself must be accessible
+  "/api/showcase", // public CMS read
+  "/api/blog", // public CMS read
 ];
 
 // Debug routes are only accessible in demo mode
