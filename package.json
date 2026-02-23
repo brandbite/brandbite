@@ -35,7 +35,7 @@
     "better-auth": "^1.4.18",
     "isomorphic-dompurify": "^2.30.0",
     "jszip": "^3.10.1",
-    "next": "16.0.2",
+    "next": "^16.1.6",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "recharts": "^3.4.1",
