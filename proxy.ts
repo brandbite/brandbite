@@ -35,6 +35,7 @@ const PUBLIC_PATHS = [
   "/api/blog", // public CMS read
   "/api/pages", // public CMS page read
   "/api/news", // public CMS news read
+  "/api/docs", // public docs read
 ];
 
 // Debug routes are only accessible in demo mode

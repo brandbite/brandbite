@@ -54,9 +54,9 @@ function resolveTheme(theme: Theme): ResolvedTheme {
 // ---------------------------------------------------------------------------
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // Always initialise with "system" so server & client match during hydration.
+  // Default to "light" so first-time visitors (no localStorage) always get light mode.
   // The real stored value is read in the mount effect below.
-  const [theme, setThemeState] = useState<Theme>("system");
+  const [theme, setThemeState] = useState<Theme>("light");
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>("light");
 
   // Apply .dark class to <html>

@@ -270,7 +270,10 @@ export async function POST(req: NextRequest) {
       priority: selectedPriority,
       dueDate: parsedDueDate,
       tagIds: rawTagIds,
+      creativeMode,
     } = parsed.data;
+
+    const isAiMode = creativeMode === "AI";
 
     // For now, pick a default "requester" from company members:
     // Prefer PM, otherwise OWNER.
@@ -369,7 +372,11 @@ export async function POST(req: NextRequest) {
       let skilledCreativeCount = 0;
       let pausedCreativeCount = 0;
 
-      if (autoAssignEffective) {
+      // AI mode: skip designer assignment entirely
+      if (isAiMode) {
+        assignedCreativeId = null;
+        assignmentReason = null;
+      } else if (autoAssignEffective) {
         // auto-assign açık: skill-filtered + load-based algoritma
         let creatives: { id: string }[];
 
@@ -486,7 +493,7 @@ export async function POST(req: NextRequest) {
         data: {
           title,
           description: description || null,
-          status: TicketStatus.TODO,
+          status: isAiMode ? TicketStatus.IN_PROGRESS : TicketStatus.TODO,
           priority: selectedPriority,
           dueDate: parsedDueDate,
           companyId: company.id,
@@ -496,6 +503,7 @@ export async function POST(req: NextRequest) {
           quantity,
           companyTicketNumber: nextCompanyTicketNumber,
           creativeId: assignedCreativeId,
+          creativeMode,
         },
         include: {
           project: {

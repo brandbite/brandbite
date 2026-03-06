@@ -1374,6 +1374,32 @@ async function main() {
   });
 
   console.log("✅ Token ledger & withdrawals created.");
+
+  // ---------------------------------------------------------------------------
+  // AI Tool Configs
+  // ---------------------------------------------------------------------------
+
+  const aiToolConfigs = [
+    { toolType: "IMAGE_GENERATION", tokenCost: 2, rateLimit: 20 },
+    { toolType: "BACKGROUND_REMOVAL", tokenCost: 1, rateLimit: 30 },
+    { toolType: "TEXT_GENERATION", tokenCost: 1, rateLimit: 50 },
+    { toolType: "DESIGN_SUGGESTION", tokenCost: 1, rateLimit: 30 },
+  ];
+
+  for (const cfg of aiToolConfigs) {
+    await prisma.aiToolConfig.upsert({
+      where: { toolType: cfg.toolType },
+      create: {
+        toolType: cfg.toolType,
+        enabled: true,
+        tokenCost: cfg.tokenCost,
+        rateLimit: cfg.rateLimit,
+      },
+      update: {},
+    });
+  }
+
+  console.log("✅ AI tool configs seeded.");
   console.log("🌱 Seed completed successfully.");
 }
 

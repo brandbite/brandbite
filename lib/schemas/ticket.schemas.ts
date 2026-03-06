@@ -1,8 +1,9 @@
 import { z } from "zod";
-import { TicketPriority } from "@prisma/client";
+import { TicketPriority, TicketCreativeMode } from "@prisma/client";
 
 export const createTicketSchema = z.object({
   title: z.string().trim().min(1, "Title is required"),
+  creativeMode: z.nativeEnum(TicketCreativeMode).optional().default("DESIGNER"),
   description: z.string().trim().optional().default(""),
   projectId: z
     .string()

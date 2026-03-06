@@ -53,6 +53,7 @@ import {
 } from "@/lib/permissions/companyRoles";
 import { downloadSingleAsset, downloadAssetsAsZip } from "@/lib/download-helpers";
 import { RevisionCompare } from "@/components/ui/revision-compare";
+import { AiTicketControls } from "@/components/ui/ai-ticket-controls";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -83,6 +84,7 @@ type TicketDetailResponse = {
       creativePayoutTokens: number;
     } | null;
     isAssigned: boolean;
+    creativeMode: "DESIGNER" | "AI";
     createdBy: { id: string; name: string | null; email: string } | null;
     completedAt: string | null;
     completedBy: { id: string; name: string | null; email: string } | null;
@@ -932,6 +934,25 @@ export default function CustomerTicketDetailPage() {
             {/* Revision History */}
             {ticket.status !== "TODO" && (
               <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
+                {/* AI Generation Controls (only for AI-mode tickets) */}
+                {ticket.creativeMode === "AI" && (
+                  <AiTicketControls
+                    ticketId={ticket.id}
+                    ticketStatus={ticket.status}
+                    hasRevisions={!!revisions && revisions.length > 0}
+                    onGenerated={() => {
+                      // Refresh revisions and ticket data
+                      setRevisionsLoading(true);
+                      fetch(`/api/customer/tickets/${ticket.id}/revisions`, { cache: "no-store" })
+                        .then((r) => r.json())
+                        .then((d) => setRevisions(d?.revisions ?? []))
+                        .catch(() => {})
+                        .finally(() => setRevisionsLoading(false));
+                      setRefreshCounter((c) => c + 1);
+                    }}
+                  />
+                )}
+
                 <div className="flex items-center justify-between">
                   <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">
                     Revision history

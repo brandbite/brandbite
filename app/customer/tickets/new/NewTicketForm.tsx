@@ -148,6 +148,7 @@ export default function NewTicketForm({
 }: Props) {
   const router = useRouter();
 
+  const [creativeMode, setCreativeMode] = useState<"DESIGNER" | "AI">("DESIGNER");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [projectId, setProjectId] = useState<string>("");
@@ -386,6 +387,7 @@ export default function NewTicketForm({
       priority,
       dueDate: dueDate || null,
       tagIds: selectedTagIds,
+      creativeMode,
     });
 
     if (!validation.success) {
@@ -433,6 +435,7 @@ export default function NewTicketForm({
             priority,
             dueDate: dueDate || null,
             tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined,
+            creativeMode,
           }),
         },
       );
@@ -537,6 +540,45 @@ export default function NewTicketForm({
         </div>
       )}
 
+      {/* Creative Mode Selector */}
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-[var(--bb-secondary)]">
+          How would you like this done?
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => setCreativeMode("DESIGNER")}
+            disabled={isBusy}
+            className={`rounded-xl border px-4 py-3 text-left transition-all ${
+              creativeMode === "DESIGNER"
+                ? "border-[var(--bb-primary)] bg-[var(--bb-primary-light)] shadow-sm"
+                : "border-[var(--bb-border)] bg-[var(--bb-bg-page)] hover:border-[var(--bb-primary)]"
+            }`}
+          >
+            <p className="text-sm font-semibold text-[var(--bb-secondary)]">Work with Designer</p>
+            <p className="mt-0.5 text-[11px] text-[var(--bb-text-muted)]">
+              A creative from our team handles the work. 2-3 day turnaround.
+            </p>
+          </button>
+          <button
+            type="button"
+            onClick={() => setCreativeMode("AI")}
+            disabled={isBusy}
+            className={`rounded-xl border px-4 py-3 text-left transition-all ${
+              creativeMode === "AI"
+                ? "border-[var(--bb-primary)] bg-[var(--bb-primary-light)] shadow-sm"
+                : "border-[var(--bb-border)] bg-[var(--bb-bg-page)] hover:border-[var(--bb-primary)]"
+            }`}
+          >
+            <p className="text-sm font-semibold text-[var(--bb-secondary)]">Work with AI</p>
+            <p className="mt-0.5 text-[11px] text-[var(--bb-text-muted)]">
+              AI generates your design instantly. Ready in seconds.
+            </p>
+          </button>
+        </div>
+      </div>
+
       {/* Title */}
       <div className="space-y-1">
         <label className="text-xs font-medium text-[var(--bb-secondary)]">Title</label>
@@ -544,11 +586,17 @@ export default function NewTicketForm({
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Briefly describe what you need designed"
+          placeholder={
+            creativeMode === "AI"
+              ? "Describe what you want AI to create"
+              : "Briefly describe what you need designed"
+          }
           disabled={isBusy}
         />
         <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-          This will be the main line your creative sees on the board.
+          {creativeMode === "AI"
+            ? "This becomes the AI prompt for generating your design."
+            : "This will be the main line your creative sees on the board."}
         </p>
       </div>
 
@@ -858,9 +906,15 @@ export default function NewTicketForm({
           size="sm"
           disabled={isLimitedAccess || insufficientTokens}
           loading={isBusy}
-          loadingText={uploadingBriefs ? "Uploading attachments..." : "Creating..."}
+          loadingText={
+            uploadingBriefs
+              ? "Uploading attachments..."
+              : creativeMode === "AI"
+                ? "Generating..."
+                : "Creating..."
+          }
         >
-          Create ticket
+          {creativeMode === "AI" ? "Create & Generate with AI" : "Create ticket"}
         </Button>
       </div>
     </form>

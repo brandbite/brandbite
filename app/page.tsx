@@ -14,8 +14,8 @@ import { useEffect, useState } from "react";
 // ---------------------------------------------------------------------------
 
 const NAV_LINKS = [
-  { href: "#how-it-works", label: "How it works?" },
-  { href: "#pricing", label: "Pricing" },
+  { href: "/how-it-works", label: "How it works?" },
+  { href: "/pricing", label: "Pricing" },
   { href: "/showcase", label: "Showcase" },
   { href: "/faq", label: "FAQs" },
   { href: "/blog", label: "Blog" },
@@ -188,13 +188,13 @@ function SiteHeader({ signInHref }: { signInHref: string }) {
         {/* Desktop nav */}
         <nav className="hidden items-center gap-8 md:flex">
           {NAV_LINKS.map((l) => (
-            <a
+            <Link
               key={l.href}
               href={l.href}
               className="text-sm font-medium text-[var(--bb-text-secondary)] transition-colors hover:text-[var(--bb-secondary)]"
             >
               {l.label}
-            </a>
+            </Link>
           ))}
           <Link
             href={signInHref}
@@ -229,14 +229,14 @@ function SiteHeader({ signInHref }: { signInHref: string }) {
         <nav className="border-t border-[var(--bb-border-subtle)] bg-white px-6 py-4 md:hidden">
           <div className="flex flex-col gap-3">
             {NAV_LINKS.map((l) => (
-              <a
+              <Link
                 key={l.href}
                 href={l.href}
                 onClick={() => setMobileOpen(false)}
                 className="text-sm font-medium text-[var(--bb-text-secondary)]"
               >
                 {l.label}
-              </a>
+              </Link>
             ))}
             <Link
               href={signInHref}

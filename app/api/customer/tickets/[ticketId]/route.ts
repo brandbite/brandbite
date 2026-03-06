@@ -145,6 +145,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
               }
             : null,
           isAssigned: ticket.creativeId != null,
+          creativeMode: ticket.creativeMode,
           jobType: ticket.jobType
             ? {
                 id: ticket.jobType.id,
@@ -464,6 +465,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
             jobTypeId: updated.jobType?.id ?? null,
             jobTypeName: updated.jobType?.name ?? null,
             isAssigned: updated.creativeId != null,
+            creativeMode: updated.creativeMode,
             tags: updated.tagAssignments.map((ta) => ({
               id: ta.tag.id,
               name: ta.tag.name,
