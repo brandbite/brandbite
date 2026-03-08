@@ -271,6 +271,7 @@ export async function POST(req: NextRequest) {
       dueDate: parsedDueDate,
       tagIds: rawTagIds,
       creativeMode,
+      moodboardId,
     } = parsed.data;
 
     const isAiMode = creativeMode === "AI";
@@ -609,6 +610,18 @@ export async function POST(req: NextRequest) {
             })),
           });
         }
+      }
+
+      // 7) Link moodboard (if provided)
+      if (moodboardId) {
+        await tx.moodboard.updateMany({
+          where: {
+            id: moodboardId,
+            companyId: company.id,
+            ticketId: null,
+          },
+          data: { ticketId: createdTicket.id },
+        });
       }
 
       return createdTicket;

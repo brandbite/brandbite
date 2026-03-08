@@ -20,12 +20,7 @@ export type CompanyRole = PrismaCompanyRole;
  * Useful when reading from JSON payloads / session data.
  */
 export function normalizeCompanyRole(role: unknown): CompanyRole | null {
-  if (
-    role === "OWNER" ||
-    role === "PM" ||
-    role === "BILLING" ||
-    role === "MEMBER"
-  ) {
+  if (role === "OWNER" || role === "PM" || role === "BILLING" || role === "MEMBER") {
     return role;
   }
   return null;
@@ -34,9 +29,7 @@ export function normalizeCompanyRole(role: unknown): CompanyRole | null {
 /**
  * Company-level "admin" access: OWNER + PM.
  */
-export function isCompanyAdminRole(
-  role: CompanyRole | null | undefined,
-): boolean {
+export function isCompanyAdminRole(role: CompanyRole | null | undefined): boolean {
   if (!role) return false;
   return role === "OWNER" || role === "PM";
 }
@@ -46,18 +39,14 @@ export function isCompanyAdminRole(
  *
  * For now this mirrors "company admin": OWNER + PM.
  */
-export function canManageMembers(
-  role: CompanyRole | null | undefined,
-): boolean {
+export function canManageMembers(role: CompanyRole | null | undefined): boolean {
   return isCompanyAdminRole(role);
 }
 
 /**
  * Plan / subscription management: OWNER + BILLING.
  */
-export function canManagePlan(
-  role: CompanyRole | null | undefined,
-): boolean {
+export function canManagePlan(role: CompanyRole | null | undefined): boolean {
   if (!role) return false;
   return role === "OWNER" || role === "BILLING";
 }
@@ -65,9 +54,7 @@ export function canManagePlan(
 /**
  * Billing management convenience helper (same as plan for now).
  */
-export function canManageBilling(
-  role: CompanyRole | null | undefined,
-): boolean {
+export function canManageBilling(role: CompanyRole | null | undefined): boolean {
   if (!role) return false;
   return role === "OWNER" || role === "BILLING";
 }
@@ -76,9 +63,7 @@ export function canManageBilling(
  * Who can edit the company profile (name, website, etc.).
  * OWNER + PM can edit company profile.
  */
-export function canEditCompanyProfile(
-  role: CompanyRole | null | undefined,
-): boolean {
+export function canEditCompanyProfile(role: CompanyRole | null | undefined): boolean {
   return isCompanyAdminRole(role); // OWNER + PM
 }
 
@@ -86,9 +71,7 @@ export function canEditCompanyProfile(
  * Who can manage tags (create/edit/delete) for a company.
  * OWNER + PM can manage tags; all other roles can view/assign existing tags.
  */
-export function canManageTags(
-  role: CompanyRole | null | undefined,
-): boolean {
+export function canManageTags(role: CompanyRole | null | undefined): boolean {
   return isCompanyAdminRole(role); // OWNER + PM
 }
 
@@ -96,18 +79,14 @@ export function canManageTags(
  * Who can manage projects (create/rename/delete) for a company.
  * OWNER + PM can manage projects.
  */
-export function canManageProjects(
-  role: CompanyRole | null | undefined,
-): boolean {
+export function canManageProjects(role: CompanyRole | null | undefined): boolean {
   return isCompanyAdminRole(role); // OWNER + PM
 }
 
 /**
  * Board visibility: anyone who is actually a member of the company.
  */
-export function canViewBoard(
-  role: CompanyRole | null | undefined,
-): boolean {
+export function canViewBoard(role: CompanyRole | null | undefined): boolean {
   return !!role;
 }
 
@@ -117,9 +96,7 @@ export function canViewBoard(
  * - OWNER, PM, MEMBER: can create
  * - BILLING: cannot create (read-only for tickets)
  */
-export function canCreateTickets(
-  role: CompanyRole | null | undefined,
-): boolean {
+export function canCreateTickets(role: CompanyRole | null | undefined): boolean {
   if (!role) return false;
   return role === "OWNER" || role === "PM" || role === "MEMBER";
 }
@@ -128,9 +105,7 @@ export function canCreateTickets(
  * Who can move tickets on the board (kanban).
  * For now we mirror canCreateTickets, so BILLING is read-only.
  */
-export function canMoveTicketsOnBoard(
-  role: CompanyRole | null | undefined,
-): boolean {
+export function canMoveTicketsOnBoard(role: CompanyRole | null | undefined): boolean {
   return canCreateTickets(role);
 }
 
@@ -140,18 +115,14 @@ export function canMoveTicketsOnBoard(
  *
  * NOTE: The API also enforces a status guard — only TODO tickets are editable.
  */
-export function canEditTickets(
-  role: CompanyRole | null | undefined,
-): boolean {
+export function canEditTickets(role: CompanyRole | null | undefined): boolean {
   return canCreateTickets(role);
 }
 
 /**
  * Tokens overview visibility: everyone inside the workspace for now.
  */
-export function canViewTokens(
-  _role: CompanyRole | null | undefined,
-): boolean {
+export function canViewTokens(_role: CompanyRole | null | undefined): boolean {
   return true;
 }
 
@@ -159,10 +130,16 @@ export function canViewTokens(
  * Convenience helper for UI copy: "is this user read-only because they
  * are only marked as BILLING for the company?"
  */
-export function isBillingReadOnly(
-  role: CompanyRole | null | undefined,
-): boolean {
+export function isBillingReadOnly(role: CompanyRole | null | undefined): boolean {
   return role === "BILLING";
+}
+
+/**
+ * Who can create and edit moodboards for a company.
+ * Same rules as ticket creation: OWNER, PM, MEMBER can manage; BILLING cannot.
+ */
+export function canManageMoodboards(role: CompanyRole | null | undefined): boolean {
+  return canCreateTickets(role);
 }
 
 /**

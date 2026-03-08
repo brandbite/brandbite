@@ -43,6 +43,12 @@ type JobTypeOption = {
   defaultQuantity?: number;
 };
 
+type MoodboardOption = {
+  id: string;
+  title: string;
+  itemCount: number;
+};
+
 type Props = {
   companySlug: string;
   projects: ProjectOption[];
@@ -157,11 +163,39 @@ export default function NewTicketForm({
   const [dueDate, setDueDate] = useState<string>("");
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [localTags, setLocalTags] = useState<TagOption[]>(tagsProp ?? []);
+  const [moodboardId, setMoodboardId] = useState<string>("");
+  const [moodboards, setMoodboards] = useState<MoodboardOption[]>([]);
 
   // Sync when tags prop changes (e.g. after parent re-fetches)
   useEffect(() => {
     if (tagsProp) setLocalTags(tagsProp);
   }, [tagsProp]);
+
+  // Load moodboards for the "Attach moodboard" dropdown
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/customer/moodboards");
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!cancelled && Array.isArray(json.moodboards)) {
+          setMoodboards(
+            json.moodboards.map((mb: any) => ({
+              id: mb.id,
+              title: mb.title,
+              itemCount: mb._count?.items ?? 0,
+            })),
+          );
+        }
+      } catch {
+        // Moodboards are optional — silently ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Quantity multiplier (1–10), reset when job type changes
   const initialQty = initialJobTypeId
@@ -436,6 +470,7 @@ export default function NewTicketForm({
             dueDate: dueDate || null,
             tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined,
             creativeMode,
+            moodboardId: moodboardId || undefined,
           }),
         },
       );
@@ -883,6 +918,28 @@ export default function NewTicketForm({
           </p>
         </div>
       ) : null}
+
+      {/* Attach moodboard */}
+      {moodboards.length > 0 && (
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-[#424143]">Attach moodboard (optional)</label>
+          <FormSelect
+            value={moodboardId}
+            onChange={(e) => setMoodboardId(e.target.value)}
+            disabled={isBusy}
+          >
+            <option value="">No moodboard</option>
+            {moodboards.map((mb) => (
+              <option key={mb.id} value={mb.id}>
+                {mb.title} ({mb.itemCount} items)
+              </option>
+            ))}
+          </FormSelect>
+          <p className="text-[11px] text-[#9a9892]">
+            Link a moodboard to share inspiration and references with your designer.
+          </p>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex items-center justify-end gap-3 pt-2">

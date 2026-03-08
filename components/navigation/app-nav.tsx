@@ -95,6 +95,7 @@ const NAV_CONFIG: Record<
       { href: "/customer/services", label: "Services" },
       { href: "/customer/tokens", label: "Tokens" },
       { href: "/customer/board", label: "Board" },
+      { href: "/customer/moodboards", label: "Moodboards" },
       { href: "/customer/tickets", label: "Tickets" },
       { href: "/customer/ai-tools", label: "AI Tools" },
       { href: "/customer/members", label: "Members" },

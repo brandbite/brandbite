@@ -54,6 +54,12 @@ export const createTicketSchema = z.object({
       ),
   ),
   tagIds: z.array(z.string().min(1)).max(5).optional().default([]),
+  moodboardId: z
+    .string()
+    .min(1)
+    .nullable()
+    .optional()
+    .transform((v) => v || null),
 });
 
 export type CreateTicketInput = z.infer<typeof createTicketSchema>;
