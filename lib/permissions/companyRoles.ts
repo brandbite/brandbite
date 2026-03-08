@@ -162,6 +162,16 @@ export function isBillingReadOnly(
  * - Other global roles: only CUSTOMER is eligible for companyRole-based rules
  * - Within a company: only OWNER + PM can mark as DONE
  */
+/**
+ * Who can create and edit moodboards for a company.
+ * Same rules as ticket creation: OWNER, PM, MEMBER can manage; BILLING cannot.
+ */
+export function canManageMoodboards(
+  role: CompanyRole | null | undefined,
+): boolean {
+  return canCreateTickets(role);
+}
+
 export function canMarkTicketsDoneForCompany(
   globalRole: string | null | undefined,
   companyRole: CompanyRole | null | undefined,

@@ -128,6 +128,17 @@ enum HelpTargetRole {
   ALL
 }
 
+// --- Moodboard ---
+
+enum MoodboardItemType {
+  NOTE
+  IMAGE
+  COLOR
+  LINK
+  FILE
+  TODO
+}
+
 // -----------------------------------------------------------------------------
 // Core User & Auth
 // -----------------------------------------------------------------------------
@@ -170,6 +181,10 @@ model UserAccount {
   notifications        Notification[]           @relation("UserNotifications")
   actedNotifications   Notification[]           @relation("NotificationActor")
   notificationPrefs    NotificationPreference[]
+
+  // Moodboards
+  createdMoodboards     Moodboard[]     @relation("MoodboardCreatedBy")
+  createdMoodboardItems MoodboardItem[] @relation("MoodboardItemCreatedBy")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -221,6 +236,8 @@ model Company {
   /// Null = onboarding not yet completed (wizard should be shown).
   /// Set to now() once the customer finishes the onboarding wizard.
   onboardingCompletedAt DateTime?
+
+  moodboards Moodboard[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -309,8 +326,9 @@ model Project {
 
   autoAssignMode AutoAssignMode @default(INHERIT)
 
-  members ProjectMember[]
-  tickets Ticket[]
+  members    ProjectMember[]
+  tickets    Ticket[]
+  moodboards Moodboard[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -467,6 +485,7 @@ model Ticket {
   notifications  Notification[]
 
   tagAssignments TicketTagAssignment[]
+  moodboards     Moodboard[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -830,4 +849,63 @@ model HelpArticle {
 
   @@index([categoryId, published, sortOrder])
   @@index([targetRole, published])
+}
+
+// -----------------------------------------------------------------------------
+// Moodboard
+// -----------------------------------------------------------------------------
+
+model Moodboard {
+  id          String  @id @default(cuid())
+  title       String
+  description String?
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id])
+
+  ticketId String?
+  ticket   Ticket? @relation(fields: [ticketId], references: [id])
+
+  createdById String
+  createdBy   UserAccount @relation("MoodboardCreatedBy", fields: [createdById], references: [id])
+
+  items MoodboardItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, createdAt])
+  @@index([projectId])
+  @@index([ticketId])
+}
+
+model MoodboardItem {
+  id String @id @default(cuid())
+
+  moodboardId String
+  moodboard   Moodboard @relation(fields: [moodboardId], references: [id], onDelete: Cascade)
+
+  type     MoodboardItemType
+  position Int               @default(0)
+  colSpan  Int               @default(1)
+
+  /// Polymorphic JSON data — shape depends on `type`:
+  /// NOTE:  { title?, body }
+  /// IMAGE: { url, storageKey, caption?, width?, height?, originalName?, mimeType?, bytes? }
+  /// COLOR: { hex, name? }
+  /// LINK:  { url, title?, description?, favicon? }
+  /// FILE:  { url, storageKey, originalName, mimeType, bytes }
+  /// TODO:  { title?, items: [{ id, text, checked }] }
+  data Json
+
+  createdById String
+  createdBy   UserAccount @relation("MoodboardItemCreatedBy", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([moodboardId, position])
 }

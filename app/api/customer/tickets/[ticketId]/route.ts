@@ -106,6 +106,14 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
             email: true,
           },
         },
+        moodboards: {
+          select: {
+            id: true,
+            title: true,
+            _count: { select: { items: true } },
+          },
+          take: 5,
+        },
       },
     });
 
@@ -185,6 +193,11 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
                 email: ticket.createdBy.email,
               }
             : null,
+          moodboards: (ticket.moodboards ?? []).map((mb: any) => ({
+            id: mb.id,
+            title: mb.title,
+            itemCount: mb._count?.items ?? 0,
+          })),
         },
       },
       { status: 200 },

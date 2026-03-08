@@ -290,6 +290,12 @@ export async function POST(req: NextRequest) {
           .slice(0, 5)
       : [];
 
+    // Parse optional moodboardId (link existing moodboard to ticket)
+    const moodboardId =
+      typeof raw.moodboardId === "string" && raw.moodboardId.length > 0
+        ? (raw.moodboardId as string)
+        : null;
+
     if (!title) {
       return NextResponse.json(
         { error: "Title is required" },
@@ -597,6 +603,18 @@ export async function POST(req: NextRequest) {
             })),
           });
         }
+      }
+
+      // 7) Link moodboard (if provided)
+      if (moodboardId) {
+        await tx.moodboard.updateMany({
+          where: {
+            id: moodboardId,
+            companyId: company.id,
+            ticketId: null,
+          },
+          data: { ticketId: createdTicket.id },
+        });
       }
 
       return createdTicket;

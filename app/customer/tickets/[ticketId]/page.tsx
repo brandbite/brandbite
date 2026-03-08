@@ -60,6 +60,12 @@ import {
 // Types
 // ---------------------------------------------------------------------------
 
+type TicketMoodboard = {
+  id: string;
+  title: string;
+  itemCount: number;
+};
+
 type TicketDetailResponse = {
   ticket: {
     id: string;
@@ -87,6 +93,7 @@ type TicketDetailResponse = {
     designer: { id: string; name: string | null; email: string } | null;
     createdBy: { id: string; name: string | null; email: string } | null;
     tags: { id: string; name: string; color: string }[];
+    moodboards?: TicketMoodboard[];
   };
 };
 
@@ -1382,6 +1389,42 @@ export default function CustomerTicketDetailPage() {
                     <p className="mt-0.5 font-semibold text-[#424143]">
                       ×{ticket.quantity}
                     </p>
+                  </div>
+                )}
+
+                {/* Linked moodboards */}
+                {ticket.moodboards && ticket.moodboards.length > 0 && (
+                  <div>
+                    <p className="text-[#9a9892]">Moodboards</p>
+                    <div className="mt-1 space-y-1">
+                      {ticket.moodboards.map((mb) => (
+                        <a
+                          key={mb.id}
+                          href={`/customer/moodboards/${mb.id}`}
+                          className="flex items-center gap-2 rounded-md border border-[#eee7dc] bg-[#fffaf1] px-2.5 py-1.5 text-xs text-[#424143] transition-colors hover:border-[var(--bb-primary)] hover:bg-[#fff4e6]"
+                        >
+                          <svg
+                            className="h-3.5 w-3.5 shrink-0 text-[var(--bb-primary)]"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            strokeWidth={2}
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a1.5 1.5 0 001.5-1.5V5.25a1.5 1.5 0 00-1.5-1.5H3.75a1.5 1.5 0 00-1.5 1.5v14.25a1.5 1.5 0 001.5 1.5z"
+                            />
+                          </svg>
+                          <span className="truncate font-medium">
+                            {mb.title}
+                          </span>
+                          <span className="ml-auto shrink-0 text-[10px] text-[#9a9892]">
+                            {mb.itemCount} items
+                          </span>
+                        </a>
+                      ))}
+                    </div>
                   </div>
                 )}
 
