@@ -177,6 +177,7 @@ export function DrawingLayer({
   // Using explicit large dimensions ensures pointer events are captured everywhere.
   return (
     <svg
+      viewBox="-10000 -10000 30000 30000"
       style={{
         position: "absolute",
         left: -10000,

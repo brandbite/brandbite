@@ -85,6 +85,7 @@ export function ConnectionLayer({
   return (
     <svg
       className="pointer-events-none"
+      viewBox="-10000 -10000 30000 30000"
       style={{
         position: "absolute",
         left: -10000,

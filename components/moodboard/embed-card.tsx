@@ -63,7 +63,6 @@ export function EmbedCard({ data }: EmbedCardProps) {
             alt={data.title ?? "Video thumbnail"}
             className="h-full w-full object-cover"
             referrerPolicy="no-referrer"
-            crossOrigin="anonymous"
             onError={() => setThumbError(true)}
           />
         ) : (
