@@ -34,6 +34,7 @@ function PlayButton() {
 
 export function EmbedCard({ data }: EmbedCardProps) {
   const [playing, setPlaying] = useState(false);
+  const [thumbError, setThumbError] = useState(false);
 
   if (playing) {
     return (
@@ -56,11 +57,14 @@ export function EmbedCard({ data }: EmbedCardProps) {
         className="group relative flex aspect-video w-full cursor-pointer items-center justify-center overflow-hidden rounded-t-xl bg-gray-900"
         onClick={() => setPlaying(true)}
       >
-        {data.thumbnailUrl ? (
+        {data.thumbnailUrl && !thumbError ? (
           <img
             src={data.thumbnailUrl}
             alt={data.title ?? "Video thumbnail"}
             className="h-full w-full object-cover"
+            referrerPolicy="no-referrer"
+            crossOrigin="anonymous"
+            onError={() => setThumbError(true)}
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900">

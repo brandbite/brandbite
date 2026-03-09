@@ -172,12 +172,17 @@ export function DrawingLayer({
     [isDrawing, strokeColor, strokeWidth, onStrokeComplete],
   );
 
+  // The SVG must cover a large canvas area because the transform div has no
+  // intrinsic size (all children are absolutely positioned → 0×0 parent).
+  // Using explicit large dimensions ensures pointer events are captured everywhere.
   return (
     <svg
-      className="absolute inset-0"
       style={{
-        width: "100%",
-        height: "100%",
+        position: "absolute",
+        left: -10000,
+        top: -10000,
+        width: 30000,
+        height: 30000,
         overflow: "visible",
         pointerEvents: active ? "auto" : "none",
         cursor: active ? "crosshair" : "default",

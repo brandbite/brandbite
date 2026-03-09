@@ -84,8 +84,15 @@ export function ConnectionLayer({
 
   return (
     <svg
-      className="pointer-events-none absolute inset-0"
-      style={{ width: "100%", height: "100%", overflow: "visible" }}
+      className="pointer-events-none"
+      style={{
+        position: "absolute",
+        left: -10000,
+        top: -10000,
+        width: 30000,
+        height: 30000,
+        overflow: "visible",
+      }}
     >
       <defs>
         <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
