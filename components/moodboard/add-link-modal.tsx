@@ -19,14 +19,6 @@ function isValidUrl(str: string): boolean {
   }
 }
 
-function getDomain(url: string): string {
-  try {
-    return new URL(url).hostname;
-  } catch {
-    return "";
-  }
-}
-
 export function AddLinkModal({ open, onClose, onSave }: AddLinkModalProps) {
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
@@ -34,6 +26,7 @@ export function AddLinkModal({ open, onClose, onSave }: AddLinkModalProps) {
   const [fetching, setFetching] = useState(false);
   const [fetchedUrl, setFetchedUrl] = useState("");
   const [ogImage, setOgImage] = useState<string | undefined>(undefined);
+  const [ogFavicon, setOgFavicon] = useState<string | undefined>(undefined);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Auto-fetch metadata when a valid URL is entered
@@ -55,6 +48,7 @@ export function AddLinkModal({ open, onClose, onSave }: AddLinkModalProps) {
         if (data.title && !title) setTitle(data.title);
         if (data.description && !description) setDescription(data.description);
         if (data.image) setOgImage(data.image);
+        if (data.favicon) setOgFavicon(data.favicon);
         setFetchedUrl(targetUrl);
       } catch {
         // Silently ignore fetch errors
@@ -84,6 +78,7 @@ export function AddLinkModal({ open, onClose, onSave }: AddLinkModalProps) {
     setFetching(false);
     setFetchedUrl("");
     setOgImage(undefined);
+    setOgFavicon(undefined);
     onClose();
   }
 
@@ -91,16 +86,11 @@ export function AddLinkModal({ open, onClose, onSave }: AddLinkModalProps) {
     const trimmedUrl = url.trim();
     if (!isValidUrl(trimmedUrl)) return;
 
-    const domain = getDomain(trimmedUrl);
-    const favicon = domain
-      ? `https://www.google.com/s2/favicons?domain=${domain}&sz=32`
-      : undefined;
-
     onSave({
       url: trimmedUrl,
       title: title.trim() || undefined,
       description: description.trim() || undefined,
-      favicon,
+      favicon: ogFavicon,
       image: ogImage,
     });
 

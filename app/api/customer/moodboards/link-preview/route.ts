@@ -64,8 +64,9 @@ export async function POST(req: NextRequest) {
     const description =
       extractMeta(html, "og:description") ?? extractMeta(html, "description") ?? null;
     const image = extractMeta(html, "og:image") ?? null;
+    const favicon = extractFavicon(html, parsed) ?? null;
 
-    return NextResponse.json({ title, description, image });
+    return NextResponse.json({ title, description, image, favicon });
   } catch (err: any) {
     if (err?.code === "UNAUTHENTICATED") {
       return NextResponse.json({ error: "UNAUTHENTICATED" }, { status: 401 });
@@ -101,6 +102,31 @@ function extractMeta(html: string, property: string): string | undefined {
 function extractTitle(html: string): string | undefined {
   const match = html.match(/<title[^>]*>([^<]+)<\/title>/i);
   return match?.[1] ? decodeHtmlEntities(match[1].trim()).slice(0, 200) : undefined;
+}
+
+function extractFavicon(html: string, pageUrl: URL): string | undefined {
+  // Try <link rel="icon" href="..."> or <link rel="shortcut icon" href="...">
+  const patterns = [
+    /<link[^>]+rel=["'](?:shortcut )?icon["'][^>]+href=["']([^"']+)["']/i,
+    /<link[^>]+href=["']([^"']+)["'][^>]+rel=["'](?:shortcut )?icon["']/i,
+    /<link[^>]+rel=["']apple-touch-icon["'][^>]+href=["']([^"']+)["']/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match?.[1]) {
+      const href = match[1].trim();
+      // Resolve relative URLs
+      try {
+        return new URL(href, pageUrl.origin).href;
+      } catch {
+        return undefined;
+      }
+    }
+  }
+
+  // Default: try /favicon.ico at domain root
+  return `${pageUrl.origin}/favicon.ico`;
 }
 
 function escapeRegex(str: string): string {
