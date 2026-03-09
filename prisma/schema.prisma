@@ -1263,7 +1263,8 @@ model Moodboard {
   createdById String
   createdBy   UserAccount @relation("MoodboardCreatedBy", fields: [createdById], references: [id])
 
-  items MoodboardItem[]
+  items       MoodboardItem[]
+  connections Json             @default("[]")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

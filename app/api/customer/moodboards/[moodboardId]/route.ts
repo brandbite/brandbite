@@ -107,6 +107,7 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
         ticketTitle: moodboard.ticket?.title ?? null,
         createdById: moodboard.createdById,
         items,
+        connections: (moodboard.connections as unknown[]) ?? [],
         createdAt: moodboard.createdAt.toISOString(),
         updatedAt: moodboard.updatedAt.toISOString(),
       },
@@ -175,6 +176,10 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     if (raw.description !== undefined) {
       data.description =
         typeof raw.description === "string" ? raw.description.trim() || null : null;
+    }
+
+    if (Array.isArray(raw.connections)) {
+      data.connections = raw.connections;
     }
 
     if (Object.keys(data).length === 0) {

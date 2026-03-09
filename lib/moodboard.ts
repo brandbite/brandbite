@@ -126,6 +126,29 @@ export type MoodboardItemClient = {
 };
 
 // ---------------------------------------------------------------------------
+// Connections (arrows between items)
+// ---------------------------------------------------------------------------
+
+export type MoodboardConnection = {
+  id: string;
+  sourceItemId: string;
+  targetItemId: string;
+  label?: string;
+  color?: string;
+  style?: "solid" | "dashed";
+};
+
+export function createConnection(sourceItemId: string, targetItemId: string): MoodboardConnection {
+  return {
+    id: crypto.randomUUID(),
+    sourceItemId,
+    targetItemId,
+    color: "#9ca3af",
+    style: "solid",
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Canvas constants
 // ---------------------------------------------------------------------------
 
@@ -150,6 +173,7 @@ export type MoodboardClient = {
   ticketId: string | null;
   createdById: string;
   items: MoodboardItemClient[];
+  connections: MoodboardConnection[];
   project?: { id: string; name: string } | null;
   ticket?: { id: string; title: string } | null;
   createdAt: string;

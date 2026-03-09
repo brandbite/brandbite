@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 
 import { CardWrapper } from "@/components/moodboard/card-wrapper";
 import { CanvasControls } from "@/components/moodboard/canvas-controls";
+import { ConnectionLayer } from "@/components/moodboard/connection-layer";
 import { NoteCard } from "@/components/moodboard/note-card";
 import { ImageCard } from "@/components/moodboard/image-card";
 import { ColorCard } from "@/components/moodboard/color-card";
@@ -14,7 +15,7 @@ import { TodoCard } from "@/components/moodboard/todo-card";
 import { EmbedCard } from "@/components/moodboard/embed-card";
 import { useCanvasTransform } from "@/components/moodboard/use-canvas-transform";
 
-import type { MoodboardItemClient, MoodboardItemData } from "@/lib/moodboard";
+import type { MoodboardItemClient, MoodboardItemData, MoodboardConnection } from "@/lib/moodboard";
 import {
   isNoteData,
   isImageData,
@@ -24,13 +25,18 @@ import {
   isTodoData,
   isEmbedData,
 } from "@/lib/moodboard";
+import type { ToolMode } from "@/components/moodboard/board-toolbar";
 
 type BoardCanvasProps = {
   items: MoodboardItemClient[];
+  connections: MoodboardConnection[];
+  toolMode: ToolMode;
   onUpdateItem: (itemId: string, data: MoodboardItemData) => void;
   onDeleteItem: (itemId: string) => void;
   onMoveItem: (itemId: string, x: number, y: number) => void;
   onResizeItem: (itemId: string, width: number, height: number) => void;
+  onAddConnection: (sourceId: string, targetId: string) => void;
+  onDeleteConnection: (id: string) => void;
 };
 
 function renderCard(item: MoodboardItemClient, onUpdate: (data: MoodboardItemData) => void) {
@@ -49,12 +55,21 @@ function renderCard(item: MoodboardItemClient, onUpdate: (data: MoodboardItemDat
 
 export function BoardCanvas({
   items,
+  connections,
+  toolMode,
   onUpdateItem,
   onDeleteItem,
   onMoveItem,
   onResizeItem,
+  onAddConnection,
+  onDeleteConnection,
 }: BoardCanvasProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
+
+  // Arrow creation state
+  const [arrowSourceId, setArrowSourceId] = useState<string | null>(null);
+  const [pendingTarget, setPendingTarget] = useState<{ x: number; y: number } | null>(null);
+  const [prevToolMode, setPrevToolMode] = useState(toolMode);
 
   const {
     transform,
@@ -71,6 +86,54 @@ export function BoardCanvas({
   } = useCanvasTransform(items, viewportRef);
 
   const { panX, panY, zoom } = transform;
+
+  // Reset arrow state when leaving arrow mode (React-recommended pattern)
+  if (prevToolMode !== toolMode) {
+    setPrevToolMode(toolMode);
+    if (toolMode !== "arrow") {
+      setArrowSourceId(null);
+      setPendingTarget(null);
+    }
+  }
+
+  // Escape cancels arrow creation
+  useEffect(() => {
+    if (toolMode !== "arrow") return;
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setArrowSourceId(null);
+        setPendingTarget(null);
+      }
+    }
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [toolMode]);
+
+  // Track cursor position for pending arrow
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (toolMode !== "arrow" || !arrowSourceId || !viewportRef.current) return;
+      const rect = viewportRef.current.getBoundingClientRect();
+      setPendingTarget({
+        x: (e.clientX - rect.left - panX) / zoom,
+        y: (e.clientY - rect.top - panY) / zoom,
+      });
+    },
+    [toolMode, arrowSourceId, panX, panY, zoom],
+  );
+
+  // Handle card click in arrow mode
+  function handleArrowCardClick(itemId: string) {
+    if (!arrowSourceId) {
+      // First click — select source
+      setArrowSourceId(itemId);
+    } else if (arrowSourceId !== itemId) {
+      // Second click — create connection
+      onAddConnection(arrowSourceId, itemId);
+      setArrowSourceId(null);
+      setPendingTarget(null);
+    }
+  }
 
   // Register space key listeners
   useEffect(() => {
@@ -148,11 +211,12 @@ export function BoardCanvas({
       <div
         ref={viewportRef}
         className="relative flex-1 overflow-hidden"
-        style={{ cursor: "default" }}
+        style={{ cursor: toolMode === "arrow" ? "crosshair" : "default" }}
         onWheel={onWheel}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onMouseMove={handleMouseMove}
       >
         {/* Dot grid background */}
         <div
@@ -174,6 +238,7 @@ export function BoardCanvas({
             left: 0,
           }}
         >
+          {/* Cards */}
           {items.map((item) => (
             <CardWrapper
               key={item.id}
@@ -189,6 +254,40 @@ export function BoardCanvas({
               {renderCard(item, (data) => onUpdateItem(item.id, data))}
             </CardWrapper>
           ))}
+
+          {/* Connection arrows layer */}
+          <ConnectionLayer
+            connections={connections}
+            items={items}
+            onDeleteConnection={onDeleteConnection}
+            pendingSourceId={arrowSourceId}
+            pendingTarget={pendingTarget}
+          />
+
+          {/* Arrow mode — click overlays on cards */}
+          {toolMode === "arrow" &&
+            items.map((item) => (
+              <div
+                key={`arrow-target-${item.id}`}
+                className={`absolute rounded-2xl border-2 transition-colors ${
+                  arrowSourceId === item.id
+                    ? "border-[var(--bb-primary)] bg-[var(--bb-primary)]/10"
+                    : "border-transparent hover:border-[var(--bb-primary)]/50 hover:bg-[var(--bb-primary)]/5"
+                }`}
+                style={{
+                  left: item.x,
+                  top: item.y,
+                  width: item.width,
+                  height: item.height || 200,
+                  zIndex: 100,
+                  cursor: "crosshair",
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleArrowCardClick(item.id);
+                }}
+              />
+            ))}
         </div>
 
         {/* Floating zoom controls */}

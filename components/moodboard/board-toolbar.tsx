@@ -2,6 +2,8 @@
 
 import React, { useState } from "react";
 
+export type ToolMode = "select" | "arrow";
+
 type BoardToolbarProps = {
   onAddNote: () => void;
   onAddImage: () => void;
@@ -10,6 +12,8 @@ type BoardToolbarProps = {
   onAddFile: () => void;
   onAddTodo: () => void;
   onAddEmbed: () => void;
+  toolMode: ToolMode;
+  onSetToolMode: (mode: ToolMode) => void;
 };
 
 type ToolItem = {
@@ -140,6 +144,21 @@ function TodoIcon() {
   );
 }
 
+function ArrowIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <path d="M4 16L16 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path
+        d="M16 4L10 4M16 4L16 10"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function VideoIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -157,6 +176,8 @@ export function BoardToolbar({
   onAddFile,
   onAddTodo,
   onAddEmbed,
+  toolMode,
+  onSetToolMode,
 }: BoardToolbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -169,6 +190,8 @@ export function BoardToolbar({
     { label: "Todo", onClick: onAddTodo, icon: <TodoIcon /> },
     { label: "Video", onClick: onAddEmbed, icon: <VideoIcon /> },
   ];
+
+  const arrowActive = toolMode === "arrow";
 
   function handleToolClick(tool: ToolItem) {
     tool.onClick();
@@ -190,6 +213,23 @@ export function BoardToolbar({
             {tool.label}
           </button>
         ))}
+
+        {/* Divider */}
+        <div className="mx-3 my-1 border-t border-[var(--bb-border)]" />
+
+        {/* Arrow toggle */}
+        <button
+          type="button"
+          onClick={() => onSetToolMode(arrowActive ? "select" : "arrow")}
+          className={`flex w-full flex-col items-center gap-1 rounded-lg px-1 py-3 text-[10px] transition-colors ${
+            arrowActive
+              ? "bg-[var(--bb-primary)]/10 text-[var(--bb-primary)]"
+              : "text-[var(--bb-text-secondary)] hover:bg-[var(--bb-bg-warm)] hover:text-[var(--bb-primary)]"
+          }`}
+        >
+          <ArrowIcon />
+          Arrow
+        </button>
       </div>
 
       {/* Mobile floating action button */}

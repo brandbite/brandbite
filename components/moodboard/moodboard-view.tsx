@@ -24,7 +24,8 @@ import type {
   FileCardData,
   EmbedCardData,
 } from "@/lib/moodboard";
-import { CANVAS_DEFAULTS } from "@/lib/moodboard";
+import { CANVAS_DEFAULTS, createConnection } from "@/lib/moodboard";
+import type { ToolMode } from "@/components/moodboard/board-toolbar";
 
 type MoodboardViewProps = {
   moodboardId: string;
@@ -72,6 +73,7 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
   const [moodboard, setMoodboard] = useState<MoodboardClient | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeModal, setActiveModal] = useState<ModalType>(null);
+  const [toolMode, setToolMode] = useState<ToolMode>("select");
 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -165,9 +167,21 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
   // ---------------------------------------------------------------------------
 
   async function handleDeleteItem(itemId: string) {
+    // Also remove any connections referencing this item
+    const orphanedConns = (moodboard?.connections ?? []).filter(
+      (c) => c.sourceItemId === itemId || c.targetItemId === itemId,
+    );
+    const cleanedConnections = (moodboard?.connections ?? []).filter(
+      (c) => c.sourceItemId !== itemId && c.targetItemId !== itemId,
+    );
+
     setMoodboard((prev) => {
       if (!prev) return prev;
-      return { ...prev, items: prev.items.filter((item) => item.id !== itemId) };
+      return {
+        ...prev,
+        items: prev.items.filter((item) => item.id !== itemId),
+        connections: cleanedConnections,
+      };
     });
 
     try {
@@ -176,6 +190,15 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
       });
 
       if (!res.ok) throw new Error("Failed to delete item");
+
+      // If connections were cleaned up, persist that too
+      if (orphanedConns.length > 0) {
+        await fetch(`/api/customer/moodboards/${moodboardId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ connections: cleanedConnections }),
+        });
+      }
     } catch (err) {
       console.error("[moodboard-view] delete item error:", err);
       fetchMoodboard();
@@ -280,6 +303,59 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
       router.push("/customer/moodboards");
     } catch (err) {
       console.error("[moodboard-view] delete board error:", err);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Connections (arrows between cards)
+  // ---------------------------------------------------------------------------
+
+  async function handleAddConnection(sourceId: string, targetId: string) {
+    const newConn = createConnection(sourceId, targetId);
+    const updatedConnections = [...(moodboard?.connections ?? []), newConn];
+
+    // Optimistic update
+    setMoodboard((prev) => {
+      if (!prev) return prev;
+      return { ...prev, connections: updatedConnections };
+    });
+
+    // Persist to API
+    try {
+      const res = await fetch(`/api/customer/moodboards/${moodboardId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ connections: updatedConnections }),
+      });
+
+      if (!res.ok) throw new Error("Failed to save connection");
+    } catch (err) {
+      console.error("[moodboard-view] add connection error:", err);
+      fetchMoodboard();
+    }
+  }
+
+  async function handleDeleteConnection(connectionId: string) {
+    const updatedConnections = (moodboard?.connections ?? []).filter((c) => c.id !== connectionId);
+
+    // Optimistic update
+    setMoodboard((prev) => {
+      if (!prev) return prev;
+      return { ...prev, connections: updatedConnections };
+    });
+
+    // Persist to API
+    try {
+      const res = await fetch(`/api/customer/moodboards/${moodboardId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ connections: updatedConnections }),
+      });
+
+      if (!res.ok) throw new Error("Failed to delete connection");
+    } catch (err) {
+      console.error("[moodboard-view] delete connection error:", err);
+      fetchMoodboard();
     }
   }
 
@@ -416,6 +492,8 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
         onAddFile={handleFileClick}
         onAddTodo={() => setActiveModal("todo")}
         onAddEmbed={() => setActiveModal("embed")}
+        toolMode={toolMode}
+        onSetToolMode={setToolMode}
       />
 
       <div className="flex flex-1 flex-col overflow-hidden">
@@ -429,10 +507,14 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
 
         <BoardCanvas
           items={moodboard.items}
+          connections={moodboard.connections}
+          toolMode={toolMode}
           onUpdateItem={handleUpdateItem}
           onDeleteItem={handleDeleteItem}
           onMoveItem={handleMoveItem}
           onResizeItem={handleResizeItem}
+          onAddConnection={handleAddConnection}
+          onDeleteConnection={handleDeleteConnection}
         />
       </div>
 
