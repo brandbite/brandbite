@@ -85,6 +85,32 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       data.colSpan = Math.floor(raw.colSpan);
     }
 
+    // Canvas position/size fields
+    if (raw.x !== undefined) {
+      if (typeof raw.x !== "number") {
+        return NextResponse.json({ error: "x must be a number" }, { status: 400 });
+      }
+      data.x = raw.x;
+    }
+    if (raw.y !== undefined) {
+      if (typeof raw.y !== "number") {
+        return NextResponse.json({ error: "y must be a number" }, { status: 400 });
+      }
+      data.y = raw.y;
+    }
+    if (raw.width !== undefined) {
+      if (typeof raw.width !== "number" || raw.width < 80) {
+        return NextResponse.json({ error: "width must be >= 80" }, { status: 400 });
+      }
+      data.width = raw.width;
+    }
+    if (raw.height !== undefined) {
+      if (typeof raw.height !== "number" || raw.height < 0) {
+        return NextResponse.json({ error: "height must be >= 0" }, { status: 400 });
+      }
+      data.height = raw.height;
+    }
+
     if (Object.keys(data).length === 0) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
@@ -100,6 +126,10 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
         type: updated.type,
         position: updated.position,
         colSpan: updated.colSpan,
+        x: updated.x,
+        y: updated.y,
+        width: updated.width,
+        height: updated.height,
         data: updated.data,
         createdById: updated.createdById,
         createdAt: updated.createdAt.toISOString(),

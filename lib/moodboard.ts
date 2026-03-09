@@ -102,11 +102,31 @@ export type MoodboardItemClient = {
   type: MoodboardItemType;
   position: number;
   colSpan: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
   data: MoodboardItemData;
   createdById: string;
   createdAt: string;
   updatedAt: string;
 };
+
+// ---------------------------------------------------------------------------
+// Canvas constants
+// ---------------------------------------------------------------------------
+
+export const CANVAS_DEFAULTS = {
+  CARD_WIDTH: 280,
+  CARD_HEIGHT: 0, // 0 = auto-height
+  GRID_SNAP: 20,
+  GAP: 20,
+  MIN_WIDTH: 160,
+  MIN_HEIGHT: 80,
+  MIN_ZOOM: 0.15,
+  MAX_ZOOM: 2,
+  ZOOM_STEP: 0.1,
+} as const;
 
 export type MoodboardClient = {
   id: string;

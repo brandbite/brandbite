@@ -1282,6 +1282,12 @@ model MoodboardItem {
   position Int               @default(0)
   colSpan  Int               @default(1)
 
+  /// Freeform canvas position and size (logical pixels)
+  x      Float @default(0)
+  y      Float @default(0)
+  width  Float @default(280)
+  height Float @default(0) /// 0 = auto-height (content determines)
+
   /// Polymorphic JSON data — shape depends on `type`:
   /// NOTE:  { title?, body }
   /// IMAGE: { url, storageKey, caption?, width?, height?, originalName?, mimeType?, bytes? }

@@ -78,7 +78,13 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         ? Math.floor(raw.colSpan)
         : 1;
 
-    // Determine next position
+    // Canvas position fields
+    const x = typeof raw.x === "number" ? raw.x : 0;
+    const y = typeof raw.y === "number" ? raw.y : 0;
+    const width = typeof raw.width === "number" && raw.width > 0 ? raw.width : 280;
+    const height = typeof raw.height === "number" && raw.height >= 0 ? raw.height : 0;
+
+    // Determine next position (used for z-index ordering)
     const lastItem = await prisma.moodboardItem.findFirst({
       where: { moodboardId },
       orderBy: { position: "desc" },
@@ -93,6 +99,10 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         type: type as MoodboardItemType,
         position,
         colSpan,
+        x,
+        y,
+        width,
+        height,
         data: data as any,
         createdById: user.id,
       },
@@ -105,6 +115,10 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
           type: item.type,
           position: item.position,
           colSpan: item.colSpan,
+          x: item.x,
+          y: item.y,
+          width: item.width,
+          height: item.height,
           data: item.data,
           createdById: item.createdById,
           createdAt: item.createdAt.toISOString(),

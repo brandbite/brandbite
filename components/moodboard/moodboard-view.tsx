@@ -22,12 +22,47 @@ import type {
   ImageCardData,
   FileCardData,
 } from "@/lib/moodboard";
+import { CANVAS_DEFAULTS } from "@/lib/moodboard";
 
 type MoodboardViewProps = {
   moodboardId: string;
 };
 
 type ModalType = "note" | "color" | "link" | "todo" | null;
+
+/** Find a non-overlapping position for a new item near the center of existing content. */
+function findOpenPosition(items: MoodboardItemClient[], width: number): { x: number; y: number } {
+  if (items.length === 0) return { x: 40, y: 40 };
+
+  // Find bounding box of existing items
+  let maxX = 0;
+  let maxY = 0;
+  for (const item of items) {
+    maxX = Math.max(maxX, item.x + item.width);
+    maxY = Math.max(maxY, item.y + (item.height || 200));
+  }
+
+  const gap = CANVAS_DEFAULTS.GAP;
+  const candidate = { x: 40, y: maxY + gap };
+
+  // Simple: place below existing content, checking for overlap
+  for (let row = 0; row < 20; row++) {
+    for (let col = 0; col < 4; col++) {
+      const cx = 40 + col * (CANVAS_DEFAULTS.CARD_WIDTH + gap);
+      const cy = maxY + gap + row * (220 + gap);
+      const overlaps = items.some(
+        (item) =>
+          cx < item.x + item.width + gap &&
+          cx + width + gap > item.x &&
+          cy < item.y + (item.height || 200) + gap &&
+          cy + 200 + gap > item.y,
+      );
+      if (!overlaps) return { x: cx, y: cy };
+    }
+  }
+
+  return candidate;
+}
 
 export function MoodboardView({ moodboardId }: MoodboardViewProps) {
   const router = useRouter();
@@ -62,15 +97,24 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
   }, [fetchMoodboard]);
 
   // ---------------------------------------------------------------------------
-  // Add item (generic)
+  // Add item (with canvas position)
   // ---------------------------------------------------------------------------
 
-  async function handleAddItem(type: string, data: MoodboardItemData, colSpan?: number) {
+  async function handleAddItem(
+    type: string,
+    data: MoodboardItemData,
+    opts?: { width?: number; height?: number },
+  ) {
+    const items = moodboard?.items ?? [];
+    const width = opts?.width ?? CANVAS_DEFAULTS.CARD_WIDTH;
+    const height = opts?.height ?? CANVAS_DEFAULTS.CARD_HEIGHT;
+    const { x, y } = findOpenPosition(items, width);
+
     try {
       const res = await fetch(`/api/customer/moodboards/${moodboardId}/items`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, data, colSpan }),
+        body: JSON.stringify({ type, data, x, y, width, height }),
       });
 
       if (!res.ok) throw new Error("Failed to add item");
@@ -88,11 +132,10 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
   }
 
   // ---------------------------------------------------------------------------
-  // Update item
+  // Update item data
   // ---------------------------------------------------------------------------
 
   async function handleUpdateItem(itemId: string, data: MoodboardItemData) {
-    // Optimistic update
     setMoodboard((prev) => {
       if (!prev) return prev;
       return {
@@ -111,7 +154,6 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
       if (!res.ok) throw new Error("Failed to update item");
     } catch (err) {
       console.error("[moodboard-view] update item error:", err);
-      // Refetch on error to restore correct state
       fetchMoodboard();
     }
   }
@@ -121,13 +163,9 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
   // ---------------------------------------------------------------------------
 
   async function handleDeleteItem(itemId: string) {
-    // Optimistic update
     setMoodboard((prev) => {
       if (!prev) return prev;
-      return {
-        ...prev,
-        items: prev.items.filter((item) => item.id !== itemId),
-      };
+      return { ...prev, items: prev.items.filter((item) => item.id !== itemId) };
     });
 
     try {
@@ -143,21 +181,15 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
   }
 
   // ---------------------------------------------------------------------------
-  // Toggle item width
+  // Move item (canvas drag)
   // ---------------------------------------------------------------------------
 
-  async function handleToggleItemWidth(itemId: string) {
-    const item = moodboard?.items.find((i) => i.id === itemId);
-    if (!item) return;
-
-    const newColSpan = item.colSpan === 1 ? 2 : 1;
-
-    // Optimistic update
+  async function handleMoveItem(itemId: string, x: number, y: number) {
     setMoodboard((prev) => {
       if (!prev) return prev;
       return {
         ...prev,
-        items: prev.items.map((i) => (i.id === itemId ? { ...i, colSpan: newColSpan } : i)),
+        items: prev.items.map((item) => (item.id === itemId ? { ...item, x, y } : item)),
       };
     });
 
@@ -165,42 +197,39 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
       const res = await fetch(`/api/customer/moodboards/${moodboardId}/items/${itemId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ colSpan: newColSpan }),
+        body: JSON.stringify({ x, y }),
       });
 
-      if (!res.ok) throw new Error("Failed to toggle width");
+      if (!res.ok) throw new Error("Failed to move item");
     } catch (err) {
-      console.error("[moodboard-view] toggle width error:", err);
+      console.error("[moodboard-view] move item error:", err);
       fetchMoodboard();
     }
   }
 
   // ---------------------------------------------------------------------------
-  // Reorder items
+  // Resize item
   // ---------------------------------------------------------------------------
 
-  async function handleReorder(orderedIds: string[]) {
-    // Optimistic reorder
+  async function handleResizeItem(itemId: string, width: number, height: number) {
     setMoodboard((prev) => {
       if (!prev) return prev;
-      const itemMap = new Map(prev.items.map((item) => [item.id, item]));
-      const reordered = orderedIds
-        .map((id) => itemMap.get(id))
-        .filter((item): item is MoodboardItemClient => !!item);
-
-      return { ...prev, items: reordered };
+      return {
+        ...prev,
+        items: prev.items.map((item) => (item.id === itemId ? { ...item, width, height } : item)),
+      };
     });
 
     try {
-      const res = await fetch(`/api/customer/moodboards/${moodboardId}/items/reorder`, {
+      const res = await fetch(`/api/customer/moodboards/${moodboardId}/items/${itemId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderedItemIds: orderedIds }),
+        body: JSON.stringify({ width, height }),
       });
 
-      if (!res.ok) throw new Error("Failed to reorder");
+      if (!res.ok) throw new Error("Failed to resize item");
     } catch (err) {
-      console.error("[moodboard-view] reorder error:", err);
+      console.error("[moodboard-view] resize item error:", err);
       fetchMoodboard();
     }
   }
@@ -258,7 +287,6 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
 
   async function handleUploadFile(file: File, type: "IMAGE" | "FILE") {
     try {
-      // Upload file server-side via FormData (avoids R2 CORS issues)
       const formData = new FormData();
       formData.append("file", file);
       formData.append("moodboardId", moodboardId);
@@ -272,7 +300,6 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
 
       const { url, storageKey, mimeType, originalName, bytes } = await uploadRes.json();
 
-      // Create the moodboard item
       if (type === "IMAGE") {
         const data: ImageCardData = {
           url: url ?? "",
@@ -310,7 +337,7 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
   }
 
   function handleAddColorData(data: ColorCardData) {
-    handleAddItem("COLOR", data);
+    handleAddItem("COLOR", data, { width: 200, height: 160 });
   }
 
   function handleAddLinkData(data: LinkCardData) {
@@ -331,18 +358,13 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
 
   function onImageInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (file) {
-      handleUploadFile(file, "IMAGE");
-    }
-    // Reset so the same file can be selected again
+    if (file) handleUploadFile(file, "IMAGE");
     e.target.value = "";
   }
 
   function onFileInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (file) {
-      handleUploadFile(file, "FILE");
-    }
+    if (file) handleUploadFile(file, "FILE");
     e.target.value = "";
   }
 
@@ -398,15 +420,13 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
           onDelete={handleDeleteBoard}
         />
 
-        <div className="flex-1 overflow-auto">
-          <BoardCanvas
-            items={moodboard.items}
-            onReorder={handleReorder}
-            onUpdateItem={handleUpdateItem}
-            onDeleteItem={handleDeleteItem}
-            onToggleItemWidth={handleToggleItemWidth}
-          />
-        </div>
+        <BoardCanvas
+          items={moodboard.items}
+          onUpdateItem={handleUpdateItem}
+          onDeleteItem={handleDeleteItem}
+          onMoveItem={handleMoveItem}
+          onResizeItem={handleResizeItem}
+        />
       </div>
 
       {/* Hidden file inputs */}

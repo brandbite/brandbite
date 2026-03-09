@@ -1,30 +1,17 @@
 "use client";
 
-import React, { useState } from "react";
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragStartEvent,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  rectSortingStrategy,
-  sortableKeyboardCoordinates,
-} from "@dnd-kit/sortable";
-import { DragOverlay } from "@dnd-kit/core";
+import React, { useCallback, useEffect, useRef } from "react";
+import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 
 import { CardWrapper } from "@/components/moodboard/card-wrapper";
+import { CanvasControls } from "@/components/moodboard/canvas-controls";
 import { NoteCard } from "@/components/moodboard/note-card";
 import { ImageCard } from "@/components/moodboard/image-card";
 import { ColorCard } from "@/components/moodboard/color-card";
 import { LinkCard } from "@/components/moodboard/link-card";
 import { FileCard } from "@/components/moodboard/file-card";
 import { TodoCard } from "@/components/moodboard/todo-card";
+import { useCanvasTransform } from "@/components/moodboard/use-canvas-transform";
 
 import type { MoodboardItemClient, MoodboardItemData } from "@/lib/moodboard";
 import {
@@ -38,79 +25,87 @@ import {
 
 type BoardCanvasProps = {
   items: MoodboardItemClient[];
-  onReorder: (orderedIds: string[]) => void;
   onUpdateItem: (itemId: string, data: MoodboardItemData) => void;
   onDeleteItem: (itemId: string) => void;
-  onToggleItemWidth: (itemId: string) => void;
+  onMoveItem: (itemId: string, x: number, y: number) => void;
+  onResizeItem: (itemId: string, width: number, height: number) => void;
 };
 
 function renderCard(item: MoodboardItemClient, onUpdate: (data: MoodboardItemData) => void) {
   const { type, data } = item;
 
-  if (isNoteData(type, data)) {
-    return <NoteCard data={data} onUpdate={onUpdate} />;
-  }
-  if (isImageData(type, data)) {
-    return <ImageCard data={data} onUpdate={onUpdate} />;
-  }
-  if (isColorData(type, data)) {
-    return <ColorCard data={data} onUpdate={onUpdate} />;
-  }
-  if (isLinkData(type, data)) {
-    return <LinkCard data={data} />;
-  }
-  if (isFileData(type, data)) {
-    return <FileCard data={data} />;
-  }
-  if (isTodoData(type, data)) {
-    return <TodoCard data={data} onUpdate={onUpdate} />;
-  }
+  if (isNoteData(type, data)) return <NoteCard data={data} onUpdate={onUpdate} />;
+  if (isImageData(type, data)) return <ImageCard data={data} onUpdate={onUpdate} />;
+  if (isColorData(type, data)) return <ColorCard data={data} onUpdate={onUpdate} />;
+  if (isLinkData(type, data)) return <LinkCard data={data} />;
+  if (isFileData(type, data)) return <FileCard data={data} />;
+  if (isTodoData(type, data)) return <TodoCard data={data} onUpdate={onUpdate} />;
 
   return null;
 }
 
 export function BoardCanvas({
   items,
-  onReorder,
   onUpdateItem,
   onDeleteItem,
-  onToggleItemWidth,
+  onMoveItem,
+  onResizeItem,
 }: BoardCanvasProps) {
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
 
+  const {
+    transform,
+    zoomIn,
+    zoomOut,
+    resetView,
+    fitToContent,
+    onWheel,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    onKeyDown,
+    onKeyUp,
+  } = useCanvasTransform();
+
+  const { panX, panY, zoom } = transform;
+
+  // Register space key listeners
+  useEffect(() => {
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+    };
+  }, [onKeyDown, onKeyUp]);
+
+  // @dnd-kit sensors — higher distance threshold to avoid accidental drags
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 5 },
     }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    }),
   );
 
-  const activeItem = activeId ? (items.find((item) => item.id === activeId) ?? null) : null;
+  // Drag end — calculate new canvas position from delta
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, delta } = event;
+      const item = items.find((i) => i.id === active.id);
+      if (!item) return;
 
-  function handleDragStart(event: DragStartEvent) {
-    setActiveId(String(event.active.id));
-  }
+      const newX = Math.max(0, item.x + delta.x / zoom);
+      const newY = Math.max(0, item.y + delta.y / zoom);
 
-  function handleDragEnd(event: DragEndEvent) {
-    setActiveId(null);
+      onMoveItem(String(active.id), newX, newY);
+    },
+    [items, zoom, onMoveItem],
+  );
 
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-
-    const oldIndex = items.findIndex((item) => item.id === active.id);
-    const newIndex = items.findIndex((item) => item.id === over.id);
-
-    if (oldIndex === -1 || newIndex === -1) return;
-
-    // Build reordered array
-    const reordered = [...items];
-    const [moved] = reordered.splice(oldIndex, 1);
-    reordered.splice(newIndex, 0, moved);
-
-    onReorder(reordered.map((item) => item.id));
-  }
+  const handleFitToContent = useCallback(() => {
+    if (!viewportRef.current) return;
+    const rect = viewportRef.current.getBoundingClientRect();
+    fitToContent(items, rect.width, rect.height);
+  }, [items, fitToContent]);
 
   if (items.length === 0) {
     return (
@@ -136,36 +131,63 @@ export function BoardCanvas({
   }
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-    >
-      <SortableContext items={items.map((item) => item.id)} strategy={rectSortingStrategy}>
-        <div className="grid grid-cols-1 gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+      {/* Viewport — clips and captures scroll/pan */}
+      <div
+        ref={viewportRef}
+        className="relative flex-1 overflow-hidden"
+        style={{ cursor: "default" }}
+        onWheel={onWheel}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+      >
+        {/* Dot grid background */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `radial-gradient(circle, #d1d5db 1px, transparent 1px)`,
+            backgroundSize: `${20 * zoom}px ${20 * zoom}px`,
+            backgroundPosition: `${panX % (20 * zoom)}px ${panY % (20 * zoom)}px`,
+          }}
+        />
+
+        {/* Transformed canvas layer */}
+        <div
+          style={{
+            transform: `translate(${panX}px, ${panY}px) scale(${zoom})`,
+            transformOrigin: "0 0",
+            position: "absolute",
+            top: 0,
+            left: 0,
+          }}
+        >
           {items.map((item) => (
             <CardWrapper
               key={item.id}
               id={item.id}
-              colSpan={item.colSpan}
-              isDragging={item.id === activeId}
+              x={item.x}
+              y={item.y}
+              width={item.width}
+              height={item.height}
+              zoom={zoom}
               onDelete={() => onDeleteItem(item.id)}
-              onToggleWidth={() => onToggleItemWidth(item.id)}
+              onResize={(w, h) => onResizeItem(item.id, w, h)}
             >
               {renderCard(item, (data) => onUpdateItem(item.id, data))}
             </CardWrapper>
           ))}
         </div>
-      </SortableContext>
 
-      <DragOverlay>
-        {activeItem ? (
-          <div className="rounded-2xl border border-[var(--bb-border)] bg-white opacity-90 shadow-xl">
-            {renderCard(activeItem, () => {})}
-          </div>
-        ) : null}
-      </DragOverlay>
+        {/* Floating zoom controls */}
+        <CanvasControls
+          zoom={zoom}
+          onZoomIn={zoomIn}
+          onZoomOut={zoomOut}
+          onReset={resetView}
+          onFitToContent={handleFitToContent}
+        />
+      </div>
     </DndContext>
   );
 }
