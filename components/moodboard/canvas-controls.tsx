@@ -20,7 +20,7 @@ export function CanvasControls({
   const pct = Math.round(zoom * 100);
 
   return (
-    <div className="absolute right-4 bottom-4 z-20 flex items-center gap-1 rounded-xl border border-[var(--bb-border)] bg-white px-1 py-1 shadow-md">
+    <div className="fixed right-8 bottom-4 z-50 flex items-center gap-1 rounded-xl border border-[var(--bb-border)] bg-white px-1 py-1 shadow-md">
       <button
         onClick={onZoomOut}
         className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--bb-text-secondary)] hover:bg-gray-100"

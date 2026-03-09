@@ -401,7 +401,7 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
   // ---------------------------------------------------------------------------
 
   return (
-    <div className="flex h-[calc(100vh-64px)] bg-[var(--bb-bg-page)]">
+    <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-[var(--bb-bg-page)]">
       <BoardToolbar
         onAddNote={() => setActiveModal("note")}
         onAddImage={handleImageClick}
