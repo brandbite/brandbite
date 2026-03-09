@@ -9,6 +9,7 @@ type BoardToolbarProps = {
   onAddLink: () => void;
   onAddFile: () => void;
   onAddTodo: () => void;
+  onAddEmbed: () => void;
 };
 
 type ToolItem = {
@@ -139,6 +140,15 @@ function TodoIcon() {
   );
 }
 
+function VideoIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M8 8V12L12 10L8 8Z" fill="currentColor" />
+    </svg>
+  );
+}
+
 export function BoardToolbar({
   onAddNote,
   onAddImage,
@@ -146,6 +156,7 @@ export function BoardToolbar({
   onAddLink,
   onAddFile,
   onAddTodo,
+  onAddEmbed,
 }: BoardToolbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -156,6 +167,7 @@ export function BoardToolbar({
     { label: "Link", onClick: onAddLink, icon: <LinkIcon /> },
     { label: "File", onClick: onAddFile, icon: <FileIcon /> },
     { label: "Todo", onClick: onAddTodo, icon: <TodoIcon /> },
+    { label: "Video", onClick: onAddEmbed, icon: <VideoIcon /> },
   ];
 
   function handleToolClick(tool: ToolItem) {

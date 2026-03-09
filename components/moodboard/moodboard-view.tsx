@@ -10,6 +10,7 @@ import { AddNoteModal } from "@/components/moodboard/add-note-modal";
 import { AddColorModal } from "@/components/moodboard/add-color-modal";
 import { AddLinkModal } from "@/components/moodboard/add-link-modal";
 import { AddTodoModal } from "@/components/moodboard/add-todo-modal";
+import { AddEmbedModal } from "@/components/moodboard/add-embed-modal";
 
 import type {
   MoodboardClient,
@@ -21,6 +22,7 @@ import type {
   TodoCardData,
   ImageCardData,
   FileCardData,
+  EmbedCardData,
 } from "@/lib/moodboard";
 import { CANVAS_DEFAULTS } from "@/lib/moodboard";
 
@@ -28,7 +30,7 @@ type MoodboardViewProps = {
   moodboardId: string;
 };
 
-type ModalType = "note" | "color" | "link" | "todo" | null;
+type ModalType = "note" | "color" | "link" | "todo" | "embed" | null;
 
 /** Find a non-overlapping position for a new item near the center of existing content. */
 function findOpenPosition(items: MoodboardItemClient[], width: number): { x: number; y: number } {
@@ -348,6 +350,10 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
     handleAddItem("TODO", data);
   }
 
+  function handleAddEmbedData(data: EmbedCardData) {
+    handleAddItem("EMBED", data, { width: 420, height: 280 });
+  }
+
   function handleImageClick() {
     imageInputRef.current?.click();
   }
@@ -409,6 +415,7 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
         onAddLink={() => setActiveModal("link")}
         onAddFile={handleFileClick}
         onAddTodo={() => setActiveModal("todo")}
+        onAddEmbed={() => setActiveModal("embed")}
       />
 
       <div className="flex flex-1 flex-col overflow-hidden">
@@ -448,6 +455,11 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
       />
       <AddLinkModal open={activeModal === "link"} onClose={closeModal} onSave={handleAddLinkData} />
       <AddTodoModal open={activeModal === "todo"} onClose={closeModal} onSave={handleAddTodoData} />
+      <AddEmbedModal
+        open={activeModal === "embed"}
+        onClose={closeModal}
+        onSave={handleAddEmbedData}
+      />
     </div>
   );
 }

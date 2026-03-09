@@ -57,13 +57,22 @@ export type TodoCardData = {
   items: TodoItem[];
 };
 
+export type EmbedCardData = {
+  url: string;
+  embedUrl: string;
+  title?: string;
+  provider: "youtube" | "vimeo" | "loom" | "generic";
+  thumbnailUrl?: string;
+};
+
 export type MoodboardItemData =
   | NoteCardData
   | ImageCardData
   | ColorCardData
   | LinkCardData
   | FileCardData
-  | TodoCardData;
+  | TodoCardData
+  | EmbedCardData;
 
 // ---------------------------------------------------------------------------
 // Type-safe data accessors
@@ -91,6 +100,10 @@ export function isFileData(type: MoodboardItemType, data: unknown): data is File
 
 export function isTodoData(type: MoodboardItemType, data: unknown): data is TodoCardData {
   return type === "TODO";
+}
+
+export function isEmbedData(type: MoodboardItemType, data: unknown): data is EmbedCardData {
+  return type === "EMBED";
 }
 
 // ---------------------------------------------------------------------------
@@ -160,6 +173,84 @@ export function defaultTodoData(): TodoCardData {
     title: "",
     items: [{ id: crypto.randomUUID(), text: "", checked: false }],
   };
+}
+
+export function defaultEmbedData(): EmbedCardData {
+  return { url: "", embedUrl: "", provider: "generic" };
+}
+
+// ---------------------------------------------------------------------------
+// Video URL parser — extracts embed URL and thumbnail from video platforms
+// ---------------------------------------------------------------------------
+
+export function parseVideoUrl(
+  url: string,
+): { embedUrl: string; provider: EmbedCardData["provider"]; thumbnailUrl?: string } | null {
+  try {
+    const u = new URL(url);
+
+    // YouTube: youtube.com/watch?v=ID, youtu.be/ID, youtube.com/shorts/ID
+    if (
+      u.hostname === "www.youtube.com" ||
+      u.hostname === "youtube.com" ||
+      u.hostname === "m.youtube.com"
+    ) {
+      let videoId = u.searchParams.get("v");
+      if (!videoId) {
+        const shortsMatch = u.pathname.match(/\/shorts\/([^/?]+)/);
+        if (shortsMatch) videoId = shortsMatch[1];
+      }
+      if (videoId) {
+        return {
+          embedUrl: `https://www.youtube.com/embed/${videoId}`,
+          provider: "youtube",
+          thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+        };
+      }
+    }
+
+    if (u.hostname === "youtu.be") {
+      const videoId = u.pathname.slice(1).split("/")[0];
+      if (videoId) {
+        return {
+          embedUrl: `https://www.youtube.com/embed/${videoId}`,
+          provider: "youtube",
+          thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+        };
+      }
+    }
+
+    // Vimeo: vimeo.com/ID
+    if (u.hostname === "vimeo.com" || u.hostname === "www.vimeo.com") {
+      const videoId = u.pathname.slice(1).split("/")[0];
+      if (videoId && /^\d+$/.test(videoId)) {
+        return {
+          embedUrl: `https://player.vimeo.com/video/${videoId}`,
+          provider: "vimeo",
+        };
+      }
+    }
+
+    // Loom: loom.com/share/ID
+    if (u.hostname === "www.loom.com" || u.hostname === "loom.com") {
+      const shareMatch = u.pathname.match(/\/share\/([^/?]+)/);
+      if (shareMatch) {
+        return {
+          embedUrl: `https://www.loom.com/embed/${shareMatch[1]}`,
+          provider: "loom",
+        };
+      }
+    }
+
+    // Generic — any other valid URL, try as iframe
+    if (u.protocol === "http:" || u.protocol === "https:") {
+      return { embedUrl: url, provider: "generic" };
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------

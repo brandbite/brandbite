@@ -11,6 +11,7 @@ import { ColorCard } from "@/components/moodboard/color-card";
 import { LinkCard } from "@/components/moodboard/link-card";
 import { FileCard } from "@/components/moodboard/file-card";
 import { TodoCard } from "@/components/moodboard/todo-card";
+import { EmbedCard } from "@/components/moodboard/embed-card";
 import { useCanvasTransform } from "@/components/moodboard/use-canvas-transform";
 
 import type { MoodboardItemClient, MoodboardItemData } from "@/lib/moodboard";
@@ -21,6 +22,7 @@ import {
   isLinkData,
   isFileData,
   isTodoData,
+  isEmbedData,
 } from "@/lib/moodboard";
 
 type BoardCanvasProps = {
@@ -40,6 +42,7 @@ function renderCard(item: MoodboardItemClient, onUpdate: (data: MoodboardItemDat
   if (isLinkData(type, data)) return <LinkCard data={data} />;
   if (isFileData(type, data)) return <FileCard data={data} />;
   if (isTodoData(type, data)) return <TodoCard data={data} onUpdate={onUpdate} />;
+  if (isEmbedData(type, data)) return <EmbedCard data={data} />;
 
   return null;
 }
