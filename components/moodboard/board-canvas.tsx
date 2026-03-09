@@ -107,6 +107,15 @@ export function BoardCanvas({
     fitToContent(items, rect.width, rect.height);
   }, [items, fitToContent]);
 
+  // Auto-fit content into view on initial load
+  const didInitialFit = useRef(false);
+  useEffect(() => {
+    if (didInitialFit.current || items.length === 0 || !viewportRef.current) return;
+    didInitialFit.current = true;
+    const rect = viewportRef.current.getBoundingClientRect();
+    fitToContent(items, rect.width, rect.height);
+  }, [items, fitToContent]);
+
   if (items.length === 0) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center p-12 text-center">
