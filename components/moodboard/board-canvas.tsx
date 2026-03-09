@@ -89,6 +89,9 @@ export function BoardCanvas({
   // Drawing selection state
   const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
 
+  // Hovered connection (for keyboard delete)
+  const [hoveredConnectionId, setHoveredConnectionId] = useState<string | null>(null);
+
   // Separate card items from drawings
   const cardItems = items.filter((i) => i.type !== "DRAWING");
   const drawings = items.filter((i) => i.type === "DRAWING");
@@ -116,7 +119,10 @@ export function BoardCanvas({
       setArrowSourceId(null);
       setPendingTarget(null);
     }
-    setSelectedDrawingId(null);
+    // Only clear drawing selection when entering arrow mode
+    if (toolMode === "arrow") {
+      setSelectedDrawingId(null);
+    }
   }
 
   // Escape cancels arrow creation
@@ -131,6 +137,36 @@ export function BoardCanvas({
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
   }, [toolMode]);
+
+  // Delete/Backspace deletes selected drawing or hovered connection
+  useEffect(() => {
+    function handleDeleteKey(e: KeyboardEvent) {
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+
+      // Don't intercept if user is typing in an input/textarea
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+      // Priority 1: Delete selected drawing
+      if (selectedDrawingId) {
+        e.preventDefault();
+        onDeleteItem(selectedDrawingId);
+        setSelectedDrawingId(null);
+        return;
+      }
+
+      // Priority 2: Delete hovered connection
+      if (hoveredConnectionId) {
+        e.preventDefault();
+        onDeleteConnection(hoveredConnectionId);
+        setHoveredConnectionId(null);
+        return;
+      }
+    }
+
+    window.addEventListener("keydown", handleDeleteKey);
+    return () => window.removeEventListener("keydown", handleDeleteKey);
+  }, [selectedDrawingId, hoveredConnectionId, onDeleteItem, onDeleteConnection]);
 
   // Track cursor position for pending arrow
   const handleMouseMove = useCallback(
@@ -301,6 +337,7 @@ export function BoardCanvas({
             onDeleteConnection={onDeleteConnection}
             pendingSourceId={arrowSourceId}
             pendingTarget={pendingTarget}
+            onHoverConnection={setHoveredConnectionId}
           />
 
           {/* Arrow mode — click overlays on cards */}

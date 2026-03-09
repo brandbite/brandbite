@@ -32,9 +32,45 @@ function PlayButton() {
   );
 }
 
+function CopyIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+      <rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" strokeWidth="2" />
+      <path
+        d="M5 15H4C2.89543 15 2 14.1046 2 13V4C2 2.89543 2.89543 2 4 2H13C14.1046 2 15 2.89543 15 4V5"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M5 13L9 17L19 7"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function EmbedCard({ data }: EmbedCardProps) {
   const [playing, setPlaying] = useState(false);
   const [thumbError, setThumbError] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  function handleCopy(e: React.MouseEvent) {
+    e.stopPropagation();
+    navigator.clipboard.writeText(data.url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }
 
   if (playing) {
     return (
@@ -85,13 +121,33 @@ export function EmbedCard({ data }: EmbedCardProps) {
         </div>
       </div>
 
-      {/* Title bar */}
-      {data.title && (
-        <div className="border-t border-[var(--bb-border)] px-3 py-2">
-          <p className="truncate text-xs font-medium text-[var(--bb-secondary)]">{data.title}</p>
-          <p className="truncate text-[10px] text-[var(--bb-text-secondary)]">{data.url}</p>
+      {/* Title bar — always visible */}
+      <div className="flex items-center justify-between border-t border-[var(--bb-border)] px-3 py-2">
+        <div className="min-w-0 flex-1">
+          {data.title ? (
+            <>
+              <p className="truncate text-xs font-medium text-[var(--bb-secondary)]">
+                {data.title}
+              </p>
+              <p className="truncate text-[10px] text-[var(--bb-text-secondary)]">{data.url}</p>
+            </>
+          ) : (
+            <p className="truncate text-xs text-[var(--bb-text-secondary)]">{data.url}</p>
+          )}
         </div>
-      )}
+        <button
+          type="button"
+          onClick={handleCopy}
+          className={`ml-2 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md transition-colors ${
+            copied
+              ? "text-green-600"
+              : "text-[var(--bb-text-secondary)] hover:bg-gray-100 hover:text-[var(--bb-secondary)]"
+          }`}
+          title={copied ? "Copied!" : "Copy link"}
+        >
+          {copied ? <CheckIcon /> : <CopyIcon />}
+        </button>
+      </div>
     </div>
   );
 }

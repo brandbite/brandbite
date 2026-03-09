@@ -31,18 +31,52 @@ export function AddEmbedModal({ open, onClose, onSave }: AddEmbedModalProps) {
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
   const [parsed, setParsed] = useState<ReturnType<typeof parseVideoUrl>>(null);
+  const [fetching, setFetching] = useState(false);
+  const [userEditedTitle, setUserEditedTitle] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fetchedUrlRef = useRef("");
 
-  // Parse URL as user types
-  const handleUrlChange = useCallback((value: string) => {
-    setUrl(value);
-    const trimmed = value.trim();
-    if (isValidUrl(trimmed)) {
-      setParsed(parseVideoUrl(trimmed));
-    } else {
-      setParsed(null);
-    }
-  }, []);
+  // Parse URL as user types and auto-fetch title
+  const handleUrlChange = useCallback(
+    (value: string) => {
+      setUrl(value);
+      const trimmed = value.trim();
+      if (isValidUrl(trimmed)) {
+        const result = parseVideoUrl(trimmed);
+        setParsed(result);
+
+        // Auto-fetch title for YouTube/Vimeo
+        if (
+          result &&
+          (result.provider === "youtube" || result.provider === "vimeo") &&
+          fetchedUrlRef.current !== trimmed
+        ) {
+          if (debounceRef.current) clearTimeout(debounceRef.current);
+          debounceRef.current = setTimeout(() => {
+            fetchedUrlRef.current = trimmed;
+            setFetching(true);
+            fetch("/api/customer/moodboards/video-oembed", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ url: trimmed }),
+            })
+              .then((r) => r.json())
+              .then((data) => {
+                if (data.title && !userEditedTitle) {
+                  setTitle(data.title);
+                }
+              })
+              .catch(() => {})
+              .finally(() => setFetching(false));
+          }, 400);
+        }
+      } else {
+        setParsed(null);
+      }
+    },
+    [userEditedTitle],
+  );
 
   // Auto-focus input when modal opens
   useEffect(() => {
@@ -55,6 +89,10 @@ export function AddEmbedModal({ open, onClose, onSave }: AddEmbedModalProps) {
     setUrl("");
     setTitle("");
     setParsed(null);
+    setFetching(false);
+    setUserEditedTitle(false);
+    fetchedUrlRef.current = "";
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     onClose();
   }
 
@@ -105,14 +143,22 @@ export function AddEmbedModal({ open, onClose, onSave }: AddEmbedModalProps) {
           )}
         </div>
 
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Title (optional)"
-          className="w-full rounded-lg border border-[var(--bb-border)] bg-white px-3 py-2 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-gray-400 focus:border-[var(--bb-primary)]"
-        />
+        <div>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              setUserEditedTitle(true);
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder="Title (auto-filled from video)"
+            className="w-full rounded-lg border border-[var(--bb-border)] bg-white px-3 py-2 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-gray-400 focus:border-[var(--bb-primary)]"
+          />
+          {fetching && (
+            <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">Fetching video title...</p>
+          )}
+        </div>
 
         {/* Preview */}
         {parsed && (
@@ -142,7 +188,7 @@ export function AddEmbedModal({ open, onClose, onSave }: AddEmbedModalProps) {
             )}
             <div className="px-3 py-2">
               <p className="text-xs font-medium text-[var(--bb-secondary)]">
-                {providerLabels[parsed.provider]} video detected
+                {title ? title : `${providerLabels[parsed.provider]} video detected`}
               </p>
             </div>
           </div>

@@ -11,6 +11,8 @@ type ConnectionLayerProps = {
   pendingSourceId: string | null;
   /** Current mouse position in canvas coords (for temp arrow while creating). */
   pendingTarget: { x: number; y: number } | null;
+  /** Called when a connection is hovered/unhovered (for keyboard delete). */
+  onHoverConnection?: (id: string | null) => void;
 };
 
 /**
@@ -77,6 +79,7 @@ export function ConnectionLayer({
   onDeleteConnection,
   pendingSourceId,
   pendingTarget,
+  onHoverConnection,
 }: ConnectionLayerProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
@@ -148,8 +151,14 @@ export function ConnectionLayer({
               stroke="transparent"
               strokeWidth={16}
               className="pointer-events-stroke cursor-pointer"
-              onMouseEnter={() => setHoveredId(conn.id)}
-              onMouseLeave={() => setHoveredId(null)}
+              onMouseEnter={() => {
+                setHoveredId(conn.id);
+                onHoverConnection?.(conn.id);
+              }}
+              onMouseLeave={() => {
+                setHoveredId(null);
+                onHoverConnection?.(null);
+              }}
               onClick={(e) => {
                 e.stopPropagation();
                 onDeleteConnection(conn.id);
