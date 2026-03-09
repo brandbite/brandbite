@@ -10,8 +10,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { canManageMoodboards, isCompanyAdminRole } from "@/lib/permissions/companyRoles";
+import { resolveAssetUrl } from "@/lib/r2";
+import type { MoodboardItemType } from "@prisma/client";
 
 type RouteParams = { params: Promise<{ moodboardId: string }> };
+
+/** Regenerate presigned URLs for IMAGE and FILE items whose URLs have expired. */
+async function refreshItemData(
+  type: MoodboardItemType,
+  data: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  if ((type === "IMAGE" || type === "FILE") && typeof data.storageKey === "string") {
+    const freshUrl = await resolveAssetUrl(data.storageKey, (data.url as string) ?? null);
+    if (freshUrl) return { ...data, url: freshUrl };
+  }
+  return data;
+}
 
 // -----------------------------------------------------------------------------
 // GET: full moodboard with all items
@@ -59,6 +73,20 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Moodboard not found" }, { status: 404 });
     }
 
+    // Refresh presigned URLs for IMAGE/FILE items in parallel
+    const items = await Promise.all(
+      moodboard.items.map(async (item) => ({
+        id: item.id,
+        type: item.type,
+        position: item.position,
+        colSpan: item.colSpan,
+        data: await refreshItemData(item.type, item.data as Record<string, unknown>),
+        createdById: item.createdById,
+        createdAt: item.createdAt.toISOString(),
+        updatedAt: item.updatedAt.toISOString(),
+      })),
+    );
+
     return NextResponse.json({
       moodboard: {
         id: moodboard.id,
@@ -70,16 +98,7 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
         ticketId: moodboard.ticket?.id ?? null,
         ticketTitle: moodboard.ticket?.title ?? null,
         createdById: moodboard.createdById,
-        items: moodboard.items.map((item) => ({
-          id: item.id,
-          type: item.type,
-          position: item.position,
-          colSpan: item.colSpan,
-          data: item.data,
-          createdById: item.createdById,
-          createdAt: item.createdAt.toISOString(),
-          updatedAt: item.updatedAt.toISOString(),
-        })),
+        items,
         createdAt: moodboard.createdAt.toISOString(),
         updatedAt: moodboard.updatedAt.toISOString(),
       },
