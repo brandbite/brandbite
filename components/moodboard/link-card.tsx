@@ -33,7 +33,7 @@ export function LinkCard({ data }: LinkCardProps) {
   const [ogImageFailed, setOgImageFailed] = useState(false);
   const [faviconFailed, setFaviconFailed] = useState(false);
 
-  const faviconUrl = data.favicon || `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+  const faviconUrl = data.favicon;
 
   return (
     <a
@@ -51,13 +51,17 @@ export function LinkCard({ data }: LinkCardProps) {
             alt=""
             className="h-full w-full object-cover"
             onError={() => setOgImageFailed(true)}
+            onLoad={(e) => {
+              // Images blocked by CORS/CSP load with naturalWidth 0 without firing onerror
+              if ((e.target as HTMLImageElement).naturalWidth === 0) setOgImageFailed(true);
+            }}
           />
         </div>
       )}
 
       <div className="p-4">
         <div className="flex items-start gap-3">
-          {faviconFailed ? (
+          {!faviconUrl || faviconFailed ? (
             <DomainIcon domain={domain} />
           ) : (
             /* eslint-disable-next-line @next/next/no-img-element */
@@ -66,6 +70,9 @@ export function LinkCard({ data }: LinkCardProps) {
               alt=""
               className="mt-0.5 h-5 w-5 flex-shrink-0 rounded-sm"
               onError={() => setFaviconFailed(true)}
+              onLoad={(e) => {
+                if ((e.target as HTMLImageElement).naturalWidth === 0) setFaviconFailed(true);
+              }}
             />
           )}
           <div className="min-w-0 flex-1">
