@@ -14,7 +14,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
-import { createR2Client, getR2BucketName } from "@/lib/r2";
+import { createR2Client, getR2BucketName, getR2PublicBaseUrl } from "@/lib/r2";
 
 function sanitizeFilename(name: string): string {
   const base = name.trim().replace(/\s+/g, "_");
@@ -91,7 +91,11 @@ export async function POST(req: Request) {
 
     const expiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
 
-    return NextResponse.json({ uploadUrl, storageKey, expiresAt });
+    // Build public URL server-side (client has no access to R2_PUBLIC_BASE_URL)
+    const publicBase = getR2PublicBaseUrl();
+    const publicUrl = publicBase ? `${publicBase.replace(/\/$/, "")}/${storageKey}` : null;
+
+    return NextResponse.json({ uploadUrl, storageKey, publicUrl, expiresAt });
   } catch (err: any) {
     const code = err?.code ?? "UNKNOWN";
     if (code === "UNAUTHENTICATED") {

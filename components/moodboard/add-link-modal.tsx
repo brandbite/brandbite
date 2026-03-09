@@ -30,10 +30,12 @@ function getDomain(url: string): string {
 export function AddLinkModal({ open, onClose, onSave }: AddLinkModalProps) {
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
 
   function handleClose() {
     setUrl("");
     setTitle("");
+    setDescription("");
     onClose();
   }
 
@@ -49,11 +51,13 @@ export function AddLinkModal({ open, onClose, onSave }: AddLinkModalProps) {
     onSave({
       url: trimmedUrl,
       title: title.trim() || undefined,
+      description: description.trim() || undefined,
       favicon,
     });
 
     setUrl("");
     setTitle("");
+    setDescription("");
     onClose();
   }
 
@@ -85,6 +89,13 @@ export function AddLinkModal({ open, onClose, onSave }: AddLinkModalProps) {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Title (optional)"
+          className="w-full rounded-lg border border-[var(--bb-border)] bg-white px-3 py-2 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-gray-400 focus:border-[var(--bb-primary)]"
+        />
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Description (optional)"
+          rows={2}
           className="w-full rounded-lg border border-[var(--bb-border)] bg-white px-3 py-2 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-gray-400 focus:border-[var(--bb-primary)]"
         />
       </div>

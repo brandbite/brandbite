@@ -56,13 +56,13 @@ export function CardWrapper({
       }`}
       {...attributes}
     >
-      {/* Drag handle + menu — visible on hover */}
-      <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+      {/* Drag handle + menu — always visible */}
+      <div className="absolute top-2 right-2 z-10 flex items-center gap-1">
         {/* Drag handle (grip icon) */}
         <button
           ref={setActivatorNodeRef}
           {...listeners}
-          className="flex h-7 w-7 cursor-grab items-center justify-center rounded-lg hover:bg-gray-100 active:cursor-grabbing"
+          className="flex h-7 w-7 cursor-grab items-center justify-center rounded-lg bg-white/80 shadow-sm hover:bg-gray-100 active:cursor-grabbing"
           aria-label="Drag to reorder"
         >
           <svg
@@ -85,7 +85,7 @@ export function CardWrapper({
         <div ref={menuRef} className="relative">
           <button
             onClick={() => setMenuOpen((prev) => !prev)}
-            className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-gray-100"
+            className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/80 shadow-sm hover:bg-gray-100"
             aria-label="Card options"
           >
             <svg

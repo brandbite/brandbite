@@ -272,7 +272,7 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
 
       if (!presignRes.ok) throw new Error("Failed to get presigned URL");
 
-      const { uploadUrl, storageKey } = await presignRes.json();
+      const { uploadUrl, storageKey, publicUrl: serverPublicUrl } = await presignRes.json();
 
       // Step 2: Upload to R2
       const uploadRes = await fetch(uploadUrl, {
@@ -283,8 +283,8 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
 
       if (!uploadRes.ok) throw new Error("Failed to upload file");
 
-      // Step 3: Build public URL
-      const publicUrl = `${process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL || ""}/${storageKey}`;
+      // Step 3: Use public URL from server (it has access to R2_PUBLIC_BASE_URL)
+      const publicUrl = serverPublicUrl ?? `/${storageKey}`;
 
       // Step 4: Create the moodboard item
       if (type === "IMAGE") {
