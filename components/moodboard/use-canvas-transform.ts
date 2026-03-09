@@ -1,10 +1,13 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CANVAS_DEFAULTS } from "@/lib/moodboard";
 import type { MoodboardItemClient } from "@/lib/moodboard";
 
 const { MIN_ZOOM, MAX_ZOOM, ZOOM_STEP } = CANVAS_DEFAULTS;
+
+/** Padding (in canvas px) allowed beyond content edges when panning. */
+const PAN_PADDING = 100;
 
 export type CanvasTransform = {
   panX: number;
@@ -12,7 +15,10 @@ export type CanvasTransform = {
   zoom: number;
 };
 
-export function useCanvasTransform() {
+export function useCanvasTransform(
+  items: MoodboardItemClient[],
+  viewportRef: React.RefObject<HTMLDivElement | null>,
+) {
   const [transform, setTransform] = useState<CanvasTransform>({
     panX: 0,
     panY: 0,
@@ -22,6 +28,68 @@ export function useCanvasTransform() {
   const isPanning = useRef(false);
   const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const spaceHeld = useRef(false);
+
+  // Keep a ref so callbacks always read latest items without re-creating
+  const itemsRef = useRef(items);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  // -------------------------------------------------------------------------
+  // Pan clamping — keep content at least partially in view
+  // -------------------------------------------------------------------------
+
+  const clampPan = useCallback(
+    (panX: number, panY: number, zoom: number) => {
+      const curItems = itemsRef.current;
+      const el = viewportRef.current;
+      if (curItems.length === 0 || !el) return { panX, panY };
+
+      const { width: vw, height: vh } = el.getBoundingClientRect();
+
+      let cMinX = Infinity,
+        cMinY = Infinity,
+        cMaxX = -Infinity,
+        cMaxY = -Infinity;
+      for (const item of curItems) {
+        cMinX = Math.min(cMinX, item.x);
+        cMinY = Math.min(cMinY, item.y);
+        cMaxX = Math.max(cMaxX, item.x + item.width);
+        cMaxY = Math.max(cMaxY, item.y + (item.height || 200));
+      }
+
+      // Visible canvas region:
+      //   left  = -panX / zoom          right  = (-panX + vw) / zoom
+      //   top   = -panY / zoom          bottom = (-panY + vh) / zoom
+      //
+      // Constraint: visible region must overlap content + padding
+      //   left  < cMaxX + pad   →  panX > -(cMaxX + pad) * zoom
+      //   right > cMinX - pad   →  panX < -(cMinX - pad) * zoom + vw
+      //   (same for Y)
+      const loPanX = -(cMaxX + PAN_PADDING) * zoom;
+      const hiPanX = -(cMinX - PAN_PADDING) * zoom + vw;
+      const loPanY = -(cMaxY + PAN_PADDING) * zoom;
+      const hiPanY = -(cMinY - PAN_PADDING) * zoom + vh;
+
+      return {
+        panX: Math.max(loPanX, Math.min(hiPanX, panX)),
+        panY: Math.max(loPanY, Math.min(hiPanY, panY)),
+      };
+    },
+    [viewportRef],
+  );
+
+  /** setTransform wrapper that clamps pan values to content bounds. */
+  const setClampedTransform = useCallback(
+    (updater: (prev: CanvasTransform) => CanvasTransform) => {
+      setTransform((prev) => {
+        const next = updater(prev);
+        const { panX, panY } = clampPan(next.panX, next.panY, next.zoom);
+        return { ...next, panX, panY };
+      });
+    },
+    [clampPan],
+  );
 
   // -------------------------------------------------------------------------
   // Coordinate conversion
@@ -45,25 +113,25 @@ export function useCanvasTransform() {
   const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
 
   const zoomIn = useCallback(() => {
-    setTransform((t) => ({ ...t, zoom: clampZoom(t.zoom + ZOOM_STEP) }));
-  }, []);
+    setClampedTransform((t) => ({ ...t, zoom: clampZoom(t.zoom + ZOOM_STEP) }));
+  }, [setClampedTransform]);
 
   const zoomOut = useCallback(() => {
-    setTransform((t) => ({ ...t, zoom: clampZoom(t.zoom - ZOOM_STEP) }));
-  }, []);
+    setClampedTransform((t) => ({ ...t, zoom: clampZoom(t.zoom - ZOOM_STEP) }));
+  }, [setClampedTransform]);
 
   const resetView = useCallback(() => {
-    setTransform({ panX: 0, panY: 0, zoom: 1 });
-  }, []);
+    // Reset zoom to 100% and clamp pan to keep content visible
+    setClampedTransform(() => ({ panX: 0, panY: 0, zoom: 1 }));
+  }, [setClampedTransform]);
 
   /** Zoom centered on a specific point (e.g., cursor position) */
   const zoomAtPoint = useCallback(
     (delta: number, clientX: number, clientY: number, rect: DOMRect) => {
-      setTransform((t) => {
+      setClampedTransform((t) => {
         const newZoom = clampZoom(t.zoom + delta);
         if (newZoom === t.zoom) return t;
 
-        // Keep the point under the cursor fixed
         const pointX = clientX - rect.left;
         const pointY = clientY - rect.top;
 
@@ -74,13 +142,13 @@ export function useCanvasTransform() {
         return { panX: newPanX, panY: newPanY, zoom: newZoom };
       });
     },
-    [],
+    [setClampedTransform],
   );
 
-  /** Fit all items into view */
+  /** Fit all items into view (unclamped — this calculates perfect position) */
   const fitToContent = useCallback(
-    (items: MoodboardItemClient[], viewportWidth: number, viewportHeight: number) => {
-      if (items.length === 0) {
+    (fitItems: MoodboardItemClient[], viewportWidth: number, viewportHeight: number) => {
+      if (fitItems.length === 0) {
         setTransform({ panX: 0, panY: 0, zoom: 1 });
         return;
       }
@@ -89,7 +157,7 @@ export function useCanvasTransform() {
         minY = Infinity,
         maxX = -Infinity,
         maxY = -Infinity;
-      for (const item of items) {
+      for (const item of fitItems) {
         minX = Math.min(minX, item.x);
         minY = Math.min(minY, item.y);
         maxX = Math.max(maxX, item.x + item.width);
@@ -126,15 +194,15 @@ export function useCanvasTransform() {
         const delta = -e.deltaY * 0.005;
         zoomAtPoint(delta, e.clientX, e.clientY, rect);
       } else {
-        // Regular scroll = pan
-        setTransform((t) => ({
+        // Regular scroll = pan (clamped)
+        setClampedTransform((t) => ({
           ...t,
           panX: t.panX - e.deltaX,
           panY: t.panY - e.deltaY,
         }));
       }
     },
-    [zoomAtPoint],
+    [zoomAtPoint, setClampedTransform],
   );
 
   // -------------------------------------------------------------------------
@@ -159,16 +227,19 @@ export function useCanvasTransform() {
     [transform.panX, transform.panY],
   );
 
-  const onPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isPanning.current) return;
-    const dx = e.clientX - panStart.current.x;
-    const dy = e.clientY - panStart.current.y;
-    setTransform((t) => ({
-      ...t,
-      panX: panStart.current.panX + dx,
-      panY: panStart.current.panY + dy,
-    }));
-  }, []);
+  const onPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!isPanning.current) return;
+      const dx = e.clientX - panStart.current.x;
+      const dy = e.clientY - panStart.current.y;
+      setClampedTransform((t) => ({
+        ...t,
+        panX: panStart.current.panX + dx,
+        panY: panStart.current.panY + dy,
+      }));
+    },
+    [setClampedTransform],
+  );
 
   const onPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (isPanning.current) {

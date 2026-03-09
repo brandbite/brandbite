@@ -65,7 +65,7 @@ export function BoardCanvas({
     onPointerUp,
     onKeyDown,
     onKeyUp,
-  } = useCanvasTransform();
+  } = useCanvasTransform(items, viewportRef);
 
   const { panX, panY, zoom } = transform;
 
