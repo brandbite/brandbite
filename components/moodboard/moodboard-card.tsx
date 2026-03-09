@@ -3,20 +3,14 @@
 import React from "react";
 import Link from "next/link";
 
-type MoodboardThumbnail = {
-  data: {
-    url?: string;
-  };
-};
-
 type MoodboardCardProps = {
   moodboard: {
     id: string;
     title: string;
     description?: string | null;
-    _count: { items: number };
-    project?: { id: string; name: string } | null;
-    thumbnails: MoodboardThumbnail[];
+    itemCount: number;
+    projectName?: string | null;
+    thumbnails: Record<string, unknown>[];
     createdAt: string;
   };
 };
@@ -43,7 +37,7 @@ function PlaceholderGrid() {
 
 export function MoodboardCard({ moodboard }: MoodboardCardProps) {
   const thumbnails = moodboard.thumbnails.slice(0, 4);
-  const hasThumbnails = thumbnails.length > 0;
+  const hasThumbnails = thumbnails.length > 0 && thumbnails.some((t) => typeof t?.url === "string");
 
   return (
     <Link
@@ -54,16 +48,19 @@ export function MoodboardCard({ moodboard }: MoodboardCardProps) {
       <div className="relative aspect-[4/3] overflow-hidden bg-gray-100">
         {hasThumbnails ? (
           <div className="grid h-full w-full grid-cols-2 grid-rows-2 gap-0.5">
-            {thumbnails.map((thumb, i) => (
-              <div key={i} className="overflow-hidden bg-gray-200">
-                {thumb.data.url ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={thumb.data.url} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <div className="h-full w-full bg-gray-200" />
-                )}
-              </div>
-            ))}
+            {thumbnails.map((thumb, i) => {
+              const url = typeof thumb?.url === "string" ? thumb.url : null;
+              return (
+                <div key={i} className="overflow-hidden bg-gray-200">
+                  {url ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src={url} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="h-full w-full bg-gray-200" />
+                  )}
+                </div>
+              );
+            })}
             {/* Fill remaining slots */}
             {Array.from({ length: Math.max(0, 4 - thumbnails.length) }).map((_, i) => (
               <div key={`empty-${i}`} className="bg-gray-200" />
@@ -81,13 +78,13 @@ export function MoodboardCard({ moodboard }: MoodboardCardProps) {
         </h3>
 
         <div className="mt-2 flex items-center gap-2">
-          {moodboard.project && (
+          {moodboard.projectName && (
             <span className="inline-flex items-center rounded-full bg-[var(--bb-bg-warm)] px-2 py-0.5 text-[10px] font-medium text-[var(--bb-text-secondary)]">
-              {moodboard.project.name}
+              {moodboard.projectName}
             </span>
           )}
           <span className="text-xs text-[var(--bb-text-secondary)]">
-            {moodboard._count.items} {moodboard._count.items === 1 ? "item" : "items"}
+            {moodboard.itemCount} {moodboard.itemCount === 1 ? "item" : "items"}
           </span>
         </div>
 

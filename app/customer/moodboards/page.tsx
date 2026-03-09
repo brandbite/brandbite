@@ -16,9 +16,10 @@ type MoodboardListItem = {
   id: string;
   title: string;
   description: string | null;
-  project: { id: string; name: string } | null;
-  _count: { items: number };
-  thumbnails: { data: { url?: string } }[];
+  projectId: string | null;
+  projectName: string | null;
+  itemCount: number;
+  thumbnails: Record<string, unknown>[];
   createdAt: string;
 };
 
