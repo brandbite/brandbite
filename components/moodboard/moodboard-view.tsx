@@ -258,51 +258,37 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
 
   async function handleUploadFile(file: File, type: "IMAGE" | "FILE") {
     try {
-      // Step 1: Get presigned URL
-      const presignRes = await fetch("/api/uploads/r2/moodboard-presign", {
+      // Upload file server-side via FormData (avoids R2 CORS issues)
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("moodboardId", moodboardId);
+
+      const uploadRes = await fetch("/api/uploads/r2/moodboard-presign", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          moodboardId,
-          contentType: file.type,
-          bytes: file.size,
-          originalName: file.name,
-        }),
-      });
-
-      if (!presignRes.ok) throw new Error("Failed to get presigned URL");
-
-      const { uploadUrl, storageKey, publicUrl: serverPublicUrl } = await presignRes.json();
-
-      // Step 2: Upload to R2
-      const uploadRes = await fetch(uploadUrl, {
-        method: "PUT",
-        headers: { "Content-Type": file.type },
-        body: file,
+        body: formData,
       });
 
       if (!uploadRes.ok) throw new Error("Failed to upload file");
 
-      // Step 3: Use public URL from server (it has access to R2_PUBLIC_BASE_URL)
-      const publicUrl = serverPublicUrl ?? `/${storageKey}`;
+      const { url, storageKey, mimeType, originalName, bytes } = await uploadRes.json();
 
-      // Step 4: Create the moodboard item
+      // Create the moodboard item
       if (type === "IMAGE") {
         const data: ImageCardData = {
-          url: publicUrl,
+          url: url ?? "",
           storageKey,
-          originalName: file.name,
-          mimeType: file.type,
-          bytes: file.size,
+          originalName: originalName ?? file.name,
+          mimeType: mimeType ?? file.type,
+          bytes: bytes ?? file.size,
         };
         await handleAddItem("IMAGE", data);
       } else {
         const data: FileCardData = {
-          url: publicUrl,
+          url: url ?? "",
           storageKey,
-          originalName: file.name,
-          mimeType: file.type,
-          bytes: file.size,
+          originalName: originalName ?? file.name,
+          mimeType: mimeType ?? file.type,
+          bytes: bytes ?? file.size,
         };
         await handleAddItem("FILE", data);
       }

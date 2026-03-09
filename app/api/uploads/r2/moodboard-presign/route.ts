@@ -1,7 +1,8 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/uploads/r2/moodboard-presign/route.ts
-// @purpose: Create presigned R2 PUT URL for uploading moodboard assets
-// @version: v1.0.0
+// @purpose: Server-side file upload for moodboard assets (image/file cards).
+//           Receives file via FormData, uploads to R2, returns URL + storageKey.
+// @version: v2.0.0
 // @status: active
 // @lastUpdate: 2026-03-09
 // -----------------------------------------------------------------------------
@@ -10,11 +11,10 @@ export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
-import { createR2Client, getR2BucketName, getR2PublicBaseUrl } from "@/lib/r2";
+import { createR2Client, getR2BucketName, getR2PublicBaseUrl, resolveAssetUrl } from "@/lib/r2";
 
 function sanitizeFilename(name: string): string {
   const base = name.trim().replace(/\s+/g, "_");
@@ -28,6 +28,8 @@ function makeStorageKey(args: { moodboardId: string; originalName?: string | nul
 
   return `moodboards/${args.moodboardId}/${ts}_${rand}_${safeName}`;
 }
+
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
 
 export async function POST(req: Request) {
   try {
@@ -44,15 +46,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No active company" }, { status: 400 });
     }
 
-    const body = (await req.json()) as any;
+    const formData = await req.formData();
+    const file = formData.get("file") as File | null;
+    const moodboardId = formData.get("moodboardId") as string | null;
 
-    const moodboardId = body?.moodboardId as string | undefined;
-    const contentType = body?.contentType as string | undefined;
-    const bytes = body?.bytes as number | undefined;
-    const originalName = (body?.originalName as string | undefined) ?? null;
-
-    if (!moodboardId || !contentType || typeof bytes !== "number") {
+    if (!file || !moodboardId) {
       return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: "FILE_TOO_LARGE", maxBytes: MAX_FILE_SIZE },
+        { status: 413 },
+      );
     }
 
     // Verify moodboard belongs to user's company
@@ -70,32 +76,39 @@ export async function POST(req: Request) {
     }
 
     // ----------------------------
-    // Presign
+    // Upload to R2 (server-side)
     // ----------------------------
 
+    const mimeType = file.type || "application/octet-stream";
+    const originalName = file.name || null;
     const storageKey = makeStorageKey({ moodboardId, originalName });
 
     const r2 = createR2Client();
     const bucket = getR2BucketName();
+    const buffer = Buffer.from(await file.arrayBuffer());
 
-    const cmd = new PutObjectCommand({
-      Bucket: bucket,
-      Key: storageKey,
-      ContentType: contentType,
+    await r2.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: storageKey,
+        Body: buffer,
+        ContentType: mimeType,
+      }),
+    );
+
+    // ----------------------------
+    // Resolve public URL
+    // ----------------------------
+
+    const publicUrl = await resolveAssetUrl(storageKey, null);
+
+    return NextResponse.json({
+      storageKey,
+      url: publicUrl,
+      mimeType,
+      originalName,
+      bytes: file.size,
     });
-
-    const expiresInSeconds = 60 * 5;
-    const uploadUrl = await getSignedUrl(r2, cmd, {
-      expiresIn: expiresInSeconds,
-    });
-
-    const expiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
-
-    // Build public URL server-side (client has no access to R2_PUBLIC_BASE_URL)
-    const publicBase = getR2PublicBaseUrl();
-    const publicUrl = publicBase ? `${publicBase.replace(/\/$/, "")}/${storageKey}` : null;
-
-    return NextResponse.json({ uploadUrl, storageKey, publicUrl, expiresAt });
   } catch (err: any) {
     const code = err?.code ?? "UNKNOWN";
     if (code === "UNAUTHENTICATED") {
@@ -109,7 +122,7 @@ export async function POST(req: Request) {
       );
     }
 
-    console.error("[r2/moodboard-presign] unexpected error:", err);
+    console.error("[r2/moodboard-upload] unexpected error:", err);
     return NextResponse.json({ error: "INTERNAL_ERROR" }, { status: 500 });
   }
 }

@@ -35,6 +35,7 @@ export type LinkCardData = {
   title?: string;
   description?: string;
   favicon?: string;
+  image?: string;
 };
 
 export type FileCardData = {

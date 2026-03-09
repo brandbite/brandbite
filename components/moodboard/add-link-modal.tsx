@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Modal, ModalHeader } from "@/components/ui/modal";
 import type { LinkCardData } from "@/lib/moodboard";
 
@@ -31,11 +31,59 @@ export function AddLinkModal({ open, onClose, onSave }: AddLinkModalProps) {
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [fetching, setFetching] = useState(false);
+  const [fetchedUrl, setFetchedUrl] = useState("");
+  const [ogImage, setOgImage] = useState<string | undefined>(undefined);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Auto-fetch metadata when a valid URL is entered
+  const fetchMetadata = useCallback(
+    async (targetUrl: string) => {
+      if (!isValidUrl(targetUrl) || targetUrl === fetchedUrl) return;
+
+      setFetching(true);
+      try {
+        const res = await fetch("/api/customer/moodboards/link-preview", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: targetUrl }),
+        });
+        if (!res.ok) return;
+
+        const data = await res.json();
+        // Only auto-fill if user hasn't manually typed something
+        if (data.title && !title) setTitle(data.title);
+        if (data.description && !description) setDescription(data.description);
+        if (data.image) setOgImage(data.image);
+        setFetchedUrl(targetUrl);
+      } catch {
+        // Silently ignore fetch errors
+      } finally {
+        setFetching(false);
+      }
+    },
+    [fetchedUrl, title, description],
+  );
+
+  useEffect(() => {
+    const trimmed = url.trim();
+    if (!isValidUrl(trimmed)) return;
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchMetadata(trimmed), 600);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [url, fetchMetadata]);
 
   function handleClose() {
     setUrl("");
     setTitle("");
     setDescription("");
+    setFetching(false);
+    setFetchedUrl("");
+    setOgImage(undefined);
     onClose();
   }
 
@@ -53,12 +101,10 @@ export function AddLinkModal({ open, onClose, onSave }: AddLinkModalProps) {
       title: title.trim() || undefined,
       description: description.trim() || undefined,
       favicon,
+      image: ogImage,
     });
 
-    setUrl("");
-    setTitle("");
-    setDescription("");
-    onClose();
+    handleClose();
   }
 
   const valid = isValidUrl(url.trim());
@@ -83,18 +129,21 @@ export function AddLinkModal({ open, onClose, onSave }: AddLinkModalProps) {
               Please enter a valid URL (including http:// or https://)
             </p>
           )}
+          {fetching && (
+            <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">Fetching link preview...</p>
+          )}
         </div>
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Title (optional)"
+          placeholder="Title (auto-filled from URL)"
           className="w-full rounded-lg border border-[var(--bb-border)] bg-white px-3 py-2 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-gray-400 focus:border-[var(--bb-primary)]"
         />
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="Description (optional)"
+          placeholder="Description (auto-filled from URL)"
           rows={2}
           className="w-full rounded-lg border border-[var(--bb-border)] bg-white px-3 py-2 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-gray-400 focus:border-[var(--bb-primary)]"
         />
@@ -109,7 +158,7 @@ export function AddLinkModal({ open, onClose, onSave }: AddLinkModalProps) {
         </button>
         <button
           onClick={handleSave}
-          disabled={!valid}
+          disabled={!valid || fetching}
           className="rounded-lg bg-[var(--bb-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--bb-primary-hover)] disabled:opacity-50"
         >
           Save
