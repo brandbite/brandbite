@@ -6,6 +6,7 @@ import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } f
 import { CardWrapper } from "@/components/moodboard/card-wrapper";
 import { CanvasControls } from "@/components/moodboard/canvas-controls";
 import { ConnectionLayer } from "@/components/moodboard/connection-layer";
+import { DrawingLayer } from "@/components/moodboard/drawing-layer";
 import { NoteCard } from "@/components/moodboard/note-card";
 import { ImageCard } from "@/components/moodboard/image-card";
 import { ColorCard } from "@/components/moodboard/color-card";
@@ -15,7 +16,12 @@ import { TodoCard } from "@/components/moodboard/todo-card";
 import { EmbedCard } from "@/components/moodboard/embed-card";
 import { useCanvasTransform } from "@/components/moodboard/use-canvas-transform";
 
-import type { MoodboardItemClient, MoodboardItemData, MoodboardConnection } from "@/lib/moodboard";
+import type {
+  MoodboardItemClient,
+  MoodboardItemData,
+  MoodboardConnection,
+  DrawingCardData,
+} from "@/lib/moodboard";
 import {
   isNoteData,
   isImageData,
@@ -31,12 +37,18 @@ type BoardCanvasProps = {
   items: MoodboardItemClient[];
   connections: MoodboardConnection[];
   toolMode: ToolMode;
+  drawColor: string;
+  drawSize: number;
   onUpdateItem: (itemId: string, data: MoodboardItemData) => void;
   onDeleteItem: (itemId: string) => void;
   onMoveItem: (itemId: string, x: number, y: number) => void;
   onResizeItem: (itemId: string, width: number, height: number) => void;
   onAddConnection: (sourceId: string, targetId: string) => void;
   onDeleteConnection: (id: string) => void;
+  onAddDrawing: (
+    data: DrawingCardData,
+    bounds: { x: number; y: number; w: number; h: number },
+  ) => void;
 };
 
 function renderCard(item: MoodboardItemClient, onUpdate: (data: MoodboardItemData) => void) {
@@ -57,12 +69,15 @@ export function BoardCanvas({
   items,
   connections,
   toolMode,
+  drawColor,
+  drawSize,
   onUpdateItem,
   onDeleteItem,
   onMoveItem,
   onResizeItem,
   onAddConnection,
   onDeleteConnection,
+  onAddDrawing,
 }: BoardCanvasProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
 
@@ -70,6 +85,13 @@ export function BoardCanvas({
   const [arrowSourceId, setArrowSourceId] = useState<string | null>(null);
   const [pendingTarget, setPendingTarget] = useState<{ x: number; y: number } | null>(null);
   const [prevToolMode, setPrevToolMode] = useState(toolMode);
+
+  // Drawing selection state
+  const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
+
+  // Separate card items from drawings
+  const cardItems = items.filter((i) => i.type !== "DRAWING");
+  const drawings = items.filter((i) => i.type === "DRAWING");
 
   const {
     transform,
@@ -87,13 +109,14 @@ export function BoardCanvas({
 
   const { panX, panY, zoom } = transform;
 
-  // Reset arrow state when leaving arrow mode (React-recommended pattern)
+  // Reset state when switching tool modes (React-recommended pattern)
   if (prevToolMode !== toolMode) {
     setPrevToolMode(toolMode);
     if (toolMode !== "arrow") {
       setArrowSourceId(null);
       setPendingTarget(null);
     }
+    setSelectedDrawingId(null);
   }
 
   // Escape cancels arrow creation
@@ -211,7 +234,7 @@ export function BoardCanvas({
       <div
         ref={viewportRef}
         className="relative flex-1 overflow-hidden"
-        style={{ cursor: toolMode === "arrow" ? "crosshair" : "default" }}
+        style={{ cursor: toolMode === "arrow" || toolMode === "draw" ? "crosshair" : "default" }}
         onWheel={onWheel}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -238,8 +261,8 @@ export function BoardCanvas({
             left: 0,
           }}
         >
-          {/* Cards */}
-          {items.map((item) => (
+          {/* Cards (excluding drawings) */}
+          {cardItems.map((item) => (
             <CardWrapper
               key={item.id}
               id={item.id}
@@ -255,10 +278,26 @@ export function BoardCanvas({
             </CardWrapper>
           ))}
 
+          {/* Drawing layer — SVG strokes */}
+          <DrawingLayer
+            drawings={drawings}
+            active={toolMode === "draw"}
+            strokeColor={drawColor}
+            strokeWidth={drawSize}
+            panX={panX}
+            panY={panY}
+            zoom={zoom}
+            viewportRef={viewportRef}
+            onStrokeComplete={onAddDrawing}
+            onSelectDrawing={toolMode === "select" ? setSelectedDrawingId : undefined}
+            selectedDrawingId={selectedDrawingId}
+            onDeleteDrawing={toolMode === "select" ? onDeleteItem : undefined}
+          />
+
           {/* Connection arrows layer */}
           <ConnectionLayer
             connections={connections}
-            items={items}
+            items={cardItems}
             onDeleteConnection={onDeleteConnection}
             pendingSourceId={arrowSourceId}
             pendingTarget={pendingTarget}
@@ -266,7 +305,7 @@ export function BoardCanvas({
 
           {/* Arrow mode — click overlays on cards */}
           {toolMode === "arrow" &&
-            items.map((item) => (
+            cardItems.map((item) => (
               <div
                 key={`arrow-target-${item.id}`}
                 className={`absolute rounded-2xl border-2 transition-colors ${

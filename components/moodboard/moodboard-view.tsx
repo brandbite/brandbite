@@ -23,8 +23,9 @@ import type {
   ImageCardData,
   FileCardData,
   EmbedCardData,
+  DrawingCardData,
 } from "@/lib/moodboard";
-import { CANVAS_DEFAULTS, createConnection } from "@/lib/moodboard";
+import { CANVAS_DEFAULTS, createConnection, DRAW_COLORS, DRAW_SIZES } from "@/lib/moodboard";
 import type { ToolMode } from "@/components/moodboard/board-toolbar";
 
 type MoodboardViewProps = {
@@ -74,6 +75,8 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
   const [loading, setLoading] = useState(true);
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [toolMode, setToolMode] = useState<ToolMode>("select");
+  const [drawColor, setDrawColor] = useState<string>(DRAW_COLORS[0]);
+  const [drawSize, setDrawSize] = useState<number>(DRAW_SIZES[1]); // 4px default
 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -360,6 +363,42 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
   }
 
   // ---------------------------------------------------------------------------
+  // Freehand drawing
+  // ---------------------------------------------------------------------------
+
+  async function handleAddDrawing(
+    data: DrawingCardData,
+    bounds: { x: number; y: number; w: number; h: number },
+  ) {
+    try {
+      const res = await fetch(`/api/customer/moodboards/${moodboardId}/items`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "DRAWING",
+          data,
+          x: bounds.x,
+          y: bounds.y,
+          width: bounds.w,
+          height: bounds.h,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Failed to save drawing");
+
+      const json = await res.json();
+      const newItem: MoodboardItemClient = json.item;
+
+      setMoodboard((prev) => {
+        if (!prev) return prev;
+        return { ...prev, items: [...prev.items, newItem] };
+      });
+    } catch (err) {
+      console.error("[moodboard-view] add drawing error:", err);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // File upload (image or file)
   // ---------------------------------------------------------------------------
 
@@ -494,6 +533,10 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
         onAddEmbed={() => setActiveModal("embed")}
         toolMode={toolMode}
         onSetToolMode={setToolMode}
+        drawColor={drawColor}
+        drawSize={drawSize}
+        onSetDrawColor={setDrawColor}
+        onSetDrawSize={setDrawSize}
       />
 
       <div className="flex flex-1 flex-col overflow-hidden">
@@ -509,12 +552,15 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
           items={moodboard.items}
           connections={moodboard.connections}
           toolMode={toolMode}
+          drawColor={drawColor}
+          drawSize={drawSize}
           onUpdateItem={handleUpdateItem}
           onDeleteItem={handleDeleteItem}
           onMoveItem={handleMoveItem}
           onResizeItem={handleResizeItem}
           onAddConnection={handleAddConnection}
           onDeleteConnection={handleDeleteConnection}
+          onAddDrawing={handleAddDrawing}
         />
       </div>
 

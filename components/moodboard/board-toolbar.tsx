@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { DRAW_COLORS, DRAW_SIZES } from "@/lib/moodboard";
 
-export type ToolMode = "select" | "arrow";
+export type ToolMode = "select" | "arrow" | "draw";
 
 type BoardToolbarProps = {
   onAddNote: () => void;
@@ -14,6 +15,10 @@ type BoardToolbarProps = {
   onAddEmbed: () => void;
   toolMode: ToolMode;
   onSetToolMode: (mode: ToolMode) => void;
+  drawColor: string;
+  drawSize: number;
+  onSetDrawColor: (color: string) => void;
+  onSetDrawSize: (size: number) => void;
 };
 
 type ToolItem = {
@@ -159,6 +164,19 @@ function ArrowIcon() {
   );
 }
 
+function DrawIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <path
+        d="M3 17C5 13 7.5 9 10 7C12.5 5 15 4 17 3"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 function VideoIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -178,8 +196,26 @@ export function BoardToolbar({
   onAddEmbed,
   toolMode,
   onSetToolMode,
+  drawColor,
+  drawSize,
+  onSetDrawColor,
+  onSetDrawSize,
 }: BoardToolbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [drawSettingsOpen, setDrawSettingsOpen] = useState(false);
+  const drawSettingsRef = useRef<HTMLDivElement>(null);
+
+  // Close draw settings on outside click
+  useEffect(() => {
+    if (!drawSettingsOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (drawSettingsRef.current && !drawSettingsRef.current.contains(e.target as Node)) {
+        setDrawSettingsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [drawSettingsOpen]);
 
   const tools: ToolItem[] = [
     { label: "Note", onClick: onAddNote, icon: <NoteIcon /> },
@@ -192,6 +228,7 @@ export function BoardToolbar({
   ];
 
   const arrowActive = toolMode === "arrow";
+  const drawActive = toolMode === "draw";
 
   function handleToolClick(tool: ToolItem) {
     tool.onClick();
@@ -230,6 +267,100 @@ export function BoardToolbar({
           <ArrowIcon />
           Arrow
         </button>
+
+        {/* Draw toggle + settings */}
+        <div ref={drawSettingsRef} className="relative">
+          <button
+            type="button"
+            onClick={() => {
+              if (drawActive) {
+                onSetToolMode("select");
+              } else {
+                onSetToolMode("draw");
+              }
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setDrawSettingsOpen((prev) => !prev);
+            }}
+            className={`flex w-full flex-col items-center gap-1 rounded-lg px-1 py-3 text-[10px] transition-colors ${
+              drawActive
+                ? "bg-[var(--bb-primary)]/10 text-[var(--bb-primary)]"
+                : "text-[var(--bb-text-secondary)] hover:bg-[var(--bb-bg-warm)] hover:text-[var(--bb-primary)]"
+            }`}
+          >
+            <DrawIcon />
+            Draw
+          </button>
+
+          {/* Draw color indicator dot */}
+          {drawActive && (
+            <button
+              type="button"
+              onClick={() => setDrawSettingsOpen((prev) => !prev)}
+              className="mx-auto mt-0.5 flex items-center justify-center"
+              aria-label="Drawing settings"
+            >
+              <div
+                className="h-3 w-3 rounded-full border border-gray-300"
+                style={{ backgroundColor: drawColor }}
+              />
+            </button>
+          )}
+
+          {/* Draw settings popover */}
+          {drawSettingsOpen && (
+            <div className="absolute top-0 left-14 z-50 w-44 rounded-xl border border-[var(--bb-border)] bg-white p-3 shadow-lg">
+              <p className="mb-2 text-[10px] font-semibold tracking-wider text-[var(--bb-text-secondary)] uppercase">
+                Color
+              </p>
+              <div className="mb-3 flex flex-wrap gap-1.5">
+                {DRAW_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => onSetDrawColor(c)}
+                    className={`h-6 w-6 rounded-full border-2 transition-transform hover:scale-110 ${
+                      drawColor === c
+                        ? "scale-110 border-[var(--bb-primary)]"
+                        : "border-transparent"
+                    }`}
+                    style={{ backgroundColor: c }}
+                    aria-label={`Color ${c}`}
+                  />
+                ))}
+              </div>
+
+              <p className="mb-2 text-[10px] font-semibold tracking-wider text-[var(--bb-text-secondary)] uppercase">
+                Size
+              </p>
+              <div className="flex items-center gap-2">
+                {DRAW_SIZES.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => onSetDrawSize(s)}
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${
+                      drawSize === s
+                        ? "border-[var(--bb-primary)] bg-[var(--bb-primary)]/10"
+                        : "border-[var(--bb-border)] hover:bg-[var(--bb-bg-warm)]"
+                    }`}
+                    aria-label={`${s}px stroke`}
+                  >
+                    <div
+                      className="rounded-full"
+                      style={{
+                        width: s + 2,
+                        height: s + 2,
+                        backgroundColor: drawColor,
+                      }}
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Mobile floating action button */}

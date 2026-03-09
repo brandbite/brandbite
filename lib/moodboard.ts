@@ -65,6 +65,12 @@ export type EmbedCardData = {
   thumbnailUrl?: string;
 };
 
+export type DrawingCardData = {
+  pathData: string;
+  strokeColor: string;
+  strokeWidth: number;
+};
+
 export type MoodboardItemData =
   | NoteCardData
   | ImageCardData
@@ -72,7 +78,8 @@ export type MoodboardItemData =
   | LinkCardData
   | FileCardData
   | TodoCardData
-  | EmbedCardData;
+  | EmbedCardData
+  | DrawingCardData;
 
 // ---------------------------------------------------------------------------
 // Type-safe data accessors
@@ -104,6 +111,10 @@ export function isTodoData(type: MoodboardItemType, data: unknown): data is Todo
 
 export function isEmbedData(type: MoodboardItemType, data: unknown): data is EmbedCardData {
   return type === "EMBED";
+}
+
+export function isDrawingData(type: MoodboardItemType, data: unknown): data is DrawingCardData {
+  return type === "DRAWING";
 }
 
 // ---------------------------------------------------------------------------
@@ -202,6 +213,21 @@ export function defaultTodoData(): TodoCardData {
 export function defaultEmbedData(): EmbedCardData {
   return { url: "", embedUrl: "", provider: "generic" };
 }
+
+// ---------------------------------------------------------------------------
+// Drawing tool presets
+// ---------------------------------------------------------------------------
+
+export const DRAW_COLORS = [
+  "#424143",
+  "#F15B2B",
+  "#4C8EF7",
+  "#32B37B",
+  "#D63A35",
+  "#8B5CF6",
+] as const;
+
+export const DRAW_SIZES = [2, 4, 8] as const;
 
 // ---------------------------------------------------------------------------
 // Video URL parser — extracts embed URL and thumbnail from video platforms
