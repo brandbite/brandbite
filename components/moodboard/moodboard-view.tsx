@@ -36,23 +36,25 @@ type ModalType = "note" | "color" | "link" | "todo" | "embed" | null;
 
 /** Find a non-overlapping position for a new item near the center of existing content. */
 function findOpenPosition(items: MoodboardItemClient[], width: number): { x: number; y: number } {
-  if (items.length === 0) return { x: 40, y: 40 };
+  // Place the first item with breathing room from the canvas origin so it feels centered
+  if (items.length === 0) return { x: 400, y: 260 };
 
   // Find bounding box of existing items
-  let maxX = 0;
+  let minX = Infinity;
   let maxY = 0;
   for (const item of items) {
-    maxX = Math.max(maxX, item.x + item.width);
+    minX = Math.min(minX, item.x);
     maxY = Math.max(maxY, item.y + (item.height || 200));
   }
 
   const gap = CANVAS_DEFAULTS.GAP;
-  const candidate = { x: 40, y: maxY + gap };
+  const colBase = Math.max(40, minX); // Align new items with leftmost existing item
+  const candidate = { x: colBase, y: maxY + gap };
 
-  // Simple: place below existing content, checking for overlap
+  // Place below existing content in a grid, checking for overlap
   for (let row = 0; row < 20; row++) {
     for (let col = 0; col < 4; col++) {
-      const cx = 40 + col * (CANVAS_DEFAULTS.CARD_WIDTH + gap);
+      const cx = colBase + col * (CANVAS_DEFAULTS.CARD_WIDTH + gap);
       const cy = maxY + gap + row * (220 + gap);
       const overlaps = items.some(
         (item) =>
