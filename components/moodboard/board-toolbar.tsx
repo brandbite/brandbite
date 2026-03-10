@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { DRAW_COLORS, DRAW_SIZES } from "@/lib/moodboard";
 
-export type ToolMode = "select" | "arrow" | "draw";
+export type ToolMode = "select" | "arrow" | "draw" | "eraser";
 
 type BoardToolbarProps = {
   onAddNote: () => void;
@@ -26,6 +26,19 @@ type ToolItem = {
   onClick: () => void;
   icon: React.ReactNode;
 };
+
+function SelectIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <path
+        d="M4 2L4 15L7.5 11.5L11 17L13 16L9.5 10L14 10L4 2Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 function NoteIcon() {
   return (
@@ -177,6 +190,31 @@ function DrawIcon() {
   );
 }
 
+function EraserIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <path
+        d="M8 17H17"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <path
+        d="M3.5 13.5L10.5 6.5L15 11L10 16L6.5 16L3.5 13.5Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M10.5 6.5L15 11"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 function VideoIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -239,6 +277,23 @@ export function BoardToolbar({
     <>
       {/* Desktop vertical sidebar */}
       <div className="hidden w-14 flex-shrink-0 flex-col gap-0.5 border-r border-[var(--bb-border-subtle)] bg-white/80 py-4 backdrop-blur-sm md:flex">
+        {/* Select tool (pointer/cursor) */}
+        <button
+          type="button"
+          onClick={() => onSetToolMode("select")}
+          className={`flex w-full flex-col items-center gap-1 rounded-xl px-1 py-2.5 text-[10px] font-medium transition-all duration-150 active:scale-95 ${
+            toolMode === "select"
+              ? "border-l-2 border-l-[var(--bb-primary)] text-[var(--bb-primary)]"
+              : "text-[var(--bb-text-tertiary)] hover:bg-[var(--bb-bg-warm)] hover:text-[var(--bb-secondary)]"
+          }`}
+        >
+          <SelectIcon />
+          Select
+        </button>
+
+        {/* Divider */}
+        <div className="mx-3 my-1.5 border-t border-[var(--bb-border-subtle)]" />
+
         {tools.map((tool) => (
           <button
             key={tool.label}
@@ -361,6 +416,20 @@ export function BoardToolbar({
             </div>
           )}
         </div>
+
+        {/* Eraser toggle */}
+        <button
+          type="button"
+          onClick={() => onSetToolMode(toolMode === "eraser" ? "select" : "eraser")}
+          className={`flex w-full flex-col items-center gap-1 rounded-xl px-1 py-2.5 text-[10px] font-medium transition-all duration-150 active:scale-95 ${
+            toolMode === "eraser"
+              ? "border-l-2 border-l-[var(--bb-primary)] text-[var(--bb-primary)]"
+              : "text-[var(--bb-text-tertiary)] hover:bg-[var(--bb-bg-warm)] hover:text-[var(--bb-secondary)]"
+          }`}
+        >
+          <EraserIcon />
+          Eraser
+        </button>
       </div>
 
       {/* Mobile floating action button */}
@@ -371,6 +440,22 @@ export function BoardToolbar({
             {/* Backdrop */}
             <div className="fixed inset-0 z-30" onClick={() => setMobileOpen(false)} />
             <div className="absolute right-0 bottom-16 z-40 flex flex-col gap-1 rounded-2xl border border-[var(--bb-border-subtle)] bg-white/95 p-2 shadow-[0_8px_32px_rgba(0,0,0,0.12)] backdrop-blur-md">
+              {/* Select tool */}
+              <button
+                type="button"
+                onClick={() => { onSetToolMode("select"); setMobileOpen(false); }}
+                className={`flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm transition-colors ${
+                  toolMode === "select"
+                    ? "bg-[var(--bb-primary)]/10 text-[var(--bb-primary)]"
+                    : "text-[var(--bb-secondary)] hover:bg-[var(--bb-bg-warm)] hover:text-[var(--bb-primary)]"
+                }`}
+              >
+                <SelectIcon />
+                Select
+              </button>
+
+              <div className="mx-2 my-1 border-t border-[var(--bb-border-subtle)]" />
+
               {tools.map((tool) => (
                 <button
                   key={tool.label}
@@ -382,6 +467,22 @@ export function BoardToolbar({
                   {tool.label}
                 </button>
               ))}
+
+              <div className="mx-2 my-1 border-t border-[var(--bb-border-subtle)]" />
+
+              {/* Eraser tool */}
+              <button
+                type="button"
+                onClick={() => { onSetToolMode(toolMode === "eraser" ? "select" : "eraser"); setMobileOpen(false); }}
+                className={`flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm transition-colors ${
+                  toolMode === "eraser"
+                    ? "bg-[var(--bb-primary)]/10 text-[var(--bb-primary)]"
+                    : "text-[var(--bb-secondary)] hover:bg-[var(--bb-bg-warm)] hover:text-[var(--bb-primary)]"
+                }`}
+              >
+                <EraserIcon />
+                Eraser
+              </button>
             </div>
           </>
         )}

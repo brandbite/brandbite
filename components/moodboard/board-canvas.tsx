@@ -119,8 +119,8 @@ export function BoardCanvas({
       setArrowSourceId(null);
       setPendingTarget(null);
     }
-    // Only clear drawing selection when entering arrow mode
-    if (toolMode === "arrow") {
+    // Clear drawing selection when entering arrow or eraser mode
+    if (toolMode === "arrow" || toolMode === "eraser") {
       setSelectedDrawingId(null);
     }
   }
@@ -270,7 +270,7 @@ export function BoardCanvas({
       <div
         ref={viewportRef}
         className="relative flex-1 overflow-hidden"
-        style={{ cursor: toolMode === "arrow" || toolMode === "draw" ? "crosshair" : "default" }}
+        style={{ cursor: toolMode === "arrow" || toolMode === "draw" ? "crosshair" : toolMode === "eraser" ? "none" : "default" }}
         onWheel={onWheel}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -318,6 +318,7 @@ export function BoardCanvas({
           <DrawingLayer
             drawings={drawings}
             active={toolMode === "draw"}
+            eraserActive={toolMode === "eraser"}
             strokeColor={drawColor}
             strokeWidth={drawSize}
             panX={panX}
@@ -327,7 +328,7 @@ export function BoardCanvas({
             onStrokeComplete={onAddDrawing}
             onSelectDrawing={toolMode === "select" ? setSelectedDrawingId : undefined}
             selectedDrawingId={selectedDrawingId}
-            onDeleteDrawing={toolMode === "select" ? onDeleteItem : undefined}
+            onDeleteDrawing={toolMode === "select" || toolMode === "eraser" ? onDeleteItem : undefined}
           />
 
           {/* Connection arrows layer */}

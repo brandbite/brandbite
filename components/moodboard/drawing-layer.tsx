@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { MoodboardItemClient, DrawingCardData } from "@/lib/moodboard";
 
 type DrawingLayerProps = {
@@ -8,6 +8,8 @@ type DrawingLayerProps = {
   drawings: MoodboardItemClient[];
   /** Whether draw mode is active (captures pointer events). */
   active: boolean;
+  /** Whether eraser mode is active. */
+  eraserActive: boolean;
   /** Current stroke color. */
   strokeColor: string;
   /** Current stroke width. */
@@ -99,6 +101,7 @@ function computeBounds(points: { x: number; y: number }[], strokeWidth: number) 
 export function DrawingLayer({
   drawings,
   active,
+  eraserActive,
   strokeColor,
   strokeWidth,
   panX,
@@ -113,6 +116,20 @@ export function DrawingLayer({
   const [currentPoints, setCurrentPoints] = useState<{ x: number; y: number }[]>([]);
   const [isDrawing, setIsDrawing] = useState(false);
   const pointsRef = useRef<{ x: number; y: number }[]>([]);
+
+  // Eraser state
+  const [eraserHoveredId, setEraserHoveredId] = useState<string | null>(null);
+  const [eraserCursorPos, setEraserCursorPos] = useState<{ x: number; y: number } | null>(null);
+  const [isErasing, setIsErasing] = useState(false);
+
+  // Clear eraser state when eraser mode is deactivated
+  useEffect(() => {
+    if (!eraserActive) {
+      setEraserHoveredId(null);
+      setEraserCursorPos(null);
+      setIsErasing(false);
+    }
+  }, [eraserActive]);
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<SVGSVGElement>) => {
@@ -172,6 +189,44 @@ export function DrawingLayer({
     [isDrawing, strokeColor, strokeWidth, onStrokeComplete],
   );
 
+  // --- Eraser handlers ---
+
+  const handleEraserPointerDown = useCallback(
+    (e: React.PointerEvent<SVGSVGElement>) => {
+      if (!eraserActive || !viewportRef.current) return;
+      e.preventDefault();
+      e.stopPropagation();
+      (e.target as SVGSVGElement).setPointerCapture(e.pointerId);
+      setIsErasing(true);
+
+      if (eraserHoveredId && onDeleteDrawing) {
+        onDeleteDrawing(eraserHoveredId);
+        setEraserHoveredId(null);
+      }
+    },
+    [eraserActive, eraserHoveredId, onDeleteDrawing, viewportRef],
+  );
+
+  const handleEraserPointerMove = useCallback(
+    (e: React.PointerEvent<SVGSVGElement>) => {
+      if (!eraserActive || !viewportRef.current) return;
+
+      const rect = viewportRef.current.getBoundingClientRect();
+      const pt = toCanvas(e.clientX, e.clientY, rect, panX, panY, zoom);
+      setEraserCursorPos(pt);
+    },
+    [eraserActive, panX, panY, zoom, viewportRef],
+  );
+
+  const handleEraserPointerUp = useCallback(
+    (e: React.PointerEvent<SVGSVGElement>) => {
+      if (!eraserActive) return;
+      (e.target as SVGSVGElement).releasePointerCapture(e.pointerId);
+      setIsErasing(false);
+    },
+    [eraserActive],
+  );
+
   // The SVG must cover a large canvas area because the transform div has no
   // intrinsic size (all children are absolutely positioned → 0×0 parent).
   // Using explicit large dimensions ensures pointer events are captured everywhere.
@@ -185,22 +240,23 @@ export function DrawingLayer({
         width: 30000,
         height: 30000,
         overflow: "visible",
-        pointerEvents: active ? "auto" : "none",
+        pointerEvents: active || eraserActive ? "auto" : "none",
         cursor: active ? "crosshair" : "default",
       }}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
+      onPointerDown={active ? handlePointerDown : eraserActive ? handleEraserPointerDown : undefined}
+      onPointerMove={active ? handlePointerMove : eraserActive ? handleEraserPointerMove : undefined}
+      onPointerUp={active ? handlePointerUp : eraserActive ? handleEraserPointerUp : undefined}
     >
       {/* Rendered saved drawings */}
       {drawings.map((item) => {
         const data = item.data as DrawingCardData;
         const isSelected = selectedDrawingId === item.id;
+        const isEraserHovered = eraserActive && eraserHoveredId === item.id;
 
         return (
           <g key={item.id}>
-            {/* Invisible wider path for easier click targeting in select mode */}
-            {!active && onSelectDrawing && (
+            {/* Invisible wider path for click/hover targeting (select + eraser modes) */}
+            {(!active || eraserActive) && (
               <path
                 d={data.pathData}
                 fill="none"
@@ -211,7 +267,27 @@ export function DrawingLayer({
                 className="pointer-events-stroke cursor-pointer"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onSelectDrawing(item.id);
+                  if (eraserActive && onDeleteDrawing) {
+                    onDeleteDrawing(item.id);
+                    setEraserHoveredId(null);
+                  } else if (onSelectDrawing) {
+                    onSelectDrawing(item.id);
+                  }
+                }}
+                onMouseEnter={() => {
+                  if (eraserActive) {
+                    if (isErasing && onDeleteDrawing) {
+                      onDeleteDrawing(item.id);
+                      setEraserHoveredId(null);
+                    } else {
+                      setEraserHoveredId(item.id);
+                    }
+                  }
+                }}
+                onMouseLeave={() => {
+                  if (eraserActive) {
+                    setEraserHoveredId((prev) => (prev === item.id ? null : prev));
+                  }
                 }}
               />
             )}
@@ -219,15 +295,27 @@ export function DrawingLayer({
             <path
               d={data.pathData}
               fill="none"
-              stroke={isSelected ? "#F15B2B" : data.strokeColor}
-              strokeWidth={isSelected ? data.strokeWidth + 1 : data.strokeWidth}
+              stroke={
+                isEraserHovered
+                  ? "#ef4444"
+                  : isSelected
+                    ? "#F15B2B"
+                    : data.strokeColor
+              }
+              strokeWidth={
+                isEraserHovered
+                  ? data.strokeWidth + 2
+                  : isSelected
+                    ? data.strokeWidth + 1
+                    : data.strokeWidth
+              }
               strokeLinecap="round"
               strokeLinejoin="round"
               className="pointer-events-none"
-              opacity={isSelected ? 0.8 : 1}
+              opacity={isEraserHovered ? 0.6 : isSelected ? 0.8 : 1}
             />
-            {/* Delete button for selected drawing */}
-            {isSelected && onDeleteDrawing && (
+            {/* Delete button for selected drawing (select mode only) */}
+            {isSelected && !eraserActive && onDeleteDrawing && (
               <g
                 className="pointer-events-auto cursor-pointer"
                 onClick={(e) => {
@@ -268,6 +356,20 @@ export function DrawingLayer({
           strokeWidth={strokeWidth}
           strokeLinecap="round"
           strokeLinejoin="round"
+          className="pointer-events-none"
+        />
+      )}
+
+      {/* Eraser cursor indicator */}
+      {eraserActive && eraserCursorPos && (
+        <circle
+          cx={eraserCursorPos.x}
+          cy={eraserCursorPos.y}
+          r={10}
+          fill="white"
+          fillOpacity={0.7}
+          stroke="#ef4444"
+          strokeWidth={2}
           className="pointer-events-none"
         />
       )}
