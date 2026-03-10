@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { CANVAS_DEFAULTS } from "@/lib/moodboard";
 
@@ -14,6 +14,8 @@ type CardWrapperProps = {
   children: React.ReactNode;
   onDelete?: () => void;
   onResize?: (width: number, height: number) => void;
+  /** Called when the card's actual DOM height is measured (for auto-height cards). */
+  onMeasuredHeight?: (height: number) => void;
 };
 
 const { MIN_WIDTH, MIN_HEIGHT } = CANVAS_DEFAULTS;
@@ -28,12 +30,41 @@ export function CardWrapper({
   children,
   onDelete,
   onResize,
+  onMeasuredHeight,
 }: CardWrapperProps) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } =
     useDraggable({ id });
 
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const cardElRef = useRef<HTMLDivElement | null>(null);
+
+  // Merge dnd-kit's setNodeRef with our own ref for ResizeObserver
+  const mergedRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      setNodeRef(node);
+      cardElRef.current = node;
+    },
+    [setNodeRef],
+  );
+
+  // ResizeObserver to measure actual DOM height for auto-height cards
+  useEffect(() => {
+    const el = cardElRef.current;
+    if (!el || !onMeasuredHeight) return;
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const observedH = entry.contentRect.height;
+        if (observedH > 0) {
+          onMeasuredHeight(observedH);
+        }
+      }
+    });
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [onMeasuredHeight]);
 
   // Resize state — use state (not ref) for values read during render
   const [resizing, setResizing] = useState(false);
@@ -98,7 +129,7 @@ export function CardWrapper({
 
   return (
     <div
-      ref={setNodeRef}
+      ref={mergedRef}
       style={style}
       className={`animate-card-enter group relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.06)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_4px_12px_rgba(0,0,0,0.08),0_2px_4px_rgba(0,0,0,0.04)] ${
         isDragging ? "z-50 scale-[0.98] opacity-40" : ""

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 
 import { CardWrapper } from "@/components/moodboard/card-wrapper";
@@ -92,9 +92,35 @@ export function BoardCanvas({
   // Hovered connection (for keyboard delete)
   const [hoveredConnectionId, setHoveredConnectionId] = useState<string | null>(null);
 
+  // Measured DOM heights for auto-height cards (height === 0)
+  const [measuredHeights, setMeasuredHeights] = useState<Map<string, number>>(new Map());
+
+  const handleMeasuredHeight = useCallback((itemId: string, h: number) => {
+    setMeasuredHeights((prev) => {
+      if (prev.get(itemId) === h) return prev;
+      const next = new Map(prev);
+      next.set(itemId, h);
+      return next;
+    });
+  }, []);
+
   // Separate card items from drawings
   const cardItems = items.filter((i) => i.type !== "DRAWING");
   const drawings = items.filter((i) => i.type === "DRAWING");
+
+  // Enrich items with measured DOM heights so ConnectionLayer uses real dimensions
+  const enrichedCardItems = useMemo(
+    () =>
+      cardItems.map((item) => {
+        if (item.height > 0) return item;
+        const measured = measuredHeights.get(item.id);
+        if (measured && measured > 0) {
+          return { ...item, height: measured };
+        }
+        return item;
+      }),
+    [cardItems, measuredHeights],
+  );
 
   const {
     transform,
@@ -309,6 +335,7 @@ export function BoardCanvas({
               zoom={zoom}
               onDelete={() => onDeleteItem(item.id)}
               onResize={(w, h) => onResizeItem(item.id, w, h)}
+              onMeasuredHeight={(h) => handleMeasuredHeight(item.id, h)}
             >
               {renderCard(item, (data) => onUpdateItem(item.id, data))}
             </CardWrapper>
@@ -334,7 +361,7 @@ export function BoardCanvas({
           {/* Connection arrows layer */}
           <ConnectionLayer
             connections={connections}
-            items={cardItems}
+            items={enrichedCardItems}
             onDeleteConnection={onDeleteConnection}
             pendingSourceId={arrowSourceId}
             pendingTarget={pendingTarget}
@@ -343,7 +370,7 @@ export function BoardCanvas({
 
           {/* Arrow mode — click overlays on cards */}
           {toolMode === "arrow" &&
-            cardItems.map((item) => (
+            enrichedCardItems.map((item) => (
               <div
                 key={`arrow-target-${item.id}`}
                 className={`absolute rounded-2xl border-2 transition-colors ${
