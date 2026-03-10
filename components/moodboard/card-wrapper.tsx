@@ -100,18 +100,18 @@ export function CardWrapper({
     <div
       ref={setNodeRef}
       style={style}
-      className={`group relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-white shadow-sm transition-shadow hover:shadow-md ${
-        isDragging ? "z-50 opacity-80 shadow-xl" : ""
+      className={`animate-card-enter group relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.06)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_4px_12px_rgba(0,0,0,0.08),0_2px_4px_rgba(0,0,0,0.04)] ${
+        isDragging ? "z-50 scale-[0.98] opacity-40" : ""
       }`}
       {...attributes}
     >
-      {/* Drag handle + menu — always visible */}
-      <div className="absolute top-2 right-2 z-10 flex items-center gap-1">
+      {/* Drag handle + menu — visible on hover */}
+      <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
         {/* Drag handle */}
         <button
           ref={setActivatorNodeRef}
           {...listeners}
-          className="flex h-7 w-7 cursor-grab items-center justify-center rounded-lg bg-white/80 shadow-sm hover:bg-gray-100 active:cursor-grabbing"
+          className="flex h-7 w-7 cursor-grab items-center justify-center rounded-lg border border-white/50 bg-white/70 shadow-sm backdrop-blur-sm transition-all duration-150 hover:bg-white/90 active:cursor-grabbing"
           aria-label="Drag to move"
         >
           <svg
@@ -134,7 +134,7 @@ export function CardWrapper({
         <div ref={menuRef} className="relative">
           <button
             onClick={() => setMenuOpen((prev) => !prev)}
-            className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/80 shadow-sm hover:bg-gray-100"
+            className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/50 bg-white/70 shadow-sm backdrop-blur-sm transition-all duration-150 hover:bg-white/90"
             aria-label="Card options"
           >
             <svg
@@ -151,7 +151,7 @@ export function CardWrapper({
           </button>
 
           {menuOpen && (
-            <div className="absolute top-8 right-0 z-20 w-40 rounded-xl border border-[var(--bb-border)] bg-white py-1 shadow-lg">
+            <div className="absolute top-8 right-0 z-20 w-40 rounded-xl border border-[var(--bb-border)] bg-white/95 py-1 shadow-[0_4px_16px_rgba(0,0,0,0.1),0_1px_4px_rgba(0,0,0,0.06)] backdrop-blur-md">
               {onDelete && (
                 <button
                   onClick={() => {

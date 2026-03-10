@@ -22,7 +22,7 @@ function DomainIcon({ domain }: { domain: string }) {
     .charAt(0)
     .toUpperCase();
   return (
-    <div className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-sm bg-gray-200 text-[10px] font-bold text-gray-500">
+    <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-gray-200 text-[10px] font-bold text-gray-500">
       {letter}
     </div>
   );
@@ -40,7 +40,7 @@ export function LinkCard({ data }: LinkCardProps) {
       href={data.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="block transition-colors hover:bg-gray-50"
+      className="block"
     >
       {/* OG Image preview — hide entire container on error */}
       {data.image && !ogImageFailed && (
@@ -68,7 +68,7 @@ export function LinkCard({ data }: LinkCardProps) {
             <img
               src={faviconUrl}
               alt=""
-              className="mt-0.5 h-5 w-5 flex-shrink-0 rounded-sm"
+              className="mt-0.5 h-6 w-6 flex-shrink-0 rounded-md"
               onError={() => setFaviconFailed(true)}
               onLoad={(e) => {
                 if ((e.target as HTMLImageElement).naturalWidth === 0) setFaviconFailed(true);

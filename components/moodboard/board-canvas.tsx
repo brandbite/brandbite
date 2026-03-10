@@ -244,7 +244,7 @@ export function BoardCanvas({
   if (items.length === 0) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center p-12 text-center">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--bb-bg-warm)]">
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-[var(--bb-border-subtle)] bg-white/60">
           <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
             <path
               d="M14 7V21M7 14H21"
@@ -281,9 +281,9 @@ export function BoardCanvas({
         <div
           className="absolute inset-0"
           style={{
-            backgroundImage: `radial-gradient(circle, #d1d5db 1px, transparent 1px)`,
-            backgroundSize: `${20 * zoom}px ${20 * zoom}px`,
-            backgroundPosition: `${panX % (20 * zoom)}px ${panY % (20 * zoom)}px`,
+            backgroundImage: `radial-gradient(circle, #ddd9d4 0.75px, transparent 0.75px)`,
+            backgroundSize: `${24 * zoom}px ${24 * zoom}px`,
+            backgroundPosition: `${panX % (24 * zoom)}px ${panY % (24 * zoom)}px`,
           }}
         />
 

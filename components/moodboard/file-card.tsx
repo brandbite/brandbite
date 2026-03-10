@@ -61,7 +61,7 @@ export function FileCard({ data }: FileCardProps) {
       href={data.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-center gap-3 p-4 transition-colors hover:bg-gray-50"
+      className="flex items-center gap-3 p-4"
     >
       <DocumentIcon />
       <div className="min-w-0 flex-1">

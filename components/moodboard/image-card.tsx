@@ -39,11 +39,11 @@ export function ImageCard({ data, onUpdate }: ImageCardProps) {
       <img
         src={data.url}
         alt={data.caption || data.originalName || "Moodboard image"}
-        className="w-full rounded-t-xl object-cover"
+        className="w-full object-cover"
         style={{ aspectRatio: "auto" }}
       />
 
-      <div className="p-3">
+      <div className="px-4 py-2.5">
         {editingCaption ? (
           <input
             ref={inputRef}

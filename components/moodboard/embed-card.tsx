@@ -74,7 +74,7 @@ export function EmbedCard({ data }: EmbedCardProps) {
 
   if (playing) {
     return (
-      <div className="aspect-video w-full overflow-hidden rounded-t-xl bg-black">
+      <div className="aspect-video w-full overflow-hidden bg-black">
         <iframe
           src={data.embedUrl + (data.embedUrl.includes("?") ? "&" : "?") + "autoplay=1"}
           title={data.title ?? "Embedded video"}
@@ -90,7 +90,7 @@ export function EmbedCard({ data }: EmbedCardProps) {
     <div className="flex flex-col">
       {/* Thumbnail / play area */}
       <div
-        className="group relative flex aspect-video w-full cursor-pointer items-center justify-center overflow-hidden rounded-t-xl bg-gray-900"
+        className="group relative flex aspect-video w-full cursor-pointer items-center justify-center overflow-hidden bg-gray-900"
         onClick={() => setPlaying(true)}
       >
         {data.thumbnailUrl && !thumbError ? (

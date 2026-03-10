@@ -82,13 +82,13 @@ export function NoteCard({ data, onUpdate }: NoteCardProps) {
   });
 
   return (
-    <div className="cursor-pointer p-4" onClick={enterEdit}>
+    <div className="min-h-[4rem] cursor-pointer p-4" onClick={enterEdit}>
       {data.title && (
-        <h3 className="mb-1 text-sm font-semibold text-[var(--bb-secondary)]">{data.title}</h3>
+        <h3 className="mb-1 text-[13px] font-semibold leading-snug text-[var(--bb-secondary)]">{data.title}</h3>
       )}
       {data.body ? (
         <div
-          className="bb-rich-text text-sm text-[var(--bb-text-secondary)]"
+          className="bb-rich-text text-[13px] leading-relaxed text-[var(--bb-text-secondary)]"
           dangerouslySetInnerHTML={{ __html: sanitizedBody }}
         />
       ) : (

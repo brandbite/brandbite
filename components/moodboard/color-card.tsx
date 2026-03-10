@@ -48,7 +48,7 @@ export function ColorCard({ data, onUpdate }: ColorCardProps) {
     <div>
       {/* Color swatch */}
       <div
-        className="h-24 cursor-pointer rounded-t-xl border-b border-[var(--bb-border)]"
+        className="h-28 cursor-pointer"
         style={{ backgroundColor: data.hex }}
         onClick={() => setEditing(true)}
       />

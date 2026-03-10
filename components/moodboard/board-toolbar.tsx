@@ -238,13 +238,13 @@ export function BoardToolbar({
   return (
     <>
       {/* Desktop vertical sidebar */}
-      <div className="hidden w-14 flex-shrink-0 flex-col border-r border-[var(--bb-border)] bg-white py-3 md:flex">
+      <div className="hidden w-14 flex-shrink-0 flex-col gap-0.5 border-r border-[var(--bb-border-subtle)] bg-white/80 py-4 backdrop-blur-sm md:flex">
         {tools.map((tool) => (
           <button
             key={tool.label}
             type="button"
             onClick={() => handleToolClick(tool)}
-            className="flex w-full flex-col items-center gap-1 rounded-lg px-1 py-3 text-[10px] text-[var(--bb-text-secondary)] transition-colors hover:bg-[var(--bb-bg-warm)] hover:text-[var(--bb-primary)]"
+            className="flex w-full flex-col items-center gap-1 rounded-xl px-1 py-2.5 text-[10px] font-medium text-[var(--bb-text-tertiary)] transition-all duration-150 hover:bg-[var(--bb-bg-warm)] hover:text-[var(--bb-secondary)] active:scale-95"
           >
             {tool.icon}
             {tool.label}
@@ -252,16 +252,16 @@ export function BoardToolbar({
         ))}
 
         {/* Divider */}
-        <div className="mx-3 my-1 border-t border-[var(--bb-border)]" />
+        <div className="mx-3 my-1.5 border-t border-[var(--bb-border-subtle)]" />
 
         {/* Arrow toggle */}
         <button
           type="button"
           onClick={() => onSetToolMode(arrowActive ? "select" : "arrow")}
-          className={`flex w-full flex-col items-center gap-1 rounded-lg px-1 py-3 text-[10px] transition-colors ${
+          className={`flex w-full flex-col items-center gap-1 rounded-xl px-1 py-2.5 text-[10px] font-medium transition-all duration-150 active:scale-95 ${
             arrowActive
-              ? "bg-[var(--bb-primary)]/10 text-[var(--bb-primary)]"
-              : "text-[var(--bb-text-secondary)] hover:bg-[var(--bb-bg-warm)] hover:text-[var(--bb-primary)]"
+              ? "border-l-2 border-l-[var(--bb-primary)] text-[var(--bb-primary)]"
+              : "text-[var(--bb-text-tertiary)] hover:bg-[var(--bb-bg-warm)] hover:text-[var(--bb-secondary)]"
           }`}
         >
           <ArrowIcon />
@@ -283,10 +283,10 @@ export function BoardToolbar({
               e.preventDefault();
               setDrawSettingsOpen((prev) => !prev);
             }}
-            className={`flex w-full flex-col items-center gap-1 rounded-lg px-1 py-3 text-[10px] transition-colors ${
+            className={`flex w-full flex-col items-center gap-1 rounded-xl px-1 py-2.5 text-[10px] font-medium transition-all duration-150 active:scale-95 ${
               drawActive
-                ? "bg-[var(--bb-primary)]/10 text-[var(--bb-primary)]"
-                : "text-[var(--bb-text-secondary)] hover:bg-[var(--bb-bg-warm)] hover:text-[var(--bb-primary)]"
+                ? "border-l-2 border-l-[var(--bb-primary)] text-[var(--bb-primary)]"
+                : "text-[var(--bb-text-tertiary)] hover:bg-[var(--bb-bg-warm)] hover:text-[var(--bb-secondary)]"
             }`}
           >
             <DrawIcon />
@@ -310,7 +310,7 @@ export function BoardToolbar({
 
           {/* Draw settings popover */}
           {drawSettingsOpen && (
-            <div className="absolute top-0 left-14 z-50 w-44 rounded-xl border border-[var(--bb-border)] bg-white p-3 shadow-lg">
+            <div className="absolute top-0 left-14 z-50 w-44 rounded-xl border border-[var(--bb-border-subtle)] bg-white/95 p-3 shadow-[0_4px_16px_rgba(0,0,0,0.1),0_1px_4px_rgba(0,0,0,0.06)] backdrop-blur-md">
               <p className="mb-2 text-[10px] font-semibold tracking-wider text-[var(--bb-text-secondary)] uppercase">
                 Color
               </p>
@@ -370,7 +370,7 @@ export function BoardToolbar({
           <>
             {/* Backdrop */}
             <div className="fixed inset-0 z-30" onClick={() => setMobileOpen(false)} />
-            <div className="absolute right-0 bottom-16 z-40 flex flex-col gap-2 rounded-2xl border border-[var(--bb-border)] bg-white p-2 shadow-xl">
+            <div className="absolute right-0 bottom-16 z-40 flex flex-col gap-1 rounded-2xl border border-[var(--bb-border-subtle)] bg-white/95 p-2 shadow-[0_8px_32px_rgba(0,0,0,0.12)] backdrop-blur-md">
               {tools.map((tool) => (
                 <button
                   key={tool.label}

@@ -43,7 +43,7 @@ export function BoardHeader({
   }
 
   return (
-    <div className="flex items-center justify-between border-b border-[var(--bb-border)] bg-white px-6 py-4">
+    <div className="flex items-center justify-between border-b border-[var(--bb-border-subtle)] bg-white/80 px-6 py-3 backdrop-blur-md">
       {/* Left: back + breadcrumbs */}
       <div className="flex min-w-0 items-center gap-3">
         <button
@@ -67,11 +67,11 @@ export function BoardHeader({
           <span className="text-[var(--bb-text-secondary)]">Moodboards</span>
           {projectName && (
             <>
-              <span className="text-gray-300">/</span>
+              <span className="text-[var(--bb-text-muted)]">/</span>
               <span className="text-[var(--bb-text-secondary)]">{projectName}</span>
             </>
           )}
-          <span className="text-gray-300">/</span>
+          <span className="text-[var(--bb-text-muted)]">/</span>
         </nav>
       </div>
 

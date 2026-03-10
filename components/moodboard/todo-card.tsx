@@ -109,7 +109,7 @@ export function TodoCard({ data, onUpdate }: TodoCardProps) {
       )}
 
       {/* Items */}
-      <ul className="space-y-1.5">
+      <ul className="space-y-2">
         {data.items.map((item) => (
           <li key={item.id} className="flex items-center gap-2">
             <input
@@ -153,14 +153,14 @@ export function TodoCard({ data, onUpdate }: TodoCardProps) {
       </ul>
 
       {/* Footer: Add item + progress */}
-      <div className="mt-3 flex items-center justify-between border-t border-[var(--bb-border)] pt-2">
+      <div className="mt-3 flex items-center justify-between border-t border-[var(--bb-border-subtle)] pt-2">
         <button
           onClick={addItem}
           className="text-xs font-medium text-[var(--bb-primary)] hover:underline"
         >
           + Add item
         </button>
-        <span className="text-xs text-[var(--bb-text-secondary)]">
+        <span className="text-xs text-[var(--bb-text-secondary)]" style={{ fontVariantNumeric: 'tabular-nums' }}>
           {checkedCount}/{totalCount} done
         </span>
       </div>

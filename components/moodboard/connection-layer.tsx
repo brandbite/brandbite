@@ -100,7 +100,7 @@ export function ConnectionLayer({
     >
       <defs>
         <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-          <polygon points="0 0, 10 3.5, 0 7" fill="#9ca3af" />
+          <polygon points="0 0, 10 3.5, 0 7" fill="#b8b5af" />
         </marker>
         <marker
           id="arrowhead-hover"
@@ -139,7 +139,7 @@ export function ConnectionLayer({
         const end = edgePoint(tr.x, tr.y, tr.w, tr.h, sc.x, sc.y);
 
         const isHovered = hoveredId === conn.id;
-        const strokeColor = isHovered ? "#ef4444" : (conn.color ?? "#9ca3af");
+        const strokeColor = isHovered ? "#ef4444" : (conn.color ?? "#b8b5af");
         const marker = isHovered ? "url(#arrowhead-hover)" : "url(#arrowhead)";
 
         return (
@@ -169,7 +169,7 @@ export function ConnectionLayer({
               d={curvedPath(start.x, start.y, end.x, end.y)}
               fill="none"
               stroke={strokeColor}
-              strokeWidth={isHovered ? 3 : 2}
+              strokeWidth={isHovered ? 2.5 : 2}
               strokeDasharray={conn.style === "dashed" ? "8 4" : undefined}
               markerEnd={marker}
               className="pointer-events-none transition-colors"
