@@ -32,11 +32,13 @@ const GAP = 28;
 /** Corner radius for rounded turns. */
 const RADIUS = 14;
 /** Default arrow stroke color — dark charcoal like FigJam. */
-const STROKE_COLOR = "#6b6b6b";
+const STROKE_COLOR = "#555555";
+/** Old default colors stored in DB — treat as "no custom color". */
+const LEGACY_DEFAULTS = new Set(["#b8b5af", "#9ca3af"]);
 /** Arrow stroke width. */
-const STROKE_WIDTH = 3;
+const STROKE_WIDTH = 3.5;
 /** Hovered arrow stroke width. */
-const STROKE_WIDTH_HOVER = 3.5;
+const STROKE_WIDTH_HOVER = 4;
 
 // ---------------------------------------------------------------------------
 // Helpers — anchor selection
@@ -363,39 +365,39 @@ export function ConnectionLayer({
       }}
     >
       <defs>
-        {/* FigJam-style bold filled arrowheads — fixed size in user space */}
+        {/* FigJam-style bold arrowheads — strokeWidth units for zoom-independent size */}
         <marker
           id="arrowhead"
-          markerWidth="14"
-          markerHeight="12"
-          refX="13"
-          refY="6"
+          markerWidth="5"
+          markerHeight="4"
+          refX="4.5"
+          refY="2"
           orient="auto"
-          markerUnits="userSpaceOnUse"
+          markerUnits="strokeWidth"
         >
-          <path d="M 0 0 L 14 6 L 0 12 Z" fill={STROKE_COLOR} />
+          <path d="M 0 0 L 5 2 L 0 4 Z" fill={STROKE_COLOR} />
         </marker>
         <marker
           id="arrowhead-hover"
-          markerWidth="14"
-          markerHeight="12"
-          refX="13"
-          refY="6"
+          markerWidth="5"
+          markerHeight="4"
+          refX="4.5"
+          refY="2"
           orient="auto"
-          markerUnits="userSpaceOnUse"
+          markerUnits="strokeWidth"
         >
-          <path d="M 0 0 L 14 6 L 0 12 Z" fill="#ef4444" />
+          <path d="M 0 0 L 5 2 L 0 4 Z" fill="#ef4444" />
         </marker>
         <marker
           id="arrowhead-pending"
-          markerWidth="14"
-          markerHeight="12"
-          refX="13"
-          refY="6"
+          markerWidth="5"
+          markerHeight="4"
+          refX="4.5"
+          refY="2"
           orient="auto"
-          markerUnits="userSpaceOnUse"
+          markerUnits="strokeWidth"
         >
-          <path d="M 0 0 L 14 6 L 0 12 Z" fill="#F15B2B" />
+          <path d="M 0 0 L 5 2 L 0 4 Z" fill="#F15B2B" />
         </marker>
       </defs>
 
@@ -412,7 +414,9 @@ export function ConnectionLayer({
         const mid = pathMidpoint(sr, tr);
 
         const isHovered = hoveredId === conn.id;
-        const strokeColor = isHovered ? "#ef4444" : (conn.color ?? STROKE_COLOR);
+        // Use new dark color unless user has explicitly set a custom (non-legacy) color
+        const customColor = conn.color && !LEGACY_DEFAULTS.has(conn.color) ? conn.color : null;
+        const strokeColor = isHovered ? "#ef4444" : (customColor ?? STROKE_COLOR);
         const marker = isHovered ? "url(#arrowhead-hover)" : "url(#arrowhead)";
 
         return (
@@ -445,8 +449,6 @@ export function ConnectionLayer({
               strokeWidth={isHovered ? STROKE_WIDTH_HOVER : STROKE_WIDTH}
               strokeDasharray={conn.style === "dashed" ? "8 4" : undefined}
               markerEnd={marker}
-              strokeLinecap="round"
-              strokeLinejoin="round"
               className="pointer-events-none transition-colors"
             />
             {/* Delete indicator on hover */}
@@ -505,7 +507,6 @@ export function ConnectionLayer({
               stroke="#F15B2B"
               strokeWidth={STROKE_WIDTH}
               strokeDasharray="8 4"
-              strokeLinecap="round"
               markerEnd="url(#arrowhead-pending)"
               className="pointer-events-none"
             />
