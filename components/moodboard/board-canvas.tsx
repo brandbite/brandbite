@@ -303,13 +303,17 @@ export function BoardCanvas({
         onPointerUp={onPointerUp}
         onMouseMove={handleMouseMove}
       >
-        {/* Dot grid background */}
+        {/* Dot grid background — only in usable area (x≥0, y≥0 canvas) */}
         <div
-          className="absolute inset-0"
+          className="absolute"
           style={{
+            top: Math.max(0, panY),
+            left: Math.max(0, panX),
+            right: 0,
+            bottom: 0,
             backgroundImage: `radial-gradient(circle, #ddd9d4 0.75px, transparent 0.75px)`,
             backgroundSize: `${24 * zoom}px ${24 * zoom}px`,
-            backgroundPosition: `${panX % (24 * zoom)}px ${panY % (24 * zoom)}px`,
+            backgroundPosition: `${panX % (24 * zoom) - Math.max(0, panX)}px ${panY % (24 * zoom) - Math.max(0, panY)}px`,
           }}
         />
 
@@ -323,6 +327,55 @@ export function BoardCanvas({
             left: 0,
           }}
         >
+          {/* Canvas boundary — dim unusable areas (x<0, y<0) */}
+          <div
+            style={{
+              position: "absolute",
+              left: -10000,
+              top: -10000,
+              width: 10000,
+              height: 30000,
+              background: "rgba(0,0,0,0.04)",
+              pointerEvents: "none",
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              left: 0,
+              top: -10000,
+              width: 30000,
+              height: 10000,
+              background: "rgba(0,0,0,0.04)",
+              pointerEvents: "none",
+            }}
+          />
+          {/* Border lines at canvas origin */}
+          <div
+            style={{
+              position: "absolute",
+              left: 0,
+              top: -10000,
+              width: 0,
+              height: 30000,
+              borderLeft: "1.5px dashed #d1cdc7",
+              pointerEvents: "none",
+              zIndex: 0,
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              left: -10000,
+              top: 0,
+              width: 30000,
+              height: 0,
+              borderTop: "1.5px dashed #d1cdc7",
+              pointerEvents: "none",
+              zIndex: 0,
+            }}
+          />
+
           {/* Cards (excluding drawings) */}
           {cardItems.map((item) => (
             <CardWrapper
