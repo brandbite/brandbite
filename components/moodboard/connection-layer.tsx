@@ -368,36 +368,36 @@ export function ConnectionLayer({
         {/* FigJam-style bold arrowheads — strokeWidth units for zoom-independent size */}
         <marker
           id="arrowhead"
-          markerWidth="5"
-          markerHeight="4"
-          refX="4.5"
-          refY="2"
+          markerWidth="7"
+          markerHeight="6"
+          refX="6"
+          refY="3"
           orient="auto"
           markerUnits="strokeWidth"
         >
-          <path d="M 0 0 L 5 2 L 0 4 Z" fill={STROKE_COLOR} />
+          <path d="M 0 0.2 L 6.5 3 L 0 5.8 Z" fill={STROKE_COLOR} />
         </marker>
         <marker
           id="arrowhead-hover"
-          markerWidth="5"
-          markerHeight="4"
-          refX="4.5"
-          refY="2"
+          markerWidth="7"
+          markerHeight="6"
+          refX="6"
+          refY="3"
           orient="auto"
           markerUnits="strokeWidth"
         >
-          <path d="M 0 0 L 5 2 L 0 4 Z" fill="#ef4444" />
+          <path d="M 0 0.2 L 6.5 3 L 0 5.8 Z" fill="#ef4444" />
         </marker>
         <marker
           id="arrowhead-pending"
-          markerWidth="5"
-          markerHeight="4"
-          refX="4.5"
-          refY="2"
+          markerWidth="7"
+          markerHeight="6"
+          refX="6"
+          refY="3"
           orient="auto"
           markerUnits="strokeWidth"
         >
-          <path d="M 0 0 L 5 2 L 0 4 Z" fill="#F15B2B" />
+          <path d="M 0 0.2 L 6.5 3 L 0 5.8 Z" fill="#F15B2B" />
         </marker>
       </defs>
 
