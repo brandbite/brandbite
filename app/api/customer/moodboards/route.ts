@@ -46,11 +46,12 @@ export async function GET(req: NextRequest) {
           select: { items: true },
         },
         items: {
-          where: { type: "IMAGE" },
+          where: { type: { not: "DRAWING" } },
           orderBy: { position: "asc" },
-          take: 3,
+          take: 4,
           select: {
             id: true,
+            type: true,
             data: true,
           },
         },
@@ -66,7 +67,7 @@ export async function GET(req: NextRequest) {
         projectId: mb.project?.id ?? null,
         projectName: mb.project?.name ?? null,
         itemCount: mb._count.items,
-        thumbnails: mb.items.map((item) => item.data),
+        thumbnails: mb.items.map((item) => ({ type: item.type, ...(item.data as Record<string, unknown>) })),
         createdAt: mb.createdAt.toISOString(),
         updatedAt: mb.updatedAt.toISOString(),
       })),
