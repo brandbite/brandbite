@@ -18,10 +18,15 @@ import {
 } from "@/lib/demo-personas";
 
 // Demo mode is a development-only shortcut for testing with personas.
-// Gate it on NODE_ENV to prevent accidental exposure in production even if
-// DEMO_MODE=true leaks into the prod environment.
-const isDemoMode = () =>
-  process.env.NODE_ENV !== "production" && process.env.DEMO_MODE === "true";
+// Gate it on NODE_ENV so a leaked DEMO_MODE=true in a real customer
+// environment does not silently switch auth to the cookie-persona path.
+// Intentional demo deploys (demo.brandbite.studio) opt back in with
+// ALLOW_DEMO_IN_PROD=true.
+const isDemoMode = () => {
+  if (process.env.DEMO_MODE !== "true") return false;
+  if (process.env.NODE_ENV !== "production") return true;
+  return process.env.ALLOW_DEMO_IN_PROD === "true";
+};
 
 // ---------------------------------------------------------------------------
 // Public API (unchanged signatures — used by all 59 API routes)
