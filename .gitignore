@@ -23,6 +23,13 @@
 # misc
 .DS_Store
 *.pem
+*.bak
+
+# Windows: `nul` gets created by shell redirects that assume /dev/null
+nul
+
+# Ad-hoc estimation / exploration artifacts kept locally
+ai-cost-estimate.html
 
 # debug
 npm-debug.log*
@@ -44,7 +51,3 @@ yarn-error.log*
 next-env.d.ts
 
 /app/generated/prisma
-
-/app/generated/prisma
-
-.vercel
