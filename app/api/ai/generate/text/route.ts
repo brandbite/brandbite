@@ -9,7 +9,7 @@ import { prisma } from "@/lib/prisma";
 import {
   getAiToolConfig,
   validateSufficientTokens,
-  debitAiTokens,
+  claimAiGeneration,
   refundAiTokens,
   checkRateLimit,
 } from "@/lib/ai/cost-calculator";
@@ -20,6 +20,7 @@ import {
   type CopyFormat,
   type CopyTone,
 } from "@/lib/ai/prompts";
+import { readIdempotencyKey } from "@/lib/ai/idempotency";
 
 export async function POST(req: NextRequest) {
   try {
@@ -28,6 +29,8 @@ export async function POST(req: NextRequest) {
     if (!user.activeCompanyId) {
       return NextResponse.json({ error: "No active company" }, { status: 400 });
     }
+
+    const idempotencyKey = readIdempotencyKey(req.headers);
 
     const body = await req.json();
     const { prompt, format, tone, variations, wordCount } = body as {
@@ -82,26 +85,37 @@ export async function POST(req: NextRequest) {
     const systemPrompt = buildCopySystemPrompt(copyFormat, copyTone, numVariations);
     const userPrompt = buildCopyPrompt(prompt, { wordCount });
 
-    // Create AiGeneration record
-    const generation = await prisma.aiGeneration.create({
-      data: {
-        toolType: "TEXT_GENERATION",
-        userId: user.id,
-        companyId: user.activeCompanyId,
-        prompt: userPrompt,
-        inputParams: { format: copyFormat, tone: copyTone, variations: numVariations, wordCount },
-        provider: "",
-        model: "",
-        status: "PENDING",
-        tokenCost: cost,
-      },
+    // Create AiGeneration record + debit tokens atomically. A retry with the
+    // same Idempotency-Key returns the existing record instead of debiting again.
+    const { generation, reused } = await claimAiGeneration({
+      idempotencyKey,
+      userId: user.id,
+      companyId: user.activeCompanyId,
+      toolType: "TEXT_GENERATION",
+      prompt: userPrompt,
+      inputParams: { format: copyFormat, tone: copyTone, variations: numVariations, wordCount },
+      cost,
     });
 
-    // Debit tokens
-    await debitAiTokens(user.activeCompanyId, cost, {
-      generationId: generation.id,
-      toolType: "TEXT_GENERATION",
-    });
+    if (reused) {
+      const prior = (generation.outputParams as { variations?: string[] } | null)?.variations ?? [];
+      return NextResponse.json(
+        {
+          generation: {
+            id: generation.id,
+            status: generation.status,
+            toolType: generation.toolType,
+            provider: generation.provider,
+            model: generation.model,
+            variations: prior,
+            tokenCost: generation.tokenCost,
+            createdAt: generation.createdAt.toISOString(),
+          },
+          reused: true,
+        },
+        { status: 200 },
+      );
+    }
 
     // Generate text
     try {
@@ -181,8 +195,21 @@ export async function POST(req: NextRequest) {
       );
     }
   } catch (error: unknown) {
-    if ((error as { code?: string })?.code === "UNAUTHENTICATED") {
+    const code = (error as { code?: string })?.code;
+    if (code === "UNAUTHENTICATED") {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    }
+    if (code === "INVALID_IDEMPOTENCY_KEY") {
+      return NextResponse.json(
+        { error: "Idempotency-Key header must be a valid UUID" },
+        { status: 400 },
+      );
+    }
+    if (error instanceof Error && error.message === "IDEMPOTENCY_KEY_CONFLICT") {
+      return NextResponse.json(
+        { error: "Idempotency-Key belongs to another user or company" },
+        { status: 409 },
+      );
     }
     console.error("[api/ai/generate/text] POST error", error);
     return NextResponse.json({ error: "Failed to generate text" }, { status: 500 });

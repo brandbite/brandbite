@@ -9,11 +9,12 @@ import { prisma } from "@/lib/prisma";
 import {
   getAiToolConfig,
   validateSufficientTokens,
-  debitAiTokens,
+  claimAiGeneration,
   refundAiTokens,
   checkRateLimit,
 } from "@/lib/ai/cost-calculator";
 import { removeBackground } from "@/lib/ai/provider-router";
+import { readIdempotencyKey } from "@/lib/ai/idempotency";
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,6 +23,8 @@ export async function POST(req: NextRequest) {
     if (!user.activeCompanyId) {
       return NextResponse.json({ error: "No active company" }, { status: 400 });
     }
+
+    const idempotencyKey = readIdempotencyKey(req.headers);
 
     const body = await req.json();
     const { imageUrl } = body as { imageUrl?: string };
@@ -66,26 +69,36 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create AiGeneration record
-    const generation = await prisma.aiGeneration.create({
-      data: {
-        toolType: "BACKGROUND_REMOVAL",
-        userId: user.id,
-        companyId: user.activeCompanyId,
-        prompt: `Remove background from: ${imageUrl}`,
-        inputParams: { imageUrl },
-        provider: "",
-        model: "",
-        status: "PENDING",
-        tokenCost: cost,
-      },
+    // Create AiGeneration record + debit tokens atomically. A retry with the
+    // same Idempotency-Key returns the existing record instead of debiting again.
+    const { generation, reused } = await claimAiGeneration({
+      idempotencyKey,
+      userId: user.id,
+      companyId: user.activeCompanyId,
+      toolType: "BACKGROUND_REMOVAL",
+      prompt: `Remove background from: ${imageUrl}`,
+      inputParams: { imageUrl },
+      cost,
     });
 
-    // Debit tokens
-    await debitAiTokens(user.activeCompanyId, cost, {
-      generationId: generation.id,
-      toolType: "BACKGROUND_REMOVAL",
-    });
+    if (reused) {
+      return NextResponse.json(
+        {
+          generation: {
+            id: generation.id,
+            status: generation.status,
+            toolType: generation.toolType,
+            provider: generation.provider,
+            model: generation.model,
+            imageUrl: generation.outputImageUrl,
+            tokenCost: generation.tokenCost,
+            createdAt: generation.createdAt.toISOString(),
+          },
+          reused: true,
+        },
+        { status: 200 },
+      );
+    }
 
     // Remove background
     try {
@@ -147,8 +160,21 @@ export async function POST(req: NextRequest) {
       );
     }
   } catch (error: unknown) {
-    if ((error as { code?: string })?.code === "UNAUTHENTICATED") {
+    const code = (error as { code?: string })?.code;
+    if (code === "UNAUTHENTICATED") {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    }
+    if (code === "INVALID_IDEMPOTENCY_KEY") {
+      return NextResponse.json(
+        { error: "Idempotency-Key header must be a valid UUID" },
+        { status: 400 },
+      );
+    }
+    if (error instanceof Error && error.message === "IDEMPOTENCY_KEY_CONFLICT") {
+      return NextResponse.json(
+        { error: "Idempotency-Key belongs to another user or company" },
+        { status: 409 },
+      );
     }
     console.error("[api/ai/generate/background-removal] POST error", error);
     return NextResponse.json({ error: "Failed to remove background" }, { status: 500 });
