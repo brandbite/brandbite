@@ -8,6 +8,7 @@
 import { useEffect, useState } from "react";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
+import { CMS_ALLOWED_ATTR, CMS_ALLOWED_TAGS, SafeHtml } from "@/components/ui/safe-html";
 
 type CmsPageData = {
   pageKey: string;
@@ -97,9 +98,11 @@ export function CmsPageView({ pageKey }: CmsPageViewProps) {
             This page hasn&apos;t been set up yet. Check back soon.
           </p>
         ) : page?.body ? (
-          <div
+          <SafeHtml
+            html={page.body}
+            allowedTags={CMS_ALLOWED_TAGS}
+            allowedAttrs={CMS_ALLOWED_ATTR}
             className="prose prose-gray prose-headings:font-brand prose-headings:tracking-tight prose-a:text-[var(--bb-primary)] prose-a:no-underline hover:prose-a:underline max-w-none"
-            dangerouslySetInnerHTML={{ __html: page.body }}
           />
         ) : (
           <p className="text-center text-[var(--bb-text-secondary)]">Content coming soon.</p>

@@ -14,8 +14,29 @@ import DOMPurify from "isomorphic-dompurify";
 /*  Config                                                                     */
 /* -------------------------------------------------------------------------- */
 
-const ALLOWED_TAGS = ["p", "br", "strong", "em", "ul", "ol", "li", "a"];
-const ALLOWED_ATTR = ["href", "target", "rel"];
+/** Default: ticket descriptions, note cards — simple inline rich text. */
+const DEFAULT_ALLOWED_TAGS = ["p", "br", "strong", "em", "ul", "ol", "li", "a"];
+const DEFAULT_ALLOWED_ATTR = ["href", "target", "rel"];
+
+/** CMS content (blog, news, docs, showcase, pages) — adds headings and media. */
+export const CMS_ALLOWED_TAGS = [
+  ...DEFAULT_ALLOWED_TAGS,
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "blockquote",
+  "code",
+  "pre",
+  "hr",
+  "s",
+  "img",
+  "figure",
+  "figcaption",
+];
+export const CMS_ALLOWED_ATTR = [...DEFAULT_ALLOWED_ATTR, "src", "alt", "title"];
 
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                    */
@@ -52,21 +73,33 @@ export function stripHtml(html: string): string {
 /*  Component                                                                  */
 /* -------------------------------------------------------------------------- */
 
+type SafeHtmlTag = "div" | "article" | "section";
+
 type SafeHtmlProps = {
   html: string;
   className?: string;
+  allowedTags?: readonly string[];
+  allowedAttrs?: readonly string[];
+  /** Semantic wrapper element (defaults to "div"). */
+  as?: SafeHtmlTag;
 };
 
-export function SafeHtml({ html, className = "" }: SafeHtmlProps) {
+export function SafeHtml({
+  html,
+  className = "",
+  allowedTags = DEFAULT_ALLOWED_TAGS,
+  allowedAttrs = DEFAULT_ALLOWED_ATTR,
+  as: Tag = "div",
+}: SafeHtmlProps) {
   // Backwards compat: convert plain text (no HTML) to HTML with preserved line breaks
   const source = isPlainText(html) ? plainTextToHtml(html) : html;
 
   const clean = DOMPurify.sanitize(source, {
-    ALLOWED_TAGS,
-    ALLOWED_ATTR,
+    ALLOWED_TAGS: [...allowedTags],
+    ALLOWED_ATTR: [...allowedAttrs],
   });
 
   return (
-    <div className={`bb-rich-text ${className}`} dangerouslySetInnerHTML={{ __html: clean }} />
+    <Tag className={`bb-rich-text ${className}`} dangerouslySetInnerHTML={{ __html: clean }} />
   );
 }
