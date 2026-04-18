@@ -5,6 +5,10 @@
 
 import { AppNav } from "@/components/navigation/app-nav";
 
+// All admin routes are auth-gated. Skip SSG so the build does not prerender
+// pages that depend on the live DB or client-only libraries.
+export const dynamic = "force-dynamic";
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-[var(--bb-bg-card)] text-[var(--bb-secondary)]">

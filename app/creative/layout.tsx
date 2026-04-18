@@ -5,6 +5,10 @@
 
 import { AppNav } from "@/components/navigation/app-nav";
 
+// All creative routes are auth-gated dashboards. Skip SSG so the build
+// never pulls heavy client-only deps (DOMPurify/jsdom) into server bundles.
+export const dynamic = "force-dynamic";
+
 export default function CreativeLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-[var(--bb-bg-card)] text-[var(--bb-secondary)]">
