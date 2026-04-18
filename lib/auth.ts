@@ -17,7 +17,11 @@ import {
   type DemoPersonaId,
 } from "@/lib/demo-personas";
 
-const isDemoMode = () => process.env.DEMO_MODE === "true";
+// Demo mode is a development-only shortcut for testing with personas.
+// Gate it on NODE_ENV to prevent accidental exposure in production even if
+// DEMO_MODE=true leaks into the prod environment.
+const isDemoMode = () =>
+  process.env.NODE_ENV !== "production" && process.env.DEMO_MODE === "true";
 
 // ---------------------------------------------------------------------------
 // Public API (unchanged signatures — used by all 59 API routes)

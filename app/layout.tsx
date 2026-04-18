@@ -73,7 +73,11 @@ const themeScript = `
 `;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+  // Gate demo persona banner on both NODE_ENV and the public env var so it
+  // never renders in a production build, even if the env var leaks through.
+  const isDemoMode =
+    process.env.NODE_ENV !== "production" &&
+    process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
   return (
     <html lang="en" suppressHydrationWarning>
