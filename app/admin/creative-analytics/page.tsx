@@ -14,15 +14,7 @@ import { InlineAlert } from "@/components/ui/inline-alert";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingState } from "@/components/ui/loading-state";
 import { FormSelect } from "@/components/ui/form-field";
-import {
-  Bar,
-  BarChart,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -205,12 +197,9 @@ export default function CreativeAnalyticsPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
       {/* Header */}
-      <h1 className="mb-1 text-xl font-bold text-[var(--bb-secondary)]">
-        Creative Performance
-      </h1>
+      <h1 className="mb-1 text-xl font-bold text-[var(--bb-secondary)]">Creative Performance</h1>
       <p className="mb-8 text-sm text-[var(--bb-text-tertiary)]">
-        Per-creative metrics across completion rate, turnaround, revisions, and
-        load.
+        Per-creative metrics across completion rate, turnaround, revisions, and load.
       </p>
 
       {/* Summary cards */}
@@ -241,16 +230,11 @@ export default function CreativeAnalyticsPage() {
             key={card.label}
             className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm"
           >
-            <div
-              className="absolute left-0 top-0 h-1 w-full"
-              style={{ background: card.accent }}
-            />
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--bb-text-muted)]">
+            <div className="absolute top-0 left-0 h-1 w-full" style={{ background: card.accent }} />
+            <p className="text-[11px] font-semibold tracking-[0.14em] text-[var(--bb-text-muted)] uppercase">
               {card.label}
             </p>
-            <p className="mt-1 text-2xl font-bold text-[var(--bb-secondary)]">
-              {card.value}
-            </p>
+            <p className="mt-1 text-2xl font-bold text-[var(--bb-secondary)]">{card.value}</p>
           </div>
         ))}
       </div>
@@ -258,7 +242,7 @@ export default function CreativeAnalyticsPage() {
       {/* Chart — completed tickets per creative */}
       {chartData.length > 0 && (
         <div className="mb-8 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--bb-text-muted)]">
+          <p className="mb-3 text-[11px] font-semibold tracking-[0.14em] text-[var(--bb-text-muted)] uppercase">
             Completed Tickets by Creative
           </p>
           <ResponsiveContainer width="100%" height={Math.max(200, chartData.length * 36)}>
@@ -283,10 +267,7 @@ export default function CreativeAnalyticsPage() {
               />
               <Bar dataKey="completed" radius={[0, 4, 4, 0]} barSize={20}>
                 {chartData.map((_entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={BAR_COLORS[index % BAR_COLORS.length]}
-                  />
+                  <Cell key={`cell-${index}`} fill={BAR_COLORS[index % BAR_COLORS.length]} />
                 ))}
               </Bar>
             </BarChart>
@@ -317,7 +298,7 @@ export default function CreativeAnalyticsPage() {
       <div className="overflow-x-auto rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] shadow-sm">
         <table className="w-full text-left text-xs">
           <thead>
-            <tr className="border-b border-[var(--bb-border-subtle)] bg-[var(--bb-bg-page)] text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--bb-text-muted)]">
+            <tr className="border-b border-[var(--bb-border-subtle)] bg-[var(--bb-bg-page)] text-[10px] font-semibold tracking-[0.12em] text-[var(--bb-text-muted)] uppercase">
               <th className="px-4 py-3">Creative</th>
               <th className="px-3 py-3 text-center">Completed</th>
               <th className="px-3 py-3 text-center">Active</th>
@@ -335,9 +316,7 @@ export default function CreativeAnalyticsPage() {
                 className="border-b border-[var(--bb-bg-card)] transition-colors hover:bg-[var(--bb-bg-page)]"
               >
                 <td className="px-4 py-3">
-                  <p className="font-medium text-[var(--bb-secondary)]">
-                    {d.name || "—"}
-                  </p>
+                  <p className="font-medium text-[var(--bb-secondary)]">{d.name || "—"}</p>
                   <p className="text-[10px] text-[var(--bb-text-tertiary)]">{d.email}</p>
                 </td>
                 <td className="px-3 py-3 text-center font-semibold text-[var(--bb-secondary)]">

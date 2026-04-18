@@ -160,7 +160,10 @@ export function TodoCard({ data, onUpdate }: TodoCardProps) {
         >
           + Add item
         </button>
-        <span className="text-xs text-[var(--bb-text-secondary)]" style={{ fontVariantNumeric: 'tabular-nums' }}>
+        <span
+          className="text-xs text-[var(--bb-text-secondary)]"
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
           {checkedCount}/{totalCount} done
         </span>
       </div>

@@ -4,10 +4,7 @@
 // -----------------------------------------------------------------------------
 
 import { describe, it, expect } from "vitest";
-import {
-  getEffectiveTokenValues,
-  BASE_PAYOUT_PERCENT,
-} from "@/lib/token-engine";
+import { getEffectiveTokenValues, BASE_PAYOUT_PERCENT } from "@/lib/token-engine";
 
 // ---------------------------------------------------------------------------
 // getEffectiveTokenValues

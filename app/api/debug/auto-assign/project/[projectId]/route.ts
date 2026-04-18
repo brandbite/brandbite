@@ -38,15 +38,10 @@ export async function PATCH(
     // Next.js 16: params bir Promise
     const { projectId } = await params;
 
-    const body = (await req.json().catch(() => null)) as
-      | ProjectPatchPayload
-      | null;
+    const body = (await req.json().catch(() => null)) as ProjectPatchPayload | null;
 
     if (!body || typeof body !== "object") {
-      return NextResponse.json(
-        { error: "Invalid request body" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
 
     const mode = body.autoAssignMode;
@@ -54,8 +49,7 @@ export async function PATCH(
     if (mode !== "INHERIT" && mode !== "ON" && mode !== "OFF") {
       return NextResponse.json(
         {
-          error:
-            "autoAssignMode must be one of: INHERIT, ON, OFF",
+          error: "autoAssignMode must be one of: INHERIT, ON, OFF",
         },
         { status: 400 },
       );
@@ -71,17 +65,13 @@ export async function PATCH(
     const response: ProjectPatchResponse = {
       id: updated.id,
       autoAssignMode:
-        ((updated as any).autoAssignMode as ProjectAutoAssignMode | undefined) ??
-        "INHERIT",
+        ((updated as any).autoAssignMode as ProjectAutoAssignMode | undefined) ?? "INHERIT",
     };
 
     return NextResponse.json(response, { status: 200 });
   } catch (error: any) {
     if (error?.code === "P2025") {
-      return NextResponse.json(
-        { error: "Project not found" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
     if (error?.code === "UNAUTHENTICATED") {

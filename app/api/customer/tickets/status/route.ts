@@ -28,12 +28,7 @@ type PatchPayload = {
 
 function isValidTicketStatus(value: unknown): value is TicketStatus {
   if (typeof value !== "string") return false;
-  return (
-    value === "TODO" ||
-    value === "IN_PROGRESS" ||
-    value === "IN_REVIEW" ||
-    value === "DONE"
-  );
+  return value === "TODO" || value === "IN_PROGRESS" || value === "IN_REVIEW" || value === "DONE";
 }
 
 export async function PATCH(req: NextRequest) {
@@ -44,8 +39,7 @@ export async function PATCH(req: NextRequest) {
     // Only customers + site admins can use this endpoint
     // -------------------------------------------------------------------------
 
-    const isSiteAdmin =
-      user.role === "SITE_OWNER" || user.role === "SITE_ADMIN";
+    const isSiteAdmin = user.role === "SITE_OWNER" || user.role === "SITE_ADMIN";
 
     if (!isSiteAdmin && user.role !== "CUSTOMER") {
       return NextResponse.json(
@@ -69,10 +63,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (!isValidTicketStatus(requestedStatus)) {
-      return NextResponse.json(
-        { error: "Invalid ticket status." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Invalid ticket status." }, { status: 400 });
     }
 
     const nextStatus = requestedStatus as TicketStatus;
@@ -109,10 +100,7 @@ export async function PATCH(req: NextRequest) {
     });
 
     if (!ticket) {
-      return NextResponse.json(
-        { error: "Ticket not found." },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Ticket not found." }, { status: 404 });
     }
 
     const currentStatus = ticket.status;
@@ -134,16 +122,13 @@ export async function PATCH(req: NextRequest) {
     // Board-level permission: can this user move tickets at all?
     // -------------------------------------------------------------------------
 
-    const normalizedCompanyRole = normalizeCompanyRole(
-      user.companyRole ?? null,
-    );
+    const normalizedCompanyRole = normalizeCompanyRole(user.companyRole ?? null);
 
     if (!isSiteAdmin) {
       if (!canMoveTicketsOnBoard(normalizedCompanyRole)) {
         return NextResponse.json(
           {
-            error:
-              "You don't have permission to move tickets on the board for this company.",
+            error: "You don't have permission to move tickets on the board for this company.",
           },
           { status: 403 },
         );
@@ -174,8 +159,7 @@ export async function PATCH(req: NextRequest) {
 
     // 2) IN_REVIEW → IN_PROGRESS revize path'i
     const isReviewToInProgress =
-      currentStatus === TicketStatus.IN_REVIEW &&
-      nextStatus === TicketStatus.IN_PROGRESS;
+      currentStatus === TicketStatus.IN_REVIEW && nextStatus === TicketStatus.IN_PROGRESS;
 
     if (nextStatus === TicketStatus.IN_PROGRESS && !isReviewToInProgress) {
       return NextResponse.json(
@@ -203,14 +187,12 @@ export async function PATCH(req: NextRequest) {
 
     // 3) DONE transition: sadece IN_REVIEW → DONE
     const isDoneTransition =
-      currentStatus !== TicketStatus.DONE &&
-      nextStatus === TicketStatus.DONE;
+      currentStatus !== TicketStatus.DONE && nextStatus === TicketStatus.DONE;
 
     if (isDoneTransition && currentStatus !== TicketStatus.IN_REVIEW) {
       return NextResponse.json(
         {
-          error:
-            "This ticket must be in review before you can mark it as done.",
+          error: "This ticket must be in review before you can mark it as done.",
         },
         { status: 400 },
       );
@@ -218,10 +200,7 @@ export async function PATCH(req: NextRequest) {
 
     // DONE için ek yetki kontrolü (Owner / PM vs.)
     if (isDoneTransition) {
-      const canMarkDone = canMarkTicketsDoneForCompany(
-        user.role,
-        normalizedCompanyRole,
-      );
+      const canMarkDone = canMarkTicketsDoneForCompany(user.role, normalizedCompanyRole);
 
       if (!canMarkDone && !isSiteAdmin) {
         return NextResponse.json(
@@ -264,17 +243,13 @@ export async function PATCH(req: NextRequest) {
           },
         });
 
-        if (
-          currentInProgressCount >= plan.maxConcurrentInProgressTickets
-        ) {
+        if (currentInProgressCount >= plan.maxConcurrentInProgressTickets) {
           return NextResponse.json(
             {
-              error:
-                "This company has reached its limit for active tickets in progress.",
+              error: "This company has reached its limit for active tickets in progress.",
               details: {
                 plan: plan.name,
-                maxConcurrentInProgress:
-                  plan.maxConcurrentInProgressTickets,
+                maxConcurrentInProgress: plan.maxConcurrentInProgressTickets,
                 currentInProgress: currentInProgressCount,
               },
             },
@@ -292,14 +267,9 @@ export async function PATCH(req: NextRequest) {
     const updated = await prisma.$transaction(async (tx) => {
       // 1) Creative payout (DONE olduğunda)
       if (isDoneTransition) {
-        const hasCreative =
-          !!ticket.creativeId && !!ticket.jobType?.creativePayoutTokens;
+        const hasCreative = !!ticket.creativeId && !!ticket.jobType?.creativePayoutTokens;
 
-        if (
-          hasCreative &&
-          ticket.jobType!.creativePayoutTokens > 0 &&
-          ticket.creativeId
-        ) {
+        if (hasCreative && ticket.jobType!.creativePayoutTokens > 0 && ticket.creativeId) {
           const existingPayout = await tx.tokenLedger.findFirst({
             where: {
               ticketId: ticket.id,
@@ -358,9 +328,7 @@ export async function PATCH(req: NextRequest) {
         where: { id: ticket.id },
         data: {
           status: nextStatus,
-          ...(isDoneTransition
-            ? { completedAt: new Date(), completedById: user.id }
-            : {}),
+          ...(isDoneTransition ? { completedAt: new Date(), completedById: user.id } : {}),
         },
         select: {
           id: true,
@@ -375,19 +343,10 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json(updated, { status: 200 });
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
-    console.error(
-      "[PATCH /api/customer/tickets/status] error",
-      error,
-    );
-    return NextResponse.json(
-      { error: "Failed to update ticket status" },
-      { status: 500 },
-    );
+    console.error("[PATCH /api/customer/tickets/status] error", error);
+    return NextResponse.json({ error: "Failed to update ticket status" }, { status: 500 });
   }
 }

@@ -16,10 +16,7 @@ export async function GET(_req: NextRequest) {
     const user = await getCurrentUserOrThrow();
 
     if (user.role !== "DESIGNER") {
-      return NextResponse.json(
-        { error: "Only creatives can access skills" },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Only creatives can access skills" }, { status: 403 });
     }
 
     const [skills, jobTypes] = await Promise.all([
@@ -40,17 +37,11 @@ export async function GET(_req: NextRequest) {
     });
   } catch (error: any) {
     if (error?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[creative.skills] GET error", error);
-    return NextResponse.json(
-      { error: "Failed to load creative skills" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load creative skills" }, { status: 500 });
   }
 }
 
@@ -63,19 +54,13 @@ export async function PUT(req: NextRequest) {
     const user = await getCurrentUserOrThrow();
 
     if (user.role !== "DESIGNER") {
-      return NextResponse.json(
-        { error: "Only creatives can manage skills" },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Only creatives can manage skills" }, { status: 403 });
     }
 
     const body = await req.json().catch(() => null);
 
     if (!body || !Array.isArray(body.jobTypeIds)) {
-      return NextResponse.json(
-        { error: "jobTypeIds array is required" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "jobTypeIds array is required" }, { status: 400 });
     }
 
     const rawIds: string[] = body.jobTypeIds.filter(
@@ -103,16 +88,10 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ selectedJobTypeIds: validIds });
   } catch (error: any) {
     if (error?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[creative.skills] PUT error", error);
-    return NextResponse.json(
-      { error: "Failed to update creative skills" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to update creative skills" }, { status: 500 });
   }
 }

@@ -66,10 +66,7 @@ const oppositeSide: Record<Side, Side> = {
  * Pick the best source/target anchors based on relative card positions.
  * Uses center-to-center vector to decide exit/entry sides.
  */
-function bestAnchorPair(
-  sr: Rect,
-  tr: Rect,
-): { source: Anchor; target: Anchor } {
+function bestAnchorPair(sr: Rect, tr: Rect): { source: Anchor; target: Anchor } {
   const scx = sr.x + sr.w / 2;
   const scy = sr.y + sr.h / 2;
   const tcx = tr.x + tr.w / 2;
@@ -154,17 +151,15 @@ function routeBetween(
   if (exitSide === entrySide) {
     if (isHorizontalExit) {
       // Push out to whichever is further, then route
-      const outX = exitSide === "right"
-        ? Math.max(exit.x, entry.x) + GAP
-        : Math.min(exit.x, entry.x) - GAP;
+      const outX =
+        exitSide === "right" ? Math.max(exit.x, entry.x) + GAP : Math.min(exit.x, entry.x) - GAP;
       return [
         { x: outX, y: exit.y },
         { x: outX, y: entry.y },
       ];
     } else {
-      const outY = exitSide === "bottom"
-        ? Math.max(exit.y, entry.y) + GAP
-        : Math.min(exit.y, entry.y) - GAP;
+      const outY =
+        exitSide === "bottom" ? Math.max(exit.y, entry.y) + GAP : Math.min(exit.y, entry.y) - GAP;
       return [
         { x: exit.x, y: outY },
         { x: entry.x, y: outY },

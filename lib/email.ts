@@ -9,8 +9,7 @@ import { Resend } from "resend";
 const apiKey = process.env.RESEND_API_KEY;
 const resend = apiKey ? new Resend(apiKey) : null;
 
-const FROM =
-  process.env.EMAIL_FROM || "BrandBite <notifications@brandbite.studio>";
+const FROM = process.env.EMAIL_FROM || "BrandBite <notifications@brandbite.studio>";
 
 /**
  * Send a notification email. Fire-and-forget — errors are caught and logged,

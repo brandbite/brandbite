@@ -193,24 +193,14 @@ function DrawIcon() {
 function EraserIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-      <path
-        d="M8 17H17"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
+      <path d="M8 17H17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
       <path
         d="M3.5 13.5L10.5 6.5L15 11L10 16L6.5 16L3.5 13.5Z"
         stroke="currentColor"
         strokeWidth="1.5"
         strokeLinejoin="round"
       />
-      <path
-        d="M10.5 6.5L15 11"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
+      <path d="M10.5 6.5L15 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   );
 }
@@ -443,7 +433,10 @@ export function BoardToolbar({
               {/* Select tool */}
               <button
                 type="button"
-                onClick={() => { onSetToolMode("select"); setMobileOpen(false); }}
+                onClick={() => {
+                  onSetToolMode("select");
+                  setMobileOpen(false);
+                }}
                 className={`flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm transition-colors ${
                   toolMode === "select"
                     ? "bg-[var(--bb-primary)]/10 text-[var(--bb-primary)]"
@@ -473,7 +466,10 @@ export function BoardToolbar({
               {/* Eraser tool */}
               <button
                 type="button"
-                onClick={() => { onSetToolMode(toolMode === "eraser" ? "select" : "eraser"); setMobileOpen(false); }}
+                onClick={() => {
+                  onSetToolMode(toolMode === "eraser" ? "select" : "eraser");
+                  setMobileOpen(false);
+                }}
                 className={`flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm transition-colors ${
                   toolMode === "eraser"
                     ? "bg-[var(--bb-primary)]/10 text-[var(--bb-primary)]"

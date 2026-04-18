@@ -10,10 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { CompanyRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
-import {
-  canManageMembers,
-  normalizeCompanyRole,
-} from "@/lib/permissions/companyRoles";
+import { canManageMembers, normalizeCompanyRole } from "@/lib/permissions/companyRoles";
 
 type RouteParams = {
   params: Promise<{
@@ -66,44 +63,31 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     }
 
     if (!user.activeCompanyId) {
-      return NextResponse.json(
-        { error: "No active company selected." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "No active company selected." }, { status: 400 });
     }
 
     const companyRole = normalizeCompanyRole(user.companyRole);
     if (!canManageMembers(companyRole)) {
       return NextResponse.json(
         {
-          error:
-            "Only company owners or project managers can manage members.",
+          error: "Only company owners or project managers can manage members.",
         },
         { status: 403 },
       );
     }
 
     const { memberId } = await params;
-    const targetMember = await getCompanyMemberOr404(
-      memberId,
-      user.activeCompanyId,
-    );
+    const targetMember = await getCompanyMemberOr404(memberId, user.activeCompanyId);
 
     if (!targetMember) {
-      return NextResponse.json(
-        { error: "Member not found." },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Member not found." }, { status: 404 });
     }
 
     const body = await req.json().catch(() => null);
     const nextRole = body?.roleInCompany as CompanyRole | undefined;
 
     if (!nextRole) {
-      return NextResponse.json(
-        { error: "roleInCompany is required." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "roleInCompany is required." }, { status: 400 });
     }
 
     if (
@@ -112,10 +96,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       nextRole !== "BILLING" &&
       nextRole !== "MEMBER"
     ) {
-      return NextResponse.json(
-        { error: "Invalid role." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Invalid role." }, { status: 400 });
     }
 
     // PM'ler OWNER'ları değiştiremez
@@ -136,8 +117,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       if (ownersCount <= 1) {
         return NextResponse.json(
           {
-            error:
-              "You must keep at least one owner in this workspace.",
+            error: "You must keep at least one owner in this workspace.",
           },
           { status: 400 },
         );
@@ -146,10 +126,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
 
     // Hiç değişiklik yoksa
     if (targetMember.roleInCompany === nextRole) {
-      return NextResponse.json(
-        { ok: true },
-        { status: 200 },
-      );
+      return NextResponse.json({ ok: true }, { status: 200 });
     }
 
     await prisma.companyMember.update({
@@ -160,17 +137,11 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[PATCH /api/customer/members/[memberId]] error", error);
-    return NextResponse.json(
-      { error: "Failed to update member" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to update member" }, { status: 500 });
   }
 }
 
@@ -190,34 +161,24 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams) {
     }
 
     if (!user.activeCompanyId) {
-      return NextResponse.json(
-        { error: "No active company selected." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "No active company selected." }, { status: 400 });
     }
 
     const companyRole = normalizeCompanyRole(user.companyRole);
     if (!canManageMembers(companyRole)) {
       return NextResponse.json(
         {
-          error:
-            "Only company owners or project managers can remove members.",
+          error: "Only company owners or project managers can remove members.",
         },
         { status: 403 },
       );
     }
 
     const { memberId } = await params;
-    const targetMember = await getCompanyMemberOr404(
-      memberId,
-      user.activeCompanyId,
-    );
+    const targetMember = await getCompanyMemberOr404(memberId, user.activeCompanyId);
 
     if (!targetMember) {
-      return NextResponse.json(
-        { error: "Member not found." },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Member not found." }, { status: 404 });
     }
 
     const isActorOwner = companyRole === "OWNER";
@@ -226,10 +187,7 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams) {
 
     // PM'ler OWNER'ı silemez
     if (isTargetOwner && !isActorOwner) {
-      return NextResponse.json(
-        { error: "Only owners can remove another owner." },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Only owners can remove another owner." }, { status: 403 });
     }
 
     // Son OWNER'ı silme
@@ -238,8 +196,7 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams) {
       if (ownersCount <= 1) {
         return NextResponse.json(
           {
-            error:
-              "You must keep at least one owner in this workspace.",
+            error: "You must keep at least one owner in this workspace.",
           },
           { status: 400 },
         );
@@ -253,16 +210,10 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[DELETE /api/customer/members/[memberId]] error", error);
-    return NextResponse.json(
-      { error: "Failed to remove member" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to remove member" }, { status: 500 });
   }
 }

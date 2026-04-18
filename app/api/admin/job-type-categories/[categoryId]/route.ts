@@ -35,25 +35,18 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
     });
 
     if (!existing) {
-      return NextResponse.json(
-        { error: "Category not found." },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Category not found." }, { status: 404 });
     }
 
     const body = await req.json().catch(() => null);
     if (!body || typeof body !== "object") {
-      return NextResponse.json(
-        { error: "Request body is required." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Request body is required." }, { status: 400 });
     }
 
     const updateData: Record<string, unknown> = {};
 
     if (body.name !== undefined) {
-      const name =
-        typeof body.name === "string" ? body.name.trim() : "";
+      const name = typeof body.name === "string" ? body.name.trim() : "";
       if (name.length < 2) {
         return NextResponse.json(
           { error: "Category name must be at least 2 characters." },
@@ -72,8 +65,7 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
     }
 
     if (body.icon !== undefined) {
-      updateData.icon =
-        typeof body.icon === "string" ? body.icon.trim() || null : null;
+      updateData.icon = typeof body.icon === "string" ? body.icon.trim() || null : null;
     }
 
     if (typeof body.sortOrder === "number") {
@@ -85,10 +77,7 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
     }
 
     if (Object.keys(updateData).length === 0) {
-      return NextResponse.json(
-        { error: "No fields to update." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "No fields to update." }, { status: 400 });
     }
 
     try {
@@ -122,17 +111,11 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
     }
   } catch (error: any) {
     if (error?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[admin.job-type-categories.id] PATCH error", error);
-    return NextResponse.json(
-      { error: "Failed to update category" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to update category" }, { status: 500 });
   }
 }
 
@@ -159,10 +142,7 @@ export async function DELETE(_req: NextRequest, ctx: RouteContext) {
     });
 
     if (!existing) {
-      return NextResponse.json(
-        { error: "Category not found." },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Category not found." }, { status: 404 });
     }
 
     // Unlink all job types from this category
@@ -179,22 +159,13 @@ export async function DELETE(_req: NextRequest, ctx: RouteContext) {
       where: { id: categoryId },
     });
 
-    return NextResponse.json(
-      { success: true, unlinkedJobTypes },
-      { status: 200 },
-    );
+    return NextResponse.json({ success: true, unlinkedJobTypes }, { status: 200 });
   } catch (error: any) {
     if (error?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[admin.job-type-categories.id] DELETE error", error);
-    return NextResponse.json(
-      { error: "Failed to delete category" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to delete category" }, { status: 500 });
   }
 }

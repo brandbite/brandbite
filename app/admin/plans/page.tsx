@@ -129,7 +129,6 @@ export default function AdminPlansPage() {
     return () => {
       cancelled = true;
     };
-     
   }, []);
 
   const handleClickPlan = (plan: Plan) => {

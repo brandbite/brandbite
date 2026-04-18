@@ -64,12 +64,7 @@ type PatchPayload = {
 
 function isValidTicketStatus(value: unknown): value is TicketStatus {
   if (typeof value !== "string") return false;
-  return (
-    value === "TODO" ||
-    value === "IN_PROGRESS" ||
-    value === "IN_REVIEW" ||
-    value === "DONE"
-  );
+  return value === "TODO" || value === "IN_PROGRESS" || value === "IN_REVIEW" || value === "DONE";
 }
 
 function toTicketStatusString(status: TicketStatus): TicketStatusString {
@@ -98,14 +93,8 @@ export async function GET(req: NextRequest) {
     const priority = url.searchParams.get("priority") || "";
     const sortBy = url.searchParams.get("sortBy") || "createdAt";
     const sortDir = url.searchParams.get("sortDir") || "desc";
-    const limit = Math.min(
-      Math.max(parseInt(url.searchParams.get("limit") || "50", 10), 1),
-      200,
-    );
-    const offset = Math.max(
-      parseInt(url.searchParams.get("offset") || "0", 10),
-      0,
-    );
+    const limit = Math.min(Math.max(parseInt(url.searchParams.get("limit") || "50", 10), 1), 200);
+    const offset = Math.max(parseInt(url.searchParams.get("offset") || "0", 10), 0);
 
     // ── Stats: always computed from UNFILTERED set ──────────────────────
     const allTickets = await prisma.ticket.findMany({
@@ -157,17 +146,11 @@ export async function GET(req: NextRequest) {
     // ── Build filtered where clause ─────────────────────────────────────
     const where: any = { creativeId: user.id };
 
-    if (
-      status &&
-      ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"].includes(status)
-    ) {
+    if (status && ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"].includes(status)) {
       where.status = status;
     }
 
-    if (
-      priority &&
-      ["LOW", "MEDIUM", "HIGH", "URGENT"].includes(priority)
-    ) {
+    if (priority && ["LOW", "MEDIUM", "HIGH", "URGENT"].includes(priority)) {
       where.priority = priority;
     }
 
@@ -266,8 +249,7 @@ export async function GET(req: NextRequest) {
         let latestRevisionFeedbackSnippet: string | null = null;
         if (latestRevision && latestRevision.feedbackMessage) {
           const full = latestRevision.feedbackMessage;
-          latestRevisionFeedbackSnippet =
-            full.length > 180 ? full.slice(0, 177) + "..." : full;
+          latestRevisionFeedbackSnippet = full.length > 180 ? full.slice(0, 177) + "..." : full;
         }
 
         return {
@@ -318,17 +300,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(response, { status: 200 });
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[creative.tickets] GET error", error);
-    return NextResponse.json(
-      { error: "Failed to load creative tickets" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load creative tickets" }, { status: 500 });
   }
 }
 
@@ -369,17 +345,11 @@ export async function PATCH(req: NextRequest) {
     const requestedStatus = body.status;
 
     if (!id || !requestedStatus) {
-      return NextResponse.json(
-        { error: "Both id and status are required." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Both id and status are required." }, { status: 400 });
     }
 
     if (!isValidTicketStatus(requestedStatus)) {
-      return NextResponse.json(
-        { error: "Invalid ticket status." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Invalid ticket status." }, { status: 400 });
     }
 
     const nextStatus = requestedStatus as TicketStatus;
@@ -401,10 +371,7 @@ export async function PATCH(req: NextRequest) {
     });
 
     if (!creative) {
-      return NextResponse.json(
-        { error: "Creative not found." },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Creative not found." }, { status: 401 });
     }
 
     const ticket = await prisma.ticket.findFirst({
@@ -422,17 +389,13 @@ export async function PATCH(req: NextRequest) {
     });
 
     if (!ticket) {
-      return NextResponse.json(
-        { error: "Ticket not found." },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Ticket not found." }, { status: 404 });
     }
 
     if (ticket.status === TicketStatus.DONE) {
       return NextResponse.json(
         {
-          error:
-            "This ticket is already marked as DONE and cannot be changed by a creative.",
+          error: "This ticket is already marked as DONE and cannot be changed by a creative.",
         },
         { status: 403 },
       );
@@ -441,10 +404,7 @@ export async function PATCH(req: NextRequest) {
     // -------------------------------------------------------------------------
     // Plan-based concurrency check for IN_PROGRESS
     // -------------------------------------------------------------------------
-    if (
-      nextStatus === TicketStatus.IN_PROGRESS &&
-      ticket.status !== TicketStatus.IN_PROGRESS
-    ) {
+    if (nextStatus === TicketStatus.IN_PROGRESS && ticket.status !== TicketStatus.IN_PROGRESS) {
       const companyWithPlan = await prisma.company.findUnique({
         where: { id: ticket.companyId },
         select: {
@@ -473,15 +433,11 @@ export async function PATCH(req: NextRequest) {
       });
 
       if (currentInProgressCount >= maxConcurrent) {
-        const planLabel =
-          typeof planData?.name === "string"
-            ? planData.name
-            : "current plan";
+        const planLabel = typeof planData?.name === "string" ? planData.name : "current plan";
 
         return NextResponse.json(
           {
-            error:
-              "This company has reached its limit for active tickets in progress.",
+            error: "This company has reached its limit for active tickets in progress.",
             details: {
               plan: planLabel,
               maxConcurrentInProgress: maxConcurrent,
@@ -494,18 +450,13 @@ export async function PATCH(req: NextRequest) {
     }
 
     const isInProgressToInReview =
-      ticket.status === TicketStatus.IN_PROGRESS &&
-      nextStatus === TicketStatus.IN_REVIEW;
+      ticket.status === TicketStatus.IN_PROGRESS && nextStatus === TicketStatus.IN_REVIEW;
 
     // Creative mesajını hazırlama
     const rawCreativeMessage =
-      typeof body.creativeMessage === "string"
-        ? body.creativeMessage.trim()
-        : "";
+      typeof body.creativeMessage === "string" ? body.creativeMessage.trim() : "";
     const creativeMessageToStore =
-      creative.creativeRevisionNotesEnabled && rawCreativeMessage
-        ? rawCreativeMessage
-        : null;
+      creative.creativeRevisionNotesEnabled && rawCreativeMessage ? rawCreativeMessage : null;
 
     let updated: { id: string; status: TicketStatus; updatedAt: Date; revisionId?: string };
 
@@ -592,16 +543,10 @@ export async function PATCH(req: NextRequest) {
     );
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[creative.tickets] PATCH error", error);
-    return NextResponse.json(
-      { error: "Failed to update ticket" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to update ticket" }, { status: 500 });
   }
 }

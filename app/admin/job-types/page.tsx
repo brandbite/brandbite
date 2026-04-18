@@ -126,9 +126,7 @@ export default function AdminJobTypesPage() {
   const inactiveCount = jobTypes.length - activeCount;
 
   // Derived token values (auto-calculated from estimated hours)
-  const derivedTokenCost = formEstimatedHours
-    ? parseInt(formEstimatedHours, 10) || 0
-    : 0;
+  const derivedTokenCost = formEstimatedHours ? parseInt(formEstimatedHours, 10) || 0 : 0;
   const derivedCreativePayout = Math.round(derivedTokenCost * 0.6);
 
   // Duplicate detection — check when name changes
@@ -140,9 +138,7 @@ export default function AdminJobTypesPage() {
     }
 
     const existing = jobTypes.find(
-      (jt) =>
-        jt.name.trim().toLowerCase() === trimmed &&
-        jt.id !== selected?.id,
+      (jt) => jt.name.trim().toLowerCase() === trimmed && jt.id !== selected?.id,
     );
 
     if (existing) {
@@ -177,9 +173,7 @@ export default function AdminJobTypesPage() {
     setFormCategoryId(jt.categoryId ?? "");
     setFormDescription(jt.description ?? "");
     // Fallback to tokenCost for legacy rows where estimatedHours was not set
-    setFormEstimatedHours(
-      String(jt.estimatedHours ?? jt.tokenCost),
-    );
+    setFormEstimatedHours(String(jt.estimatedHours ?? jt.tokenCost));
     setFormHasQuantity(jt.hasQuantity);
     setFormQuantityLabel(jt.quantityLabel ?? "");
     setFormDefaultQuantity(String(jt.defaultQuantity));
@@ -202,17 +196,12 @@ export default function AdminJobTypesPage() {
 
       if (!jtRes.ok) {
         if (jtRes.status === 401) {
-          throw new Error(
-            "You must be signed in as an admin to view this page.",
-          );
+          throw new Error("You must be signed in as an admin to view this page.");
         }
         if (jtRes.status === 403) {
-          throw new Error(
-            "You do not have permission to manage job types.",
-          );
+          throw new Error("You do not have permission to manage job types.");
         }
-        const msg =
-          jtJson?.error || `Request failed with status ${jtRes.status}`;
+        const msg = jtJson?.error || `Request failed with status ${jtRes.status}`;
         throw new Error(msg);
       }
 
@@ -220,9 +209,7 @@ export default function AdminJobTypesPage() {
       setCategoryOptions((catJson?.categories ?? []) as CategoryOption[]);
     } catch (err: any) {
       console.error("Admin job types fetch error:", err);
-      setError(
-        err?.message || "Failed to load job types.",
-      );
+      setError(err?.message || "Failed to load job types.");
     } finally {
       setLoading(false);
     }
@@ -266,15 +253,13 @@ export default function AdminJobTypesPage() {
         categoryId: formCategoryId || null,
         // Also set legacy text field from category name for backward compat
         category: formCategoryId
-          ? categoryOptions.find((c) => c.id === formCategoryId)?.name ?? null
+          ? (categoryOptions.find((c) => c.id === formCategoryId)?.name ?? null)
           : null,
         description: formDescription.trim() || null,
         estimatedHours,
         hasQuantity: formHasQuantity,
         quantityLabel: formHasQuantity ? formQuantityLabel.trim() || null : null,
-        defaultQuantity: formHasQuantity
-          ? Math.max(1, parseInt(formDefaultQuantity, 10) || 1)
-          : 1,
+        defaultQuantity: formHasQuantity ? Math.max(1, parseInt(formDefaultQuantity, 10) || 1) : 1,
         isActive: formIsActive,
       };
 
@@ -298,14 +283,11 @@ export default function AdminJobTypesPage() {
       const json = await res.json().catch(() => null);
 
       if (!res.ok) {
-        const msg =
-          json?.error || `Request failed with status ${res.status}`;
+        const msg = json?.error || `Request failed with status ${res.status}`;
         throw new Error(msg);
       }
 
-      const msg = isEditing
-        ? "Job type updated successfully."
-        : "Job type created successfully.";
+      const msg = isEditing ? "Job type updated successfully." : "Job type created successfully.";
       setSaveSuccess(msg);
       showToast({ type: "success", title: msg });
 
@@ -331,436 +313,411 @@ export default function AdminJobTypesPage() {
 
   return (
     <>
-        {/* Page header */}
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Job types
-            </h1>
-            <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-              Set estimated hours for each job type. Token cost and creative
-              payout are calculated automatically.
+      {/* Page header */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Job types</h1>
+          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
+            Set estimated hours for each job type. Token cost and creative payout are calculated
+            automatically.
+          </p>
+        </div>
+        <Button onClick={handleNewClick}>New job type</Button>
+      </div>
+
+      {/* Error */}
+      {error && (
+        <InlineAlert variant="error" title="Error" className="mb-4">
+          {error}
+        </InlineAlert>
+      )}
+
+      {/* Summary cards */}
+      <section className="mb-6 grid gap-4 md:grid-cols-3">
+        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+          <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
+            Total job types
+          </p>
+          <p className="mt-2 text-3xl font-semibold text-[var(--bb-secondary)]">
+            {loading ? "&mdash;" : jobTypes.length}
+          </p>
+          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">All configured job types.</p>
+        </div>
+        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+          <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
+            Active
+          </p>
+          <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
+            {loading ? "&mdash;" : activeCount}
+          </p>
+          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
+            Job types available to customers.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+          <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
+            Inactive
+          </p>
+          <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
+            {loading ? "&mdash;" : inactiveCount}
+          </p>
+          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
+            Hidden job types kept for history.
+          </p>
+        </div>
+      </section>
+
+      {/* Filter + table + form layout */}
+      <section className="grid gap-4 md:grid-cols-[3fr_2fr]">
+        {/* Left: table */}
+        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
+          {/* Search bar */}
+          <div className="mb-3">
+            <div className="relative">
+              <svg
+                className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[var(--bb-text-tertiary)]"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+                />
+              </svg>
+              <input
+                type="text"
+                placeholder="Search job types..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] py-2 pr-3 pl-10 text-sm text-[var(--bb-secondary)] transition-colors outline-none placeholder:text-[var(--bb-text-tertiary)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute top-1/2 right-3 -translate-y-1/2 text-[var(--bb-text-tertiary)] hover:text-[var(--bb-secondary)]"
+                >
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={2}
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Filters row */}
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-semibold tracking-tight">Job type list</h2>
+              <FormSelect
+                value={filterActive}
+                onChange={(e) => setFilterActive(e.target.value as "ALL" | "ACTIVE" | "INACTIVE")}
+                size="sm"
+                className="w-auto"
+              >
+                <option value="ALL">All status</option>
+                <option value="ACTIVE">Active</option>
+                <option value="INACTIVE">Inactive</option>
+              </FormSelect>
+              <FormSelect
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+                size="sm"
+                className="w-auto"
+              >
+                <option value="ALL">All categories</option>
+                <option value="UNCATEGORIZED">Uncategorized</option>
+                {categoryOptions
+                  .filter((c) => c.isActive)
+                  .map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.icon ? `${cat.icon} ` : ""}
+                      {cat.name}
+                    </option>
+                  ))}
+              </FormSelect>
+            </div>
+            <p className="text-xs text-[var(--bb-text-tertiary)]">
+              Showing {filteredJobTypes.length} of {jobTypes.length}
             </p>
           </div>
-          <Button onClick={handleNewClick}>New job type</Button>
+
+          {loading ? (
+            <LoadingState message="Loading job types..." />
+          ) : filteredJobTypes.length === 0 ? (
+            <EmptyState
+              title={
+                searchQuery ? "No job types match your search." : "No job types match your filter."
+              }
+            />
+          ) : (
+            <div className="max-h-[420px] overflow-x-auto overflow-y-auto">
+              <table className="min-w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--bb-border)] text-xs tracking-[0.08em] text-[var(--bb-text-tertiary)] uppercase">
+                    <th className="px-2 py-2">Name</th>
+                    <th className="px-2 py-2">Category</th>
+                    <th className="px-2 py-2 text-right">Est. Hours</th>
+                    <th className="px-2 py-2 text-center">Qty</th>
+                    <th className="px-2 py-2 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredJobTypes.map((jt) => (
+                    <tr
+                      key={jt.id}
+                      className={`border-b border-[var(--bb-border-subtle)] text-xs last:border-b-0 ${
+                        selected?.id === jt.id
+                          ? "bg-[var(--bb-primary-light)]"
+                          : "bg-[var(--bb-bg-page)]"
+                      } cursor-pointer`}
+                      onClick={() => handleEditClick(jt)}
+                    >
+                      <td className="px-2 py-2 align-top text-[11px] text-[var(--bb-secondary)]">
+                        <div className="font-semibold">{jt.name}</div>
+                        {jt.description && (
+                          <div className="mt-0.5 line-clamp-1 text-[10px] text-[var(--bb-text-secondary)]">
+                            {jt.description}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-2 py-2 align-top text-[11px] text-[var(--bb-text-tertiary)]">
+                        {getCategoryDisplay(jt) ? (
+                          <span className="inline-flex items-center gap-1">
+                            {jt.categoryRef?.icon && <span>{jt.categoryRef.icon}</span>}
+                            {getCategoryDisplay(jt)}
+                          </span>
+                        ) : (
+                          <span className="text-[var(--bb-border-input)]">&mdash;</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-2 text-right align-top text-[11px] text-[var(--bb-secondary)]">
+                        {jt.estimatedHours ?? jt.tokenCost}{" "}
+                        <span className="text-[10px] text-[var(--bb-text-tertiary)]">hrs</span>
+                      </td>
+                      <td className="px-2 py-2 text-center align-top text-[11px]">
+                        {jt.hasQuantity ? (
+                          <Badge variant="info">Yes</Badge>
+                        ) : (
+                          <span className="text-[var(--bb-text-tertiary)]">&mdash;</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-2 text-center align-top text-[11px]">
+                        <Badge variant={jt.isActive ? "success" : "neutral"}>
+                          {jt.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
-        {/* Error */}
-        {error && (
-          <InlineAlert variant="error" title="Error" className="mb-4">
-            {error}
-          </InlineAlert>
-        )}
+        {/* Right: form */}
+        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+          <h2 className="text-sm font-semibold tracking-tight">
+            {selected ? "Edit job type" : "Create new job type"}
+          </h2>
+          <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
+            Enter estimated hours. Token cost and creative payout are calculated automatically (1
+            token = 1 hour, 60% base payout).
+          </p>
 
-        {/* Summary cards */}
-        <section className="mb-6 grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
-              Total job types
-            </p>
-            <p className="mt-2 text-3xl font-semibold text-[var(--bb-secondary)]">
-              {loading ? "&mdash;" : jobTypes.length}
-            </p>
-            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-              All configured job types.
-            </p>
-          </div>
-          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
-              Active
-            </p>
-            <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
-              {loading ? "&mdash;" : activeCount}
-            </p>
-            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-              Job types available to customers.
-            </p>
-          </div>
-          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
-              Inactive
-            </p>
-            <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
-              {loading ? "&mdash;" : inactiveCount}
-            </p>
-            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-              Hidden job types kept for history.
-            </p>
-          </div>
-        </section>
+          {saveError && (
+            <InlineAlert variant="error" size="sm" className="mt-3">
+              {saveError}
+            </InlineAlert>
+          )}
 
-        {/* Filter + table + form layout */}
-        <section className="grid gap-4 md:grid-cols-[3fr_2fr]">
-          {/* Left: table */}
-          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
-            {/* Search bar */}
-            <div className="mb-3">
-              <div className="relative">
-                <svg
-                  className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--bb-text-tertiary)]"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={2}
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-                  />
-                </svg>
-                <input
-                  type="text"
-                  placeholder="Search job types..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] py-2 pl-10 pr-3 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-tertiary)] transition-colors focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--bb-text-tertiary)] hover:text-[var(--bb-secondary)]"
-                  >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-            </div>
+          {saveSuccess && (
+            <InlineAlert variant="success" size="sm" className="mt-3">
+              {saveSuccess}
+            </InlineAlert>
+          )}
 
-            {/* Filters row */}
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold tracking-tight">
-                  Job type list
-                </h2>
-                <FormSelect
-                  value={filterActive}
-                  onChange={(e) =>
-                    setFilterActive(
-                      e.target.value as "ALL" | "ACTIVE" | "INACTIVE",
-                    )
-                  }
-                  size="sm"
-                  className="w-auto"
-                >
-                  <option value="ALL">All status</option>
-                  <option value="ACTIVE">Active</option>
-                  <option value="INACTIVE">Inactive</option>
-                </FormSelect>
-                <FormSelect
-                  value={filterCategory}
-                  onChange={(e) => setFilterCategory(e.target.value)}
-                  size="sm"
-                  className="w-auto"
-                >
-                  <option value="ALL">All categories</option>
-                  <option value="UNCATEGORIZED">Uncategorized</option>
-                  {categoryOptions
-                    .filter((c) => c.isActive)
-                    .map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.icon ? `${cat.icon} ` : ""}{cat.name}
-                      </option>
-                    ))}
-                </FormSelect>
-              </div>
-              <p className="text-xs text-[var(--bb-text-tertiary)]">
-                Showing {filteredJobTypes.length} of {jobTypes.length}
-              </p>
-            </div>
-
-            {loading ? (
-              <LoadingState message="Loading job types..." />
-            ) : filteredJobTypes.length === 0 ? (
-              <EmptyState
-                title={
-                  searchQuery
-                    ? "No job types match your search."
-                    : "No job types match your filter."
-                }
+          <form className="mt-4 space-y-3" onSubmit={handleSubmit}>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="job-name" className="text-xs font-medium text-[var(--bb-secondary)]">
+                Name
+              </label>
+              <FormInput
+                id="job-name"
+                type="text"
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+                required
+                placeholder="e.g. Logo design"
               />
-            ) : (
-              <div className="max-h-[420px] overflow-y-auto overflow-x-auto">
-                <table className="min-w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-[var(--bb-border)] text-xs uppercase tracking-[0.08em] text-[var(--bb-text-tertiary)]">
-                      <th className="px-2 py-2">Name</th>
-                      <th className="px-2 py-2">Category</th>
-                      <th className="px-2 py-2 text-right">Est. Hours</th>
-                      <th className="px-2 py-2 text-center">Qty</th>
-                      <th className="px-2 py-2 text-center">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredJobTypes.map((jt) => (
-                      <tr
-                        key={jt.id}
-                        className={`border-b border-[var(--bb-border-subtle)] text-xs last:border-b-0 ${
-                          selected?.id === jt.id
-                            ? "bg-[var(--bb-primary-light)]"
-                            : "bg-[var(--bb-bg-page)]"
-                        } cursor-pointer`}
-                        onClick={() => handleEditClick(jt)}
-                      >
-                        <td className="px-2 py-2 align-top text-[11px] text-[var(--bb-secondary)]">
-                          <div className="font-semibold">{jt.name}</div>
-                          {jt.description && (
-                            <div className="mt-0.5 text-[10px] text-[var(--bb-text-secondary)] line-clamp-1">
-                              {jt.description}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-2 py-2 align-top text-[11px] text-[var(--bb-text-tertiary)]">
-                          {getCategoryDisplay(jt) ? (
-                            <span className="inline-flex items-center gap-1">
-                              {jt.categoryRef?.icon && (
-                                <span>{jt.categoryRef.icon}</span>
-                              )}
-                              {getCategoryDisplay(jt)}
-                            </span>
-                          ) : (
-                            <span className="text-[var(--bb-border-input)]">&mdash;</span>
-                          )}
-                        </td>
-                        <td className="px-2 py-2 align-top text-right text-[11px] text-[var(--bb-secondary)]">
-                          {jt.estimatedHours ?? jt.tokenCost}{" "}
-                          <span className="text-[10px] text-[var(--bb-text-tertiary)]">
-                            hrs
-                          </span>
-                        </td>
-                        <td className="px-2 py-2 align-top text-center text-[11px]">
-                          {jt.hasQuantity ? (
-                            <Badge variant="info">Yes</Badge>
-                          ) : (
-                            <span className="text-[var(--bb-text-tertiary)]">&mdash;</span>
-                          )}
-                        </td>
-                        <td className="px-2 py-2 align-top text-center text-[11px]">
-                          <Badge variant={jt.isActive ? "success" : "neutral"}>
-                            {jt.isActive ? "Active" : "Inactive"}
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+              {duplicateWarning && <p className="text-[10px] text-amber-600">{duplicateWarning}</p>}
+            </div>
 
-          {/* Right: form */}
-          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-            <h2 className="text-sm font-semibold tracking-tight">
-              {selected ? "Edit job type" : "Create new job type"}
-            </h2>
-            <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
-              Enter estimated hours. Token cost and creative payout are
-              calculated automatically (1 token = 1 hour, 60% base payout).
-            </p>
-
-            {saveError && (
-              <InlineAlert variant="error" size="sm" className="mt-3">
-                {saveError}
-              </InlineAlert>
-            )}
-
-            {saveSuccess && (
-              <InlineAlert variant="success" size="sm" className="mt-3">
-                {saveSuccess}
-              </InlineAlert>
-            )}
-
-            <form className="mt-4 space-y-3" onSubmit={handleSubmit}>
-              <div className="flex flex-col gap-1">
-                <label
-                  htmlFor="job-name"
-                  className="text-xs font-medium text-[var(--bb-secondary)]"
-                >
-                  Name
-                </label>
-                <FormInput
-                  id="job-name"
-                  type="text"
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  required
-                  placeholder="e.g. Logo design"
-                />
-                {duplicateWarning && (
-                  <p className="text-[10px] text-amber-600">
-                    {duplicateWarning}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label
-                  htmlFor="job-category"
-                  className="text-xs font-medium text-[var(--bb-secondary)]"
-                >
-                  Category
-                </label>
-                <FormSelect
-                  id="job-category"
-                  value={formCategoryId}
-                  onChange={(e) => setFormCategoryId(e.target.value)}
-                >
-                  <option value="">No category</option>
-                  {categoryOptions
-                    .filter((c) => c.isActive)
-                    .map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.icon ? `${cat.icon} ` : ""}{cat.name}
-                      </option>
-                    ))}
-                </FormSelect>
-                {categoryOptions.length === 0 && !loading && (
-                  <p className="text-[10px] text-[var(--bb-text-tertiary)]">
-                    No categories yet.{" "}
-                    <a
-                      href="/admin/job-type-categories"
-                      className="text-[var(--bb-primary)] underline"
-                    >
-                      Create categories
-                    </a>
-                  </p>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label
-                  htmlFor="job-description"
-                  className="text-xs font-medium text-[var(--bb-secondary)]"
-                >
-                  Description
-                </label>
-                <FormTextarea
-                  id="job-description"
-                  value={formDescription}
-                  onChange={(e) => setFormDescription(e.target.value)}
-                  rows={2}
-                  placeholder="Short description visible to team and admins."
-                />
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label
-                  htmlFor="job-estimated-hours"
-                  className="text-xs font-medium text-[var(--bb-secondary)]"
-                >
-                  Estimated hours
-                </label>
-                <FormInput
-                  id="job-estimated-hours"
-                  type="number"
-                  min={1}
-                  value={formEstimatedHours}
-                  onChange={(e) => setFormEstimatedHours(e.target.value)}
-                  required
-                  placeholder="e.g. 8"
-                />
-              </div>
-
-              {/* Derived values preview */}
-              {derivedTokenCost > 0 && (
-                <div className="rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-2 text-xs text-[var(--bb-text-secondary)]">
-                  <p>
-                    <span className="font-medium text-[var(--bb-secondary)]">
-                      Token cost:
-                    </span>{" "}
-                    {derivedTokenCost} tokens{" "}
-                    <span className="text-[10px]">(1 token = 1 hour)</span>
-                  </p>
-                  <p className="mt-0.5">
-                    <span className="font-medium text-[var(--bb-secondary)]">
-                      Creative payout:
-                    </span>{" "}
-                    {derivedCreativePayout} tokens{" "}
-                    <span className="text-[10px]">(60% base rate)</span>
-                  </p>
-                </div>
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor="job-category"
+                className="text-xs font-medium text-[var(--bb-secondary)]"
+              >
+                Category
+              </label>
+              <FormSelect
+                id="job-category"
+                value={formCategoryId}
+                onChange={(e) => setFormCategoryId(e.target.value)}
+              >
+                <option value="">No category</option>
+                {categoryOptions
+                  .filter((c) => c.isActive)
+                  .map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.icon ? `${cat.icon} ` : ""}
+                      {cat.name}
+                    </option>
+                  ))}
+              </FormSelect>
+              {categoryOptions.length === 0 && !loading && (
+                <p className="text-[10px] text-[var(--bb-text-tertiary)]">
+                  No categories yet.{" "}
+                  <a
+                    href="/admin/job-type-categories"
+                    className="text-[var(--bb-primary)] underline"
+                  >
+                    Create categories
+                  </a>
+                </p>
               )}
+            </div>
 
-              {/* Has Quantity */}
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor="job-description"
+                className="text-xs font-medium text-[var(--bb-secondary)]"
+              >
+                Description
+              </label>
+              <FormTextarea
+                id="job-description"
+                value={formDescription}
+                onChange={(e) => setFormDescription(e.target.value)}
+                rows={2}
+                placeholder="Short description visible to team and admins."
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor="job-estimated-hours"
+                className="text-xs font-medium text-[var(--bb-secondary)]"
+              >
+                Estimated hours
+              </label>
+              <FormInput
+                id="job-estimated-hours"
+                type="number"
+                min={1}
+                value={formEstimatedHours}
+                onChange={(e) => setFormEstimatedHours(e.target.value)}
+                required
+                placeholder="e.g. 8"
+              />
+            </div>
+
+            {/* Derived values preview */}
+            {derivedTokenCost > 0 && (
+              <div className="rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-2 text-xs text-[var(--bb-text-secondary)]">
+                <p>
+                  <span className="font-medium text-[var(--bb-secondary)]">Token cost:</span>{" "}
+                  {derivedTokenCost} tokens <span className="text-[10px]">(1 token = 1 hour)</span>
+                </p>
+                <p className="mt-0.5">
+                  <span className="font-medium text-[var(--bb-secondary)]">Creative payout:</span>{" "}
+                  {derivedCreativePayout} tokens{" "}
+                  <span className="text-[10px]">(60% base rate)</span>
+                </p>
+              </div>
+            )}
+
+            {/* Has Quantity */}
+            <label className="flex items-center gap-2 text-xs font-medium text-[var(--bb-secondary)]">
+              <input
+                type="checkbox"
+                checked={formHasQuantity}
+                onChange={(e) => setFormHasQuantity(e.target.checked)}
+                className="h-3 w-3 rounded border-[var(--bb-border-input)] text-[var(--bb-primary)] focus:ring-[var(--bb-primary)]"
+              />
+              Has quantity (per-unit pricing)
+            </label>
+
+            {/* Quantity fields — visible when hasQuantity is checked */}
+            {formHasQuantity && (
+              <div className="grid gap-3 border-l-2 border-[var(--bb-primary)]/20 pl-4 md:grid-cols-2">
+                <div className="flex flex-col gap-1">
+                  <label
+                    htmlFor="job-quantity-label"
+                    className="text-xs font-medium text-[var(--bb-secondary)]"
+                  >
+                    Quantity label
+                  </label>
+                  <FormInput
+                    id="job-quantity-label"
+                    type="text"
+                    value={formQuantityLabel}
+                    onChange={(e) => setFormQuantityLabel(e.target.value)}
+                    placeholder="e.g. Number of sizes"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label
+                    htmlFor="job-default-quantity"
+                    className="text-xs font-medium text-[var(--bb-secondary)]"
+                  >
+                    Default quantity
+                  </label>
+                  <FormInput
+                    id="job-default-quantity"
+                    type="number"
+                    min={1}
+                    value={formDefaultQuantity}
+                    onChange={(e) => setFormDefaultQuantity(e.target.value)}
+                    placeholder="1"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between">
               <label className="flex items-center gap-2 text-xs font-medium text-[var(--bb-secondary)]">
                 <input
                   type="checkbox"
-                  checked={formHasQuantity}
-                  onChange={(e) => setFormHasQuantity(e.target.checked)}
+                  checked={formIsActive}
+                  onChange={(e) => setFormIsActive(e.target.checked)}
                   className="h-3 w-3 rounded border-[var(--bb-border-input)] text-[var(--bb-primary)] focus:ring-[var(--bb-primary)]"
                 />
-                Has quantity (per-unit pricing)
+                Active
               </label>
 
-              {/* Quantity fields — visible when hasQuantity is checked */}
-              {formHasQuantity && (
-                <div className="grid gap-3 md:grid-cols-2 border-l-2 border-[var(--bb-primary)]/20 pl-4">
-                  <div className="flex flex-col gap-1">
-                    <label
-                      htmlFor="job-quantity-label"
-                      className="text-xs font-medium text-[var(--bb-secondary)]"
-                    >
-                      Quantity label
-                    </label>
-                    <FormInput
-                      id="job-quantity-label"
-                      type="text"
-                      value={formQuantityLabel}
-                      onChange={(e) => setFormQuantityLabel(e.target.value)}
-                      placeholder="e.g. Number of sizes"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label
-                      htmlFor="job-default-quantity"
-                      className="text-xs font-medium text-[var(--bb-secondary)]"
-                    >
-                      Default quantity
-                    </label>
-                    <FormInput
-                      id="job-default-quantity"
-                      type="number"
-                      min={1}
-                      value={formDefaultQuantity}
-                      onChange={(e) => setFormDefaultQuantity(e.target.value)}
-                      placeholder="1"
-                    />
-                  </div>
-                </div>
+              {selected && (
+                <Button variant="ghost" size="sm" onClick={resetForm}>
+                  Clear selection
+                </Button>
               )}
+            </div>
 
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 text-xs font-medium text-[var(--bb-secondary)]">
-                  <input
-                    type="checkbox"
-                    checked={formIsActive}
-                    onChange={(e) => setFormIsActive(e.target.checked)}
-                    className="h-3 w-3 rounded border-[var(--bb-border-input)] text-[var(--bb-primary)] focus:ring-[var(--bb-primary)]"
-                  />
-                  Active
-                </label>
-
-                {selected && (
-                  <Button variant="ghost" size="sm" onClick={resetForm}>
-                    Clear selection
-                  </Button>
-                )}
-              </div>
-
-              <Button
-                type="submit"
-                loading={saving}
-                loadingText="Saving..."
-                className="mt-2"
-              >
-                {selected ? "Save changes" : "Create job type"}
-              </Button>
-            </form>
-          </div>
-        </section>
+            <Button type="submit" loading={saving} loadingText="Saving..." className="mt-2">
+              {selected ? "Save changes" : "Create job type"}
+            </Button>
+          </form>
+        </div>
+      </section>
     </>
   );
 }

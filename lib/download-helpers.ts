@@ -24,10 +24,7 @@ export async function fetchPresignedUrl(assetId: string): Promise<string> {
  * Fetches the blob first to guarantee download behaviour
  * (presigned URLs may open in-browser for images otherwise).
  */
-export async function downloadSingleAsset(
-  assetId: string,
-  filename: string,
-): Promise<void> {
+export async function downloadSingleAsset(assetId: string, filename: string): Promise<void> {
   const presignedUrl = await fetchPresignedUrl(assetId);
 
   const response = await fetch(presignedUrl);
@@ -60,7 +57,9 @@ export async function downloadAssetsAsZip(
       const url = await fetchPresignedUrl(asset.id);
       const response = await fetch(url);
       if (!response.ok)
-        throw new Error(`Download failed for ${asset.originalName ?? asset.id} (${response.status})`);
+        throw new Error(
+          `Download failed for ${asset.originalName ?? asset.id} (${response.status})`,
+        );
       const blob = await response.blob();
       const name = asset.originalName || `file-${index + 1}`;
       return { name, blob };
@@ -70,8 +69,7 @@ export async function downloadAssetsAsZip(
   // Collect successful entries
   const entries = results
     .filter(
-      (r): r is PromiseFulfilledResult<{ name: string; blob: Blob }> =>
-        r.status === "fulfilled",
+      (r): r is PromiseFulfilledResult<{ name: string; blob: Blob }> => r.status === "fulfilled",
     )
     .map((r) => r.value);
 

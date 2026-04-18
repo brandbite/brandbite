@@ -15,18 +15,12 @@ type DataTableProps = {
   className?: string;
 };
 
-export function DataTable({
-  children,
-  maxHeight,
-  className = "",
-}: DataTableProps) {
+export function DataTable({ children, maxHeight, className = "" }: DataTableProps) {
   return (
     <div
       className={`overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] shadow-sm ${className}`}
     >
-      <div
-        className={`overflow-x-auto ${maxHeight ? `max-h-[${maxHeight}] overflow-y-auto` : ""}`}
-      >
+      <div className={`overflow-x-auto ${maxHeight ? `max-h-[${maxHeight}] overflow-y-auto` : ""}`}>
         <table className="min-w-full text-left text-xs">{children}</table>
       </div>
     </div>
@@ -45,7 +39,7 @@ type THeadProps = {
 export function THead({ children, className = "" }: THeadProps) {
   return (
     <thead
-      className={`border-b border-[var(--bb-border)] text-[11px] uppercase tracking-[0.08em] text-[var(--bb-text-tertiary)] ${className}`}
+      className={`border-b border-[var(--bb-border)] text-[11px] tracking-[0.08em] text-[var(--bb-text-tertiary)] uppercase ${className}`}
     >
       <tr>{children}</tr>
     </thead>
@@ -74,37 +68,25 @@ export function TH({
   onSort,
 }: THProps) {
   const alignClass =
-    align === "right"
-      ? "text-right"
-      : align === "center"
-        ? "text-center"
-        : "text-left";
+    align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left";
 
   if (sortable) {
     return (
       <th
-        className={`px-3 py-2.5 font-semibold ${alignClass} cursor-pointer select-none transition-colors hover:text-[var(--bb-secondary)] ${className}`}
+        className={`px-3 py-2.5 font-semibold ${alignClass} cursor-pointer transition-colors select-none hover:text-[var(--bb-secondary)] ${className}`}
         onClick={onSort}
       >
         <span className="inline-flex items-center gap-1">
           {children}
           <span className="text-[9px] leading-none opacity-60">
-            {sortDirection === "asc"
-              ? "▲"
-              : sortDirection === "desc"
-                ? "▼"
-                : "⇅"}
+            {sortDirection === "asc" ? "▲" : sortDirection === "desc" ? "▼" : "⇅"}
           </span>
         </span>
       </th>
     );
   }
 
-  return (
-    <th className={`px-3 py-2.5 font-semibold ${alignClass} ${className}`}>
-      {children}
-    </th>
-  );
+  return <th className={`px-3 py-2.5 font-semibold ${alignClass} ${className}`}>{children}</th>;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -120,11 +102,7 @@ type TDProps = {
 
 export function TD({ children, align = "left", className = "", onClick }: TDProps) {
   const alignClass =
-    align === "right"
-      ? "text-right"
-      : align === "center"
-        ? "text-center"
-        : "text-left";
+    align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left";
 
   return (
     <td

@@ -14,23 +14,15 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => null);
 
     if (!body || typeof body !== "object") {
-      return NextResponse.json(
-        { error: "Invalid request body" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
 
     const persona = String((body as any).persona ?? "");
     const redirectTo =
-      typeof (body as any).redirectTo === "string"
-        ? (body as any).redirectTo
-        : "/";
+      typeof (body as any).redirectTo === "string" ? (body as any).redirectTo : "/";
 
     if (!isValidDemoPersona(persona)) {
-      return NextResponse.json(
-        { error: "Unknown demo persona" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Unknown demo persona" }, { status: 400 });
     }
 
     const res = NextResponse.json({
@@ -48,9 +40,6 @@ export async function POST(req: NextRequest) {
     return res;
   } catch (error) {
     console.error("[debug.demo-user] POST error", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

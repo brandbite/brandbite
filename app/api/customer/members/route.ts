@@ -9,10 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
-import {
-  canManageMembers,
-  normalizeCompanyRole,
-} from "@/lib/permissions/companyRoles";
+import { canManageMembers, normalizeCompanyRole } from "@/lib/permissions/companyRoles";
 
 export async function GET(_req: NextRequest) {
   try {
@@ -27,10 +24,7 @@ export async function GET(_req: NextRequest) {
     }
 
     if (!user.activeCompanyId) {
-      return NextResponse.json(
-        { error: "No active company selected." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "No active company selected." }, { status: 400 });
     }
 
     const companyRole = normalizeCompanyRole(user.companyRole);
@@ -95,10 +89,7 @@ export async function GET(_req: NextRequest) {
     ]);
 
     if (!company) {
-      return NextResponse.json(
-        { error: "Company not found." },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Company not found." }, { status: 404 });
     }
 
     return NextResponse.json(
@@ -131,16 +122,10 @@ export async function GET(_req: NextRequest) {
     );
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[customer.members] GET error", error);
-    return NextResponse.json(
-      { error: "Failed to load company members" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load company members" }, { status: 500 });
   }
 }

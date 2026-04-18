@@ -54,16 +54,10 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json(response, { status: 200 });
   } catch (error: any) {
     if (error?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[customer.company-role] GET error", error);
-    return NextResponse.json(
-      { error: "Failed to load company role" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load company role" }, { status: 500 });
   }
 }

@@ -9,10 +9,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { PinOverlay, type PinData } from "./pin-overlay";
 import { PinSidebar, PinBottomSheet } from "./pin-sidebar";
-import {
-  downloadSingleAsset,
-  downloadAssetsAsZip,
-} from "@/lib/download-helpers";
+import { downloadSingleAsset, downloadAssetsAsZip } from "@/lib/download-helpers";
 
 // ---------------------------------------------------------------------------
 // Download icon SVG (arrow-down to tray)
@@ -207,17 +204,11 @@ function ImageLightbox({
   const hasMultiple = assets.length > 1;
 
   // Pin state — keyed by asset ID so navigating between images preserves pins
-  const [pinsPerAsset, setPinsPerAsset] = useState<Record<string, PinData[]>>(
-    {},
-  );
+  const [pinsPerAsset, setPinsPerAsset] = useState<Record<string, PinData[]>>({});
   const [activePinOrder, setActivePinOrder] = useState<number | null>(null);
-  const [existingPinsLoaded, setExistingPinsLoaded] = useState<Set<string>>(
-    new Set(),
-  );
+  const [existingPinsLoaded, setExistingPinsLoaded] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
-  const [validationErrors, setValidationErrors] = useState<Set<number>>(
-    new Set(),
-  );
+  const [validationErrors, setValidationErrors] = useState<Set<number>>(new Set());
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [mobileAutoExpand, setMobileAutoExpand] = useState(false);
   const [resolvingPinId, setResolvingPinId] = useState<string | null>(null);
@@ -229,10 +220,7 @@ function ImageLightbox({
   const hasPinUI = isEditMode || pinMode === "view" || isResolveMode;
 
   // Total pins across all assets (for discard guard)
-  const totalNewPins = Object.values(pinsPerAsset).reduce(
-    (sum, arr) => sum + arr.length,
-    0,
-  );
+  const totalNewPins = Object.values(pinsPerAsset).reduce((sum, arr) => sum + arr.length, 0);
 
   // Fetch existing pins for the current asset
   useEffect(() => {
@@ -288,9 +276,7 @@ function ImageLightbox({
   const handleClose = useCallback(() => {
     if (isEditMode && totalNewPins > 0) {
       // Check if any pins are new (no id = unsaved)
-      const hasUnsaved = Object.values(pinsPerAsset).some((pins) =>
-        pins.some((p) => !p.id),
-      );
+      const hasUnsaved = Object.values(pinsPerAsset).some((pins) => pins.some((p) => !p.id));
       if (hasUnsaved) {
         setShowDiscardConfirm(true);
         return;
@@ -306,11 +292,7 @@ function ImageLightbox({
       if (e.key === "Escape") handleClose();
       if (e.key === "ArrowLeft") goPrev();
       if (e.key === "ArrowRight") goNext();
-      if (
-        (e.key === "Delete" || e.key === "Backspace") &&
-        isEditMode &&
-        activePinOrder != null
-      ) {
+      if ((e.key === "Delete" || e.key === "Backspace") && isEditMode && activePinOrder != null) {
         // Only delete if not focused on a textarea
         const active = document.activeElement;
         if (active && (active.tagName === "TEXTAREA" || active.tagName === "INPUT")) return;
@@ -335,10 +317,7 @@ function ImageLightbox({
     (x: number, y: number) => {
       if (!isEditMode) return;
       const existing = pinsPerAsset[asset.id] ?? [];
-      const nextOrder =
-        existing.length > 0
-          ? Math.max(...existing.map((p) => p.order)) + 1
-          : 1;
+      const nextOrder = existing.length > 0 ? Math.max(...existing.map((p) => p.order)) + 1 : 1;
       const newPin: PinData = { x, y, order: nextOrder, label: "" };
 
       setPinsPerAsset((prev) => ({
@@ -365,9 +344,7 @@ function ImageLightbox({
     (order: number, label: string) => {
       setPinsPerAsset((prev) => ({
         ...prev,
-        [asset.id]: (prev[asset.id] ?? []).map((p) =>
-          p.order === order ? { ...p, label } : p,
-        ),
+        [asset.id]: (prev[asset.id] ?? []).map((p) => (p.order === order ? { ...p, label } : p)),
       }));
       // Clear validation error when user types
       setValidationErrors((prev) => {
@@ -382,9 +359,7 @@ function ImageLightbox({
   const handlePinDelete = useCallback(
     (order: number) => {
       setPinsPerAsset((prev) => {
-        const filtered = (prev[asset.id] ?? []).filter(
-          (p) => p.order !== order,
-        );
+        const filtered = (prev[asset.id] ?? []).filter((p) => p.order !== order);
         // Re-order remaining pins sequentially
         const reordered = filtered.map((p, i) => ({ ...p, order: i + 1 }));
         return { ...prev, [asset.id]: reordered };
@@ -501,10 +476,13 @@ function ImageLightbox({
     onSubmitRevision: isEditMode ? handleSubmitRevision : undefined,
     onResolvePin: isResolveMode ? handleResolvePin : undefined,
     resolvingPinId: isResolveMode ? resolvingPinId : undefined,
-    onUploadWork: isResolveMode && onUploadWork ? () => {
-      onClose();
-      onUploadWork();
-    } : undefined,
+    onUploadWork:
+      isResolveMode && onUploadWork
+        ? () => {
+            onClose();
+            onUploadWork();
+          }
+        : undefined,
     submitting,
     validationErrors,
   };
@@ -549,7 +527,7 @@ function ImageLightbox({
       )}
 
       {/* Top bar */}
-      <div className="absolute left-0 right-0 top-0 z-20 flex items-center justify-between px-4 py-3">
+      <div className="absolute top-0 right-0 left-0 z-20 flex items-center justify-between px-4 py-3">
         {/* Counter */}
         {hasMultiple ? (
           <div className="rounded-full bg-[var(--bb-bg-page)]/10 px-3 py-1 text-xs font-medium text-white/80">
@@ -567,10 +545,7 @@ function ImageLightbox({
             onClick={async () => {
               setLightboxDownloading(true);
               try {
-                await downloadSingleAsset(
-                  asset.id,
-                  asset.originalName || `image-${index + 1}`,
-                );
+                await downloadSingleAsset(asset.id, asset.originalName || `image-${index + 1}`);
               } catch (err) {
                 console.error("[Lightbox] download error:", err);
               } finally {
@@ -684,7 +659,7 @@ function ImageLightbox({
               e.stopPropagation();
               goPrev();
             }}
-            className="absolute left-2 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-[var(--bb-bg-page)]/10 text-lg text-white/80 transition-colors hover:bg-[var(--bb-bg-page)]/20 md:hidden"
+            className="absolute top-1/2 left-2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-[var(--bb-bg-page)]/10 text-lg text-white/80 transition-colors hover:bg-[var(--bb-bg-page)]/20 md:hidden"
             aria-label="Previous image"
           >
             &#8249;
@@ -695,7 +670,7 @@ function ImageLightbox({
               e.stopPropagation();
               goNext();
             }}
-            className="absolute right-2 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-[var(--bb-bg-page)]/10 text-lg text-white/80 transition-colors hover:bg-[var(--bb-bg-page)]/20 md:hidden"
+            className="absolute top-1/2 right-2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-[var(--bb-bg-page)]/10 text-lg text-white/80 transition-colors hover:bg-[var(--bb-bg-page)]/20 md:hidden"
             aria-label="Next image"
           >
             &#8250;
@@ -711,9 +686,7 @@ function ImageLightbox({
       )}
 
       {/* Mobile bottom sheet */}
-      {showSidebar && (
-        <PinBottomSheet {...sidebarProps} autoExpand={mobileAutoExpand} />
-      )}
+      {showSidebar && <PinBottomSheet {...sidebarProps} autoExpand={mobileAutoExpand} />}
     </div>
   );
 }
@@ -780,7 +753,7 @@ export function RevisionImageGrid({
             {/* Download button — always visible, enhanced on hover */}
             <button
               type="button"
-              className="pointer-events-auto absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/20 text-white/70 backdrop-blur-sm transition-all group-hover:h-6 group-hover:w-6 group-hover:bg-black/50 group-hover:text-white hover:!bg-black/70"
+              className="pointer-events-auto absolute right-1 bottom-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/20 text-white/70 backdrop-blur-sm transition-all group-hover:h-6 group-hover:w-6 group-hover:bg-black/50 group-hover:text-white hover:!bg-black/70"
               onClick={(e) => {
                 e.stopPropagation();
                 handleDownload(asset.id, asset.originalName || `image-${i + 1}`);
@@ -796,7 +769,7 @@ export function RevisionImageGrid({
             </button>
             {/* Pin count badge */}
             {asset.pinCount != null && asset.pinCount > 0 && (
-              <div className="absolute left-1 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[var(--bb-primary)] px-1 text-[8px] font-bold text-white shadow-sm">
+              <div className="absolute top-1 left-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[var(--bb-primary)] px-1 text-[8px] font-bold text-white shadow-sm">
                 📌 {asset.pinCount}
               </div>
             )}
@@ -870,7 +843,7 @@ export function RevisionImageLarge({
             {/* Download button — always visible, enhanced on hover */}
             <button
               type="button"
-              className="pointer-events-auto absolute bottom-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/20 text-white/70 backdrop-blur-sm transition-all group-hover:h-8 group-hover:w-8 group-hover:bg-black/50 group-hover:text-white hover:!bg-black/70"
+              className="pointer-events-auto absolute right-2 bottom-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/20 text-white/70 backdrop-blur-sm transition-all group-hover:h-8 group-hover:w-8 group-hover:bg-black/50 group-hover:text-white hover:!bg-black/70"
               onClick={(e) => {
                 e.stopPropagation();
                 handleDownload(asset.id, asset.originalName || `image-${i + 1}`);
@@ -886,7 +859,7 @@ export function RevisionImageLarge({
             </button>
             {/* Pin count badge */}
             {asset.pinCount != null && asset.pinCount > 0 && (
-              <div className="absolute left-2 top-2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[var(--bb-primary)] px-1.5 text-[9px] font-bold text-white shadow-sm">
+              <div className="absolute top-2 left-2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[var(--bb-primary)] px-1.5 text-[9px] font-bold text-white shadow-sm">
                 📌 {asset.pinCount}
               </div>
             )}
@@ -964,11 +937,7 @@ export function DownloadAllButton({
 // Used when creative work exists so briefs don't dominate the viewport
 // ---------------------------------------------------------------------------
 
-export function BriefThumbnailRow({
-  assets,
-}: {
-  assets: AssetEntry[];
-}) {
+export function BriefThumbnailRow({ assets }: { assets: AssetEntry[] }) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
@@ -1003,7 +972,7 @@ export function BriefThumbnailRow({
             {/* Download badge */}
             <button
               type="button"
-              className="pointer-events-auto absolute bottom-0.5 right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/20 text-white/70 transition-all group-hover/brief:h-5 group-hover/brief:w-5 group-hover/brief:bg-black/50 group-hover/brief:text-white hover:!bg-black/70"
+              className="pointer-events-auto absolute right-0.5 bottom-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/20 text-white/70 transition-all group-hover/brief:h-5 group-hover/brief:w-5 group-hover/brief:bg-black/50 group-hover/brief:text-white hover:!bg-black/70"
               onClick={(e) => {
                 e.stopPropagation();
                 handleDownload(asset.id, asset.originalName || `brief-${i + 1}`);

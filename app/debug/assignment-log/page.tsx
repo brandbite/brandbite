@@ -88,9 +88,7 @@ export default async function AssignmentLogDebugPage() {
     return (
       <div className="min-h-screen bg-[var(--bb-bg-card)] px-6 py-10 text-[var(--bb-secondary)]">
         <div className="mx-auto max-w-5xl">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Assignment log
-          </h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Assignment log</h1>
           <p className="mt-2 text-sm text-[var(--bb-text-tertiary)]">
             This page is only available to site owners and admins.
           </p>
@@ -143,15 +141,13 @@ export default async function AssignmentLogDebugPage() {
         {/* Header */}
         <header className="mb-6 flex items-start justify-between gap-4">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
+            <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--bb-text-muted)] uppercase">
               Debug panel
             </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-              Ticket assignment log
-            </h1>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight">Ticket assignment log</h1>
             <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-              Last 50 assignment events across all workspaces: auto-assign,
-              fallback and future strategies.
+              Last 50 assignment events across all workspaces: auto-assign, fallback and future
+              strategies.
             </p>
           </div>
           <div className="rounded-full bg-[var(--bb-bg-card)] px-3 py-1 text-[11px] text-[var(--bb-text-secondary)]">
@@ -161,13 +157,16 @@ export default async function AssignmentLogDebugPage() {
 
         {/* Empty state */}
         {logs.length === 0 && (
-          <EmptyState title="No assignment events yet." description="Once customers start creating tickets and the auto-assign engine runs, events will appear here for debugging." />
+          <EmptyState
+            title="No assignment events yet."
+            description="Once customers start creating tickets and the auto-assign engine runs, events will appear here for debugging."
+          />
         )}
 
         {/* Log table */}
         {logs.length > 0 && (
           <div className="overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] shadow-sm">
-            <div className="border-b border-[var(--bb-border-subtle)] bg-[var(--bb-bg-warm)] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--bb-text-tertiary)]">
+            <div className="border-b border-[var(--bb-border-subtle)] bg-[var(--bb-bg-warm)] px-4 py-2.5 text-[11px] font-semibold tracking-wide text-[var(--bb-text-tertiary)] uppercase">
               Assignment events
             </div>
             <div className="divide-y divide-[var(--bb-border-subtle)] text-xs">
@@ -178,14 +177,12 @@ export default async function AssignmentLogDebugPage() {
                 const code = ticket
                   ? formatTicketCode({
                       projectCode: ticket.project?.code ?? null,
-                      companyTicketNumber:
-                        ticket.companyTicketNumber ?? null,
+                      companyTicketNumber: ticket.companyTicketNumber ?? null,
                       ticketId: ticket.id,
                     })
                   : log.ticketId;
 
-                const companyName =
-                  ticket?.company?.name ?? "Unknown company";
+                const companyName = ticket?.company?.name ?? "Unknown company";
 
                 const reason = String(log.reason ?? "UNKNOWN");
 
@@ -195,8 +192,7 @@ export default async function AssignmentLogDebugPage() {
                     const raw = log.metadata as any;
                     metadataPreview = JSON.stringify(raw, null, 0);
                     if (metadataPreview.length > 120) {
-                      metadataPreview =
-                        metadataPreview.slice(0, 117) + "...";
+                      metadataPreview = metadataPreview.slice(0, 117) + "...";
                     }
                   }
                 } catch {
@@ -214,9 +210,7 @@ export default async function AssignmentLogDebugPage() {
                         {formatDateTime(log.createdAt)}
                       </p>
                       <p className="mt-1">
-                        <Badge variant={reasonBadgeVariant(reason)}>
-                          {reason}
-                        </Badge>
+                        <Badge variant={reasonBadgeVariant(reason)}>{reason}</Badge>
                       </p>
                     </div>
 
@@ -255,9 +249,7 @@ export default async function AssignmentLogDebugPage() {
                         {creative ? (
                           <>
                             Assigned to{" "}
-                            <span className="font-semibold">
-                              {creative.name || creative.email}
-                            </span>
+                            <span className="font-semibold">{creative.name || creative.email}</span>
                           </>
                         ) : (
                           <span className="text-[var(--bb-danger-text)]">
@@ -272,12 +264,8 @@ export default async function AssignmentLogDebugPage() {
                       )}
                       {metadataPreview && (
                         <p className="mt-1 text-[10px] text-[var(--bb-text-secondary)]">
-                          <span className="font-medium text-[var(--bb-secondary)]">
-                            Metadata:
-                          </span>{" "}
-                          <span className="font-mono">
-                            {metadataPreview}
-                          </span>
+                          <span className="font-medium text-[var(--bb-secondary)]">Metadata:</span>{" "}
+                          <span className="font-mono">{metadataPreview}</span>
                         </p>
                       )}
                     </div>

@@ -66,10 +66,7 @@ export function PinOverlay({
       if (!rect) return;
 
       const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-      const y = Math.max(
-        0,
-        Math.min(1, (e.clientY - rect.top) / rect.height),
-      );
+      const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
 
       onImageClick(x, y);
     },
@@ -96,14 +93,8 @@ export function PinOverlay({
       const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) return;
 
-      const x = Math.max(
-        0,
-        Math.min(1, (touch.clientX - rect.left) / rect.width),
-      );
-      const y = Math.max(
-        0,
-        Math.min(1, (touch.clientY - rect.top) / rect.height),
-      );
+      const x = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
+      const y = Math.max(0, Math.min(1, (touch.clientY - rect.top) / rect.height));
 
       onImageClick(x, y);
     },
@@ -111,14 +102,11 @@ export function PinOverlay({
   );
 
   // Long-press on pin for mobile tooltip
-  const handlePinTouchStart = useCallback(
-    (pin: PinData) => {
-      longPressTimer.current = setTimeout(() => {
-        setLongPressPin(pin.order);
-      }, 500);
-    },
-    [],
-  );
+  const handlePinTouchStart = useCallback((pin: PinData) => {
+    longPressTimer.current = setTimeout(() => {
+      setLongPressPin(pin.order);
+    }, 500);
+  }, []);
 
   const handlePinTouchEnd = useCallback(() => {
     if (longPressTimer.current) {
@@ -148,14 +136,7 @@ export function PinOverlay({
           <div
             key={`pin-${pin.order}`}
             data-pin
-            className={`absolute z-10 flex items-center justify-center rounded-full font-bold text-white shadow-lg transition-all
-              ${isResolved ? "bg-[#32b37b]" : "bg-[var(--bb-primary)]"}
-              ${isActive ? "ring-2 ring-white ring-offset-1 ring-offset-transparent animate-pin-pulse md:h-7 md:w-7 h-6 w-6" : "md:h-6 md:w-6 h-5 w-5"}
-              ${mode === "edit" ? "cursor-pointer hover:scale-110" : ""}
-              ${resolveMode && !isResolved ? "cursor-pointer hover:scale-110 hover:ring-2 hover:ring-[#32b37b]/40" : ""}
-              ${!resolveMode && mode !== "edit" ? "cursor-default" : ""}
-              animate-pin-drop
-            `}
+            className={`absolute z-10 flex items-center justify-center rounded-full font-bold text-white shadow-lg transition-all ${isResolved ? "bg-[#32b37b]" : "bg-[var(--bb-primary)]"} ${isActive ? "animate-pin-pulse h-6 w-6 ring-2 ring-white ring-offset-1 ring-offset-transparent md:h-7 md:w-7" : "h-5 w-5 md:h-6 md:w-6"} ${mode === "edit" ? "cursor-pointer hover:scale-110" : ""} ${resolveMode && !isResolved ? "cursor-pointer hover:scale-110 hover:ring-2 hover:ring-[#32b37b]/40" : ""} ${!resolveMode && mode !== "edit" ? "cursor-default" : ""} animate-pin-drop`}
             style={{
               left: `${pin.x * 100}%`,
               top: `${pin.y * 100}%`,
@@ -174,9 +155,9 @@ export function PinOverlay({
 
             {/* Mobile long-press tooltip */}
             {longPressPin === pin.order && pin.label && (
-              <div className="absolute bottom-full left-1/2 z-20 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-[var(--bb-secondary)] px-2.5 py-1.5 text-[10px] font-normal text-white shadow-lg md:hidden">
+              <div className="absolute bottom-full left-1/2 z-20 mb-2 -translate-x-1/2 rounded-lg bg-[var(--bb-secondary)] px-2.5 py-1.5 text-[10px] font-normal whitespace-nowrap text-white shadow-lg md:hidden">
                 <div className="max-w-[200px] truncate">{pin.label}</div>
-                <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-[var(--bb-secondary)]" />
+                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[var(--bb-secondary)]" />
               </div>
             )}
           </div>

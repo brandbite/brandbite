@@ -67,9 +67,6 @@ export function SafeHtml({ html, className = "" }: SafeHtmlProps) {
   });
 
   return (
-    <div
-      className={`bb-rich-text ${className}`}
-      dangerouslySetInnerHTML={{ __html: clean }}
-    />
+    <div className={`bb-rich-text ${className}`} dangerouslySetInnerHTML={{ __html: clean }} />
   );
 }

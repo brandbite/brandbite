@@ -84,7 +84,9 @@ export function NoteCard({ data, onUpdate }: NoteCardProps) {
   return (
     <div className="min-h-[4rem] cursor-pointer p-4" onClick={enterEdit}>
       {data.title && (
-        <h3 className="mb-1 text-[13px] font-semibold leading-snug text-[var(--bb-secondary)]">{data.title}</h3>
+        <h3 className="mb-1 text-[13px] leading-snug font-semibold text-[var(--bb-secondary)]">
+          {data.title}
+        </h3>
       )}
       {data.body ? (
         <div

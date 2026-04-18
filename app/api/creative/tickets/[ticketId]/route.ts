@@ -30,10 +30,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
     const { ticketId } = await params;
 
     if (!ticketId) {
-      return NextResponse.json(
-        { error: "Missing ticketId in route params" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Missing ticketId in route params" }, { status: 400 });
     }
 
     const ticket = await prisma.ticket.findFirst({
@@ -131,19 +128,10 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
     );
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
-    console.error(
-      "[GET /api/creative/tickets/[ticketId]] error",
-      error,
-    );
-    return NextResponse.json(
-      { error: "Failed to load ticket detail" },
-      { status: 500 },
-    );
+    console.error("[GET /api/creative/tickets/[ticketId]] error", error);
+    return NextResponse.json({ error: "Failed to load ticket detail" }, { status: 500 });
   }
 }

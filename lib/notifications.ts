@@ -7,10 +7,7 @@
 import { prisma } from "@/lib/prisma";
 import type { NotificationType, UserRole } from "@prisma/client";
 import { sendNotificationEmail } from "@/lib/email";
-import {
-  buildNotificationEmailHtml,
-  getSubjectForType,
-} from "@/lib/email-templates";
+import { buildNotificationEmailHtml, getSubjectForType } from "@/lib/email-templates";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -44,9 +41,7 @@ type CreateNotificationInput = {
  * type, both channels default to enabled.
  * Fire-and-forget — errors are swallowed to avoid breaking the main flow.
  */
-export async function createNotification(
-  input: CreateNotificationInput,
-): Promise<void> {
+export async function createNotification(input: CreateNotificationInput): Promise<void> {
   try {
     // Check user preference (both channels)
     const pref = await prisma.notificationPreference.findUnique({
@@ -91,17 +86,13 @@ export async function createNotification(
 // Email sending helper (private)
 // ---------------------------------------------------------------------------
 
-function roleToRecipientRole(
-  role: UserRole,
-): "customer" | "creative" | "admin" {
+function roleToRecipientRole(role: UserRole): "customer" | "creative" | "admin" {
   if (role === "CUSTOMER") return "customer";
   if (role === "DESIGNER") return "creative";
   return "admin"; // SITE_OWNER, SITE_ADMIN
 }
 
-async function sendEmailForNotification(
-  input: CreateNotificationInput,
-): Promise<void> {
+async function sendEmailForNotification(input: CreateNotificationInput): Promise<void> {
   // Look up recipient email + name + role
   const recipient = await prisma.userAccount.findUnique({
     where: { id: input.userId },
@@ -151,10 +142,7 @@ type GetNotificationsOptions = {
   unreadOnly?: boolean;
 };
 
-export async function getNotifications(
-  userId: string,
-  opts: GetNotificationsOptions = {},
-) {
+export async function getNotifications(userId: string, opts: GetNotificationsOptions = {}) {
   const { limit = 20, offset = 0, unreadOnly = false } = opts;
 
   return prisma.notification.findMany({
@@ -184,10 +172,7 @@ export async function getNotifications(
 // Mark as read
 // ---------------------------------------------------------------------------
 
-export async function markAsRead(
-  notificationId: string,
-  userId: string,
-): Promise<boolean> {
+export async function markAsRead(notificationId: string, userId: string): Promise<boolean> {
   const result = await prisma.notification.updateMany({
     where: { id: notificationId, userId },
     data: { read: true, readAt: new Date() },
@@ -217,9 +202,7 @@ export type PreferenceEntry = {
  * Returns all notification type preferences for a user.
  * Types without an explicit row default to enabled for both channels.
  */
-export async function getUserPreferences(
-  userId: string,
-): Promise<PreferenceEntry[]> {
+export async function getUserPreferences(userId: string): Promise<PreferenceEntry[]> {
   const rows = await prisma.notificationPreference.findMany({
     where: { userId },
     select: { type: true, enabled: true, emailEnabled: true },

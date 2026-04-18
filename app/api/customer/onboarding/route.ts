@@ -19,10 +19,7 @@ export async function POST(req: NextRequest) {
     const user = await getCurrentUserOrThrow();
 
     if (user.role !== "CUSTOMER") {
-      return NextResponse.json(
-        { error: "Only customers can create companies." },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Only customers can create companies." }, { status: 403 });
     }
 
     // Check if user already belongs to a company
@@ -95,16 +92,10 @@ export async function POST(req: NextRequest) {
     console.error("[Onboarding] POST error:", err);
 
     if (err?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Not authenticated." },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
     }
 
-    return NextResponse.json(
-      { error: "Failed to create company." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to create company." }, { status: 500 });
   }
 }
 
@@ -117,10 +108,7 @@ export async function PATCH() {
     const user = await getCurrentUserOrThrow();
 
     if (!user.activeCompanyId) {
-      return NextResponse.json(
-        { error: "No active company found." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "No active company found." }, { status: 400 });
     }
 
     await prisma.company.update({
@@ -133,15 +121,9 @@ export async function PATCH() {
     console.error("[Onboarding] PATCH error:", err);
 
     if (err?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Not authenticated." },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
     }
 
-    return NextResponse.json(
-      { error: "Failed to complete onboarding." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to complete onboarding." }, { status: 500 });
   }
 }

@@ -98,15 +98,12 @@ export default function DemoPersonaBanner() {
     <div className="w-full bg-[var(--bb-primary)] text-[11px] text-white">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-2">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="rounded-full bg-[var(--bb-bg-page)]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em]">
+          <span className="rounded-full bg-[var(--bb-bg-page)]/15 px-2 py-0.5 text-[10px] font-semibold tracking-[0.16em] uppercase">
             Demo mode
           </span>
           <span className="opacity-90">
-            You are browsing as{" "}
-            <span className="font-medium">{persona.label}</span>
-            {persona.roleLabel && (
-              <span className="opacity-75"> ({persona.roleLabel})</span>
-            )}
+            You are browsing as <span className="font-medium">{persona.label}</span>
+            {persona.roleLabel && <span className="opacity-75"> ({persona.roleLabel})</span>}
           </span>
         </div>
 

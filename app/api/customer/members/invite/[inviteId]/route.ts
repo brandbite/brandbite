@@ -10,10 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { InviteStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
-import {
-  canManageMembers,
-  normalizeCompanyRole,
-} from "@/lib/permissions/companyRoles";
+import { canManageMembers, normalizeCompanyRole } from "@/lib/permissions/companyRoles";
 
 type RouteParams = {
   params: Promise<{
@@ -33,18 +30,14 @@ export async function DELETE(req: NextRequest, context: RouteParams) {
     }
 
     if (!user.activeCompanyId) {
-      return NextResponse.json(
-        { error: "No active company selected." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "No active company selected." }, { status: 400 });
     }
 
     const companyRole = normalizeCompanyRole(user.companyRole);
     if (!canManageMembers(companyRole)) {
       return NextResponse.json(
         {
-          error:
-            "Only company owners or project managers can cancel invites.",
+          error: "Only company owners or project managers can cancel invites.",
         },
         { status: 403 },
       );
@@ -56,10 +49,7 @@ export async function DELETE(req: NextRequest, context: RouteParams) {
     const { inviteId } = await context.params;
 
     if (!inviteId) {
-      return NextResponse.json(
-        { error: "Invalid invite id." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Invalid invite id." }, { status: 400 });
     }
 
     const invite = await prisma.companyInvite.findUnique({
@@ -67,10 +57,7 @@ export async function DELETE(req: NextRequest, context: RouteParams) {
     });
 
     if (!invite || invite.companyId !== user.activeCompanyId) {
-      return NextResponse.json(
-        { error: "Invite not found." },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Invite not found." }, { status: 404 });
     }
 
     if (invite.status !== InviteStatus.PENDING) {
@@ -90,19 +77,10 @@ export async function DELETE(req: NextRequest, context: RouteParams) {
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
-    console.error(
-      "[DELETE /api/customer/members/invite/[inviteId]] error",
-      error,
-    );
-    return NextResponse.json(
-      { error: "Failed to cancel invite" },
-      { status: 500 },
-    );
+    console.error("[DELETE /api/customer/members/invite/[inviteId]] error", error);
+    return NextResponse.json({ error: "Failed to cancel invite" }, { status: 500 });
   }
 }

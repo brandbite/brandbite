@@ -12,17 +12,11 @@ import { Prisma, WithdrawalStatus } from "@prisma/client";
 /**
  * POST /api/admin/withdrawals/:id/reject
  */
-export async function POST(
-  request: Request,
-  context: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
 
   if (!id) {
-    return NextResponse.json(
-      { error: "Missing withdrawal id in route params" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Missing withdrawal id in route params" }, { status: 400 });
   }
 
   let body: { reason?: string };
@@ -40,10 +34,7 @@ export async function POST(
     });
 
     if (!withdrawal) {
-      return NextResponse.json(
-        { error: "Withdrawal not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Withdrawal not found" }, { status: 404 });
     }
 
     if (withdrawal.status !== WithdrawalStatus.PENDING) {
@@ -52,7 +43,7 @@ export async function POST(
           error: "Only PENDING withdrawals can be rejected",
           currentStatus: withdrawal.status,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -61,7 +52,11 @@ export async function POST(
       data: {
         status: WithdrawalStatus.REJECTED,
         metadata: {
-          ...((typeof withdrawal.metadata === "object" && withdrawal.metadata !== null && !Array.isArray(withdrawal.metadata)) ? (withdrawal.metadata as Prisma.JsonObject) : {}),
+          ...(typeof withdrawal.metadata === "object" &&
+          withdrawal.metadata !== null &&
+          !Array.isArray(withdrawal.metadata)
+            ? (withdrawal.metadata as Prisma.JsonObject)
+            : {}),
           adminRejectReason: adminReason,
         },
       },
@@ -72,13 +67,10 @@ export async function POST(
         message: "Withdrawal rejected",
         withdrawal: updated,
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error) {
     console.error("[POST /api/admin/withdrawals/:id/reject] error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

@@ -93,7 +93,6 @@ export default function CreativeWithdrawalsPage() {
     return () => {
       cancelled = true;
     };
-     
   }, []);
 
   const withdrawals = data?.withdrawals ?? [];

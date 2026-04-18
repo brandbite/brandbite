@@ -97,8 +97,8 @@ function PinList({
       {mode === "edit" && (
         <div className="rounded-lg bg-[var(--bb-primary)]/[0.06] px-3 py-2">
           <p className="text-[10px] leading-relaxed text-[var(--bb-text-tertiary)]">
-            <span className="font-semibold text-[var(--bb-primary)]">How it works:</span>{" "}
-            Click on the image to place all your pins, add a note to each one, then press{" "}
+            <span className="font-semibold text-[var(--bb-primary)]">How it works:</span> Click on
+            the image to place all your pins, add a note to each one, then press{" "}
             <span className="font-semibold">&quot;Send all notes&quot;</span> when you&apos;re done.
           </p>
         </div>
@@ -116,9 +116,7 @@ function PinList({
       {/* All-resolved success banner */}
       {mode === "resolve" && openCount === 0 && resolvedCount > 0 && (
         <div className="rounded-lg bg-[#32b37b]/[0.08] px-3 py-2.5 text-center">
-          <p className="text-[11px] font-semibold text-[#32b37b]">
-            All notes addressed ✓
-          </p>
+          <p className="text-[11px] font-semibold text-[#32b37b]">All notes addressed ✓</p>
           <p className="mt-0.5 text-[9px] text-[#32b37b]/70">
             Every revision note has been resolved
           </p>
@@ -137,22 +135,19 @@ function PinList({
             ref={(el) => {
               if (el) pinRefs.current.set(pin.order, el);
             }}
-            className={`group rounded-xl border p-2.5 transition-all
-              ${isActive
+            className={`group rounded-xl border p-2.5 transition-all ${
+              isActive
                 ? isResolved
                   ? "border-[#32b37b]/40 bg-[#32b37b]/[0.04] shadow-sm"
                   : "border-[var(--bb-primary)]/40 bg-[var(--bb-primary)]/[0.04] shadow-sm"
-                : "border-[var(--bb-border)] bg-[var(--bb-bg-page)] hover:border-[var(--bb-border-input)]"}
-              ${hasError ? "border-red-300 bg-red-50/50" : ""}
-            `}
+                : "border-[var(--bb-border)] bg-[var(--bb-bg-page)] hover:border-[var(--bb-border-input)]"
+            } ${hasError ? "border-red-300 bg-red-50/50" : ""} `}
             onClick={() => onActivePinChange(pin.order)}
           >
             <div className="mb-1.5 flex items-center gap-2">
               {/* Pin number badge */}
               <div
-                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white
-                  ${isResolved ? "bg-[#32b37b]" : "bg-[var(--bb-primary)]"}
-                `}
+                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white ${isResolved ? "bg-[#32b37b]" : "bg-[var(--bb-primary)]"} `}
               >
                 {isResolved ? "✓" : pin.order}
               </div>
@@ -176,7 +171,7 @@ function PinList({
                     e.stopPropagation();
                     onPinDelete(pin.order);
                   }}
-                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[var(--bb-text-muted)] opacity-0 transition-opacity hover:bg-[var(--bb-bg-card)] hover:text-[var(--bb-text-tertiary)] group-hover:opacity-100"
+                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[var(--bb-text-muted)] opacity-0 transition-opacity group-hover:opacity-100 hover:bg-[var(--bb-bg-card)] hover:text-[var(--bb-text-tertiary)]"
                   aria-label={`Delete pin ${pin.order}`}
                 >
                   ×
@@ -188,13 +183,9 @@ function PinList({
             {mode === "edit" && (
               <textarea
                 value={pin.label}
-                onChange={(e) =>
-                  onPinLabelChange?.(pin.order, e.target.value)
-                }
+                onChange={(e) => onPinLabelChange?.(pin.order, e.target.value)}
                 placeholder="Describe the change needed here..."
-                className={`w-full resize-none rounded-lg border bg-[var(--bb-bg-page)] px-2.5 py-2 text-[11px] leading-snug text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] transition-colors
-                  ${hasError ? "border-red-300 focus:border-red-400 focus:ring-1 focus:ring-red-200" : "border-[var(--bb-border)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]/20"}
-                `}
+                className={`w-full resize-none rounded-lg border bg-[var(--bb-bg-page)] px-2.5 py-2 text-[11px] leading-snug text-[var(--bb-secondary)] transition-colors outline-none placeholder:text-[var(--bb-text-muted)] ${hasError ? "border-red-300 focus:border-red-400 focus:ring-1 focus:ring-red-200" : "border-[var(--bb-border)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]/20"} `}
                 rows={2}
                 autoFocus={isActive}
                 onFocus={() => onActivePinChange(pin.order)}
@@ -218,9 +209,7 @@ function PinList({
 
             {/* Resolved status indicator */}
             {isResolved && (
-              <div className="mt-1 text-[9px] font-medium text-[#32b37b]">
-                ✓ Resolved
-              </div>
+              <div className="mt-1 text-[9px] font-medium text-[#32b37b]">✓ Resolved</div>
             )}
           </div>
         );
@@ -268,46 +257,33 @@ export function PinBottomSheet({
     expanded: "75vh",
   };
 
-  const handleTouchStart = useCallback(
-    (e: React.TouchEvent) => {
-      dragStartY.current = e.touches[0].clientY;
-      const el = sheetRef.current;
-      if (el) {
-        dragStartTranslate.current = el.getBoundingClientRect().top;
-      }
-    },
-    [],
-  );
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    dragStartY.current = e.touches[0].clientY;
+    const el = sheetRef.current;
+    if (el) {
+      dragStartTranslate.current = el.getBoundingClientRect().top;
+    }
+  }, []);
 
-  const handleTouchMove = useCallback(
-    (e: React.TouchEvent) => {
-      if (dragStartY.current === null) return;
-      // Prevent default to avoid scroll conflicts
-      e.preventDefault();
-    },
-    [],
-  );
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (dragStartY.current === null) return;
+    // Prevent default to avoid scroll conflicts
+    e.preventDefault();
+  }, []);
 
-  const handleTouchEnd = useCallback(
-    (e: React.TouchEvent) => {
-      if (dragStartY.current === null) return;
-      const endY = e.changedTouches[0].clientY;
-      const delta = dragStartY.current - endY;
-      dragStartY.current = null;
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (dragStartY.current === null) return;
+    const endY = e.changedTouches[0].clientY;
+    const delta = dragStartY.current - endY;
+    dragStartY.current = null;
 
-      // Swipe up → expand, swipe down → collapse
-      if (delta > 50) {
-        setSnap((s) =>
-          s === "collapsed" ? "half" : s === "half" ? "expanded" : "expanded",
-        );
-      } else if (delta < -50) {
-        setSnap((s) =>
-          s === "expanded" ? "half" : s === "half" ? "collapsed" : "collapsed",
-        );
-      }
-    },
-    [],
-  );
+    // Swipe up → expand, swipe down → collapse
+    if (delta > 50) {
+      setSnap((s) => (s === "collapsed" ? "half" : s === "half" ? "expanded" : "expanded"));
+    } else if (delta < -50) {
+      setSnap((s) => (s === "expanded" ? "half" : s === "half" ? "collapsed" : "collapsed"));
+    }
+  }, []);
 
   const toggleSnap = useCallback(() => {
     setSnap((s) => (s === "collapsed" ? "half" : "collapsed"));
@@ -352,9 +328,7 @@ export function PinBottomSheet({
                 onSubmitRevision();
               }}
               disabled={pins.length === 0 || submitting}
-              className={`rounded-lg px-3 py-1.5 text-[11px] font-semibold text-white transition-colors
-                ${pins.length > 0 && !submitting ? "bg-[var(--bb-primary)] hover:bg-[var(--bb-primary-hover)]" : "bg-[var(--bb-border-input)] cursor-not-allowed"}
-              `}
+              className={`rounded-lg px-3 py-1.5 text-[11px] font-semibold text-white transition-colors ${pins.length > 0 && !submitting ? "bg-[var(--bb-primary)] hover:bg-[var(--bb-primary-hover)]" : "cursor-not-allowed bg-[var(--bb-border-input)]"} `}
             >
               {submitting ? "Sending..." : "Send all notes"}
             </button>
@@ -421,7 +395,7 @@ export function PinSidebar({
       {/* Header */}
       <div className="flex shrink-0 items-center justify-between border-b border-[var(--bb-border-subtle)] px-4 py-3">
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
+          <span className="text-[11px] font-semibold tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
             {mode === "resolve" ? "Creative review" : "Revision notes"}
           </span>
           {pins.length > 0 && mode !== "resolve" && (
@@ -460,24 +434,26 @@ export function PinSidebar({
       />
 
       {/* Footer with upload work button (resolve mode, all pins resolved) */}
-      {mode === "resolve" && onUploadWork && (() => {
-        const allResolved = pins.length > 0 && pins.every((p) => p.status === "RESOLVED");
-        if (!allResolved) return null;
-        return (
-          <div className="shrink-0 border-t border-[var(--bb-border-subtle)] px-4 py-3">
-            <button
-              type="button"
-              onClick={onUploadWork}
-              className="w-full rounded-xl bg-[var(--bb-primary)] px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-all hover:bg-[var(--bb-primary-hover)]"
-            >
-              Upload new revision
-            </button>
-            <p className="mt-1.5 text-center text-[9px] text-[var(--bb-text-muted)]">
-              Ready to upload your updated designs
-            </p>
-          </div>
-        );
-      })()}
+      {mode === "resolve" &&
+        onUploadWork &&
+        (() => {
+          const allResolved = pins.length > 0 && pins.every((p) => p.status === "RESOLVED");
+          if (!allResolved) return null;
+          return (
+            <div className="shrink-0 border-t border-[var(--bb-border-subtle)] px-4 py-3">
+              <button
+                type="button"
+                onClick={onUploadWork}
+                className="w-full rounded-xl bg-[var(--bb-primary)] px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-all hover:bg-[var(--bb-primary-hover)]"
+              >
+                Upload new revision
+              </button>
+              <p className="mt-1.5 text-center text-[9px] text-[var(--bb-text-muted)]">
+                Ready to upload your updated designs
+              </p>
+            </div>
+          );
+        })()}
 
       {/* Footer with submit button (edit mode only) */}
       {mode === "edit" && onSubmitRevision && (
@@ -486,9 +462,7 @@ export function PinSidebar({
             type="button"
             onClick={onSubmitRevision}
             disabled={pins.length === 0 || submitting}
-            className={`w-full rounded-xl px-4 py-2.5 text-xs font-semibold text-white transition-all
-              ${pins.length > 0 && !submitting ? "bg-[var(--bb-primary)] hover:bg-[var(--bb-primary-hover)] shadow-sm" : "bg-[var(--bb-border-input)] cursor-not-allowed"}
-            `}
+            className={`w-full rounded-xl px-4 py-2.5 text-xs font-semibold text-white transition-all ${pins.length > 0 && !submitting ? "bg-[var(--bb-primary)] shadow-sm hover:bg-[var(--bb-primary-hover)]" : "cursor-not-allowed bg-[var(--bb-border-input)]"} `}
           >
             {submitting
               ? "Sending all notes..."

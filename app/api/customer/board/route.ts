@@ -12,12 +12,7 @@ import { getCurrentUserOrThrow } from "@/lib/auth";
 
 type TicketStatusString = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 
-const STATUS_LIST: TicketStatusString[] = [
-  "TODO",
-  "IN_PROGRESS",
-  "IN_REVIEW",
-  "DONE",
-];
+const STATUS_LIST: TicketStatusString[] = ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"];
 
 export async function GET(_req: NextRequest) {
   try {
@@ -31,10 +26,7 @@ export async function GET(_req: NextRequest) {
     }
 
     if (!user.activeCompanyId) {
-      return NextResponse.json(
-        { error: "No active company set for this user" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "No active company set for this user" }, { status: 400 });
     }
 
     const tickets = await prisma.ticket.findMany({
@@ -114,16 +106,10 @@ export async function GET(_req: NextRequest) {
     });
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[customer.board] GET error", error);
-    return NextResponse.json(
-      { error: "Failed to load customer board" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load customer board" }, { status: 500 });
   }
 }

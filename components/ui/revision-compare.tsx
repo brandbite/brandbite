@@ -76,13 +76,7 @@ function useResolvedSrc(assetId: string, url: string | null) {
 // CompareImage — single image in the comparison grid
 // ---------------------------------------------------------------------------
 
-function CompareImage({
-  asset,
-  label,
-}: {
-  asset: AssetEntry;
-  label: string;
-}) {
+function CompareImage({ asset, label }: { asset: AssetEntry; label: string }) {
   const { src, loading, error } = useResolvedSrc(asset.id, asset.url);
 
   if (loading) {
@@ -103,11 +97,7 @@ function CompareImage({
 
   return (
     <div className="group relative overflow-hidden rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-card)]">
-      <img
-        src={src}
-        alt={label}
-        className="aspect-video w-full object-cover"
-      />
+      <img src={src} alt={label} className="aspect-video w-full object-cover" />
       {asset.originalName && (
         <p className="truncate px-2 py-1 text-[10px] text-[var(--bb-text-tertiary)]">
           {asset.originalName}
@@ -142,15 +132,10 @@ export function RevisionCompare({
   const sorted = [...revisions].sort((a, b) => a.version - b.version);
 
   const defaultRight = sorted[sorted.length - 1]?.version ?? 1;
-  const defaultLeft =
-    sorted.length >= 2 ? sorted[sorted.length - 2].version : defaultRight;
+  const defaultLeft = sorted.length >= 2 ? sorted[sorted.length - 2].version : defaultRight;
 
-  const [leftVersion, setLeftVersion] = useState(
-    initialLeftVersion ?? defaultLeft,
-  );
-  const [rightVersion, setRightVersion] = useState(
-    initialRightVersion ?? defaultRight,
-  );
+  const [leftVersion, setLeftVersion] = useState(initialLeftVersion ?? defaultLeft);
+  const [rightVersion, setRightVersion] = useState(initialRightVersion ?? defaultRight);
 
   // Mobile tab state
   const [activeTab, setActiveTab] = useState<"left" | "right">("left");
@@ -158,10 +143,7 @@ export function RevisionCompare({
   const leftRev = sorted.find((r) => r.version === leftVersion);
   const rightRev = sorted.find((r) => r.version === rightVersion);
 
-  const maxAssets = Math.max(
-    leftRev?.assets.length ?? 0,
-    rightRev?.assets.length ?? 0,
-  );
+  const maxAssets = Math.max(leftRev?.assets.length ?? 0, rightRev?.assets.length ?? 0);
 
   // Close on Escape
   const handleKeyDown = useCallback(
@@ -188,9 +170,7 @@ export function RevisionCompare({
     <div className="fixed inset-0 z-[200] flex flex-col bg-black/60 backdrop-blur-sm">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-3 md:px-6">
-        <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">
-          Compare revisions
-        </h2>
+        <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">Compare revisions</h2>
 
         <div className="flex items-center gap-3">
           {/* Desktop dropdowns */}
@@ -243,7 +223,7 @@ export function RevisionCompare({
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
               activeTab === "left"
                 ? "bg-[var(--bb-primary)] text-white"
-                : "bg-[var(--bb-bg-page)] text-[var(--bb-secondary)] border border-[var(--bb-border-input)]"
+                : "border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] text-[var(--bb-secondary)]"
             }`}
             onClick={() => setActiveTab("left")}
           >
@@ -254,7 +234,7 @@ export function RevisionCompare({
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
               activeTab === "right"
                 ? "bg-[var(--bb-primary)] text-white"
-                : "bg-[var(--bb-bg-page)] text-[var(--bb-secondary)] border border-[var(--bb-border-input)]"
+                : "border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] text-[var(--bb-secondary)]"
             }`}
             onClick={() => setActiveTab("right")}
           >
@@ -322,10 +302,7 @@ export function RevisionCompare({
                   return (
                     <div key={i} className="grid grid-cols-2 gap-4">
                       {leftAsset ? (
-                        <CompareImage
-                          asset={leftAsset}
-                          label={`v${leftVersion} asset ${i + 1}`}
-                        />
+                        <CompareImage asset={leftAsset} label={`v${leftVersion} asset ${i + 1}`} />
                       ) : (
                         <EmptySlot />
                       )}
@@ -346,22 +323,18 @@ export function RevisionCompare({
             {/* Mobile: single column, tab-switched */}
             <div className="md:hidden">
               <p className="mb-3 text-xs font-semibold text-[var(--bb-secondary)]">
-                Version{" "}
-                {activeTab === "left" ? leftVersion : rightVersion}
+                Version {activeTab === "left" ? leftVersion : rightVersion}
               </p>
 
               <div className="space-y-3">
-                {(activeTab === "left" ? leftRev : rightRev)?.assets.map(
-                  (asset, i) => (
-                    <CompareImage
-                      key={asset.id}
-                      asset={asset}
-                      label={`v${activeTab === "left" ? leftVersion : rightVersion} asset ${i + 1}`}
-                    />
-                  ),
-                )}
-                {((activeTab === "left" ? leftRev : rightRev)?.assets
-                  .length ?? 0) === 0 && (
+                {(activeTab === "left" ? leftRev : rightRev)?.assets.map((asset, i) => (
+                  <CompareImage
+                    key={asset.id}
+                    asset={asset}
+                    label={`v${activeTab === "left" ? leftVersion : rightVersion} asset ${i + 1}`}
+                  />
+                ))}
+                {((activeTab === "left" ? leftRev : rightRev)?.assets.length ?? 0) === 0 && (
                   <div className="flex h-32 items-center justify-center text-xs text-[var(--bb-text-muted)]">
                     No assets in this version.
                   </div>

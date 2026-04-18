@@ -48,16 +48,11 @@ export async function GET(_req: NextRequest) {
       take: MAX_WITHDRAWALS,
     });
 
-    const totalRequested = withdrawals.reduce(
-      (sum, w) => sum + w.amountTokens,
-      0,
-    );
+    const totalRequested = withdrawals.reduce((sum, w) => sum + w.amountTokens, 0);
     const totalPaid = withdrawals
       .filter((w) => w.status === "PAID")
       .reduce((sum, w) => sum + w.amountTokens, 0);
-    const pendingCount = withdrawals.filter(
-      (w) => w.status === "PENDING",
-    ).length;
+    const pendingCount = withdrawals.filter((w) => w.status === "PENDING").length;
 
     const items = withdrawals.map((w) => ({
       id: w.id,
@@ -84,17 +79,11 @@ export async function GET(_req: NextRequest) {
     });
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[admin.withdrawals] GET error", error);
-    return NextResponse.json(
-      { error: "Failed to load admin withdrawals" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load admin withdrawals" }, { status: 500 });
   }
 }
 
@@ -119,10 +108,7 @@ export async function PATCH(req: NextRequest) {
     const action = body?.action as AdminWithdrawalAction | undefined;
 
     if (!id || !action) {
-      return NextResponse.json(
-        { error: "Missing id or action" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Missing id or action" }, { status: 400 });
     }
 
     const updated = await prisma.$transaction(async (tx) => {
@@ -146,10 +132,7 @@ export async function PATCH(req: NextRequest) {
 
       if (action === "APPROVE") {
         if (withdrawal.status !== "PENDING") {
-          throw new Response(
-            "Only pending withdrawals can be approved",
-            { status: 422 },
-          );
+          throw new Response("Only pending withdrawals can be approved", { status: 422 });
         }
 
         const w = await tx.withdrawal.update({
@@ -175,10 +158,7 @@ export async function PATCH(req: NextRequest) {
 
       if (action === "REJECT") {
         if (withdrawal.status !== "PENDING") {
-          throw new Response(
-            "Only pending withdrawals can be rejected",
-            { status: 422 },
-          );
+          throw new Response("Only pending withdrawals can be rejected", { status: 422 });
         }
 
         const w = await tx.withdrawal.update({
@@ -209,10 +189,7 @@ export async function PATCH(req: NextRequest) {
         });
       }
       if (withdrawal.status !== "APPROVED") {
-        throw new Response(
-          "Withdrawal must be approved before marking as paid",
-          { status: 422 },
-        );
+        throw new Response("Withdrawal must be approved before marking as paid", { status: 422 });
       }
 
       // Calculate creative balance before this debit
@@ -277,9 +254,7 @@ export async function PATCH(req: NextRequest) {
         amountTokens: updated.amountTokens,
         status: updated.status,
         createdAt: updated.createdAt.toISOString(),
-        approvedAt: updated.approvedAt
-          ? updated.approvedAt.toISOString()
-          : null,
+        approvedAt: updated.approvedAt ? updated.approvedAt.toISOString() : null,
         creative: updated.creative,
       },
     });
@@ -287,23 +262,14 @@ export async function PATCH(req: NextRequest) {
     // tx içinden Response fırlattıysak onu aynen geçir
     if (error instanceof Response) {
       const text = await error.text();
-      return NextResponse.json(
-        { error: text || "Request failed" },
-        { status: error.status },
-      );
+      return NextResponse.json({ error: text || "Request failed" }, { status: error.status });
     }
 
     if ((error as any)?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[admin.withdrawals] PATCH error", error);
-    return NextResponse.json(
-      { error: "Failed to update withdrawal" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to update withdrawal" }, { status: 500 });
   }
 }

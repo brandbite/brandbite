@@ -67,8 +67,7 @@ export const DEMO_PERSONAS: DemoPersona[] = [
   {
     id: "customer-pm",
     label: "Customer • Project manager",
-    description:
-      "Project manager for Acme Studio demo projects. Creates and manages tickets.",
+    description: "Project manager for Acme Studio demo projects. Creates and manages tickets.",
     redirectTo: "/customer/tickets",
     email: "pm@acme-demo.com",
     role: "CUSTOMER",
@@ -106,14 +105,10 @@ export function isValidDemoPersona(id: string): id is DemoPersonaId {
   return DEMO_PERSONAS.some((persona) => persona.id === id);
 }
 
-export function getDemoPersonaById(
-  id: DemoPersonaId,
-): DemoPersona | undefined {
+export function getDemoPersonaById(id: DemoPersonaId): DemoPersona | undefined {
   return DEMO_PERSONAS.find((persona) => persona.id === id);
 }
 
-export function getEmailForDemoPersona(
-  id: DemoPersonaId,
-): string | null {
+export function getEmailForDemoPersona(id: DemoPersonaId): string | null {
   return getDemoPersonaById(id)?.email ?? null;
 }

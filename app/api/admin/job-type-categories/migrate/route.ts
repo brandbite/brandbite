@@ -12,10 +12,7 @@ import { getCurrentUserOrThrow } from "@/lib/auth";
 import { isSiteAdminRole } from "@/lib/roles";
 
 /** Known categories with their default icons and sort order */
-const KNOWN_CATEGORIES: Record<
-  string,
-  { icon: string; sortOrder: number }
-> = {
+const KNOWN_CATEGORIES: Record<string, { icon: string; sortOrder: number }> = {
   "Brand Strategy & Creative Direction": { icon: "\u2728", sortOrder: 0 },
   "Copywriting & Creative Writing": { icon: "\u270D\uFE0F", sortOrder: 1 },
   "Visual Design & Brand Identity": { icon: "\uD83C\uDFA8", sortOrder: 2 },
@@ -32,10 +29,7 @@ export async function POST(_req: NextRequest) {
     const user = await getCurrentUserOrThrow();
 
     if (!isSiteAdminRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only site admins can run migrations" },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Only site admins can run migrations" }, { status: 403 });
     }
 
     // Check if categories already exist
@@ -54,11 +48,7 @@ export async function POST(_req: NextRequest) {
     });
 
     const uniqueCategories = [
-      ...new Set(
-        jobTypes
-          .map((jt) => jt.category?.trim())
-          .filter((c): c is string => !!c),
-      ),
+      ...new Set(jobTypes.map((jt) => jt.category?.trim()).filter((c): c is string => !!c)),
     ];
 
     if (uniqueCategories.length === 0) {
@@ -130,16 +120,10 @@ export async function POST(_req: NextRequest) {
     });
   } catch (error: any) {
     if (error?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[admin.job-type-categories.migrate] POST error", error);
-    return NextResponse.json(
-      { error: "Migration failed" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Migration failed" }, { status: 500 });
   }
 }

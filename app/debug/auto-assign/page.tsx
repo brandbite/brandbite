@@ -48,63 +48,45 @@ async function fetchOverview(): Promise<AutoAssignOverviewCompany[]> {
   const json = await res.json().catch(() => null);
 
   if (!res.ok) {
-    const message =
-      (json as any)?.error ??
-      `Failed to load overview (status ${res.status})`;
+    const message = (json as any)?.error ?? `Failed to load overview (status ${res.status})`;
     throw new Error(message);
   }
 
   return (json as AutoAssignOverviewResponse).companies;
 }
 
-async function updateCompanyAutoAssign(
-  companyId: string,
-  autoAssignDefaultEnabled: boolean,
-) {
-  const res = await fetch(
-    `/api/debug/auto-assign/company/${encodeURIComponent(companyId)}`,
-    {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ autoAssignDefaultEnabled }),
+async function updateCompanyAutoAssign(companyId: string, autoAssignDefaultEnabled: boolean) {
+  const res = await fetch(`/api/debug/auto-assign/company/${encodeURIComponent(companyId)}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify({ autoAssignDefaultEnabled }),
+  });
 
   const json = await res.json().catch(() => null);
 
   if (!res.ok) {
-    const message =
-      (json as any)?.error ??
-      `Failed to update company (status ${res.status})`;
+    const message = (json as any)?.error ?? `Failed to update company (status ${res.status})`;
     throw new Error(message);
   }
 
   return json as { id: string; autoAssignDefaultEnabled: boolean };
 }
 
-async function updateProjectAutoAssignMode(
-  projectId: string,
-  mode: ProjectAutoAssignMode,
-) {
-  const res = await fetch(
-    `/api/debug/auto-assign/project/${encodeURIComponent(projectId)}`,
-    {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ autoAssignMode: mode }),
+async function updateProjectAutoAssignMode(projectId: string, mode: ProjectAutoAssignMode) {
+  const res = await fetch(`/api/debug/auto-assign/project/${encodeURIComponent(projectId)}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify({ autoAssignMode: mode }),
+  });
 
   const json = await res.json().catch(() => null);
 
   if (!res.ok) {
-    const message =
-      (json as any)?.error ??
-      `Failed to update project (status ${res.status})`;
+    const message = (json as any)?.error ?? `Failed to update project (status ${res.status})`;
     throw new Error(message);
   }
 
@@ -161,10 +143,7 @@ export default function AutoAssignDebugPage() {
   const isError = state.status === "error";
   const companies = state.status === "ready" ? state.companies : [];
 
-  const handleToggleCompany = async (
-    companyId: string,
-    nextValue: boolean,
-  ) => {
+  const handleToggleCompany = async (companyId: string, nextValue: boolean) => {
     setUpdatingKey(`company:${companyId}`);
     try {
       const updated = await updateCompanyAutoAssign(companyId, nextValue);
@@ -176,8 +155,7 @@ export default function AutoAssignDebugPage() {
             c.id === updated.id
               ? {
                   ...c,
-                  autoAssignDefaultEnabled:
-                    updated.autoAssignDefaultEnabled,
+                  autoAssignDefaultEnabled: updated.autoAssignDefaultEnabled,
                 }
               : c,
           ),
@@ -186,18 +164,14 @@ export default function AutoAssignDebugPage() {
     } catch (err: any) {
       console.error("[AutoAssignDebug] company update error", err);
       alert(
-        err?.message ??
-          "Failed to update company auto-assign setting. See console for details.",
+        err?.message ?? "Failed to update company auto-assign setting. See console for details.",
       );
     } finally {
       setUpdatingKey(null);
     }
   };
 
-  const handleChangeProjectMode = async (
-    projectId: string,
-    mode: ProjectAutoAssignMode,
-  ) => {
+  const handleChangeProjectMode = async (projectId: string, mode: ProjectAutoAssignMode) => {
     setUpdatingKey(`project:${projectId}`);
     try {
       const updated = await updateProjectAutoAssignMode(projectId, mode);
@@ -208,19 +182,14 @@ export default function AutoAssignDebugPage() {
           companies: prev.companies.map((c) => ({
             ...c,
             projects: c.projects.map((p) =>
-              p.id === updated.id
-                ? { ...p, autoAssignMode: updated.autoAssignMode }
-                : p,
+              p.id === updated.id ? { ...p, autoAssignMode: updated.autoAssignMode } : p,
             ),
           })),
         };
       });
     } catch (err: any) {
       console.error("[AutoAssignDebug] project update error", err);
-      alert(
-        err?.message ??
-          "Failed to update project auto-assign mode. See console for details.",
-      );
+      alert(err?.message ?? "Failed to update project auto-assign mode. See console for details.");
     } finally {
       setUpdatingKey(null);
     }
@@ -232,20 +201,18 @@ export default function AutoAssignDebugPage() {
         {/* Header */}
         <header className="mb-6 flex items-start justify-between gap-4">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
+            <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--bb-text-muted)] uppercase">
               Debug panel
             </p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight">
               Auto-assign configuration
             </h1>
             <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-              Manage how tickets are automatically assigned to creatives on each
-              workspace and project. Only visible to site owners and admins.
+              Manage how tickets are automatically assigned to creatives on each workspace and
+              project. Only visible to site owners and admins.
             </p>
           </div>
-          {isLoading && (
-            <LoadingState display="inline" message="Loading overview…" />
-          )}
+          {isLoading && <LoadingState display="inline" message="Loading overview…" />}
         </header>
 
         {/* Error state */}
@@ -253,16 +220,18 @@ export default function AutoAssignDebugPage() {
           <InlineAlert variant="error" title="Something went wrong" className="mb-4">
             <p>{state.message}</p>
             <p className="mt-1 text-[11px] opacity-70">
-              Make sure you&apos;re signed in as a{" "}
-              <span className="font-medium">SITE_OWNER</span> or{" "}
-              <span className="font-medium">SITE_ADMIN</span>.
+              Make sure you&apos;re signed in as a <span className="font-medium">SITE_OWNER</span>{" "}
+              or <span className="font-medium">SITE_ADMIN</span>.
             </p>
           </InlineAlert>
         )}
 
         {/* Empty state */}
         {!isError && !isLoading && companies.length === 0 && (
-          <EmptyState title="No companies found in this environment." description="Once you seed demo data or create companies, they will appear in this panel." />
+          <EmptyState
+            title="No companies found in this environment."
+            description="Once you seed demo data or create companies, they will appear in this panel."
+          />
         )}
 
         {/* Companies list */}
@@ -279,7 +248,7 @@ export default function AutoAssignDebugPage() {
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--bb-text-muted)]">
+                      <p className="text-xs font-semibold tracking-[0.14em] text-[var(--bb-text-muted)] uppercase">
                         Workspace
                       </p>
                       <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
@@ -299,19 +268,12 @@ export default function AutoAssignDebugPage() {
                           type="checkbox"
                           className="h-4 w-4 rounded border-[var(--bb-border-input)]"
                           checked={company.autoAssignDefaultEnabled}
-                          onChange={(e) =>
-                            handleToggleCompany(
-                              company.id,
-                              e.target.checked,
-                            )
-                          }
+                          onChange={(e) => handleToggleCompany(company.id, e.target.checked)}
                           disabled={isCompanyUpdating}
                         />
                       </label>
                       {isCompanyUpdating && (
-                        <span className="text-[11px] text-[var(--bb-text-tertiary)]">
-                          Saving…
-                        </span>
+                        <span className="text-[11px] text-[var(--bb-text-tertiary)]">Saving…</span>
                       )}
                     </div>
                   </div>
@@ -327,8 +289,7 @@ export default function AutoAssignDebugPage() {
                       <div className="space-y-2">
                         {company.projects.map((project) => {
                           const projectKey = `project:${project.id}`;
-                          const isProjectUpdating =
-                            updatingKey === projectKey;
+                          const isProjectUpdating = updatingKey === projectKey;
 
                           return (
                             <div
@@ -354,15 +315,12 @@ export default function AutoAssignDebugPage() {
                                   onChange={(e) =>
                                     handleChangeProjectMode(
                                       project.id,
-                                      e.target
-                                        .value as ProjectAutoAssignMode,
+                                      e.target.value as ProjectAutoAssignMode,
                                     )
                                   }
                                   disabled={isProjectUpdating}
                                 >
-                                  <option value="INHERIT">
-                                    Inherit company default
-                                  </option>
+                                  <option value="INHERIT">Inherit company default</option>
                                   <option value="ON">Always on</option>
                                   <option value="OFF">Always off</option>
                                 </FormSelect>
