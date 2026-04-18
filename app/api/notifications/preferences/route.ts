@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
   try {
     // Rate limit: 30 requests/min per IP
     const ip = getClientIp(req.headers);
-    const rl = rateLimit(`notif-prefs:${ip}`, { limit: 30, windowSeconds: 60 });
+    const rl = await rateLimit(`notif-prefs:${ip}`, { limit: 30, windowSeconds: 60 });
     if (!rl.allowed) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 });
     }

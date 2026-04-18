@@ -1,16 +1,66 @@
 // -----------------------------------------------------------------------------
 // @file: lib/rate-limit.ts
-// @purpose: In-memory sliding-window rate limiter for API routes
+// @purpose: Sliding-window rate limiter — Upstash Redis when configured,
+//           in-memory fallback otherwise. In-memory mode is per-instance and
+//           must not be relied on for abuse prevention in production.
 // -----------------------------------------------------------------------------
+
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
 
 type RateLimitEntry = {
   count: number;
   resetAt: number;
 };
 
+type RateLimitConfig = {
+  /** Maximum requests allowed in the window */
+  limit: number;
+  /** Window duration in seconds */
+  windowSeconds: number;
+};
+
+export type RateLimitResult = {
+  allowed: boolean;
+  remaining: number;
+  resetAt: number;
+};
+
+// ---------------------------------------------------------------------------
+// Upstash backend (enabled when both env vars are set)
+// ---------------------------------------------------------------------------
+
+const upstashRedis = (() => {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) return null;
+  return new Redis({ url, token });
+})();
+
+const upstashLimiterCache = new Map<string, Ratelimit>();
+
+function getUpstashLimiter(config: RateLimitConfig): Ratelimit | null {
+  if (!upstashRedis) return null;
+  const cacheKey = `${config.limit}:${config.windowSeconds}`;
+  let limiter = upstashLimiterCache.get(cacheKey);
+  if (!limiter) {
+    limiter = new Ratelimit({
+      redis: upstashRedis,
+      limiter: Ratelimit.slidingWindow(config.limit, `${config.windowSeconds} s`),
+      prefix: "bb:rl",
+      analytics: false,
+    });
+    upstashLimiterCache.set(cacheKey, limiter);
+  }
+  return limiter;
+}
+
+// ---------------------------------------------------------------------------
+// In-memory fallback — single-instance only
+// ---------------------------------------------------------------------------
+
 const store = new Map<string, RateLimitEntry>();
 
-// Cleanup stale entries every 60 seconds
 if (typeof setInterval !== "undefined") {
   setInterval(() => {
     const now = Date.now();
@@ -22,28 +72,7 @@ if (typeof setInterval !== "undefined") {
   }, 60_000);
 }
 
-type RateLimitConfig = {
-  /** Maximum requests allowed in the window */
-  limit: number;
-  /** Window duration in seconds */
-  windowSeconds: number;
-};
-
-type RateLimitResult = {
-  allowed: boolean;
-  remaining: number;
-  resetAt: number;
-};
-
-/**
- * In-memory sliding-window rate limiter.
- *
- * Use `identifier` to scope limits (e.g. IP address, user ID, route name).
- * Suitable for single-instance or Vercel serverless deployments where each
- * cold start gets a fresh Map. For aggressive abuse prevention, upgrade to
- * Vercel KV or Upstash Redis.
- */
-export function rateLimit(identifier: string, config: RateLimitConfig): RateLimitResult {
+function rateLimitInMemory(identifier: string, config: RateLimitConfig): RateLimitResult {
   const now = Date.now();
   const windowMs = config.windowSeconds * 1000;
 
@@ -66,6 +95,36 @@ export function rateLimit(identifier: string, config: RateLimitConfig): RateLimi
     remaining: config.limit - existing.count,
     resetAt: existing.resetAt,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+/**
+ * Sliding-window rate limiter.
+ *
+ * Uses Upstash Redis when UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN
+ * are set — correct across multiple Vercel instances. Otherwise falls back to
+ * an in-memory Map, which is single-instance and should only be used in
+ * development.
+ *
+ * `identifier` scopes the counter (e.g. IP address, user ID, route name).
+ */
+export async function rateLimit(
+  identifier: string,
+  config: RateLimitConfig,
+): Promise<RateLimitResult> {
+  const upstash = getUpstashLimiter(config);
+  if (upstash) {
+    const result = await upstash.limit(identifier);
+    return {
+      allowed: result.success,
+      remaining: Math.max(0, result.remaining),
+      resetAt: result.reset,
+    };
+  }
+  return rateLimitInMemory(identifier, config);
 }
 
 /**
