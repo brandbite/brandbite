@@ -18,10 +18,7 @@ import { createNotification } from "@/lib/notifications";
 // Shared: load asset + authorize
 // ---------------------------------------------------------------------------
 
-async function loadAssetAndAuthorize(
-  assetId: string,
-  user: { id: string; role: string },
-) {
+async function loadAssetAndAuthorize(assetId: string, user: { id: string; role: string }) {
   const asset = await prisma.asset.findUnique({
     where: { id: assetId },
     select: {
@@ -71,20 +68,14 @@ async function loadAssetAndAuthorize(
 // GET /api/assets/[assetId]/pins — Fetch all pins for an asset
 // ---------------------------------------------------------------------------
 
-export async function GET(
-  _req: Request,
-  ctx: { params: Promise<{ assetId: string }> },
-) {
+export async function GET(_req: Request, ctx: { params: Promise<{ assetId: string }> }) {
   try {
     const user = await getCurrentUserOrThrow();
     const { assetId } = await ctx.params;
 
     const auth = await loadAssetAndAuthorize(assetId, user);
     if (auth.error) {
-      return NextResponse.json(
-        { error: auth.error },
-        { status: auth.status },
-      );
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
     const pins = await prisma.assetPin.findMany({
@@ -119,10 +110,7 @@ export async function GET(
     });
   } catch (err: any) {
     if (err?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "UNAUTHENTICATED" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "UNAUTHENTICATED" }, { status: 401 });
     }
     console.error("[GET /api/assets/:assetId/pins] error:", err);
     return NextResponse.json({ error: "INTERNAL_ERROR" }, { status: 500 });
@@ -140,28 +128,19 @@ type PinInput = {
   label: string;
 };
 
-export async function POST(
-  req: Request,
-  ctx: { params: Promise<{ assetId: string }> },
-) {
+export async function POST(req: Request, ctx: { params: Promise<{ assetId: string }> }) {
   try {
     const user = await getCurrentUserOrThrow();
 
     if (user.role !== "CUSTOMER") {
-      return NextResponse.json(
-        { error: "Only customers can create pins." },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Only customers can create pins." }, { status: 403 });
     }
 
     const { assetId } = await ctx.params;
 
     const auth = await loadAssetAndAuthorize(assetId, user);
     if (auth.error) {
-      return NextResponse.json(
-        { error: auth.error },
-        { status: auth.status },
-      );
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
     const asset = auth.asset!;
@@ -174,10 +153,7 @@ export async function POST(
 
     // Validate pins array
     if (!Array.isArray(pins) || pins.length === 0) {
-      return NextResponse.json(
-        { error: "At least one pin is required." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "At least one pin is required." }, { status: 400 });
     }
 
     for (const pin of pins) {
@@ -195,10 +171,7 @@ export async function POST(
         );
       }
       if (typeof pin.order !== "number" || pin.order < 1) {
-        return NextResponse.json(
-          { error: "Pin order must be >= 1." },
-          { status: 400 },
-        );
+        return NextResponse.json({ error: "Pin order must be >= 1." }, { status: 400 });
       }
       if (!pin.label || typeof pin.label !== "string" || !pin.label.trim()) {
         return NextResponse.json(
@@ -250,8 +223,7 @@ export async function POST(
         if (currentInProgress >= plan.maxConcurrentInProgressTickets) {
           return NextResponse.json(
             {
-              error:
-                "Your company has reached its limit for active tickets in progress.",
+              error: "Your company has reached its limit for active tickets in progress.",
             },
             { status: 400 },
           );
@@ -316,16 +288,10 @@ export async function POST(
       });
     }
 
-    return NextResponse.json(
-      { success: true, pinCount: result.pinCount },
-      { status: 201 },
-    );
+    return NextResponse.json({ success: true, pinCount: result.pinCount }, { status: 201 });
   } catch (err: any) {
     if (err?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "UNAUTHENTICATED" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "UNAUTHENTICATED" }, { status: 401 });
     }
     console.error("[POST /api/assets/:assetId/pins] error:", err);
     return NextResponse.json({ error: "INTERNAL_ERROR" }, { status: 500 });
@@ -336,44 +302,39 @@ export async function POST(
 // PATCH /api/assets/[assetId]/pins — Resolve a single pin (creative only)
 // ---------------------------------------------------------------------------
 
-export async function PATCH(
-  req: Request,
-  ctx: { params: Promise<{ assetId: string }> },
-) {
+export async function PATCH(req: Request, ctx: { params: Promise<{ assetId: string }> }) {
   try {
     const user = await getCurrentUserOrThrow();
 
     if (user.role !== "DESIGNER" && user.role !== "SITE_OWNER" && user.role !== "SITE_ADMIN") {
-      return NextResponse.json(
-        { error: "Only creatives can resolve pins." },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Only creatives can resolve pins." }, { status: 403 });
     }
 
     const { assetId } = await ctx.params;
 
     const auth = await loadAssetAndAuthorize(assetId, user);
     if (auth.error) {
-      return NextResponse.json(
-        { error: auth.error },
-        { status: auth.status },
-      );
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
     const body = (await req.json()) as any;
     const pinId = body?.pinId as string | undefined;
 
     if (!pinId || typeof pinId !== "string") {
-      return NextResponse.json(
-        { error: "pinId is required." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "pinId is required." }, { status: 400 });
     }
 
     // Load pin and verify it belongs to this asset
     const pin = await prisma.assetPin.findUnique({
       where: { id: pinId },
-      select: { id: true, assetId: true, status: true, createdById: true, order: true, label: true },
+      select: {
+        id: true,
+        assetId: true,
+        status: true,
+        createdById: true,
+        order: true,
+        label: true,
+      },
     });
 
     if (!pin || pin.assetId !== assetId) {
@@ -429,10 +390,7 @@ export async function PATCH(
     });
   } catch (err: any) {
     if (err?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "UNAUTHENTICATED" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "UNAUTHENTICATED" }, { status: 401 });
     }
     console.error("[PATCH /api/assets/:assetId/pins] error:", err);
     return NextResponse.json({ error: "INTERNAL_ERROR" }, { status: 500 });

@@ -12,15 +12,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { LoadingState } from "@/components/ui/loading-state";
-import {
-  Bar,
-  BarChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-  Cell,
-} from "recharts";
+import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from "recharts";
 
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -109,8 +101,7 @@ export default function AdminDashboardPage() {
 
         if (!res.ok) {
           throw new Error(
-            (json as any)?.error ??
-              `Dashboard request failed with status ${res.status}`,
+            (json as any)?.error ?? `Dashboard request failed with status ${res.status}`,
           );
         }
 
@@ -125,8 +116,7 @@ export default function AdminDashboardPage() {
         if (!cancelled) {
           setState({
             status: "error",
-            message:
-              err?.message ?? "Failed to load admin dashboard. Please try again.",
+            message: err?.message ?? "Failed to load admin dashboard. Please try again.",
           });
         }
       }
@@ -170,19 +160,15 @@ export default function AdminDashboardPage() {
       {/* Header */}
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-muted)]">
+          <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--bb-text-muted)] uppercase">
             Admin
           </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-            Dashboard
-          </h1>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Dashboard</h1>
           <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
             Platform-wide analytics and health overview.
           </p>
         </div>
-        {isLoading && (
-          <LoadingState display="inline" message="Loading dashboard..." />
-        )}
+        {isLoading && <LoadingState display="inline" message="Loading dashboard..." />}
       </div>
 
       {/* Error */}
@@ -199,8 +185,8 @@ export default function AdminDashboardPage() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {/* Companies */}
             <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-[#6366F1] to-[#A5B4FC]" />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
+              <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-[#6366F1] to-[#A5B4FC]" />
+              <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
                 Companies
               </p>
               <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">
@@ -216,8 +202,8 @@ export default function AdminDashboardPage() {
 
             {/* Creatives */}
             <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-[#F15B2B] to-[#f6a07a]" />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
+              <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-[#F15B2B] to-[#f6a07a]" />
+              <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
                 Creatives
               </p>
               <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">
@@ -228,8 +214,8 @@ export default function AdminDashboardPage() {
 
             {/* Tickets */}
             <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-[#3B82F6] to-[#93C5FD]" />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
+              <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-[#3B82F6] to-[#93C5FD]" />
+              <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
                 Tickets
               </p>
               <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">
@@ -253,8 +239,8 @@ export default function AdminDashboardPage() {
 
             {/* Tokens */}
             <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-[#22C55E] to-[#86EFAC]" />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
+              <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-[#22C55E] to-[#86EFAC]" />
+              <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
                 Token economy
               </p>
               <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">
@@ -378,11 +364,11 @@ export default function AdminDashboardPage() {
               <div className="flex items-center gap-2">
                 <span
                   className={`inline-flex h-2.5 w-2.5 rounded-full ${
-                    (health?.companiesLowBalance ?? 0) > 0
-                      ? "bg-[#EF4444]"
-                      : "bg-[#22C55E]"
+                    (health?.companiesLowBalance ?? 0) > 0 ? "bg-[#EF4444]" : "bg-[#22C55E]"
                   }`}
-                  aria-label={(health?.companiesLowBalance ?? 0) > 0 ? "Attention needed" : "All clear"}
+                  aria-label={
+                    (health?.companiesLowBalance ?? 0) > 0 ? "Attention needed" : "All clear"
+                  }
                   title={(health?.companiesLowBalance ?? 0) > 0 ? "Attention needed" : "All clear"}
                 />
                 <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
@@ -402,9 +388,7 @@ export default function AdminDashboardPage() {
               <div className="flex items-center gap-2">
                 <span
                   className={`inline-flex h-2.5 w-2.5 rounded-full ${
-                    (health?.overdueTickets ?? 0) > 0
-                      ? "bg-[#F59E0B]"
-                      : "bg-[#22C55E]"
+                    (health?.overdueTickets ?? 0) > 0 ? "bg-[#F59E0B]" : "bg-[#22C55E]"
                   }`}
                   aria-label={(health?.overdueTickets ?? 0) > 0 ? "Attention needed" : "All clear"}
                   title={(health?.overdueTickets ?? 0) > 0 ? "Attention needed" : "All clear"}
@@ -426,9 +410,7 @@ export default function AdminDashboardPage() {
               <div className="flex items-center gap-2">
                 <span
                   className={`inline-flex h-2.5 w-2.5 rounded-full ${
-                    (health?.staleTickets ?? 0) > 0
-                      ? "bg-[#F59E0B]"
-                      : "bg-[#22C55E]"
+                    (health?.staleTickets ?? 0) > 0 ? "bg-[#F59E0B]" : "bg-[#22C55E]"
                   }`}
                   aria-label={(health?.staleTickets ?? 0) > 0 ? "Attention needed" : "All clear"}
                   title={(health?.staleTickets ?? 0) > 0 ? "Attention needed" : "All clear"}
@@ -450,20 +432,18 @@ export default function AdminDashboardPage() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {/* Avg revisions */}
             <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
+              <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
                 Avg. revisions
               </p>
               <p className="mt-2 text-2xl font-bold text-[var(--bb-secondary)]">
                 {platform?.avgRevisionCount ?? "\u2014"}
               </p>
-              <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-                per completed ticket
-              </p>
+              <p className="text-[11px] text-[var(--bb-text-tertiary)]">per completed ticket</p>
             </section>
 
             {/* Pending withdrawals */}
             <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
+              <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
                 Pending payouts
               </p>
               <p className="mt-2 text-2xl font-bold text-[var(--bb-secondary)]">
@@ -476,7 +456,7 @@ export default function AdminDashboardPage() {
 
             {/* Total paid */}
             <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
+              <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
                 Total paid out
               </p>
               <p className="mt-2 text-2xl font-bold text-[var(--bb-secondary)]">
@@ -487,12 +467,14 @@ export default function AdminDashboardPage() {
 
             {/* Net tokens */}
             <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
+              <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
                 Net token flow
               </p>
-              <p className={`mt-2 text-2xl font-bold ${
-                (tokens?.globalNet ?? 0) >= 0 ? "text-[#22C55E]" : "text-[#EF4444]"
-              }`}>
+              <p
+                className={`mt-2 text-2xl font-bold ${
+                  (tokens?.globalNet ?? 0) >= 0 ? "text-[#22C55E]" : "text-[#EF4444]"
+                }`}
+              >
                 {(tokens?.globalNet ?? 0) >= 0 ? "+" : ""}
                 {tokens?.globalNet?.toLocaleString() ?? 0}
               </p>
@@ -542,9 +524,7 @@ export default function AdminDashboardPage() {
               className="group rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm transition-colors hover:border-[#F15B2B]"
             >
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-[var(--bb-secondary)]">
-                  All companies
-                </h3>
+                <h3 className="text-sm font-semibold text-[var(--bb-secondary)]">All companies</h3>
                 <span className="text-xs text-[#F15B2B] opacity-0 transition-opacity group-hover:opacity-100">
                   Open &rarr;
                 </span>

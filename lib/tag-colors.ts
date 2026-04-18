@@ -15,10 +15,10 @@ export type TagColorKey =
 
 export type TagColorStyle = {
   label: string;
-  bg: string;     // Tailwind bg class
-  text: string;   // Tailwind text class
+  bg: string; // Tailwind bg class
+  text: string; // Tailwind text class
   border: string; // Tailwind border class
-  dot: string;    // Solid hex color for dot/swatch in color picker
+  dot: string; // Solid hex color for dot/swatch in color picker
 };
 
 export const TAG_COLORS: Record<TagColorKey, TagColorStyle> = {
@@ -80,14 +80,9 @@ export const TAG_COLORS: Record<TagColorKey, TagColorStyle> = {
   },
 };
 
-export const TAG_COLOR_KEYS: TagColorKey[] = Object.keys(
-  TAG_COLORS,
-) as TagColorKey[];
+export const TAG_COLOR_KEYS: TagColorKey[] = Object.keys(TAG_COLORS) as TagColorKey[];
 
 /** Check if a string is a valid TagColorKey */
 export function isValidTagColor(value: unknown): value is TagColorKey {
-  return (
-    typeof value === "string" &&
-    TAG_COLOR_KEYS.includes(value as TagColorKey)
-  );
+  return typeof value === "string" && TAG_COLOR_KEYS.includes(value as TagColorKey);
 }

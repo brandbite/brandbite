@@ -73,8 +73,7 @@ const STATUS_LABELS: Record<TicketStatus, string> = {
 const PAGE_SIZE = 50;
 
 export default function CustomerTicketsPage() {
-  const [company, setCompany] =
-    useState<CustomerTicketsResponse["company"]>();
+  const [company, setCompany] = useState<CustomerTicketsResponse["company"]>();
   const [tickets, setTickets] = useState<CustomerTicket[]>([]);
   const [pagination, setPagination] = useState<PaginationMeta | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -103,10 +102,8 @@ export default function CustomerTicketsPage() {
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
 
   // Company role
-  const [companyRole, setCompanyRole] =
-    useState<CompanyRoleString | null>(null);
-  const [companyRoleLoading, setCompanyRoleLoading] =
-    useState<boolean>(true);
+  const [companyRole, setCompanyRole] = useState<CompanyRoleString | null>(null);
+  const [companyRoleLoading, setCompanyRoleLoading] = useState<boolean>(true);
 
   // Ref for cancellation
   const fetchIdRef = useRef(0);
@@ -143,18 +140,13 @@ export default function CustomerTicketsPage() {
       params.set("limit", String(PAGE_SIZE));
       params.set("offset", String(page * PAGE_SIZE));
 
-      const res = await fetch(
-        `/api/customer/tickets?${params.toString()}`,
-        { cache: "no-store" },
-      );
+      const res = await fetch(`/api/customer/tickets?${params.toString()}`, { cache: "no-store" });
       const json = await res.json().catch(() => null);
 
       if (id !== fetchIdRef.current) return; // stale
 
       if (!res.ok) {
-        throw new Error(
-          json?.error || `Request failed with status ${res.status}`,
-        );
+        throw new Error(json?.error || `Request failed with status ${res.status}`);
       }
 
       const data = json as CustomerTicketsResponse;
@@ -170,7 +162,16 @@ export default function CustomerTicketsPage() {
         setLoading(false);
       }
     }
-  }, [debouncedSearch, statusFilter, projectFilter, priorityFilter, tagFilter, sortField, sortDir, page]);
+  }, [
+    debouncedSearch,
+    statusFilter,
+    projectFilter,
+    priorityFilter,
+    tagFilter,
+    sortField,
+    sortDir,
+    page,
+  ]);
 
   useEffect(() => {
     fetchTickets();
@@ -201,7 +202,9 @@ export default function CustomerTicketsPage() {
       }
     };
     loadRole();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // ---- Load tags + projects (once) ----
@@ -237,7 +240,9 @@ export default function CustomerTicketsPage() {
       })
       .catch(() => {});
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // ---- Sorting handler ----
@@ -251,9 +256,7 @@ export default function CustomerTicketsPage() {
     setPage(0);
   };
 
-  const canCreateNewTicket = companyRoleLoading
-    ? false
-    : canCreateTickets(companyRole);
+  const canCreateNewTicket = companyRoleLoading ? false : canCreateTickets(companyRole);
 
   const formatDate = (iso: string | null) => {
     if (!iso) return "-";
@@ -264,10 +267,14 @@ export default function CustomerTicketsPage() {
 
   const formatPriorityLabel = (priority: TicketPriority) => {
     switch (priority) {
-      case "LOW": return "Low";
-      case "MEDIUM": return "Medium";
-      case "HIGH": return "High";
-      case "URGENT": return "Urgent";
+      case "LOW":
+        return "Low";
+      case "MEDIUM":
+        return "Medium";
+      case "HIGH":
+        return "High";
+      case "URGENT":
+        return "Urgent";
     }
   };
 
@@ -278,334 +285,302 @@ export default function CustomerTicketsPage() {
   return (
     <>
       {/* Page header */}
-      <div className="mb-4 mt-2 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              My tickets
-            </h1>
-            <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-              All creative requests created for your company, with project,
-              status, and creative information.
+      <div className="mt-2 mb-4 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">My tickets</h1>
+          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
+            All creative requests created for your company, with project, status, and creative
+            information.
+          </p>
+          {company && (
+            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
+              Company:{" "}
+              <span className="font-medium text-[var(--bb-secondary)]">{company.name}</span> (
+              {company.slug})
             </p>
-            {company && (
-              <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-                Company:{" "}
-                <span className="font-medium text-[var(--bb-secondary)]">
-                  {company.name}
-                </span>{" "}
-                ({company.slug})
-              </p>
-            )}
-          </div>
-
-          <div className="flex flex-col items-end gap-2">
-            <button
-              type="button"
-              disabled={!canCreateNewTicket}
-              className={`inline-flex items-center justify-center rounded-full px-4 py-1.5 text-[11px] font-medium ${
-                canCreateNewTicket
-                  ? "bg-[var(--bb-primary)] text-white hover:bg-[var(--bb-primary-hover)]"
-                  : "cursor-not-allowed bg-[var(--bb-border-subtle)] text-[var(--bb-text-muted)]"
-              }`}
-              onClick={() => {
-                if (!canCreateNewTicket) return;
-                window.location.href = "/customer/tickets/new";
-              }}
-            >
-              New ticket
-            </button>
-
-            {!loading && pagination && (
-              <div className="rounded-full bg-[var(--bb-bg-card)] px-3 py-1 text-xs text-[var(--bb-text-secondary)]">
-                {pagination.total} ticket
-                {pagination.total === 1 ? "" : "s"} total
-              </div>
-            )}
-          </div>
+          )}
         </div>
 
-        {/* Limited access for billing role */}
-        {!error &&
-          !companyRoleLoading &&
-          companyRole === "BILLING" && (
-            <div className="mb-4 rounded-xl border border-[var(--bb-warning-border)] bg-[var(--bb-warning-bg)] px-4 py-3 text-xs text-[var(--bb-text-secondary)]">
-              <p className="text-[11px] font-medium text-[var(--bb-warning-text)]">
-                Limited access
-              </p>
-              <p className="mt-1">
-                You can review existing tickets, but only your company owner
-                or project manager can create new tickets for this workspace.
-              </p>
+        <div className="flex flex-col items-end gap-2">
+          <button
+            type="button"
+            disabled={!canCreateNewTicket}
+            className={`inline-flex items-center justify-center rounded-full px-4 py-1.5 text-[11px] font-medium ${
+              canCreateNewTicket
+                ? "bg-[var(--bb-primary)] text-white hover:bg-[var(--bb-primary-hover)]"
+                : "cursor-not-allowed bg-[var(--bb-border-subtle)] text-[var(--bb-text-muted)]"
+            }`}
+            onClick={() => {
+              if (!canCreateNewTicket) return;
+              window.location.href = "/customer/tickets/new";
+            }}
+          >
+            New ticket
+          </button>
+
+          {!loading && pagination && (
+            <div className="rounded-full bg-[var(--bb-bg-card)] px-3 py-1 text-xs text-[var(--bb-text-secondary)]">
+              {pagination.total} ticket
+              {pagination.total === 1 ? "" : "s"} total
             </div>
           )}
+        </div>
+      </div>
 
-        {/* Error */}
-        {error && (
-          <InlineAlert variant="error" title="Error" className="mb-4">
-            {error}
-          </InlineAlert>
-        )}
+      {/* Limited access for billing role */}
+      {!error && !companyRoleLoading && companyRole === "BILLING" && (
+        <div className="mb-4 rounded-xl border border-[var(--bb-warning-border)] bg-[var(--bb-warning-bg)] px-4 py-3 text-xs text-[var(--bb-text-secondary)]">
+          <p className="text-[11px] font-medium text-[var(--bb-warning-text)]">Limited access</p>
+          <p className="mt-1">
+            You can review existing tickets, but only your company owner or project manager can
+            create new tickets for this workspace.
+          </p>
+        </div>
+      )}
 
-        {/* Filters */}
-        <section className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div className="flex-1">
-            <label className="block text-xs font-medium text-[var(--bb-secondary)]">
-              Search
-            </label>
-            <FormInput
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by ticket, project, job type..."
+      {/* Error */}
+      {error && (
+        <InlineAlert variant="error" title="Error" className="mb-4">
+          {error}
+        </InlineAlert>
+      )}
+
+      {/* Filters */}
+      <section className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div className="flex-1">
+          <label className="block text-xs font-medium text-[var(--bb-secondary)]">Search</label>
+          <FormInput
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by ticket, project, job type..."
+            size="sm"
+            className="mt-1"
+          />
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium text-[var(--bb-secondary)]">Status</label>
+            <FormSelect
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as "ALL" | TicketStatus)}
               size="sm"
-              className="mt-1"
-            />
+              className="w-auto"
+            >
+              <option value="ALL">All</option>
+              <option value="TODO">To do</option>
+              <option value="IN_PROGRESS">In progress</option>
+              <option value="IN_REVIEW">In review</option>
+              <option value="DONE">Done</option>
+            </FormSelect>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-medium text-[var(--bb-secondary)]">
-                Status
-              </label>
-              <FormSelect
-                value={statusFilter}
-                onChange={(e) =>
-                  setStatusFilter(e.target.value as "ALL" | TicketStatus)
-                }
-                size="sm"
-                className="w-auto"
-              >
-                <option value="ALL">All</option>
-                <option value="TODO">To do</option>
-                <option value="IN_PROGRESS">In progress</option>
-                <option value="IN_REVIEW">In review</option>
-                <option value="DONE">Done</option>
-              </FormSelect>
-            </div>
 
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium text-[var(--bb-secondary)]">Project</label>
+            <FormSelect
+              value={projectFilter}
+              onChange={(e) => setProjectFilter(e.target.value)}
+              size="sm"
+              className="w-auto"
+            >
+              <option value="ALL">All projects</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </FormSelect>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium text-[var(--bb-secondary)]">Priority</label>
+            <FormSelect
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value as "ALL" | TicketPriority)}
+              size="sm"
+              className="w-auto"
+            >
+              <option value="ALL">All</option>
+              <option value="LOW">Low</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="HIGH">High</option>
+              <option value="URGENT">Urgent</option>
+            </FormSelect>
+          </div>
+
+          {availableTags.length > 0 && (
             <div className="flex items-center gap-2">
-              <label className="text-xs font-medium text-[var(--bb-secondary)]">
-                Project
-              </label>
+              <label className="text-xs font-medium text-[var(--bb-secondary)]">Tag</label>
               <FormSelect
-                value={projectFilter}
-                onChange={(e) => setProjectFilter(e.target.value)}
+                value={tagFilter}
+                onChange={(e) => setTagFilter(e.target.value)}
                 size="sm"
                 className="w-auto"
               >
-                <option value="ALL">All projects</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
+                <option value="ALL">All tags</option>
+                {availableTags.map((tag) => (
+                  <option key={tag.id} value={tag.id}>
+                    {tag.name}
                   </option>
                 ))}
               </FormSelect>
             </div>
+          )}
+        </div>
+      </section>
 
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-medium text-[var(--bb-secondary)]">
-                Priority
-              </label>
-              <FormSelect
-                value={priorityFilter}
-                onChange={(e) =>
-                  setPriorityFilter(e.target.value as "ALL" | TicketPriority)
-                }
-                size="sm"
-                className="w-auto"
-              >
-                <option value="ALL">All</option>
-                <option value="LOW">Low</option>
-                <option value="MEDIUM">Medium</option>
-                <option value="HIGH">High</option>
-                <option value="URGENT">Urgent</option>
-              </FormSelect>
-            </div>
+      {/* Tickets table */}
+      {!loading && tickets.length === 0 && !error && (
+        <EmptyState title="No tickets found for this filter." />
+      )}
 
-            {availableTags.length > 0 && (
-              <div className="flex items-center gap-2">
-                <label className="text-xs font-medium text-[var(--bb-secondary)]">
-                  Tag
-                </label>
-                <FormSelect
-                  value={tagFilter}
-                  onChange={(e) => setTagFilter(e.target.value)}
-                  size="sm"
-                  className="w-auto"
-                >
-                  <option value="ALL">All tags</option>
-                  {availableTags.map((tag) => (
-                    <option key={tag.id} value={tag.id}>
-                      {tag.name}
-                    </option>
-                  ))}
-                </FormSelect>
-              </div>
+      {!loading && tickets.length > 0 && (
+        <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold tracking-tight">Tickets</h2>
+            {pagination && (
+              <p className="text-xs text-[var(--bb-text-tertiary)]">
+                Showing {page * PAGE_SIZE + 1}–{totalShown} of {pagination.total} tickets
+              </p>
             )}
           </div>
-        </section>
 
-        {/* Tickets table */}
-        {!loading && tickets.length === 0 && !error && (
-          <EmptyState title="No tickets found for this filter." />
-        )}
+          <DataTable>
+            <THead>
+              <TH>Ticket</TH>
+              <TH>Project</TH>
+              <TH
+                sortable
+                sortDirection={sortField === "status" ? sortDir : null}
+                onSort={() => handleSort("status")}
+              >
+                Status
+              </TH>
+              <TH
+                sortable
+                sortDirection={sortField === "priority" ? sortDir : null}
+                onSort={() => handleSort("priority")}
+              >
+                Priority
+              </TH>
+              <TH className="hidden md:table-cell">Assigned</TH>
+              <TH className="hidden md:table-cell">Job type</TH>
+              <TH
+                className="hidden md:table-cell"
+                sortable
+                sortDirection={sortField === "createdAt" ? sortDir : null}
+                onSort={() => handleSort("createdAt")}
+              >
+                Created
+              </TH>
+              <TH
+                sortable
+                sortDirection={sortField === "dueDate" ? sortDir : null}
+                onSort={() => handleSort("dueDate")}
+              >
+                Due
+              </TH>
+            </THead>
+            <tbody>
+              {tickets.map((t) => (
+                <tr
+                  key={t.id}
+                  className="cursor-pointer border-b border-[var(--bb-border-subtle)] transition-colors last:border-b-0 hover:bg-[var(--bb-bg-warm)]"
+                  onClick={() => (window.location.href = `/customer/tickets/${t.id}`)}
+                >
+                  <TD>
+                    <div className="font-medium text-[var(--bb-secondary)]">{t.code}</div>
+                    <div className="text-[11px] text-[var(--bb-text-secondary)]">{t.title}</div>
+                  </TD>
+                  <TD>
+                    <div className="text-[11px] font-medium text-[var(--bb-secondary)]">
+                      {t.projectName ?? "-"}
+                    </div>
+                    {t.projectCode && (
+                      <div className="text-[11px] text-[var(--bb-text-tertiary)]">
+                        {t.projectCode}
+                      </div>
+                    )}
+                  </TD>
+                  <TD>
+                    <Badge variant={statusBadgeVariant(t.status)}>
+                      {formatStatusLabel(t.status)}
+                    </Badge>
+                  </TD>
+                  <TD>
+                    <Badge variant={priorityBadgeVariant(t.priority)}>
+                      {formatPriorityLabel(t.priority)}
+                    </Badge>
+                  </TD>
+                  <TD className="hidden md:table-cell">
+                    <div className="text-[11px] text-[var(--bb-secondary)]">
+                      {t.isAssigned ? "Yes" : "-"}
+                    </div>
+                  </TD>
+                  <TD className="hidden md:table-cell">
+                    <div className="text-[11px] text-[var(--bb-secondary)]">
+                      {t.jobTypeName ?? "-"}
+                    </div>
+                  </TD>
+                  <TD className="hidden text-[var(--bb-text-secondary)] md:table-cell">
+                    {formatDate(t.createdAt)}
+                  </TD>
+                  <TD>
+                    {t.dueDate ? (
+                      <span
+                        className={
+                          isDueDateOverdue(t.dueDate)
+                            ? "font-semibold text-[var(--bb-danger-text)]"
+                            : isDueDateSoon(t.dueDate)
+                              ? "font-semibold text-[var(--bb-warning-text)]"
+                              : "text-[var(--bb-text-secondary)]"
+                        }
+                      >
+                        {formatDate(t.dueDate)}
+                      </span>
+                    ) : (
+                      <span className="text-[var(--bb-text-secondary)]">-</span>
+                    )}
+                  </TD>
+                </tr>
+              ))}
+            </tbody>
+          </DataTable>
 
-        {!loading && tickets.length > 0 && (
-          <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold tracking-tight">
-                Tickets
-              </h2>
-              {pagination && (
-                <p className="text-xs text-[var(--bb-text-tertiary)]">
-                  Showing {page * PAGE_SIZE + 1}–{totalShown} of{" "}
-                  {pagination.total} tickets
-                </p>
-              )}
-            </div>
-
-            <DataTable>
-              <THead>
-                <TH>Ticket</TH>
-                <TH>Project</TH>
-                <TH
-                  sortable
-                  sortDirection={sortField === "status" ? sortDir : null}
-                  onSort={() => handleSort("status")}
+          {/* Pagination controls */}
+          {pagination && pagination.total > PAGE_SIZE && (
+            <div className="mt-4 flex items-center justify-between border-t border-[var(--bb-border-subtle)] pt-3">
+              <p className="text-xs text-[var(--bb-text-tertiary)]">
+                Page {page + 1} of {Math.ceil(pagination.total / PAGE_SIZE)}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={page === 0}
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  className="rounded-full border border-[var(--bb-border)] px-3 py-1 text-[11px] font-medium text-[var(--bb-secondary)] transition-colors hover:bg-[var(--bb-bg-card)] disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  Status
-                </TH>
-                <TH
-                  sortable
-                  sortDirection={sortField === "priority" ? sortDir : null}
-                  onSort={() => handleSort("priority")}
+                  ← Previous
+                </button>
+                <button
+                  type="button"
+                  disabled={!pagination.hasMore}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="rounded-full border border-[var(--bb-border)] px-3 py-1 text-[11px] font-medium text-[var(--bb-secondary)] transition-colors hover:bg-[var(--bb-bg-card)] disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  Priority
-                </TH>
-                <TH className="hidden md:table-cell">Assigned</TH>
-                <TH className="hidden md:table-cell">Job type</TH>
-                <TH
-                  className="hidden md:table-cell"
-                  sortable
-                  sortDirection={sortField === "createdAt" ? sortDir : null}
-                  onSort={() => handleSort("createdAt")}
-                >
-                  Created
-                </TH>
-                <TH
-                  sortable
-                  sortDirection={sortField === "dueDate" ? sortDir : null}
-                  onSort={() => handleSort("dueDate")}
-                >
-                  Due
-                </TH>
-              </THead>
-              <tbody>
-                {tickets.map((t) => (
-                  <tr
-                    key={t.id}
-                    className="border-b border-[var(--bb-border-subtle)] last:border-b-0 cursor-pointer transition-colors hover:bg-[var(--bb-bg-warm)]"
-                    onClick={() =>
-                      (window.location.href =
-                        `/customer/tickets/${t.id}`)
-                    }
-                  >
-                    <TD>
-                      <div className="font-medium text-[var(--bb-secondary)]">
-                        {t.code}
-                      </div>
-                      <div className="text-[11px] text-[var(--bb-text-secondary)]">
-                        {t.title}
-                      </div>
-                    </TD>
-                    <TD>
-                      <div className="text-[11px] font-medium text-[var(--bb-secondary)]">
-                        {t.projectName ?? "-"}
-                      </div>
-                      {t.projectCode && (
-                        <div className="text-[11px] text-[var(--bb-text-tertiary)]">
-                          {t.projectCode}
-                        </div>
-                      )}
-                    </TD>
-                    <TD>
-                      <Badge variant={statusBadgeVariant(t.status)}>
-                        {formatStatusLabel(t.status)}
-                      </Badge>
-                    </TD>
-                    <TD>
-                      <Badge variant={priorityBadgeVariant(t.priority)}>
-                        {formatPriorityLabel(t.priority)}
-                      </Badge>
-                    </TD>
-                    <TD className="hidden md:table-cell">
-                      <div className="text-[11px] text-[var(--bb-secondary)]">
-                        {t.isAssigned ? "Yes" : "-"}
-                      </div>
-                    </TD>
-                    <TD className="hidden md:table-cell">
-                      <div className="text-[11px] text-[var(--bb-secondary)]">
-                        {t.jobTypeName ?? "-"}
-                      </div>
-                    </TD>
-                    <TD className="hidden md:table-cell text-[var(--bb-text-secondary)]">
-                      {formatDate(t.createdAt)}
-                    </TD>
-                    <TD>
-                      {t.dueDate ? (
-                        <span
-                          className={
-                            isDueDateOverdue(t.dueDate)
-                              ? "font-semibold text-[var(--bb-danger-text)]"
-                              : isDueDateSoon(t.dueDate)
-                                ? "font-semibold text-[var(--bb-warning-text)]"
-                                : "text-[var(--bb-text-secondary)]"
-                          }
-                        >
-                          {formatDate(t.dueDate)}
-                        </span>
-                      ) : (
-                        <span className="text-[var(--bb-text-secondary)]">-</span>
-                      )}
-                    </TD>
-                  </tr>
-                ))}
-              </tbody>
-            </DataTable>
-
-            {/* Pagination controls */}
-            {pagination && pagination.total > PAGE_SIZE && (
-              <div className="mt-4 flex items-center justify-between border-t border-[var(--bb-border-subtle)] pt-3">
-                <p className="text-xs text-[var(--bb-text-tertiary)]">
-                  Page {page + 1} of {Math.ceil(pagination.total / PAGE_SIZE)}
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    disabled={page === 0}
-                    onClick={() => setPage((p) => Math.max(0, p - 1))}
-                    className="rounded-full border border-[var(--bb-border)] px-3 py-1 text-[11px] font-medium text-[var(--bb-secondary)] transition-colors hover:bg-[var(--bb-bg-card)] disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    ← Previous
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!pagination.hasMore}
-                    onClick={() => setPage((p) => p + 1)}
-                    className="rounded-full border border-[var(--bb-border)] px-3 py-1 text-[11px] font-medium text-[var(--bb-secondary)] transition-colors hover:bg-[var(--bb-bg-card)] disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    Next →
-                  </button>
-                </div>
+                  Next →
+                </button>
               </div>
-            )}
-          </section>
-        )}
+            </div>
+          )}
+        </section>
+      )}
 
-        {loading && (
-          <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 shadow-sm">
-            <LoadingState message="Loading tickets..." />
-          </section>
-        )}
+      {loading && (
+        <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 shadow-sm">
+          <LoadingState message="Loading tickets..." />
+        </section>
+      )}
     </>
   );
 }

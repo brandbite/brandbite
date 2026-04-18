@@ -74,9 +74,7 @@ export default function AdminJobTypeCategoriesPage() {
         });
         const jtJson = await jtRes.json().catch(() => null);
         const jobTypes = jtJson?.jobTypes ?? [];
-        const hasText = jobTypes.some(
-          (jt: any) => jt.category && !jt.categoryId,
-        );
+        const hasText = jobTypes.some((jt: any) => jt.category && !jt.categoryId);
         setHasLegacyCategories(hasText);
       } else {
         setHasLegacyCategories(false);
@@ -136,9 +134,7 @@ export default function AdminJobTypeCategoriesPage() {
         throw new Error(json?.error || `Request failed (${res.status})`);
       }
 
-      const msg = isEditing
-        ? "Category updated successfully."
-        : "Category created successfully.";
+      const msg = isEditing ? "Category updated successfully." : "Category created successfully.";
       showToast({ type: "success", title: msg });
 
       await load();
@@ -189,10 +185,9 @@ export default function AdminJobTypeCategoriesPage() {
     setDeleting(true);
 
     try {
-      const res = await fetch(
-        `/api/admin/job-type-categories/${deleteConfirm.id}`,
-        { method: "DELETE" },
-      );
+      const res = await fetch(`/api/admin/job-type-categories/${deleteConfirm.id}`, {
+        method: "DELETE",
+      });
       const json = await res.json().catch(() => null);
 
       if (!res.ok) {
@@ -225,12 +220,10 @@ export default function AdminJobTypeCategoriesPage() {
       {/* Page header */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Job type categories
-          </h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Job type categories</h1>
           <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-            Organize job types into categories. Categories appear in the
-            service catalog and ticket creation form.
+            Organize job types into categories. Categories appear in the service catalog and ticket
+            creation form.
           </p>
         </div>
         <Button onClick={resetForm}>New category</Button>
@@ -247,9 +240,9 @@ export default function AdminJobTypeCategoriesPage() {
       {hasLegacyCategories && categories.length === 0 && (
         <InlineAlert variant="warning" title="Legacy categories detected" className="mb-4">
           <p className="mt-1 text-xs">
-            Your job types have text-based categories that haven&apos;t been
-            migrated yet. Click the button below to automatically create
-            structured categories and link your existing job types.
+            Your job types have text-based categories that haven&apos;t been migrated yet. Click the
+            button below to automatically create structured categories and link your existing job
+            types.
           </p>
           <Button
             size="sm"
@@ -266,7 +259,7 @@ export default function AdminJobTypeCategoriesPage() {
       {/* Summary */}
       <section className="mb-6 grid gap-4 md:grid-cols-3">
         <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
+          <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
             Total categories
           </p>
           <p className="mt-2 text-3xl font-semibold text-[var(--bb-secondary)]">
@@ -274,23 +267,19 @@ export default function AdminJobTypeCategoriesPage() {
           </p>
         </div>
         <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
+          <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
             Active
           </p>
           <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
-            {loading
-              ? "&mdash;"
-              : categories.filter((c) => c.isActive).length}
+            {loading ? "&mdash;" : categories.filter((c) => c.isActive).length}
           </p>
         </div>
         <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
+          <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
             Total job types linked
           </p>
           <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
-            {loading
-              ? "&mdash;"
-              : categories.reduce((sum, c) => sum + c.jobTypeCount, 0)}
+            {loading ? "&mdash;" : categories.reduce((sum, c) => sum + c.jobTypeCount, 0)}
           </p>
         </div>
       </section>
@@ -300,12 +289,8 @@ export default function AdminJobTypeCategoriesPage() {
         {/* Left: Category list */}
         <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold tracking-tight">
-              Category list
-            </h2>
-            <p className="text-xs text-[var(--bb-text-tertiary)]">
-              {categories.length} categories
-            </p>
+            <h2 className="text-sm font-semibold tracking-tight">Category list</h2>
+            <p className="text-xs text-[var(--bb-text-tertiary)]">{categories.length} categories</p>
           </div>
 
           {loading ? (
@@ -316,7 +301,7 @@ export default function AdminJobTypeCategoriesPage() {
             <div className="max-h-[420px] overflow-y-auto">
               <table className="min-w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-[var(--bb-border)] text-xs uppercase tracking-[0.08em] text-[var(--bb-text-tertiary)]">
+                  <tr className="border-b border-[var(--bb-border)] text-xs tracking-[0.08em] text-[var(--bb-text-tertiary)] uppercase">
                     <th className="px-2 py-2">Icon</th>
                     <th className="px-2 py-2">Name</th>
                     <th className="px-2 py-2 text-center">Order</th>
@@ -329,14 +314,14 @@ export default function AdminJobTypeCategoriesPage() {
                   {categories.map((cat) => (
                     <tr
                       key={cat.id}
-                      className={`border-b border-[var(--bb-border-subtle)] text-xs last:border-b-0 cursor-pointer ${
-                        selected?.id === cat.id ? "bg-[var(--bb-primary-light)]" : "bg-[var(--bb-bg-page)]"
+                      className={`cursor-pointer border-b border-[var(--bb-border-subtle)] text-xs last:border-b-0 ${
+                        selected?.id === cat.id
+                          ? "bg-[var(--bb-primary-light)]"
+                          : "bg-[var(--bb-bg-page)]"
                       }`}
                       onClick={() => fillForm(cat)}
                     >
-                      <td className="px-2 py-2 text-center text-base">
-                        {cat.icon || "&mdash;"}
-                      </td>
+                      <td className="px-2 py-2 text-center text-base">{cat.icon || "&mdash;"}</td>
                       <td className="px-2 py-2 text-[11px] font-semibold text-[var(--bb-secondary)]">
                         {cat.name}
                         <div className="text-[10px] font-normal text-[var(--bb-text-tertiary)]">
@@ -350,9 +335,7 @@ export default function AdminJobTypeCategoriesPage() {
                         <Badge variant="neutral">{cat.jobTypeCount}</Badge>
                       </td>
                       <td className="px-2 py-2 text-center text-[11px]">
-                        <Badge
-                          variant={cat.isActive ? "success" : "neutral"}
-                        >
+                        <Badge variant={cat.isActive ? "success" : "neutral"}>
                           {cat.isActive ? "Active" : "Inactive"}
                         </Badge>
                       </td>
@@ -363,7 +346,7 @@ export default function AdminJobTypeCategoriesPage() {
                             e.stopPropagation();
                             setDeleteConfirm(cat);
                           }}
-                          className="rounded p-1 text-[var(--bb-text-tertiary)] hover:bg-red-50 hover:text-red-600 transition-colors"
+                          className="rounded p-1 text-[var(--bb-text-tertiary)] transition-colors hover:bg-red-50 hover:text-red-600"
                           title="Delete category"
                         >
                           <svg
@@ -400,10 +383,7 @@ export default function AdminJobTypeCategoriesPage() {
 
           <form className="mt-4 space-y-3" onSubmit={handleSubmit}>
             <div className="flex flex-col gap-1">
-              <label
-                htmlFor="cat-name"
-                className="text-xs font-medium text-[var(--bb-secondary)]"
-              >
+              <label htmlFor="cat-name" className="text-xs font-medium text-[var(--bb-secondary)]">
                 Name
               </label>
               <FormInput
@@ -469,12 +449,7 @@ export default function AdminJobTypeCategoriesPage() {
               )}
             </div>
 
-            <Button
-              type="submit"
-              loading={saving}
-              loadingText="Saving..."
-              className="mt-2"
-            >
+            <Button type="submit" loading={saving} loadingText="Saving..." className="mt-2">
               {selected ? "Save changes" : "Create category"}
             </Button>
           </form>
@@ -485,27 +460,19 @@ export default function AdminJobTypeCategoriesPage() {
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
           <div className="w-full max-w-sm rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] p-6 shadow-xl">
-            <h3 className="text-base font-semibold text-[var(--bb-secondary)]">
-              Delete category
-            </h3>
+            <h3 className="text-base font-semibold text-[var(--bb-secondary)]">Delete category</h3>
             <p className="mt-2 text-sm text-[var(--bb-text-secondary)]">
-              Are you sure you want to delete{" "}
-              <strong>{deleteConfirm.name}</strong>?
+              Are you sure you want to delete <strong>{deleteConfirm.name}</strong>?
             </p>
             {deleteConfirm.jobTypeCount > 0 && (
               <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                This category has{" "}
-                <strong>{deleteConfirm.jobTypeCount}</strong> job type
-                {deleteConfirm.jobTypeCount === 1 ? "" : "s"} linked.
-                They will be unlinked (moved to &quot;Uncategorized&quot;).
+                This category has <strong>{deleteConfirm.jobTypeCount}</strong> job type
+                {deleteConfirm.jobTypeCount === 1 ? "" : "s"} linked. They will be unlinked (moved
+                to &quot;Uncategorized&quot;).
               </div>
             )}
             <div className="mt-4 flex items-center justify-end gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setDeleteConfirm(null)}
-              >
+              <Button variant="ghost" size="sm" onClick={() => setDeleteConfirm(null)}>
                 Cancel
               </Button>
               <Button

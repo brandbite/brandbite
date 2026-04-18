@@ -35,12 +35,12 @@ ve admin paneli üzerinden ödeme/çekim akışı yönetilir.
 
 > Klasör yapısı, projedeki ana katmanları gösterir. Detaylar geliştikçe güncellenecek.
 
-- `/app` → Next.js App Router sayfaları & route segment’leri  
-- `/components` → Shared UI bileşenleri (Board layout, token panelleri, vb.)  
-- `/lib` → Core logic (auth, roles, guards, token engine)  
-  - `lib/token-engine.ts` → şirket ve designer bazlı token hareketleri için servis katmanı  
-- `/prisma` → DB şeması ve migration’lar  
-- `/scripts` → Token reset, seeding, bakım script’leri (planlı)  
+- `/app` → Next.js App Router sayfaları & route segment’leri
+- `/components` → Shared UI bileşenleri (Board layout, token panelleri, vb.)
+- `/lib` → Core logic (auth, roles, guards, token engine)
+  - `lib/token-engine.ts` → şirket ve designer bazlı token hareketleri için servis katmanı
+- `/prisma` → DB şeması ve migration’lar
+- `/scripts` → Token reset, seeding, bakım script’leri (planlı)
 
 ---
 
@@ -63,16 +63,16 @@ Bu değerler, admin panelinden (SiteOwner / SiteAdmin) değiştirilebilir olacak
 
 Her token hareketi, `TokenLedger` tablosuna bir kayıt olarak düşer:
 
-- `direction` → `CREDIT` (ekleme) / `DEBIT` (düşme)  
-- `amount` → ham token miktarı (daima pozitif)  
-- `reason` → kısa kod (örn: `PLAN_PURCHASE`, `JOB_PAYMENT`, `WITHDRAW`)  
-- `notes` → insan tarafından okunabilir açıklama  
-- `metadata` (JSON) → provider ID, dış sistem referansları vb.  
+- `direction` → `CREDIT` (ekleme) / `DEBIT` (düşme)
+- `amount` → ham token miktarı (daima pozitif)
+- `reason` → kısa kod (örn: `PLAN_PURCHASE`, `JOB_PAYMENT`, `WITHDRAW`)
+- `notes` → insan tarafından okunabilir açıklama
+- `metadata` (JSON) → provider ID, dış sistem referansları vb.
 - `balanceBefore` / `balanceAfter` → hareket öncesi/sonrası bakiye snapshot’ları
 
 Şu an için:
 
-- `Company.tokenBalance` → müşteri tarafındaki cache alanı  
+- `Company.tokenBalance` → müşteri tarafındaki cache alanı
 - Gerçek kaynak → `TokenLedger` kayıtları (istatistik & audit için)
 
 ---

@@ -243,8 +243,12 @@ export function DrawingLayer({
         pointerEvents: active || eraserActive ? "auto" : "none",
         cursor: active ? "crosshair" : "default",
       }}
-      onPointerDown={active ? handlePointerDown : eraserActive ? handleEraserPointerDown : undefined}
-      onPointerMove={active ? handlePointerMove : eraserActive ? handleEraserPointerMove : undefined}
+      onPointerDown={
+        active ? handlePointerDown : eraserActive ? handleEraserPointerDown : undefined
+      }
+      onPointerMove={
+        active ? handlePointerMove : eraserActive ? handleEraserPointerMove : undefined
+      }
       onPointerUp={active ? handlePointerUp : eraserActive ? handleEraserPointerUp : undefined}
     >
       {/* Rendered saved drawings */}
@@ -295,13 +299,7 @@ export function DrawingLayer({
             <path
               d={data.pathData}
               fill="none"
-              stroke={
-                isEraserHovered
-                  ? "#ef4444"
-                  : isSelected
-                    ? "#F15B2B"
-                    : data.strokeColor
-              }
+              stroke={isEraserHovered ? "#ef4444" : isSelected ? "#F15B2B" : data.strokeColor}
               strokeWidth={
                 isEraserHovered
                   ? data.strokeWidth + 2

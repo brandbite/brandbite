@@ -296,7 +296,14 @@ export function BoardCanvas({
       <div
         ref={viewportRef}
         className="relative flex-1 overflow-hidden"
-        style={{ cursor: toolMode === "arrow" || toolMode === "draw" ? "crosshair" : toolMode === "eraser" ? "none" : "default" }}
+        style={{
+          cursor:
+            toolMode === "arrow" || toolMode === "draw"
+              ? "crosshair"
+              : toolMode === "eraser"
+                ? "none"
+                : "default",
+        }}
         onWheel={onWheel}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -313,7 +320,7 @@ export function BoardCanvas({
             bottom: 0,
             backgroundImage: `radial-gradient(circle, #ddd9d4 0.75px, transparent 0.75px)`,
             backgroundSize: `${24 * zoom}px ${24 * zoom}px`,
-            backgroundPosition: `${panX % (24 * zoom) - Math.max(0, panX)}px ${panY % (24 * zoom) - Math.max(0, panY)}px`,
+            backgroundPosition: `${(panX % (24 * zoom)) - Math.max(0, panX)}px ${(panY % (24 * zoom)) - Math.max(0, panY)}px`,
           }}
         />
 
@@ -408,7 +415,9 @@ export function BoardCanvas({
             onStrokeComplete={onAddDrawing}
             onSelectDrawing={toolMode === "select" ? setSelectedDrawingId : undefined}
             selectedDrawingId={selectedDrawingId}
-            onDeleteDrawing={toolMode === "select" || toolMode === "eraser" ? onDeleteItem : undefined}
+            onDeleteDrawing={
+              toolMode === "select" || toolMode === "eraser" ? onDeleteItem : undefined
+            }
           />
 
           {/* Connection arrows layer */}

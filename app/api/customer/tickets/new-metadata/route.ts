@@ -15,17 +15,11 @@ export async function GET(_req: NextRequest) {
     const user = await getCurrentUserOrThrow();
 
     if (user.role !== "CUSTOMER") {
-      return NextResponse.json(
-        { error: "Only customers can create tickets" },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Only customers can create tickets" }, { status: 403 });
     }
 
     if (!user.activeCompanyId) {
-      return NextResponse.json(
-        { error: "User has no active company" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "User has no active company" }, { status: 400 });
     }
 
     const company = await prisma.company.findUnique({
@@ -38,10 +32,7 @@ export async function GET(_req: NextRequest) {
     });
 
     if (!company) {
-      return NextResponse.json(
-        { error: "Company not found for current user" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Company not found for current user" }, { status: 404 });
     }
 
     const [projects, jobTypes, tags] = await Promise.all([
@@ -96,20 +87,11 @@ export async function GET(_req: NextRequest) {
     );
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
-    console.error(
-      "[customer.tickets.new-metadata] GET error",
-      error,
-    );
+    console.error("[customer.tickets.new-metadata] GET error", error);
 
-    return NextResponse.json(
-      { error: "Failed to load ticket metadata" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load ticket metadata" }, { status: 500 });
   }
 }

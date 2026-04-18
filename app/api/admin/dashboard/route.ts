@@ -207,21 +207,12 @@ export async function GET() {
     console.error("[AdminDashboard] GET error:", err);
 
     if (err?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: err.message ?? "Not authenticated." },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: err.message ?? "Not authenticated." }, { status: 401 });
     }
     if (err?.code === "FORBIDDEN") {
-      return NextResponse.json(
-        { error: err.message ?? "Access denied." },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: err.message ?? "Access denied." }, { status: 403 });
     }
 
-    return NextResponse.json(
-      { error: "Failed to load admin dashboard data." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load admin dashboard data." }, { status: 500 });
   }
 }

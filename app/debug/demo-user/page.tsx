@@ -39,9 +39,7 @@ export default function DebugDemoUserPage() {
       const json = await res.json().catch(() => null);
 
       if (!res.ok) {
-        setError(
-          json?.error || "Failed to switch demo user. Please try again.",
-        );
+        setError(json?.error || "Failed to switch demo user. Please try again.");
         return;
       }
 
@@ -58,17 +56,16 @@ export default function DebugDemoUserPage() {
   return (
     <div className="min-h-screen bg-[var(--bb-bg-card)] text-[var(--bb-secondary)]">
       <div className="mx-auto flex min-h-screen max-w-4xl flex-col items-center justify-center px-4 py-10">
-        <div className="w-full rounded-3xl bg-[var(--bb-bg-page)]/90 p-6 shadow-sm shadow-[var(--bb-border)] md:p-8">
+        <div className="w-full rounded-3xl bg-[var(--bb-bg-page)]/90 p-6 shadow-[var(--bb-border)] shadow-sm md:p-8">
           <header className="mb-6 border-b border-[var(--bb-border-subtle)] pb-4">
-            <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--bb-text-muted)]">
+            <p className="text-[11px] font-medium tracking-[0.2em] text-[var(--bb-text-muted)] uppercase">
               Debug
             </p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--bb-secondary)]">
               Browse Brandbite as…
             </h1>
             <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-              Pick a persona to explore Brandbite from different perspectives.
-              This will set a{" "}
+              Pick a persona to explore Brandbite from different perspectives. This will set a{" "}
               <code className="rounded bg-[var(--bb-bg-card)] px-1 py-0.5 text-[11px]">
                 bb-demo-user
               </code>{" "}
@@ -97,7 +94,7 @@ export default function DebugDemoUserPage() {
                     <span className="text-[13px] font-semibold text-[var(--bb-secondary)]">
                       {p.label}
                     </span>
-                    <span className="text-[10px] uppercase tracking-[0.14em] text-[var(--bb-text-muted)]">
+                    <span className="text-[10px] tracking-[0.14em] text-[var(--bb-text-muted)] uppercase">
                       {isLoading ? "Switching…" : "Use"}
                     </span>
                   </div>
@@ -105,10 +102,10 @@ export default function DebugDemoUserPage() {
                     {p.role === "SITE_OWNER" || p.role === "SITE_ADMIN"
                       ? "Platform"
                       : p.role === "CUSTOMER"
-                      ? "Customer"
-                      : p.role === "DESIGNER"
-                      ? "Creative"
-                      : p.role}
+                        ? "Customer"
+                        : p.role === "DESIGNER"
+                          ? "Creative"
+                          : p.role}
                   </p>
                   <p className="text-[12px] text-[var(--bb-text-secondary)]">{p.description}</p>
                 </button>
@@ -117,8 +114,8 @@ export default function DebugDemoUserPage() {
           </div>
 
           <p className="mt-4 text-xs text-[var(--bb-text-muted)]">
-            This page is for local development and demos only. In production,
-            this flow will be replaced by real authentication.
+            This page is for local development and demos only. In production, this flow will be
+            replaced by real authentication.
           </p>
         </div>
       </div>

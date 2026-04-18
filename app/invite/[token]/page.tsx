@@ -12,11 +12,7 @@ type RouteParamsPromise = Promise<{
   token: string;
 }>;
 
-export default async function InvitePage({
-  params,
-}: {
-  params: RouteParamsPromise;
-}) {
+export default async function InvitePage({ params }: { params: RouteParamsPromise }) {
   const { token } = await params; // ✅ params Promise, burada await ediyoruz
   return <InvitePageClient token={token} />;
 }

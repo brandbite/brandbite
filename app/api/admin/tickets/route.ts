@@ -10,10 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
-import {
-  applyCompanyLedgerEntry,
-  getEffectiveTokenValues,
-} from "@/lib/token-engine";
+import { applyCompanyLedgerEntry, getEffectiveTokenValues } from "@/lib/token-engine";
 
 type PatchPayload = {
   ticketId?: string;
@@ -26,14 +23,12 @@ export async function GET(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
 
-    const isSiteAdmin =
-      user.role === "SITE_OWNER" || user.role === "SITE_ADMIN";
+    const isSiteAdmin = user.role === "SITE_OWNER" || user.role === "SITE_ADMIN";
 
     if (!isSiteAdmin) {
       return NextResponse.json(
         {
-          error:
-            "Only site owners or admins can access this endpoint.",
+          error: "Only site owners or admins can access this endpoint.",
         },
         { status: 403 },
       );
@@ -46,22 +41,13 @@ export async function GET(req: NextRequest) {
     const companyId = url.searchParams.get("company") || "";
     const sortBy = url.searchParams.get("sortBy") || "createdAt";
     const sortDir = url.searchParams.get("sortDir") || "desc";
-    const limit = Math.min(
-      Math.max(parseInt(url.searchParams.get("limit") || "50", 10), 1),
-      200,
-    );
-    const offset = Math.max(
-      parseInt(url.searchParams.get("offset") || "0", 10),
-      0,
-    );
+    const limit = Math.min(Math.max(parseInt(url.searchParams.get("limit") || "50", 10), 1), 200);
+    const offset = Math.max(parseInt(url.searchParams.get("offset") || "0", 10), 0);
 
     // ── Build where clause ──────────────────────────────────────────────
     const where: any = {};
 
-    if (
-      status &&
-      ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"].includes(status)
-    ) {
+    if (status && ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"].includes(status)) {
       where.status = status;
     }
 
@@ -161,17 +147,11 @@ export async function GET(req: NextRequest) {
     );
   } catch (error: any) {
     if (error?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[GET /api/admin/tickets] error", error);
-    return NextResponse.json(
-      { error: "Failed to load tickets" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load tickets" }, { status: 500 });
   }
 }
 
@@ -179,14 +159,12 @@ export async function PATCH(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
 
-    const isSiteAdmin =
-      user.role === "SITE_OWNER" || user.role === "SITE_ADMIN";
+    const isSiteAdmin = user.role === "SITE_OWNER" || user.role === "SITE_ADMIN";
 
     if (!isSiteAdmin) {
       return NextResponse.json(
         {
-          error:
-            "Only site owners or admins can modify tickets.",
+          error: "Only site owners or admins can modify tickets.",
         },
         { status: 403 },
       );
@@ -196,10 +174,7 @@ export async function PATCH(req: NextRequest) {
     const ticketId = body.ticketId;
 
     if (!ticketId) {
-      return NextResponse.json(
-        { error: "ticketId is required." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "ticketId is required." }, { status: 400 });
     }
 
     const ticket = await prisma.ticket.findUnique({
@@ -221,10 +196,7 @@ export async function PATCH(req: NextRequest) {
     });
 
     if (!ticket) {
-      return NextResponse.json(
-        { error: "Ticket not found." },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Ticket not found." }, { status: 404 });
     }
 
     // -----------------------------------------------------------------------
@@ -247,8 +219,7 @@ export async function PATCH(req: NextRequest) {
       if (!creative) {
         return NextResponse.json(
           {
-            error:
-              "Creative not found or not a creative.",
+            error: "Creative not found or not a creative.",
           },
           { status: 400 },
         );
@@ -263,15 +234,15 @@ export async function PATCH(req: NextRequest) {
 
     // Parse override values: null means "clear override", number means "set"
     const newCostOverride = hasCostOverrideChange
-      ? (typeof body.tokenCostOverride === "number" && body.tokenCostOverride >= 0
-          ? body.tokenCostOverride
-          : null)
+      ? typeof body.tokenCostOverride === "number" && body.tokenCostOverride >= 0
+        ? body.tokenCostOverride
+        : null
       : undefined; // undefined = no change
 
     const newPayoutOverride = hasPayoutOverrideChange
-      ? (typeof body.creativePayoutOverride === "number" && body.creativePayoutOverride >= 0
-          ? body.creativePayoutOverride
-          : null)
+      ? typeof body.creativePayoutOverride === "number" && body.creativePayoutOverride >= 0
+        ? body.creativePayoutOverride
+        : null
       : undefined;
 
     // If cost override changed, reconcile the company ledger
@@ -350,16 +321,10 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json(updated, { status: 200 });
   } catch (error: any) {
     if (error?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[PATCH /api/admin/tickets] error", error);
-    return NextResponse.json(
-      { error: "Failed to update ticket" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to update ticket" }, { status: 500 });
   }
 }

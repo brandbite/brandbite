@@ -31,56 +31,55 @@ export async function GET() {
     // Run all queries in parallel
     // -----------------------------------------------------------------------
 
-    const [creatives, tickets, revisions, earningsGrouped, withdrawalsGrouped] =
-      await Promise.all([
-        // 1. All creatives
-        prisma.userAccount.findMany({
-          where: { role: "DESIGNER" },
-          select: { id: true, name: true, email: true },
-        }),
+    const [creatives, tickets, revisions, earningsGrouped, withdrawalsGrouped] = await Promise.all([
+      // 1. All creatives
+      prisma.userAccount.findMany({
+        where: { role: "DESIGNER" },
+        select: { id: true, name: true, email: true },
+      }),
 
-        // 2. All tickets with a creative assigned
-        prisma.ticket.findMany({
-          where: { creativeId: { not: null } },
-          select: {
-            id: true,
-            creativeId: true,
-            status: true,
-            priority: true,
-            revisionCount: true,
-            createdAt: true,
-            updatedAt: true,
-            jobType: { select: { tokenCost: true } },
-          },
-        }),
+      // 2. All tickets with a creative assigned
+      prisma.ticket.findMany({
+        where: { creativeId: { not: null } },
+        select: {
+          id: true,
+          creativeId: true,
+          status: true,
+          priority: true,
+          revisionCount: true,
+          createdAt: true,
+          updatedAt: true,
+          jobType: { select: { tokenCost: true } },
+        },
+      }),
 
-        // 3. All revisions submitted by creatives
-        prisma.ticketRevision.findMany({
-          where: { submittedByCreativeId: { not: null } },
-          select: {
-            submittedByCreativeId: true,
-            submittedAt: true,
-            feedbackAt: true,
-            version: true,
-            ticketId: true,
-          },
-        }),
+      // 3. All revisions submitted by creatives
+      prisma.ticketRevision.findMany({
+        where: { submittedByCreativeId: { not: null } },
+        select: {
+          submittedByCreativeId: true,
+          submittedAt: true,
+          feedbackAt: true,
+          version: true,
+          ticketId: true,
+        },
+      }),
 
-        // 4. Earnings grouped by creative
-        prisma.tokenLedger.groupBy({
-          by: ["userId"],
-          where: { direction: "CREDIT", userId: { not: null } },
-          _sum: { amount: true },
-          _count: true,
-        }),
+      // 4. Earnings grouped by creative
+      prisma.tokenLedger.groupBy({
+        by: ["userId"],
+        where: { direction: "CREDIT", userId: { not: null } },
+        _sum: { amount: true },
+        _count: true,
+      }),
 
-        // 5. Withdrawals grouped by creative
-        prisma.withdrawal.groupBy({
-          by: ["creativeId"],
-          _sum: { amountTokens: true },
-          _count: true,
-        }),
-      ]);
+      // 5. Withdrawals grouped by creative
+      prisma.withdrawal.groupBy({
+        by: ["creativeId"],
+        _sum: { amountTokens: true },
+        _count: true,
+      }),
+    ]);
 
     // -----------------------------------------------------------------------
     // Build lookup maps
@@ -128,42 +127,28 @@ export async function GET() {
     const creativeMetrics = creatives.map((d) => {
       // Tickets
       const dTickets = tickets.filter((t) => t.creativeId === d.id);
-      const completedTickets = dTickets.filter(
-        (t) => t.status === "DONE",
-      ).length;
-      const activeTickets = dTickets.filter(
-        (t) => t.status !== "DONE",
-      ).length;
+      const completedTickets = dTickets.filter((t) => t.status === "DONE").length;
+      const activeTickets = dTickets.filter((t) => t.status !== "DONE").length;
       const totalTickets = dTickets.length;
       const completionRate =
-        totalTickets > 0
-          ? Math.round((completedTickets / totalTickets) * 100)
-          : 0;
+        totalTickets > 0 ? Math.round((completedTickets / totalTickets) * 100) : 0;
 
       // Average revision count (from completed tickets)
-      const completedWithRevisions = dTickets.filter(
-        (t) => t.status === "DONE",
-      );
-      const revisionSum = completedWithRevisions.reduce(
-        (sum, t) => sum + t.revisionCount,
-        0,
-      );
+      const completedWithRevisions = dTickets.filter((t) => t.status === "DONE");
+      const revisionSum = completedWithRevisions.reduce((sum, t) => sum + t.revisionCount, 0);
       const avgRevisionCount =
         completedWithRevisions.length > 0
           ? Math.round((revisionSum / completedWithRevisions.length) * 10) / 10
           : 0;
 
       // Average turnaround (hours) — from revision submittedAt to feedbackAt
-      const dRevisions = revisions.filter(
-        (r) => r.submittedByCreativeId === d.id && r.feedbackAt,
-      );
+      const dRevisions = revisions.filter((r) => r.submittedByCreativeId === d.id && r.feedbackAt);
       let turnaroundSum = 0;
       let turnaroundCount = 0;
       for (const r of dRevisions) {
         if (r.feedbackAt && r.submittedAt) {
           const hours =
-            (new Date(r.feedbackAt).getTime() -
-              new Date(r.submittedAt).getTime()) /
+            (new Date(r.feedbackAt).getTime() - new Date(r.submittedAt).getTime()) /
             (1000 * 60 * 60);
           if (hours >= 0) {
             turnaroundSum += hours;
@@ -172,9 +157,7 @@ export async function GET() {
         }
       }
       const avgTurnaroundHours =
-        turnaroundCount > 0
-          ? Math.round((turnaroundSum / turnaroundCount) * 10) / 10
-          : 0;
+        turnaroundCount > 0 ? Math.round((turnaroundSum / turnaroundCount) * 10) / 10 : 0;
 
       // Load score (priority-weighted, non-DONE tickets only)
       let loadScore = 0;
@@ -222,15 +205,12 @@ export async function GET() {
 
     const avgPlatformRevisionRate =
       platformRevisionTicketCount > 0
-        ? Math.round(
-            (platformRevisionSum / platformRevisionTicketCount) * 10,
-          ) / 10
+        ? Math.round((platformRevisionSum / platformRevisionTicketCount) * 10) / 10
         : 0;
 
     const avgPlatformTurnaround =
       platformTurnaroundCount > 0
-        ? Math.round((platformTurnaroundSum / platformTurnaroundCount) * 10) /
-          10
+        ? Math.round((platformTurnaroundSum / platformTurnaroundCount) * 10) / 10
         : 0;
 
     return NextResponse.json({
@@ -246,21 +226,12 @@ export async function GET() {
     console.error("[CreativeAnalytics] GET error:", err);
 
     if (err?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: err.message ?? "Not authenticated." },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: err.message ?? "Not authenticated." }, { status: 401 });
     }
     if (err?.code === "FORBIDDEN") {
-      return NextResponse.json(
-        { error: err.message ?? "Access denied." },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: err.message ?? "Access denied." }, { status: 403 });
     }
 
-    return NextResponse.json(
-      { error: "Failed to load creative analytics." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load creative analytics." }, { status: 500 });
   }
 }

@@ -12,17 +12,11 @@ import { WithdrawalStatus } from "@prisma/client";
 /**
  * POST /api/admin/withdrawals/:id/mark-paid
  */
-export async function POST(
-  _request: Request,
-  context: { params: Promise<{ id: string }> }
-) {
+export async function POST(_request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
 
   if (!id) {
-    return NextResponse.json(
-      { error: "Missing withdrawal id in route params" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Missing withdrawal id in route params" }, { status: 400 });
   }
 
   try {
@@ -31,10 +25,7 @@ export async function POST(
     });
 
     if (!withdrawal) {
-      return NextResponse.json(
-        { error: "Withdrawal not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Withdrawal not found" }, { status: 404 });
     }
 
     if (withdrawal.status !== WithdrawalStatus.APPROVED) {
@@ -43,7 +34,7 @@ export async function POST(
           error: "Only APPROVED withdrawals can be marked as PAID",
           currentStatus: withdrawal.status,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -60,13 +51,10 @@ export async function POST(
         message: "Withdrawal marked as paid",
         withdrawal: updated,
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error) {
     console.error("[POST /api/admin/withdrawals/:id/mark-paid] error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

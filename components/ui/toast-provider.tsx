@@ -8,13 +8,7 @@
 
 "use client";
 
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-} from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 export type ToastType = "success" | "error" | "info" | "warning";
@@ -112,10 +106,7 @@ export function ToastProvider({ children }: ToastProviderProps) {
     <ToastContext.Provider value={value}>
       {children}
       {mounted &&
-        createPortal(
-          <ToastViewport toasts={toasts} onClose={hideToast} />,
-          document.body,
-        )}
+        createPortal(<ToastViewport toasts={toasts} onClose={hideToast} />, document.body)}
     </ToastContext.Provider>
   );
 }
@@ -165,16 +156,12 @@ function ToastItem({ toast, onClose }: ToastItemProps) {
       </div>
       <div className="flex-1">
         <div className={`text-[11px] font-semibold ${titleClass}`}>{title}</div>
-        {description && (
-          <p className="mt-1 text-[11px] text-slate-200 opacity-90">
-            {description}
-          </p>
-        )}
+        {description && <p className="mt-1 text-[11px] text-slate-200 opacity-90">{description}</p>}
       </div>
       <button
         type="button"
         onClick={() => onClose(id)}
-        className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-black/10 text-[11px] text-slate-200 hover:bg-black/20 focus:outline-none focus:ring-1 focus:ring-slate-400"
+        className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-black/10 text-[11px] text-slate-200 hover:bg-black/20 focus:ring-1 focus:ring-slate-400 focus:outline-none"
         aria-label="Close notification"
       >
         ×

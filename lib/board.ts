@@ -10,12 +10,7 @@ export type { TicketStatus, TicketPriority };
 // Status
 // ---------------------------------------------------------------------------
 
-export const STATUS_ORDER: TicketStatus[] = [
-  "TODO",
-  "IN_PROGRESS",
-  "IN_REVIEW",
-  "DONE",
-];
+export const STATUS_ORDER: TicketStatus[] = ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"];
 
 export const STATUS_LABELS: Record<TicketStatus, string> = {
   TODO: "To do",
@@ -43,12 +38,7 @@ export const statusColumnClass = (status: TicketStatus): string => {
 // Priority
 // ---------------------------------------------------------------------------
 
-export const PRIORITY_ORDER: TicketPriority[] = [
-  "URGENT",
-  "HIGH",
-  "MEDIUM",
-  "LOW",
-];
+export const PRIORITY_ORDER: TicketPriority[] = ["URGENT", "HIGH", "MEDIUM", "LOW"];
 
 export const PRIORITY_LABELS: Record<TicketPriority, string> = {
   URGENT: "Urgent",
@@ -96,8 +86,7 @@ export const statusBadgeVariant = (s: TicketStatus): BadgeVariant => {
 // Board card / column shared class constants
 // ---------------------------------------------------------------------------
 
-export const BOARD_CARD_BASE =
-  "rounded-xl border border-[var(--bb-border)] bg-white p-3 shadow-sm";
+export const BOARD_CARD_BASE = "rounded-xl border border-[var(--bb-border)] bg-white p-3 shadow-sm";
 
 export const BOARD_COLUMN_HEADER =
   "text-xs font-semibold uppercase tracking-[0.18em] text-[var(--bb-text-tertiary)]";
@@ -138,14 +127,26 @@ export const columnAccentColor: Record<TicketStatus, string> = {
 
 /** Palette for project sidebar icon backgrounds */
 export const PROJECT_COLORS = [
-  "#7C3AED", "#3B82F6", "#22C55E", "#F59E0B",
-  "#EC4899", "#14B8A6", "#F97316", "#EF4444",
+  "#7C3AED",
+  "#3B82F6",
+  "#22C55E",
+  "#F59E0B",
+  "#EC4899",
+  "#14B8A6",
+  "#F97316",
+  "#EF4444",
 ];
 
 /** Palette for avatar circle backgrounds */
 export const AVATAR_COLORS = [
-  "#6366F1", "#8B5CF6", "#EC4899", "#F43F5E",
-  "#F59E0B", "#10B981", "#06B6D4", "#3B82F6",
+  "#6366F1",
+  "#8B5CF6",
+  "#EC4899",
+  "#F43F5E",
+  "#F59E0B",
+  "#10B981",
+  "#06B6D4",
+  "#3B82F6",
 ];
 
 /** Deterministic color for a name — same name always gets same color */
@@ -183,9 +184,7 @@ export const formatDueDateShort = (iso: string | null): string | null => {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
   const day = d.getDate();
-  const month = d
-    .toLocaleString("en-US", { month: "short" })
-    .toUpperCase();
+  const month = d.toLocaleString("en-US", { month: "short" }).toUpperCase();
   return `${day} ${month}`;
 };
 
@@ -225,10 +224,7 @@ export const formatDueDateCountdown = (
 };
 
 /** Returns 2-char uppercase initials for avatar circles */
-export const getInitials = (
-  name: string | null,
-  email: string | null,
-): string => {
+export const getInitials = (name: string | null, email: string | null): string => {
   const str = name || email || "?";
   const namePart = str.split("@")[0];
   const parts = namePart.trim().split(/\s+/);

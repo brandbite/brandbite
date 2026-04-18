@@ -27,9 +27,7 @@ export function LoadingState({
   }
 
   return (
-    <div
-      className={`py-6 text-center text-sm text-[var(--bb-text-secondary)] ${className}`}
-    >
+    <div className={`py-6 text-center text-sm text-[var(--bb-text-secondary)] ${className}`}>
       {message}
     </div>
   );

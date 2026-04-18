@@ -20,14 +20,7 @@ describe("Badge", () => {
     expect(el.className).toContain("bb-bg-card");
   });
 
-  const variants: BadgeVariant[] = [
-    "neutral",
-    "primary",
-    "info",
-    "success",
-    "warning",
-    "danger",
-  ];
+  const variants: BadgeVariant[] = ["neutral", "primary", "info", "success", "warning", "danger"];
 
   variants.forEach((variant) => {
     it(`renders ${variant} variant with correct styling`, () => {

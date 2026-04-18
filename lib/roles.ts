@@ -66,9 +66,7 @@ export function hasActiveCompany(user: SessionUser): boolean {
  * Company-level permission helper.
  * PM & OWNER can manage project/ticket workflows; others are more limited.
  */
-export function isAtLeastCompanyPM(
-  companyRole: CompanyRole | null | undefined,
-): boolean {
+export function isAtLeastCompanyPM(companyRole: CompanyRole | null | undefined): boolean {
   return companyRole === "OWNER" || companyRole === "PM";
 }
 

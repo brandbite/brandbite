@@ -214,7 +214,6 @@ export default function AdminShowcasePage() {
     return () => {
       cancelled = true;
     };
-     
   }, []);
 
   /* ---------------------------------------------------------------------- */

@@ -37,12 +37,8 @@ export async function GET(_req: NextRequest) {
     });
 
     const totalCompanies = companies.length;
-    const totalTokenBalance = companies.reduce(
-      (sum, c) => sum + (c.tokenBalance ?? 0),
-      0,
-    );
-    const avgTokenBalance =
-      totalCompanies > 0 ? totalTokenBalance / totalCompanies : 0;
+    const totalTokenBalance = companies.reduce((sum, c) => sum + (c.tokenBalance ?? 0), 0);
+    const avgTokenBalance = totalCompanies > 0 ? totalTokenBalance / totalCompanies : 0;
     const companiesWithPlan = companies.filter((c) => c.planId != null).length;
 
     const items = companies.map((c) => ({
@@ -79,16 +75,10 @@ export async function GET(_req: NextRequest) {
     });
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[admin.companies] GET error", error);
-    return NextResponse.json(
-      { error: "Failed to load companies overview" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load companies overview" }, { status: 500 });
   }
 }

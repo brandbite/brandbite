@@ -88,9 +88,7 @@ export function formatPauseStatus(creative: FullPauseFields): {
   return {
     isPaused: paused,
     pausedAt: paused ? (creative.pausedAt?.toISOString() ?? null) : null,
-    pauseExpiresAt: paused
-      ? (creative.pauseExpiresAt?.toISOString() ?? null)
-      : null,
+    pauseExpiresAt: paused ? (creative.pauseExpiresAt?.toISOString() ?? null) : null,
     pauseType: paused ? creative.pauseType : null,
     remainingMs:
       paused && creative.pauseExpiresAt

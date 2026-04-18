@@ -18,17 +18,11 @@ import { createNotification } from "@/lib/notifications";
  * Kullanım:
  * POST /api/tickets/:id/complete
  */
-export async function POST(
-  _request: Request,
-  context: { params: Promise<{ id: string }> }
-) {
+export async function POST(_request: Request, context: { params: Promise<{ id: string }> }) {
   const { id: ticketId } = await context.params;
 
   if (!ticketId) {
-    return NextResponse.json(
-      { error: "Missing ticket id in route params" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Missing ticket id in route params" }, { status: 400 });
   }
 
   try {
@@ -41,7 +35,7 @@ export async function POST(
           ticket: result.ticket,
           alreadyCompleted: true,
         },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -83,20 +77,16 @@ export async function POST(
         },
         alreadyCompleted: false,
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error) {
     console.error("[POST /api/tickets/:id/complete] error:", error);
-    const message =
-      error instanceof Error ? error.message : "Internal server error";
+    const message = error instanceof Error ? error.message : "Internal server error";
 
     if (message.startsWith("Ticket not found")) {
       return NextResponse.json({ error: message }, { status: 404 });
     }
 
-    return NextResponse.json(
-      { error: message },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

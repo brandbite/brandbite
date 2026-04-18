@@ -133,9 +133,7 @@ export function PauseBanner() {
     <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-sm font-medium text-amber-800">
-            You are currently paused
-          </p>
+          <p className="text-sm font-medium text-amber-800">You are currently paused</p>
           <p className="mt-0.5 text-[11px] text-amber-700">{message}</p>
         </div>
         <Button

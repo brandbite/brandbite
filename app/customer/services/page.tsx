@@ -61,9 +61,7 @@ export default function CustomerServicesPage() {
         const json = await res.json().catch(() => null);
 
         if (!res.ok) {
-          throw new Error(
-            (json as any)?.error ?? `Request failed (${res.status})`,
-          );
+          throw new Error((json as any)?.error ?? `Request failed (${res.status})`);
         }
 
         if (!cancelled) {
@@ -72,9 +70,7 @@ export default function CustomerServicesPage() {
         }
       } catch (err: unknown) {
         if (!cancelled) {
-          setError(
-            err instanceof Error ? err.message : "Failed to load services.",
-          );
+          setError(err instanceof Error ? err.message : "Failed to load services.");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -115,10 +111,7 @@ export default function CustomerServicesPage() {
     for (const category of sortedCats) {
       const items = map.get(category) ?? [];
       if (items.length > 0) {
-        const icon =
-          catOrderMap.get(category)?.icon ??
-          items[0]?.categoryIcon ??
-          null;
+        const icon = catOrderMap.get(category)?.icon ?? items[0]?.categoryIcon ?? null;
         result.push({ category, icon, services: items });
       }
     }
@@ -138,7 +131,7 @@ export default function CustomerServicesPage() {
     <div className="mx-auto max-w-6xl">
       {/* Header */}
       <div className="mb-6">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--bb-text-muted)]">
+        <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
           Service catalog
         </p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--bb-secondary)]">
@@ -180,19 +173,14 @@ export default function CustomerServicesPage() {
           {grouped.map((g) => (
             <button
               key={g.category}
-              onClick={() =>
-                setActiveCategory(
-                  activeCategory === g.category ? null : g.category,
-                )
-              }
+              onClick={() => setActiveCategory(activeCategory === g.category ? null : g.category)}
               className={`rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors ${
                 activeCategory === g.category
                   ? "bg-[var(--bb-primary)] text-white"
                   : "border border-[var(--bb-border)] bg-[var(--bb-bg-page)] text-[var(--bb-text-secondary)] hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
               }`}
             >
-              {g.icon ?? ""}{" "}
-              {g.category} ({g.services.length})
+              {g.icon ?? ""} {g.category} ({g.services.length})
             </button>
           ))}
         </div>
@@ -206,8 +194,7 @@ export default function CustomerServicesPage() {
               {/* Category header */}
               <div className="mb-4 flex items-center gap-3">
                 <h2 className="text-base font-semibold text-[var(--bb-secondary)]">
-                  {group.icon ?? ""}{" "}
-                  {group.category}
+                  {group.icon ?? ""} {group.category}
                 </h2>
                 <span className="rounded-full bg-[var(--bb-bg-card)] px-2 py-0.5 text-[10px] font-medium text-[var(--bb-text-secondary)]">
                   {group.services.length}
@@ -236,9 +223,7 @@ function ServiceCard({ service }: { service: Service }) {
   return (
     <div className="flex flex-col rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm transition-colors hover:border-[var(--bb-primary)]/30">
       {/* Name */}
-      <h3 className="text-sm font-semibold text-[var(--bb-secondary)]">
-        {service.name}
-      </h3>
+      <h3 className="text-sm font-semibold text-[var(--bb-secondary)]">{service.name}</h3>
 
       {/* Description */}
       {service.description && (
@@ -263,9 +248,7 @@ function ServiceCard({ service }: { service: Service }) {
 
         {/* Quantity indicator */}
         {service.hasQuantity && service.quantityLabel && (
-          <span className="text-[10px] text-[var(--bb-text-muted)]">
-            {service.quantityLabel}
-          </span>
+          <span className="text-[10px] text-[var(--bb-text-muted)]">{service.quantityLabel}</span>
         )}
       </div>
 

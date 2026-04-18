@@ -10,11 +10,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { TagBadge } from "@/components/ui/tag-badge";
-import {
-  TAG_COLORS,
-  TAG_COLOR_KEYS,
-  type TagColorKey,
-} from "@/lib/tag-colors";
+import { TAG_COLORS, TAG_COLOR_KEYS, type TagColorKey } from "@/lib/tag-colors";
 
 export type TagOption = {
   id: string;
@@ -26,10 +22,7 @@ type TagMultiSelectProps = {
   availableTags: TagOption[];
   selectedTagIds: string[];
   onChange: (tagIds: string[]) => void;
-  onCreateTag?: (
-    name: string,
-    color: TagColorKey,
-  ) => Promise<TagOption | null>;
+  onCreateTag?: (name: string, color: TagColorKey) => Promise<TagOption | null>;
   maxTags?: number;
   disabled?: boolean;
   canCreate?: boolean;
@@ -60,10 +53,7 @@ export function TagMultiSelect({
   useEffect(() => {
     if (!open) return;
     function handleClick(e: MouseEvent) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
-      ) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
         setCreating(false);
         setSearch("");
@@ -116,9 +106,7 @@ export function TagMultiSelect({
   };
 
   const filteredTags = search.trim()
-    ? availableTags.filter((t) =>
-        t.name.toLowerCase().includes(search.trim().toLowerCase()),
-      )
+    ? availableTags.filter((t) => t.name.toLowerCase().includes(search.trim().toLowerCase()))
     : availableTags;
 
   const selectedTags = selectedTagIds
@@ -141,9 +129,7 @@ export function TagMultiSelect({
             key={tag.id}
             name={tag.name}
             color={tag.color}
-            onRemove={
-              disabled ? undefined : () => removeTag(tag.id)
-            }
+            onRemove={disabled ? undefined : () => removeTag(tag.id)}
           />
         ))}
         {selectedTags.length === 0 && (
@@ -156,7 +142,7 @@ export function TagMultiSelect({
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-full min-w-[240px] rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] shadow-lg">
+        <div className="absolute top-full left-0 z-50 mt-1 w-full min-w-[240px] rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] shadow-lg">
           {/* Search */}
           <div className="border-b border-[var(--bb-border)] px-3 py-2">
             <input
@@ -194,9 +180,7 @@ export function TagMultiSelect({
                   disabled={disabledItem}
                   onClick={() => toggleTag(tag.id)}
                   className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] transition-colors ${
-                    disabledItem
-                      ? "cursor-not-allowed opacity-40"
-                      : "hover:bg-[var(--bb-bg-card)]"
+                    disabledItem ? "cursor-not-allowed opacity-40" : "hover:bg-[var(--bb-bg-card)]"
                   }`}
                 >
                   {/* Checkbox indicator */}
@@ -208,12 +192,7 @@ export function TagMultiSelect({
                     }`}
                   >
                     {selected && (
-                      <svg
-                        width="10"
-                        height="10"
-                        viewBox="0 0 10 10"
-                        fill="none"
-                      >
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                         <path
                           d="M2 5L4 7L8 3"
                           stroke="white"
@@ -246,12 +225,7 @@ export function TagMultiSelect({
                   onClick={() => setCreating(true)}
                   className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-[12px] font-medium text-[var(--bb-primary)] hover:bg-[var(--bb-bg-card)]"
                 >
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 12 12"
-                    fill="none"
-                  >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                     <path
                       d="M6 2.5V9.5M2.5 6H9.5"
                       stroke="currentColor"

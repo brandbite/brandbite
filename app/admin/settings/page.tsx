@@ -53,13 +53,9 @@ export default function AdminSettingsPage() {
         const json = await res.json().catch(() => null);
 
         if (!res.ok) {
-          if (res.status === 401)
-            throw new Error("You must be signed in as an admin.");
-          if (res.status === 403)
-            throw new Error("You do not have permission to view settings.");
-          throw new Error(
-            json?.error || `Request failed with status ${res.status}`,
-          );
+          if (res.status === 401) throw new Error("You must be signed in as an admin.");
+          if (res.status === 403) throw new Error("You do not have permission to view settings.");
+          throw new Error(json?.error || `Request failed with status ${res.status}`);
         }
 
         if (!cancelled) {
@@ -114,9 +110,7 @@ export default function AdminSettingsPage() {
       const json = await res.json().catch(() => null);
 
       if (!res.ok) {
-        throw new Error(
-          json?.error || `Request failed with status ${res.status}`,
-        );
+        throw new Error(json?.error || `Request failed with status ${res.status}`);
       }
 
       setSettings((prev) => ({ ...prev, [key]: value }));
@@ -138,135 +132,131 @@ export default function AdminSettingsPage() {
   return (
     <>
       {/* Page header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-            Global configuration for the Brandbite platform. Changes take effect
-            immediately.
-          </p>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+        <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
+          Global configuration for the Brandbite platform. Changes take effect immediately.
+        </p>
+      </div>
 
-        {/* Error */}
-        {error && (
-          <InlineAlert variant="error" title="Something went wrong" className="mb-4">
-            {error}
-          </InlineAlert>
-        )}
+      {/* Error */}
+      {error && (
+        <InlineAlert variant="error" title="Something went wrong" className="mb-4">
+          {error}
+        </InlineAlert>
+      )}
 
-        {/* Settings cards */}
-        {loading ? (
-          <LoadingState message="Loading settings…" />
-        ) : (
-          <div className="space-y-4">
-            {settingKeys.map((key) => {
-              const meta = SETTING_META[key];
-              const isSaving = savingKey === key;
-              const currentValue = settings[key] ?? "";
-              const draftValue = drafts[key] ?? "";
-              const hasChanged = draftValue.trim() !== currentValue;
+      {/* Settings cards */}
+      {loading ? (
+        <LoadingState message="Loading settings…" />
+      ) : (
+        <div className="space-y-4">
+          {settingKeys.map((key) => {
+            const meta = SETTING_META[key];
+            const isSaving = savingKey === key;
+            const currentValue = settings[key] ?? "";
+            const draftValue = drafts[key] ?? "";
+            const hasChanged = draftValue.trim() !== currentValue;
 
-              return (
-                <div
-                  key={key}
-                  className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm"
-                >
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                    <div className="flex-1">
-                      <label
-                        htmlFor={`setting-${key}`}
-                        className="text-sm font-semibold text-[var(--bb-secondary)]"
-                      >
-                        {meta.label}
-                      </label>
-                      <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
-                        {meta.description}
-                      </p>
-                      <FormInput
-                        id={`setting-${key}`}
-                        type={meta.type}
-                        min={meta.type === "number" ? 1 : undefined}
-                        value={draftValue}
-                        onChange={(e) =>
-                          setDrafts((prev) => ({
-                            ...prev,
-                            [key]: e.target.value,
-                          }))
-                        }
-                        className="mt-3 max-w-xs"
-                      />
-                      {currentValue && (
-                        <p className="mt-1.5 text-[11px] text-[var(--bb-text-tertiary)]">
-                          Current value:{" "}
-                          <span className="font-semibold">{currentValue}</span>
-                        </p>
-                      )}
-                    </div>
-
-                    <Button
-                      disabled={isSaving || !hasChanged || !draftValue.trim()}
-                      onClick={() => handleSave(key)}
-                      loading={isSaving}
-                      loadingText="Saving…"
+            return (
+              <div
+                key={key}
+                className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm"
+              >
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                  <div className="flex-1">
+                    <label
+                      htmlFor={`setting-${key}`}
+                      className="text-sm font-semibold text-[var(--bb-secondary)]"
                     >
-                      Save
-                    </Button>
+                      {meta.label}
+                    </label>
+                    <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
+                      {meta.description}
+                    </p>
+                    <FormInput
+                      id={`setting-${key}`}
+                      type={meta.type}
+                      min={meta.type === "number" ? 1 : undefined}
+                      value={draftValue}
+                      onChange={(e) =>
+                        setDrafts((prev) => ({
+                          ...prev,
+                          [key]: e.target.value,
+                        }))
+                      }
+                      className="mt-3 max-w-xs"
+                    />
+                    {currentValue && (
+                      <p className="mt-1.5 text-[11px] text-[var(--bb-text-tertiary)]">
+                        Current value: <span className="font-semibold">{currentValue}</span>
+                      </p>
+                    )}
                   </div>
+
+                  <Button
+                    disabled={isSaving || !hasChanged || !draftValue.trim()}
+                    onClick={() => handleSave(key)}
+                    loading={isSaving}
+                    loadingText="Saving…"
+                  >
+                    Save
+                  </Button>
                 </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Debug tools */}
-        <div className="mt-10">
-          <h2 className="text-lg font-semibold tracking-tight text-[var(--bb-secondary)]">
-            Debug tools
-          </h2>
-          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-            Internal tools for inspecting and configuring platform behaviour.
-          </p>
-
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Link
-              href="/debug/auto-assign"
-              className="group rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm transition-colors hover:border-[var(--bb-primary)]/40 hover:bg-[var(--bb-primary-light)]"
-            >
-              <h3 className="text-sm font-semibold text-[var(--bb-secondary)] group-hover:text-[var(--bb-primary)]">
-                Auto-assign configuration
-              </h3>
-              <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
-                View and toggle auto-assign settings at company and project
-                level. Inspect per-project modes (inherit, on, off).
-              </p>
-            </Link>
-
-            <Link
-              href="/debug/assignment-log"
-              className="group rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm transition-colors hover:border-[var(--bb-primary)]/40 hover:bg-[var(--bb-primary-light)]"
-            >
-              <h3 className="text-sm font-semibold text-[var(--bb-secondary)] group-hover:text-[var(--bb-primary)]">
-                Assignment log
-              </h3>
-              <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
-                Review ticket assignment history and auto-assign decisions
-                across the platform.
-              </p>
-            </Link>
-
-            <Link
-              href="/debug/demo-user"
-              className="group rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm transition-colors hover:border-[var(--bb-primary)]/40 hover:bg-[var(--bb-primary-light)]"
-            >
-              <h3 className="text-sm font-semibold text-[var(--bb-secondary)] group-hover:text-[var(--bb-primary)]">
-                Demo user switcher
-              </h3>
-              <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
-                Switch between demo personas to test different user roles and
-                permissions.
-              </p>
-            </Link>
-          </div>
+              </div>
+            );
+          })}
         </div>
+      )}
+
+      {/* Debug tools */}
+      <div className="mt-10">
+        <h2 className="text-lg font-semibold tracking-tight text-[var(--bb-secondary)]">
+          Debug tools
+        </h2>
+        <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
+          Internal tools for inspecting and configuring platform behaviour.
+        </p>
+
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Link
+            href="/debug/auto-assign"
+            className="group rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm transition-colors hover:border-[var(--bb-primary)]/40 hover:bg-[var(--bb-primary-light)]"
+          >
+            <h3 className="text-sm font-semibold text-[var(--bb-secondary)] group-hover:text-[var(--bb-primary)]">
+              Auto-assign configuration
+            </h3>
+            <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
+              View and toggle auto-assign settings at company and project level. Inspect per-project
+              modes (inherit, on, off).
+            </p>
+          </Link>
+
+          <Link
+            href="/debug/assignment-log"
+            className="group rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm transition-colors hover:border-[var(--bb-primary)]/40 hover:bg-[var(--bb-primary-light)]"
+          >
+            <h3 className="text-sm font-semibold text-[var(--bb-secondary)] group-hover:text-[var(--bb-primary)]">
+              Assignment log
+            </h3>
+            <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
+              Review ticket assignment history and auto-assign decisions across the platform.
+            </p>
+          </Link>
+
+          <Link
+            href="/debug/demo-user"
+            className="group rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm transition-colors hover:border-[var(--bb-primary)]/40 hover:bg-[var(--bb-primary-light)]"
+          >
+            <h3 className="text-sm font-semibold text-[var(--bb-secondary)] group-hover:text-[var(--bb-primary)]">
+              Demo user switcher
+            </h3>
+            <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
+              Switch between demo personas to test different user roles and permissions.
+            </p>
+          </Link>
+        </div>
+      </div>
     </>
   );
 }

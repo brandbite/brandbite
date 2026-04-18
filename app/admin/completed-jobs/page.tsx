@@ -63,22 +63,17 @@ export default function AdminCompletedJobsPage() {
         }
         if (res.status === 403) {
           throw new Error(
-            (json as any)?.error ||
-              "You do not have access to completed jobs in this workspace.",
+            (json as any)?.error || "You do not have access to completed jobs in this workspace.",
           );
         }
-        const msg =
-          (json as any)?.error || `Request failed with status ${res.status}`;
+        const msg = (json as any)?.error || `Request failed with status ${res.status}`;
         throw new Error(msg);
       }
 
       setData((json as CompletedJobsResponse).jobs ?? []);
     } catch (err: unknown) {
       console.error("[AdminCompletedJobs] load error", err);
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Failed to load completed jobs.";
+      const message = err instanceof Error ? err.message : "Failed to load completed jobs.";
       setError(message);
     } finally {
       setLoading(false);
@@ -138,203 +133,177 @@ export default function AdminCompletedJobsPage() {
   }, [data]);
 
   return (
-    <div className="-mx-6 -mb-10 -mt-2 rounded-2xl bg-[#0f172a] px-6 py-8 text-slate-100">
-
-        <div className="mt-4 mb-4 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-              Admin · Completed jobs
-            </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-              Completed jobs
-            </h1>
-            <p className="mt-1 text-xs text-slate-400">
-              Tickets that have been marked as{" "}
-              <span className="font-semibold text-slate-100">Done</span> by
-              customers. Use this view to review recent work and reconcile
-              creative payouts.
-            </p>
-          </div>
-          {loading && (
-            <div className="rounded-full bg-slate-800 px-3 py-1 text-[11px] text-slate-300">
-              Loading completed jobs…
-            </div>
-          )}
-        </div>
-
-        {error && (
-          <div className="mb-4 rounded-xl border border-red-500/30 bg-red-950/40 px-4 py-3 text-sm text-red-200">
-            <p className="font-medium">Something went wrong</p>
-            <p className="mt-1 text-xs">{error}</p>
-          </div>
-        )}
-
-        {/* Stats */}
-        <div className="mb-4 grid gap-3 text-[11px] text-slate-200 md:grid-cols-4">
-          <div className="rounded-2xl bg-slate-800/70 px-4 py-3">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">
-              Total jobs
-            </p>
-            <p className="mt-2 text-xl font-semibold">{stats.total}</p>
-          </div>
-          <div className="rounded-2xl bg-slate-800/70 px-4 py-3">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">
-              With payout ledger
-            </p>
-            <p className="mt-2 text-xl font-semibold">{stats.withPayout}</p>
-          </div>
-          <div className="rounded-2xl bg-slate-800/70 px-4 py-3">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">
-              Missing payout ledger
-            </p>
-            <p className="mt-2 text-xl font-semibold text-amber-300">
-              {stats.withoutPayout}
-            </p>
-          </div>
-          <div className="rounded-2xl bg-slate-800/70 px-4 py-3">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">
-              Total creative tokens (v1)
-            </p>
-            <p className="mt-2 text-xl font-semibold">
-              {stats.totalTokens.toLocaleString()}
-            </p>
-          </div>
-        </div>
-
-        {/* Search */}
-        <div className="mb-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="relative flex-1">
-            <input
-              type="text"
-              placeholder="Search by ticket code, title, company, project or creative"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-full border border-slate-700 bg-slate-900/60 px-4 py-2 text-xs text-slate-100 outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400"
-            />
-          </div>
-          <p className="text-[11px] text-slate-400">
-            Showing{" "}
-            <span className="font-semibold text-slate-100">
-              {filteredJobs.length}
-            </span>{" "}
-            of{" "}
-            <span className="font-semibold text-slate-100">
-              {data.length}
-            </span>{" "}
-            completed jobs.
+    <div className="-mx-6 -mt-2 -mb-10 rounded-2xl bg-[#0f172a] px-6 py-8 text-slate-100">
+      <div className="mt-4 mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold tracking-[0.18em] text-slate-400 uppercase">
+            Admin · Completed jobs
+          </p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Completed jobs</h1>
+          <p className="mt-1 text-xs text-slate-400">
+            Tickets that have been marked as{" "}
+            <span className="font-semibold text-slate-100">Done</span> by customers. Use this view
+            to review recent work and reconcile creative payouts.
           </p>
         </div>
+        {loading && (
+          <div className="rounded-full bg-slate-800 px-3 py-1 text-[11px] text-slate-300">
+            Loading completed jobs…
+          </div>
+        )}
+      </div>
 
-        {/* Table */}
-        <div className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/60">
-          <div className="max-h-[60vh] overflow-auto">
-            <table className="min-w-full border-separate border-spacing-0 text-left text-[11px]">
-              <thead className="sticky top-0 bg-slate-900">
+      {error && (
+        <div className="mb-4 rounded-xl border border-red-500/30 bg-red-950/40 px-4 py-3 text-sm text-red-200">
+          <p className="font-medium">Something went wrong</p>
+          <p className="mt-1 text-xs">{error}</p>
+        </div>
+      )}
+
+      {/* Stats */}
+      <div className="mb-4 grid gap-3 text-[11px] text-slate-200 md:grid-cols-4">
+        <div className="rounded-2xl bg-slate-800/70 px-4 py-3">
+          <p className="text-[10px] tracking-[0.16em] text-slate-400 uppercase">Total jobs</p>
+          <p className="mt-2 text-xl font-semibold">{stats.total}</p>
+        </div>
+        <div className="rounded-2xl bg-slate-800/70 px-4 py-3">
+          <p className="text-[10px] tracking-[0.16em] text-slate-400 uppercase">
+            With payout ledger
+          </p>
+          <p className="mt-2 text-xl font-semibold">{stats.withPayout}</p>
+        </div>
+        <div className="rounded-2xl bg-slate-800/70 px-4 py-3">
+          <p className="text-[10px] tracking-[0.16em] text-slate-400 uppercase">
+            Missing payout ledger
+          </p>
+          <p className="mt-2 text-xl font-semibold text-amber-300">{stats.withoutPayout}</p>
+        </div>
+        <div className="rounded-2xl bg-slate-800/70 px-4 py-3">
+          <p className="text-[10px] tracking-[0.16em] text-slate-400 uppercase">
+            Total creative tokens (v1)
+          </p>
+          <p className="mt-2 text-xl font-semibold">{stats.totalTokens.toLocaleString()}</p>
+        </div>
+      </div>
+
+      {/* Search */}
+      <div className="mb-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="relative flex-1">
+          <input
+            type="text"
+            placeholder="Search by ticket code, title, company, project or creative"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-full border border-slate-700 bg-slate-900/60 px-4 py-2 text-xs text-slate-100 outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400"
+          />
+        </div>
+        <p className="text-[11px] text-slate-400">
+          Showing <span className="font-semibold text-slate-100">{filteredJobs.length}</span> of{" "}
+          <span className="font-semibold text-slate-100">{data.length}</span> completed jobs.
+        </p>
+      </div>
+
+      {/* Table */}
+      <div className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/60">
+        <div className="max-h-[60vh] overflow-auto">
+          <table className="min-w-full border-separate border-spacing-0 text-left text-[11px]">
+            <thead className="sticky top-0 bg-slate-900">
+              <tr>
+                <th className="border-b border-slate-700 px-3 py-2 font-semibold text-slate-300">
+                  Ticket
+                </th>
+                <th className="border-b border-slate-700 px-3 py-2 font-semibold text-slate-300">
+                  Company / Project
+                </th>
+                <th className="border-b border-slate-700 px-3 py-2 font-semibold text-slate-300">
+                  Creative
+                </th>
+                <th className="border-b border-slate-700 px-3 py-2 font-semibold text-slate-300">
+                  Job type
+                </th>
+                <th className="border-b border-slate-700 px-3 py-2 font-semibold text-slate-300">
+                  Payout tokens
+                </th>
+                <th className="border-b border-slate-700 px-3 py-2 font-semibold text-slate-300">
+                  Completed at
+                </th>
+                <th className="border-b border-slate-700 px-3 py-2 font-semibold text-slate-300">
+                  Payout status
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredJobs.length === 0 ? (
                 <tr>
-                  <th className="border-b border-slate-700 px-3 py-2 font-semibold text-slate-300">
-                    Ticket
-                  </th>
-                  <th className="border-b border-slate-700 px-3 py-2 font-semibold text-slate-300">
-                    Company / Project
-                  </th>
-                  <th className="border-b border-slate-700 px-3 py-2 font-semibold text-slate-300">
-                    Creative
-                  </th>
-                  <th className="border-b border-slate-700 px-3 py-2 font-semibold text-slate-300">
-                    Job type
-                  </th>
-                  <th className="border-b border-slate-700 px-3 py-2 font-semibold text-slate-300">
-                    Payout tokens
-                  </th>
-                  <th className="border-b border-slate-700 px-3 py-2 font-semibold text-slate-300">
-                    Completed at
-                  </th>
-                  <th className="border-b border-slate-700 px-3 py-2 font-semibold text-slate-300">
-                    Payout status
-                  </th>
+                  <td colSpan={7} className="px-3 py-4">
+                    <EmptyState
+                      title="No completed jobs found for this filter."
+                      description="Try adjusting your search terms or clear the filter."
+                    />
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {filteredJobs.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-3 py-4">
-                      <EmptyState title="No completed jobs found for this filter." description="Try adjusting your search terms or clear the filter." />
+              ) : (
+                filteredJobs.map((job, idx) => (
+                  <tr
+                    key={job.ticketId}
+                    className={idx % 2 === 0 ? "bg-slate-900/40" : "bg-slate-900/20"}
+                  >
+                    <td className="border-t border-slate-800 px-3 py-2 align-top">
+                      <div className="font-semibold text-slate-100">{job.code}</div>
+                      <div className="mt-0.5 line-clamp-2 text-[10px] text-slate-300">
+                        {job.title}
+                      </div>
+                    </td>
+                    <td className="border-t border-slate-800 px-3 py-2 align-top">
+                      <div className="text-[11px] font-medium text-slate-100">
+                        {job.companyName ?? "—"}
+                      </div>
+                      <div className="text-[10px] text-slate-400">{job.projectName ?? "—"}</div>
+                    </td>
+                    <td className="border-t border-slate-800 px-3 py-2 align-top">
+                      <div className="text-[11px] font-medium text-slate-100">
+                        {job.creativeName ?? "—"}
+                      </div>
+                      <div className="text-[10px] text-slate-400">{job.creativeEmail ?? "—"}</div>
+                    </td>
+                    <td className="border-t border-slate-800 px-3 py-2 align-top">
+                      <div className="text-[11px] text-slate-100">{job.jobTypeName ?? "—"}</div>
+                    </td>
+                    <td className="border-t border-slate-800 px-3 py-2 align-top">
+                      <div className="text-[11px] font-semibold text-slate-100">
+                        {job.creativePayoutTokens ?? "—"}
+                      </div>
+                    </td>
+                    <td className="border-t border-slate-800 px-3 py-2 align-top">
+                      <div className="text-[10px] text-slate-300">
+                        {formatDateTime(job.completedAt)}
+                      </div>
+                    </td>
+                    <td className="border-t border-slate-800 px-3 py-2 align-top">
+                      {job.hasPayoutEntry ? (
+                        <div className="inline-flex items-center rounded-full bg-emerald-900/40 px-2 py-0.5 text-[10px] text-emerald-200">
+                          <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                          Payout ledger created
+                        </div>
+                      ) : (
+                        <div className="inline-flex items-center rounded-full bg-amber-900/40 px-2 py-0.5 text-[10px] text-amber-200">
+                          <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
+                          Missing payout ledger
+                        </div>
+                      )}
+                      {job.payoutLedgerCreatedAt && (
+                        <div className="mt-1 text-[10px] text-slate-400">
+                          {formatDateTime(job.payoutLedgerCreatedAt)}
+                        </div>
+                      )}
                     </td>
                   </tr>
-                ) : (
-                  filteredJobs.map((job, idx) => (
-                    <tr
-                      key={job.ticketId}
-                      className={
-                        idx % 2 === 0
-                          ? "bg-slate-900/40"
-                          : "bg-slate-900/20"
-                      }
-                    >
-                      <td className="border-t border-slate-800 px-3 py-2 align-top">
-                        <div className="font-semibold text-slate-100">
-                          {job.code}
-                        </div>
-                        <div className="mt-0.5 line-clamp-2 text-[10px] text-slate-300">
-                          {job.title}
-                        </div>
-                      </td>
-                      <td className="border-t border-slate-800 px-3 py-2 align-top">
-                        <div className="text-[11px] font-medium text-slate-100">
-                          {job.companyName ?? "—"}
-                        </div>
-                        <div className="text-[10px] text-slate-400">
-                          {job.projectName ?? "—"}
-                        </div>
-                      </td>
-                      <td className="border-t border-slate-800 px-3 py-2 align-top">
-                        <div className="text-[11px] font-medium text-slate-100">
-                          {job.creativeName ?? "—"}
-                        </div>
-                        <div className="text-[10px] text-slate-400">
-                          {job.creativeEmail ?? "—"}
-                        </div>
-                      </td>
-                      <td className="border-t border-slate-800 px-3 py-2 align-top">
-                        <div className="text-[11px] text-slate-100">
-                          {job.jobTypeName ?? "—"}
-                        </div>
-                      </td>
-                      <td className="border-t border-slate-800 px-3 py-2 align-top">
-                        <div className="text-[11px] font-semibold text-slate-100">
-                          {job.creativePayoutTokens ?? "—"}
-                        </div>
-                      </td>
-                      <td className="border-t border-slate-800 px-3 py-2 align-top">
-                        <div className="text-[10px] text-slate-300">
-                          {formatDateTime(job.completedAt)}
-                        </div>
-                      </td>
-                      <td className="border-t border-slate-800 px-3 py-2 align-top">
-                        {job.hasPayoutEntry ? (
-                          <div className="inline-flex items-center rounded-full bg-emerald-900/40 px-2 py-0.5 text-[10px] text-emerald-200">
-                            <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                            Payout ledger created
-                          </div>
-                        ) : (
-                          <div className="inline-flex items-center rounded-full bg-amber-900/40 px-2 py-0.5 text-[10px] text-amber-200">
-                            <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
-                            Missing payout ledger
-                          </div>
-                        )}
-                        {job.payoutLedgerCreatedAt && (
-                          <div className="mt-1 text-[10px] text-slate-400">
-                            {formatDateTime(job.payoutLedgerCreatedAt)}
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
+      </div>
     </div>
   );
 }

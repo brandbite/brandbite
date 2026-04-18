@@ -36,12 +36,7 @@ export function LinkCard({ data }: LinkCardProps) {
   const faviconUrl = data.favicon;
 
   return (
-    <a
-      href={data.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="block"
-    >
+    <a href={data.url} target="_blank" rel="noopener noreferrer" className="block">
       {/* OG Image preview — hide entire container on error */}
       {data.image && !ogImageFailed && (
         <div className="aspect-[2/1] overflow-hidden bg-gray-100">

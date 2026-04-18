@@ -88,7 +88,7 @@ export function ConfirmDialog({
 
   return (
     <Modal open={open} onClose={loading ? () => {} : onClose} size="sm">
-      <div className="flex flex-col items-center text-center px-2 pt-2">
+      <div className="flex flex-col items-center px-2 pt-2 text-center">
         {/* Icon */}
         <div
           className={`flex h-11 w-11 items-center justify-center rounded-full ${config.iconBg} ${config.iconColor}`}
@@ -97,25 +97,18 @@ export function ConfirmDialog({
         </div>
 
         {/* Title */}
-        <h3 className="mt-3 text-base font-semibold text-[var(--bb-secondary)]">
-          {title}
-        </h3>
+        <h3 className="mt-3 text-base font-semibold text-[var(--bb-secondary)]">{title}</h3>
 
         {/* Description */}
         {description && (
-          <p className="mt-1.5 text-sm text-[var(--bb-text-secondary)] leading-relaxed">
+          <p className="mt-1.5 text-sm leading-relaxed text-[var(--bb-text-secondary)]">
             {description}
           </p>
         )}
       </div>
 
       <ModalFooter className="mt-5 justify-center">
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={onClose}
-          disabled={loading}
-        >
+        <Button variant="secondary" size="sm" onClick={onClose} disabled={loading}>
           {cancelLabel}
         </Button>
         <Button

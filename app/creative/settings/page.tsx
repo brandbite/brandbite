@@ -102,8 +102,7 @@ export default function CreativeSettingsPage() {
         if (!cancelled) {
           if (prefsJson?.preferences) setPreferences(prefsJson.preferences);
           if (skillsJson?.jobTypes) setJobTypes(skillsJson.jobTypes);
-          if (skillsJson?.selectedJobTypeIds)
-            setSelectedSkillIds(skillsJson.selectedJobTypeIds);
+          if (skillsJson?.selectedJobTypeIds) setSelectedSkillIds(skillsJson.selectedJobTypeIds);
           if (tierJson?.tiers) {
             setPayoutTiers(tierJson.tiers);
             setCurrentPayoutPercent(tierJson.currentPayoutPercent ?? 60);
@@ -117,7 +116,9 @@ export default function CreativeSettingsPage() {
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [showToast]);
 
   // Save skills (debounced)
@@ -134,8 +135,7 @@ export default function CreativeSettingsPage() {
           });
           if (!res.ok) throw new Error();
           const json = await res.json();
-          if (json?.selectedJobTypeIds)
-            setSelectedSkillIds(json.selectedJobTypeIds);
+          if (json?.selectedJobTypeIds) setSelectedSkillIds(json.selectedJobTypeIds);
         } catch {
           showToast({ type: "error", title: "Failed to save skills" });
         } finally {
@@ -181,9 +181,7 @@ export default function CreativeSettingsPage() {
       } catch {
         // Revert on failure
         setPreferences((prev) =>
-          prev.map((p) =>
-            p.type === type ? { ...p, enabled: currentEnabled } : p,
-          ),
+          prev.map((p) => (p.type === type ? { ...p, enabled: currentEnabled } : p)),
         );
         showToast({ type: "error", title: "Failed to update preference" });
       } finally {
@@ -221,8 +219,8 @@ export default function CreativeSettingsPage() {
               Skills &amp; expertise
             </h2>
             <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
-              Select the job types you can handle. You will only be
-              auto-assigned tickets that match your skills.
+              Select the job types you can handle. You will only be auto-assigned tickets that match
+              your skills.
             </p>
           </div>
           {savingSkills && (
@@ -250,9 +248,7 @@ export default function CreativeSettingsPage() {
                   className="h-4 w-4 shrink-0 rounded border-[var(--bb-border-input)] text-[var(--bb-primary)] accent-[var(--bb-primary)] focus:ring-[var(--bb-primary)]"
                 />
                 <div className="min-w-0">
-                  <p className="text-xs font-medium text-[var(--bb-secondary)]">
-                    {jt.name}
-                  </p>
+                  <p className="text-xs font-medium text-[var(--bb-secondary)]">{jt.name}</p>
                   {jt.description && (
                     <p className="mt-0.5 text-[10px] text-[var(--bb-text-tertiary)]">
                       {jt.description}
@@ -271,8 +267,7 @@ export default function CreativeSettingsPage() {
           <div>
             <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">Payout tiers</h2>
             <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
-              Complete more tickets to unlock higher payout rates. Your current rate
-              is{" "}
+              Complete more tickets to unlock higher payout rates. Your current rate is{" "}
               <span className="font-semibold text-[var(--bb-secondary)]">
                 {currentPayoutPercent}%
               </span>
@@ -313,9 +308,7 @@ export default function CreativeSettingsPage() {
 
           {payoutTiers.map((tier) => {
             const progress = Math.min(
-              Math.round(
-                (tier.completedInWindow / tier.minCompletedTickets) * 100,
-              ),
+              Math.round((tier.completedInWindow / tier.minCompletedTickets) * 100),
               100,
             );
             const windowLabel =
@@ -337,9 +330,7 @@ export default function CreativeSettingsPage() {
                 <div className="flex items-center justify-between">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="text-xs font-medium text-[var(--bb-secondary)]">
-                        {tier.name}
-                      </p>
+                      <p className="text-xs font-medium text-[var(--bb-secondary)]">{tier.name}</p>
                       {tier.qualified && (
                         <span className="inline-flex rounded-full bg-[#8B5CF6] px-2 py-0.5 text-[9px] font-semibold text-white">
                           Active
@@ -369,8 +360,7 @@ export default function CreativeSettingsPage() {
                       />
                     </div>
                     <p className="mt-1 text-[10px] text-[var(--bb-text-tertiary)]">
-                      {tier.completedInWindow} / {tier.minCompletedTickets}{" "}
-                      tickets completed
+                      {tier.completedInWindow} / {tier.minCompletedTickets} tickets completed
                     </p>
                   </div>
                 )}
@@ -406,9 +396,7 @@ export default function CreativeSettingsPage() {
                 className="flex items-center justify-between rounded-xl px-3 py-3 transition-colors hover:bg-[var(--bb-bg-card)]/50"
               >
                 <div className="mr-4 min-w-0">
-                  <p className="text-xs font-medium text-[var(--bb-secondary)]">
-                    {pref.label}
-                  </p>
+                  <p className="text-xs font-medium text-[var(--bb-secondary)]">{pref.label}</p>
                   <p className="mt-0.5 text-[10px] text-[var(--bb-text-tertiary)]">
                     {pref.description}
                   </p>

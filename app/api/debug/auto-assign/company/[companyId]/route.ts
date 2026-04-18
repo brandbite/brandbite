@@ -36,15 +36,10 @@ export async function PATCH(
     // Next.js 16: params bir Promise, önce await etmeliyiz
     const { companyId } = await params;
 
-    const body = (await req.json().catch(() => null)) as
-      | CompanyPatchPayload
-      | null;
+    const body = (await req.json().catch(() => null)) as CompanyPatchPayload | null;
 
     if (!body || typeof body !== "object") {
-      return NextResponse.json(
-        { error: "Invalid request body" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
 
     if (typeof body.autoAssignDefaultEnabled !== "boolean") {
@@ -64,8 +59,7 @@ export async function PATCH(
 
     const response: CompanyPatchResponse = {
       id: updated.id,
-      autoAssignDefaultEnabled:
-        (updated as any).autoAssignDefaultEnabled ?? false,
+      autoAssignDefaultEnabled: (updated as any).autoAssignDefaultEnabled ?? false,
     };
 
     return NextResponse.json(response, { status: 200 });

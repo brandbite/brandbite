@@ -206,17 +206,14 @@ export function PauseControl() {
       <div className="mb-4 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
         <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">Availability</h2>
         <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
-          Pause to stop receiving new ticket assignments. Your existing work is
-          not affected.
+          Pause to stop receiving new ticket assignments. Your existing work is not affected.
         </p>
 
         {status?.isPaused ? (
           /* ------- Currently paused ------- */
           <div className="mt-4">
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-              <p className="text-xs font-medium text-amber-800">
-                You are currently paused
-              </p>
+              <p className="text-xs font-medium text-amber-800">You are currently paused</p>
               <p className="mt-1 text-[11px] text-amber-700">
                 {status.pauseType === "MANUAL"
                   ? `Paused since ${formatDate(status.pausedAt)}. No expiry set.`
@@ -253,12 +250,8 @@ export function PauseControl() {
                   className="h-4 w-4 accent-[var(--bb-primary)]"
                 />
                 <div>
-                  <p className="text-xs font-medium text-[var(--bb-secondary)]">
-                    {opt.label}
-                  </p>
-                  <p className="text-[10px] text-[var(--bb-text-tertiary)]">
-                    {opt.description}
-                  </p>
+                  <p className="text-xs font-medium text-[var(--bb-secondary)]">{opt.label}</p>
+                  <p className="text-[10px] text-[var(--bb-text-tertiary)]">{opt.description}</p>
                 </div>
               </label>
             ))}

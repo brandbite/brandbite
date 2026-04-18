@@ -84,14 +84,23 @@ function ThumbnailCell({ item }: { item: Record<string, unknown> }) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-gray-50">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-gray-300">
-          <path d="M8.5 11.5L11.5 8.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          <path
+            d="M8.5 11.5L11.5 8.5"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
           <path
             d="M11.5 13.5L14 11C15.1046 9.89543 15.1046 8.10457 14 7L13 6C11.8954 4.89543 10.1046 4.89543 9 6L6.5 8.5"
-            stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
           />
           <path
             d="M8.5 6.5L6 9C4.89543 10.1046 4.89543 11.8954 6 13L7 14C8.10457 15.1046 9.89543 15.1046 11 14L13.5 11.5"
-            stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
           />
         </svg>
       </div>
@@ -119,13 +128,13 @@ function ThumbnailCell({ item }: { item: Record<string, unknown> }) {
       <div className="flex h-full w-full flex-col gap-1 overflow-hidden bg-white p-2">
         {items.map((todo: any, i: number) => (
           <div key={i} className="flex items-center gap-1">
-            <div className={`h-2 w-2 flex-shrink-0 rounded-sm border ${todo?.checked ? "border-green-400 bg-green-400" : "border-gray-300"}`} />
+            <div
+              className={`h-2 w-2 flex-shrink-0 rounded-sm border ${todo?.checked ? "border-green-400 bg-green-400" : "border-gray-300"}`}
+            />
             <span className="truncate text-[7px] text-gray-400">{todo?.text || ""}</span>
           </div>
         ))}
-        {items.length === 0 && (
-          <p className="text-[8px] text-gray-300">Empty list</p>
-        )}
+        {items.length === 0 && <p className="text-[8px] text-gray-300">Empty list</p>}
       </div>
     );
   }
@@ -137,7 +146,8 @@ function ThumbnailCell({ item }: { item: Record<string, unknown> }) {
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-gray-300">
           <path
             d="M5 3C5 2.44772 5.44772 2 6 2H12L16 6V17C16 17.5523 15.5523 18 15 18H6C5.44772 18 5 17.5523 5 17V3Z"
-            stroke="currentColor" strokeWidth="1.5"
+            stroke="currentColor"
+            strokeWidth="1.5"
           />
           <path d="M12 2V6H16" stroke="currentColor" strokeWidth="1.5" />
         </svg>

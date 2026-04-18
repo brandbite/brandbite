@@ -57,16 +57,14 @@ export async function GET(_req: NextRequest) {
     });
 
     const payload: AutoAssignOverviewCompany[] = companies.map((c) => {
-      const autoAssignDefaultEnabled =
-        (c as any).autoAssignDefaultEnabled ?? false;
+      const autoAssignDefaultEnabled = (c as any).autoAssignDefaultEnabled ?? false;
 
       const projects: AutoAssignOverviewProject[] = c.projects.map((p) => ({
         id: p.id,
         name: p.name,
         code: p.code ?? null,
         autoAssignMode:
-          ((p as any).autoAssignMode as ProjectAutoAssignMode | undefined) ??
-          "INHERIT",
+          ((p as any).autoAssignMode as ProjectAutoAssignMode | undefined) ?? "INHERIT",
       }));
 
       return {
@@ -89,9 +87,6 @@ export async function GET(_req: NextRequest) {
     }
 
     console.error("[debug.autoAssign.overview] GET error", error);
-    return NextResponse.json(
-      { error: "Failed to load auto-assign overview" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load auto-assign overview" }, { status: 500 });
   }
 }

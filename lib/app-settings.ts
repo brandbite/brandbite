@@ -26,10 +26,7 @@ export async function getAppSetting(key: string): Promise<string | null> {
  * Convenience wrapper that parses the value as an integer, returning the
  * provided fallback when the key is missing or not a valid number.
  */
-export async function getAppSettingInt(
-  key: string,
-  fallback: number,
-): Promise<number> {
+export async function getAppSettingInt(key: string, fallback: number): Promise<number> {
   const raw = await getAppSetting(key);
   if (raw === null) return fallback;
   const parsed = parseInt(raw, 10);
@@ -39,10 +36,7 @@ export async function getAppSettingInt(
 /**
  * Upsert a single app setting.
  */
-export async function setAppSetting(
-  key: string,
-  value: string,
-): Promise<void> {
+export async function setAppSetting(key: string, value: string): Promise<void> {
   await prisma.appSetting.upsert({
     where: { key },
     update: { value },

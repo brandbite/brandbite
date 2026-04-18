@@ -16,17 +16,12 @@ type TagBadgeProps = {
   className?: string;
 };
 
-export function TagBadge({
-  name,
-  color,
-  onRemove,
-  className = "",
-}: TagBadgeProps) {
+export function TagBadge({ name, color, onRemove, className = "" }: TagBadgeProps) {
   const style = TAG_COLORS[color] ?? TAG_COLORS.GRAY;
 
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold leading-tight ${style.bg} ${style.text} ${style.border} ${className}`}
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] leading-tight font-semibold ${style.bg} ${style.text} ${style.border} ${className}`}
     >
       {name}
       {onRemove && (

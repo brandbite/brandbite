@@ -69,16 +69,10 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json({ services, categories });
   } catch (error: any) {
     if (error?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[customer.services] GET error", error);
-    return NextResponse.json(
-      { error: "Failed to load services" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load services" }, { status: 500 });
   }
 }

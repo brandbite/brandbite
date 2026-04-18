@@ -43,10 +43,7 @@ export async function GET(_req: NextRequest) {
       }),
     ]);
 
-    const companyInfo = new Map<
-      string,
-      { id: string; name: string; slug: string }
-    >();
+    const companyInfo = new Map<string, { id: string; name: string; slug: string }>();
     for (const c of companies) {
       companyInfo.set(c.id, { id: c.id, name: c.name, slug: c.slug });
     }
@@ -76,14 +73,13 @@ export async function GET(_req: NextRequest) {
         globalDebits += delta;
       }
 
-      const existing =
-        perCompany.get(entry.companyId) ?? {
-          companyId: entry.companyId,
-          totalCredits: 0,
-          totalDebits: 0,
-          netTokens: 0,
-          entriesCount: 0,
-        };
+      const existing = perCompany.get(entry.companyId) ?? {
+        companyId: entry.companyId,
+        totalCredits: 0,
+        totalDebits: 0,
+        netTokens: 0,
+        entriesCount: 0,
+      };
 
       if (isCredit) {
         existing.totalCredits += delta;
@@ -97,29 +93,25 @@ export async function GET(_req: NextRequest) {
       perCompany.set(entry.companyId, existing);
     }
 
-    const perCompanyArray = Array.from(perCompany.values()).map(
-      (agg) => {
-        const meta = companyInfo.get(agg.companyId);
-        return {
-          companyId: agg.companyId,
-          company: meta
-            ? {
-                id: meta.id,
-                name: meta.name,
-                slug: meta.slug,
-              }
-            : null,
-          totalCredits: agg.totalCredits,
-          totalDebits: agg.totalDebits,
-          netTokens: agg.netTokens,
-          entriesCount: agg.entriesCount,
-        };
-      },
-    );
+    const perCompanyArray = Array.from(perCompany.values()).map((agg) => {
+      const meta = companyInfo.get(agg.companyId);
+      return {
+        companyId: agg.companyId,
+        company: meta
+          ? {
+              id: meta.id,
+              name: meta.name,
+              slug: meta.slug,
+            }
+          : null,
+        totalCredits: agg.totalCredits,
+        totalDebits: agg.totalDebits,
+        netTokens: agg.netTokens,
+        entriesCount: agg.entriesCount,
+      };
+    });
 
-    perCompanyArray.sort(
-      (a, b) => (b.netTokens ?? 0) - (a.netTokens ?? 0),
-    );
+    perCompanyArray.sort((a, b) => (b.netTokens ?? 0) - (a.netTokens ?? 0));
 
     return NextResponse.json({
       stats: {
@@ -133,16 +125,10 @@ export async function GET(_req: NextRequest) {
     });
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[admin.token-analytics] GET error", error);
-    return NextResponse.json(
-      { error: "Failed to load token analytics" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load token analytics" }, { status: 500 });
   }
 }

@@ -48,10 +48,7 @@ function getCategoryName(jt: JobTypeOption): string {
  * Sort categories using categorySortOrder from DB.
  * Categories without a sort order go last, sorted alphabetically.
  */
-function sortedCategories(
-  cats: string[],
-  sortOrderMap: Map<string, number>,
-): string[] {
+function sortedCategories(cats: string[], sortOrderMap: Map<string, number>): string[] {
   return [...cats].sort((a, b) => {
     const aOrder = sortOrderMap.get(a) ?? 999;
     const bOrder = sortOrderMap.get(b) ?? 999;
@@ -75,12 +72,7 @@ function shortLabel(cat: string): string {
 /*  Component                                                                  */
 /* -------------------------------------------------------------------------- */
 
-export function JobTypePicker({
-  jobTypes,
-  value,
-  onChange,
-  disabled = false,
-}: JobTypePickerProps) {
+export function JobTypePicker({ jobTypes, value, onChange, disabled = false }: JobTypePickerProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -149,9 +141,7 @@ export function JobTypePicker({
 
     for (const cat of catsToShow) {
       const items = grouped.get(cat) ?? [];
-      const filtered = q
-        ? items.filter((jt) => jt.name.toLowerCase().includes(q))
-        : items;
+      const filtered = q ? items.filter((jt) => jt.name.toLowerCase().includes(q)) : items;
       if (filtered.length > 0) {
         result.set(cat, filtered);
       }
@@ -183,14 +173,10 @@ export function JobTypePicker({
   const totalFiltered = categoryCounts.get("__all__") ?? 0;
 
   // Selected job type for display
-  const selectedJobType = value
-    ? jobTypes.find((jt) => jt.id === value) ?? null
-    : null;
+  const selectedJobType = value ? (jobTypes.find((jt) => jt.id === value) ?? null) : null;
 
   // Pending job type in modal
-  const pendingJobType = pendingId
-    ? jobTypes.find((jt) => jt.id === pendingId) ?? null
-    : null;
+  const pendingJobType = pendingId ? (jobTypes.find((jt) => jt.id === pendingId) ?? null) : null;
 
   // ---------------------------------------------------------------------------
   // Handlers
@@ -211,16 +197,13 @@ export function JobTypePicker({
     setOpen(false);
   }, [pendingId, onChange]);
 
-  const handleSearchChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setSearch(e.target.value);
-      // Reset category filter when searching so results span all categories
-      if (e.target.value.trim()) {
-        setActiveCategory(null);
-      }
-    },
-    [],
-  );
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearch(e.target.value);
+    // Reset category filter when searching so results span all categories
+    if (e.target.value.trim()) {
+      setActiveCategory(null);
+    }
+  }, []);
 
   const handleCategoryClick = useCallback((cat: string | null) => {
     setActiveCategory(cat);
@@ -276,22 +259,13 @@ export function JobTypePicker({
         onClick={handleOpen}
         disabled={disabled}
         aria-label="Select job type"
-        className={`
-          flex w-full items-center justify-between gap-2 rounded-md border
-          border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-2
-          text-left text-sm outline-none transition-colors
-          focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]
-          disabled:cursor-not-allowed disabled:opacity-50
-          ${selectedJobType ? "text-[var(--bb-secondary)]" : "text-[var(--bb-text-muted)]"}
-        `}
+        className={`flex w-full items-center justify-between gap-2 rounded-md border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-2 text-left text-sm transition-colors outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)] disabled:cursor-not-allowed disabled:opacity-50 ${selectedJobType ? "text-[var(--bb-secondary)]" : "text-[var(--bb-text-muted)]"} `}
       >
         <div className="min-w-0 flex-1">
           {selectedJobType ? (
             <>
               <div className="flex items-center gap-2">
-                <span className="truncate font-medium">
-                  {selectedJobType.name}
-                </span>
+                <span className="truncate font-medium">{selectedJobType.name}</span>
                 {selectedJobType.tokenCost != null && (
                   <Badge variant="neutral" className="shrink-0">
                     {selectedJobType.tokenCost} tokens
@@ -336,7 +310,7 @@ export function JobTypePicker({
         <div className="mb-3 shrink-0">
           <div className="relative">
             <svg
-              className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--bb-text-muted)]"
+              className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[var(--bb-text-muted)]"
               fill="none"
               viewBox="0 0 24 24"
               strokeWidth={2}
@@ -356,16 +330,22 @@ export function JobTypePicker({
               onChange={handleSearchChange}
               onKeyDown={handleSearchKeyDown}
               aria-label="Search services"
-              className="w-full rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-warm)] py-2 pl-10 pr-3 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] transition-colors focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
+              className="w-full rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-warm)] py-2 pr-3 pl-10 text-sm text-[var(--bb-secondary)] transition-colors outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
             />
             {search && (
               <button
                 type="button"
                 onClick={() => setSearch("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--bb-text-muted)] hover:text-[var(--bb-secondary)]"
+                className="absolute top-1/2 right-3 -translate-y-1/2 text-[var(--bb-text-muted)] hover:text-[var(--bb-secondary)]"
                 aria-label="Clear search"
               >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                >
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
@@ -410,9 +390,7 @@ export function JobTypePicker({
                   }`}
                 >
                   {cat}
-                  <span className="ml-1.5 text-[10px] opacity-60">
-                    ({count})
-                  </span>
+                  <span className="ml-1.5 text-[10px] opacity-60">({count})</span>
                 </button>
               );
             })}
@@ -425,8 +403,8 @@ export function JobTypePicker({
               onClick={() => handleCategoryClick(null)}
               className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-semibold transition-colors ${
                 activeCategory === null
-                  ? "bg-[var(--bb-primary-light)] text-[var(--bb-primary-hover)] border border-[var(--bb-primary-border)]"
-                  : "bg-[var(--bb-bg-card)] text-[var(--bb-text-secondary)] border border-[var(--bb-border)]"
+                  ? "border border-[var(--bb-primary-border)] bg-[var(--bb-primary-light)] text-[var(--bb-primary-hover)]"
+                  : "border border-[var(--bb-border)] bg-[var(--bb-bg-card)] text-[var(--bb-text-secondary)]"
               }`}
             >
               All ({categoryCounts.get("__all__") ?? 0})
@@ -441,10 +419,10 @@ export function JobTypePicker({
                   onClick={() => handleCategoryClick(cat)}
                   className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-semibold transition-colors ${
                     activeCategory === cat
-                      ? "bg-[var(--bb-primary-light)] text-[var(--bb-primary-hover)] border border-[var(--bb-primary-border)]"
+                      ? "border border-[var(--bb-primary-border)] bg-[var(--bb-primary-light)] text-[var(--bb-primary-hover)]"
                       : count === 0
-                        ? "bg-[var(--bb-bg-card)] text-[var(--bb-text-muted)] border border-[var(--bb-border)] opacity-40"
-                        : "bg-[var(--bb-bg-card)] text-[var(--bb-text-secondary)] border border-[var(--bb-border)]"
+                        ? "border border-[var(--bb-border)] bg-[var(--bb-bg-card)] text-[var(--bb-text-muted)] opacity-40"
+                        : "border border-[var(--bb-border)] bg-[var(--bb-bg-card)] text-[var(--bb-text-secondary)]"
                   }`}
                 >
                   {shortLabel(cat)} ({count})
@@ -467,7 +445,7 @@ export function JobTypePicker({
                 <div key={cat}>
                   {/* Category header -- sticky */}
                   <div className="sticky top-0 z-10 border-b border-[var(--bb-border-subtle)] bg-[var(--bb-bg-warm)] px-4 py-2">
-                    <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--bb-text-tertiary)]">
+                    <span className="text-[11px] font-semibold tracking-[0.08em] text-[var(--bb-text-tertiary)] uppercase">
                       {cat}
                     </span>
                     <span className="ml-2 text-[10px] text-[var(--bb-text-muted)]">
@@ -486,7 +464,7 @@ export function JobTypePicker({
                         onDoubleClick={() => handleItemDoubleClick(jt.id)}
                         className={`flex w-full items-center gap-3 border-b border-[var(--bb-border-subtle)] px-4 py-2.5 text-left transition-colors last:border-b-0 ${
                           isSelected
-                            ? "bg-[var(--bb-primary-light)] border-l-2 border-l-[var(--bb-primary)]"
+                            ? "border-l-2 border-l-[var(--bb-primary)] bg-[var(--bb-primary-light)]"
                             : "hover:bg-[var(--bb-bg-card)]"
                         }`}
                         role="option"
@@ -549,19 +527,12 @@ export function JobTypePicker({
                 )}
               </span>
             ) : (
-              <span className="text-[var(--bb-text-muted)]">
-                Select a service to continue
-              </span>
+              <span className="text-[var(--bb-text-muted)]">Select a service to continue</span>
             )}
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={handleClose}
-            >
+            <Button type="button" variant="ghost" size="sm" onClick={handleClose}>
               Cancel
             </Button>
             <Button

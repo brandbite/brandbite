@@ -16,12 +16,7 @@ type TicketStatusString = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 
 function isValidTicketStatus(value: unknown): value is TicketStatus {
   if (typeof value !== "string") return false;
-  return (
-    value === "TODO" ||
-    value === "IN_PROGRESS" ||
-    value === "IN_REVIEW" ||
-    value === "DONE"
-  );
+  return value === "TODO" || value === "IN_PROGRESS" || value === "IN_REVIEW" || value === "DONE";
 }
 
 type BatchResult = {
@@ -41,21 +36,14 @@ export async function PATCH(req: NextRequest) {
     const user = await getCurrentUserOrThrow();
 
     if (user.role !== "DESIGNER") {
-      return NextResponse.json(
-        { error: "Only creatives can update tickets." },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Only creatives can update tickets." }, { status: 403 });
     }
 
     const body = await req.json();
     const ticketIds: string[] = body.ticketIds;
     const requestedStatus: string = body.status;
 
-    if (
-      !Array.isArray(ticketIds) ||
-      ticketIds.length === 0 ||
-      !requestedStatus
-    ) {
+    if (!Array.isArray(ticketIds) || ticketIds.length === 0 || !requestedStatus) {
       return NextResponse.json(
         { error: "ticketIds (non-empty array) and status are required." },
         { status: 400 },
@@ -70,10 +58,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (!isValidTicketStatus(requestedStatus)) {
-      return NextResponse.json(
-        { error: "Invalid ticket status." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Invalid ticket status." }, { status: 400 });
     }
 
     const nextStatus = requestedStatus as TicketStatus;
@@ -89,8 +74,7 @@ export async function PATCH(req: NextRequest) {
     if (nextStatus === TicketStatus.IN_REVIEW) {
       return NextResponse.json(
         {
-          error:
-            "Sending to review requires uploading work. Use the upload modal instead.",
+          error: "Sending to review requires uploading work. Use the upload modal instead.",
         },
         { status: 400 },
       );
@@ -123,9 +107,7 @@ export async function PATCH(req: NextRequest) {
     if (nextStatus === TicketStatus.IN_PROGRESS) {
       const companyIds = [
         ...new Set(
-          tickets
-            .filter((t) => t.status !== TicketStatus.IN_PROGRESS)
-            .map((t) => t.companyId),
+          tickets.filter((t) => t.status !== TicketStatus.IN_PROGRESS).map((t) => t.companyId),
         ),
       ];
 
@@ -161,10 +143,7 @@ export async function PATCH(req: NextRequest) {
           concurrencyByCompany.set(company.id, {
             max: maxConcurrent,
             current: currentInProgress,
-            planName:
-              typeof planData?.name === "string"
-                ? planData.name
-                : "current plan",
+            planName: typeof planData?.name === "string" ? planData.name : "current plan",
           });
         }
       }
@@ -246,10 +225,7 @@ export async function PATCH(req: NextRequest) {
           actorId: user.id,
         });
       } catch (err) {
-        console.error(
-          `[creative.tickets.batch] Failed to update ticket ${ticketId}`,
-          err,
-        );
+        console.error(`[creative.tickets.batch] Failed to update ticket ${ticketId}`, err);
         results.push({
           ticketId,
           success: false,
@@ -261,22 +237,13 @@ export async function PATCH(req: NextRequest) {
     const successCount = results.filter((r) => r.success).length;
     const failCount = results.filter((r) => !r.success).length;
 
-    return NextResponse.json(
-      { results, successCount, failCount },
-      { status: 200 },
-    );
+    return NextResponse.json({ results, successCount, failCount }, { status: 200 });
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     console.error("[creative.tickets.batch] PATCH error", error);
-    return NextResponse.json(
-      { error: "Failed to batch update tickets" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to batch update tickets" }, { status: 500 });
   }
 }

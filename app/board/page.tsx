@@ -30,10 +30,10 @@ type BoardTicketsResponse = {
 };
 
 const STATUS_COLUMNS: { id: TicketStatus; label: string }[] = [
-  { id: "TODO",        label: "To do" },
+  { id: "TODO", label: "To do" },
   { id: "IN_PROGRESS", label: "In progress" },
-  { id: "IN_REVIEW",   label: "In review" },
-  { id: "DONE",        label: "Done" },
+  { id: "IN_REVIEW", label: "In review" },
+  { id: "DONE", label: "Done" },
 ];
 
 const PRIORITY_COLORS: Record<TicketPriority, string> = {
@@ -89,7 +89,7 @@ export default function BoardPage() {
 
   const projects = useMemo(() => {
     const names = Array.from(
-      new Set(tickets.map((t) => t.projectName).filter(Boolean))
+      new Set(tickets.map((t) => t.projectName).filter(Boolean)),
     ) as string[];
     return names;
   }, [tickets]);
@@ -103,13 +103,7 @@ export default function BoardPage() {
       if (!search.trim()) return true;
 
       const needle = search.toLowerCase();
-      const haystack = [
-        t.code,
-        t.title,
-        t.projectName,
-        t.companyName,
-        t.creativeName,
-      ]
+      const haystack = [t.code, t.title, t.projectName, t.companyName, t.creativeName]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
@@ -140,9 +134,7 @@ export default function BoardPage() {
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--bb-primary)] text-sm font-semibold text-white">
               B
             </div>
-            <span className="text-lg font-semibold tracking-tight">
-              Brandbite
-            </span>
+            <span className="text-lg font-semibold tracking-tight">Brandbite</span>
           </div>
           <nav className="hidden items-center gap-6 text-sm text-[var(--bb-text-secondary)] md:flex">
             <button className="font-medium text-[var(--bb-secondary)]">Board</button>
@@ -154,12 +146,10 @@ export default function BoardPage() {
         {/* Page header */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Tickets board
-            </h1>
+            <h1 className="text-2xl font-semibold tracking-tight">Tickets board</h1>
             <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-              Visual overview of all active creative requests. This view is now
-              powered by real Ticket records from the database.
+              Visual overview of all active creative requests. This view is now powered by real
+              Ticket records from the database.
             </p>
           </div>
         </div>
@@ -175,9 +165,7 @@ export default function BoardPage() {
         {/* Filters */}
         <section className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
           <div className="flex flex-1 items-center gap-2">
-            <label className="text-xs font-medium text-[var(--bb-secondary)]">
-              Search
-            </label>
+            <label className="text-xs font-medium text-[var(--bb-secondary)]">Search</label>
             <input
               type="text"
               value={search}
@@ -187,9 +175,7 @@ export default function BoardPage() {
             />
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-[var(--bb-secondary)]">
-              Project
-            </label>
+            <label className="text-xs font-medium text-[var(--bb-secondary)]">Project</label>
             <select
               value={projectFilter}
               onChange={(e) => setProjectFilter(e.target.value)}
@@ -214,25 +200,16 @@ export default function BoardPage() {
 
         {/* Board frame */}
         {!loading && (
-          <section
-            className="
-              board-frame
-              mt-4 flex gap-4 overflow-x-auto rounded-2xl border border-[var(--bb-border)]
-              bg-[var(--bb-bg-warm)] px-4 py-4 shadow-sm
-            "
-          >
+          <section className="board-frame mt-4 flex gap-4 overflow-x-auto rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-warm)] px-4 py-4 shadow-sm">
             {STATUS_COLUMNS.map((column) => {
               const columnTickets = ticketsByStatus[column.id];
 
               return (
-                <div
-                  key={column.id}
-                  className="flex min-w-[250px] max-w-xs flex-1 flex-col"
-                >
+                <div key={column.id} className="flex max-w-xs min-w-[250px] flex-1 flex-col">
                   {/* Column header */}
                   <div className="mb-3 flex items-center justify-between">
                     <div>
-                      <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
+                      <h2 className="text-xs font-semibold tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
                         {column.label}
                       </h2>
                       <p className="text-xs text-[var(--bb-text-muted)]">
@@ -262,7 +239,7 @@ export default function BoardPage() {
                               <div className="text-[11px] font-medium text-[var(--bb-text-secondary)]">
                                 {ticket.code}
                               </div>
-                              <h3 className="mt-0.5 text-[13px] font-semibold leading-snug text-[var(--bb-secondary)]">
+                              <h3 className="mt-0.5 text-[13px] leading-snug font-semibold text-[var(--bb-secondary)]">
                                 {ticket.title}
                               </h3>
                             </div>
@@ -278,7 +255,7 @@ export default function BoardPage() {
                           <div className="mb-2 space-y-1 text-[11px] text-[var(--bb-text-secondary)]">
                             {ticket.projectName && (
                               <div className="flex items-center gap-1">
-                                <span className="text-[10px] uppercase tracking-wide text-[var(--bb-text-muted)]">
+                                <span className="text-[10px] tracking-wide text-[var(--bb-text-muted)] uppercase">
                                   Project
                                 </span>
                                 <span className="font-medium text-[var(--bb-secondary)]">
@@ -288,7 +265,7 @@ export default function BoardPage() {
                             )}
                             {ticket.companyName && (
                               <div className="flex items-center gap-1">
-                                <span className="text-[10px] uppercase tracking-wide text-[var(--bb-text-muted)]">
+                                <span className="text-[10px] tracking-wide text-[var(--bb-text-muted)] uppercase">
                                   Company
                                 </span>
                                 <span>{ticket.companyName}</span>
@@ -296,7 +273,7 @@ export default function BoardPage() {
                             )}
                             {ticket.creativeName && (
                               <div className="flex items-center gap-1">
-                                <span className="text-[10px] uppercase tracking-wide text-[var(--bb-text-muted)]">
+                                <span className="text-[10px] tracking-wide text-[var(--bb-text-muted)] uppercase">
                                   Creative
                                 </span>
                                 <span>{ticket.creativeName}</span>
@@ -309,15 +286,11 @@ export default function BoardPage() {
                               {ticket.tokenCost != null && (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-[var(--bb-bg-card)] px-2 py-0.5 font-medium text-[var(--bb-secondary)]">
                                   <span className="text-[9px]">Tokens</span>
-                                  <span className="text-[11px]">
-                                    {ticket.tokenCost}
-                                  </span>
+                                  <span className="text-[11px]">{ticket.tokenCost}</span>
                                 </span>
                               )}
                             </div>
-                            <span>
-                              {new Date(ticket.createdAt).toLocaleDateString()}
-                            </span>
+                            <span>{new Date(ticket.createdAt).toLocaleDateString()}</span>
                           </footer>
                         </article>
                       ))

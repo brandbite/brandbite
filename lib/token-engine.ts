@@ -5,11 +5,7 @@
 // @lastUpdate: 2026-02-20
 // -----------------------------------------------------------------------------
 
-import {
-  LedgerDirection,
-  Prisma,
-  TicketStatus,
-} from "@prisma/client";
+import { LedgerDirection, Prisma, TicketStatus } from "@prisma/client";
 import { prisma } from "./prisma";
 
 /**
@@ -32,10 +28,7 @@ type SignedAmount = {
   direction: LedgerDirection;
 };
 
-function computeSignedAmount(
-  amount: number,
-  direction: LedgerDirection
-): SignedAmount {
+function computeSignedAmount(amount: number, direction: LedgerDirection): SignedAmount {
   if (amount <= 0) {
     throw new Error("Token amount must be a positive integer");
   }
@@ -78,9 +71,7 @@ export function getEffectiveTokenValues(ticket: {
   return {
     effectiveCost: ticket.tokenCostOverride ?? baseCost,
     effectivePayout: ticket.creativePayoutOverride ?? basePayout,
-    isOverridden:
-      ticket.tokenCostOverride != null ||
-      ticket.creativePayoutOverride != null,
+    isOverridden: ticket.tokenCostOverride != null || ticket.creativePayoutOverride != null,
   };
 }
 
@@ -167,11 +158,8 @@ export interface ApplyCompanyLedgerInput {
  * - amount: pozitif integer
  * - direction: CREDIT => bakiye artar, DEBIT => bakiye azalır
  */
-export async function applyCompanyLedgerEntry(
-  input: ApplyCompanyLedgerInput
-) {
-  const { companyId, ticketId, amount, direction, reason, notes, metadata } =
-    input;
+export async function applyCompanyLedgerEntry(input: ApplyCompanyLedgerInput) {
+  const { companyId, ticketId, amount, direction, reason, notes, metadata } = input;
 
   const { signedAmount, rawAmount } = computeSignedAmount(amount, direction);
 
@@ -270,16 +258,7 @@ export interface ApplyUserLedgerInput {
  * bu yüzden balanceBefore / balanceAfter değerlerini ledger üzerinden hesaplıyoruz.
  */
 export async function applyUserLedgerEntry(input: ApplyUserLedgerInput) {
-  const {
-    userId,
-    companyId,
-    ticketId,
-    amount,
-    direction,
-    reason,
-    notes,
-    metadata,
-  } = input;
+  const { userId, companyId, ticketId, amount, direction, reason, notes, metadata } = input;
 
   const { signedAmount, rawAmount } = computeSignedAmount(amount, direction);
 
@@ -376,7 +355,7 @@ export interface TicketCompletionResult {
  *   "alreadyCompleted = true" ile döner ve yeni hareket yaratmaz.
  */
 export async function completeTicketAndApplyTokens(
-  ticketId: string
+  ticketId: string,
 ): Promise<TicketCompletionResult> {
   return prisma.$transaction(async (tx) => {
     const ticket = await tx.ticket.findUnique({
@@ -391,15 +370,11 @@ export async function completeTicketAndApplyTokens(
     }
 
     if (!ticket.companyId) {
-      throw new Error(
-        `Ticket ${ticketId} has no companyId. Cannot apply company tokens.`
-      );
+      throw new Error(`Ticket ${ticketId} has no companyId. Cannot apply company tokens.`);
     }
 
     if (!ticket.jobType) {
-      throw new Error(
-        `Ticket ${ticketId} has no jobType. Token costs are not defined.`
-      );
+      throw new Error(`Ticket ${ticketId} has no jobType. Token costs are not defined.`);
     }
 
     // Eğer zaten DONE ise veya JOB_PAYMENT ledger'ı varsa idempotent kabul edelim
@@ -411,12 +386,13 @@ export async function completeTicketAndApplyTokens(
     });
 
     if (ticket.status === TicketStatus.DONE || existingPayment) {
-      const finalTicket = ticket.status === TicketStatus.DONE
-        ? ticket
-        : await tx.ticket.update({
-            where: { id: ticket.id },
-            data: { status: TicketStatus.DONE },
-          });
+      const finalTicket =
+        ticket.status === TicketStatus.DONE
+          ? ticket
+          : await tx.ticket.update({
+              where: { id: ticket.id },
+              data: { status: TicketStatus.DONE },
+            });
 
       return {
         ticket: {
@@ -443,21 +419,15 @@ export async function completeTicketAndApplyTokens(
     if (ticket.creativePayoutOverride != null) {
       effectivePayout = ticket.creativePayoutOverride;
     } else if (ticket.creativeId) {
-      const ruleResult = await evaluateCreativePayoutPercent(
-        ticket.creativeId,
-        tx,
-      );
+      const ruleResult = await evaluateCreativePayoutPercent(ticket.creativeId, tx);
       appliedPayoutPercent = ruleResult.payoutPercent;
       matchedRuleId = ruleResult.matchedRuleId;
       matchedRuleName = ruleResult.matchedRuleName;
       effectivePayout = Math.round(
-        ticket.jobType.tokenCost *
-          (ticket.quantity ?? 1) *
-          (appliedPayoutPercent / 100),
+        ticket.jobType.tokenCost * (ticket.quantity ?? 1) * (appliedPayoutPercent / 100),
       );
     } else {
-      effectivePayout =
-        ticket.jobType.creativePayoutTokens * (ticket.quantity ?? 1);
+      effectivePayout = ticket.jobType.creativePayoutTokens * (ticket.quantity ?? 1);
     }
 
     // Company is NOT debited here — the company was already charged at ticket

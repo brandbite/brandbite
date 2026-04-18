@@ -120,9 +120,7 @@ describe("createNotification", () => {
   });
 
   it("swallows errors gracefully (fire-and-forget)", async () => {
-    mockPrisma.notificationPreference.findUnique.mockRejectedValueOnce(
-      new Error("DB error"),
-    );
+    mockPrisma.notificationPreference.findUnique.mockRejectedValueOnce(new Error("DB error"));
 
     // Should not throw
     await expect(createNotification(baseInput)).resolves.toBeUndefined();
@@ -220,9 +218,7 @@ describe("getUserPreferences", () => {
     expect(pinResolved?.emailEnabled).toBe(false);
 
     // Remaining types should still default to true
-    const others = prefs.filter(
-      (p) => p.type !== "TICKET_ASSIGNED" && p.type !== "PIN_RESOLVED",
-    );
+    const others = prefs.filter((p) => p.type !== "TICKET_ASSIGNED" && p.type !== "PIN_RESOLVED");
     others.forEach((p) => {
       expect(p.enabled).toBe(true);
       expect(p.emailEnabled).toBe(true);
@@ -240,7 +236,11 @@ describe("setUserPreference", () => {
 
     expect(mockPrisma.notificationPreference.upsert).toHaveBeenCalledWith({
       where: { userId_type: { userId: "user-1", type: "TICKET_ASSIGNED" } },
-      create: expect.objectContaining({ userId: "user-1", type: "TICKET_ASSIGNED", enabled: false }),
+      create: expect.objectContaining({
+        userId: "user-1",
+        type: "TICKET_ASSIGNED",
+        enabled: false,
+      }),
       update: { enabled: false },
     });
   });

@@ -64,9 +64,7 @@ export default function AdminLedgerPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [companyFilter, setCompanyFilter] = useState<string>("ALL");
-  const [directionFilter, setDirectionFilter] = useState<
-    "ALL" | LedgerDirection
-  >("ALL");
+  const [directionFilter, setDirectionFilter] = useState<"ALL" | LedgerDirection>("ALL");
 
   useEffect(() => {
     let cancelled = false;
@@ -84,17 +82,12 @@ export default function AdminLedgerPage() {
 
         if (!res.ok) {
           if (res.status === 401) {
-            throw new Error(
-              "You must be signed in as an admin to view this page.",
-            );
+            throw new Error("You must be signed in as an admin to view this page.");
           }
           if (res.status === 403) {
-            throw new Error(
-              "You do not have permission to view the admin ledger.",
-            );
+            throw new Error("You do not have permission to view the admin ledger.");
           }
-          const msg =
-            json?.error || `Request failed with status ${res.status}`;
+          const msg = json?.error || `Request failed with status ${res.status}`;
           throw new Error(msg);
         }
 
@@ -124,11 +117,7 @@ export default function AdminLedgerPage() {
 
   const companies = useMemo(() => {
     const list = Array.from(
-      new Set(
-        entries
-          .map((e) => e.company?.name)
-          .filter((name): name is string => !!name),
-      ),
+      new Set(entries.map((e) => e.company?.name).filter((name): name is string => !!name)),
     );
     return list;
   }, [entries]);
@@ -147,237 +136,200 @@ export default function AdminLedgerPage() {
 
   return (
     <>
-        {/* Page header */}
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Global token ledger
-            </h1>
-            <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-              All token movements across companies, jobs and creatives. Only
-              visible to site admins.
-            </p>
-          </div>
+      {/* Page header */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Global token ledger</h1>
+          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
+            All token movements across companies, jobs and creatives. Only visible to site admins.
+          </p>
+        </div>
+      </div>
+
+      {/* Error */}
+      {error && (
+        <InlineAlert variant="error" title="Error" className="mb-4">
+          {error}
+        </InlineAlert>
+      )}
+
+      {/* Summary cards */}
+      <section className="mb-6 grid gap-4 md:grid-cols-3">
+        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+          <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
+            Net tokens
+          </p>
+          <p className="mt-2 text-3xl font-semibold text-[var(--bb-primary)]">
+            {loading ? "—" : data ? data.stats.netTokens : 0}
+          </p>
+          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
+            Total credits minus total debits in the system.
+          </p>
         </div>
 
-        {/* Error */}
-        {error && (
-          <InlineAlert variant="error" title="Error" className="mb-4">
-            {error}
-          </InlineAlert>
+        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+          <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
+            Total credits
+          </p>
+          <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
+            {loading ? "—" : data ? data.stats.totalCredits : 0}
+          </p>
+          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
+            Tokens added via plans, top-ups or adjustments.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+          <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
+            Total debits
+          </p>
+          <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
+            {loading ? "—" : data ? data.stats.totalDebits : 0}
+          </p>
+          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
+            Tokens spent on jobs, withdrawals and corrections.
+          </p>
+        </div>
+      </section>
+
+      {/* Filters */}
+      <section className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-medium text-[var(--bb-secondary)]">Company</label>
+          <FormSelect
+            className="w-auto"
+            value={companyFilter}
+            onChange={(e) => setCompanyFilter(e.target.value)}
+          >
+            <option value="ALL">All companies</option>
+            {companies.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </FormSelect>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-medium text-[var(--bb-secondary)]">Direction</label>
+          <FormSelect
+            className="w-auto"
+            value={directionFilter}
+            onChange={(e) => setDirectionFilter(e.target.value as "ALL" | LedgerDirection)}
+          >
+            <option value="ALL">All</option>
+            <option value="CREDIT">Credits</option>
+            <option value="DEBIT">Debits</option>
+          </FormSelect>
+        </div>
+      </section>
+
+      {/* Table */}
+      <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold tracking-tight">Recent token movements</h2>
+          <p className="text-xs text-[var(--bb-text-tertiary)]">
+            Showing up to {filteredEntries.length} entries.
+          </p>
+        </div>
+
+        {loading ? (
+          <LoadingState message="Loading ledger…" />
+        ) : filteredEntries.length === 0 ? (
+          <EmptyState title="No entries match your filters." />
+        ) : (
+          <DataTable>
+            <THead>
+              <TH>When</TH>
+              <TH>Company</TH>
+              <TH>Direction</TH>
+              <TH>Amount</TH>
+              <TH>Ticket</TH>
+              <TH>User</TH>
+              <TH>Reason</TH>
+              <TH>Notes</TH>
+              <TH>Balance</TH>
+            </THead>
+            <tbody>
+              {filteredEntries.map((e) => {
+                const created = new Date(e.createdAt);
+                const isCredit = e.direction === "CREDIT";
+
+                return (
+                  <tr
+                    key={e.id}
+                    className="border-b border-[var(--bb-border-subtle)] last:border-b-0"
+                  >
+                    <TD className="text-[var(--bb-text-secondary)]">
+                      {created.toLocaleDateString()}{" "}
+                      {created.toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </TD>
+                    <TD>
+                      {e.company ? (
+                        <>
+                          <div className="font-medium">{e.company.name}</div>
+                          <div className="text-[10px] text-[var(--bb-text-tertiary)]">
+                            {e.company.slug}
+                          </div>
+                        </>
+                      ) : (
+                        "—"
+                      )}
+                    </TD>
+                    <TD>
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                          isCredit
+                            ? "bg-[var(--bb-success-bg)] text-[var(--bb-success-text)]"
+                            : "bg-[var(--bb-danger-bg)] text-[var(--bb-danger-text)]"
+                        }`}
+                      >
+                        {isCredit ? "Credit" : "Debit"}
+                      </span>
+                    </TD>
+                    <TD>
+                      {isCredit ? "+" : "-"}
+                      {e.amount}
+                    </TD>
+                    <TD>
+                      {e.ticket ? (
+                        <>
+                          <div className="font-medium">{e.ticket.code ?? "—"}</div>
+                          <div className="text-[10px] text-[var(--bb-text-secondary)]">
+                            {e.ticket.title}
+                          </div>
+                        </>
+                      ) : (
+                        "—"
+                      )}
+                    </TD>
+                    <TD>
+                      {e.user ? (
+                        <>
+                          <div className="font-medium">{e.user.name || e.user.email}</div>
+                          <div className="text-[10px] text-[var(--bb-text-tertiary)]">
+                            {formatRole(e.user.role as import("@prisma/client").UserRole)}
+                          </div>
+                        </>
+                      ) : (
+                        "—"
+                      )}
+                    </TD>
+                    <TD>{e.reason ?? "—"}</TD>
+                    <TD className="text-[var(--bb-text-secondary)]">{e.notes ?? "—"}</TD>
+                    <TD className="text-[var(--bb-text-tertiary)]">
+                      {e.balanceAfter != null ? e.balanceAfter : "—"}
+                    </TD>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </DataTable>
         )}
-
-        {/* Summary cards */}
-        <section className="mb-6 grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
-              Net tokens
-            </p>
-            <p className="mt-2 text-3xl font-semibold text-[var(--bb-primary)]">
-              {loading
-                ? "—"
-                : data
-                ? data.stats.netTokens
-                : 0}
-            </p>
-            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-              Total credits minus total debits in the system.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
-              Total credits
-            </p>
-            <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
-              {loading
-                ? "—"
-                : data
-                ? data.stats.totalCredits
-                : 0}
-            </p>
-            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-              Tokens added via plans, top-ups or adjustments.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--bb-text-tertiary)]">
-              Total debits
-            </p>
-            <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
-              {loading
-                ? "—"
-                : data
-                ? data.stats.totalDebits
-                : 0}
-            </p>
-            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-              Tokens spent on jobs, withdrawals and corrections.
-            </p>
-          </div>
-        </section>
-
-        {/* Filters */}
-        <section className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-          <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-[var(--bb-secondary)]">
-              Company
-            </label>
-            <FormSelect
-              className="w-auto"
-              value={companyFilter}
-              onChange={(e) => setCompanyFilter(e.target.value)}
-            >
-              <option value="ALL">All companies</option>
-              {companies.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </FormSelect>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-[var(--bb-secondary)]">
-              Direction
-            </label>
-            <FormSelect
-              className="w-auto"
-              value={directionFilter}
-              onChange={(e) =>
-                setDirectionFilter(
-                  e.target.value as "ALL" | LedgerDirection,
-                )
-              }
-            >
-              <option value="ALL">All</option>
-              <option value="CREDIT">Credits</option>
-              <option value="DEBIT">Debits</option>
-            </FormSelect>
-          </div>
-        </section>
-
-        {/* Table */}
-        <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold tracking-tight">
-              Recent token movements
-            </h2>
-            <p className="text-xs text-[var(--bb-text-tertiary)]">
-              Showing up to {filteredEntries.length} entries.
-            </p>
-          </div>
-
-          {loading ? (
-            <LoadingState message="Loading ledger…" />
-          ) : filteredEntries.length === 0 ? (
-            <EmptyState title="No entries match your filters." />
-          ) : (
-            <DataTable>
-              <THead>
-                <TH>When</TH>
-                <TH>Company</TH>
-                <TH>Direction</TH>
-                <TH>Amount</TH>
-                <TH>Ticket</TH>
-                <TH>User</TH>
-                <TH>Reason</TH>
-                <TH>Notes</TH>
-                <TH>Balance</TH>
-              </THead>
-              <tbody>
-                {filteredEntries.map((e) => {
-                  const created = new Date(e.createdAt);
-                  const isCredit = e.direction === "CREDIT";
-
-                  return (
-                    <tr
-                      key={e.id}
-                      className="border-b border-[var(--bb-border-subtle)] last:border-b-0"
-                    >
-                      <TD className="text-[var(--bb-text-secondary)]">
-                        {created.toLocaleDateString()}{" "}
-                        {created.toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </TD>
-                      <TD>
-                        {e.company ? (
-                          <>
-                            <div className="font-medium">
-                              {e.company.name}
-                            </div>
-                            <div className="text-[10px] text-[var(--bb-text-tertiary)]">
-                              {e.company.slug}
-                            </div>
-                          </>
-                        ) : (
-                          "—"
-                        )}
-                      </TD>
-                      <TD>
-                        <span
-                          className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                            isCredit
-                              ? "bg-[var(--bb-success-bg)] text-[var(--bb-success-text)]"
-                              : "bg-[var(--bb-danger-bg)] text-[var(--bb-danger-text)]"
-                          }`}
-                        >
-                          {isCredit ? "Credit" : "Debit"}
-                        </span>
-                      </TD>
-                      <TD>
-                        {isCredit ? "+" : "-"}
-                        {e.amount}
-                      </TD>
-                      <TD>
-                        {e.ticket ? (
-                          <>
-                            <div className="font-medium">
-                              {e.ticket.code ?? "—"}
-                            </div>
-                            <div className="text-[10px] text-[var(--bb-text-secondary)]">
-                              {e.ticket.title}
-                            </div>
-                          </>
-                        ) : (
-                          "—"
-                        )}
-                      </TD>
-                      <TD>
-                        {e.user ? (
-                          <>
-                            <div className="font-medium">
-                              {e.user.name || e.user.email}
-                            </div>
-                            <div className="text-[10px] text-[var(--bb-text-tertiary)]">
-                              {formatRole(e.user.role as import("@prisma/client").UserRole)}
-                            </div>
-                          </>
-                        ) : (
-                          "—"
-                        )}
-                      </TD>
-                      <TD>
-                        {e.reason ?? "—"}
-                      </TD>
-                      <TD className="text-[var(--bb-text-secondary)]">
-                        {e.notes ?? "—"}
-                      </TD>
-                      <TD className="text-[var(--bb-text-tertiary)]">
-                        {e.balanceAfter != null
-                          ? e.balanceAfter
-                          : "—"}
-                      </TD>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </DataTable>
-          )}
-        </section>
+      </section>
     </>
   );
 }

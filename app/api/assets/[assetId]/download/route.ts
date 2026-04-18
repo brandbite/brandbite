@@ -16,10 +16,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { createR2Client, getR2BucketName } from "@/lib/r2";
 
-export async function GET(
-  _req: Request,
-  ctx: { params: Promise<{ assetId: string }> },
-) {
+export async function GET(_req: Request, ctx: { params: Promise<{ assetId: string }> }) {
   try {
     const user = await getCurrentUserOrThrow();
     const { assetId } = await ctx.params;
