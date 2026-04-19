@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { FormTextarea, FormSelect, FormInput } from "@/components/ui/form-field";
 import { Badge } from "@/components/ui/badge";
 import { InlineAlert } from "@/components/ui/inline-alert";
+import { useIdempotencyKey } from "@/lib/hooks/use-idempotency-key";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -73,6 +74,7 @@ function ImageGenerationPanel({ onGenerated }: { onGenerated: () => void }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ imageUrl: string; revisedPrompt?: string } | null>(null);
   const [error, setError] = useState("");
+  const { key: idempotencyKey, rotate: rotateIdempotencyKey } = useIdempotencyKey();
 
   const generate = async () => {
     setLoading(true);
@@ -81,11 +83,15 @@ function ImageGenerationPanel({ onGenerated }: { onGenerated: () => void }) {
     try {
       const res = await fetch("/api/ai/generate/image", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
+        },
         body: JSON.stringify({ prompt, style, size }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Generation failed");
+      rotateIdempotencyKey();
       setResult({
         imageUrl: data.generation.imageUrl,
         revisedPrompt: data.generation.revisedPrompt,
@@ -182,6 +188,7 @@ function TextGenerationPanel({ onGenerated }: { onGenerated: () => void }) {
   const [results, setResults] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState<number | null>(null);
+  const { key: idempotencyKey, rotate: rotateIdempotencyKey } = useIdempotencyKey();
 
   const generate = async () => {
     setLoading(true);
@@ -190,11 +197,15 @@ function TextGenerationPanel({ onGenerated }: { onGenerated: () => void }) {
     try {
       const res = await fetch("/api/ai/generate/text", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
+        },
         body: JSON.stringify({ prompt, format, tone, variations }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Generation failed");
+      rotateIdempotencyKey();
       setResults(data.generation.variations || [data.generation.outputText]);
       onGenerated();
     } catch (err) {
@@ -295,6 +306,7 @@ function BackgroundRemovalPanel({ onGenerated }: { onGenerated: () => void }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const { key: idempotencyKey, rotate: rotateIdempotencyKey } = useIdempotencyKey();
 
   const generate = async () => {
     setLoading(true);
@@ -303,11 +315,15 @@ function BackgroundRemovalPanel({ onGenerated }: { onGenerated: () => void }) {
     try {
       const res = await fetch("/api/ai/generate/background-removal", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
+        },
         body: JSON.stringify({ imageUrl }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Background removal failed");
+      rotateIdempotencyKey();
       setResult(data.generation.imageUrl);
       onGenerated();
     } catch (err) {
@@ -387,6 +403,7 @@ function DesignSuggestionsPanel({ onGenerated }: { onGenerated: () => void }) {
     overallDirection: string;
   } | null>(null);
   const [error, setError] = useState("");
+  const { key: idempotencyKey, rotate: rotateIdempotencyKey } = useIdempotencyKey();
 
   const generate = async () => {
     setLoading(true);
@@ -395,11 +412,15 @@ function DesignSuggestionsPanel({ onGenerated }: { onGenerated: () => void }) {
     try {
       const res = await fetch("/api/ai/generate/design-suggestions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
+        },
         body: JSON.stringify({ brief, includeColors, includeFonts, includeLayout }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to get suggestions");
+      rotateIdempotencyKey();
       setResult(data.generation.suggestions);
       onGenerated();
     } catch (err) {
