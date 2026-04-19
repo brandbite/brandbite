@@ -181,6 +181,17 @@ export default function CustomerSettingsPage() {
   const [billingError, setBillingError] = useState<string | null>(null);
   const [billingLoading, setBillingLoading] = useState<boolean>(false);
 
+  // Top-up packs (one-time Plans where isRecurring=false) — loaded lazily.
+  type Topup = {
+    id: string;
+    name: string;
+    description: string | null;
+    monthlyTokens: number;
+    priceCents: number | null;
+  };
+  const [topups, setTopups] = useState<Topup[]>([]);
+  const [topupLoadingId, setTopupLoadingId] = useState<string | null>(null);
+
   const searchParams = useSearchParams();
   const billingStatusParam = searchParams.get("billing");
 
@@ -219,6 +230,21 @@ export default function CustomerSettingsPage() {
 
     load();
 
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Load top-up packs (non-recurring plans) for the "Need more tokens now?" section.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/customer/plans/topups", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((json) => {
+        if (cancelled) return;
+        if (Array.isArray(json?.topups)) setTopups(json.topups as Topup[]);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -409,6 +435,30 @@ export default function CustomerSettingsPage() {
       setBillingError(err?.message || "Failed to start billing checkout.");
     } finally {
       setBillingLoading(false);
+    }
+  };
+
+  /** Start a Stripe one-time checkout for a specific top-up pack planId. */
+  const handleBuyTopup = async (topupId: string) => {
+    setTopupLoadingId(topupId);
+    setBillingError(null);
+    try {
+      const res = await fetch("/api/billing/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId: topupId }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.url) {
+        const msg = json?.error || `Request failed with status ${res.status}`;
+        throw new Error(msg);
+      }
+      window.location.href = json.url as string;
+    } catch (err: any) {
+      console.error("Top-up checkout error:", err);
+      setBillingError(err?.message || "Failed to start top-up checkout.");
+    } finally {
+      setTopupLoadingId(null);
     }
   };
 
@@ -913,6 +963,62 @@ export default function CustomerSettingsPage() {
               <div className="mt-3 rounded-lg bg-[var(--bb-bg-page)] px-3 py-2 text-[11px] text-[var(--bb-text-secondary)]">
                 No subscription plan is assigned to your company yet. Please contact support if this
                 does not look correct.
+              </div>
+            )}
+
+            {/* One-time token top-up packs */}
+            {topups.length > 0 && (
+              <div className="mt-5 border-t border-[var(--bb-border-subtle)] pt-4">
+                <h3 className="text-sm font-semibold text-[var(--bb-secondary)]">
+                  Need more tokens now?
+                </h3>
+                <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
+                  One-time top-up — charged immediately, tokens credited when payment succeeds.
+                </p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {topups.map((t) => {
+                    const price =
+                      t.priceCents != null ? `$${(t.priceCents / 100).toFixed(2)}` : "—";
+                    return (
+                      <div
+                        key={t.id}
+                        className="flex flex-col rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] p-3"
+                      >
+                        <div className="text-xs font-semibold text-[var(--bb-secondary)]">
+                          {t.name}
+                        </div>
+                        {t.description && (
+                          <div className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
+                            {t.description}
+                          </div>
+                        )}
+                        <div className="mt-2 flex items-baseline gap-1">
+                          <span className="text-lg font-semibold text-[var(--bb-primary)]">
+                            {t.monthlyTokens.toLocaleString()}
+                          </span>
+                          <span className="text-[11px] text-[var(--bb-text-tertiary)]">tokens</span>
+                        </div>
+                        <div className="text-[11px] text-[var(--bb-text-secondary)]">
+                          {price} one-time
+                        </div>
+                        {canManagePlan ? (
+                          <button
+                            type="button"
+                            onClick={() => handleBuyTopup(t.id)}
+                            disabled={topupLoadingId !== null}
+                            className="mt-3 rounded-full bg-[var(--bb-primary)] px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm disabled:opacity-60"
+                          >
+                            {topupLoadingId === t.id ? "Redirecting…" : "Buy"}
+                          </button>
+                        ) : (
+                          <p className="mt-3 text-[10px] text-[var(--bb-text-muted)]">
+                            Owner / Billing only
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </section>

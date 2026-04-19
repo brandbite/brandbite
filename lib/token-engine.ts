@@ -20,6 +20,7 @@ export type TokenReason =
   | "REFUND"
   | "CONSULTATION_BOOKING"
   | "CONSULTATION_REFUND"
+  | "TOKEN_TOPUP"
   | string;
 
 export type TokenMetadata = Prisma.InputJsonValue;

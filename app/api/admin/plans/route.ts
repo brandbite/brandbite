@@ -18,6 +18,7 @@ type PlanResponseItem = {
   monthlyTokens: number;
   priceCents: number | null;
   isActive: boolean;
+  isRecurring: boolean;
   stripeProductId: string | null;
   stripePriceId: string | null;
   attachedCompanies: number;
@@ -75,6 +76,7 @@ export async function GET() {
         monthlyTokens: p.monthlyTokens,
         priceCents: p.priceCents,
         isActive: p.isActive,
+        isRecurring: p.isRecurring,
         stripeProductId: p.stripeProductId,
         stripePriceId: p.stripePriceId,
         attachedCompanies: p._count.companies,
@@ -108,8 +110,15 @@ export async function POST(req: NextRequest) {
 
     const parsed = await parseBody(req, createPlanSchema);
     if (!parsed.success) return parsed.response;
-    const { name, monthlyTokens, priceCents, isActive, stripeProductId, stripePriceId } =
-      parsed.data;
+    const {
+      name,
+      monthlyTokens,
+      priceCents,
+      isActive,
+      isRecurring,
+      stripeProductId,
+      stripePriceId,
+    } = parsed.data;
 
     const created = await prisma.plan.create({
       data: {
@@ -117,6 +126,7 @@ export async function POST(req: NextRequest) {
         monthlyTokens,
         priceCents: priceCents ?? 0,
         isActive,
+        isRecurring,
         stripeProductId,
         stripePriceId,
       },
@@ -167,6 +177,7 @@ export async function PATCH(req: NextRequest) {
     if (fields.monthlyTokens !== undefined) updateData.monthlyTokens = fields.monthlyTokens;
     if (fields.priceCents !== undefined) updateData.priceCents = fields.priceCents ?? 0;
     if (fields.isActive !== undefined) updateData.isActive = fields.isActive;
+    if (fields.isRecurring !== undefined) updateData.isRecurring = fields.isRecurring;
     if (fields.stripeProductId !== undefined) updateData.stripeProductId = fields.stripeProductId;
     if (fields.stripePriceId !== undefined) updateData.stripePriceId = fields.stripePriceId;
 

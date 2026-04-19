@@ -59,8 +59,13 @@ export async function POST(req: NextRequest) {
 
     const baseUrl = getAppBaseUrl();
 
+    // Recurring plans use Stripe subscription mode; one-time "top-up" packs
+    // (plan.isRecurring === false) use payment mode — single charge, no
+    // subscription record, tokens credited once on checkout.session.completed.
+    const mode = plan.isRecurring ? "subscription" : "payment";
+
     const session = await stripe.checkout.sessions.create({
-      mode: "subscription",
+      mode,
       payment_method_types: ["card"],
       line_items: [
         {
