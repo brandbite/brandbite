@@ -162,3 +162,44 @@ export function extractMeetLink(event: GoogleCalendarEvent): string | null {
   const videoEntry = event.conferenceData?.entryPoints?.find((e) => e.entryPointType === "video");
   return videoEntry?.uri ?? null;
 }
+
+export type FreeBusyInterval = { start: string; end: string };
+
+/** Query freebusy on the configured calendar and return busy intervals
+ *  within [timeMinIso, timeMaxIso]. Used to grey out unavailable slots
+ *  on the customer consultation picker. */
+export async function queryFreeBusy(
+  settings: ConsultationSettings,
+  timeMinIso: string,
+  timeMaxIso: string,
+): Promise<FreeBusyInterval[]> {
+  const ensured = await ensureFreshAccessToken(settings);
+  if ("error" in ensured) throw new Error(ensured.error);
+
+  const calendarId = settings.googleCalendarId ?? "primary";
+
+  const body = {
+    timeMin: timeMinIso,
+    timeMax: timeMaxIso,
+    items: [{ id: calendarId }],
+  };
+
+  type Response = {
+    calendars: Record<
+      string,
+      { busy?: FreeBusyInterval[]; errors?: { domain: string; reason: string }[] }
+    >;
+  };
+
+  const json = await googleFetch<Response>(ensured.accessToken, "/freeBusy", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+  const cal = json.calendars?.[calendarId];
+  if (cal?.errors?.length) {
+    console.warn("[google.freeBusy] calendar errors", cal.errors);
+    return [];
+  }
+  return cal?.busy ?? [];
+}
