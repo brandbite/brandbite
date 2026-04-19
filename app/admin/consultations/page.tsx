@@ -219,14 +219,22 @@ export default function AdminConsultationsPage() {
 
   return (
     <div className="mx-auto w-full max-w-5xl">
-      <header className="mb-6">
-        <h1 className="font-brand text-2xl font-bold tracking-tight text-[var(--bb-secondary)]">
-          Consultations
-        </h1>
-        <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-          Requests from company OWNER / PM members. Schedule, paste a Google Meet / Zoom link, mark
-          completed, or cancel and refund tokens.
-        </p>
+      <header className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-brand text-2xl font-bold tracking-tight text-[var(--bb-secondary)]">
+            Consultations
+          </h1>
+          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
+            Requests from company OWNER / PM members. Schedule, paste a Google Meet / Zoom link,
+            mark completed, or cancel and refund tokens.
+          </p>
+        </div>
+        <a
+          href="/admin/consultations/settings"
+          className="shrink-0 rounded-full border border-[var(--bb-border)] bg-white px-3 py-1.5 text-xs font-medium text-[var(--bb-secondary)] hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
+        >
+          Settings
+        </a>
       </header>
 
       {/* Filter bar */}

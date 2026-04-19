@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getCurrentUserOrThrow } from "@/lib/auth";
-import { CONSULTATION_TOKEN_COST } from "@/lib/consultation/config";
+import { getConsultationSettings } from "@/lib/consultation/settings";
 import { canBookConsultation } from "@/lib/permissions/companyRoles";
 import { prisma } from "@/lib/prisma";
 import { parseBody } from "@/lib/schemas/helpers";
@@ -25,23 +25,26 @@ export async function GET() {
       return NextResponse.json({ error: "No active company" }, { status: 400 });
     }
 
-    const consultations = await prisma.consultation.findMany({
-      where: { companyId: user.activeCompanyId },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        description: true,
-        preferredTimes: true,
-        timezone: true,
-        scheduledAt: true,
-        videoLink: true,
-        tokenCost: true,
-        status: true,
-        createdAt: true,
-        updatedAt: true,
-        requestedBy: { select: { id: true, name: true, email: true } },
-      },
-    });
+    const [consultations, settings] = await Promise.all([
+      prisma.consultation.findMany({
+        where: { companyId: user.activeCompanyId },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          description: true,
+          preferredTimes: true,
+          timezone: true,
+          scheduledAt: true,
+          videoLink: true,
+          tokenCost: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+          requestedBy: { select: { id: true, name: true, email: true } },
+        },
+      }),
+      getConsultationSettings(),
+    ]);
 
     return NextResponse.json({
       consultations: consultations.map((c) => ({
@@ -50,7 +53,7 @@ export async function GET() {
         createdAt: c.createdAt.toISOString(),
         updatedAt: c.updatedAt.toISOString(),
       })),
-      tokenCost: CONSULTATION_TOKEN_COST,
+      tokenCost: settings.tokenCost,
     });
   } catch (error: unknown) {
     if ((error as { code?: string })?.code === "UNAUTHENTICATED") {
@@ -84,16 +87,25 @@ export async function POST(req: NextRequest) {
     const parsed = await parseBody(req, createConsultationSchema);
     if (!parsed.success) return parsed.response;
 
+    const settings = await getConsultationSettings();
+    if (!settings.enabled) {
+      return NextResponse.json(
+        { error: "Consultation bookings are currently disabled." },
+        { status: 503 },
+      );
+    }
+    const tokenCost = settings.tokenCost;
+
     // Balance check before creating the row
     const company = await prisma.company.findUniqueOrThrow({
       where: { id: user.activeCompanyId },
       select: { id: true, tokenBalance: true },
     });
-    if (company.tokenBalance < CONSULTATION_TOKEN_COST) {
+    if (company.tokenBalance < tokenCost) {
       return NextResponse.json(
         {
           error: "Insufficient token balance",
-          required: CONSULTATION_TOKEN_COST,
+          required: tokenCost,
           balance: company.tokenBalance,
         },
         { status: 402 },
@@ -112,7 +124,7 @@ export async function POST(req: NextRequest) {
           description: parsed.data.description,
           preferredTimes: preferredTimes ?? undefined,
           timezone: parsed.data.timezone,
-          tokenCost: CONSULTATION_TOKEN_COST,
+          tokenCost,
           status: "PENDING",
         },
       });
@@ -121,14 +133,14 @@ export async function POST(req: NextRequest) {
       // applyCompanyLedgerEntry's flow — keep the two paths in sync if
       // that helper's data shape evolves.
       const balanceBefore = company.tokenBalance;
-      const balanceAfter = balanceBefore - CONSULTATION_TOKEN_COST;
+      const balanceAfter = balanceBefore - tokenCost;
 
       await tx.tokenLedger.create({
         data: {
           companyId: company.id,
           userId: user.id,
           direction: "DEBIT",
-          amount: CONSULTATION_TOKEN_COST,
+          amount: tokenCost,
           reason: "CONSULTATION_BOOKING",
           notes: `Consultation booking ${row.id}`,
           metadata: { consultationId: row.id },

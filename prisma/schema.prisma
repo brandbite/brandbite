@@ -231,6 +231,9 @@ model UserAccount {
   // Consultations requested by this user
   requestedConsultations Consultation[] @relation("ConsultationsRequested")
 
+  // Consultation settings rows last touched by this admin (site-level)
+  updatedConsultationSettings ConsultationSettings[] @relation("ConsultationSettingsUpdatedBy")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -1430,4 +1433,60 @@ model Consultation {
 
   @@index([companyId, createdAt])
   @@index([status, createdAt])
+}
+
+// -----------------------------------------------------------------------------
+// ConsultationSettings
+// -----------------------------------------------------------------------------
+// Site-level configuration for the consultation feature. Managed by
+// SITE_OWNER / SITE_ADMIN from /admin/consultations/settings.
+//
+// Enforced as a singleton via `@unique` on `singleton = true` — Postgres will
+// reject a second row since `true` is already taken.
+// -----------------------------------------------------------------------------
+
+model ConsultationSettings {
+  id        String  @id @default(cuid())
+  singleton Boolean @unique @default(true)
+
+  /// Master switch — when false, customer form refuses new bookings.
+  enabled Boolean @default(true)
+
+  /// Tokens charged on submit. Replaces the old hardcoded CONSULTATION_TOKEN_COST.
+  tokenCost Int @default(50)
+
+  /// Duration (minutes) shown to the customer.
+  durationMinutes Int @default(30)
+
+  /// Team contact email (Gmail/etc.) — shown to the customer and used as a
+  /// notification target by future integrations.
+  contactEmail String?
+
+  /// Public "secret iCal URL" of the team's Google Calendar. Parsed
+  /// server-side to surface busy windows on the customer picker.
+  calendarIcsUrl String?
+
+  /// Days the team is available (0=Sun ... 6=Sat). Defaults to Mon-Fri.
+  workingDays Int[] @default([1, 2, 3, 4, 5])
+
+  /// Working hour window in 24h local time (company timezone).
+  workingHourStart Int @default(9)
+  workingHourEnd   Int @default(17)
+
+  /// Minimum notice (hours) a customer must give when picking a slot.
+  minNoticeHours Int @default(24)
+
+  /// Max days in the future a customer may pick.
+  maxBookingDays Int @default(30)
+
+  /// Company timezone, IANA zone. Used when interpreting working hours.
+  companyTimezone String?
+
+  /// Free-text notes shown only to admins on the settings page.
+  adminNotes String?
+
+  updatedAt DateTime @updatedAt
+
+  updatedById String?
+  updatedBy   UserAccount? @relation("ConsultationSettingsUpdatedBy", fields: [updatedById], references: [id])
 }
