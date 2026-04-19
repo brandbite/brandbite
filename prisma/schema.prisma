@@ -1423,6 +1423,11 @@ model Consultation {
   videoLink   String?
   adminNotes  String?
 
+  /// Google Calendar event id if the booking was auto-scheduled by the
+  /// Google integration. Null when the booking is in the legacy PENDING
+  /// flow (no Google connected at submit time).
+  googleEventId String?
+
   /// Token cost snapshot (in case admin changes pricing later).
   tokenCost Int
 
@@ -1484,6 +1489,18 @@ model ConsultationSettings {
 
   /// Free-text notes shown only to admins on the settings page.
   adminNotes String?
+
+  /// Google Calendar OAuth state. Populated when SITE_OWNER / SITE_ADMIN
+  /// connects the team Gmail via /admin/consultation-settings/google/connect.
+  /// Tokens persisted here plaintext for now — rotating encryption key is a
+  /// follow-up; low blast radius since the DB is single-tenant and the
+  /// refresh token only scopes calendar.events + calendar.freebusy.
+  googleAccountEmail     String?
+  googleCalendarId       String?  @default("primary")
+  googleAccessToken      String?
+  googleRefreshToken     String?
+  googleTokenExpiresAt   DateTime?
+  googleConnectedAt      DateTime?
 
   updatedAt DateTime @updatedAt
 
