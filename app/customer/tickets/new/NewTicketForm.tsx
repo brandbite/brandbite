@@ -248,6 +248,11 @@ export default function NewTicketForm({
   const [tokenError, setTokenError] = useState<InsufficientTokensInfo | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  // --- AI brief parsing ---
+  const [briefText, setBriefText] = useState("");
+  const [briefParsing, setBriefParsing] = useState(false);
+  const [briefHint, setBriefHint] = useState<string | null>(null);
+
   // ---------------------------------------------------------------------------
   // Company role (for limited access / billing-only users)
   // ---------------------------------------------------------------------------
@@ -399,6 +404,62 @@ export default function NewTicketForm({
 
     return { attempted: briefFiles.length, succeeded, failed };
   }
+
+  // ---------------------------------------------------------------------------
+  // AI brief parsing — take the free-text brief, call the AI tool, pre-fill
+  // the structured fields (title / description / jobTypeId / quantity /
+  // priority). Customer can edit everything before submitting.
+  // ---------------------------------------------------------------------------
+
+  const handleParseBrief = async () => {
+    if (briefText.trim().length < 10) {
+      setBriefHint("Write at least 10 characters first — the AI needs something to work with.");
+      return;
+    }
+    setBriefParsing(true);
+    setBriefHint(null);
+    setError(null);
+    try {
+      const res = await fetch("/api/ai/generate/brief-parsing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brief: briefText }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        if (res.status === 402 && isInsufficientTokensBody(json)) {
+          setTokenError(json);
+          return;
+        }
+        throw new Error(json?.error || `Parse failed (${res.status})`);
+      }
+      const parsed = json?.generation?.parsed as
+        | {
+            title: string;
+            description: string;
+            jobTypeId: string | null;
+            quantity: number;
+            priority: TicketPriorityValue;
+          }
+        | undefined;
+      if (!parsed) throw new Error("The AI didn't return a usable result. Try rewording.");
+
+      if (parsed.title) setTitle(parsed.title);
+      if (parsed.description) setDescription(parsed.description);
+      if (parsed.jobTypeId) setJobTypeId(parsed.jobTypeId);
+      if (parsed.quantity && parsed.quantity > 0) setQuantity(parsed.quantity);
+      if (parsed.priority) setPriority(parsed.priority);
+
+      setBriefHint(
+        "Fields pre-filled from your brief. Tweak anything before submitting — you're the author.",
+      );
+    } catch (err) {
+      console.error("[NewTicketForm] handleParseBrief error", err);
+      setBriefHint(err instanceof Error ? err.message : "Something went wrong parsing the brief.");
+    } finally {
+      setBriefParsing(false);
+    }
+  };
 
   // ---------------------------------------------------------------------------
   // Submit handler
@@ -621,6 +682,58 @@ export default function NewTicketForm({
           </button>
         </div>
       </div>
+
+      {/* AI brief parsing — pre-fills title / description / jobType / quantity
+          / priority from a free-text brief. Skip if you already know the
+          fields you want. */}
+      {!isLimitedAccess && (
+        <div className="rounded-lg border border-[var(--bb-primary)] bg-[var(--bb-primary-light)] px-3 py-3">
+          <p className="text-[11px] font-semibold tracking-[0.14em] text-[var(--bb-primary)] uppercase">
+            Start with a brief (optional)
+          </p>
+          <p className="mt-0.5 text-[11px] text-[var(--bb-text-muted)]">
+            Paste or type what you need. AI pre-fills the fields below — you can edit anything
+            before submitting.
+          </p>
+          <textarea
+            value={briefText}
+            onChange={(e) => setBriefText(e.target.value)}
+            disabled={briefParsing}
+            rows={3}
+            placeholder="e.g. We need a square social post for our new espresso blend launching next Tuesday. Moody, warm tones, inspired by old Italian cafes. Needs to be ready by Monday."
+            className="mt-2 w-full rounded-md border border-[var(--bb-border-input)] bg-white px-2 py-1.5 text-xs text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
+            maxLength={4000}
+          />
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={handleParseBrief}
+              loading={briefParsing}
+              loadingText="Parsing…"
+              disabled={briefParsing || briefText.trim().length < 10}
+            >
+              ✨ Fill with AI
+            </Button>
+            {briefText && !briefParsing && (
+              <button
+                type="button"
+                onClick={() => {
+                  setBriefText("");
+                  setBriefHint(null);
+                }}
+                className="text-[11px] font-medium text-[var(--bb-text-muted)] hover:text-[var(--bb-secondary)] hover:underline"
+              >
+                Clear brief
+              </button>
+            )}
+            {briefHint && (
+              <span className="text-[11px] text-[var(--bb-text-secondary)]">{briefHint}</span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Title */}
       <div className="space-y-1">

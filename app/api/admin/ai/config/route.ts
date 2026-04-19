@@ -14,6 +14,7 @@ const AI_TOOL_TYPES: AiToolType[] = [
   "BACKGROUND_REMOVAL",
   "TEXT_GENERATION",
   "DESIGN_SUGGESTION",
+  "BRIEF_PARSING",
 ];
 
 const DEFAULT_CONFIGS: Record<AiToolType, { tokenCost: number; rateLimit: number }> = {
@@ -21,6 +22,7 @@ const DEFAULT_CONFIGS: Record<AiToolType, { tokenCost: number; rateLimit: number
   BACKGROUND_REMOVAL: { tokenCost: 1, rateLimit: 30 },
   TEXT_GENERATION: { tokenCost: 1, rateLimit: 50 },
   DESIGN_SUGGESTION: { tokenCost: 1, rateLimit: 30 },
+  BRIEF_PARSING: { tokenCost: 1, rateLimit: 30 },
 };
 
 const TOOL_LABELS: Record<AiToolType, string> = {
@@ -28,6 +30,7 @@ const TOOL_LABELS: Record<AiToolType, string> = {
   BACKGROUND_REMOVAL: "Background Removal",
   TEXT_GENERATION: "Text / Copy Generation",
   DESIGN_SUGGESTION: "Design Suggestions",
+  BRIEF_PARSING: "Brief Parsing",
 };
 
 // GET: list all tool configs
