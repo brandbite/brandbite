@@ -143,6 +143,15 @@ export function canManageMoodboards(role: CompanyRole | null | undefined): boole
 }
 
 /**
+ * Who can book a consultation with the Brandbite team. Only OWNER/PM —
+ * billing and regular members don't have the standing to commit token
+ * spend on a scheduled call.
+ */
+export function canBookConsultation(role: CompanyRole | null | undefined): boolean {
+  return role === "OWNER" || role === "PM";
+}
+
+/**
  * Who can mark tickets as DONE for a given company.
  *
  * - SITE_OWNER / SITE_ADMIN: always allowed

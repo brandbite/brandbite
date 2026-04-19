@@ -18,6 +18,8 @@ export type TokenReason =
   | "WITHDRAW"
   | "ADMIN_ADJUSTMENT"
   | "REFUND"
+  | "CONSULTATION_BOOKING"
+  | "CONSULTATION_REFUND"
   | string;
 
 export type TokenMetadata = Prisma.InputJsonValue;

@@ -73,6 +73,7 @@ const NAV_CONFIG: Record<
           { href: "/admin/users", label: "Users" },
         ],
       },
+      { href: "/admin/consultations", label: "Consultations" },
       {
         label: "Content",
         children: [
@@ -99,6 +100,7 @@ const NAV_CONFIG: Record<
       { href: "/customer/moodboards", label: "Moodboards" },
       { href: "/customer/tickets", label: "Tickets" },
       { href: "/customer/ai-tools", label: "AI Tools" },
+      { href: "/customer/consultation", label: "Consultation" },
       { href: "/customer/members", label: "Members" },
       { href: "/customer/faq", label: "FAQ" },
       { href: "/customer/settings", label: "Settings" },

@@ -228,6 +228,9 @@ model UserAccount {
   receivedRatings CreativeRating[] @relation("CreativeRatingsReceived")
   submittedRatings CreativeRating[] @relation("CreativeRatingsGiven")
 
+  // Consultations requested by this user
+  requestedConsultations Consultation[] @relation("ConsultationsRequested")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -284,6 +287,8 @@ model Company {
   moodboards Moodboard[]
 
   creativeRatings CreativeRating[]
+
+  consultations Consultation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1364,4 +1369,65 @@ model MoodboardItem {
   updatedAt DateTime @updatedAt
 
   @@index([moodboardId, position])
+}
+
+// -----------------------------------------------------------------------------
+// Consultations
+//
+// Company OWNER / PM members can request a video consultation with the
+// Brandbite admin team. Costs tokens up-front (debited via TokenLedger on
+// submit, refunded on admin/company cancel). Status lifecycle:
+//   PENDING    — customer submitted, admin hasn't scheduled yet
+//   SCHEDULED  — admin picked a time + video link, customer notified
+//   COMPLETED  — call happened (manually marked by admin)
+//   CANCELED   — either side backed out; refund posted if we had debited
+//
+// MVP deliberately keeps scheduling out-of-band: the admin pastes a
+// Google Meet / Zoom link into `videoLink` when flipping to SCHEDULED.
+// A later PR can swap this for a Cal.com-style embed without changing
+// the data model.
+// -----------------------------------------------------------------------------
+
+enum ConsultationStatus {
+  PENDING
+  SCHEDULED
+  COMPLETED
+  CANCELED
+}
+
+model Consultation {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  requestedByUserId String
+  requestedBy       UserAccount @relation("ConsultationsRequested", fields: [requestedByUserId], references: [id])
+
+  /// What the customer wants to discuss (required).
+  description String
+
+  /// Customer-proposed time slots as free-text or ISO strings. Optional.
+  /// Persisted as JSON so an upgraded form can switch to structured slots
+  /// without a migration.
+  preferredTimes Json?
+
+  /// Customer's timezone at submit-time, e.g. "Europe/Istanbul".
+  timezone String?
+
+  /// Admin fills these when scheduling.
+  scheduledAt DateTime?
+  videoLink   String?
+  adminNotes  String?
+
+  /// Token cost snapshot (in case admin changes pricing later).
+  tokenCost Int
+
+  status ConsultationStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, createdAt])
+  @@index([status, createdAt])
 }
