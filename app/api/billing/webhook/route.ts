@@ -43,7 +43,7 @@ function mapStripeSubscriptionStatus(status: Stripe.Subscription.Status): Billin
 export async function POST(req: NextRequest) {
   // Rate limit: 30 requests/min per IP
   const ip = getClientIp(req.headers);
-  const rl = rateLimit(`webhook:${ip}`, { limit: 30, windowSeconds: 60 });
+  const rl = await rateLimit(`webhook:${ip}`, { limit: 30, windowSeconds: 60 });
   if (!rl.allowed) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

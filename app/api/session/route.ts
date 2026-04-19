@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   try {
     // Rate limit: 60 requests/min per IP
     const ip = getClientIp(req.headers);
-    const rl = rateLimit(`session:${ip}`, { limit: 60, windowSeconds: 60 });
+    const rl = await rateLimit(`session:${ip}`, { limit: 60, windowSeconds: 60 });
     if (!rl.allowed) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 });
     }
