@@ -5,7 +5,14 @@ import { Button } from "@/components/ui/button";
 import { FormTextarea, FormSelect, FormInput } from "@/components/ui/form-field";
 import { Badge } from "@/components/ui/badge";
 import { InlineAlert } from "@/components/ui/inline-alert";
+import {
+  InsufficientTokensModal,
+  type InsufficientTokensInfo,
+} from "@/components/tokens/insufficient-tokens-modal";
+import { isInsufficientTokensBody } from "@/lib/errors/insufficient-tokens";
 import { useIdempotencyKey } from "@/lib/hooks/use-idempotency-key";
+
+type OnInsufficient = (info: InsufficientTokensInfo) => void;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -67,7 +74,13 @@ const TOOLS: ToolCard[] = [
 // Tool Panel Components
 // ---------------------------------------------------------------------------
 
-function ImageGenerationPanel({ onGenerated }: { onGenerated: () => void }) {
+function ImageGenerationPanel({
+  onGenerated,
+  onInsufficient,
+}: {
+  onGenerated: () => void;
+  onInsufficient: OnInsufficient;
+}) {
   const [prompt, setPrompt] = useState("");
   const [style, setStyle] = useState("vivid");
   const [size, setSize] = useState("1024x1024");
@@ -90,7 +103,13 @@ function ImageGenerationPanel({ onGenerated }: { onGenerated: () => void }) {
         body: JSON.stringify({ prompt, style, size }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Generation failed");
+      if (!res.ok) {
+        if (res.status === 402 && isInsufficientTokensBody(data)) {
+          onInsufficient(data);
+          return;
+        }
+        throw new Error(data.error || "Generation failed");
+      }
       rotateIdempotencyKey();
       setResult({
         imageUrl: data.generation.imageUrl,
@@ -179,7 +198,13 @@ function ImageGenerationPanel({ onGenerated }: { onGenerated: () => void }) {
   );
 }
 
-function TextGenerationPanel({ onGenerated }: { onGenerated: () => void }) {
+function TextGenerationPanel({
+  onGenerated,
+  onInsufficient,
+}: {
+  onGenerated: () => void;
+  onInsufficient: OnInsufficient;
+}) {
   const [prompt, setPrompt] = useState("");
   const [format, setFormat] = useState("tagline");
   const [tone, setTone] = useState("professional");
@@ -204,7 +229,13 @@ function TextGenerationPanel({ onGenerated }: { onGenerated: () => void }) {
         body: JSON.stringify({ prompt, format, tone, variations }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Generation failed");
+      if (!res.ok) {
+        if (res.status === 402 && isInsufficientTokensBody(data)) {
+          onInsufficient(data);
+          return;
+        }
+        throw new Error(data.error || "Generation failed");
+      }
       rotateIdempotencyKey();
       setResults(data.generation.variations || [data.generation.outputText]);
       onGenerated();
@@ -301,7 +332,13 @@ function TextGenerationPanel({ onGenerated }: { onGenerated: () => void }) {
   );
 }
 
-function BackgroundRemovalPanel({ onGenerated }: { onGenerated: () => void }) {
+function BackgroundRemovalPanel({
+  onGenerated,
+  onInsufficient,
+}: {
+  onGenerated: () => void;
+  onInsufficient: OnInsufficient;
+}) {
   const [imageUrl, setImageUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -322,7 +359,13 @@ function BackgroundRemovalPanel({ onGenerated }: { onGenerated: () => void }) {
         body: JSON.stringify({ imageUrl }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Background removal failed");
+      if (!res.ok) {
+        if (res.status === 402 && isInsufficientTokensBody(data)) {
+          onInsufficient(data);
+          return;
+        }
+        throw new Error(data.error || "Background removal failed");
+      }
       rotateIdempotencyKey();
       setResult(data.generation.imageUrl);
       onGenerated();
@@ -390,7 +433,13 @@ function BackgroundRemovalPanel({ onGenerated }: { onGenerated: () => void }) {
   );
 }
 
-function DesignSuggestionsPanel({ onGenerated }: { onGenerated: () => void }) {
+function DesignSuggestionsPanel({
+  onGenerated,
+  onInsufficient,
+}: {
+  onGenerated: () => void;
+  onInsufficient: OnInsufficient;
+}) {
   const [brief, setBrief] = useState("");
   const [includeColors, setIncludeColors] = useState(true);
   const [includeFonts, setIncludeFonts] = useState(true);
@@ -419,7 +468,13 @@ function DesignSuggestionsPanel({ onGenerated }: { onGenerated: () => void }) {
         body: JSON.stringify({ brief, includeColors, includeFonts, includeLayout }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to get suggestions");
+      if (!res.ok) {
+        if (res.status === 402 && isInsufficientTokensBody(data)) {
+          onInsufficient(data);
+          return;
+        }
+        throw new Error(data.error || "Failed to get suggestions");
+      }
       rotateIdempotencyKey();
       setResult(data.generation.suggestions);
       onGenerated();
@@ -558,6 +613,7 @@ export default function AiToolsPage() {
   const [generations, setGenerations] = useState<Generation[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [tokenBalance, setTokenBalance] = useState<number | null>(null);
+  const [tokenError, setTokenError] = useState<InsufficientTokensInfo | null>(null);
 
   const loadHistory = useCallback(async () => {
     try {
@@ -659,13 +715,17 @@ export default function AiToolsPage() {
               Close
             </button>
           </div>
-          {activeTool === "IMAGE_GENERATION" && <ImageGenerationPanel onGenerated={onGenerated} />}
-          {activeTool === "TEXT_GENERATION" && <TextGenerationPanel onGenerated={onGenerated} />}
+          {activeTool === "IMAGE_GENERATION" && (
+            <ImageGenerationPanel onGenerated={onGenerated} onInsufficient={setTokenError} />
+          )}
+          {activeTool === "TEXT_GENERATION" && (
+            <TextGenerationPanel onGenerated={onGenerated} onInsufficient={setTokenError} />
+          )}
           {activeTool === "BACKGROUND_REMOVAL" && (
-            <BackgroundRemovalPanel onGenerated={onGenerated} />
+            <BackgroundRemovalPanel onGenerated={onGenerated} onInsufficient={setTokenError} />
           )}
           {activeTool === "DESIGN_SUGGESTION" && (
-            <DesignSuggestionsPanel onGenerated={onGenerated} />
+            <DesignSuggestionsPanel onGenerated={onGenerated} onInsufficient={setTokenError} />
           )}
         </section>
       )}
@@ -727,6 +787,8 @@ export default function AiToolsPage() {
           </div>
         )}
       </section>
+
+      <InsufficientTokensModal info={tokenError} onClose={() => setTokenError(null)} />
     </div>
   );
 }

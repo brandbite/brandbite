@@ -15,6 +15,7 @@ import {
 } from "@/lib/ai/cost-calculator";
 import { removeBackground } from "@/lib/ai/provider-router";
 import { readIdempotencyKey } from "@/lib/ai/idempotency";
+import { insufficientTokensResponse } from "@/lib/errors/insufficient-tokens";
 
 export async function POST(req: NextRequest) {
   try {
@@ -59,14 +60,11 @@ export async function POST(req: NextRequest) {
     const cost = toolConfig.tokenCost;
     const balance = await validateSufficientTokens(user.activeCompanyId, cost);
     if (!balance.sufficient) {
-      return NextResponse.json(
-        {
-          error: "Insufficient token balance",
-          required: cost,
-          balance: balance.balance,
-        },
-        { status: 402 },
-      );
+      return insufficientTokensResponse({
+        required: cost,
+        balance: balance.balance,
+        action: "AI background removal",
+      });
     }
 
     // Create AiGeneration record + debit tokens atomically. A retry with the

@@ -16,6 +16,7 @@ import {
   refundAiTokens,
 } from "@/lib/ai/cost-calculator";
 import { readIdempotencyKey } from "@/lib/ai/idempotency";
+import { insufficientTokensResponse } from "@/lib/errors/insufficient-tokens";
 
 export async function POST(
   req: NextRequest,
@@ -84,14 +85,11 @@ export async function POST(
 
     const balance = await validateSufficientTokens(user.activeCompanyId, iterationCost);
     if (!balance.sufficient) {
-      return NextResponse.json(
-        {
-          error: "Insufficient token balance for iteration",
-          required: iterationCost,
-          balance: balance.balance,
-        },
-        { status: 402 },
-      );
+      return insufficientTokensResponse({
+        required: iterationCost,
+        balance: balance.balance,
+        action: "AI iteration",
+      });
     }
 
     // Create AiGeneration record + debit tokens atomically. A retry with the

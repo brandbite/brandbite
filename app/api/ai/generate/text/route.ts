@@ -14,6 +14,7 @@ import {
   checkRateLimit,
 } from "@/lib/ai/cost-calculator";
 import { generateText } from "@/lib/ai/provider-router";
+import { insufficientTokensResponse } from "@/lib/errors/insufficient-tokens";
 import {
   buildCopySystemPrompt,
   buildCopyPrompt,
@@ -68,14 +69,11 @@ export async function POST(req: NextRequest) {
     const cost = toolConfig.tokenCost;
     const balance = await validateSufficientTokens(user.activeCompanyId, cost);
     if (!balance.sufficient) {
-      return NextResponse.json(
-        {
-          error: "Insufficient token balance",
-          required: cost,
-          balance: balance.balance,
-        },
-        { status: 402 },
-      );
+      return insufficientTokensResponse({
+        required: cost,
+        balance: balance.balance,
+        action: "AI text generation",
+      });
     }
 
     // Build prompts

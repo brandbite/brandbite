@@ -22,6 +22,11 @@ import { FormInput, FormSelect } from "@/components/ui/form-field";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { TagMultiSelect, type TagOption } from "@/components/ui/tag-multi-select";
 import { JobTypePicker } from "@/components/ui/job-type-picker";
+import {
+  InsufficientTokensModal,
+  type InsufficientTokensInfo,
+} from "@/components/tokens/insufficient-tokens-modal";
+import { isInsufficientTokensBody } from "@/lib/errors/insufficient-tokens";
 import type { TagColorKey } from "@/lib/tag-colors";
 import { canManageTags as canManageTagsCheck } from "@/lib/permissions/companyRoles";
 
@@ -240,6 +245,7 @@ export default function NewTicketForm({
   const [uploadProgressText, setUploadProgressText] = useState<string | null>(null);
 
   const [error, setError] = useState<string | null>(null);
+  const [tokenError, setTokenError] = useState<InsufficientTokensInfo | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // ---------------------------------------------------------------------------
@@ -478,7 +484,9 @@ export default function NewTicketForm({
       const json = await res.json().catch(() => null);
 
       if (!res.ok) {
-        if (res.status === 403) {
+        if (res.status === 402 && isInsufficientTokensBody(json)) {
+          setTokenError(json);
+        } else if (res.status === 403) {
           setError(
             json?.error ||
               "You don't have permission to create tickets. Please ask your company owner or project manager.",
@@ -974,6 +982,8 @@ export default function NewTicketForm({
           {creativeMode === "AI" ? "Create & Generate with AI" : "Create ticket"}
         </Button>
       </div>
+
+      <InsufficientTokensModal info={tokenError} onClose={() => setTokenError(null)} />
     </form>
   );
 }

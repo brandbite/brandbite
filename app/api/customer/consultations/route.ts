@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { getConsultationSettings } from "@/lib/consultation/settings";
+import { insufficientTokensResponse } from "@/lib/errors/insufficient-tokens";
 import { createConsultationEvent, extractMeetLink } from "@/lib/google/calendar";
 import { canBookConsultation } from "@/lib/permissions/companyRoles";
 import { prisma } from "@/lib/prisma";
@@ -103,14 +104,11 @@ export async function POST(req: NextRequest) {
       select: { id: true, tokenBalance: true },
     });
     if (company.tokenBalance < tokenCost) {
-      return NextResponse.json(
-        {
-          error: "Insufficient token balance",
-          required: tokenCost,
-          balance: company.tokenBalance,
-        },
-        { status: 402 },
-      );
+      return insufficientTokensResponse({
+        required: tokenCost,
+        balance: company.tokenBalance,
+        action: "consultation booking",
+      });
     }
 
     // Decide up-front whether we can auto-schedule via Google Calendar.
