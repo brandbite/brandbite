@@ -15,6 +15,11 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { FormSelect, FormTextarea } from "@/components/ui/form-field";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { LoadingState } from "@/components/ui/loading-state";
+import {
+  InsufficientTokensModal,
+  type InsufficientTokensInfo,
+} from "@/components/tokens/insufficient-tokens-modal";
+import { isInsufficientTokensBody } from "@/lib/errors/insufficient-tokens";
 
 type ConsultationStatus = "PENDING" | "SCHEDULED" | "COMPLETED" | "CANCELED";
 
@@ -224,6 +229,7 @@ export default function CustomerConsultationPage() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [tokenError, setTokenError] = useState<InsufficientTokensInfo | null>(null);
 
   // Merge the auto-detected zone into the curated list so it's always selectable.
   const timezoneOptions = useMemo(() => {
@@ -417,7 +423,11 @@ export default function CustomerConsultationPage() {
       });
       const json = await res.json().catch(() => null);
       if (!res.ok) {
-        setFormError((json && json.error) || "Could not submit the consultation request.");
+        if (res.status === 402 && isInsufficientTokensBody(json)) {
+          setTokenError(json);
+        } else {
+          setFormError((json && json.error) || "Could not submit the consultation request.");
+        }
         return;
       }
       setSuccessMessage(
@@ -737,6 +747,8 @@ export default function CustomerConsultationPage() {
           </div>
         )}
       </section>
+
+      <InsufficientTokensModal info={tokenError} onClose={() => setTokenError(null)} />
     </div>
   );
 }

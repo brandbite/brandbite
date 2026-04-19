@@ -18,6 +18,7 @@ import {
   type AutoAssignMode,
 } from "@prisma/client";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { insufficientTokensResponse } from "@/lib/errors/insufficient-tokens";
 import { canCreateTickets } from "@/lib/permissions/companyRoles";
 import { createNotification } from "@/lib/notifications";
 import { isCreativePaused } from "@/lib/creative-availability";
@@ -318,7 +319,11 @@ export async function POST(req: NextRequest) {
     const effectiveCost = jobType ? jobType.tokenCost * quantity : 0;
 
     if (jobType && company.tokenBalance < effectiveCost) {
-      return NextResponse.json({ error: "Not enough tokens for this job type" }, { status: 400 });
+      return insufficientTokensResponse({
+        required: effectiveCost,
+        balance: company.tokenBalance,
+        action: "this job",
+      });
     }
 
     // -------------------------------------------------------------------------
