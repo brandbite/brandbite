@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { FormTextarea, FormSelect } from "@/components/ui/form-field";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Badge } from "@/components/ui/badge";
+import { useIdempotencyKey } from "@/lib/hooks/use-idempotency-key";
 
 type AiTicketControlsProps = {
   ticketId: string;
@@ -28,6 +29,7 @@ export function AiTicketControls({
     imageUrl: string;
     revisedPrompt?: string;
   } | null>(null);
+  const { key: idempotencyKey, rotate: rotateIdempotencyKey } = useIdempotencyKey();
 
   const isFirstGeneration = !hasRevisions;
 
@@ -45,12 +47,19 @@ export function AiTicketControls({
     try {
       const res = await fetch(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          // The first-time ai-generate route does not yet support idempotency
+          // on the backend (it does not debit tokens); the regenerate route
+          // does, so we only attach the key there.
+          ...(isFirstGeneration ? {} : { "Idempotency-Key": idempotencyKey }),
+        },
         body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Generation failed");
 
+      if (!isFirstGeneration) rotateIdempotencyKey();
       setLastResult({
         imageUrl: data.generation.imageUrl,
         revisedPrompt: data.generation.revisedPrompt,
