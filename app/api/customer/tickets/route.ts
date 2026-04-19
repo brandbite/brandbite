@@ -15,7 +15,7 @@ import {
   CompanyRole,
   LedgerDirection,
   UserRole,
-  AutoAssignMode,
+  type AutoAssignMode,
 } from "@prisma/client";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { canCreateTickets } from "@/lib/permissions/companyRoles";
@@ -25,22 +25,7 @@ import { parseBody } from "@/lib/schemas/helpers";
 import { createTicketSchema } from "@/lib/schemas/ticket.schemas";
 import { buildTicketCode } from "@/lib/ticket-code";
 import { resolveAssetUrl } from "@/lib/r2";
-
-// -----------------------------------------------------------------------------
-// Helpers
-// -----------------------------------------------------------------------------
-
-function isAutoAssignEnabled(
-  companyDefault: boolean,
-  projectMode?: AutoAssignMode | null,
-): boolean {
-  if (!projectMode || projectMode === AutoAssignMode.INHERIT) {
-    return companyDefault;
-  }
-  if (projectMode === AutoAssignMode.ON) return true;
-  if (projectMode === AutoAssignMode.OFF) return false;
-  return companyDefault;
-}
+import { isAutoAssignEnabled } from "@/lib/tickets/auto-assign";
 
 // -----------------------------------------------------------------------------
 // GET: list tickets for the current customer's active company
