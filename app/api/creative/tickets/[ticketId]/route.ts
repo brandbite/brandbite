@@ -51,6 +51,10 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
             id: true,
             name: true,
             code: true,
+            brandLogoUrl: true,
+            brandColors: true,
+            brandFonts: true,
+            brandVoice: true,
           },
         },
         jobType: {

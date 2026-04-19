@@ -76,6 +76,14 @@ export async function POST(
       },
       include: {
         jobType: { select: { name: true } },
+        project: {
+          select: {
+            brandLogoUrl: true,
+            brandColors: true,
+            brandFonts: true,
+            brandVoice: true,
+          },
+        },
       },
     });
 
@@ -89,9 +97,17 @@ export async function POST(
       size?: string;
     };
 
-    // Build prompt from ticket title + description
+    // Build prompt from ticket title + description, with the project's brand
+    // guide appended when any field is set so the AI picks up colors / fonts
+    // / voice automatically.
+    const brandParts: string[] = [];
+    if (ticket.project?.brandColors) brandParts.push(`Brand colors: ${ticket.project.brandColors}`);
+    if (ticket.project?.brandFonts) brandParts.push(`Fonts: ${ticket.project.brandFonts}`);
+    if (ticket.project?.brandVoice) brandParts.push(`Voice/tone: ${ticket.project.brandVoice}`);
+    const brandSuffix = brandParts.length > 0 ? `\n\nBrand guide — ${brandParts.join("; ")}.` : "";
+
     const prompt = buildImagePrompt(
-      `${ticket.title}${ticket.description ? `. ${ticket.description}` : ""}`,
+      `${ticket.title}${ticket.description ? `. ${ticket.description}` : ""}${brandSuffix}`,
       { jobType: ticket.jobType?.name, style },
     );
 

@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     const idempotencyKey = readIdempotencyKey(req.headers);
 
     const body = await req.json();
-    const { brief } = body as { brief?: string };
+    const { brief, projectId } = body as { brief?: string; projectId?: string };
     if (!brief || brief.trim().length < 10) {
       return NextResponse.json(
         { error: "Brief is required (at least 10 characters)." },
@@ -137,8 +137,36 @@ export async function POST(req: NextRequest) {
     }));
     const validJobTypeIds = new Set(jobTypesRaw.map((j) => j.id));
 
+    // Optional project brand guide — spliced into the user prompt so the
+    // model knows the customer's colors / fonts / voice when describing
+    // what the ticket should deliver. Silently ignored when projectId is
+    // absent or the project has no brand fields filled.
+    let brandContext: string | null = null;
+    if (projectId) {
+      const project = await prisma.project.findFirst({
+        where: { id: projectId, companyId: user.activeCompanyId },
+        select: {
+          brandLogoUrl: true,
+          brandColors: true,
+          brandFonts: true,
+          brandVoice: true,
+        },
+      });
+      if (project) {
+        const parts: string[] = [];
+        if (project.brandLogoUrl) parts.push(`Logo URL: ${project.brandLogoUrl}`);
+        if (project.brandColors) parts.push(`Brand colors: ${project.brandColors}`);
+        if (project.brandFonts) parts.push(`Brand fonts: ${project.brandFonts}`);
+        if (project.brandVoice) parts.push(`Voice / tone: ${project.brandVoice}`);
+        if (parts.length > 0) {
+          brandContext = `Project brand guide (apply when describing deliverables):\n${parts.join("\n")}`;
+        }
+      }
+    }
+
     const systemPrompt = buildBriefParsingSystemPrompt(jobTypesForPrompt);
-    const userPrompt = buildBriefParsingPrompt(brief);
+    const userPromptBase = buildBriefParsingPrompt(brief);
+    const userPrompt = brandContext ? `${brandContext}\n\n${userPromptBase}` : userPromptBase;
 
     const { generation, reused } = await claimAiGeneration({
       idempotencyKey,

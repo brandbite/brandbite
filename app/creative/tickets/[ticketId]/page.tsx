@@ -60,6 +60,10 @@ type TicketDetailResponse = {
       id: string;
       name: string;
       code: string | null;
+      brandLogoUrl: string | null;
+      brandColors: string | null;
+      brandFonts: string | null;
+      brandVoice: string | null;
     } | null;
     jobType: {
       id: string;
@@ -533,6 +537,74 @@ export default function CreativeTicketDetailPage() {
                   )}
                 </div>
               </div>
+
+              {/* Brand guide — pulled from the project so creatives see the
+                  customer's brand without hunting. Only rendered when at
+                  least one field is set. */}
+              {ticket.project &&
+                (ticket.project.brandLogoUrl ||
+                  ticket.project.brandColors ||
+                  ticket.project.brandFonts ||
+                  ticket.project.brandVoice) && (
+                  <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-3 shadow-sm">
+                    <h3 className="text-xs font-semibold tracking-[0.18em] text-[var(--bb-text-muted)] uppercase">
+                      Brand guide
+                    </h3>
+                    <div className="mt-2 space-y-2 text-xs text-[var(--bb-text-secondary)]">
+                      {ticket.project.brandLogoUrl && (
+                        <div>
+                          <p className="text-[11px] text-[var(--bb-text-tertiary)]">Logo</p>
+                          <a
+                            href={ticket.project.brandLogoUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="break-all text-[var(--bb-primary)] hover:underline"
+                          >
+                            {ticket.project.brandLogoUrl}
+                          </a>
+                        </div>
+                      )}
+                      {ticket.project.brandColors && (
+                        <div>
+                          <p className="text-[11px] text-[var(--bb-text-tertiary)]">Colors</p>
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            {ticket.project.brandColors
+                              .split(",")
+                              .map((c) => c.trim())
+                              .filter(Boolean)
+                              .map((c) => (
+                                <span
+                                  key={c}
+                                  className="flex items-center gap-1 rounded-full border border-[var(--bb-border-subtle)] bg-white px-2 py-0.5 font-mono text-[10px]"
+                                >
+                                  <span
+                                    className="h-3 w-3 rounded-full border border-[var(--bb-border-subtle)]"
+                                    style={{ backgroundColor: c }}
+                                    aria-hidden="true"
+                                  />
+                                  {c}
+                                </span>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+                      {ticket.project.brandFonts && (
+                        <div>
+                          <p className="text-[11px] text-[var(--bb-text-tertiary)]">Fonts</p>
+                          <p className="font-semibold text-[var(--bb-secondary)]">
+                            {ticket.project.brandFonts}
+                          </p>
+                        </div>
+                      )}
+                      {ticket.project.brandVoice && (
+                        <div>
+                          <p className="text-[11px] text-[var(--bb-text-tertiary)]">Voice / tone</p>
+                          <p className="whitespace-pre-wrap">{ticket.project.brandVoice}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
               <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-3 shadow-sm">
                 <h3 className="text-xs font-semibold tracking-[0.18em] text-[var(--bb-text-muted)] uppercase">
