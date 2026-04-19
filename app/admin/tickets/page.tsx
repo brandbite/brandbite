@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
+type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 
 type AdminCreative = {
   id: string;
@@ -90,6 +91,24 @@ export default function AdminTicketsPage() {
 
   // Override editing — keyed by ticket id
   const [editingOverrides, setEditingOverrides] = useState<Record<string, OverrideDraft>>({});
+
+  // Bulk selection + action bar
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkMessage, setBulkMessage] = useState<string | null>(null);
+  const [bulkCreativeId, setBulkCreativeId] = useState<string>(""); // "" = placeholder, "__none__" = unassign
+  const [bulkStatus, setBulkStatus] = useState<TicketStatus | "">("");
+  const [bulkPriority, setBulkPriority] = useState<TicketPriority | "">("");
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const clearSelection = () => setSelectedIds(new Set());
 
   const load = async () => {
     setLoading(true);
@@ -314,6 +333,54 @@ export default function AdminTicketsPage() {
     return d.toLocaleString();
   };
 
+  // -------------------------------------------------------------------------
+  // Bulk ops
+  // -------------------------------------------------------------------------
+  type BulkPayload =
+    | { op: "reassign"; creativeId: string | null }
+    | { op: "status"; status: TicketStatus }
+    | { op: "priority"; priority: TicketPriority };
+
+  const runBulk = async (payload: BulkPayload) => {
+    if (selectedIds.size === 0) return;
+    setBulkSaving(true);
+    setBulkMessage(null);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/tickets/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticketIds: Array.from(selectedIds), ...payload }),
+      });
+      const json = (await res.json().catch(() => null)) as {
+        succeeded?: string[];
+        failed?: { id: string; error: string }[];
+        error?: string;
+      } | null;
+      if (!res.ok) throw new Error(json?.error || `Request failed with status ${res.status}`);
+
+      const ok = json?.succeeded?.length ?? 0;
+      const bad = json?.failed?.length ?? 0;
+      setBulkMessage(
+        bad === 0
+          ? `Updated ${ok} ticket${ok === 1 ? "" : "s"}.`
+          : `Updated ${ok}, failed ${bad}. First error: ${json?.failed?.[0]?.error ?? "unknown"}`,
+      );
+
+      // Refresh the table from server — cheap and keeps everything consistent.
+      await load();
+      clearSelection();
+      setBulkCreativeId("");
+      setBulkStatus("");
+      setBulkPriority("");
+    } catch (err) {
+      console.error("[AdminTicketsPage] bulk op error", err);
+      setError(err instanceof Error ? err.message : "Bulk op failed.");
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
   return (
     <>
       {/* View switcher — Kanban ↔ Table (this page) */}
@@ -339,9 +406,133 @@ export default function AdminTicketsPage() {
         )}
       </div>
 
+      {/* Bulk action bar — visible only when ≥1 ticket is selected. */}
+      {selectedIds.size > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-[var(--bb-primary)] bg-[var(--bb-primary-light)] p-2">
+          <span className="text-xs font-semibold text-[var(--bb-secondary)]">
+            {selectedIds.size} selected
+          </span>
+          <button
+            type="button"
+            className="rounded-full px-2 py-0.5 text-[11px] text-[var(--bb-text-secondary)] hover:text-[var(--bb-secondary)] hover:underline"
+            onClick={clearSelection}
+            disabled={bulkSaving}
+          >
+            Clear
+          </button>
+
+          <span className="mx-1 h-4 w-px bg-[var(--bb-border)]" />
+
+          {/* Reassign */}
+          <select
+            value={bulkCreativeId}
+            onChange={(e) => setBulkCreativeId(e.target.value)}
+            disabled={bulkSaving}
+            className="rounded-md border border-[var(--bb-border-input)] bg-white px-2 py-1 text-xs text-[var(--bb-secondary)]"
+          >
+            <option value="">Reassign creative…</option>
+            <option value="__none__">Unassign</option>
+            {creatives.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name ?? c.email}
+              </option>
+            ))}
+          </select>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={bulkCreativeId === "" || bulkSaving}
+            loading={bulkSaving}
+            onClick={() =>
+              runBulk({
+                op: "reassign",
+                creativeId: bulkCreativeId === "__none__" ? null : bulkCreativeId,
+              })
+            }
+          >
+            Apply
+          </Button>
+
+          <span className="mx-1 h-4 w-px bg-[var(--bb-border)]" />
+
+          {/* Status */}
+          <select
+            value={bulkStatus}
+            onChange={(e) => setBulkStatus(e.target.value as TicketStatus | "")}
+            disabled={bulkSaving}
+            className="rounded-md border border-[var(--bb-border-input)] bg-white px-2 py-1 text-xs text-[var(--bb-secondary)]"
+          >
+            <option value="">Set status…</option>
+            <option value="TODO">TODO</option>
+            <option value="IN_PROGRESS">IN_PROGRESS</option>
+            <option value="IN_REVIEW">IN_REVIEW</option>
+            <option value="DONE">DONE</option>
+          </select>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={bulkStatus === "" || bulkSaving}
+            loading={bulkSaving}
+            onClick={() => {
+              if (bulkStatus === "") return;
+              runBulk({ op: "status", status: bulkStatus });
+            }}
+          >
+            Apply
+          </Button>
+
+          <span className="mx-1 h-4 w-px bg-[var(--bb-border)]" />
+
+          {/* Priority */}
+          <select
+            value={bulkPriority}
+            onChange={(e) => setBulkPriority(e.target.value as TicketPriority | "")}
+            disabled={bulkSaving}
+            className="rounded-md border border-[var(--bb-border-input)] bg-white px-2 py-1 text-xs text-[var(--bb-secondary)]"
+          >
+            <option value="">Set priority…</option>
+            <option value="LOW">LOW</option>
+            <option value="MEDIUM">MEDIUM</option>
+            <option value="HIGH">HIGH</option>
+            <option value="URGENT">URGENT</option>
+          </select>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={bulkPriority === "" || bulkSaving}
+            loading={bulkSaving}
+            onClick={() => {
+              if (bulkPriority === "") return;
+              runBulk({ op: "priority", priority: bulkPriority });
+            }}
+          >
+            Apply
+          </Button>
+
+          {bulkMessage && (
+            <span className="ml-2 text-[11px] text-[var(--bb-text-secondary)]">{bulkMessage}</span>
+          )}
+        </div>
+      )}
+
       {/* Table */}
       <DataTable maxHeight="600px">
         <THead>
+          <TH className="w-8">
+            <input
+              type="checkbox"
+              aria-label="Select all tickets on this page"
+              checked={tickets.length > 0 && tickets.every((t) => selectedIds.has(t.id))}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  setSelectedIds(new Set(tickets.map((t) => t.id)));
+                } else {
+                  clearSelection();
+                }
+              }}
+              className="h-3 w-3 rounded border-[var(--bb-border-input)] text-[var(--bb-primary)] focus:ring-[var(--bb-primary)]"
+            />
+          </TH>
           <TH className="hidden md:table-cell">Created</TH>
           <TH>Company</TH>
           <TH>Title</TH>
@@ -353,7 +544,7 @@ export default function AdminTicketsPage() {
         <tbody>
           {tickets.length === 0 ? (
             <tr>
-              <td colSpan={7} className="px-3 py-4">
+              <td colSpan={8} className="px-3 py-4">
                 {loading ? (
                   <p className="text-center text-[11px] text-[var(--bb-text-tertiary)]">
                     Loading tickets…
@@ -380,8 +571,19 @@ export default function AdminTicketsPage() {
               return (
                 <tr
                   key={t.id}
-                  className="border-b border-[var(--bb-border-subtle)] last:border-b-0"
+                  className={`border-b border-[var(--bb-border-subtle)] last:border-b-0 ${
+                    selectedIds.has(t.id) ? "bg-[var(--bb-primary-light)]" : ""
+                  }`}
                 >
+                  <TD>
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ticket ${t.title}`}
+                      checked={selectedIds.has(t.id)}
+                      onChange={() => toggleSelected(t.id)}
+                      className="h-3 w-3 rounded border-[var(--bb-border-input)] text-[var(--bb-primary)] focus:ring-[var(--bb-primary)]"
+                    />
+                  </TD>
                   <TD className="hidden md:table-cell">{formatDateTime(t.createdAt)}</TD>
                   <TD>{t.company?.name ?? "—"}</TD>
                   <TD>
