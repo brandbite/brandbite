@@ -12,7 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { FormInput, FormTextarea } from "@/components/ui/form-field";
+import { FormSelect, FormTextarea } from "@/components/ui/form-field";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { LoadingState } from "@/components/ui/loading-state";
 
@@ -53,6 +53,145 @@ const STATUS_VARIANT: Record<ConsultationStatus, "info" | "success" | "warning" 
   CANCELED: "neutral",
 };
 
+const DESCRIPTION_MIN = 10;
+const DESCRIPTION_MAX = 4000;
+
+/** Topic presets — clicking fills the description with a starter sentence. */
+const TOPIC_PRESETS: { label: string; text: string }[] = [
+  {
+    label: "Brand refresh",
+    text: "We want to refresh our brand identity (logo, colors, typography) across web and packaging. Main goals: ",
+  },
+  {
+    label: "Product launch",
+    text: "We're launching a new product and need a design and marketing plan that covers: ",
+  },
+  {
+    label: "Website redesign",
+    text: "Our website needs a redesign. The main problems today are: ",
+  },
+  {
+    label: "Packaging design",
+    text: "We need packaging for a new SKU. Format, constraints, and audience: ",
+  },
+  {
+    label: "Social media kit",
+    text: "We need a social media kit (templates, stories, ads) focused on: ",
+  },
+];
+
+/** Curated IANA zones used in the timezone dropdown, grouped by region. */
+const TIMEZONE_GROUPS: { label: string; zones: string[] }[] = [
+  {
+    label: "Americas",
+    zones: [
+      "America/Los_Angeles",
+      "America/Denver",
+      "America/Chicago",
+      "America/New_York",
+      "America/Toronto",
+      "America/Mexico_City",
+      "America/Sao_Paulo",
+      "America/Argentina/Buenos_Aires",
+    ],
+  },
+  {
+    label: "Europe / Africa",
+    zones: [
+      "Europe/London",
+      "Europe/Dublin",
+      "Europe/Paris",
+      "Europe/Berlin",
+      "Europe/Madrid",
+      "Europe/Amsterdam",
+      "Europe/Istanbul",
+      "Africa/Johannesburg",
+      "Africa/Cairo",
+      "Africa/Lagos",
+    ],
+  },
+  {
+    label: "Middle East / Asia",
+    zones: [
+      "Asia/Dubai",
+      "Asia/Karachi",
+      "Asia/Kolkata",
+      "Asia/Bangkok",
+      "Asia/Singapore",
+      "Asia/Hong_Kong",
+      "Asia/Shanghai",
+      "Asia/Tokyo",
+      "Asia/Seoul",
+    ],
+  },
+  {
+    label: "Oceania",
+    zones: ["Australia/Perth", "Australia/Sydney", "Pacific/Auckland"],
+  },
+  { label: "Other", zones: ["UTC"] },
+];
+
+function detectTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
+
+/** Short offset label like "GMT+3" for a given IANA zone at "now". */
+function tzShortLabel(tz: string): string {
+  try {
+    const parts = new Intl.DateTimeFormat(undefined, {
+      timeZone: tz,
+      timeZoneName: "shortOffset",
+    }).formatToParts(new Date());
+    const off = parts.find((p) => p.type === "timeZoneName")?.value;
+    return off ?? tz;
+  } catch {
+    return tz;
+  }
+}
+
+/** "YYYY-MM-DDTHH:mm" from the user's local wall clock. */
+function toDatetimeLocalInput(d: Date): string {
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  );
+}
+
+/** Return the next N weekdays at 10:00 local starting tomorrow. */
+function nextWeekdaysAtTen(count: number): Date[] {
+  const out: Date[] = [];
+  const cursor = new Date();
+  cursor.setDate(cursor.getDate() + 1);
+  cursor.setHours(10, 0, 0, 0);
+  while (out.length < count) {
+    const day = cursor.getDay();
+    if (day !== 0 && day !== 6) out.push(new Date(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return out;
+}
+
+/** Format a preferredTime: ISO → nicely-formatted; otherwise raw (legacy). */
+function formatPreferred(raw: string, tz: string | null): string {
+  const isIso = raw.includes("T") && !Number.isNaN(Date.parse(raw));
+  if (!isIso) return raw;
+  const d = new Date(raw);
+  const formatted = d.toLocaleString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  const tzHint = tz ? ` (${tzShortLabel(tz)})` : "";
+  return `${formatted}${tzHint}`;
+}
+
 function formatDateTime(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -69,15 +208,22 @@ export default function CustomerConsultationPage() {
 
   // Form state
   const [description, setDescription] = useState("");
-  const [timezone, setTimezone] = useState<string>(() =>
-    typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "",
-  );
-  const [slot1, setSlot1] = useState("");
-  const [slot2, setSlot2] = useState("");
-  const [slot3, setSlot3] = useState("");
+  const [timezone, setTimezone] = useState<string>(() => detectTimezone());
+  const [slots, setSlots] = useState<[string, string, string]>(["", "", ""]);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Merge the auto-detected zone into the curated list so it's always selectable.
+  const timezoneOptions = useMemo(() => {
+    const detected = detectTimezone();
+    const groups = TIMEZONE_GROUPS.map((g) => ({ ...g, zones: [...g.zones] }));
+    const isListed = groups.some((g) => g.zones.includes(detected));
+    if (!isListed) {
+      groups.unshift({ label: "Detected", zones: [detected] });
+    }
+    return groups;
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -127,16 +273,56 @@ export default function CustomerConsultationPage() {
 
   const canBook = companyRole === "OWNER" || companyRole === "PM";
 
-  const preferredSlots = useMemo(
-    () => [slot1, slot2, slot3].map((s) => s.trim()).filter(Boolean),
-    [slot1, slot2, slot3],
-  );
+  // Minimum datetime for slot inputs: 30 min in the future.
+  const minSlot = useMemo(() => {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() + 30);
+    return toDatetimeLocalInput(d);
+  }, []);
+
+  // Normalised preferred slots — emitted as ISO strings.
+  const preferredIsoSlots = useMemo(() => {
+    return slots
+      .map((v) => v.trim())
+      .filter(Boolean)
+      .map((v) => {
+        const d = new Date(v);
+        return Number.isNaN(d.getTime()) ? null : d.toISOString();
+      })
+      .filter((v): v is string => Boolean(v));
+  }, [slots]);
+
+  const charCount = description.trim().length;
+  const charOk = charCount >= DESCRIPTION_MIN && charCount <= DESCRIPTION_MAX;
+
+  const applyPreset = (text: string) => {
+    setDescription((prev) => (prev.trim().length === 0 ? text : prev.trimEnd() + "\n\n" + text));
+  };
+
+  const suggestWeekdaySlots = () => {
+    const ds = nextWeekdaysAtTen(3).map(toDatetimeLocalInput);
+    setSlots([ds[0] ?? "", ds[1] ?? "", ds[2] ?? ""]);
+  };
+
+  const clearSlots = () => setSlots(["", "", ""]);
+
+  const setSlotAt = (index: 0 | 1 | 2, value: string) => {
+    setSlots((prev) => {
+      const next: [string, string, string] = [prev[0], prev[1], prev[2]];
+      next[index] = value;
+      return next;
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canBook) return;
-    if (description.trim().length < 10) {
-      setFormError("Tell us a bit more about what you want to discuss (at least 10 characters).");
+    if (!charOk) {
+      setFormError(
+        charCount < DESCRIPTION_MIN
+          ? `Tell us a bit more about what you want to discuss (at least ${DESCRIPTION_MIN} characters).`
+          : `Description is too long (max ${DESCRIPTION_MAX} characters).`,
+      );
       return;
     }
     setSubmitting(true);
@@ -148,7 +334,7 @@ export default function CustomerConsultationPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           description: description.trim(),
-          preferredTimes: preferredSlots.length > 0 ? preferredSlots : undefined,
+          preferredTimes: preferredIsoSlots.length > 0 ? preferredIsoSlots : undefined,
           timezone: timezone.trim() || undefined,
         }),
       });
@@ -161,9 +347,7 @@ export default function CustomerConsultationPage() {
         `Request submitted. Your team will email you with a time slot. (${tokenCost} tokens debited.)`,
       );
       setDescription("");
-      setSlot1("");
-      setSlot2("");
-      setSlot3("");
+      setSlots(["", "", ""]);
       load();
     } catch (err) {
       console.error("[CustomerConsultationPage] submit error", err);
@@ -183,9 +367,8 @@ export default function CustomerConsultationPage() {
           Book a call with our team
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-[var(--bb-text-secondary)]">
-          Get a 30-minute video consultation with the Brandbite team. Tell us what you want to
-          discuss and when you&apos;re available, and we&apos;ll confirm a slot by email with a
-          video link.
+          Get a 30-minute video consultation with the Brandbite team. Pick what you want to discuss
+          and a few time slots that work — we&apos;ll confirm one by email with a video link.
         </p>
       </header>
 
@@ -209,7 +392,27 @@ export default function CustomerConsultationPage() {
             </span>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Topic presets */}
+            <div>
+              <p className="mb-2 text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-tertiary)] uppercase">
+                Quick start (optional)
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {TOPIC_PRESETS.map((p) => (
+                  <button
+                    key={p.label}
+                    type="button"
+                    onClick={() => applyPreset(p.text)}
+                    className="rounded-full border border-[var(--bb-border)] bg-[var(--bb-bg-warm)] px-3 py-1 text-xs font-medium text-[var(--bb-secondary)] transition-colors hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
+                  >
+                    + {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Description */}
             <div>
               <label className="mb-1 block text-xs font-semibold tracking-[0.15em] text-[var(--bb-text-tertiary)] uppercase">
                 What do you want to discuss?
@@ -218,47 +421,112 @@ export default function CustomerConsultationPage() {
                 placeholder="e.g. We want to refresh our brand identity across web + packaging before a product launch."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                rows={4}
+                rows={5}
+                maxLength={DESCRIPTION_MAX}
                 required
               />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-xs font-semibold tracking-[0.15em] text-[var(--bb-text-tertiary)] uppercase">
-                Preferred time slots (optional)
-              </label>
-              <p className="mb-2 text-[11px] text-[var(--bb-text-muted)]">
-                Free-form — e.g. &quot;Tue 14:00&quot; or &quot;Thursday morning&quot;. Admin will
-                confirm one.
-              </p>
-              <div className="space-y-2">
-                <FormInput
-                  placeholder="Slot 1"
-                  value={slot1}
-                  onChange={(e) => setSlot1(e.target.value)}
-                />
-                <FormInput
-                  placeholder="Slot 2"
-                  value={slot2}
-                  onChange={(e) => setSlot2(e.target.value)}
-                />
-                <FormInput
-                  placeholder="Slot 3"
-                  value={slot3}
-                  onChange={(e) => setSlot3(e.target.value)}
-                />
+              <div className="mt-1 flex items-center justify-between">
+                <span
+                  className={`text-[11px] ${
+                    charCount < DESCRIPTION_MIN
+                      ? "text-[var(--bb-text-muted)]"
+                      : "text-[var(--bb-text-tertiary)]"
+                  }`}
+                >
+                  {charCount < DESCRIPTION_MIN
+                    ? `${DESCRIPTION_MIN - charCount} more characters needed`
+                    : `${charCount} / ${DESCRIPTION_MAX} characters`}
+                </span>
               </div>
             </div>
 
+            {/* Preferred slots */}
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <label className="block text-xs font-semibold tracking-[0.15em] text-[var(--bb-text-tertiary)] uppercase">
+                  Preferred time slots (optional)
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={suggestWeekdaySlots}
+                    className="text-[11px] font-medium text-[var(--bb-primary)] hover:underline"
+                  >
+                    Suggest 3 times
+                  </button>
+                  {(slots[0] || slots[1] || slots[2]) && (
+                    <button
+                      type="button"
+                      onClick={clearSlots}
+                      className="text-[11px] font-medium text-[var(--bb-text-muted)] hover:text-[var(--bb-secondary)] hover:underline"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+              <p className="mb-2 text-[11px] text-[var(--bb-text-muted)]">
+                Pick up to 3 times in your timezone. The admin will confirm one.
+              </p>
+              <div className="space-y-2">
+                {[0, 1, 2].map((i) => {
+                  const idx = i as 0 | 1 | 2;
+                  const value = slots[idx];
+                  const preview = value
+                    ? new Date(value).toLocaleString(undefined, {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })
+                    : null;
+                  return (
+                    <div
+                      key={idx}
+                      className="flex flex-col gap-1 rounded-lg border border-[var(--bb-border-subtle)] bg-white p-2 sm:flex-row sm:items-center"
+                    >
+                      <span className="shrink-0 text-[11px] font-semibold text-[var(--bb-text-tertiary)] uppercase sm:w-14">
+                        Slot {i + 1}
+                      </span>
+                      <input
+                        type="datetime-local"
+                        value={value}
+                        min={minSlot}
+                        onChange={(e) => setSlotAt(idx, e.target.value)}
+                        className="w-full rounded-md border border-[var(--bb-border-input)] bg-white px-2 py-1.5 text-sm text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
+                      />
+                      {preview && (
+                        <span className="text-[11px] text-[var(--bb-text-muted)] sm:ml-2 sm:whitespace-nowrap">
+                          {preview}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Timezone */}
             <div>
               <label className="mb-1 block text-xs font-semibold tracking-[0.15em] text-[var(--bb-text-tertiary)] uppercase">
                 Timezone
               </label>
-              <FormInput
-                placeholder="e.g. Europe/Istanbul"
-                value={timezone}
-                onChange={(e) => setTimezone(e.target.value)}
-              />
+              <FormSelect value={timezone} onChange={(e) => setTimezone(e.target.value)}>
+                {timezoneOptions.map((g) => (
+                  <optgroup key={g.label} label={g.label}>
+                    {g.zones.map((z) => (
+                      <option key={z} value={z}>
+                        {z.replace(/_/g, " ")} — {tzShortLabel(z)}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </FormSelect>
+              <p className="mt-1 text-[11px] text-[var(--bb-text-muted)]">
+                We detected {detectTimezone().replace(/_/g, " ")} ({tzShortLabel(detectTimezone())}
+                ). Change it if you&apos;d like to discuss slots in a different zone.
+              </p>
             </div>
 
             {formError && <InlineAlert variant="error">{formError}</InlineAlert>}
@@ -269,7 +537,7 @@ export default function CustomerConsultationPage() {
                 type="submit"
                 loading={submitting}
                 loadingText="Submitting..."
-                disabled={description.trim().length < 10 || !canBook}
+                disabled={!charOk || !canBook}
               >
                 Submit request — {tokenCost} tokens
               </Button>
@@ -316,6 +584,17 @@ export default function CustomerConsultationPage() {
                 <p className="mb-3 line-clamp-3 text-sm text-[var(--bb-text-secondary)]">
                   {c.description}
                 </p>
+
+                {c.status === "PENDING" && c.preferredTimes && c.preferredTimes.length > 0 && (
+                  <div className="mt-2 rounded-lg border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-warm)] p-3 text-xs">
+                    <p className="text-[var(--bb-text-muted)]">You offered</p>
+                    <ul className="mt-1 space-y-0.5 text-[var(--bb-secondary)]">
+                      {c.preferredTimes.map((t, i) => (
+                        <li key={i}>· {formatPreferred(t, c.timezone)}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
                 {c.status === "SCHEDULED" && (
                   <div className="mt-2 rounded-lg border border-[var(--bb-border-subtle)] bg-white p-3 text-xs">
