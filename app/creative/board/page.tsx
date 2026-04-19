@@ -10,6 +10,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BoardViewToggle } from "@/components/board/board-view-toggle";
 import { buildTicketCode } from "@/lib/ticket-code";
 import { type PendingFile, getImageDimensions } from "@/lib/upload-helpers";
 import { useToast } from "@/components/ui/toast-provider";
@@ -1111,6 +1112,11 @@ export default function CreativeBoardPage() {
 
         {/* Main board area */}
         <main className="flex flex-col">
+          {/* View switcher — Kanban (this page) ↔ Table */}
+          <div className="mb-3">
+            <BoardViewToggle rolePath="/creative" />
+          </div>
+
           {/* Header */}
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div>

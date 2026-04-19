@@ -20,6 +20,8 @@ import { authClient } from "@/lib/auth-client";
 type NavItem = {
   href: string;
   label: string;
+  /** Additional paths that should keep this item in the active state. */
+  highlightOnPaths?: string[];
 };
 
 type NavGroup = {
@@ -47,8 +49,13 @@ const NAV_CONFIG: Record<
     items: [
       { href: "/admin", label: "Dashboard" },
       { href: "/admin/companies", label: "Companies" },
-      { href: "/admin/board", label: "Board" },
-      { href: "/admin/tickets", label: "Tickets" },
+      // Board entry covers both the kanban and table views for admin; the
+      // table view is /admin/tickets and is reached via the in-page toggle.
+      {
+        href: "/admin/board",
+        label: "Board",
+        highlightOnPaths: ["/admin/tickets"],
+      },
       {
         label: "Catalog",
         children: [
@@ -95,9 +102,15 @@ const NAV_CONFIG: Record<
       { href: "/customer", label: "Overview" },
       { href: "/customer/services", label: "Services" },
       { href: "/customer/tokens", label: "Tokens" },
-      { href: "/customer/board", label: "Board" },
+      // Board entry now covers both the kanban and table views; the table
+      // view lives at /customer/tickets and is reached via the in-page
+      // BoardViewToggle (see components/board/board-view-toggle.tsx).
+      {
+        href: "/customer/board",
+        label: "Board",
+        highlightOnPaths: ["/customer/tickets"],
+      },
       { href: "/customer/moodboards", label: "Moodboards" },
-      { href: "/customer/tickets", label: "Tickets" },
       { href: "/customer/ai-tools", label: "AI Tools" },
       { href: "/customer/members", label: "Members" },
       { href: "/customer/faq", label: "FAQ" },
@@ -109,8 +122,13 @@ const NAV_CONFIG: Record<
   creative: {
     items: [
       { href: "/creative", label: "Overview" },
-      { href: "/creative/board", label: "Board" },
-      { href: "/creative/tickets", label: "Tickets" },
+      // Board entry covers both the kanban and table views for creatives; the
+      // table view is /creative/tickets and is reached via the in-page toggle.
+      {
+        href: "/creative/board",
+        label: "Board",
+        highlightOnPaths: ["/creative/tickets"],
+      },
       { href: "/creative/balance", label: "Balance" },
       { href: "/creative/withdrawals", label: "Withdrawals" },
       { href: "/creative/faq", label: "FAQ" },
@@ -171,8 +189,15 @@ export function AppNav({ role }: { role: AppNavRole }) {
     return pathname === href || pathname.startsWith(href + "/");
   };
 
+  const isItemActive = (item: NavItem) => {
+    if (isActive(item.href)) return true;
+    return (
+      item.highlightOnPaths?.some((p) => pathname === p || pathname.startsWith(p + "/")) ?? false
+    );
+  };
+
   /** Returns true when any child of a group is the current page */
-  const isGroupActive = (group: NavGroup) => group.children.some((c) => isActive(c.href));
+  const isGroupActive = (group: NavGroup) => group.children.some((c) => isItemActive(c));
 
   // ---- Escape key closes mobile nav / desktop dropdown ----
   const handleEscape = useCallback(
@@ -219,7 +244,7 @@ export function AppNav({ role }: { role: AppNavRole }) {
 
   /** Desktop: render a single NavItem (link or active span) */
   const renderDesktopLink = (item: NavItem) => {
-    const active = isActive(item.href);
+    const active = isItemActive(item);
     if (active) {
       return (
         <span
@@ -267,7 +292,7 @@ export function AppNav({ role }: { role: AppNavRole }) {
         {isOpen && (
           <div className="absolute top-full left-1/2 z-50 mt-2 min-w-[160px] -translate-x-1/2 rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] py-2 shadow-lg">
             {group.children.map((child) => {
-              const active = isActive(child.href);
+              const active = isItemActive(child);
               return (
                 <Link
                   key={child.href}
@@ -376,7 +401,7 @@ export function AppNav({ role }: { role: AppNavRole }) {
                     </span>
                     <div className="flex flex-col gap-2 pl-2">
                       {entry.children.map((child) => {
-                        const active = isActive(child.href);
+                        const active = isItemActive(child);
                         return (
                           <Link
                             key={child.href}
@@ -397,7 +422,7 @@ export function AppNav({ role }: { role: AppNavRole }) {
                 );
               }
 
-              const active = isActive(entry.href);
+              const active = isItemActive(entry);
               return (
                 <Link
                   key={entry.href}

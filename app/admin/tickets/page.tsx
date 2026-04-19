@@ -10,6 +10,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { BoardViewToggle } from "@/components/board/board-view-toggle";
 import { DataTable, THead, TH, TD } from "@/components/ui/data-table";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -264,6 +265,11 @@ export default function AdminTicketsPage() {
 
   return (
     <>
+      {/* View switcher — Kanban ↔ Table (this page) */}
+      <div className="mt-2 mb-4">
+        <BoardViewToggle rolePath="/admin" />
+      </div>
+
       {/* Error / info */}
       {error && (
         <InlineAlert variant="error" title="Something went wrong" className="mb-4">
