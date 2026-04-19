@@ -357,6 +357,12 @@ model Plan {
 
   isActive Boolean @default(true)
 
+  /// Recurring Stripe subscription vs. one-time "top-up" pack. Existing
+  /// rows default to true so historical plans keep their subscription
+  /// semantics. A top-up pack (false) credits monthlyTokens once when
+  /// checkout completes and never writes Company.stripeSubscriptionId.
+  isRecurring Boolean @default(true)
+
   // Plan-level max concurrent IN_PROGRESS ticket count
   maxConcurrentInProgressTickets Int @default(1)
 

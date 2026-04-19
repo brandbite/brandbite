@@ -125,6 +125,77 @@ export async function POST(req: NextRequest) {
           stripeSubscriptionId = (session.subscription as Stripe.Subscription).id;
         }
 
+        // ---------------------------------------------------------------
+        // One-time top-up pack: credit tokens once, no subscription mutation.
+        // Idempotency guard: match on the ledger entry's stripeSessionId
+        // metadata so a retried webhook doesn't double-credit.
+        // ---------------------------------------------------------------
+        if (!plan.isRecurring) {
+          const amount = plan.monthlyTokens;
+          if (amount <= 0) {
+            console.warn("[billing.webhook] top-up plan has 0 tokens — skipping credit", {
+              planId: plan.id,
+            });
+            break;
+          }
+
+          const already = await prisma.tokenLedger.findFirst({
+            where: {
+              companyId: company.id,
+              reason: "TOKEN_TOPUP",
+              metadata: { path: ["stripeSessionId"], equals: session.id },
+            },
+            select: { id: true },
+          });
+          if (already) {
+            console.log("[billing.webhook] top-up already credited for this session", {
+              sessionId: session.id,
+            });
+            break;
+          }
+
+          await prisma.$transaction(async (tx) => {
+            const beforeBalance = company.tokenBalance;
+            const afterBalance = beforeBalance + amount;
+
+            await tx.company.update({
+              where: { id: company.id },
+              data: {
+                stripeCustomerId: stripeCustomerId ?? company.stripeCustomerId,
+                tokenBalance: afterBalance,
+              },
+            });
+
+            await tx.tokenLedger.create({
+              data: {
+                companyId: company.id,
+                userId: userId ?? null,
+                direction: "CREDIT",
+                amount,
+                reason: "TOKEN_TOPUP",
+                notes: `Token top-up via Stripe (${plan.name})`,
+                metadata: {
+                  stripeEventId: event.id,
+                  stripeSessionId: session.id,
+                  stripeCustomerId,
+                  planId: plan.id,
+                },
+                balanceBefore: beforeBalance,
+                balanceAfter: afterBalance,
+              },
+            });
+          });
+
+          console.log("[billing.webhook] checkout.session.completed handled (TOP-UP)", {
+            planId: plan.id,
+            companyId: company.id,
+            amount,
+            sessionId: session.id,
+          });
+
+          break;
+        }
+
         const isFirstSubscription = !company.stripeSubscriptionId;
 
         await prisma.$transaction(async (tx) => {

@@ -11,6 +11,7 @@ export const createPlanSchema = z.object({
     .optional()
     .default(null),
   isActive: z.boolean().optional().default(true),
+  isRecurring: z.boolean().optional().default(true),
   stripeProductId: z
     .string()
     .trim()
@@ -42,6 +43,7 @@ export const updatePlanSchema = z.object({
     .nullable()
     .optional(),
   isActive: z.boolean().optional(),
+  isRecurring: z.boolean().optional(),
   stripeProductId: z
     .string()
     .trim()

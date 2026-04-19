@@ -24,6 +24,7 @@ type Plan = {
   monthlyTokens: number;
   priceCents: number | null;
   isActive: boolean;
+  isRecurring: boolean;
   // Stripe mapping fields
   stripeProductId: string | null;
   stripePriceId: string | null;
@@ -48,6 +49,7 @@ export default function AdminPlansPage() {
   const [monthlyTokens, setMonthlyTokens] = useState("");
   const [priceCents, setPriceCents] = useState("");
   const [isActive, setIsActive] = useState(true);
+  const [isRecurring, setIsRecurring] = useState(true);
   const [stripeProductId, setStripeProductId] = useState("");
   const [stripePriceId, setStripePriceId] = useState("");
 
@@ -69,6 +71,7 @@ export default function AdminPlansPage() {
     setMonthlyTokens("");
     setPriceCents("");
     setIsActive(true);
+    setIsRecurring(true);
     setStripeProductId("");
     setStripePriceId("");
     setSaveError(null);
@@ -81,6 +84,7 @@ export default function AdminPlansPage() {
     setMonthlyTokens(String(plan.monthlyTokens));
     setPriceCents(plan.priceCents != null ? String(plan.priceCents) : "");
     setIsActive(plan.isActive);
+    setIsRecurring(plan.isRecurring);
     setStripeProductId(plan.stripeProductId ?? "");
     setStripePriceId(plan.stripePriceId ?? "");
     setSaveError(null);
@@ -155,6 +159,7 @@ export default function AdminPlansPage() {
         name: name.trim(),
         monthlyTokens: mt,
         isActive,
+        isRecurring,
       };
 
       if (priceCents.trim() !== "") {
@@ -456,6 +461,25 @@ export default function AdminPlansPage() {
                   Clear selection
                 </Button>
               )}
+            </div>
+
+            <div className="rounded-lg border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-page)] p-3">
+              <label className="flex items-start gap-2 text-xs font-medium text-[var(--bb-secondary)]">
+                <input
+                  type="checkbox"
+                  checked={isRecurring}
+                  onChange={(e) => setIsRecurring(e.target.checked)}
+                  className="mt-0.5 h-3 w-3 rounded border-[var(--bb-border-input)] text-[var(--bb-primary)] focus:ring-[var(--bb-primary)]"
+                />
+                <span className="flex-1">
+                  Recurring subscription
+                  <span className="mt-0.5 block text-[10px] font-normal text-[var(--bb-text-muted)]">
+                    {isRecurring
+                      ? "Stripe subscription mode — charged monthly, renews automatically."
+                      : "One-time top-up pack — single charge, tokens credited once. Use a Stripe one-time price."}
+                  </span>
+                </span>
+              </label>
             </div>
 
             <Button type="submit" loading={saving} loadingText="Saving…" className="mt-2">
