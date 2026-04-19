@@ -1,6 +1,10 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/customer/tickets/[ticketId]/ai-generate/route.ts
-// @purpose: Trigger AI generation for an AI-mode ticket, creating a revision
+// @purpose: Trigger AI generation for an AI-mode ticket, creating a revision.
+//           Idempotent on the optional `Idempotency-Key` request header — a
+//           retry with the same key returns the existing generation/revision
+//           instead of creating a duplicate (no ledger debit here because the
+//           cost was already paid at ticket creation).
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
@@ -9,6 +13,8 @@ import { prisma } from "@/lib/prisma";
 import { generateImage } from "@/lib/ai/provider-router";
 import { buildImagePrompt } from "@/lib/ai/prompts";
 import { saveAiImageToR2 } from "@/lib/ai/asset-pipeline";
+import { readIdempotencyKey } from "@/lib/ai/idempotency";
+import { Prisma } from "@prisma/client";
 
 export async function POST(
   req: NextRequest,
@@ -27,6 +33,38 @@ export async function POST(
 
     if (!user.activeCompanyId) {
       return NextResponse.json({ error: "No active company" }, { status: 400 });
+    }
+
+    const idempotencyKey = readIdempotencyKey(req.headers);
+
+    // If the client sent a key that already has a generation, return that
+    // row unchanged (reused) — skips the provider call + revision + asset
+    // duplication that naive retries would trigger.
+    if (idempotencyKey) {
+      const existing = await prisma.aiGeneration.findUnique({
+        where: { idempotencyKey },
+      });
+      if (existing) {
+        if (existing.companyId !== user.activeCompanyId || existing.userId !== user.id) {
+          return NextResponse.json(
+            { error: "Idempotency-Key belongs to another user or company" },
+            { status: 409 },
+          );
+        }
+        return NextResponse.json(
+          {
+            generation: {
+              id: existing.id,
+              status: existing.status,
+              imageUrl: existing.outputImageUrl,
+              provider: existing.provider,
+              model: existing.model,
+            },
+            reused: true,
+          },
+          { status: 200 },
+        );
+      }
     }
 
     // Verify ticket belongs to the customer's company and is AI mode
@@ -57,22 +95,60 @@ export async function POST(
       { jobType: ticket.jobType?.name, style },
     );
 
-    // Create AiGeneration record linked to ticket
-    const generation = await prisma.aiGeneration.create({
-      data: {
-        toolType: "IMAGE_GENERATION",
-        userId: user.id,
-        companyId: user.activeCompanyId,
-        ticketId,
-        prompt,
-        inputParams: { style, size },
-        provider: "",
-        model: "",
-        status: "PROCESSING",
-        tokenCost: 0, // Already paid at ticket creation
-        startedAt: new Date(),
-      },
-    });
+    // Create AiGeneration record linked to ticket. Race-safe on the
+    // idempotency key: a concurrent call with the same key hits the unique
+    // constraint, we re-fetch the winner and return its response.
+    let generation;
+    try {
+      generation = await prisma.aiGeneration.create({
+        data: {
+          toolType: "IMAGE_GENERATION",
+          userId: user.id,
+          companyId: user.activeCompanyId,
+          ticketId,
+          prompt,
+          inputParams: { style, size },
+          provider: "",
+          model: "",
+          status: "PROCESSING",
+          tokenCost: 0, // Already paid at ticket creation
+          startedAt: new Date(),
+          idempotencyKey,
+        },
+      });
+    } catch (createErr) {
+      if (
+        idempotencyKey &&
+        createErr instanceof Prisma.PrismaClientKnownRequestError &&
+        createErr.code === "P2002"
+      ) {
+        const winner = await prisma.aiGeneration.findUnique({
+          where: { idempotencyKey },
+        });
+        if (winner) {
+          if (winner.companyId !== user.activeCompanyId || winner.userId !== user.id) {
+            return NextResponse.json(
+              { error: "Idempotency-Key belongs to another user or company" },
+              { status: 409 },
+            );
+          }
+          return NextResponse.json(
+            {
+              generation: {
+                id: winner.id,
+                status: winner.status,
+                imageUrl: winner.outputImageUrl,
+                provider: winner.provider,
+                model: winner.model,
+              },
+              reused: true,
+            },
+            { status: 200 },
+          );
+        }
+      }
+      throw createErr;
+    }
 
     try {
       const result = await generateImage(prompt, {
@@ -160,8 +236,15 @@ export async function POST(
       );
     }
   } catch (error: unknown) {
-    if ((error as { code?: string })?.code === "UNAUTHENTICATED") {
+    const code = (error as { code?: string })?.code;
+    if (code === "UNAUTHENTICATED") {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    }
+    if (code === "INVALID_IDEMPOTENCY_KEY") {
+      return NextResponse.json(
+        { error: "Idempotency-Key header must be a valid UUID" },
+        { status: 400 },
+      );
     }
     console.error("[customer/tickets/ai-generate] POST error", error);
     return NextResponse.json({ error: "Failed to generate AI content" }, { status: 500 });
