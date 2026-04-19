@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 
 import { SiteFooter } from "@/components/marketing/site-footer";
 import { SiteHeader } from "@/components/marketing/site-header";
+import { CMS_ALLOWED_ATTR, CMS_ALLOWED_TAGS, SafeHtml } from "@/components/ui/safe-html";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -149,9 +150,12 @@ export default function DocArticlePage() {
 
             <div className="my-8 border-t border-[var(--bb-border-subtle)]" />
 
-            <article
+            <SafeHtml
+              as="article"
+              html={article.body}
+              allowedTags={CMS_ALLOWED_TAGS}
+              allowedAttrs={CMS_ALLOWED_ATTR}
               className="prose prose-lg prose-headings:font-brand prose-headings:text-[var(--bb-secondary)] prose-p:text-[var(--bb-text-secondary)] prose-p:leading-relaxed prose-a:text-[var(--bb-primary)] prose-a:no-underline hover:prose-a:underline prose-strong:text-[var(--bb-secondary)] prose-li:text-[var(--bb-text-secondary)] max-w-none"
-              dangerouslySetInnerHTML={{ __html: article.body }}
             />
           </div>
 

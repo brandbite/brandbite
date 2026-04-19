@@ -11,6 +11,7 @@ import { useParams } from "next/navigation";
 
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
+import { CMS_ALLOWED_ATTR, CMS_ALLOWED_TAGS, SafeHtml } from "@/components/ui/safe-html";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -182,9 +183,11 @@ export default function ShowcaseDetailPage() {
 
             {/* Description */}
             {work.description && (
-              <div
+              <SafeHtml
+                html={work.description}
+                allowedTags={CMS_ALLOWED_TAGS}
+                allowedAttrs={CMS_ALLOWED_ATTR}
                 className="prose prose-headings:font-brand prose-headings:text-[var(--bb-secondary)] prose-li:marker:text-[var(--bb-primary)] mt-10 max-w-none"
-                dangerouslySetInnerHTML={{ __html: work.description }}
               />
             )}
           </section>
