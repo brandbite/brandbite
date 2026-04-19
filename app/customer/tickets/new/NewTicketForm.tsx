@@ -879,8 +879,14 @@ export default function NewTicketForm({
 
         {insufficientTokens && (
           <div className="mt-1.5 rounded-md border border-red-200 bg-[var(--bb-danger-bg)] px-2.5 py-1.5 text-[11px] text-red-700">
-            Not enough tokens to create this ticket. Choose a different job type or top up your
-            balance.
+            Not enough tokens to create this ticket. Choose a different job type or{" "}
+            <a
+              href="/customer/settings"
+              className="font-semibold underline underline-offset-2 hover:no-underline"
+            >
+              top up your balance
+            </a>
+            .
           </div>
         )}
       </div>
