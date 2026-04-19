@@ -10,6 +10,11 @@ import { prisma } from "@/lib/prisma";
 /** Known setting keys with their default values. */
 const DEFAULTS: Record<string, string> = {
   MIN_WITHDRAWAL_TOKENS: "20",
+  /** When true, the scheduled payouts cron auto-creates PENDING withdrawals
+   *  for creatives whose balance is at or above AUTO_PAYOUT_THRESHOLD_TOKENS. */
+  AUTO_PAYOUT_ENABLED: "true",
+  /** Minimum creative balance required for the cron to auto-create a request. */
+  AUTO_PAYOUT_THRESHOLD_TOKENS: "100",
 };
 
 /**

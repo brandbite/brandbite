@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-const ALLOWED_KEYS = ["MIN_WITHDRAWAL_TOKENS"] as const;
+const ALLOWED_KEYS = [
+  "MIN_WITHDRAWAL_TOKENS",
+  "AUTO_PAYOUT_ENABLED",
+  "AUTO_PAYOUT_THRESHOLD_TOKENS",
+] as const;
 
 export const updateAdminSettingSchema = z.object({
   key: z.enum(ALLOWED_KEYS, {
