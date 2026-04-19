@@ -16,6 +16,7 @@ import { useToast } from "@/components/ui/toast-provider";
 import { FormInput } from "@/components/ui/form-field";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Modal, ModalHeader, ModalFooter } from "@/components/ui/modal";
 import { TagBadge } from "@/components/ui/tag-badge";
 import { TAG_COLORS, TAG_COLOR_KEYS, type TagColorKey } from "@/lib/tag-colors";
 
@@ -192,6 +193,24 @@ export default function CustomerSettingsPage() {
   const [topups, setTopups] = useState<Topup[]>([]);
   const [topupLoadingId, setTopupLoadingId] = useState<string | null>(null);
 
+  // Available recurring plans (for upgrade/downgrade).
+  type SubscriptionPlan = {
+    id: string;
+    name: string;
+    description: string | null;
+    monthlyTokens: number;
+    priceCents: number | null;
+  };
+  const [availablePlans, setAvailablePlans] = useState<SubscriptionPlan[]>([]);
+  const [planChangeTarget, setPlanChangeTarget] = useState<SubscriptionPlan | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [preview, setPreview] = useState<{
+    amountDueCents: number;
+    currency: string;
+    lineItems: { description: string | null; amountCents: number; proration: boolean }[];
+  } | null>(null);
+  const [changePlanSaving, setChangePlanSaving] = useState(false);
+
   const searchParams = useSearchParams();
   const billingStatusParam = searchParams.get("billing");
 
@@ -243,6 +262,21 @@ export default function CustomerSettingsPage() {
       .then((json) => {
         if (cancelled) return;
         if (Array.isArray(json?.topups)) setTopups(json.topups as Topup[]);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Load the catalog of recurring plans so the customer can upgrade/downgrade.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/customer/plans/subscriptions", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((json) => {
+        if (cancelled) return;
+        if (Array.isArray(json?.plans)) setAvailablePlans(json.plans as SubscriptionPlan[]);
       })
       .catch(() => {});
     return () => {
@@ -435,6 +469,67 @@ export default function CustomerSettingsPage() {
       setBillingError(err?.message || "Failed to start billing checkout.");
     } finally {
       setBillingLoading(false);
+    }
+  };
+
+  /** Open the change-plan confirm modal and fetch the upcoming-invoice preview
+   *  so the customer can see the prorated cost before committing. */
+  const openPlanChange = async (target: SubscriptionPlan) => {
+    setPlanChangeTarget(target);
+    setPreview(null);
+    setBillingError(null);
+    setPreviewLoading(true);
+    try {
+      const res = await fetch("/api/billing/preview-plan-change", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId: target.id }),
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json) {
+        setPreview({
+          amountDueCents: json.amountDueCents,
+          currency: json.currency,
+          lineItems: json.lineItems ?? [],
+        });
+      }
+    } catch (err) {
+      console.error("[plan-change preview] error", err);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const closePlanChange = () => {
+    setPlanChangeTarget(null);
+    setPreview(null);
+  };
+
+  const confirmPlanChange = async () => {
+    if (!planChangeTarget) return;
+    setChangePlanSaving(true);
+    setBillingError(null);
+    try {
+      const res = await fetch("/api/billing/change-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId: planChangeTarget.id }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || `Request failed with status ${res.status}`);
+      }
+      showToast({ type: "success", title: "Plan changed. Next invoice will reflect the change." });
+      closePlanChange();
+      // Refresh the settings payload so the header card shows the new plan.
+      const reload = await fetch("/api/customer/settings", { cache: "no-store" });
+      const reloadJson = await reload.json().catch(() => null);
+      if (reload.ok && reloadJson) setData(reloadJson as CustomerSettingsResponse);
+    } catch (err: any) {
+      console.error("[plan-change confirm] error", err);
+      setBillingError(err?.message || "Failed to change plan.");
+    } finally {
+      setChangePlanSaving(false);
     }
   };
 
@@ -966,6 +1061,73 @@ export default function CustomerSettingsPage() {
               </div>
             )}
 
+            {/* Change plan — upgrade/downgrade with Stripe proration */}
+            {plan && canManagePlan && availablePlans.filter((p) => p.id !== plan.id).length > 0 && (
+              <div className="mt-5 border-t border-[var(--bb-border-subtle)] pt-4">
+                <h3 className="text-sm font-semibold text-[var(--bb-secondary)]">
+                  Switch to a different plan
+                </h3>
+                <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
+                  Upgrade or downgrade at any time. Stripe prorates the charge so you only pay the
+                  difference for the remaining days in your billing period.
+                </p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {availablePlans
+                    .filter((p) => p.id !== plan.id)
+                    .map((p) => {
+                      const isUpgrade = p.monthlyTokens > plan.monthlyTokens;
+                      const priceLabel =
+                        p.priceCents != null ? `$${(p.priceCents / 100).toFixed(2)}/mo` : "—";
+                      return (
+                        <div
+                          key={p.id}
+                          className="flex flex-col rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] p-3"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="text-xs font-semibold text-[var(--bb-secondary)]">
+                              {p.name}
+                            </div>
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                isUpgrade
+                                  ? "bg-[var(--bb-primary-light)] text-[var(--bb-primary)]"
+                                  : "bg-[var(--bb-bg-card)] text-[var(--bb-text-tertiary)]"
+                              }`}
+                            >
+                              {isUpgrade ? "Upgrade" : "Downgrade"}
+                            </span>
+                          </div>
+                          {p.description && (
+                            <div className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
+                              {p.description}
+                            </div>
+                          )}
+                          <div className="mt-2 flex items-baseline gap-1">
+                            <span className="text-lg font-semibold text-[var(--bb-secondary)]">
+                              {p.monthlyTokens.toLocaleString()}
+                            </span>
+                            <span className="text-[11px] text-[var(--bb-text-tertiary)]">
+                              tokens/mo
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-[var(--bb-text-secondary)]">
+                            {priceLabel}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => openPlanChange(p)}
+                            disabled={changePlanSaving}
+                            className="mt-3 rounded-full border border-[var(--bb-border)] bg-white px-3 py-1.5 text-[11px] font-semibold text-[var(--bb-secondary)] shadow-sm hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)] disabled:opacity-60"
+                          >
+                            Preview &amp; switch
+                          </button>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+
             {/* One-time token top-up packs */}
             {topups.length > 0 && (
               <div className="mt-5 border-t border-[var(--bb-border-subtle)] pt-4">
@@ -1303,6 +1465,78 @@ export default function CustomerSettingsPage() {
         confirmLabel="Delete"
         loading={deletingTagId === tagToDelete}
       />
+
+      {/* Plan change confirm modal with Stripe preview */}
+      <Modal open={planChangeTarget !== null} onClose={closePlanChange} size="md">
+        <ModalHeader title="Confirm plan change" onClose={closePlanChange} />
+        <div className="px-6 pb-4 text-sm text-[var(--bb-text-secondary)]">
+          {planChangeTarget && (
+            <>
+              <p>
+                Switch to <strong>{planChangeTarget.name}</strong> (
+                {planChangeTarget.monthlyTokens.toLocaleString()} tokens/mo)?
+              </p>
+              {previewLoading && (
+                <p className="mt-3 text-[11px] text-[var(--bb-text-muted)]">
+                  Fetching prorated cost from Stripe…
+                </p>
+              )}
+              {!previewLoading && preview && (
+                <div className="mt-4 rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] p-3 text-xs">
+                  <p className="text-[var(--bb-text-muted)]">
+                    Your next invoice from Stripe will look like this:
+                  </p>
+                  <ul className="mt-2 space-y-1">
+                    {preview.lineItems.map((li, i) => (
+                      <li
+                        key={i}
+                        className="flex items-start justify-between gap-3 text-[var(--bb-text-secondary)]"
+                      >
+                        <span className="flex-1">
+                          {li.description ?? "Line item"}
+                          {li.proration && (
+                            <span className="ml-1 text-[10px] text-[var(--bb-text-tertiary)]">
+                              (proration)
+                            </span>
+                          )}
+                        </span>
+                        <span className="font-mono text-[var(--bb-secondary)]">
+                          {(li.amountCents / 100).toFixed(2)} {preview.currency.toUpperCase()}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-3 flex items-center justify-between border-t border-[var(--bb-border-subtle)] pt-2 font-semibold">
+                    <span>Amount due now</span>
+                    <span className="font-mono">
+                      {(preview.amountDueCents / 100).toFixed(2)} {preview.currency.toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+              )}
+              {!previewLoading && !preview && (
+                <p className="mt-3 text-[11px] text-[var(--bb-text-muted)]">
+                  (Preview unavailable — Stripe will bill the prorated difference on your next
+                  invoice.)
+                </p>
+              )}
+            </>
+          )}
+        </div>
+        <ModalFooter>
+          <Button variant="ghost" onClick={closePlanChange} disabled={changePlanSaving}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={confirmPlanChange}
+            loading={changePlanSaving}
+            loadingText="Switching…"
+          >
+            Confirm switch
+          </Button>
+        </ModalFooter>
+      </Modal>
     </>
   );
 }
