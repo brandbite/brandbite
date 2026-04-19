@@ -19,6 +19,14 @@ type PatchPayload = {
   creativePayoutOverride?: number | null;
 };
 
+/**
+ * Sanity cap on per-ticket token overrides. No legitimate single ticket should
+ * cost or pay out more than this; anything above that's an enterprise deal that
+ * belongs off-platform. Historically unbounded — see demo ledger for what a
+ * typo can do.
+ */
+const TOKEN_OVERRIDE_MAX = 1_000_000;
+
 export async function GET(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
@@ -232,18 +240,43 @@ export async function PATCH(req: NextRequest) {
     const hasCostOverrideChange = "tokenCostOverride" in body;
     const hasPayoutOverrideChange = "creativePayoutOverride" in body;
 
-    // Parse override values: null means "clear override", number means "set"
-    const newCostOverride = hasCostOverrideChange
-      ? typeof body.tokenCostOverride === "number" && body.tokenCostOverride >= 0
-        ? body.tokenCostOverride
-        : null
-      : undefined; // undefined = no change
+    // -----------------------------------------------------------------------
+    // Guardrails: integer, >= 0, and a sanity cap to prevent typo-disasters
+    // (the demo ledger has a 1.1B debit from exactly this kind of mistake).
+    // -----------------------------------------------------------------------
+    function validateOverride(
+      fieldName: "tokenCostOverride" | "creativePayoutOverride",
+      raw: unknown,
+    ): { ok: true; value: number | null } | { ok: false; error: string } {
+      if (raw === null) return { ok: true, value: null };
+      if (typeof raw !== "number" || !Number.isFinite(raw) || !Number.isInteger(raw)) {
+        return { ok: false, error: `${fieldName} must be an integer or null.` };
+      }
+      if (raw < 0) return { ok: false, error: `${fieldName} must be >= 0.` };
+      if (raw > TOKEN_OVERRIDE_MAX) {
+        return {
+          ok: false,
+          error: `${fieldName} cannot exceed ${TOKEN_OVERRIDE_MAX.toLocaleString()}. Negotiate larger jobs off-platform or split them into multiple tickets.`,
+        };
+      }
+      return { ok: true, value: raw };
+    }
 
-    const newPayoutOverride = hasPayoutOverrideChange
-      ? typeof body.creativePayoutOverride === "number" && body.creativePayoutOverride >= 0
-        ? body.creativePayoutOverride
-        : null
-      : undefined;
+    // Parse override values: null means "clear override", number means "set".
+    // undefined = no change (field not present in the payload).
+    let newCostOverride: number | null | undefined = undefined;
+    if (hasCostOverrideChange) {
+      const check = validateOverride("tokenCostOverride", body.tokenCostOverride);
+      if (!check.ok) return NextResponse.json({ error: check.error }, { status: 400 });
+      newCostOverride = check.value;
+    }
+
+    let newPayoutOverride: number | null | undefined = undefined;
+    if (hasPayoutOverrideChange) {
+      const check = validateOverride("creativePayoutOverride", body.creativePayoutOverride);
+      if (!check.ok) return NextResponse.json({ error: check.error }, { status: 400 });
+      newPayoutOverride = check.value;
+    }
 
     // If cost override changed, reconcile the company ledger
     if (hasCostOverrideChange && ticket.companyId && ticket.jobType) {
@@ -275,6 +308,7 @@ export async function PATCH(req: NextRequest) {
           notes: `Admin token cost override: ${oldValues.effectiveCost} → ${newValues.effectiveCost}`,
           metadata: {
             adminUserId: user.id,
+            adminEmail: user.email,
             oldEffectiveCost: oldValues.effectiveCost,
             newEffectiveCost: newValues.effectiveCost,
             oldOverride: ticket.tokenCostOverride,

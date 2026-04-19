@@ -62,6 +62,15 @@ type OverrideDraft = {
   payoutOverride: string;
 };
 
+/** Mirror of server-side sanity cap — keep in sync with TOKEN_OVERRIDE_MAX
+ *  in app/api/admin/tickets/route.ts. */
+const TOKEN_OVERRIDE_MAX = 1_000_000;
+
+/** When the admin sets an override that's this many × above the JobType
+ *  default, show a confirm dialog before saving. Catches the "typed one
+ *  extra zero" class of bugs. */
+const OVERRIDE_CONFIRM_MULTIPLIER = 10;
+
 function getEffectiveCost(t: AdminTicket): number | null {
   if (!t.jobType) return null;
   return t.tokenCostOverride ?? t.jobType.tokenCost * (t.quantity ?? 1);
@@ -206,20 +215,62 @@ export default function AdminTicketsPage() {
       payload.creativePayoutOverride = payoutVal === "" ? null : parseInt(payoutVal, 10);
 
       // Validate
-      if (
-        costVal !== "" &&
-        (isNaN(payload.tokenCostOverride as number) || (payload.tokenCostOverride as number) < 0)
-      ) {
+      const costNum = payload.tokenCostOverride as number | null;
+      const payoutNum = payload.creativePayoutOverride as number | null;
+      if (costVal !== "" && (isNaN(costNum as number) || (costNum as number) < 0)) {
         setError("Cost override must be a non-negative number.");
         return;
       }
-      if (
-        payoutVal !== "" &&
-        (isNaN(payload.creativePayoutOverride as number) ||
-          (payload.creativePayoutOverride as number) < 0)
-      ) {
+      if (payoutVal !== "" && (isNaN(payoutNum as number) || (payoutNum as number) < 0)) {
         setError("Payout override must be a non-negative number.");
         return;
+      }
+      if (costVal !== "" && (costNum as number) > TOKEN_OVERRIDE_MAX) {
+        setError(
+          `Cost override cannot exceed ${TOKEN_OVERRIDE_MAX.toLocaleString()}. Split larger jobs into multiple tickets.`,
+        );
+        return;
+      }
+      if (payoutVal !== "" && (payoutNum as number) > TOKEN_OVERRIDE_MAX) {
+        setError(
+          `Payout override cannot exceed ${TOKEN_OVERRIDE_MAX.toLocaleString()}. Split larger jobs into multiple tickets.`,
+        );
+        return;
+      }
+
+      // "Did you really mean that many zeros?" check.
+      // Compare each override against its JobType default (scaled by quantity).
+      const ticket = tickets.find((t) => t.id === ticketId);
+      const jobType = ticket?.jobType;
+      if (jobType) {
+        const qty = ticket?.quantity ?? 1;
+        const defaultCost = jobType.tokenCost * qty;
+        const defaultPayout = jobType.creativePayoutTokens * qty;
+        const warnings: string[] = [];
+        if (
+          costVal !== "" &&
+          defaultCost > 0 &&
+          (costNum as number) > defaultCost * OVERRIDE_CONFIRM_MULTIPLIER
+        ) {
+          warnings.push(
+            `Cost override (${(costNum as number).toLocaleString()}) is more than ${OVERRIDE_CONFIRM_MULTIPLIER}× the default (${defaultCost.toLocaleString()}).`,
+          );
+        }
+        if (
+          payoutVal !== "" &&
+          defaultPayout > 0 &&
+          (payoutNum as number) > defaultPayout * OVERRIDE_CONFIRM_MULTIPLIER
+        ) {
+          warnings.push(
+            `Payout override (${(payoutNum as number).toLocaleString()}) is more than ${OVERRIDE_CONFIRM_MULTIPLIER}× the default (${defaultPayout.toLocaleString()}).`,
+          );
+        }
+        if (warnings.length > 0) {
+          const ok = window.confirm(
+            `${warnings.join("\n")}\n\nAre you sure? This debits the company immediately.`,
+          );
+          if (!ok) return;
+        }
       }
 
       const res = await fetch("/api/admin/tickets", {
@@ -362,6 +413,8 @@ export default function AdminTicketsPage() {
                             <input
                               type="number"
                               min="0"
+                              max={TOKEN_OVERRIDE_MAX}
+                              step="1"
                               className="w-full max-w-[4rem] rounded border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-1.5 py-0.5 text-[11px] outline-none focus:border-[var(--bb-primary)]"
                               placeholder={String(t.jobType.tokenCost * (t.quantity ?? 1))}
                               value={draft.costOverride}
@@ -384,6 +437,8 @@ export default function AdminTicketsPage() {
                             <input
                               type="number"
                               min="0"
+                              max={TOKEN_OVERRIDE_MAX}
+                              step="1"
                               className="w-full max-w-[4rem] rounded border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-1.5 py-0.5 text-[11px] outline-none focus:border-[var(--bb-primary)]"
                               placeholder={String(
                                 t.jobType.creativePayoutTokens * (t.quantity ?? 1),
