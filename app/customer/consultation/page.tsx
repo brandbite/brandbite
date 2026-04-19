@@ -231,6 +231,11 @@ export default function CustomerConsultationPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [tokenError, setTokenError] = useState<InsufficientTokensInfo | null>(null);
 
+  // Freebusy — populated after the customer picks a date, if Google is connected.
+  const [busyIntervals, setBusyIntervals] = useState<{ start: string; end: string }[]>([]);
+  const [busyLoading, setBusyLoading] = useState(false);
+  const [busyGoogleConnected, setBusyGoogleConnected] = useState(false);
+
   // Merge the auto-detected zone into the curated list so it's always selectable.
   const timezoneOptions = useMemo(() => {
     const detected = detectTimezone();
@@ -365,6 +370,73 @@ export default function CustomerConsultationPage() {
     if (!settings.workingDays.includes(picked.getDay())) return "Outside team working days";
     return "";
   }, [date, settings]);
+
+  // Fetch team busy intervals when the customer picks a date.
+  useEffect(() => {
+    if (!date || !settings) {
+      setBusyIntervals([]);
+      setBusyGoogleConnected(false);
+      return;
+    }
+    const timeMin = new Date(`${date}T00:00`).toISOString();
+    const timeMaxLocal = new Date(`${date}T00:00`);
+    timeMaxLocal.setDate(timeMaxLocal.getDate() + 1);
+    const timeMax = timeMaxLocal.toISOString();
+
+    let cancelled = false;
+    setBusyLoading(true);
+    fetch(
+      `/api/customer/consultations/availability?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}`,
+      { cache: "no-store" },
+    )
+      .then((r) => r.json())
+      .then((json) => {
+        if (cancelled) return;
+        if (Array.isArray(json?.busy)) setBusyIntervals(json.busy);
+        else setBusyIntervals([]);
+        setBusyGoogleConnected(Boolean(json?.googleConnected));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setBusyIntervals([]);
+          setBusyGoogleConnected(false);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setBusyLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [date, settings]);
+
+  // Which dropdown slots overlap a busy interval? Compared as (start, end+30min)
+  // per slot against the busy list.
+  const busySlots = useMemo(() => {
+    if (!date || busyIntervals.length === 0) return new Set<string>();
+    const out = new Set<string>();
+    for (const slot of ["00:00"]) void slot; // placate TS no-unused
+    for (let h = 0; h < 24; h++) {
+      for (const mm of [0, 30]) {
+        const slotStart = new Date(`${date}T${pad2(h)}:${pad2(mm)}`).getTime();
+        const slotEnd = slotStart + 30 * 60_000;
+        for (const b of busyIntervals) {
+          const bs = new Date(b.start).getTime();
+          const be = new Date(b.end).getTime();
+          if (slotStart < be && slotEnd > bs) {
+            out.add(`${pad2(h)}:${pad2(mm)}`);
+            break;
+          }
+        }
+      }
+    }
+    return out;
+  }, [date, busyIntervals]);
+
+  // If the currently-picked time just became busy, clear it so the user re-picks.
+  useEffect(() => {
+    if (time && busySlots.has(time)) setTime("");
+  }, [busySlots, time]);
 
   // Normalised preferred slot — emitted as a single-element ISO array on the
   // wire (API still accepts the legacy preferredTimes[] shape).
@@ -594,11 +666,15 @@ export default function CustomerConsultationPage() {
                         : "Select a time..."
                       : "Pick a date first"}
                   </option>
-                  {timeOptions.map((t) => (
-                    <option key={t} value={t}>
-                      {formatTimeLabel(t)}
-                    </option>
-                  ))}
+                  {timeOptions.map((t) => {
+                    const busy = busySlots.has(t);
+                    return (
+                      <option key={t} value={t} disabled={busy}>
+                        {formatTimeLabel(t)}
+                        {busy ? " — busy" : ""}
+                      </option>
+                    );
+                  })}
                 </FormSelect>
               </div>
               {date && time && (
@@ -616,6 +692,17 @@ export default function CustomerConsultationPage() {
               {slotWarning && (
                 <p className="mt-2 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-900">
                   {slotWarning}
+                </p>
+              )}
+              {date && busyLoading && (
+                <p className="mt-2 text-[11px] text-[var(--bb-text-muted)]">
+                  Checking team availability…
+                </p>
+              )}
+              {date && !busyLoading && busyGoogleConnected && busySlots.size > 0 && (
+                <p className="mt-2 text-[11px] text-[var(--bb-text-muted)]">
+                  {busySlots.size} slot{busySlots.size === 1 ? "" : "s"} are already booked and
+                  greyed out.
                 </p>
               )}
               <p className="mt-2 text-[11px] text-[var(--bb-text-muted)]">
