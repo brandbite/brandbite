@@ -9,6 +9,10 @@ import { AppNav } from "@/components/navigation/app-nav";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+// All customer routes are auth-gated dashboards. Skip SSG so the build
+// never pulls heavy client-only deps (DOMPurify/jsdom) into server bundles.
+export const dynamic = "force-dynamic";
+
 export default async function CustomerLayout({ children }: { children: React.ReactNode }) {
   // If the user's company hasn't completed onboarding, redirect to /onboarding
   // (which lives outside the /customer route group to avoid layout loops).

@@ -15,9 +15,9 @@ env:
 
 jobs:
   quality:
-    name: Lint, Type-check & Test
+    name: Lint, Type-check, Test & Build
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -46,3 +46,24 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+      - name: Cache Next.js build
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-
+
+      - name: Next.js build
+        # Dummy env vars so Prisma client init, better-auth, and lib/stripe.ts
+        # do not fail at build-time. We do not need a real DB or real API keys;
+        # all auth-gated routes are force-dynamic so the build never runs
+        # actual queries, and public routes that import lib/stripe.ts only need
+        # STRIPE_SECRET_KEY to exist at module-evaluation time.
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          BETTER_AUTH_SECRET: ci-only-secret-not-used
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          STRIPE_SECRET_KEY: sk_test_ci_dummy_not_used
+        run: npm run build
