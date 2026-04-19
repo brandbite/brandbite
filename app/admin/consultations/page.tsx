@@ -61,6 +61,58 @@ function formatDateTime(iso: string | null): string {
   return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
+/** Short offset label like "GMT+3" for an IANA zone at "now". */
+function tzShortLabel(tz: string): string {
+  try {
+    const parts = new Intl.DateTimeFormat(undefined, {
+      timeZone: tz,
+      timeZoneName: "shortOffset",
+    }).formatToParts(new Date());
+    return parts.find((p) => p.type === "timeZoneName")?.value ?? tz;
+  } catch {
+    return tz;
+  }
+}
+
+/** Was this preferred-time entry submitted as an ISO datetime? */
+function isIsoSlot(raw: string): boolean {
+  return raw.includes("T") && !Number.isNaN(Date.parse(raw));
+}
+
+/** Pretty-print a preferred slot. ISO → local formatted + zone hint. */
+function formatPreferredSlot(raw: string, requesterTz: string | null): string {
+  if (!isIsoSlot(raw)) return raw;
+  const d = new Date(raw);
+  const inRequesterTz = requesterTz
+    ? d.toLocaleString(undefined, {
+        timeZone: requesterTz,
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      })
+    : d.toLocaleString(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      });
+  const tzHint = requesterTz ? ` (${tzShortLabel(requesterTz)})` : "";
+  return `${inRequesterTz}${tzHint}`;
+}
+
+/** Turn an ISO into the "YYYY-MM-DDTHH:mm" datetime-local admin-side uses. */
+function isoToDatetimeLocal(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  );
+}
+
 export default function AdminConsultationsPage() {
   const [rows, setRows] = useState<AdminConsultation[]>([]);
   const [statusFilter, setStatusFilter] = useState<"ALL" | ConsultationStatus>("ALL");
@@ -252,9 +304,29 @@ export default function AdminConsultationsPage() {
                       Preferred times
                     </p>
                     {c.preferredTimes && c.preferredTimes.length > 0 ? (
-                      <ul className="mt-1 space-y-0.5 text-xs text-[var(--bb-secondary)]">
+                      <ul className="mt-1 space-y-1 text-xs text-[var(--bb-secondary)]">
                         {c.preferredTimes.map((t, i) => (
-                          <li key={i}>· {t}</li>
+                          <li key={i} className="flex items-center justify-between gap-2">
+                            <span>· {formatPreferredSlot(t, c.timezone)}</span>
+                            {isIsoSlot(t) && c.status === "PENDING" && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDrafts((prev) => ({
+                                    ...prev,
+                                    [c.id]: {
+                                      scheduledAt: isoToDatetimeLocal(t),
+                                      videoLink: prev[c.id]?.videoLink ?? c.videoLink ?? "",
+                                      adminNotes: prev[c.id]?.adminNotes ?? c.adminNotes ?? "",
+                                    },
+                                  }));
+                                }}
+                                className="shrink-0 rounded-full border border-[var(--bb-border)] bg-white px-2 py-0.5 text-[10px] font-medium text-[var(--bb-primary)] hover:border-[var(--bb-primary)]"
+                              >
+                                Use this
+                              </button>
+                            )}
+                          </li>
                         ))}
                       </ul>
                     ) : (
