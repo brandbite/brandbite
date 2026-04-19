@@ -26,7 +26,8 @@ import { parseBody } from "@/lib/schemas/helpers";
 import { createTicketSchema } from "@/lib/schemas/ticket.schemas";
 import { buildTicketCode } from "@/lib/ticket-code";
 import { resolveAssetUrl } from "@/lib/r2";
-import { isAutoAssignEnabled } from "@/lib/tickets/auto-assign";
+import { getCreativeRatingSummaries } from "@/lib/ratings/creative-ratings";
+import { isAutoAssignEnabled, selectCreativeByLoadThenRating } from "@/lib/tickets/auto-assign";
 
 // -----------------------------------------------------------------------------
 // GET: list tickets for the current customer's active company
@@ -453,16 +454,15 @@ export async function POST(req: NextRequest) {
             loadByCreative.set(t.creativeId, (loadByCreative.get(t.creativeId) ?? 0) + delta);
           }
 
-          assignedCreativeId = creativeIds.reduce(
-            (bestId: string | null, currentId: string) => {
-              if (!bestId) return currentId;
-              const bestLoad = loadByCreative.get(bestId) ?? 0;
-              const currentLoad = loadByCreative.get(currentId) ?? 0;
-              if (currentLoad < bestLoad) return currentId;
-              return bestId;
-            },
-            null as string | null,
-          );
+          // Rating lookup batched across the candidate pool — used as a
+          // tie-breaker when two creatives are equally loaded.
+          const ratingByCreative = await getCreativeRatingSummaries(creativeIds);
+
+          assignedCreativeId = selectCreativeByLoadThenRating({
+            candidateIds: creativeIds,
+            loadByCreative,
+            ratingByCreative,
+          });
 
           assignmentReason = "AUTO_ASSIGN";
         } else {
