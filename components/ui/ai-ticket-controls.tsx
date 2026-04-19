@@ -49,17 +49,14 @@ export function AiTicketControls({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          // The first-time ai-generate route does not yet support idempotency
-          // on the backend (it does not debit tokens); the regenerate route
-          // does, so we only attach the key there.
-          ...(isFirstGeneration ? {} : { "Idempotency-Key": idempotencyKey }),
+          "Idempotency-Key": idempotencyKey,
         },
         body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Generation failed");
 
-      if (!isFirstGeneration) rotateIdempotencyKey();
+      rotateIdempotencyKey();
       setLastResult({
         imageUrl: data.generation.imageUrl,
         revisedPrompt: data.generation.revisedPrompt,
