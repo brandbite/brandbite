@@ -123,6 +123,7 @@ enum AiToolType {
   BACKGROUND_REMOVAL
   TEXT_GENERATION
   DESIGN_SUGGESTION
+  BRIEF_PARSING
 }
 
 // --- Assets & Annotations ---

@@ -186,5 +186,7 @@ export function getProviderForTool(toolType: AiToolType): { provider: string; mo
       return { provider: "openai", model: "gpt-4o" };
     case "DESIGN_SUGGESTION":
       return { provider: "openai", model: "gpt-4o" };
+    case "BRIEF_PARSING":
+      return { provider: "openai", model: "gpt-4o-mini" };
   }
 }

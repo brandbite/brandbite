@@ -13,6 +13,7 @@ const DEFAULT_COSTS: Record<AiToolType, number> = {
   BACKGROUND_REMOVAL: 1,
   TEXT_GENERATION: 1,
   DESIGN_SUGGESTION: 1,
+  BRIEF_PARSING: 1,
 };
 
 const DEFAULT_RATE_LIMITS: Record<AiToolType, number> = {
@@ -20,6 +21,7 @@ const DEFAULT_RATE_LIMITS: Record<AiToolType, number> = {
   BACKGROUND_REMOVAL: 30,
   TEXT_GENERATION: 50,
   DESIGN_SUGGESTION: 30,
+  BRIEF_PARSING: 30,
 };
 
 // ---------------------------------------------------------------------------
