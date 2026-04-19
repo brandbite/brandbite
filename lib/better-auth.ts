@@ -22,8 +22,45 @@ export const auth = betterAuth({
 
   database: prismaAdapter(prisma, { provider: "postgresql" }),
 
+  // Email verification — users who sign up with email+password must click
+  // a verification link before they can sign in. Reuses the same Resend
+  // helper as password reset.
+  emailVerification: {
+    sendOnSignUp: true,
+    autoSignInAfterVerification: true,
+    sendVerificationEmail: async ({ user, url }) => {
+      await sendNotificationEmail(
+        user.email,
+        "Verify your Brandbite email",
+        [
+          "<div style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto;\">",
+          '<div style="background: #f15b2b; padding: 20px 24px; border-radius: 12px 12px 0 0;">',
+          '<span style="font-size: 20px; font-weight: 700; color: #fff;">brandbite</span>',
+          "</div>",
+          '<div style="background: #fff; padding: 28px 24px; border: 1px solid #e3e1dc; border-top: none;">',
+          `<p style="margin: 0 0 16px; font-size: 14px; color: #424143;">Welcome${user.name ? ` ${user.name}` : ""},</p>`,
+          '<p style="margin: 0 0 16px; font-size: 14px; color: #424143;">Confirm your email address to finish setting up your Brandbite account:</p>',
+          '<table role="presentation" cellpadding="0" cellspacing="0" style="margin: 24px 0;">',
+          "<tr>",
+          '<td style="border-radius: 8px; background: #f15b2b;">',
+          `<a href="${url}" target="_blank" style="display: inline-block; padding: 12px 28px; font-size: 14px; font-weight: 600; color: #fff; text-decoration: none; border-radius: 8px;">Verify email</a>`,
+          "</td>",
+          "</tr>",
+          "</table>",
+          '<p style="margin: 0; font-size: 13px; color: #7a7a7a;">This link expires in 24 hours. If you didn\'t create this account, you can safely ignore this email.</p>',
+          "</div>",
+          '<div style="background: #faf9f7; padding: 16px 24px; border-radius: 0 0 12px 12px; border: 1px solid #e3e1dc; border-top: none;">',
+          '<p style="margin: 0; font-size: 11px; color: #9a9892; text-align: center;">Brandbite &mdash; Creative-as-a-service platform</p>',
+          "</div>",
+          "</div>",
+        ].join("\n"),
+      );
+    },
+  },
+
   emailAndPassword: {
     enabled: true,
+    requireEmailVerification: true,
     sendResetPassword: async ({ user, url }) => {
       await sendNotificationEmail(
         user.email,

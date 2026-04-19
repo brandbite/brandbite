@@ -104,16 +104,28 @@ export default function LoginPage() {
           setStatus("error");
           return;
         }
-      } else {
-        const { error: signInError } = await authClient.signIn.email({
-          email: email.trim(),
-          password,
-        });
-        if (signInError) {
-          setError(signInError.message || "Invalid email or password.");
-          setStatus("error");
+        // Email verification is required before sign-in — BetterAuth has
+        // sent the link; send the user to the "check your email" notice.
+        router.push(`/verify-email?email=${encodeURIComponent(email.trim())}`);
+        return;
+      }
+
+      const { error: signInError } = await authClient.signIn.email({
+        email: email.trim(),
+        password,
+      });
+      if (signInError) {
+        const msg = (signInError.message || "").toLowerCase();
+        const code = (signInError as { code?: string }).code ?? "";
+        const looksUnverified =
+          msg.includes("verif") || code.toUpperCase().includes("EMAIL_NOT_VERIFIED");
+        if (looksUnverified) {
+          router.push(`/verify-email?email=${encodeURIComponent(email.trim())}&reason=unverified`);
           return;
         }
+        setError(signInError.message || "Invalid email or password.");
+        setStatus("error");
+        return;
       }
 
       await handlePostLogin();
