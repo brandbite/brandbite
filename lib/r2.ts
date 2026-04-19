@@ -53,13 +53,47 @@ function isPresignedUrl(url: string): boolean {
   return url.includes("X-Amz-Signature=") || url.includes("X-Amz-Credential=");
 }
 
+// ---------------------------------------------------------------------------
+// Presigned URL cache
+//
+// R2 presigned URLs are stable until their signature expires. We sign them
+// for 20 minutes and serve from this per-instance memo for 10 minutes — the
+// cached URL is always at least 10 minutes from expiry when handed out.
+// Avoids a GetObjectCommand round-trip on every asset listing render.
+// ---------------------------------------------------------------------------
+
+type CachedPresignedUrl = { url: string; cachedUntil: number };
+
+const PRESIGNED_URL_VALIDITY_SECONDS = 60 * 20;
+const PRESIGNED_CACHE_TTL_MS = 60 * 10 * 1000;
+
+const presignedUrlCache = new Map<string, CachedPresignedUrl>();
+
+// Periodic eviction of expired entries so the map does not grow unbounded
+// in long-lived servers. No-op on edge runtimes where setInterval is undefined.
+if (typeof setInterval !== "undefined") {
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of presignedUrlCache) {
+      if (entry.cachedUntil <= now) presignedUrlCache.delete(key);
+    }
+  }, 60_000);
+}
+
+/**
+ * Invalidate the cached presigned URL for a storage key. Call from asset
+ * delete / rename paths so clients don't receive a URL pointing at a gone
+ * object for up to 10 minutes.
+ */
+export function invalidatePresignedUrlCache(storageKey: string): void {
+  presignedUrlCache.delete(storageKey);
+}
+
 /**
  * Resolve a displayable URL for an asset. Returns the public URL if
- * R2_PUBLIC_BASE_URL is configured, otherwise generates a short-lived
- * presigned download URL. Returns null only when R2 is not configured.
- *
- * NOTE: presigned URLs stored in the DB are always regenerated because
- * they expire after a short TTL.
+ * R2_PUBLIC_BASE_URL is configured, otherwise generates (or re-uses a
+ * cached) short-lived presigned download URL. Returns null only when R2
+ * is not configured.
  */
 export async function resolveAssetUrl(
   storageKey: string,
@@ -74,12 +108,19 @@ export async function resolveAssetUrl(
     return `${trimmed}/${storageKey}`;
   }
 
-  // Generate a fresh presigned GET URL (valid for 15 minutes)
+  // Memo hit
+  const now = Date.now();
+  const cached = presignedUrlCache.get(storageKey);
+  if (cached && cached.cachedUntil > now) return cached.url;
+
+  // Generate a fresh presigned GET URL and cache it
   try {
     const r2 = createR2Client();
     const bucket = getR2BucketName();
     const cmd = new GetObjectCommand({ Bucket: bucket, Key: storageKey });
-    return await getSignedUrl(r2, cmd, { expiresIn: 60 * 15 });
+    const url = await getSignedUrl(r2, cmd, { expiresIn: PRESIGNED_URL_VALIDITY_SECONDS });
+    presignedUrlCache.set(storageKey, { url, cachedUntil: now + PRESIGNED_CACHE_TTL_MS });
+    return url;
   } catch {
     return null;
   }
