@@ -20,12 +20,24 @@ type SettingsMap = Record<string, string | null>;
 /** Human-readable labels and descriptions for each setting key. */
 const SETTING_META: Record<
   string,
-  { label: string; description: string; type: "number" | "text" }
+  { label: string; description: string; type: "number" | "text" | "boolean" }
 > = {
   MIN_WITHDRAWAL_TOKENS: {
     label: "Minimum withdrawal (tokens)",
     description:
       "The minimum number of tokens a creative must request when creating a withdrawal. Creatives cannot submit a withdrawal below this amount.",
+    type: "number",
+  },
+  AUTO_PAYOUT_ENABLED: {
+    label: "Auto-create weekly payout requests",
+    description:
+      "When on, a scheduled cron runs every Monday and auto-creates a PENDING withdrawal for each creative whose balance is at or above the threshold below. Admins still review + mark paid.",
+    type: "boolean",
+  },
+  AUTO_PAYOUT_THRESHOLD_TOKENS: {
+    label: "Auto-payout threshold (tokens)",
+    description:
+      "Creatives at or above this balance get a PENDING withdrawal request auto-created during the weekly run.",
     type: "number",
   },
 };
@@ -174,19 +186,37 @@ export default function AdminSettingsPage() {
                     <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
                       {meta.description}
                     </p>
-                    <FormInput
-                      id={`setting-${key}`}
-                      type={meta.type}
-                      min={meta.type === "number" ? 1 : undefined}
-                      value={draftValue}
-                      onChange={(e) =>
-                        setDrafts((prev) => ({
-                          ...prev,
-                          [key]: e.target.value,
-                        }))
-                      }
-                      className="mt-3 max-w-xs"
-                    />
+                    {meta.type === "boolean" ? (
+                      <label className="mt-3 flex items-center gap-2 text-xs text-[var(--bb-secondary)]">
+                        <input
+                          type="checkbox"
+                          id={`setting-${key}`}
+                          checked={draftValue === "true"}
+                          onChange={(e) =>
+                            setDrafts((prev) => ({
+                              ...prev,
+                              [key]: e.target.checked ? "true" : "false",
+                            }))
+                          }
+                          className="h-3.5 w-3.5 rounded border-[var(--bb-border-input)] text-[var(--bb-primary)] focus:ring-[var(--bb-primary)]"
+                        />
+                        <span>{draftValue === "true" ? "Enabled" : "Disabled"}</span>
+                      </label>
+                    ) : (
+                      <FormInput
+                        id={`setting-${key}`}
+                        type={meta.type}
+                        min={meta.type === "number" ? 1 : undefined}
+                        value={draftValue}
+                        onChange={(e) =>
+                          setDrafts((prev) => ({
+                            ...prev,
+                            [key]: e.target.value,
+                          }))
+                        }
+                        className="mt-3 max-w-xs"
+                      />
+                    )}
                     {currentValue && (
                       <p className="mt-1.5 text-[11px] text-[var(--bb-text-tertiary)]">
                         Current value: <span className="font-semibold">{currentValue}</span>

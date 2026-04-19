@@ -23,7 +23,11 @@ function requireAdmin(userRole: string) {
 }
 
 /** Allowed setting keys that admins may read/write via this endpoint. */
-const ALLOWED_KEYS = ["MIN_WITHDRAWAL_TOKENS"] as const;
+const ALLOWED_KEYS = [
+  "MIN_WITHDRAWAL_TOKENS",
+  "AUTO_PAYOUT_ENABLED",
+  "AUTO_PAYOUT_THRESHOLD_TOKENS",
+] as const;
 
 function isAllowedKey(key: string): key is (typeof ALLOWED_KEYS)[number] {
   return (ALLOWED_KEYS as readonly string[]).includes(key);
