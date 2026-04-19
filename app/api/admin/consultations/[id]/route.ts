@@ -9,6 +9,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { getConsultationSettings } from "@/lib/consultation/settings";
+import { cancelConsultationEvent } from "@/lib/google/calendar";
 import { prisma } from "@/lib/prisma";
 import { parseBody } from "@/lib/schemas/helpers";
 import { updateConsultationSchema } from "@/lib/schemas/consultation.schemas";
@@ -33,6 +35,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         tokenCost: true,
         scheduledAt: true,
         videoLink: true,
+        googleEventId: true,
       },
     });
     if (!existing) {
@@ -107,6 +110,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
       return row;
     });
+
+    // If we cancelled a booking that had a Google event, cancel it on Google
+    // too so the attendees get a cancellation email and the calendar entry
+    // disappears. Best-effort; booking is already cancelled in our DB.
+    if (nextStatus === "CANCELED" && existing.status !== "CANCELED" && existing.googleEventId) {
+      try {
+        const settings = await getConsultationSettings();
+        if (settings.googleRefreshToken) {
+          await cancelConsultationEvent(
+            settings,
+            settings.googleCalendarId ?? "primary",
+            existing.googleEventId,
+          );
+        }
+      } catch (err) {
+        console.error(
+          "[admin/consultations/:id] Google event cancel failed (booking already cancelled in DB)",
+          err,
+        );
+      }
+    }
 
     return NextResponse.json({
       consultation: {

@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { getConsultationSettings } from "@/lib/consultation/settings";
+import { createConsultationEvent, extractMeetLink } from "@/lib/google/calendar";
 import { canBookConsultation } from "@/lib/permissions/companyRoles";
 import { prisma } from "@/lib/prisma";
 import { parseBody } from "@/lib/schemas/helpers";
@@ -112,10 +113,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create the row + debit in a single transaction. applyCompanyLedgerEntry
-    // opens its own transaction, so we do the Consultation create inside the
-    // same function boundary by hand here.
+    // Decide up-front whether we can auto-schedule via Google Calendar.
+    // This matters because an auto-scheduled booking goes straight to
+    // SCHEDULED and we need the ISO datetime right now to create the
+    // Calendar event. The legacy path (no Google connected) stays PENDING.
+    const googleReady = Boolean(settings.googleRefreshToken);
     const preferredTimes = parsed.data.preferredTimes ?? undefined;
+
+    // Pull the single preferred time the customer picked (PR #109 reduced
+    // the UI to one). If absent OR Google isn't connected, we fall back to
+    // the PENDING flow.
+    const firstPreferred = preferredTimes?.[0];
+    const canAutoSchedule =
+      googleReady && firstPreferred && !Number.isNaN(Date.parse(firstPreferred));
+
     const created = await prisma.$transaction(async (tx) => {
       const row = await tx.consultation.create({
         data: {
@@ -157,6 +168,65 @@ export async function POST(req: NextRequest) {
       return row;
     });
 
+    // Auto-schedule via Google Calendar (best-effort — booking stays PENDING
+    // on failure so an admin can manually schedule it).
+    if (canAutoSchedule) {
+      try {
+        const startIso = new Date(firstPreferred!).toISOString();
+        const endIso = new Date(
+          new Date(firstPreferred!).getTime() + settings.durationMinutes * 60_000,
+        ).toISOString();
+        const attendees = [user.email];
+        if (settings.contactEmail) attendees.push(settings.contactEmail);
+
+        const event = await createConsultationEvent(settings, {
+          calendarId: settings.googleCalendarId ?? "primary",
+          summary: `Brandbite consultation — ${parsed.data.description.slice(0, 60)}`,
+          description:
+            `Consultation request from ${user.email}.\n\n` +
+            `Booking reference: ${created.id}\n\n` +
+            `What they want to discuss:\n${parsed.data.description}`,
+          startIso,
+          endIso,
+          timeZone: parsed.data.timezone ?? settings.companyTimezone ?? "UTC",
+          attendeeEmails: attendees,
+        });
+
+        const meetLink = extractMeetLink(event);
+
+        await prisma.consultation.update({
+          where: { id: created.id },
+          data: {
+            status: "SCHEDULED",
+            scheduledAt: new Date(startIso),
+            videoLink: meetLink,
+            googleEventId: event.id,
+          },
+        });
+
+        return NextResponse.json(
+          {
+            consultation: {
+              id: created.id,
+              status: "SCHEDULED",
+              tokenCost: created.tokenCost,
+              scheduledAt: startIso,
+              videoLink: meetLink,
+              createdAt: created.createdAt.toISOString(),
+            },
+            autoScheduled: true,
+          },
+          { status: 201 },
+        );
+      } catch (err) {
+        console.error(
+          "[customer/consultations] auto-schedule via Google failed; leaving as PENDING",
+          err,
+        );
+        // Fall through — the row exists and is PENDING; admin can schedule.
+      }
+    }
+
     return NextResponse.json(
       {
         consultation: {
@@ -165,6 +235,7 @@ export async function POST(req: NextRequest) {
           tokenCost: created.tokenCost,
           createdAt: created.createdAt.toISOString(),
         },
+        autoScheduled: false,
       },
       { status: 201 },
     );

@@ -30,6 +30,9 @@ type Settings = {
   companyTimezone: string | null;
   adminNotes: string | null;
   updatedAt: string;
+  googleConnected: boolean;
+  googleAccountEmail: string | null;
+  googleConnectedAt: string | null;
 };
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -92,6 +95,30 @@ export default function AdminConsultationSettingsPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Surface the Google OAuth callback result in the page banners.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const flag = params.get("google");
+    const message = params.get("message");
+    if (flag === "connected") {
+      setSuccess(
+        message && message !== "connected"
+          ? `Google Calendar connected (${message}).`
+          : "Google Calendar connected.",
+      );
+    } else if (flag === "error") {
+      setError(
+        message ? `Google Calendar connect failed: ${message}` : "Google Calendar connect failed.",
+      );
+    }
+    if (flag) {
+      params.delete("google");
+      params.delete("message");
+      const url = window.location.pathname + (params.toString() ? `?${params}` : "");
+      window.history.replaceState(null, "", url);
+    }
+  }, []);
 
   const patch = <K extends keyof Settings>(key: K, value: Settings[K]) => {
     setSettings((prev) => (prev ? { ...prev, [key]: value } : prev));
@@ -272,7 +299,7 @@ export default function AdminConsultationSettingsPage() {
 
             <div>
               <label className="mb-1 block text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-tertiary)] uppercase">
-                Google Calendar secret iCal URL
+                Google Calendar secret iCal URL (legacy)
               </label>
               <FormInput
                 type="url"
@@ -281,12 +308,81 @@ export default function AdminConsultationSettingsPage() {
                 onChange={(e) => patch("calendarIcsUrl", e.target.value)}
               />
               <p className="mt-1 text-[11px] text-[var(--bb-text-muted)]">
-                From Google Calendar → Settings → Integrate calendar →{" "}
-                <em>Secret address in iCal format</em>. Used to block out busy slots on the customer
-                picker — stored now, parsed in a follow-up.
+                Optional. Superseded by the Google Calendar OAuth connection below — keep blank
+                unless you need a read-only fallback.
               </p>
             </div>
           </div>
+        </section>
+
+        {/* ---------------- Google Calendar OAuth ---------------- */}
+        <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] p-5">
+          <h2 className="mb-3 text-sm font-semibold text-[var(--bb-secondary)]">
+            Google Calendar integration
+          </h2>
+
+          {settings.googleConnected ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                <span className="text-lg">✓</span>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-emerald-900">
+                    Connected as {settings.googleAccountEmail ?? "(unknown account)"}
+                  </p>
+                  <p className="text-[11px] text-emerald-800">
+                    {settings.googleConnectedAt
+                      ? `Connected ${new Date(settings.googleConnectedAt).toLocaleString()}`
+                      : "Connected"}
+                    . New bookings will auto-schedule on this calendar and send Google Meet invites
+                    to customers.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={async () => {
+                    if (
+                      !window.confirm(
+                        "Disconnect Google Calendar? New bookings will fall back to the manual PENDING flow.",
+                      )
+                    )
+                      return;
+                    const res = await fetch("/api/admin/consultation-settings/google/disconnect", {
+                      method: "POST",
+                    });
+                    if (res.ok) {
+                      await load();
+                      setSuccess("Google Calendar disconnected.");
+                    } else {
+                      const json = await res.json().catch(() => null);
+                      setError((json && json.error) || "Failed to disconnect");
+                    }
+                  }}
+                >
+                  Disconnect
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-[var(--bb-text-secondary)]">
+                Connect the team Gmail to auto-schedule bookings. When a customer submits: Brandbite
+                creates a calendar event with a Google Meet link, invites the customer, and the
+                event lands on your team calendar automatically.
+              </p>
+              <a
+                href="/api/admin/consultation-settings/google/connect"
+                className="inline-flex items-center gap-2 rounded-lg border border-[var(--bb-border)] bg-white px-4 py-2 text-sm font-medium text-[var(--bb-secondary)] shadow-sm transition-colors hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
+              >
+                Connect Google Calendar
+              </a>
+              <p className="text-[11px] text-[var(--bb-text-muted)]">
+                You&apos;ll be redirected to Google to grant calendar.events and calendar.freebusy
+                scopes. Brandbite stores the refresh token and uses it on your behalf.
+              </p>
+            </div>
+          )}
         </section>
 
         {/* ---------------- Availability ---------------- */}
