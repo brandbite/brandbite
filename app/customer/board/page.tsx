@@ -62,6 +62,7 @@ import { SafeHtml, stripHtml } from "@/components/ui/safe-html";
 import { downloadSingleAsset, downloadAssetsAsZip } from "@/lib/download-helpers";
 
 import NewTicketForm from "@/app/customer/tickets/new/NewTicketForm";
+import { RateCreativeModal } from "@/components/ratings/rate-creative-modal";
 
 type CustomerBoardTicket = {
   id: string;
@@ -334,6 +335,11 @@ export default function CustomerBoardPage() {
   const [uploadBriefsProgress, setUploadBriefsProgress] = useState<string | null>(null);
 
   const [pendingDoneTicketId, setPendingDoneTicketId] = useState<string | null>(null);
+  // Rating modal after drag-to-DONE (skippable; opens only when the ticket
+  // had a creative assigned — no point rating no-one).
+  const [ratingForTicket, setRatingForTicket] = useState<{ id: string; title: string } | null>(
+    null,
+  );
   const [pendingDoneRevisions, setPendingDoneRevisions] = useState<TicketRevisionEntry[] | null>(
     null,
   );
@@ -1478,6 +1484,13 @@ export default function CustomerBoardPage() {
 
     await persistTicketStatus(ticket.id, "DONE");
     setPendingDoneTicketId(null);
+
+    // After successful DONE transition, open the skippable rating modal if
+    // a creative was actually assigned. Mirrors the same flow already used
+    // on the customer ticket detail page.
+    if (ticket.isAssigned) {
+      setRatingForTicket({ id: ticket.id, title: ticket.title });
+    }
   };
 
   const handleConfirmRevision = async () => {
@@ -3261,6 +3274,18 @@ export default function CustomerBoardPage() {
           </Button>
         </ModalFooter>
       </Modal>
+
+      {/* Skippable creative rating modal — opens after a successful drag-to-DONE
+          when the ticket had a creative assigned. Creatives never see these
+          ratings; they're an admin-only signal used as an auto-assign tie-breaker. */}
+      {ratingForTicket && (
+        <RateCreativeModal
+          open={true}
+          ticketId={ratingForTicket.id}
+          ticketTitle={ratingForTicket.title}
+          onClose={() => setRatingForTicket(null)}
+        />
+      )}
     </>
   );
 }
