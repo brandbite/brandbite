@@ -33,6 +33,12 @@ type CreativeMetrics = {
   loadScore: number;
   totalEarnings: number;
   totalWithdrawn: number;
+  /** Customer ratings (admin-only; creatives don't see these). null when no ratings yet. */
+  ratingCount: number;
+  ratingOverall: number | null;
+  ratingQuality: number | null;
+  ratingCommunication: number | null;
+  ratingSpeed: number | null;
 };
 
 type CreativeAnalyticsResponse = {
@@ -55,7 +61,8 @@ type SortKey =
   | "avgRevisionCount"
   | "loadScore"
   | "totalEarnings"
-  | "completionRate";
+  | "completionRate"
+  | "ratingOverall";
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "completedTickets", label: "Completed tickets" },
@@ -64,6 +71,7 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "avgTurnaroundHours", label: "Turnaround time" },
   { value: "loadScore", label: "Load score" },
   { value: "totalEarnings", label: "Earnings" },
+  { value: "ratingOverall", label: "Avg rating" },
 ];
 
 function loadScoreColor(score: number): string {
@@ -139,6 +147,12 @@ export default function CreativeAnalyticsPage() {
       if (sortBy === "avgTurnaroundHours") {
         // lower is better — ascending
         return a[sortBy] - b[sortBy];
+      }
+      if (sortBy === "ratingOverall") {
+        // null (no ratings yet) sorts to the bottom; otherwise higher is better
+        const av = a.ratingOverall ?? -Infinity;
+        const bv = b.ratingOverall ?? -Infinity;
+        return bv - av;
       }
       // higher is better — descending
       return b[sortBy] - a[sortBy];
@@ -305,6 +319,7 @@ export default function CreativeAnalyticsPage() {
               <th className="px-3 py-3 text-center">Rate</th>
               <th className="px-3 py-3 text-center">Avg Rev.</th>
               <th className="px-3 py-3 text-center">Turnaround</th>
+              <th className="px-3 py-3 text-center">Rating</th>
               <th className="px-3 py-3 text-center">Earnings</th>
               <th className="px-3 py-3 text-center">Load</th>
             </tr>
@@ -343,6 +358,22 @@ export default function CreativeAnalyticsPage() {
                 </td>
                 <td className="px-3 py-3 text-center text-[var(--bb-secondary)]">
                   {formatHours(d.avgTurnaroundHours)}
+                </td>
+                <td className="px-3 py-3 text-center">
+                  {d.ratingOverall !== null ? (
+                    <span
+                      title={`Quality ${d.ratingQuality?.toFixed(1)} · Communication ${d.ratingCommunication?.toFixed(1)} · Speed ${d.ratingSpeed?.toFixed(1)} — ${d.ratingCount} rating${d.ratingCount === 1 ? "" : "s"}`}
+                    >
+                      <span className="font-semibold text-[var(--bb-secondary)]">
+                        {d.ratingOverall.toFixed(1)}
+                      </span>
+                      <span className="ml-1 text-[10px] text-[var(--bb-text-tertiary)]">
+                        / 5 · n={d.ratingCount}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="text-[var(--bb-text-tertiary)]">—</span>
+                  )}
                 </td>
                 <td className="px-3 py-3 text-center font-medium text-[var(--bb-secondary)]">
                   {d.totalEarnings > 0 ? d.totalEarnings.toLocaleString() : "—"}

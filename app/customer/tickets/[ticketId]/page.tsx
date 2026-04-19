@@ -19,6 +19,7 @@ import { FormInput, FormSelect } from "@/components/ui/form-field";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { SafeHtml } from "@/components/ui/safe-html";
 import { Modal, ModalHeader, ModalFooter } from "@/components/ui/modal";
+import { RateCreativeModal } from "@/components/ratings/rate-creative-modal";
 import { TagBadge } from "@/components/ui/tag-badge";
 import { TagMultiSelect, type TagOption } from "@/components/ui/tag-multi-select";
 import type { TagColorKey } from "@/lib/tag-colors";
@@ -236,6 +237,7 @@ export default function CustomerTicketDetailPage() {
   const [revisionMessage, setRevisionMessage] = useState("");
   const [revisionMessageError, setRevisionMessageError] = useState<string | null>(null);
   const [showDoneModal, setShowDoneModal] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
   const [statusSaving, setStatusSaving] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
 
@@ -504,6 +506,12 @@ export default function CustomerTicketDetailPage() {
           const msg = json?.error || "We couldn't update this request. Please try again.";
           setStatusError(typeof msg === "string" ? msg : String(msg));
           return;
+        }
+        // Prompt for a rating when the customer marks the ticket DONE. The
+        // modal is skippable, so closing or dismissing it leaves the ticket
+        // in DONE state with no rating attached.
+        if (newStatus === "DONE") {
+          setShowRatingModal(true);
         }
         // Refresh all data
         setRefreshCounter((c) => c + 1);
@@ -1647,6 +1655,16 @@ export default function CustomerTicketDetailPage() {
             })),
           }))}
           onClose={() => setShowCompare(false)}
+        />
+      )}
+
+      {/* Creative rating modal — opens when the customer marks the ticket DONE */}
+      {ticket && (
+        <RateCreativeModal
+          open={showRatingModal}
+          ticketId={ticket.id}
+          ticketTitle={ticket.title}
+          onClose={() => setShowRatingModal(false)}
         />
       )}
     </>

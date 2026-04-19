@@ -224,6 +224,10 @@ model UserAccount {
   createdMoodboards     Moodboard[]     @relation("MoodboardCreatedBy")
   createdMoodboardItems MoodboardItem[] @relation("MoodboardItemCreatedBy")
 
+  // Creative ratings (admin-only signal; creative does NOT see their own ratings)
+  receivedRatings CreativeRating[] @relation("CreativeRatingsReceived")
+  submittedRatings CreativeRating[] @relation("CreativeRatingsGiven")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -278,6 +282,8 @@ model Company {
   aiGenerations AiGeneration[]
 
   moodboards Moodboard[]
+
+  creativeRatings CreativeRating[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -590,10 +596,56 @@ model Ticket {
 
   moodboards Moodboard[]
 
+  // Creative rating (one per ticket, submitted by the customer on ticket DONE)
+  creativeRating CreativeRating?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([creativeId, status, updatedAt])
+}
+
+// -----------------------------------------------------------------------------
+// Creative Ratings
+//
+// Customers rate the creative after a ticket transitions to DONE. Multi-dim
+// scores (quality / communication / speed, each 1-5) plus optional free-text
+// feedback. Admin-only surface: creatives never see their own ratings. Used
+// to (a) inform admin coaching & staffing decisions, and (b) serve as a
+// tie-breaker in the auto-assign algorithm.
+// -----------------------------------------------------------------------------
+
+model CreativeRating {
+  id String @id @default(cuid())
+
+  // One rating per ticket (the customer rates the creative once, on DONE)
+  ticketId String @unique
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  // Creative being rated
+  creativeId String
+  creative   UserAccount @relation("CreativeRatingsReceived", fields: [creativeId], references: [id])
+
+  // User who submitted the rating (a company member, typically the ticket creator)
+  ratedByUserId String
+  ratedBy       UserAccount @relation("CreativeRatingsGiven", fields: [ratedByUserId], references: [id])
+
+  // Scope — useful for company-level analytics
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  // Multi-dimensional scores (1..5). All three required.
+  quality       Int
+  communication Int
+  speed         Int
+
+  // Optional feedback text, admin-only readable.
+  feedback String?
+
+  createdAt DateTime @default(now())
+
+  @@index([creativeId, createdAt])
+  @@index([companyId, createdAt])
 }
 
 // -----------------------------------------------------------------------------

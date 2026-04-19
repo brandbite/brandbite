@@ -31,55 +31,63 @@ export async function GET() {
     // Run all queries in parallel
     // -----------------------------------------------------------------------
 
-    const [creatives, tickets, revisions, earningsGrouped, withdrawalsGrouped] = await Promise.all([
-      // 1. All creatives
-      prisma.userAccount.findMany({
-        where: { role: "DESIGNER" },
-        select: { id: true, name: true, email: true },
-      }),
+    const [creatives, tickets, revisions, earningsGrouped, withdrawalsGrouped, ratingsGrouped] =
+      await Promise.all([
+        // 1. All creatives
+        prisma.userAccount.findMany({
+          where: { role: "DESIGNER" },
+          select: { id: true, name: true, email: true },
+        }),
 
-      // 2. All tickets with a creative assigned
-      prisma.ticket.findMany({
-        where: { creativeId: { not: null } },
-        select: {
-          id: true,
-          creativeId: true,
-          status: true,
-          priority: true,
-          revisionCount: true,
-          createdAt: true,
-          updatedAt: true,
-          jobType: { select: { tokenCost: true } },
-        },
-      }),
+        // 2. All tickets with a creative assigned
+        prisma.ticket.findMany({
+          where: { creativeId: { not: null } },
+          select: {
+            id: true,
+            creativeId: true,
+            status: true,
+            priority: true,
+            revisionCount: true,
+            createdAt: true,
+            updatedAt: true,
+            jobType: { select: { tokenCost: true } },
+          },
+        }),
 
-      // 3. All revisions submitted by creatives
-      prisma.ticketRevision.findMany({
-        where: { submittedByCreativeId: { not: null } },
-        select: {
-          submittedByCreativeId: true,
-          submittedAt: true,
-          feedbackAt: true,
-          version: true,
-          ticketId: true,
-        },
-      }),
+        // 3. All revisions submitted by creatives
+        prisma.ticketRevision.findMany({
+          where: { submittedByCreativeId: { not: null } },
+          select: {
+            submittedByCreativeId: true,
+            submittedAt: true,
+            feedbackAt: true,
+            version: true,
+            ticketId: true,
+          },
+        }),
 
-      // 4. Earnings grouped by creative
-      prisma.tokenLedger.groupBy({
-        by: ["userId"],
-        where: { direction: "CREDIT", userId: { not: null } },
-        _sum: { amount: true },
-        _count: true,
-      }),
+        // 4. Earnings grouped by creative
+        prisma.tokenLedger.groupBy({
+          by: ["userId"],
+          where: { direction: "CREDIT", userId: { not: null } },
+          _sum: { amount: true },
+          _count: true,
+        }),
 
-      // 5. Withdrawals grouped by creative
-      prisma.withdrawal.groupBy({
-        by: ["creativeId"],
-        _sum: { amountTokens: true },
-        _count: true,
-      }),
-    ]);
+        // 5. Withdrawals grouped by creative
+        prisma.withdrawal.groupBy({
+          by: ["creativeId"],
+          _sum: { amountTokens: true },
+          _count: true,
+        }),
+
+        // 6. Rating averages grouped by creative
+        prisma.creativeRating.groupBy({
+          by: ["creativeId"],
+          _count: { _all: true },
+          _avg: { quality: true, communication: true, speed: true },
+        }),
+      ]);
 
     // -----------------------------------------------------------------------
     // Build lookup maps
@@ -100,6 +108,25 @@ export async function GET() {
       withdrawalsMap.set(row.creativeId, {
         total: row._sum.amountTokens ?? 0,
         count: row._count,
+      });
+    }
+
+    const ratingsMap = new Map<
+      string,
+      { count: number; overall: number; quality: number; communication: number; speed: number }
+    >();
+    for (const row of ratingsGrouped) {
+      const count = row._count._all;
+      if (count === 0) continue;
+      const quality = row._avg.quality ?? 0;
+      const communication = row._avg.communication ?? 0;
+      const speed = row._avg.speed ?? 0;
+      ratingsMap.set(row.creativeId, {
+        count,
+        overall: (quality + communication + speed) / 3,
+        quality,
+        communication,
+        speed,
       });
     }
 
@@ -173,6 +200,9 @@ export async function GET() {
       const earnings = earningsMap.get(d.id);
       const withdrawals = withdrawalsMap.get(d.id);
 
+      // Ratings (admin-only signal)
+      const rating = ratingsMap.get(d.id) ?? null;
+
       // Platform aggregation
       platformTotalCompleted += completedTickets;
       platformRevisionSum += revisionSum;
@@ -193,6 +223,11 @@ export async function GET() {
         loadScore,
         totalEarnings: earnings?.total ?? 0,
         totalWithdrawn: withdrawals?.total ?? 0,
+        ratingCount: rating?.count ?? 0,
+        ratingOverall: rating ? Math.round(rating.overall * 10) / 10 : null,
+        ratingQuality: rating ? Math.round(rating.quality * 10) / 10 : null,
+        ratingCommunication: rating ? Math.round(rating.communication * 10) / 10 : null,
+        ratingSpeed: rating ? Math.round(rating.speed * 10) / 10 : null,
       };
     });
 
