@@ -383,6 +383,18 @@ export default function CustomerBoardPage() {
   const [renameProjectSaving, setRenameProjectSaving] = useState(false);
   const [renameProjectError, setRenameProjectError] = useState<string | null>(null);
 
+  // Brand-guide modal (D19) — keyed off the project being edited.
+  const [brandGuideProject, setBrandGuideProject] = useState<SidebarProject | null>(null);
+  const [brandGuideDraft, setBrandGuideDraft] = useState({
+    brandLogoUrl: "",
+    brandColors: "",
+    brandFonts: "",
+    brandVoice: "",
+  });
+  const [brandGuideLoading, setBrandGuideLoading] = useState(false);
+  const [brandGuideSaving, setBrandGuideSaving] = useState(false);
+  const [brandGuideError, setBrandGuideError] = useState<string | null>(null);
+
   // Delete project confirmation
   const [deleteProject, setDeleteProject] = useState<SidebarProject | null>(null);
   const [deleteProjectSaving, setDeleteProjectSaving] = useState(false);
@@ -609,6 +621,60 @@ export default function CustomerBoardPage() {
   const closeRenameProject = () => {
     setRenameProject(null);
     setRenameProjectError(null);
+  };
+
+  // ---- Brand guide modal -----------------------------------------------
+  const openBrandGuide = async (proj: SidebarProject) => {
+    setBrandGuideProject(proj);
+    setProjectMenuId(null);
+    setBrandGuideError(null);
+    setBrandGuideDraft({ brandLogoUrl: "", brandColors: "", brandFonts: "", brandVoice: "" });
+    setBrandGuideLoading(true);
+    try {
+      const res = await fetch(`/api/customer/projects/${proj.id}`, { cache: "no-store" });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.project) {
+        setBrandGuideDraft({
+          brandLogoUrl: json.project.brandLogoUrl ?? "",
+          brandColors: json.project.brandColors ?? "",
+          brandFonts: json.project.brandFonts ?? "",
+          brandVoice: json.project.brandVoice ?? "",
+        });
+      }
+    } catch {
+      // Leave draft empty — user can fill and save.
+    } finally {
+      setBrandGuideLoading(false);
+    }
+  };
+
+  const closeBrandGuide = () => {
+    setBrandGuideProject(null);
+    setBrandGuideError(null);
+  };
+
+  const handleSaveBrandGuide = async () => {
+    if (!brandGuideProject) return;
+    setBrandGuideSaving(true);
+    setBrandGuideError(null);
+    try {
+      const res = await fetch(`/api/customer/projects/${brandGuideProject.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(brandGuideDraft),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setBrandGuideError(json?.error || "Failed to save brand guide.");
+        return;
+      }
+      closeBrandGuide();
+      showToast({ type: "success", title: "Brand guide saved" });
+    } catch {
+      setBrandGuideError("Unexpected error saving brand guide.");
+    } finally {
+      setBrandGuideSaving(false);
+    }
   };
 
   const handleRenameProject = async () => {
@@ -1747,6 +1813,21 @@ export default function CustomerBoardPage() {
                         </svg>
                         Rename
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => openBrandGuide(proj)}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-medium text-[var(--bb-secondary)] transition-colors hover:bg-[var(--bb-bg-card)]"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 16 16"
+                          fill="currentColor"
+                          className="h-3 w-3 text-[var(--bb-text-tertiary)]"
+                        >
+                          <path d="M3 2a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H3Zm2 2h6v2H5V4Zm0 3h6v1H5V7Zm0 2h4v1H5V9Z" />
+                        </svg>
+                        Brand guide
+                      </button>
                       <div className="mx-2 my-1 border-t border-[var(--bb-border-subtle)]" />
                       <button
                         type="button"
@@ -2241,6 +2322,98 @@ export default function CustomerBoardPage() {
             disabled={!renameProjectName.trim() || renameProjectName.trim().length < 2}
           >
             Save
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Project brand guide modal (D19) */}
+      <Modal open={!!brandGuideProject} onClose={closeBrandGuide} size="md">
+        <ModalHeader
+          eyebrow="Brand guide"
+          title={brandGuideProject?.name ?? ""}
+          subtitle="Fill these once per project. They show up on every ticket for creatives and feed AI prompts automatically."
+          onClose={closeBrandGuide}
+        />
+
+        <div className="space-y-4 px-5 pb-2">
+          {brandGuideError && (
+            <InlineAlert variant="error" size="sm">
+              {brandGuideError}
+            </InlineAlert>
+          )}
+          {brandGuideLoading && (
+            <p className="text-[11px] text-[var(--bb-text-muted)]">Loading current values…</p>
+          )}
+
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-[var(--bb-secondary)]">Logo URL</label>
+            <FormInput
+              type="url"
+              value={brandGuideDraft.brandLogoUrl}
+              onChange={(e) =>
+                setBrandGuideDraft((prev) => ({ ...prev, brandLogoUrl: e.target.value }))
+              }
+              placeholder="https://… (public image link)"
+              disabled={brandGuideSaving}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-[var(--bb-secondary)]">Brand colors</label>
+            <FormInput
+              type="text"
+              value={brandGuideDraft.brandColors}
+              onChange={(e) =>
+                setBrandGuideDraft((prev) => ({ ...prev, brandColors: e.target.value }))
+              }
+              placeholder="#ff6600, #1e293b, #ffffff"
+              disabled={brandGuideSaving}
+            />
+            <p className="text-[11px] text-[var(--bb-text-muted)]">Comma-separated hex values.</p>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-[var(--bb-secondary)]">Fonts</label>
+            <FormInput
+              type="text"
+              value={brandGuideDraft.brandFonts}
+              onChange={(e) =>
+                setBrandGuideDraft((prev) => ({ ...prev, brandFonts: e.target.value }))
+              }
+              placeholder="Inter, Source Serif 4"
+              disabled={brandGuideSaving}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-[var(--bb-secondary)]">
+              Voice / tone notes
+            </label>
+            <textarea
+              value={brandGuideDraft.brandVoice}
+              onChange={(e) =>
+                setBrandGuideDraft((prev) => ({ ...prev, brandVoice: e.target.value }))
+              }
+              placeholder="e.g. Warm, confident, lightly playful. We say ‘folks’ not ‘customers’. Avoid corporate jargon."
+              rows={4}
+              maxLength={2000}
+              disabled={brandGuideSaving}
+              className="w-full rounded-md border border-[var(--bb-border-input)] bg-white px-3 py-2 text-sm text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
+            />
+          </div>
+        </div>
+
+        <ModalFooter>
+          <Button variant="ghost" size="sm" onClick={closeBrandGuide} disabled={brandGuideSaving}>
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleSaveBrandGuide}
+            loading={brandGuideSaving}
+            loadingText="Saving..."
+          >
+            Save brand guide
           </Button>
         </ModalFooter>
       </Modal>

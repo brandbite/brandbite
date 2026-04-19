@@ -16,6 +16,45 @@ import { updateProjectSchema } from "@/lib/schemas/project.schemas";
 type RouteContext = { params: Promise<{ projectId: string }> };
 
 // ---------------------------------------------------------------------------
+// GET — Full project detail (used by the brand-guide modal to pre-populate).
+// ---------------------------------------------------------------------------
+
+export async function GET(_req: NextRequest, ctx: RouteContext) {
+  try {
+    const user = await getCurrentUserOrThrow();
+    if (user.role !== "CUSTOMER" || !user.activeCompanyId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
+
+    const { projectId } = await ctx.params;
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, companyId: user.activeCompanyId },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        brandLogoUrl: true,
+        brandColors: true,
+        brandFonts: true,
+        brandVoice: true,
+      },
+    });
+
+    if (!project) {
+      return NextResponse.json({ error: "Project not found." }, { status: 404 });
+    }
+
+    return NextResponse.json({ project });
+  } catch (error: any) {
+    if (error?.code === "UNAUTHENTICATED") {
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    }
+    console.error("[customer.projects.projectId] GET error", error);
+    return NextResponse.json({ error: "Failed to load project." }, { status: 500 });
+  }
+}
+
+// ---------------------------------------------------------------------------
 // PATCH — Rename a project
 // ---------------------------------------------------------------------------
 
@@ -55,7 +94,7 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
 
     const parsed = await parseBody(req, updateProjectSchema);
     if (!parsed.success) return parsed.response;
-    const { name, code } = parsed.data;
+    const { name, code, brandLogoUrl, brandColors, brandFonts, brandVoice } = parsed.data;
 
     // If code is being changed, check per-company uniqueness
     if (code && code !== existing.code) {
@@ -70,14 +109,33 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
       }
     }
 
-    const data: { name?: string; code?: string } = {};
+    const data: {
+      name?: string;
+      code?: string;
+      brandLogoUrl?: string | null;
+      brandColors?: string | null;
+      brandFonts?: string | null;
+      brandVoice?: string | null;
+    } = {};
     if (name) data.name = name;
     if (code) data.code = code;
+    if (brandLogoUrl !== undefined) data.brandLogoUrl = brandLogoUrl;
+    if (brandColors !== undefined) data.brandColors = brandColors;
+    if (brandFonts !== undefined) data.brandFonts = brandFonts;
+    if (brandVoice !== undefined) data.brandVoice = brandVoice;
 
     const project = await prisma.project.update({
       where: { id: projectId },
       data,
-      select: { id: true, name: true, code: true },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        brandLogoUrl: true,
+        brandColors: true,
+        brandFonts: true,
+        brandVoice: true,
+      },
     });
 
     return NextResponse.json({ project }, { status: 200 });

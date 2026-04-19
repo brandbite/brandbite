@@ -387,6 +387,14 @@ model Project {
 
   autoAssignMode AutoAssignMode @default(INHERIT)
 
+  // Brand guide — surfaced to creatives on every ticket that belongs to this
+  // project and spliced into AI prompt context. Customer fills each field once
+  // per project instead of repeating brand details on every ticket.
+  brandLogoUrl String? /// Single public URL (can be R2, CDN, any https://…).
+  brandColors  String? /// Comma-separated hex values, e.g. "#ff6600,#1e293b,#ffffff".
+  brandFonts   String? /// Comma-separated font names, e.g. "Inter, Source Serif 4".
+  brandVoice   String? /// Free-form tone / voice notes (max 2000 chars at the API level).
+
   members ProjectMember[]
   tickets Ticket[]
 
