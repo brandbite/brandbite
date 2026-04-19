@@ -45,6 +45,14 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["isomorphic-dompurify"],
+  images: {
+    // R2-hosted assets (hero images, thumbnails) served either through the
+    // S3-compatible origin or an optional custom public domain (R2_PUBLIC_BASE_URL).
+    remotePatterns: [
+      { protocol: "https", hostname: "**.r2.cloudflarestorage.com" },
+      { protocol: "https", hostname: "**.r2.dev" },
+    ],
+  },
   headers: async () => [
     {
       source: "/(.*)",

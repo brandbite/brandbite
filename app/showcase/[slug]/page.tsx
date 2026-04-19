@@ -9,6 +9,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
+import Image from "next/image";
+
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
 import { CMS_ALLOWED_ATTR, CMS_ALLOWED_TAGS, SafeHtml } from "@/components/ui/safe-html";
@@ -112,8 +114,15 @@ export default function ShowcaseDetailPage() {
           {/* Hero image                                                      */}
           {/* --------------------------------------------------------------- */}
           {work.heroUrl ? (
-            <div className="w-full">
-              <img src={work.heroUrl} alt={work.title} className="h-[400px] w-full object-cover" />
+            <div className="relative h-[400px] w-full">
+              <Image
+                src={work.heroUrl}
+                alt={work.title}
+                fill
+                sizes="100vw"
+                priority
+                className="object-cover"
+              />
             </div>
           ) : (
             <div className="h-[400px] w-full bg-[#e8dff5]" />

@@ -5,6 +5,7 @@
 
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
@@ -79,8 +80,15 @@ export function CmsPageView({ pageKey }: CmsPageViewProps) {
       {/* Hero image */}
       {page?.heroUrl && (
         <section className="mx-auto w-full max-w-5xl px-6">
-          <div className="overflow-hidden rounded-2xl">
-            <img src={page.heroUrl} alt={page.title} className="h-auto w-full object-cover" />
+          <div className="relative aspect-[16/9] overflow-hidden rounded-2xl">
+            <Image
+              src={page.heroUrl}
+              alt={page.title}
+              fill
+              sizes="(max-width: 1024px) 100vw, 1024px"
+              priority
+              className="object-cover"
+            />
           </div>
         </section>
       )}
