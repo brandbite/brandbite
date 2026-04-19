@@ -162,20 +162,6 @@ function toDatetimeLocalInput(d: Date): string {
   );
 }
 
-/** Return the next N weekdays at 10:00 local starting tomorrow. */
-function nextWeekdaysAtTen(count: number): Date[] {
-  const out: Date[] = [];
-  const cursor = new Date();
-  cursor.setDate(cursor.getDate() + 1);
-  cursor.setHours(10, 0, 0, 0);
-  while (out.length < count) {
-    const day = cursor.getDay();
-    if (day !== 0 && day !== 6) out.push(new Date(cursor));
-    cursor.setDate(cursor.getDate() + 1);
-  }
-  return out;
-}
-
 /** Format a preferredTime: ISO → nicely-formatted; otherwise raw (legacy). */
 function formatPreferred(raw: string, tz: string | null): string {
   const isIso = raw.includes("T") && !Number.isNaN(Date.parse(raw));
@@ -198,6 +184,19 @@ function formatDateTime(iso: string | null): string {
   return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
+type PublicSettings = {
+  enabled: boolean;
+  tokenCost: number;
+  durationMinutes: number;
+  contactEmail: string | null;
+  workingDays: number[];
+  workingHourStart: number;
+  workingHourEnd: number;
+  minNoticeHours: number;
+  maxBookingDays: number;
+  companyTimezone: string | null;
+};
+
 export default function CustomerConsultationPage() {
   const [rows, setRows] = useState<ConsultationRow[]>([]);
   const [tokenCost, setTokenCost] = useState<number>(0);
@@ -205,6 +204,7 @@ export default function CustomerConsultationPage() {
   const [error, setError] = useState<string | null>(null);
   const [companyRole, setCompanyRole] = useState<CompanyRole | null>(null);
   const [companyRoleLoading, setCompanyRoleLoading] = useState(true);
+  const [settings, setSettings] = useState<PublicSettings | null>(null);
 
   // Form state
   const [description, setDescription] = useState("");
@@ -248,6 +248,21 @@ export default function CustomerConsultationPage() {
     load();
   }, [load]);
 
+  // Public settings — drives min/max slots, enabled gate, contact email.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/customer/consultation-settings", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((json) => {
+        if (cancelled) return;
+        if (json?.settings) setSettings(json.settings as PublicSettings);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Company role
   useEffect(() => {
     let cancelled = false;
@@ -271,14 +286,43 @@ export default function CustomerConsultationPage() {
     };
   }, []);
 
-  const canBook = companyRole === "OWNER" || companyRole === "PM";
+  const featureDisabled = settings !== null && !settings.enabled;
+  const canBook = (companyRole === "OWNER" || companyRole === "PM") && !featureDisabled;
 
-  // Minimum datetime for slot inputs: 30 min in the future.
+  // Minimum datetime: now + minNoticeHours (falls back to 30 min before settings load).
   const minSlot = useMemo(() => {
     const d = new Date();
-    d.setMinutes(d.getMinutes() + 30);
+    if (settings) {
+      d.setHours(d.getHours() + settings.minNoticeHours);
+    } else {
+      d.setMinutes(d.getMinutes() + 30);
+    }
     return toDatetimeLocalInput(d);
-  }, []);
+  }, [settings]);
+
+  // Maximum datetime: now + maxBookingDays days (only when settings loaded).
+  const maxSlot = useMemo(() => {
+    if (!settings) return undefined;
+    const d = new Date();
+    d.setDate(d.getDate() + settings.maxBookingDays);
+    return toDatetimeLocalInput(d);
+  }, [settings]);
+
+  // Warn when a picked slot is outside the configured working window.
+  const slotWarnings = useMemo(() => {
+    if (!settings) return ["", "", ""] as [string, string, string];
+    return slots.map((v) => {
+      if (!v) return "";
+      const d = new Date(v);
+      if (Number.isNaN(d.getTime())) return "";
+      const day = d.getDay();
+      const hour = d.getHours();
+      if (!settings.workingDays.includes(day)) return "Outside team working days";
+      if (hour < settings.workingHourStart || hour >= settings.workingHourEnd)
+        return `Outside ${settings.workingHourStart}:00–${settings.workingHourEnd}:00 working hours`;
+      return "";
+    }) as [string, string, string];
+  }, [slots, settings]);
 
   // Normalised preferred slots — emitted as ISO strings.
   const preferredIsoSlots = useMemo(() => {
@@ -300,7 +344,18 @@ export default function CustomerConsultationPage() {
   };
 
   const suggestWeekdaySlots = () => {
-    const ds = nextWeekdaysAtTen(3).map(toDatetimeLocalInput);
+    const workingDays = settings?.workingDays ?? [1, 2, 3, 4, 5];
+    const hour = settings?.workingHourStart ?? 10;
+    const out: Date[] = [];
+    const cursor = new Date();
+    cursor.setDate(cursor.getDate() + 1);
+    cursor.setHours(hour, 0, 0, 0);
+    let safety = 60; // hard cap so we never loop forever on a bad config
+    while (out.length < 3 && safety-- > 0) {
+      if (workingDays.includes(cursor.getDay())) out.push(new Date(cursor));
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    const ds = out.map(toDatetimeLocalInput);
     setSlots([ds[0] ?? "", ds[1] ?? "", ds[2] ?? ""]);
   };
 
@@ -367,13 +422,21 @@ export default function CustomerConsultationPage() {
           Book a call with our team
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-[var(--bb-text-secondary)]">
-          Get a 30-minute video consultation with the Brandbite team. Pick what you want to discuss
-          and a few time slots that work — we&apos;ll confirm one by email with a video link.
+          Get a {settings?.durationMinutes ?? 30}-minute video consultation with the Brandbite team.
+          Pick what you want to discuss and a few time slots that work — we&apos;ll confirm one by
+          email with a video link
+          {settings?.contactEmail ? ` from ${settings.contactEmail}` : ""}.
         </p>
       </header>
 
       {/* Access gate */}
-      {!companyRoleLoading && !canBook && (
+      {featureDisabled && (
+        <InlineAlert variant="warning" className="mb-6">
+          Consultation bookings are paused right now. Please check back later.
+        </InlineAlert>
+      )}
+
+      {!featureDisabled && !companyRoleLoading && !canBook && (
         <InlineAlert variant="info" className="mb-6">
           Consultations are available to company <strong>Owners</strong> and <strong>PM</strong>{" "}
           members. Ask a teammate with one of those roles to book on your behalf.
@@ -493,6 +556,7 @@ export default function CustomerConsultationPage() {
                         type="datetime-local"
                         value={value}
                         min={minSlot}
+                        max={maxSlot}
                         onChange={(e) => setSlotAt(idx, e.target.value)}
                         className="w-full rounded-md border border-[var(--bb-border-input)] bg-white px-2 py-1.5 text-sm text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
                       />
@@ -501,10 +565,25 @@ export default function CustomerConsultationPage() {
                           {preview}
                         </span>
                       )}
+                      {slotWarnings[idx] && (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-900 sm:ml-2 sm:whitespace-nowrap">
+                          {slotWarnings[idx]}
+                        </span>
+                      )}
                     </div>
                   );
                 })}
               </div>
+              {settings && (
+                <p className="mt-2 text-[11px] text-[var(--bb-text-muted)]">
+                  Team is available{" "}
+                  {settings.workingDays
+                    .map((d) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d])
+                    .join(", ")}{" "}
+                  from {settings.workingHourStart}:00 to {settings.workingHourEnd}:00
+                  {settings.companyTimezone ? ` ${settings.companyTimezone}` : ""}.
+                </p>
+              )}
             </div>
 
             {/* Timezone */}
