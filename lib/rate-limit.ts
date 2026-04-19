@@ -27,14 +27,32 @@ export type RateLimitResult = {
 };
 
 // ---------------------------------------------------------------------------
-// Upstash backend (enabled when both env vars are set)
+// Upstash backend (enabled when REST URL + TOKEN env vars are set)
+//
+// Accepts three naming conventions so the integration works whether the
+// vars were set manually, auto-injected by Vercel's Upstash marketplace
+// integration (Redis.fromEnv-compatible `KV_REST_API_*` names), or
+// auto-injected with a `UPSTASH_REDIS_REST` custom prefix in the Vercel
+// integration wizard (producing `UPSTASH_REDIS_REST_KV_REST_API_*`).
 // ---------------------------------------------------------------------------
 
-const upstashRedis = (() => {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+function resolveUpstashCredentials(): { url: string; token: string } | null {
+  const url =
+    process.env.UPSTASH_REDIS_REST_URL ||
+    process.env.KV_REST_API_URL ||
+    process.env.UPSTASH_REDIS_REST_KV_REST_API_URL;
+  const token =
+    process.env.UPSTASH_REDIS_REST_TOKEN ||
+    process.env.KV_REST_API_TOKEN ||
+    process.env.UPSTASH_REDIS_REST_KV_REST_API_TOKEN;
   if (!url || !token) return null;
-  return new Redis({ url, token });
+  return { url, token };
+}
+
+const upstashRedis = (() => {
+  const creds = resolveUpstashCredentials();
+  if (!creds) return null;
+  return new Redis({ url: creds.url, token: creds.token });
 })();
 
 const upstashLimiterCache = new Map<string, Ratelimit>();
