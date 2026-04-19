@@ -153,13 +153,21 @@ function tzShortLabel(tz: string): string {
   }
 }
 
-/** "YYYY-MM-DDTHH:mm" from the user's local wall clock. */
-function toDatetimeLocalInput(d: Date): string {
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  return (
-    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
-    `T${pad(d.getHours())}:${pad(d.getMinutes())}`
-  );
+function pad2(n: number): string {
+  return n.toString().padStart(2, "0");
+}
+
+/** "YYYY-MM-DD" — date-only input format. */
+function toDateInput(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+/** "9:00 AM" style from a "HH:MM" 24-h string. */
+function formatTimeLabel(hhmm: string): string {
+  const [h, m] = hhmm.split(":").map(Number);
+  const hour12 = ((h + 11) % 12) + 1;
+  const ampm = h < 12 ? "AM" : "PM";
+  return `${hour12}:${pad2(m)} ${ampm}`;
 }
 
 /** Format a preferredTime: ISO → nicely-formatted; otherwise raw (legacy). */
@@ -206,10 +214,13 @@ export default function CustomerConsultationPage() {
   const [companyRoleLoading, setCompanyRoleLoading] = useState(true);
   const [settings, setSettings] = useState<PublicSettings | null>(null);
 
-  // Form state — one proposed time slot only (single-slot UX, was 3-slot).
+  // Form state — date + time as two separate fields so the time dropdown
+  // can offer only valid 30-min slots (native datetime-local ignores step
+  // on the picker UI, leading to confusing 1-minute granularity).
   const [description, setDescription] = useState("");
   const [timezone, setTimezone] = useState<string>(() => detectTimezone());
-  const [slot, setSlot] = useState<string>("");
+  const [date, setDate] = useState<string>(""); // YYYY-MM-DD
+  const [time, setTime] = useState<string>(""); // HH:MM (30-min granularity)
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -289,51 +300,74 @@ export default function CustomerConsultationPage() {
   const featureDisabled = settings !== null && !settings.enabled;
   const canBook = (companyRole === "OWNER" || companyRole === "PM") && !featureDisabled;
 
-  // Minimum datetime: now + minNoticeHours (falls back to 30 min before settings load).
-  const minSlot = useMemo(() => {
+  // --- Date-picker bounds ----------------------------------------------------
+  // Minimum date: today + ceil(minNoticeHours / 24). The hour guard below
+  // trims same-day slots that would violate minNoticeHours more precisely.
+  const minDate = useMemo(() => {
     const d = new Date();
     if (settings) {
-      d.setHours(d.getHours() + settings.minNoticeHours);
-    } else {
-      d.setMinutes(d.getMinutes() + 30);
+      const minNoticeDays = Math.ceil(settings.minNoticeHours / 24);
+      d.setDate(d.getDate() + Math.max(0, minNoticeDays - 1));
     }
-    return toDatetimeLocalInput(d);
+    d.setHours(0, 0, 0, 0);
+    return toDateInput(d);
   }, [settings]);
 
-  // Maximum datetime: now + maxBookingDays days (only when settings loaded).
-  const maxSlot = useMemo(() => {
+  const maxDate = useMemo(() => {
     if (!settings) return undefined;
     const d = new Date();
     d.setDate(d.getDate() + settings.maxBookingDays);
-    return toDatetimeLocalInput(d);
+    return toDateInput(d);
   }, [settings]);
 
-  // Warn when the picked slot is outside the configured working window.
+  // --- Time-slot dropdown options -------------------------------------------
+  // 30-min slots across the configured working-hours window. If the user picked
+  // today, hide slots before now + minNoticeHours.
+  const timeOptions = useMemo(() => {
+    const start = settings?.workingHourStart ?? 9;
+    const end = settings?.workingHourEnd ?? 17;
+    const out: string[] = [];
+    for (let h = start; h < end; h++) {
+      out.push(`${pad2(h)}:00`);
+      out.push(`${pad2(h)}:30`);
+    }
+
+    if (!date) return out;
+
+    // Same-day? Trim slots before now + minNoticeHours.
+    const picked = new Date(`${date}T00:00`);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const isToday = picked.getTime() === today.getTime();
+    if (!isToday) return out;
+
+    const minHourToday = new Date();
+    minHourToday.setHours(minHourToday.getHours() + (settings?.minNoticeHours ?? 0));
+    return out.filter((slot) => {
+      const [hh, mm] = slot.split(":").map(Number);
+      const slotDate = new Date(picked);
+      slotDate.setHours(hh, mm, 0, 0);
+      return slotDate.getTime() >= minHourToday.getTime();
+    });
+  }, [date, settings]);
+
+  // Warn when the picked date is a non-working day.
   const slotWarning = useMemo(() => {
-    if (!settings || !slot) return "";
-    const d = new Date(slot);
-    if (Number.isNaN(d.getTime())) return "";
-    const day = d.getDay();
-    const hour = d.getHours();
-    if (!settings.workingDays.includes(day)) return "Outside team working days";
-    if (hour < settings.workingHourStart || hour >= settings.workingHourEnd)
-      return `Outside ${settings.workingHourStart}:00–${settings.workingHourEnd}:00 working hours`;
+    if (!settings || !date) return "";
+    const picked = new Date(`${date}T00:00`);
+    if (Number.isNaN(picked.getTime())) return "";
+    if (!settings.workingDays.includes(picked.getDay())) return "Outside team working days";
     return "";
-  }, [slot, settings]);
+  }, [date, settings]);
 
   // Normalised preferred slot — emitted as a single-element ISO array on the
   // wire (API still accepts the legacy preferredTimes[] shape).
   const preferredIsoSlots = useMemo(() => {
-    return [slot]
-      .map((v) => v.trim())
-      .filter(Boolean)
-      .map((v) => {
-        if (!v) return null;
-        const d = new Date(v);
-        return Number.isNaN(d.getTime()) ? null : d.toISOString();
-      })
-      .filter((v): v is string => Boolean(v));
-  }, [slot]);
+    if (!date || !time) return [];
+    const local = new Date(`${date}T${time}`);
+    if (Number.isNaN(local.getTime())) return [];
+    return [local.toISOString()];
+  }, [date, time]);
 
   const charCount = description.trim().length;
   const charOk = charCount >= DESCRIPTION_MIN && charCount <= DESCRIPTION_MAX;
@@ -342,19 +376,19 @@ export default function CustomerConsultationPage() {
     setDescription((prev) => (prev.trim().length === 0 ? text : prev.trimEnd() + "\n\n" + text));
   };
 
-  /** Pick the next weekday at the configured working-hour start. */
+  /** Pick the next working day at the configured working-hour start. */
   const suggestSlot = () => {
     const workingDays = settings?.workingDays ?? [1, 2, 3, 4, 5];
     const hour = settings?.workingHourStart ?? 10;
     const cursor = new Date();
     cursor.setDate(cursor.getDate() + 1);
-    cursor.setHours(hour, 0, 0, 0);
     let safety = 14;
     while (safety-- > 0) {
       if (workingDays.includes(cursor.getDay())) break;
       cursor.setDate(cursor.getDate() + 1);
     }
-    setSlot(toDatetimeLocalInput(cursor));
+    setDate(toDateInput(cursor));
+    setTime(`${pad2(hour)}:00`);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -390,7 +424,8 @@ export default function CustomerConsultationPage() {
         `Request submitted. Your team will email you with a time slot. (${tokenCost} tokens debited.)`,
       );
       setDescription("");
-      setSlot("");
+      setDate("");
+      setTime("");
       load();
     } catch (err) {
       console.error("[CustomerConsultationPage] submit error", err);
@@ -491,11 +526,11 @@ export default function CustomerConsultationPage() {
               </div>
             </div>
 
-            {/* Preferred time */}
+            {/* Preferred date + time */}
             <div>
               <div className="mb-2 flex items-center justify-between gap-2">
                 <label className="block text-xs font-semibold tracking-[0.15em] text-[var(--bb-text-tertiary)] uppercase">
-                  Preferred time
+                  Preferred date &amp; time
                 </label>
                 <div className="flex items-center gap-2">
                   <button
@@ -505,10 +540,13 @@ export default function CustomerConsultationPage() {
                   >
                     Suggest a time
                   </button>
-                  {slot && (
+                  {(date || time) && (
                     <button
                       type="button"
-                      onClick={() => setSlot("")}
+                      onClick={() => {
+                        setDate("");
+                        setTime("");
+                      }}
                       className="text-[11px] font-medium text-[var(--bb-text-muted)] hover:text-[var(--bb-secondary)] hover:underline"
                     >
                       Clear
@@ -517,36 +555,59 @@ export default function CustomerConsultationPage() {
                 </div>
               </div>
               <p className="mb-2 text-[11px] text-[var(--bb-text-muted)]">
-                Pick a time in your timezone. The admin will confirm or propose a different slot by
-                email.
+                Pick a date and a 30-minute slot. The admin will confirm or propose a different slot
+                by email.
               </p>
-              <div className="flex flex-col gap-1 rounded-lg border border-[var(--bb-border-subtle)] bg-white p-2 sm:flex-row sm:items-center">
+              <div className="grid gap-2 sm:grid-cols-2">
                 <input
-                  type="datetime-local"
-                  value={slot}
-                  min={minSlot}
-                  max={maxSlot}
-                  step={1800}
-                  onChange={(e) => setSlot(e.target.value)}
+                  type="date"
+                  value={date}
+                  min={minDate}
+                  max={maxDate}
+                  onChange={(e) => {
+                    setDate(e.target.value);
+                    // Reset time if it's no longer valid for the new date's
+                    // same-day min-notice filter.
+                    setTime("");
+                  }}
                   className="w-full rounded-md border border-[var(--bb-border-input)] bg-white px-2 py-1.5 text-sm text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
                 />
-                {slot && (
-                  <span className="text-[11px] text-[var(--bb-text-muted)] sm:ml-2 sm:whitespace-nowrap">
-                    {new Date(slot).toLocaleString(undefined, {
-                      weekday: "short",
-                      month: "short",
-                      day: "numeric",
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                )}
-                {slotWarning && (
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-900 sm:ml-2 sm:whitespace-nowrap">
-                    {slotWarning}
-                  </span>
-                )}
+                <FormSelect
+                  value={time}
+                  onChange={(e) => setTime(e.target.value)}
+                  disabled={!date || timeOptions.length === 0}
+                >
+                  <option value="">
+                    {date
+                      ? timeOptions.length === 0
+                        ? "No slots available on this day"
+                        : "Select a time..."
+                      : "Pick a date first"}
+                  </option>
+                  {timeOptions.map((t) => (
+                    <option key={t} value={t}>
+                      {formatTimeLabel(t)}
+                    </option>
+                  ))}
+                </FormSelect>
               </div>
+              {date && time && (
+                <p className="mt-2 text-[11px] text-[var(--bb-text-secondary)]">
+                  →{" "}
+                  {new Date(`${date}T${time}`).toLocaleString(undefined, {
+                    weekday: "long",
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </p>
+              )}
+              {slotWarning && (
+                <p className="mt-2 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-900">
+                  {slotWarning}
+                </p>
+              )}
               <p className="mt-2 text-[11px] text-[var(--bb-text-muted)]">
                 {settings ? (
                   <>
