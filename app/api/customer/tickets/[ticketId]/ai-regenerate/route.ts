@@ -12,9 +12,10 @@ import { saveAiImageToR2 } from "@/lib/ai/asset-pipeline";
 import {
   getAiToolConfig,
   validateSufficientTokens,
-  debitAiTokens,
+  claimAiGeneration,
   refundAiTokens,
 } from "@/lib/ai/cost-calculator";
+import { readIdempotencyKey } from "@/lib/ai/idempotency";
 
 export async function POST(
   req: NextRequest,
@@ -34,6 +35,8 @@ export async function POST(
     if (!user.activeCompanyId) {
       return NextResponse.json({ error: "No active company" }, { status: 400 });
     }
+
+    const idempotencyKey = readIdempotencyKey(req.headers);
 
     const ticket = await prisma.ticket.findFirst({
       where: {
@@ -91,28 +94,40 @@ export async function POST(
       );
     }
 
-    // Create AiGeneration record
-    const generation = await prisma.aiGeneration.create({
-      data: {
-        toolType: "IMAGE_GENERATION",
-        userId: user.id,
-        companyId: user.activeCompanyId,
-        ticketId,
-        prompt: refinedPrompt,
-        inputParams: { feedback, style, size, isIteration: true },
-        provider: "",
-        model: "",
-        status: "PROCESSING",
-        tokenCost: iterationCost,
-        startedAt: new Date(),
-      },
+    // Create AiGeneration record + debit tokens atomically. A retry with the
+    // same Idempotency-Key returns the existing record instead of debiting again.
+    const { generation, reused } = await claimAiGeneration({
+      idempotencyKey,
+      userId: user.id,
+      companyId: user.activeCompanyId,
+      ticketId,
+      toolType: "IMAGE_GENERATION",
+      prompt: refinedPrompt,
+      inputParams: { feedback, style, size, isIteration: true },
+      cost: iterationCost,
     });
 
-    // Debit iteration cost
-    await debitAiTokens(user.activeCompanyId, iterationCost, {
-      generationId: generation.id,
-      toolType: "IMAGE_GENERATION",
-      ticketId,
+    if (reused) {
+      return NextResponse.json(
+        {
+          generation: {
+            id: generation.id,
+            status: generation.status,
+            imageUrl: generation.outputImageUrl,
+            provider: generation.provider,
+            model: generation.model,
+          },
+          reused: true,
+        },
+        { status: 200 },
+      );
+    }
+
+    // Flip to PROCESSING now that we've claimed the debit and are about to
+    // call the provider (claimAiGeneration leaves the row in PENDING).
+    await prisma.aiGeneration.update({
+      where: { id: generation.id },
+      data: { status: "PROCESSING", startedAt: new Date() },
     });
 
     try {
@@ -202,8 +217,21 @@ export async function POST(
       );
     }
   } catch (error: unknown) {
-    if ((error as { code?: string })?.code === "UNAUTHENTICATED") {
+    const code = (error as { code?: string })?.code;
+    if (code === "UNAUTHENTICATED") {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    }
+    if (code === "INVALID_IDEMPOTENCY_KEY") {
+      return NextResponse.json(
+        { error: "Idempotency-Key header must be a valid UUID" },
+        { status: 400 },
+      );
+    }
+    if (error instanceof Error && error.message === "IDEMPOTENCY_KEY_CONFLICT") {
+      return NextResponse.json(
+        { error: "Idempotency-Key belongs to another user or company" },
+        { status: 409 },
+      );
     }
     console.error("[customer/tickets/ai-regenerate] POST error", error);
     return NextResponse.json({ error: "Failed to regenerate AI content" }, { status: 500 });
