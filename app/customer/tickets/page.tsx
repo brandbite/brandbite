@@ -10,6 +10,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BoardViewToggle } from "@/components/board/board-view-toggle";
 import { DataTable, THead, TH, TD } from "@/components/ui/data-table";
 import type { CompanyRole as CompanyRoleString } from "@/lib/permissions/companyRoles";
 import { canCreateTickets } from "@/lib/permissions/companyRoles";
@@ -284,8 +285,13 @@ export default function CustomerTicketsPage() {
 
   return (
     <>
+      {/* View switcher — Board (kanban) ↔ Table (this page) */}
+      <div className="mt-2 mb-4">
+        <BoardViewToggle rolePath="/customer" />
+      </div>
+
       {/* Page header */}
-      <div className="mt-2 mb-4 flex flex-wrap items-center justify-between gap-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">My tickets</h1>
           <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">

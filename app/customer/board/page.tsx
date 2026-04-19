@@ -10,6 +10,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BoardViewToggle } from "@/components/board/board-view-toggle";
 import {
   CompanyRole,
   normalizeCompanyRole,
@@ -1824,6 +1825,11 @@ export default function CustomerBoardPage() {
 
         {/* Main board area */}
         <main className="flex min-w-0 flex-col">
+          {/* View switcher — Kanban (this page) ↔ Table */}
+          <div className="mb-3">
+            <BoardViewToggle rolePath="/customer" />
+          </div>
+
           {/* Header — project-aware */}
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div className="flex items-center gap-3">

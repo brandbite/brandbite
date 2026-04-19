@@ -9,6 +9,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { BoardViewToggle } from "@/components/board/board-view-toggle";
 import { useToast } from "@/components/ui/toast-provider";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -310,6 +311,11 @@ export default function AdminBoardPage() {
 
         {/* Main board area */}
         <main className="flex flex-col">
+          {/* View switcher — Kanban (this page) ↔ Table */}
+          <div className="mb-3">
+            <BoardViewToggle rolePath="/admin" />
+          </div>
+
           {/* Header */}
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div>

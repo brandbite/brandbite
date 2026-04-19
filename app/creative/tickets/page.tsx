@@ -10,6 +10,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { BoardViewToggle } from "@/components/board/board-view-toggle";
 import { buildTicketCode } from "@/lib/ticket-code";
 import { DataTable, THead, TH, TD } from "@/components/ui/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -231,6 +232,11 @@ export default function CreativeTicketsPage() {
 
   return (
     <>
+      {/* View switcher — Kanban ↔ Table (this page) */}
+      <div className="mt-2 mb-4">
+        <BoardViewToggle rolePath="/creative" />
+      </div>
+
       {/* Page header */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
         <div>
