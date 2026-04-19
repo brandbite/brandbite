@@ -206,10 +206,10 @@ export default function CustomerConsultationPage() {
   const [companyRoleLoading, setCompanyRoleLoading] = useState(true);
   const [settings, setSettings] = useState<PublicSettings | null>(null);
 
-  // Form state
+  // Form state — one proposed time slot only (single-slot UX, was 3-slot).
   const [description, setDescription] = useState("");
   const [timezone, setTimezone] = useState<string>(() => detectTimezone());
-  const [slots, setSlots] = useState<[string, string, string]>(["", "", ""]);
+  const [slot, setSlot] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -308,33 +308,32 @@ export default function CustomerConsultationPage() {
     return toDatetimeLocalInput(d);
   }, [settings]);
 
-  // Warn when a picked slot is outside the configured working window.
-  const slotWarnings = useMemo(() => {
-    if (!settings) return ["", "", ""] as [string, string, string];
-    return slots.map((v) => {
-      if (!v) return "";
-      const d = new Date(v);
-      if (Number.isNaN(d.getTime())) return "";
-      const day = d.getDay();
-      const hour = d.getHours();
-      if (!settings.workingDays.includes(day)) return "Outside team working days";
-      if (hour < settings.workingHourStart || hour >= settings.workingHourEnd)
-        return `Outside ${settings.workingHourStart}:00–${settings.workingHourEnd}:00 working hours`;
-      return "";
-    }) as [string, string, string];
-  }, [slots, settings]);
+  // Warn when the picked slot is outside the configured working window.
+  const slotWarning = useMemo(() => {
+    if (!settings || !slot) return "";
+    const d = new Date(slot);
+    if (Number.isNaN(d.getTime())) return "";
+    const day = d.getDay();
+    const hour = d.getHours();
+    if (!settings.workingDays.includes(day)) return "Outside team working days";
+    if (hour < settings.workingHourStart || hour >= settings.workingHourEnd)
+      return `Outside ${settings.workingHourStart}:00–${settings.workingHourEnd}:00 working hours`;
+    return "";
+  }, [slot, settings]);
 
-  // Normalised preferred slots — emitted as ISO strings.
+  // Normalised preferred slot — emitted as a single-element ISO array on the
+  // wire (API still accepts the legacy preferredTimes[] shape).
   const preferredIsoSlots = useMemo(() => {
-    return slots
+    return [slot]
       .map((v) => v.trim())
       .filter(Boolean)
       .map((v) => {
+        if (!v) return null;
         const d = new Date(v);
         return Number.isNaN(d.getTime()) ? null : d.toISOString();
       })
       .filter((v): v is string => Boolean(v));
-  }, [slots]);
+  }, [slot]);
 
   const charCount = description.trim().length;
   const charOk = charCount >= DESCRIPTION_MIN && charCount <= DESCRIPTION_MAX;
@@ -343,30 +342,19 @@ export default function CustomerConsultationPage() {
     setDescription((prev) => (prev.trim().length === 0 ? text : prev.trimEnd() + "\n\n" + text));
   };
 
-  const suggestWeekdaySlots = () => {
+  /** Pick the next weekday at the configured working-hour start. */
+  const suggestSlot = () => {
     const workingDays = settings?.workingDays ?? [1, 2, 3, 4, 5];
     const hour = settings?.workingHourStart ?? 10;
-    const out: Date[] = [];
     const cursor = new Date();
     cursor.setDate(cursor.getDate() + 1);
     cursor.setHours(hour, 0, 0, 0);
-    let safety = 60; // hard cap so we never loop forever on a bad config
-    while (out.length < 3 && safety-- > 0) {
-      if (workingDays.includes(cursor.getDay())) out.push(new Date(cursor));
+    let safety = 14;
+    while (safety-- > 0) {
+      if (workingDays.includes(cursor.getDay())) break;
       cursor.setDate(cursor.getDate() + 1);
     }
-    const ds = out.map(toDatetimeLocalInput);
-    setSlots([ds[0] ?? "", ds[1] ?? "", ds[2] ?? ""]);
-  };
-
-  const clearSlots = () => setSlots(["", "", ""]);
-
-  const setSlotAt = (index: 0 | 1 | 2, value: string) => {
-    setSlots((prev) => {
-      const next: [string, string, string] = [prev[0], prev[1], prev[2]];
-      next[index] = value;
-      return next;
-    });
+    setSlot(toDatetimeLocalInput(cursor));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -402,7 +390,7 @@ export default function CustomerConsultationPage() {
         `Request submitted. Your team will email you with a time slot. (${tokenCost} tokens debited.)`,
       );
       setDescription("");
-      setSlots(["", "", ""]);
+      setSlot("");
       load();
     } catch (err) {
       console.error("[CustomerConsultationPage] submit error", err);
@@ -503,24 +491,24 @@ export default function CustomerConsultationPage() {
               </div>
             </div>
 
-            {/* Preferred slots */}
+            {/* Preferred time */}
             <div>
               <div className="mb-2 flex items-center justify-between gap-2">
                 <label className="block text-xs font-semibold tracking-[0.15em] text-[var(--bb-text-tertiary)] uppercase">
-                  Preferred time slots (optional)
+                  Preferred time
                 </label>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={suggestWeekdaySlots}
+                    onClick={suggestSlot}
                     className="text-[11px] font-medium text-[var(--bb-primary)] hover:underline"
                   >
-                    Suggest 3 times
+                    Suggest a time
                   </button>
-                  {(slots[0] || slots[1] || slots[2]) && (
+                  {slot && (
                     <button
                       type="button"
-                      onClick={clearSlots}
+                      onClick={() => setSlot("")}
                       className="text-[11px] font-medium text-[var(--bb-text-muted)] hover:text-[var(--bb-secondary)] hover:underline"
                     >
                       Clear
@@ -529,61 +517,51 @@ export default function CustomerConsultationPage() {
                 </div>
               </div>
               <p className="mb-2 text-[11px] text-[var(--bb-text-muted)]">
-                Pick up to 3 times in your timezone. The admin will confirm one.
+                Pick a time in your timezone. The admin will confirm or propose a different slot by
+                email.
               </p>
-              <div className="space-y-2">
-                {[0, 1, 2].map((i) => {
-                  const idx = i as 0 | 1 | 2;
-                  const value = slots[idx];
-                  const preview = value
-                    ? new Date(value).toLocaleString(undefined, {
-                        weekday: "short",
-                        month: "short",
-                        day: "numeric",
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })
-                    : null;
-                  return (
-                    <div
-                      key={idx}
-                      className="flex flex-col gap-1 rounded-lg border border-[var(--bb-border-subtle)] bg-white p-2 sm:flex-row sm:items-center"
-                    >
-                      <span className="shrink-0 text-[11px] font-semibold text-[var(--bb-text-tertiary)] uppercase sm:w-14">
-                        Slot {i + 1}
-                      </span>
-                      <input
-                        type="datetime-local"
-                        value={value}
-                        min={minSlot}
-                        max={maxSlot}
-                        onChange={(e) => setSlotAt(idx, e.target.value)}
-                        className="w-full rounded-md border border-[var(--bb-border-input)] bg-white px-2 py-1.5 text-sm text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
-                      />
-                      {preview && (
-                        <span className="text-[11px] text-[var(--bb-text-muted)] sm:ml-2 sm:whitespace-nowrap">
-                          {preview}
-                        </span>
-                      )}
-                      {slotWarnings[idx] && (
-                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-900 sm:ml-2 sm:whitespace-nowrap">
-                          {slotWarnings[idx]}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
+              <div className="flex flex-col gap-1 rounded-lg border border-[var(--bb-border-subtle)] bg-white p-2 sm:flex-row sm:items-center">
+                <input
+                  type="datetime-local"
+                  value={slot}
+                  min={minSlot}
+                  max={maxSlot}
+                  step={1800}
+                  onChange={(e) => setSlot(e.target.value)}
+                  className="w-full rounded-md border border-[var(--bb-border-input)] bg-white px-2 py-1.5 text-sm text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
+                />
+                {slot && (
+                  <span className="text-[11px] text-[var(--bb-text-muted)] sm:ml-2 sm:whitespace-nowrap">
+                    {new Date(slot).toLocaleString(undefined, {
+                      weekday: "short",
+                      month: "short",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                )}
+                {slotWarning && (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-900 sm:ml-2 sm:whitespace-nowrap">
+                    {slotWarning}
+                  </span>
+                )}
               </div>
-              {settings && (
-                <p className="mt-2 text-[11px] text-[var(--bb-text-muted)]">
-                  Team is available{" "}
-                  {settings.workingDays
-                    .map((d) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d])
-                    .join(", ")}{" "}
-                  from {settings.workingHourStart}:00 to {settings.workingHourEnd}:00
-                  {settings.companyTimezone ? ` ${settings.companyTimezone}` : ""}.
-                </p>
-              )}
+              <p className="mt-2 text-[11px] text-[var(--bb-text-muted)]">
+                {settings ? (
+                  <>
+                    Team is available{" "}
+                    {settings.workingDays
+                      .map((d) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d])
+                      .join(", ")}{" "}
+                    from {settings.workingHourStart}:00 to {settings.workingHourEnd}:00
+                    {settings.companyTimezone ? ` ${settings.companyTimezone}` : ""}. Times snap to
+                    30-minute increments.
+                  </>
+                ) : (
+                  "Times snap to 30-minute increments."
+                )}
+              </p>
             </div>
 
             {/* Timezone */}
