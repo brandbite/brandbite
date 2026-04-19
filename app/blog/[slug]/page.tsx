@@ -5,6 +5,7 @@
 
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -115,8 +116,15 @@ export default function BlogPostPage() {
         <>
           {/* Hero image */}
           {post.heroUrl && (
-            <div className="mx-auto max-h-[500px] overflow-hidden">
-              <img src={post.heroUrl} alt={post.title} className="h-full w-full object-cover" />
+            <div className="relative mx-auto h-[500px] w-full overflow-hidden">
+              <Image
+                src={post.heroUrl}
+                alt={post.title}
+                fill
+                sizes="100vw"
+                priority
+                className="object-cover"
+              />
             </div>
           )}
 
