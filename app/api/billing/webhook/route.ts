@@ -408,10 +408,32 @@ export async function POST(req: NextRequest) {
 
         const billingStatus = mapStripeSubscriptionStatus(subscription.status);
 
+        // Sync planId when the subscription's price changes (customer upgraded
+        // or downgraded mid-cycle via /api/billing/change-plan or the Stripe
+        // Billing Portal). We look up the Plan by stripePriceId; if nothing
+        // matches we leave planId untouched (the price may be an unlinked one,
+        // e.g. during migration).
+        let newPlanId: string | undefined;
+        if (event.type === "customer.subscription.updated") {
+          const item = subscription.items?.data?.[0];
+          const newPriceId =
+            item?.price?.id && typeof item.price.id === "string" ? item.price.id : null;
+          if (newPriceId) {
+            const matchingPlan = await prisma.plan.findFirst({
+              where: { stripePriceId: newPriceId },
+              select: { id: true },
+            });
+            if (matchingPlan && matchingPlan.id !== company.planId) {
+              newPlanId = matchingPlan.id;
+            }
+          }
+        }
+
         await prisma.company.update({
           where: { id: company.id },
           data: {
             billingStatus,
+            ...(newPlanId ? { planId: newPlanId } : {}),
           },
         });
 
@@ -419,6 +441,7 @@ export async function POST(req: NextRequest) {
           companyId: company.id,
           subscriptionId,
           billingStatus,
+          planChanged: newPlanId ?? null,
           type: event.type,
         });
 
