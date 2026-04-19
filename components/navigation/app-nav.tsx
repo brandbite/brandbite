@@ -41,7 +41,7 @@ type AppNavRole = "admin" | "customer" | "creative";
 
 const NAV_CONFIG: Record<
   AppNavRole,
-  { items: NavEntry[]; brandLabel: string; roleLabel?: string }
+  { items: NavEntry[]; brandLabel: string; roleLabel?: string; homeHref: string }
 > = {
   admin: {
     items: [
@@ -88,6 +88,7 @@ const NAV_CONFIG: Record<
     ],
     brandLabel: "Brandbite",
     roleLabel: "Admin",
+    homeHref: "/admin",
   },
   customer: {
     items: [
@@ -99,9 +100,11 @@ const NAV_CONFIG: Record<
       { href: "/customer/tickets", label: "Tickets" },
       { href: "/customer/ai-tools", label: "AI Tools" },
       { href: "/customer/members", label: "Members" },
+      { href: "/customer/faq", label: "FAQ" },
       { href: "/customer/settings", label: "Settings" },
     ],
     brandLabel: "Brandbite",
+    homeHref: "/customer/board",
   },
   creative: {
     items: [
@@ -110,9 +113,11 @@ const NAV_CONFIG: Record<
       { href: "/creative/tickets", label: "Tickets" },
       { href: "/creative/balance", label: "Balance" },
       { href: "/creative/withdrawals", label: "Withdrawals" },
+      { href: "/creative/faq", label: "FAQ" },
       { href: "/creative/settings", label: "Settings" },
     ],
     brandLabel: "Brandbite \u00b7 Creative",
+    homeHref: "/creative/board",
   },
 };
 
@@ -286,9 +291,13 @@ export function AppNav({ role }: { role: AppNavRole }) {
 
   return (
     <header className="relative mb-6 flex items-center justify-between">
-      {/* Logo + brand */}
+      {/* Logo + brand — clicks to the role's home page */}
       <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1.5">
+        <Link
+          href={config.homeHref}
+          className="flex items-center gap-1.5 rounded-md transition-opacity outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)]"
+          aria-label={`${config.brandLabel} home`}
+        >
           <Image
             src="/brandbite-logo.svg"
             alt="Brandbite"
@@ -302,7 +311,7 @@ export function AppNav({ role }: { role: AppNavRole }) {
               · {config.roleLabel}
             </span>
           )}
-        </div>
+        </Link>
       </div>
 
       {/* Desktop nav */}
