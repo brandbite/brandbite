@@ -309,8 +309,14 @@ export default function AdminBoardPage() {
           </div>
         </aside>
 
-        {/* Main board area */}
-        <main className="flex flex-col">
+        {/* Main board area
+            min-w-0 lets this grid cell shrink below the intrinsic width
+            of the 4 kanban columns (4 × 320px). Without it, CSS grid's
+            default min-width:auto forces the cell to 1280px wide, and
+            the whole page scrolls horizontally — dragging content under
+            the fixed app sidebar — instead of engaging the internal
+            overflow-x-auto on the kanban strip below. */}
+        <main className="flex min-w-0 flex-col">
           {/* View switcher — Kanban (this page) ↔ Table */}
           <div className="mb-3">
             <BoardViewToggle rolePath="/admin" />

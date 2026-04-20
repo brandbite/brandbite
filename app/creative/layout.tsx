@@ -1,21 +1,19 @@
 // -----------------------------------------------------------------------------
 // @file: app/creative/layout.tsx
-// @purpose: Creative shell — shared nav + page wrapper for all creative routes
+// @purpose: Creative shell — fixed-left sidebar + content area.
 // -----------------------------------------------------------------------------
 
-import { AppNav } from "@/components/navigation/app-nav";
+import { AppSidebar } from "@/components/navigation/app-sidebar";
 
-// All creative routes are auth-gated dashboards. Skip SSG so the build
-// never pulls heavy client-only deps (DOMPurify/jsdom) into server bundles.
 export const dynamic = "force-dynamic";
 
 export default function CreativeLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-[var(--bb-bg-card)] text-[var(--bb-secondary)]">
-      <div className="relative px-4 pt-6 md:px-6 md:pt-8 lg:px-8 lg:pt-10">
-        <AppNav role="creative" />
+      <AppSidebar role="creative" />
+      <div className="md:pl-[var(--bb-sidebar-w,240px)] md:transition-[padding] md:duration-200">
+        <main className="px-4 py-6 md:px-8 md:py-8 lg:px-10 lg:py-10">{children}</main>
       </div>
-      <div className="px-4 pb-6 md:px-6 md:pb-8 lg:px-8 lg:pb-10">{children}</div>
     </div>
   );
 }

@@ -52,7 +52,25 @@ const TYPE_ICONS: Record<string, string> = {
 // NotificationBell
 // ---------------------------------------------------------------------------
 
-export function NotificationBell({ role }: { role: "customer" | "creative" | "admin" }) {
+/**
+ * Controls where the dropdown panel opens relative to the bell button.
+ *
+ * - `bottom-right` (default): panel opens DOWN + RIGHT-aligned (legacy
+ *   top-bar behaviour — bell was in the top-right of the viewport).
+ * - `top-right`: panel opens UP + LEFT-aligned. Used when the bell sits
+ *   in the sidebar's bottom-left corner; the panel extends rightward
+ *   into the viewport so it stays on-screen regardless of sidebar width
+ *   or collapsed state.
+ */
+export type NotificationBellPlacement = "bottom-right" | "top-right";
+
+export function NotificationBell({
+  role,
+  placement = "bottom-right",
+}: {
+  role: "customer" | "creative" | "admin";
+  placement?: NotificationBellPlacement;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -226,7 +244,16 @@ export function NotificationBell({ role }: { role: "customer" | "creative" | "ad
         <div
           ref={panelRef}
           role="menu"
-          className="absolute top-full right-0 z-50 mt-2 w-80 rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] shadow-lg"
+          className={[
+            "absolute z-50 w-80 rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] shadow-lg",
+            placement === "top-right"
+              ? // Opens UP + aligned to the LEFT edge of the bell so the
+                // panel extends rightward into the viewport (used in the
+                // fixed sidebar).
+                "bottom-full left-0 mb-2"
+              : // Legacy behaviour: opens DOWN + RIGHT-aligned.
+                "top-full right-0 mt-2",
+          ].join(" ")}
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-[var(--bb-border-subtle)] px-4 py-3">
