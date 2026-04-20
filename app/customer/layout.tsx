@@ -42,7 +42,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
     <div className="min-h-screen bg-[var(--bb-bg-card)] text-[var(--bb-secondary)]">
       <AppSidebar role="customer" />
       <div className="md:pl-[var(--bb-sidebar-w,240px)] md:transition-[padding] md:duration-200">
-        <main className="px-4 py-6 md:px-8 md:py-8 lg:px-10 lg:py-10">{children}</main>
+        <main className="px-4 py-6 md:px-6 md:py-8 lg:px-8 lg:py-10">{children}</main>
       </div>
     </div>
   );

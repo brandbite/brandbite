@@ -94,25 +94,34 @@ export default function DemoPersonaBanner() {
 
   const { persona } = state;
 
+  // The banner sits at the root layout level, above the dashboard layouts
+  // that render the fixed sidebar. Without extra padding the banner's text
+  // content is visually chopped behind the 240px / 64px sidebar. The
+  // --bb-sidebar-w CSS var is set by <AppSidebar /> on mount, so when a
+  // sidebar is present the banner content shifts right to match;
+  // elsewhere (marketing, auth) the var is unset and the fallback 0
+  // keeps the banner flush-left as before.
   return (
     <div className="w-full bg-[var(--bb-primary)] text-[11px] text-white">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-2">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="rounded-full bg-[var(--bb-bg-page)]/15 px-2 py-0.5 text-[10px] font-semibold tracking-[0.16em] uppercase">
-            Demo mode
-          </span>
-          <span className="opacity-90">
-            You are browsing as <span className="font-medium">{persona.label}</span>
-            {persona.roleLabel && <span className="opacity-75"> ({persona.roleLabel})</span>}
-          </span>
-        </div>
+      <div className="md:pl-[var(--bb-sidebar-w,0px)] md:transition-[padding] md:duration-200">
+        <div className="flex items-center justify-between gap-3 px-4 py-2">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="rounded-full bg-[var(--bb-bg-page)]/15 px-2 py-0.5 text-[10px] font-semibold tracking-[0.16em] uppercase">
+              Demo mode
+            </span>
+            <span className="opacity-90">
+              You are browsing as <span className="font-medium">{persona.label}</span>
+              {persona.roleLabel && <span className="opacity-75"> ({persona.roleLabel})</span>}
+            </span>
+          </div>
 
-        <a
-          href="/debug/demo-user"
-          className="rounded-full border border-white/40 px-3 py-1 text-[11px] font-medium hover:bg-[var(--bb-bg-page)]/10"
-        >
-          Switch persona
-        </a>
+          <a
+            href="/debug/demo-user"
+            className="shrink-0 rounded-full border border-white/40 px-3 py-1 text-[11px] font-medium hover:bg-[var(--bb-bg-page)]/10"
+          >
+            Switch persona
+          </a>
+        </div>
       </div>
     </div>
   );

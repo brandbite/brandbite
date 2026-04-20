@@ -208,8 +208,9 @@ export default function AdminTokenAnalyticsPage() {
         </div>
       </section>
 
-      {/* Chart + table */}
-      <section className="grid gap-4 md:grid-cols-[3fr_4fr]">
+      {/* Chart + table — stacks below lg so neither column gets squeezed
+          next to the fixed sidebar. */}
+      <section className="grid gap-4 lg:grid-cols-[3fr_4fr]">
         {/* Chart */}
         <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">

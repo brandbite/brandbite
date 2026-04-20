@@ -280,8 +280,11 @@ export default function AdminPlansPage() {
         </div>
       </section>
 
-      {/* Table + Form */}
-      <section className="grid gap-4 md:grid-cols-[3fr_2fr]">
+      {/* Table + Form — stacks below lg so the form column doesn't get
+          squeezed (labels like "Price (in cents, optional)" and Stripe
+          placeholders need ~400px to breathe). 2-col kicks in at lg
+          (1024px+). */}
+      <section className="grid gap-4 lg:grid-cols-[3fr_2fr]">
         {/* List */}
         <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
