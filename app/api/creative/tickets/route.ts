@@ -11,6 +11,7 @@ import { TicketStatus, TicketPriority } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { createNotification } from "@/lib/notifications";
+import { transitionCreativeTicketStatus } from "@/lib/tickets/transition-status";
 
 type TicketStatusString = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 
@@ -347,205 +348,61 @@ export async function PATCH(req: NextRequest) {
     if (!id || !requestedStatus) {
       return NextResponse.json({ error: "Both id and status are required." }, { status: 400 });
     }
-
     if (!isValidTicketStatus(requestedStatus)) {
       return NextResponse.json({ error: "Invalid ticket status." }, { status: 400 });
     }
 
-    const nextStatus = requestedStatus as TicketStatus;
-
-    if (nextStatus === TicketStatus.DONE) {
-      return NextResponse.json(
-        {
-          error:
-            "Creatives cannot mark tickets as DONE. Please ask the client to close the ticket.",
-        },
-        { status: 403 },
-      );
-    }
-
-    // Creative flag'i DB'den oku
-    const creative = await prisma.userAccount.findUnique({
-      where: { id: user.id },
-      select: { id: true, creativeRevisionNotesEnabled: true },
+    const outcome = await transitionCreativeTicketStatus({
+      creativeUserId: user.id,
+      ticketId: id,
+      nextStatus: requestedStatus as TicketStatus,
+      creativeMessage: body.creativeMessage ?? null,
     });
 
-    if (!creative) {
-      return NextResponse.json({ error: "Creative not found." }, { status: 401 });
-    }
-
-    const ticket = await prisma.ticket.findFirst({
-      where: {
-        id,
-        creativeId: user.id,
-      },
-      select: {
-        id: true,
-        title: true,
-        status: true,
-        companyId: true,
-        createdById: true,
-      },
-    });
-
-    if (!ticket) {
-      return NextResponse.json({ error: "Ticket not found." }, { status: 404 });
-    }
-
-    if (ticket.status === TicketStatus.DONE) {
-      return NextResponse.json(
-        {
-          error: "This ticket is already marked as DONE and cannot be changed by a creative.",
-        },
-        { status: 403 },
-      );
-    }
-
-    // -------------------------------------------------------------------------
-    // Plan-based concurrency check for IN_PROGRESS
-    // -------------------------------------------------------------------------
-    if (nextStatus === TicketStatus.IN_PROGRESS && ticket.status !== TicketStatus.IN_PROGRESS) {
-      const companyWithPlan = await prisma.company.findUnique({
-        where: { id: ticket.companyId },
-        select: {
-          plan: true,
-        },
-      });
-
-      const planData = companyWithPlan?.plan as
-        | {
-            name?: string | null;
-            maxConcurrentInProgressTickets?: number | null;
-          }
-        | null
-        | undefined;
-
-      const maxConcurrent =
-        typeof planData?.maxConcurrentInProgressTickets === "number"
-          ? planData.maxConcurrentInProgressTickets
-          : 1;
-
-      const currentInProgressCount = await prisma.ticket.count({
-        where: {
-          companyId: ticket.companyId,
-          status: TicketStatus.IN_PROGRESS,
-        },
-      });
-
-      if (currentInProgressCount >= maxConcurrent) {
-        const planLabel = typeof planData?.name === "string" ? planData.name : "current plan";
-
-        return NextResponse.json(
-          {
-            error: "This company has reached its limit for active tickets in progress.",
-            details: {
-              plan: planLabel,
-              maxConcurrentInProgress: maxConcurrent,
-              currentInProgress: currentInProgressCount,
-            },
-          },
-          { status: 400 },
-        );
+    if (!outcome.success) {
+      // Map structured errors to HTTP responses. The shape below matches
+      // what the old inline implementation returned, so API consumers see
+      // no change.
+      if (outcome.code === "FORBIDDEN_DONE" || outcome.code === "ALREADY_DONE") {
+        return NextResponse.json({ error: outcome.message }, { status: 403 });
       }
+      if (outcome.code === "CREATIVE_NOT_FOUND") {
+        return NextResponse.json({ error: outcome.message }, { status: 401 });
+      }
+      if (outcome.code === "NOT_FOUND") {
+        return NextResponse.json({ error: outcome.message }, { status: 404 });
+      }
+      // CONCURRENCY_LIMIT
+      return NextResponse.json(
+        { error: outcome.message, details: outcome.details },
+        { status: 400 },
+      );
     }
 
-    const isInProgressToInReview =
-      ticket.status === TicketStatus.IN_PROGRESS && nextStatus === TicketStatus.IN_REVIEW;
-
-    // Creative mesajını hazırlama
-    const rawCreativeMessage =
-      typeof body.creativeMessage === "string" ? body.creativeMessage.trim() : "";
-    const creativeMessageToStore =
-      creative.creativeRevisionNotesEnabled && rawCreativeMessage ? rawCreativeMessage : null;
-
-    let updated: { id: string; status: TicketStatus; updatedAt: Date; revisionId?: string };
-
-    if (isInProgressToInReview) {
-      updated = await prisma.$transaction(async (tx) => {
-        const updatedTicket = await tx.ticket.update({
-          where: { id: ticket.id },
-          data: {
-            status: nextStatus,
-            revisionCount: {
-              increment: 1,
-            },
-          },
-          select: {
-            id: true,
-            status: true,
-            updatedAt: true,
-            revisionCount: true,
-          },
-        });
-
-        const revision = await tx.ticketRevision.create({
-          data: {
-            ticketId: updatedTicket.id,
-            version: updatedTicket.revisionCount,
-            submittedByCreativeId: user.id,
-            creativeMessage: creativeMessageToStore,
-          },
-          select: { id: true },
-        });
-
-        return {
-          id: updatedTicket.id,
-          status: updatedTicket.status,
-          updatedAt: updatedTicket.updatedAt,
-          revisionId: revision.id,
-        };
-      });
-    } else {
-      const result = await prisma.ticket.update({
-        where: { id: ticket.id },
-        data: {
-          status: nextStatus,
-        },
-        select: {
-          id: true,
-          status: true,
-          updatedAt: true,
-        },
-      });
-
-      updated = result;
-    }
-
-    // Fire notifications (fire-and-forget, won't block the response)
-    if (isInProgressToInReview) {
-      createNotification({
-        userId: ticket.createdById,
-        type: "REVISION_SUBMITTED",
-        title: "New revision submitted",
-        message: `Your creative submitted a new version for "${ticket.title}"`,
-        ticketId: ticket.id,
-        actorId: user.id,
-      });
-    } else {
-      createNotification({
-        userId: ticket.createdById,
-        type: "TICKET_STATUS_CHANGED",
-        title: "Ticket status updated",
-        message: `"${ticket.title}" was moved to ${toTicketStatusString(updated.status).replace("_", " ").toLowerCase()}`,
-        ticketId: ticket.id,
-        actorId: user.id,
-      });
-    }
+    // Fire-and-forget notification. Kept in the route so the service
+    // stays free of I/O side-effects beyond the DB transaction.
+    createNotification({
+      userId: outcome.notify.recipientUserId,
+      type: outcome.notify.notificationType,
+      title: outcome.notify.title,
+      message: outcome.notify.message,
+      ticketId: outcome.notify.ticketId,
+      actorId: outcome.notify.actorId,
+    });
 
     return NextResponse.json(
       {
-        ticketId: updated.id,
-        status: toTicketStatusString(updated.status),
-        updatedAt: updated.updatedAt.toISOString(),
-        ...(updated.revisionId ? { revisionId: updated.revisionId } : {}),
+        ticketId: outcome.result.ticketId,
+        status: toTicketStatusString(outcome.result.status),
+        updatedAt: outcome.result.updatedAt.toISOString(),
+        ...(outcome.result.revisionId ? { revisionId: outcome.result.revisionId } : {}),
       },
       { status: 200 },
     );
-  } catch (error: any) {
-    if ((error as any)?.code === "UNAUTHENTICATED") {
+  } catch (error: unknown) {
+    if ((error as { code?: string })?.code === "UNAUTHENTICATED") {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
-
     console.error("[creative.tickets] PATCH error", error);
     return NextResponse.json({ error: "Failed to update ticket" }, { status: 500 });
   }
