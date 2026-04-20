@@ -173,6 +173,11 @@ model UserAccount {
   name       String?
   role       UserRole
 
+  /// Soft-delete timestamp. When set, the account is considered anonymized
+  /// (email rewritten to a placeholder, name cleared) and auth is refused.
+  /// Ledger + ticket rows are retained for financial / audit compliance.
+  deletedAt DateTime?
+
   /// Admin-controlled flag: whether this creative can send revision notes to clients
   creativeRevisionNotesEnabled Boolean @default(false) @map("designerRevisionNotesEnabled")
 

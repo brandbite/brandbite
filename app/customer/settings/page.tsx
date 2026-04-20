@@ -203,6 +203,12 @@ export default function CustomerSettingsPage() {
   };
   const [availablePlans, setAvailablePlans] = useState<SubscriptionPlan[]>([]);
   const [planChangeTarget, setPlanChangeTarget] = useState<SubscriptionPlan | null>(null);
+
+  // Account deletion state
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
+  const [deleteConfirmEmail, setDeleteConfirmEmail] = useState("");
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [preview, setPreview] = useState<{
     amountDueCents: number;
@@ -530,6 +536,29 @@ export default function CustomerSettingsPage() {
       setBillingError(err?.message || "Failed to change plan.");
     } finally {
       setChangePlanSaving(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!data?.user?.email) return;
+    setDeletingAccount(true);
+    setDeleteAccountError(null);
+    try {
+      const res = await fetch("/api/customer/account", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmEmail: deleteConfirmEmail }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(json?.error || "Failed to delete account.");
+      }
+      // Belt-and-suspenders: force a full reload to clear any client state.
+      window.location.href = "/login?deleted=1";
+    } catch (err) {
+      setDeleteAccountError(err instanceof Error ? err.message : "Failed to delete account.");
+    } finally {
+      setDeletingAccount(false);
     }
   };
 
@@ -1450,6 +1479,80 @@ export default function CustomerSettingsPage() {
           )}
         </div>
       )}
+
+      {/* Danger zone — account deletion (GDPR right-to-erasure). */}
+      {!loading && data && (
+        <div className="mt-6 rounded-2xl border border-red-200 bg-red-50/40 px-5 py-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-[var(--bb-danger-text)]">Danger zone</h2>
+          <p className="mt-1 text-[11px] text-[var(--bb-text-tertiary)]">
+            Delete your Brandbite account permanently. Your ledger history and existing tickets are
+            retained in anonymized form for audit purposes; your email is freed up for future
+            sign-ups.
+          </p>
+          <div className="mt-3">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setDeleteConfirmEmail("");
+                setDeleteAccountError(null);
+                setDeleteAccountOpen(true);
+              }}
+              className="!border !border-red-300 !text-red-700 hover:!bg-red-50"
+            >
+              Delete my account
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete account confirm modal — requires the user to type their
+          own email as a "yes I meant it" safeguard. */}
+      <Modal open={deleteAccountOpen} onClose={() => setDeleteAccountOpen(false)} size="md">
+        <ModalHeader title="Delete your account?" onClose={() => setDeleteAccountOpen(false)} />
+        <div className="space-y-3 px-6 pb-4 text-sm text-[var(--bb-text-secondary)]">
+          <p>
+            This is permanent. Your sign-in credentials are removed immediately. Historical tickets,
+            ratings, and ledger entries are kept but <strong>anonymized</strong>.
+          </p>
+          <p>
+            To confirm, type your account email: <strong>{data?.user?.email ?? ""}</strong>
+          </p>
+          <FormInput
+            type="email"
+            value={deleteConfirmEmail}
+            onChange={(e) => setDeleteConfirmEmail(e.target.value)}
+            placeholder="Type your email to confirm"
+            disabled={deletingAccount}
+          />
+          {deleteAccountError && (
+            <InlineAlert variant="error" size="sm">
+              {deleteAccountError}
+            </InlineAlert>
+          )}
+        </div>
+        <ModalFooter>
+          <Button
+            variant="ghost"
+            onClick={() => setDeleteAccountOpen(false)}
+            disabled={deletingAccount}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleDeleteAccount}
+            loading={deletingAccount}
+            loadingText="Deleting…"
+            disabled={
+              deletingAccount ||
+              deleteConfirmEmail.trim().toLowerCase() !== (data?.user?.email ?? "").toLowerCase()
+            }
+            className="!bg-red-600 hover:!bg-red-700"
+          >
+            Delete my account
+          </Button>
+        </ModalFooter>
+      </Modal>
 
       {/* Delete tag confirmation */}
       <ConfirmDialog
