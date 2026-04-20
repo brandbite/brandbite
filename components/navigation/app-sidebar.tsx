@@ -223,8 +223,11 @@ export function AppSidebar({ role }: { role: NavRole }) {
           </button>
         </div>
 
-        {/* Sections */}
-        <nav className="flex-1 overflow-y-auto px-2 py-3">
+        {/* Sections — overflow-x-hidden stops the collapsed 64px rail from
+            picking up a horizontal scrollbar if any child ever extends
+            beyond its content box. overflow-y-auto alone lets the browser
+            auto-promote overflow-x to auto in that case. */}
+        <nav className="flex-1 overflow-x-hidden overflow-y-auto px-2 py-3">
           <ul className="flex flex-col gap-4">
             {config.sections.map((section, sectionIdx) => (
               <li key={`${section.label ?? "main"}-${sectionIdx}`}>
@@ -363,16 +366,11 @@ function SidebarLink({
         ].join(" ")}
       />
       <span className={["truncate", collapsed ? "md:sr-only" : ""].join(" ")}>{item.label}</span>
-
-      {/* Tooltip when collapsed (desktop only) */}
-      {collapsed && (
-        <span
-          className="pointer-events-none absolute left-full z-20 ml-2 hidden rounded-md bg-[var(--bb-secondary)] px-2 py-1 text-xs font-medium whitespace-nowrap text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 md:block"
-          role="tooltip"
-        >
-          {item.label}
-        </span>
-      )}
+      {/* Collapsed-mode label: the native `title` attribute set above
+          handles hover tooltips. We intentionally don't render a custom
+          tooltip here — absolutely-positioned descendants extending past
+          the 64px rail would trigger a horizontal scrollbar on the parent
+          nav (which has overflow-y-auto). */}
     </Link>
   );
 }
