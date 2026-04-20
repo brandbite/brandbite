@@ -312,22 +312,22 @@ export async function GET(req: NextRequest) {
 // -----------------------------------------------------------------------------
 // PATCH: update ticket status (creatives cannot mark DONE, creates revisions)
 //
-// Plan bazlı concurrency kuralı:
-// - Plan.maxConcurrentInProgressTickets değeri,
-//   aynı company için eşzamanlı IN_PROGRESS ticket sayısının üst sınırıdır.
-// - Sadece IN_PROGRESS'e geçişte kontrol edilir.
-// - TODO / IN_REVIEW geçişleri bu limitten etkilenmez.
+// Plan-based concurrency rule:
+// - Plan.maxConcurrentInProgressTickets caps the number of concurrent
+//   IN_PROGRESS tickets for the same company.
+// - Only enforced on transitions INTO IN_PROGRESS.
+// - TODO / IN_REVIEW transitions are not limited.
 //
-// Revision kuralı:
-// - Creative tarafında IN_PROGRESS -> IN_REVIEW geçişinde:
+// Revision rule:
+// - On the creative-side IN_PROGRESS -> IN_REVIEW transition:
 //   - Ticket.revisionCount +1
-//   - Aynı transaction içinde yeni bir TicketRevision kaydı oluşturulur.
+//   - A new TicketRevision row is created in the same transaction.
 //
-// Creative note kuralı:
-// - Admin tarafından creative için creativeRevisionNotesEnabled = true ise,
-//   IN_PROGRESS -> IN_REVIEW geçişinde optional creativeMessage alır ve
-//   TicketRevision.creativeMessage alanına yazar.
-// - Flag false ise, gönderilen creativeMessage görmezden gelinir.
+// Creative note rule:
+// - When creativeRevisionNotesEnabled = true (admin-controlled on the
+//   creative), the IN_PROGRESS -> IN_REVIEW transition accepts an
+//   optional creativeMessage and stores it on TicketRevision.creativeMessage.
+// - When the flag is false, any creativeMessage in the payload is ignored.
 // -----------------------------------------------------------------------------
 
 export async function PATCH(req: NextRequest) {

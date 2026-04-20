@@ -26,12 +26,12 @@ async function main() {
   console.log("🌱 Seeding Brandbite demo data...");
 
   // ---------------------------------------------------------------------------
-  // 0) TEMİZLİK
+  // 0) CLEANUP
   // ---------------------------------------------------------------------------
-  // Not: Bu kısım dev DB için. Tüm kayıtlari siliyor.
-  // Production’da kullanılmamalı.
+  // Note: This block is for the dev DB. It deletes every record.
+  // Must not be used in production.
 
-  // Ticket ile ilişkili child tablolari önce temizle (deepest children first)
+  // Delete child tables related to tickets first (deepest children first)
   await prisma.assetPinComment.deleteMany({});
   await prisma.assetPin.deleteMany({});
   await prisma.asset.deleteMany({});
@@ -48,7 +48,7 @@ async function main() {
   await prisma.creativeSkill.deleteMany({});
   await prisma.payoutRule.deleteMany({});
 
-  // Sonra ticket ve diğer üst seviye kayıtlar
+  // Then tickets and the other top-level records
   await prisma.ticket.deleteMany({});
   await prisma.projectMember.deleteMany({});
   await prisma.project.deleteMany({});
@@ -187,7 +187,7 @@ async function main() {
       slug: "acme-studio",
       planId: fullPlan.id,
       website: "https://acme-studio.com",
-      tokenBalance: 200, // demo amaçlı başlangıç bakiye
+      tokenBalance: 200, // starter balance for demo purposes
       autoAssignDefaultEnabled: true, // Demo company: auto-assign ON by default
       onboardingCompletedAt: new Date(), // Pre-seeded company — onboarding already done
     },
@@ -228,13 +228,13 @@ async function main() {
       slug: "acme-studio-manual",
       planId: basicPlan.id,
       website: "https://acme-manual.com",
-      tokenBalance: 80, // biraz daha düşük demo bakiye
-      autoAssignDefaultEnabled: false, // burada auto-assign kapalı
+      tokenBalance: 80, // slightly lower demo balance
+      autoAssignDefaultEnabled: false, // auto-assign disabled for this company
       onboardingCompletedAt: new Date(), // Pre-seeded company — onboarding already done
     },
   });
 
-  // Aynı demo customer kullanıcılarını ikinci şirkete de üye yapıyoruz
+  // Add the same demo customer users as members of the second company as well
   const company2OwnerMember = await prisma.companyMember.create({
     data: {
       companyId: company2.id,
@@ -283,10 +283,10 @@ async function main() {
     },
   });
 
-  // Project-level üyelikler
+  // Project-level memberships
   await prisma.projectMember.createMany({
     data: [
-      // Owner her iki projede OWNER
+      // Owner is OWNER on both projects
       {
         projectId: websiteProject.id,
         userId: customerOwner.id,
@@ -298,14 +298,14 @@ async function main() {
         role: ProjectRole.OWNER,
       },
 
-      // PM sadece Website revamp projesinde PM
+      // PM is only PM on the Website revamp project
       {
         projectId: websiteProject.id,
         userId: customerPM.id,
         role: ProjectRole.PM,
       },
 
-      // Creative'ler contributor olarak projelere bağlanmış
+      // Creatives are attached to projects as contributors
       {
         projectId: websiteProject.id,
         userId: creativeAda.id,
@@ -1284,10 +1284,10 @@ async function main() {
   console.log("✅ Tag assignments created.");
 
   // ---------------------------------------------------------------------------
-  // 7) TOKEN LEDGER + WITHDRAWALS (basit demo)
+  // 7) TOKEN LEDGER + WITHDRAWALS (simple demo)
   // ---------------------------------------------------------------------------
 
-  // Company token hareketleri (örnek)
+  // Company token movements (example)
   await prisma.tokenLedger.createMany({
     data: [
       {

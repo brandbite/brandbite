@@ -15,7 +15,7 @@ export async function GET(_req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
 
-    // Sadece CUSTOMER kullanıcılar company members görebilir
+    // Only CUSTOMER users can see company members.
     if (user.role !== "CUSTOMER") {
       return NextResponse.json(
         { error: "Only customer users can access members." },
@@ -29,7 +29,7 @@ export async function GET(_req: NextRequest) {
 
     const companyRole = normalizeCompanyRole(user.companyRole);
 
-    // OWNER + PM dışındakiler için members erişimi yok
+    // Everyone other than OWNER + PM is blocked from members access.
     if (!canManageMembers(companyRole)) {
       return NextResponse.json(
         {

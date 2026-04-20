@@ -18,7 +18,7 @@ export async function GET(_req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
 
-    // Sadece CUSTOMER persona bu endpoint'i kullanıyor
+    // This endpoint is only meant for the CUSTOMER persona.
     if (user.role !== "CUSTOMER") {
       return NextResponse.json(
         { error: "Only customers can access this endpoint." },
@@ -28,7 +28,7 @@ export async function GET(_req: NextRequest) {
 
     const activeCompanyId = user.activeCompanyId;
 
-    // Aktif company yoksa rol de yok – board tarafında "Not set" gösteriyoruz
+    // No active company → no role. The board UI renders this as "Not set".
     if (!activeCompanyId) {
       const response: CompanyRoleResponse = {
         role: null,
@@ -47,7 +47,7 @@ export async function GET(_req: NextRequest) {
     });
 
     const response: CompanyRoleResponse = {
-      // Prisma enum, string olarak döneceğiz: "OWNER" | "PM" | "BILLING" | "MEMBER" | null
+      // Prisma enum surfaced as a string: "OWNER" | "PM" | "BILLING" | "MEMBER" | null
       role: membership?.roleInCompany ?? null,
     };
 

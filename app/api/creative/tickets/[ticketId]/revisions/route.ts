@@ -15,11 +15,11 @@ type RouteParams = {
   ticketId: string;
 };
 
-// Next 15+ bazen params'i Promise olarak geçirebiliyor, o yüzden ikisini de
-// destekleyecek şekilde type tanımlıyoruz.
+// Next 15+ sometimes passes params as a Promise; accept both shapes so we
+// don't care which runtime resolves it.
 type RouteContext = { params: RouteParams } | { params: Promise<RouteParams> };
 
-// Küçük helper: params Promise ise await et, değilse direkt al
+// Small helper: await params when it's a Promise, otherwise return as-is.
 async function resolveParams(context: RouteContext): Promise<RouteParams> {
   const raw = (context as any).params;
 
@@ -27,7 +27,7 @@ async function resolveParams(context: RouteContext): Promise<RouteParams> {
     return { ticketId: "" };
   }
 
-  // Promise mi diye kabaca kontrol edelim
+  // Rough check for whether this is a Promise
   if (typeof raw.then === "function") {
     return (await raw) as RouteParams;
   }
@@ -59,7 +59,7 @@ export async function GET(_req: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Ticket id is required." }, { status: 400 });
     }
 
-    // Ticket bu creativea mı ait, onu doğrula
+    // Verify this ticket belongs to the current creative
     const ticket = await prisma.ticket.findFirst({
       where: {
         id: ticketId,

@@ -470,7 +470,7 @@ export default function NewTicketForm({
     setError(null);
     setSuccessMessage(null);
 
-    // Billing-only users: UI-level guard (API tarafında da ayrıca kilit var)
+    // Billing-only users: UI-level guard (the API also enforces its own check)
     if (isLimitedAccess) {
       setError(
         "You don't have permission to create tickets. Please ask your company owner or project manager.",

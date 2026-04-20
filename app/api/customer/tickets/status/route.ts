@@ -136,17 +136,17 @@ export async function PATCH(req: NextRequest) {
     }
 
     // -------------------------------------------------------------------------
-    // New rules for customer board transitions (hibrit yapı)
+    // Customer-side board transition rules (split with the creative side)
     //
-    // - Customer ticket oluşturur → TODO
-    // - IN_PROGRESS → sadece creative (customer buraya geçiremez)
-    // - IN_REVIEW → creative alır (işi review’a gönderir)
-    // - Customer:
-    //     * IN_REVIEW → DONE  (işi onaylar)
-    //     * IN_REVIEW → IN_PROGRESS (revize ister, ticket geri açılır)
+    // - Customer creates a ticket → starts as TODO.
+    // - IN_PROGRESS → only the creative can move tickets here.
+    // - IN_REVIEW → creative picks it up (submits for review).
+    // - Customer can:
+    //     * IN_REVIEW → DONE         (approves the work)
+    //     * IN_REVIEW → IN_PROGRESS  (requests a revision; ticket re-opens)
     // -------------------------------------------------------------------------
 
-    // 1) Customer hiçbir şekilde REVIEW'a taşıyamaz
+    // 1) Customers can never move a ticket into REVIEW.
     if (nextStatus === TicketStatus.IN_REVIEW) {
       return NextResponse.json(
         {
@@ -157,7 +157,7 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    // 2) IN_REVIEW → IN_PROGRESS revize path'i
+    // 2) IN_REVIEW → IN_PROGRESS revision path.
     const isReviewToInProgress =
       currentStatus === TicketStatus.IN_REVIEW && nextStatus === TicketStatus.IN_PROGRESS;
 
@@ -171,7 +171,7 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    // IN_REVIEW → IN_PROGRESS geçişinde revizyon mesajı zorunlu
+    // A revision message is required on the IN_REVIEW → IN_PROGRESS transition.
     if (isReviewToInProgress) {
       const msg = (body.revisionMessage ?? "").trim();
       if (!msg) {
@@ -185,7 +185,7 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
-    // 3) DONE transition: sadece IN_REVIEW → DONE
+    // 3) DONE transition: only allowed from IN_REVIEW.
     const isDoneTransition =
       currentStatus !== TicketStatus.DONE && nextStatus === TicketStatus.DONE;
 
@@ -198,7 +198,7 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    // DONE için ek yetki kontrolü (Owner / PM vs.)
+    // Extra permission check for DONE (Owner / PM, etc.)
     if (isDoneTransition) {
       const canMarkDone = canMarkTicketsDoneForCompany(user.role, normalizedCompanyRole);
 
@@ -214,7 +214,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     // -------------------------------------------------------------------------
-    // Plan limiti: IN_REVIEW → IN_PROGRESS revize'de de kontrol et
+    // Plan limit: also enforce on the IN_REVIEW → IN_PROGRESS revision path
     // -------------------------------------------------------------------------
 
     if (isReviewToInProgress) {
@@ -260,12 +260,12 @@ export async function PATCH(req: NextRequest) {
     }
 
     // -------------------------------------------------------------------------
-    // Status update + (opsiyonel) creative payout (DONE’da)
-    // + (yeni) revision feedback kaydı (IN_REVIEW → IN_PROGRESS)
+    // Status update + (optional) creative payout (on DONE)
+    // + (new) revision feedback record (IN_REVIEW → IN_PROGRESS)
     // -------------------------------------------------------------------------
 
     const updated = await prisma.$transaction(async (tx) => {
-      // 1) Creative payout (DONE olduğunda)
+      // 1) Creative payout (when moving to DONE)
       if (isDoneTransition) {
         const hasCreative = !!ticket.creativeId && !!ticket.jobType?.creativePayoutTokens;
 
@@ -296,7 +296,7 @@ export async function PATCH(req: NextRequest) {
         }
       }
 
-      // 2) IN_REVIEW → IN_PROGRESS ise, son TicketRevision'a feedback yaz
+      // 2) On IN_REVIEW → IN_PROGRESS, write feedback on the latest TicketRevision
       if (isReviewToInProgress) {
         const msg = (body.revisionMessage ?? "").trim();
 
@@ -319,8 +319,8 @@ export async function PATCH(req: NextRequest) {
             },
           });
         }
-        // Eğer hiçbir revision yoksa (teorik edge case),
-        // sessizce geçiyoruz; ileride log eklenebilir.
+        // If no revision exists (theoretical edge case),
+        // we silently pass; logging could be added later.
       }
 
       // 3) Ticket status update (+ completion tracking for DONE)

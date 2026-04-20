@@ -11,7 +11,7 @@ import Stripe from "stripe";
 const secretKey = process.env.STRIPE_SECRET_KEY;
 
 if (!secretKey) {
-  // Bu hatayı dev ortamında görmek istiyoruz; prod'da da deploy sırasında fark edilir.
+  // Surface this error in dev; in prod it's caught at deploy time.
   throw new Error(
     "Missing STRIPE_SECRET_KEY environment variable. Please set it in your .env/.env.local.",
   );
