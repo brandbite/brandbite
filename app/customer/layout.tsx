@@ -5,7 +5,7 @@
 // -----------------------------------------------------------------------------
 
 import { redirect } from "next/navigation";
-import { AppNav } from "@/components/navigation/app-nav";
+import { AppSidebar } from "@/components/navigation/app-sidebar";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -37,13 +37,13 @@ export default async function CustomerLayout({ children }: { children: React.Rea
     // Other errors: silently continue to render the page
   }
 
-  // Normal customer layout with nav
+  // Normal customer layout with sidebar
   return (
     <div className="min-h-screen bg-[var(--bb-bg-card)] text-[var(--bb-secondary)]">
-      <div className="relative px-4 pt-6 md:px-6 md:pt-8 lg:px-8 lg:pt-10">
-        <AppNav role="customer" />
+      <AppSidebar role="customer" />
+      <div className="md:pl-[var(--bb-sidebar-w,240px)] md:transition-[padding] md:duration-200">
+        <main className="px-4 py-6 md:px-8 md:py-8 lg:px-10 lg:py-10">{children}</main>
       </div>
-      <div className="px-4 pb-6 md:px-6 md:pb-8 lg:px-8 lg:pb-10">{children}</div>
     </div>
   );
 }
