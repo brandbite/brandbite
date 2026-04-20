@@ -18,7 +18,12 @@ type OnInsufficient = (info: InsufficientTokensInfo) => void;
 // Types
 // ---------------------------------------------------------------------------
 
-type ToolType = "IMAGE_GENERATION" | "TEXT_GENERATION" | "BACKGROUND_REMOVAL" | "DESIGN_SUGGESTION";
+type ToolType =
+  | "IMAGE_GENERATION"
+  | "TEXT_GENERATION"
+  | "BACKGROUND_REMOVAL"
+  | "DESIGN_SUGGESTION"
+  | "UPSCALE_IMAGE";
 
 type Generation = {
   id: string;
@@ -67,6 +72,12 @@ const TOOLS: ToolCard[] = [
     title: "Design Suggestions",
     description: "Get AI-powered color, font, and layout recommendations",
     icon: "💡",
+  },
+  {
+    type: "UPSCALE_IMAGE",
+    title: "Image Upscaling",
+    description: "Upscale an existing image 2x or 4x with Real-ESRGAN",
+    icon: "🔍",
   },
 ];
 
@@ -731,6 +742,133 @@ function DesignSuggestionsPanel({
   );
 }
 
+function UpscaleImagePanel({
+  onGenerated,
+  onInsufficient,
+}: {
+  onGenerated: () => void;
+  onInsufficient: OnInsufficient;
+}) {
+  const [imageUrl, setImageUrl] = useState("");
+  const [scale, setScale] = useState<2 | 4>(4);
+  const [faceEnhance, setFaceEnhance] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<{ imageUrl: string; scale: number } | null>(null);
+  const [error, setError] = useState("");
+  const { key: idempotencyKey, rotate: rotateIdempotencyKey } = useIdempotencyKey();
+
+  const generate = async () => {
+    setLoading(true);
+    setError("");
+    setResult(null);
+    try {
+      const res = await fetch("/api/ai/generate/upscale", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
+        },
+        body: JSON.stringify({ imageUrl, scale, faceEnhance }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (res.status === 402 && isInsufficientTokensBody(data)) {
+          onInsufficient(data);
+          return;
+        }
+        throw new Error(data.error || "Upscaling failed");
+      }
+      rotateIdempotencyKey();
+      setResult({ imageUrl: data.generation.imageUrl, scale: data.generation.scale });
+      onGenerated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="mb-1 block text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-tertiary)] uppercase">
+          Image URL
+        </label>
+        <FormInput
+          placeholder="Paste the URL of the image you want to upscale..."
+          value={imageUrl}
+          onChange={(e) => setImageUrl(e.target.value)}
+        />
+      </div>
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="w-32">
+          <label className="mb-1 block text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-tertiary)] uppercase">
+            Scale
+          </label>
+          <FormSelect
+            value={String(scale)}
+            onChange={(e) => setScale((Number(e.target.value) === 2 ? 2 : 4) as 2 | 4)}
+            size="sm"
+          >
+            <option value="2">2x</option>
+            <option value="4">4x</option>
+          </FormSelect>
+        </div>
+        <label className="flex items-center gap-1.5 pb-1.5 text-[11px] font-semibold text-[var(--bb-text-secondary)]">
+          <input
+            type="checkbox"
+            checked={faceEnhance}
+            onChange={(e) => setFaceEnhance(e.target.checked)}
+            className="rounded border-[var(--bb-border)]"
+          />
+          Face enhance
+        </label>
+      </div>
+      {error && <InlineAlert variant="error">{error}</InlineAlert>}
+      <Button
+        onClick={generate}
+        loading={loading}
+        loadingText="Upscaling..."
+        disabled={!imageUrl.trim()}
+      >
+        Upscale Image
+      </Button>
+      {result && (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="mb-1 text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-tertiary)] uppercase">
+                Original
+              </p>
+              <div className="overflow-hidden rounded-xl border border-[var(--bb-border)]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={imageUrl} alt="Original" className="w-full" />
+              </div>
+            </div>
+            <div>
+              <p className="mb-1 text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-tertiary)] uppercase">
+                Upscaled ({result.scale}x)
+              </p>
+              <div className="overflow-hidden rounded-xl border border-[var(--bb-border)]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={result.imageUrl} alt="Upscaled" className="w-full" />
+              </div>
+            </div>
+          </div>
+          <a
+            href={result.imageUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center rounded-full border border-[var(--bb-border)] px-3 py-1.5 text-[11px] font-semibold text-[var(--bb-text-secondary)] transition-colors hover:bg-[var(--bb-bg-warm)]"
+          >
+            Download
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Main Page
 // ---------------------------------------------------------------------------
@@ -854,6 +992,9 @@ export default function AiToolsPage() {
           {activeTool === "DESIGN_SUGGESTION" && (
             <DesignSuggestionsPanel onGenerated={onGenerated} onInsufficient={setTokenError} />
           )}
+          {activeTool === "UPSCALE_IMAGE" && (
+            <UpscaleImagePanel onGenerated={onGenerated} onInsufficient={setTokenError} />
+          )}
         </section>
       )}
 
@@ -884,6 +1025,7 @@ export default function AiToolsPage() {
                   {gen.toolType === "TEXT_GENERATION" && "✍️"}
                   {gen.toolType === "BACKGROUND_REMOVAL" && "✂️"}
                   {gen.toolType === "DESIGN_SUGGESTION" && "💡"}
+                  {gen.toolType === "UPSCALE_IMAGE" && "🔍"}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-[var(--bb-secondary)]">

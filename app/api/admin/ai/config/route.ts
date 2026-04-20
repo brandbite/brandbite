@@ -15,6 +15,7 @@ const AI_TOOL_TYPES: AiToolType[] = [
   "TEXT_GENERATION",
   "DESIGN_SUGGESTION",
   "BRIEF_PARSING",
+  "UPSCALE_IMAGE",
 ];
 
 const DEFAULT_CONFIGS: Record<AiToolType, { tokenCost: number; rateLimit: number }> = {
@@ -23,6 +24,7 @@ const DEFAULT_CONFIGS: Record<AiToolType, { tokenCost: number; rateLimit: number
   TEXT_GENERATION: { tokenCost: 1, rateLimit: 50 },
   DESIGN_SUGGESTION: { tokenCost: 1, rateLimit: 30 },
   BRIEF_PARSING: { tokenCost: 1, rateLimit: 30 },
+  UPSCALE_IMAGE: { tokenCost: 2, rateLimit: 20 },
 };
 
 const TOOL_LABELS: Record<AiToolType, string> = {
@@ -31,6 +33,7 @@ const TOOL_LABELS: Record<AiToolType, string> = {
   TEXT_GENERATION: "Text / Copy Generation",
   DESIGN_SUGGESTION: "Design Suggestions",
   BRIEF_PARSING: "Brief Parsing",
+  UPSCALE_IMAGE: "Image Upscaling",
 };
 
 // GET: list all tool configs
