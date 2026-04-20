@@ -9,7 +9,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
-import { TicketPriority } from "@prisma/client";
+import { isCreativePaused } from "@/lib/creative-availability";
+import { TicketPriority, TicketStatus } from "@prisma/client";
 
 function requireAdmin(userRole: string) {
   if (userRole !== "SITE_OWNER" && userRole !== "SITE_ADMIN") {
@@ -33,10 +34,17 @@ export async function GET() {
 
     const [creatives, tickets, revisions, earningsGrouped, withdrawalsGrouped, ratingsGrouped] =
       await Promise.all([
-        // 1. All creatives
+        // 1. All creatives (+ pause state for the utilization view)
         prisma.userAccount.findMany({
           where: { role: "DESIGNER" },
-          select: { id: true, name: true, email: true },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            isPaused: true,
+            pausedAt: true,
+            pauseExpiresAt: true,
+          },
         }),
 
         // 2. All tickets with a creative assigned
@@ -157,6 +165,13 @@ export async function GET() {
       const completedTickets = dTickets.filter((t) => t.status === "DONE").length;
       const activeTickets = dTickets.filter((t) => t.status !== "DONE").length;
       const totalTickets = dTickets.length;
+
+      // Per-status breakdown for the "who's holding what" column.
+      const statusBreakdown = {
+        TODO: dTickets.filter((t) => t.status === TicketStatus.TODO).length,
+        IN_PROGRESS: dTickets.filter((t) => t.status === TicketStatus.IN_PROGRESS).length,
+        IN_REVIEW: dTickets.filter((t) => t.status === TicketStatus.IN_REVIEW).length,
+      };
       const completionRate =
         totalTickets > 0 ? Math.round((completedTickets / totalTickets) * 100) : 0;
 
@@ -214,8 +229,14 @@ export async function GET() {
         id: d.id,
         name: d.name,
         email: d.email,
+        isPaused: isCreativePaused({
+          isPaused: d.isPaused,
+          pauseExpiresAt: d.pauseExpiresAt,
+        }),
+        pauseExpiresAt: d.pauseExpiresAt ? d.pauseExpiresAt.toISOString() : null,
         completedTickets,
         activeTickets,
+        statusBreakdown,
         totalTickets,
         completionRate,
         avgRevisionCount,
@@ -248,12 +269,20 @@ export async function GET() {
         ? Math.round((platformTurnaroundSum / platformTurnaroundCount) * 10) / 10
         : 0;
 
+    // Utilization reference: highest load on the team. Used by the client
+    // to normalize each creative's utilization bar (so the most-loaded
+    // creative maps to 100%). 0 is fine when the roster is idle.
+    const maxLoadScore = creativeMetrics.reduce((m, c) => Math.max(m, c.loadScore), 0);
+    const pausedCount = creativeMetrics.filter((c) => c.isPaused).length;
+
     return NextResponse.json({
       summary: {
         totalCreatives: creatives.length,
         totalCompletedTickets: platformTotalCompleted,
         avgPlatformRevisionRate,
         avgPlatformTurnaround,
+        maxLoadScore,
+        pausedCount,
       },
       creatives: creativeMetrics,
     });
