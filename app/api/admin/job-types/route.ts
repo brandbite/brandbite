@@ -55,6 +55,7 @@ export async function GET(_req: NextRequest) {
       hasQuantity: jt.hasQuantity,
       quantityLabel: jt.quantityLabel,
       defaultQuantity: jt.defaultQuantity,
+      aiPromptTemplate: jt.aiPromptTemplate,
       isActive: jt.isActive,
       createdAt: jt.createdAt.toISOString(),
       updatedAt: jt.updatedAt.toISOString(),
@@ -95,6 +96,7 @@ export async function POST(req: NextRequest) {
       hasQuantity,
       quantityLabel,
       defaultQuantity,
+      aiPromptTemplate,
     } = parsed.data;
 
     // Derive token values from estimated hours
@@ -113,6 +115,7 @@ export async function POST(req: NextRequest) {
         hasQuantity,
         quantityLabel,
         defaultQuantity,
+        aiPromptTemplate,
         isActive,
       },
     });
@@ -142,6 +145,7 @@ export async function POST(req: NextRequest) {
           hasQuantity: created.hasQuantity,
           quantityLabel: created.quantityLabel,
           defaultQuantity: created.defaultQuantity,
+          aiPromptTemplate: created.aiPromptTemplate,
           isActive: created.isActive,
           createdAt: created.createdAt.toISOString(),
           updatedAt: created.updatedAt.toISOString(),
@@ -184,6 +188,7 @@ export async function PATCH(req: NextRequest) {
     if (fields.hasQuantity !== undefined) data.hasQuantity = fields.hasQuantity;
     if (fields.quantityLabel !== undefined) data.quantityLabel = fields.quantityLabel;
     if (fields.defaultQuantity !== undefined) data.defaultQuantity = fields.defaultQuantity;
+    if (fields.aiPromptTemplate !== undefined) data.aiPromptTemplate = fields.aiPromptTemplate;
     if (fields.isActive !== undefined) data.isActive = fields.isActive;
 
     if (fields.estimatedHours !== undefined) {
@@ -220,6 +225,7 @@ export async function PATCH(req: NextRequest) {
         hasQuantity: updated.hasQuantity,
         quantityLabel: updated.quantityLabel,
         defaultQuantity: updated.defaultQuantity,
+        aiPromptTemplate: updated.aiPromptTemplate,
         isActive: updated.isActive,
         createdAt: updated.createdAt.toISOString(),
         updatedAt: updated.updatedAt.toISOString(),

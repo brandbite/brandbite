@@ -468,6 +468,12 @@ model JobType {
   quantityLabel    String?                 // e.g. "Number of sizes", "Number of pages"
   defaultQuantity  Int     @default(1)     // pre-filled quantity for this job type
 
+  /// Optional per-job-type prompt template. Spliced into AI image-generation
+  /// prompts as additional context so each job type gets tuned output
+  /// (e.g. "For logos: emphasize simplicity, recognizable at small sizes").
+  /// Free-form text; empty / null means the generic prompt is used.
+  aiPromptTemplate String?
+
   isActive Boolean @default(true)
 
   tickets Ticket[]

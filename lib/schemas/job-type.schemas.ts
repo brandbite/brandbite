@@ -32,6 +32,14 @@ export const createJobTypeSchema = z.object({
     .optional()
     .default(null),
   defaultQuantity: z.coerce.number().int().min(1).optional().default(1),
+  aiPromptTemplate: z
+    .string()
+    .trim()
+    .max(2000, "Prompt template is too long (max 2000 characters).")
+    .transform((v) => (v === "" ? null : v))
+    .nullable()
+    .optional()
+    .default(null),
 });
 
 export const updateJobTypeSchema = z.object({
@@ -65,6 +73,13 @@ export const updateJobTypeSchema = z.object({
     .nullable()
     .optional(),
   defaultQuantity: z.coerce.number().int().min(1).optional(),
+  aiPromptTemplate: z
+    .string()
+    .trim()
+    .max(2000, "Prompt template is too long (max 2000 characters).")
+    .transform((v) => (v === "" ? null : v))
+    .nullable()
+    .optional(),
 });
 
 export type CreateJobTypeInput = z.infer<typeof createJobTypeSchema>;
