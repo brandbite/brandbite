@@ -7,11 +7,13 @@ import type { AiToolType } from "@prisma/client";
 import {
   generateImage as dalleGenerateImage,
   generateText as openaiGenerateText,
+  generateTextStream as openaiGenerateTextStream,
   getDesignSuggestions as openaiGetDesignSuggestions,
   type ImageSize,
   type ImageStyle,
   type ImageGenerationResult,
   type TextGenerationResult,
+  type TextStreamChunk,
   type DesignSuggestion,
 } from "./openai";
 import {
@@ -131,6 +133,39 @@ export async function generateText(
   const result = await openaiGenerateText(prompt, systemPrompt, options);
   markProviderUp("openai");
   return { ...result, provider: "openai", model: "gpt-4o" };
+}
+
+export type TextStreamMeta = { provider: "openai"; model: "gpt-4o" };
+
+/**
+ * Streaming variant of {@link generateText}. Returns an async generator of
+ * text deltas plus a meta object the caller can forward to the browser.
+ */
+export function generateTextStream(
+  prompt: string,
+  systemPrompt: string,
+  options: { maxTokens?: number; temperature?: number } = {},
+): { meta: TextStreamMeta; chunks: AsyncGenerator<TextStreamChunk, void, unknown> } {
+  if (!isProviderAvailable("openai")) {
+    throw new Error("OpenAI is not available for text generation");
+  }
+
+  const meta: TextStreamMeta = { provider: "openai", model: "gpt-4o" };
+  // Defer `markProviderUp` until the stream actually yields its first chunk so
+  // a failure before the first token still marks the provider down via the
+  // route's catch.
+  const chunks = (async function* () {
+    let markedUp = false;
+    for await (const chunk of openaiGenerateTextStream(prompt, systemPrompt, options)) {
+      if (!markedUp) {
+        markProviderUp("openai");
+        markedUp = true;
+      }
+      yield chunk;
+    }
+  })();
+
+  return { meta, chunks };
 }
 
 // ---------------------------------------------------------------------------

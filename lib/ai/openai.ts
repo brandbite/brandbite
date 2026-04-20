@@ -105,6 +105,65 @@ export async function generateText(
 }
 
 // ---------------------------------------------------------------------------
+// Streaming Text Generation (GPT-4o, Server-Sent Events friendly)
+// ---------------------------------------------------------------------------
+
+export type TextStreamChunk = {
+  /** Incremental text delta from the model. Empty string on usage-only chunks. */
+  text: string;
+  /** Present only on the final chunk once OpenAI reports token usage. */
+  usage?: { promptTokens: number; completionTokens: number };
+  /** True on the final chunk (either usage chunk or `finish_reason` present). */
+  done: boolean;
+};
+
+/**
+ * Streaming variant of {@link generateText}. Consumes OpenAI's SSE chunks and
+ * yields plain objects so callers (e.g. Next.js route handlers) can forward
+ * them to the browser without depending on the OpenAI SDK shape.
+ */
+export async function* generateTextStream(
+  prompt: string,
+  systemPrompt: string,
+  options: { maxTokens?: number; temperature?: number } = {},
+): AsyncGenerator<TextStreamChunk, void, unknown> {
+  const client = getOpenAIClient();
+  const { maxTokens = 1024, temperature = 0.8 } = options;
+
+  const stream = await client.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: prompt },
+    ],
+    max_tokens: maxTokens,
+    temperature,
+    stream: true,
+    stream_options: { include_usage: true },
+  });
+
+  for await (const part of stream) {
+    const choice = part.choices?.[0];
+    const delta = choice?.delta?.content ?? "";
+    const finishReason = choice?.finish_reason ?? null;
+    const usage = part.usage
+      ? {
+          promptTokens: part.usage.prompt_tokens ?? 0,
+          completionTokens: part.usage.completion_tokens ?? 0,
+        }
+      : undefined;
+
+    if (delta) {
+      yield { text: delta, done: false };
+    }
+
+    if (usage || finishReason) {
+      yield { text: "", usage, done: true };
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Design Suggestions (GPT-4o with structured JSON output)
 // ---------------------------------------------------------------------------
 
