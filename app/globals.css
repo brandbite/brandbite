@@ -46,6 +46,12 @@
   --bb-danger-bg: #fde8e7;
   --bb-danger-text: #b13832;
   --bb-danger-border: #f7c7c0;
+
+  /* ── Scrollbars ────────────────────────────────────────────────────────── */
+  /* Vercel-ish: thin, transparent track, subtle thumb that darkens on hover. */
+  --bb-scrollbar-thumb: rgba(0, 0, 0, 0.18);
+  --bb-scrollbar-thumb-hover: rgba(0, 0, 0, 0.35);
+  --bb-scrollbar-track: transparent;
 }
 
 /* ── Dark mode overrides ──────────────────────────────────────────────────── */
@@ -93,6 +99,11 @@
   --bb-danger-bg: #2a0f0f;
   --bb-danger-text: #f87171;
   --bb-danger-border: #7f1d1d;
+
+  /* ── Scrollbars (dark) ───────────────────────────────────────────────── */
+  --bb-scrollbar-thumb: rgba(255, 255, 255, 0.14);
+  --bb-scrollbar-thumb-hover: rgba(255, 255, 255, 0.28);
+  --bb-scrollbar-track: transparent;
 }
 
 *,
@@ -116,6 +127,59 @@ body {
     sans-serif;
   background: var(--bb-bg-page);
   color: var(--bb-secondary);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Themed thin scrollbars (Vercel-style)
+
+   - Firefox / modern Chromium: `scrollbar-width: thin` + `scrollbar-color`
+     read straight from the theme CSS vars, so light/dark swap for free.
+   - WebKit / older Chromium: dedicated pseudo-elements for finer control
+     (exact width, rounded thumb, hover state). Track stays transparent so
+     it blends into any background the scroll container sits on.
+   - Scoped with `*` selector so every scrollable element in the app
+     (sidebar nav, tables, modals, dropdowns) inherits the same treatment.
+   ───────────────────────────────────────────────────────────────────────── */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--bb-scrollbar-thumb) var(--bb-scrollbar-track);
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--bb-scrollbar-track);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--bb-scrollbar-thumb);
+  border-radius: 4px;
+  /* Inset border keeps the thumb visually detached from edges without
+     making the scrollbar feel thicker. */
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--bb-scrollbar-thumb-hover);
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Respect the user's OS preference to hide scrollbars until scrolling. The
+   above rules still apply when the scrollbar is shown. */
+@media (hover: none) {
+  *::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
 }
 
 /* Heading font — Josefin Sans for branding/display elements */
