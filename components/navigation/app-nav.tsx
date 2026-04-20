@@ -77,6 +77,7 @@ const NAV_CONFIG: Record<
         label: "People",
         children: [
           { href: "/admin/creative-analytics", label: "Creatives" },
+          { href: "/admin/time-tracking", label: "Time tracking" },
           { href: "/admin/users", label: "Users" },
         ],
       },

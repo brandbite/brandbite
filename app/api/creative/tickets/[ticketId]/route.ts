@@ -63,6 +63,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
             name: true,
             tokenCost: true,
             creativePayoutTokens: true,
+            estimatedHours: true,
           },
         },
         createdBy: {

@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/revision-image";
 import { formatBytes } from "@/lib/upload-helpers";
 import { RevisionCompare } from "@/components/ui/revision-compare";
+import { TimeTrackingPanel } from "@/components/creative/time-tracking-panel";
 
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -70,6 +71,7 @@ type TicketDetailResponse = {
       name: string;
       tokenCost: number;
       creativePayoutTokens: number;
+      estimatedHours: number | null;
     } | null;
     creative: {
       id: string;
@@ -644,6 +646,14 @@ export default function CreativeTicketDetailPage() {
                 </p>
                 <BriefThumbnailRow assets={briefAssets} />
               </div>
+            )}
+
+            {/* Time tracking */}
+            {data && (
+              <TimeTrackingPanel
+                ticketId={data.ticket.id}
+                estimatedHours={data.ticket.jobType?.estimatedHours ?? null}
+              />
             )}
 
             {/* Revision history */}

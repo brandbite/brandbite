@@ -241,6 +241,9 @@ model UserAccount {
   // Consultation settings rows last touched by this admin (site-level)
   updatedConsultationSettings ConsultationSettings[] @relation("ConsultationSettingsUpdatedBy")
 
+  // Time-tracking entries owned by this creative (D7)
+  creativeTimeEntries TicketTimeEntry[] @relation("CreativeTimeEntries")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -634,10 +637,46 @@ model Ticket {
   // Creative rating (one per ticket, submitted by the customer on ticket DONE)
   creativeRating CreativeRating?
 
+  // Time-tracking entries (D7). One ticket can have many entries from its
+  // assigned creative; exactly zero or one of those is "running" (endedAt is
+  // null) at any time, enforced by application logic.
+  timeEntries TicketTimeEntry[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([creativeId, status, updatedAt])
+}
+
+// -----------------------------------------------------------------------------
+// Time tracking (D7)
+//
+// A creative can start/stop a timer while working on a ticket. Stopped
+// entries carry a denormalized durationSeconds so admin analytics can
+// aggregate with a single SQL sum. Running entries (endedAt = null) have
+// durationSeconds = 0 and are computed client-side against `now` for live
+// display. The (creativeId, endedAt = NULL) pair is effectively unique —
+// starting a new timer always closes any running one first.
+// -----------------------------------------------------------------------------
+
+model TicketTimeEntry {
+  id String @id @default(cuid())
+
+  ticketId   String
+  ticket     Ticket      @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  creativeId String
+  creative   UserAccount @relation("CreativeTimeEntries", fields: [creativeId], references: [id])
+
+  startedAt        DateTime
+  endedAt          DateTime?
+  durationSeconds  Int       @default(0) // 0 while running; set on stop
+  notes            String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ticketId, startedAt])
+  @@index([creativeId, endedAt])
 }
 
 // -----------------------------------------------------------------------------
