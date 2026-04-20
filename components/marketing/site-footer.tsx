@@ -30,6 +30,13 @@ const FOOTER_COLS = [
       { label: "News", href: "/news" },
     ],
   },
+  {
+    title: "Legal",
+    links: [
+      { label: "Privacy policy", href: "/privacy" },
+      { label: "Terms of service", href: "/terms" },
+    ],
+  },
 ];
 
 export function SiteFooter() {

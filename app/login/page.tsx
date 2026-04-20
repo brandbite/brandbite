@@ -360,6 +360,26 @@ export default function LoginPage() {
                   ? "Sign in"
                   : "Create account"}
             </button>
+
+            {mode === "signup" && (
+              <p className="pt-1 text-center text-[11px] text-[var(--bb-text-muted)]">
+                By creating an account you agree to our{" "}
+                <Link
+                  href="/terms"
+                  className="font-medium text-[var(--bb-text-secondary)] hover:underline"
+                >
+                  Terms
+                </Link>{" "}
+                and{" "}
+                <Link
+                  href="/privacy"
+                  className="font-medium text-[var(--bb-text-secondary)] hover:underline"
+                >
+                  Privacy Policy
+                </Link>
+                .
+              </p>
+            )}
           </form>
 
           {/* Divider */}
