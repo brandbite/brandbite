@@ -286,7 +286,7 @@ export default function AdminJobTypeCategoriesPage() {
 
       {/* Table + Form layout — stacks below lg so the form column doesn't
           get squeezed next to the fixed sidebar. */}
-      <section className="grid gap-4 lg:grid-cols-[3fr_2fr]">
+      <section className="grid gap-4 xl:grid-cols-[3fr_2fr]">
         {/* Left: Category list */}
         <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">

@@ -207,7 +207,7 @@ export default function CreativeWithdrawalsPage() {
 
       {/* Summary + form — stacks below lg so neither column gets squeezed
           next to the fixed sidebar. */}
-      <section className="mb-6 grid gap-4 lg:grid-cols-[2fr_3fr]">
+      <section className="mb-6 grid gap-4 xl:grid-cols-[2fr_3fr]">
         {/* Summary cards */}
         <div className="space-y-3">
           <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">

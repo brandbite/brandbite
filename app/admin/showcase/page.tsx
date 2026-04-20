@@ -390,7 +390,7 @@ export default function AdminShowcasePage() {
       </section>
 
       {/* Split-view grid: list + form */}
-      <section className="grid grid-cols-1 gap-6 px-6 pb-6 lg:grid-cols-[3fr_2fr]">
+      <section className="grid grid-cols-1 gap-6 px-6 pb-6 xl:grid-cols-[3fr_2fr]">
         {/* ---------------------------------------------------------------- */}
         {/*  Left Panel: List                                                 */}
         {/* ---------------------------------------------------------------- */}
