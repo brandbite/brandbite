@@ -10,7 +10,6 @@ import { useToast } from "@/components/ui/toast-provider";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { LoadingState } from "@/components/ui/loading-state";
 import { EmptyState } from "@/components/ui/empty-state";
-import { AppNav } from "@/components/navigation/app-nav";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -172,9 +171,7 @@ export default function AdminUsersPage() {
   // ---------------------------------------------------------------------------
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
-      <AppNav role="admin" />
-
+    <div className="mx-auto max-w-6xl">
       <div className="mb-6">
         <h1 className="text-xl font-bold text-[var(--bb-secondary)]">Users</h1>
         <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">

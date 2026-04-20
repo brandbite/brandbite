@@ -47,6 +47,7 @@ type Response = {
     totalEstimatedHours: number;
     overrunCount: number;
   };
+  migrationPending?: boolean;
 };
 
 type SortKey = "logged" | "variance" | "recent";
@@ -179,6 +180,21 @@ export default function AdminTimeTrackingPage() {
           can spot overruns and retune token pricing.
         </p>
       </header>
+
+      {data.migrationPending && (
+        <InlineAlert variant="warning">
+          <p className="text-sm font-semibold">
+            Time-tracking migration is pending on this environment.
+          </p>
+          <p className="mt-1 text-xs">
+            The <code className="rounded bg-[var(--bb-bg-warm)] px-1">TicketTimeEntry</code> table
+            doesn&apos;t exist in the current database yet. Run{" "}
+            <code className="rounded bg-[var(--bb-bg-warm)] px-1">npx prisma migrate deploy</code>{" "}
+            against this environment, then reload. Until then creatives can&apos;t log time and this
+            page will stay empty.
+          </p>
+        </InlineAlert>
+      )}
 
       {/* Stats cards */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">

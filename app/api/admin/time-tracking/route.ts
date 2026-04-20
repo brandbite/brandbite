@@ -10,6 +10,7 @@
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { isSiteAdminRole } from "@/lib/roles";
@@ -60,7 +61,36 @@ export type AdminTimeTrackingResponse = {
     totalEstimatedHours: number;
     overrunCount: number; // rows where ratio > 1
   };
+  /**
+   * True when the TicketTimeEntry table itself is missing from the
+   * current DB — i.e. the D7 migration hasn't been run yet against this
+   * environment. The admin page renders a "migration pending" note
+   * instead of a generic error.
+   */
+  migrationPending?: boolean;
 };
+
+/** Empty payload shared between the "no entries yet" and "table missing"
+ *  paths so the admin page handles both with a single empty-state render. */
+function emptyResponse(migrationPending = false): AdminTimeTrackingResponse {
+  return {
+    rows: [],
+    stats: {
+      ticketCount: 0,
+      totalLoggedHours: 0,
+      totalEstimatedHours: 0,
+      overrunCount: 0,
+    },
+    ...(migrationPending ? { migrationPending: true } : {}),
+  };
+}
+
+/** Prisma raises P2021 "The table does not exist in the current database"
+ *  when a model referenced in code has no matching table. That happens on
+ *  demo/staging DBs where `prisma migrate deploy` hasn't caught up yet. */
+function isMissingTableError(err: unknown): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2021";
+}
 
 export async function GET(_req: NextRequest) {
   try {
@@ -74,27 +104,28 @@ export async function GET(_req: NextRequest) {
 
     // Aggregate time per ticket. groupBy + take forces us to do this in two
     // steps, but the set is bounded at MAX_ROWS so it stays cheap.
-    const aggregates = await prisma.ticketTimeEntry.groupBy({
-      by: ["ticketId"],
-      _sum: { durationSeconds: true },
-      _count: { _all: true },
-      orderBy: { _sum: { durationSeconds: "desc" } },
-      take: MAX_ROWS,
-    });
+    const aggregates = await prisma.ticketTimeEntry
+      .groupBy({
+        by: ["ticketId"],
+        _sum: { durationSeconds: true },
+        _count: { _all: true },
+        orderBy: { _sum: { durationSeconds: "desc" } },
+        take: MAX_ROWS,
+      })
+      .catch((err: unknown) => {
+        if (isMissingTableError(err)) return "MISSING_TABLE" as const;
+        throw err;
+      });
+
+    if (aggregates === "MISSING_TABLE") {
+      // Migration hasn't run yet — return the empty-state payload with a
+      // hint so the page can surface it to the admin rather than showing
+      // a generic red "Failed to load" banner.
+      return NextResponse.json(emptyResponse(true), { status: 200 });
+    }
 
     if (aggregates.length === 0) {
-      return NextResponse.json(
-        {
-          rows: [],
-          stats: {
-            ticketCount: 0,
-            totalLoggedHours: 0,
-            totalEstimatedHours: 0,
-            overrunCount: 0,
-          },
-        } satisfies AdminTimeTrackingResponse,
-        { status: 200 },
-      );
+      return NextResponse.json(emptyResponse(), { status: 200 });
     }
 
     const ticketIds = aggregates.map((a) => a.ticketId);
