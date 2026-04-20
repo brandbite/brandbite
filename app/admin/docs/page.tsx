@@ -758,7 +758,7 @@ export default function AdminDocsPage() {
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-[3fr_2fr]">
+                <div className="grid grid-cols-1 gap-6 p-6 xl:grid-cols-[3fr_2fr]">
                   {/* Left — content */}
                   <div className="space-y-4">
                     <div className="flex flex-col gap-1">

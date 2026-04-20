@@ -22,7 +22,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         the very first paint before the client hydrates.
       */}
       <div className="md:pl-[var(--bb-sidebar-w,240px)] md:transition-[padding] md:duration-200">
-        <main className="px-4 py-6 md:px-8 md:py-8 lg:px-10 lg:py-10">{children}</main>
+        {/* Horizontal padding intentionally matches the pre-sidebar layout
+            (md:px-6 lg:px-8). The sidebar already claims 240px of the
+            viewport; bumping content padding further squeezes pages
+            designed for the old full-width top-nav layout (e.g. /admin/plans
+            2-col grid). */}
+        <main className="px-4 py-6 md:px-6 md:py-8 lg:px-8 lg:py-10">{children}</main>
       </div>
     </div>
   );

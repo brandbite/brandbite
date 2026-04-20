@@ -372,8 +372,9 @@ export default function AdminJobTypesPage() {
         </div>
       </section>
 
-      {/* Filter + table + form layout */}
-      <section className="grid gap-4 md:grid-cols-[3fr_2fr]">
+      {/* Filter + table + form layout — stacks below lg so the form column
+          doesn't get squeezed next to the fixed sidebar. */}
+      <section className="grid gap-4 xl:grid-cols-[3fr_2fr]">
         {/* Left: table */}
         <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
           {/* Search bar */}
