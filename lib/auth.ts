@@ -112,6 +112,13 @@ async function getCurrentUserFromBetterAuth(): Promise<SessionUser | null> {
     include: { companies: true },
   });
 
+  // Soft-deleted accounts cannot sign in. Belt-and-suspenders: the deletion
+  // flow also wipes AuthSession rows, but we short-circuit here in case a
+  // session slipped through or a demo-mode user got deleted mid-cycle.
+  if (user?.deletedAt) {
+    return null;
+  }
+
   // Auto-create or link UserAccount on first BetterAuth login
   if (!user) {
     // Check if a UserAccount exists with this email (e.g. from invite pre-creation)
@@ -163,7 +170,7 @@ async function resolveSessionUserByEmail(email: string): Promise<SessionUser | n
     include: { companies: true },
   });
 
-  if (!user) return null;
+  if (!user || user.deletedAt) return null;
 
   const primaryMembership = user.companies[0] ?? null;
 
