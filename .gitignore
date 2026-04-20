@@ -25,6 +25,9 @@
 *.pem
 *.bak
 
+# Claude Code local session metadata (settings + scheduled task locks)
+.claude/
+
 # Windows: `nul` gets created by shell redirects that assume /dev/null
 nul
 
