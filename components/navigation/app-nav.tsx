@@ -131,6 +131,7 @@ const NAV_CONFIG: Record<
         label: "Board",
         highlightOnPaths: ["/creative/tickets"],
       },
+      { href: "/creative/portfolio", label: "Portfolio" },
       { href: "/creative/balance", label: "Balance" },
       { href: "/creative/withdrawals", label: "Withdrawals" },
       { href: "/creative/faq", label: "FAQ" },
