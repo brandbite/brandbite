@@ -49,24 +49,52 @@ export type CopyFormat =
 
 export type CopyTone = "professional" | "casual" | "playful" | "bold" | "elegant" | "technical";
 
+const COPY_FORMAT_GUIDE: Record<CopyFormat, string> = {
+  tagline: "short, memorable taglines (5-10 words each)",
+  headline: "compelling headlines for ads or landing pages (8-15 words each)",
+  social_post: "engaging social media posts (1-3 sentences each)",
+  email_subject: "high-open-rate email subject lines (5-12 words each)",
+  ad_copy: "persuasive ad copy paragraphs (2-4 sentences each)",
+  custom: "creative copy based on the brief",
+};
+
 export function buildCopySystemPrompt(
   format: CopyFormat,
   tone: CopyTone,
   variations: number = 3,
 ): string {
-  const formatGuide: Record<CopyFormat, string> = {
-    tagline: "short, memorable taglines (5-10 words each)",
-    headline: "compelling headlines for ads or landing pages (8-15 words each)",
-    social_post: "engaging social media posts (1-3 sentences each)",
-    email_subject: "high-open-rate email subject lines (5-12 words each)",
-    ad_copy: "persuasive ad copy paragraphs (2-4 sentences each)",
-    custom: "creative copy based on the brief",
-  };
-
-  return `You are an expert copywriter for creative brands. Generate exactly ${variations} variations of ${formatGuide[format]}.
+  return `You are an expert copywriter for creative brands. Generate exactly ${variations} variations of ${COPY_FORMAT_GUIDE[format]}.
 Tone: ${tone}.
 Return ONLY a JSON array of strings, e.g. ["variation 1", "variation 2", "variation 3"].
 No explanations, no markdown — just the JSON array.`;
+}
+
+/**
+ * Delimiter used between variations in the streaming copy response.
+ * Kept out of the response until the model actually outputs it so clients
+ * can split cleanly as chunks arrive.
+ */
+export const STREAM_VARIATION_DELIMITER = "---NEXT---";
+
+/**
+ * Streaming-friendly variant of {@link buildCopySystemPrompt}. Instead of a
+ * JSON array (which would have to be buffered and parsed at the end), the
+ * model emits variations as plain text separated by a stable delimiter so
+ * each chunk can be rendered progressively in the UI.
+ */
+export function buildStreamingCopySystemPrompt(
+  format: CopyFormat,
+  tone: CopyTone,
+  variations: number = 3,
+): string {
+  return `You are an expert copywriter for creative brands. Generate exactly ${variations} variations of ${COPY_FORMAT_GUIDE[format]}.
+Tone: ${tone}.
+
+Output format (strict):
+- Emit each variation as plain text.
+- Between variations, output the exact delimiter "${STREAM_VARIATION_DELIMITER}" on its own line.
+- Do not number the variations, add explanations, or use markdown, quotes, or JSON.
+- Do not emit the delimiter before the first variation or after the last one.`;
 }
 
 export function buildCopyPrompt(brief: string, options: { wordCount?: number } = {}): string {

@@ -9,6 +9,7 @@
 import { NextResponse } from "next/server";
 
 export const INSUFFICIENT_TOKENS_CODE = "INSUFFICIENT_TOKENS";
+export const INSUFFICIENT_TOKENS_STATUS = 402;
 
 export type InsufficientTokensBody = {
   error: string;
@@ -20,14 +21,17 @@ export type InsufficientTokensBody = {
   action?: string;
 };
 
-/** Build a normalised 402 response for "company can't afford this action". */
-export function insufficientTokensResponse(args: {
+/** Build the plain JSON body for an "insufficient tokens" response. Used by
+ *  routes that need the raw shape (e.g. SSE routes that can't return a
+ *  NextResponse directly).
+ */
+export function insufficientTokensBody(args: {
   required: number;
   balance: number;
   action?: string;
-}): NextResponse {
+}): InsufficientTokensBody {
   const shortBy = Math.max(0, args.required - args.balance);
-  const body: InsufficientTokensBody = {
+  return {
     error: "Insufficient token balance",
     code: INSUFFICIENT_TOKENS_CODE,
     required: args.required,
@@ -35,7 +39,15 @@ export function insufficientTokensResponse(args: {
     shortBy,
     action: args.action,
   };
-  return NextResponse.json(body, { status: 402 });
+}
+
+/** Build a normalised 402 response for "company can't afford this action". */
+export function insufficientTokensResponse(args: {
+  required: number;
+  balance: number;
+  action?: string;
+}): NextResponse {
+  return NextResponse.json(insufficientTokensBody(args), { status: INSUFFICIENT_TOKENS_STATUS });
 }
 
 /** Client-side type guard — true when a JSON error response is an

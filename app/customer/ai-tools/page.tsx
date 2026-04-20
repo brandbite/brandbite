@@ -198,6 +198,57 @@ function ImageGenerationPanel({
   );
 }
 
+/**
+ * Delimiter used between variations in the streaming response. Kept in sync
+ * with STREAM_VARIATION_DELIMITER in lib/ai/prompts.ts.
+ */
+const STREAM_VARIATION_DELIMITER = "---NEXT---";
+
+/**
+ * Splits the accumulated streaming text into an array of in-progress
+ * variations. The final segment is still growing — we don't trim the
+ * trailing entry so the user can see characters landing in real time.
+ */
+function splitStreamingVariations(fullText: string): string[] {
+  if (!fullText) return [];
+  return fullText.split(STREAM_VARIATION_DELIMITER).map((s) => s.replace(/^\n+/, ""));
+}
+
+/**
+ * Parses a single SSE line buffer into complete events. Each event has the
+ * form `event: <name>\ndata: <json>\n\n`. Partial events at the tail are
+ * returned as a leftover buffer to be prepended to the next chunk.
+ */
+function consumeSseBuffer(buf: string): {
+  events: { event: string; data: unknown }[];
+  rest: string;
+} {
+  const events: { event: string; data: unknown }[] = [];
+  let rest = buf;
+  while (true) {
+    const boundary = rest.indexOf("\n\n");
+    if (boundary === -1) break;
+    const raw = rest.slice(0, boundary);
+    rest = rest.slice(boundary + 2);
+
+    let eventName = "message";
+    let dataLine = "";
+    for (const line of raw.split("\n")) {
+      if (line.startsWith("event:")) {
+        eventName = line.slice(6).trim();
+      } else if (line.startsWith("data:")) {
+        dataLine += line.slice(5).trim();
+      }
+    }
+    try {
+      events.push({ event: eventName, data: dataLine ? JSON.parse(dataLine) : null });
+    } catch {
+      // Malformed chunk — skip.
+    }
+  }
+  return { events, rest };
+}
+
 function TextGenerationPanel({
   onGenerated,
   onInsufficient,
@@ -210,17 +261,22 @@ function TextGenerationPanel({
   const [tone, setTone] = useState("professional");
   const [variations, setVariations] = useState(3);
   const [loading, setLoading] = useState(false);
+  const [streamingText, setStreamingText] = useState("");
   const [results, setResults] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState<number | null>(null);
   const { key: idempotencyKey, rotate: rotateIdempotencyKey } = useIdempotencyKey();
 
+  const inFlightVariations = splitStreamingVariations(streamingText);
+
   const generate = async () => {
     setLoading(true);
     setError("");
     setResults([]);
+    setStreamingText("");
+
     try {
-      const res = await fetch("/api/ai/generate/text", {
+      const res = await fetch("/api/ai/generate/text/stream", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -228,19 +284,68 @@ function TextGenerationPanel({
         },
         body: JSON.stringify({ prompt, format, tone, variations }),
       });
-      const data = await res.json();
+
+      // Pre-stream errors arrive as JSON, not SSE.
       if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: "Generation failed" }));
         if (res.status === 402 && isInsufficientTokensBody(data)) {
           onInsufficient(data);
           return;
         }
         throw new Error(data.error || "Generation failed");
       }
+
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("Streaming is not supported in this browser");
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let accumulated = "";
+      let finalVariations: string[] | null = null;
+      let streamError: string | null = null;
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (value) {
+          buffer += decoder.decode(value, { stream: true });
+          const { events, rest } = consumeSseBuffer(buffer);
+          buffer = rest;
+          for (const ev of events) {
+            if (ev.event === "delta") {
+              const d = ev.data as { text?: string } | null;
+              if (d?.text) {
+                accumulated += d.text;
+                setStreamingText(accumulated);
+              }
+            } else if (ev.event === "done") {
+              const d = ev.data as { variations?: string[]; outputText?: string } | null;
+              finalVariations =
+                d?.variations && d.variations.length > 0
+                  ? d.variations
+                  : splitStreamingVariations(d?.outputText ?? accumulated)
+                      .map((s) => s.trim())
+                      .filter(Boolean);
+            } else if (ev.event === "error") {
+              const d = ev.data as { message?: string } | null;
+              streamError = d?.message || "Text generation failed";
+            }
+          }
+        }
+        if (done) break;
+      }
+
+      if (streamError) {
+        rotateIdempotencyKey();
+        throw new Error(streamError);
+      }
+
       rotateIdempotencyKey();
-      setResults(data.generation.variations || [data.generation.outputText]);
+      setResults(finalVariations ?? []);
+      setStreamingText("");
       onGenerated();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
+      setStreamingText("");
     } finally {
       setLoading(false);
     }
@@ -305,19 +410,41 @@ function TextGenerationPanel({
       <Button
         onClick={generate}
         loading={loading}
-        loadingText="Generating..."
+        loadingText="Streaming..."
         disabled={!prompt.trim()}
       >
         Generate Copy
       </Button>
-      {results.length > 0 && (
+
+      {loading && inFlightVariations.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-tertiary)] uppercase">
+            Streaming…
+          </p>
+          {inFlightVariations.map((text, i) => (
+            <div
+              key={`stream-${i}`}
+              className="rounded-xl border border-dashed border-[var(--bb-primary)]/40 bg-[var(--bb-bg-page)] px-4 py-3"
+            >
+              <p className="text-sm whitespace-pre-wrap text-[var(--bb-secondary)]">
+                {text}
+                <span className="-mb-0.5 ml-0.5 inline-block h-3 w-1.5 animate-pulse bg-[var(--bb-primary)]" />
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!loading && results.length > 0 && (
         <div className="space-y-2">
           {results.map((text, i) => (
             <div
               key={i}
               className="flex items-start justify-between gap-3 rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-3"
             >
-              <p className="flex-1 text-sm text-[var(--bb-secondary)]">{text}</p>
+              <p className="flex-1 text-sm whitespace-pre-wrap text-[var(--bb-secondary)]">
+                {text}
+              </p>
               <button
                 onClick={() => copyToClipboard(text, i)}
                 className="shrink-0 rounded-full border border-[var(--bb-border)] px-2.5 py-1 text-[10px] font-semibold text-[var(--bb-text-tertiary)] transition-colors hover:bg-[var(--bb-bg-warm)]"
