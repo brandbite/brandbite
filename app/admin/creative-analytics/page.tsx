@@ -24,8 +24,11 @@ type CreativeMetrics = {
   id: string;
   name: string | null;
   email: string;
+  isPaused: boolean;
+  pauseExpiresAt: string | null;
   completedTickets: number;
   activeTickets: number;
+  statusBreakdown: { TODO: number; IN_PROGRESS: number; IN_REVIEW: number };
   totalTickets: number;
   completionRate: number;
   avgRevisionCount: number;
@@ -47,6 +50,8 @@ type CreativeAnalyticsResponse = {
     totalCompletedTickets: number;
     avgPlatformRevisionRate: number;
     avgPlatformTurnaround: number;
+    maxLoadScore: number;
+    pausedCount: number;
   };
   creatives: CreativeMetrics[];
 };
@@ -217,12 +222,16 @@ export default function CreativeAnalyticsPage() {
       </p>
 
       {/* Summary cards */}
-      <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {[
           {
             label: "Active Creatives",
-            value: summary.totalCreatives,
+            value:
+              summary.pausedCount > 0
+                ? `${summary.totalCreatives - summary.pausedCount} / ${summary.totalCreatives}`
+                : summary.totalCreatives,
             accent: "#3B82F6",
+            hint: summary.pausedCount > 0 ? `${summary.pausedCount} paused` : undefined,
           },
           {
             label: "Total Completed",
@@ -239,6 +248,12 @@ export default function CreativeAnalyticsPage() {
             value: formatHours(summary.avgPlatformTurnaround),
             accent: "var(--bb-primary)",
           },
+          {
+            label: "Max Load Score",
+            value: summary.maxLoadScore,
+            accent: "#EF4444",
+            hint: "Team peak — utilization bars normalize to this.",
+          },
         ].map((card) => (
           <div
             key={card.label}
@@ -249,6 +264,9 @@ export default function CreativeAnalyticsPage() {
               {card.label}
             </p>
             <p className="mt-1 text-2xl font-bold text-[var(--bb-secondary)]">{card.value}</p>
+            {"hint" in card && card.hint && (
+              <p className="mt-1 text-[10px] text-[var(--bb-text-tertiary)]">{card.hint}</p>
+            )}
           </div>
         ))}
       </div>
@@ -315,12 +333,13 @@ export default function CreativeAnalyticsPage() {
             <tr className="border-b border-[var(--bb-border-subtle)] bg-[var(--bb-bg-page)] text-[10px] font-semibold tracking-[0.12em] text-[var(--bb-text-muted)] uppercase">
               <th className="px-4 py-3">Creative</th>
               <th className="px-3 py-3 text-center">Completed</th>
-              <th className="px-3 py-3 text-center">Active</th>
+              <th className="px-3 py-3 text-center">Active (T / IP / IR)</th>
               <th className="px-3 py-3 text-center">Rate</th>
               <th className="px-3 py-3 text-center">Avg Rev.</th>
               <th className="px-3 py-3 text-center">Turnaround</th>
               <th className="px-3 py-3 text-center">Rating</th>
               <th className="px-3 py-3 text-center">Earnings</th>
+              <th className="px-3 py-3 text-center">Utilization</th>
               <th className="px-3 py-3 text-center">Load</th>
             </tr>
           </thead>
@@ -331,14 +350,34 @@ export default function CreativeAnalyticsPage() {
                 className="border-b border-[var(--bb-bg-card)] transition-colors hover:bg-[var(--bb-bg-page)]"
               >
                 <td className="px-4 py-3">
-                  <p className="font-medium text-[var(--bb-secondary)]">{d.name || "—"}</p>
-                  <p className="text-[10px] text-[var(--bb-text-tertiary)]">{d.email}</p>
+                  <div className="flex items-center gap-2">
+                    <div>
+                      <p className="font-medium text-[var(--bb-secondary)]">{d.name || "—"}</p>
+                      <p className="text-[10px] text-[var(--bb-text-tertiary)]">{d.email}</p>
+                    </div>
+                    {d.isPaused && (
+                      <span
+                        className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold text-amber-900"
+                        title={
+                          d.pauseExpiresAt
+                            ? `Paused until ${new Date(d.pauseExpiresAt).toLocaleDateString()}`
+                            : "Paused (no expiry)"
+                        }
+                      >
+                        Paused
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-3 py-3 text-center font-semibold text-[var(--bb-secondary)]">
                   {d.completedTickets}
                 </td>
-                <td className="px-3 py-3 text-center text-[var(--bb-text-tertiary)]">
-                  {d.activeTickets}
+                <td className="px-3 py-3 text-center">
+                  <span className="font-medium text-[var(--bb-secondary)]">{d.activeTickets}</span>
+                  <span className="ml-1 font-mono text-[10px] text-[var(--bb-text-tertiary)]">
+                    ({d.statusBreakdown.TODO} / {d.statusBreakdown.IN_PROGRESS} /{" "}
+                    {d.statusBreakdown.IN_REVIEW})
+                  </span>
                 </td>
                 <td className="px-3 py-3 text-center">
                   <span
@@ -380,6 +419,29 @@ export default function CreativeAnalyticsPage() {
                   <span className="ml-0.5 text-[10px] text-[var(--bb-text-tertiary)]">
                     {d.totalEarnings > 0 ? "tkn" : ""}
                   </span>
+                </td>
+                <td className="px-3 py-3">
+                  {(() => {
+                    const max = data?.summary.maxLoadScore ?? 0;
+                    const pct = max > 0 ? Math.round((d.loadScore / max) * 100) : 0;
+                    return (
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 min-w-[60px] flex-1 overflow-hidden rounded-full bg-[var(--bb-bg-card)]">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{
+                              width: `${Math.max(3, pct)}%`,
+                              backgroundColor: loadScoreColor(d.loadScore),
+                            }}
+                            aria-label={`${pct}% of team's max load`}
+                          />
+                        </div>
+                        <span className="w-9 text-right font-mono text-[10px] text-[var(--bb-text-tertiary)]">
+                          {pct}%
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </td>
                 <td className="px-3 py-3 text-center">
                   <span
