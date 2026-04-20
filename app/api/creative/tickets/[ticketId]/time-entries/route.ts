@@ -7,12 +7,34 @@
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import {
   getTicketTimeSummaryForCreative,
   startTicketTimer,
   TimeEntryError,
 } from "@/lib/tickets/time-tracking";
+
+/**
+ * Prisma raises P2021 when the TicketTimeEntry table is missing — happens
+ * on demo/staging DBs where `prisma migrate deploy` hasn't run since D7.
+ * We surface it as a 503 + a specific code the UI can branch on instead
+ * of a scary 500 banner.
+ */
+function isMissingTableError(err: unknown): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2021";
+}
+
+function migrationPendingResponse(): NextResponse {
+  return NextResponse.json(
+    {
+      error:
+        "Time tracking is not yet available on this environment. The database migration hasn't been applied.",
+      code: "MIGRATION_PENDING",
+    },
+    { status: 503 },
+  );
+}
 
 type RouteContext = {
   params: Promise<{ ticketId: string }>;
@@ -49,6 +71,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
     const summary = await getTicketTimeSummaryForCreative(ticketId, user.id);
     return NextResponse.json(summary, { status: 200 });
   } catch (error: unknown) {
+    if (isMissingTableError(error)) return migrationPendingResponse();
     const mapped = mapTimeEntryError(error);
     if (mapped) return mapped;
 
@@ -85,6 +108,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json(result, { status: 201 });
   } catch (error: unknown) {
+    if (isMissingTableError(error)) return migrationPendingResponse();
     const mapped = mapTimeEntryError(error);
     if (mapped) return mapped;
 

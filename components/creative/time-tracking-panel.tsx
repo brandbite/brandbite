@@ -90,6 +90,7 @@ export function TimeTrackingPanel({
   const [summary, setSummary] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [migrationPending, setMigrationPending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [pending, setPending] = useState<"start" | "stop" | string | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
@@ -97,12 +98,20 @@ export function TimeTrackingPanel({
   // ---- Load summary ----
   const load = useCallback(async () => {
     setError(null);
+    setMigrationPending(false);
     try {
       const res = await fetch(`/api/creative/tickets/${ticketId}/time-entries`, {
         cache: "no-store",
       });
-      const json = await res.json().catch(() => null);
+      const json = (await res.json().catch(() => null)) as
+        | (Summary & { code?: string })
+        | { error?: string; code?: string }
+        | null;
       if (!res.ok) {
+        if (res.status === 503 && json && "code" in json && json.code === "MIGRATION_PENDING") {
+          setMigrationPending(true);
+          return;
+        }
         setError((json as { error?: string } | null)?.error ?? "Failed to load time entries.");
         return;
       }
@@ -226,13 +235,20 @@ export function TimeTrackingPanel({
 
       {loading && <p className="mt-2 text-xs text-[var(--bb-text-tertiary)]">Loading entries…</p>}
 
-      {!loading && error && (
+      {!loading && migrationPending && (
+        <p className="mt-2 text-xs text-[var(--bb-text-tertiary)]">
+          Time tracking isn&apos;t available on this environment yet — ask an admin to run the
+          pending database migration.
+        </p>
+      )}
+
+      {!loading && !migrationPending && error && (
         <InlineAlert variant="error" size="sm" className="mt-2">
           {error}
         </InlineAlert>
       )}
 
-      {!loading && !error && summary && (
+      {!loading && !error && !migrationPending && summary && (
         <>
           {/* Progress bar vs estimate */}
           {percentOfEstimate !== null && (
