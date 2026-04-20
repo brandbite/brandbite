@@ -94,6 +94,50 @@ export async function removeBackground(imageUrl: string): Promise<BackgroundRemo
 }
 
 // ---------------------------------------------------------------------------
+// Image Upscaling (Real-ESRGAN via Replicate)
+// ---------------------------------------------------------------------------
+
+export type UpscaleScale = 2 | 4;
+
+export type UpscaleImageResult = {
+  url: string;
+  scale: UpscaleScale;
+};
+
+/**
+ * Upscale an existing image by 2x or 4x using nightmareai/real-esrgan. The
+ * model is well-tested on Replicate and produces sharp, natural upscales
+ * for photos, generated art, and UI mockups. We deliberately don't pass
+ * `face_enhance: true` by default because it subtly alters generated faces
+ * and users often find that jarring.
+ */
+export async function upscaleImage(
+  imageUrl: string,
+  options: { scale?: UpscaleScale; faceEnhance?: boolean } = {},
+): Promise<UpscaleImageResult> {
+  const client = getReplicateClient();
+  const { scale = 4, faceEnhance = false } = options;
+
+  const output = await client.run(
+    "nightmareai/real-esrgan:f121d640bd286e1fdc67f9799164c1d5be36ff74576ee11c803ae5b665dd46aa",
+    {
+      input: {
+        image: imageUrl,
+        scale,
+        face_enhance: faceEnhance,
+      },
+    },
+  );
+
+  const url = extractUrl(output);
+  if (!url) {
+    throw new Error("No image returned from Real-ESRGAN");
+  }
+
+  return { url, scale };
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 

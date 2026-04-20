@@ -19,9 +19,12 @@ import {
 import {
   generateImageFlux,
   removeBackground as replicateRemoveBackground,
+  upscaleImage as replicateUpscaleImage,
   type FluxImageSize,
   type FluxImageResult,
   type BackgroundRemovalResult,
+  type UpscaleImageResult,
+  type UpscaleScale,
 } from "./replicate";
 
 // ---------------------------------------------------------------------------
@@ -185,6 +188,29 @@ export async function removeBackground(
 }
 
 // ---------------------------------------------------------------------------
+// Image Upscaling (routes to Replicate Real-ESRGAN)
+// ---------------------------------------------------------------------------
+
+export async function upscaleImage(
+  imageUrl: string,
+  options: { scale?: UpscaleScale; faceEnhance?: boolean } = {},
+): Promise<UpscaleImageResult & { provider: string; model: string }> {
+  if (!isProviderAvailable("replicate")) {
+    throw new Error("Replicate is not available for image upscaling");
+  }
+
+  try {
+    const result = await replicateUpscaleImage(imageUrl, options);
+    markProviderUp("replicate");
+    return { ...result, provider: "replicate", model: "real-esrgan" };
+  } catch (error) {
+    console.error("[ai:replicate] image upscaling failed", error);
+    markProviderDown("replicate");
+    throw error;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Design Suggestions (routes to GPT-4o)
 // ---------------------------------------------------------------------------
 
@@ -223,5 +249,7 @@ export function getProviderForTool(toolType: AiToolType): { provider: string; mo
       return { provider: "openai", model: "gpt-4o" };
     case "BRIEF_PARSING":
       return { provider: "openai", model: "gpt-4o-mini" };
+    case "UPSCALE_IMAGE":
+      return { provider: "replicate", model: "real-esrgan" };
   }
 }

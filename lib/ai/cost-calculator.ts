@@ -14,6 +14,10 @@ const DEFAULT_COSTS: Record<AiToolType, number> = {
   TEXT_GENERATION: 1,
   DESIGN_SUGGESTION: 1,
   BRIEF_PARSING: 1,
+  // Real-ESRGAN at 4x is the most expensive tool we offer; users should pay
+  // roughly double an image gen because the output is meaningfully larger
+  // and the Replicate run is longer.
+  UPSCALE_IMAGE: 2,
 };
 
 const DEFAULT_RATE_LIMITS: Record<AiToolType, number> = {
@@ -22,6 +26,7 @@ const DEFAULT_RATE_LIMITS: Record<AiToolType, number> = {
   TEXT_GENERATION: 50,
   DESIGN_SUGGESTION: 30,
   BRIEF_PARSING: 30,
+  UPSCALE_IMAGE: 20,
 };
 
 // ---------------------------------------------------------------------------

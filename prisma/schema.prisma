@@ -22,7 +22,7 @@ datasource db {
 enum UserRole {
   SITE_OWNER
   SITE_ADMIN
-  DESIGNER  // DB value stays "DESIGNER"; display label = "Creative"
+  DESIGNER // DB value stays "DESIGNER"; display label = "Creative"
   CUSTOMER
 }
 
@@ -89,12 +89,12 @@ enum BillingStatus {
 // --- Notifications ---
 
 enum NotificationType {
-  REVISION_SUBMITTED    // Creative submitted a new revision
-  FEEDBACK_SUBMITTED    // Customer submitted revision feedback (pins)
-  TICKET_COMPLETED      // Ticket marked as DONE
-  TICKET_ASSIGNED       // Ticket assigned to creative
+  REVISION_SUBMITTED // Creative submitted a new revision
+  FEEDBACK_SUBMITTED // Customer submitted revision feedback (pins)
+  TICKET_COMPLETED // Ticket marked as DONE
+  TICKET_ASSIGNED // Ticket assigned to creative
   TICKET_STATUS_CHANGED // Any status transition
-  PIN_RESOLVED          // Creative resolved a pin
+  PIN_RESOLVED // Creative resolved a pin
 }
 
 // --- CMS Content ---
@@ -124,6 +124,7 @@ enum AiToolType {
   TEXT_GENERATION
   DESIGN_SUGGESTION
   BRIEF_PARSING
+  UPSCALE_IMAGE
 }
 
 // --- Assets & Annotations ---
@@ -191,7 +192,7 @@ model UserAccount {
   pauseType      String?
 
   // Relations
-  companies       CompanyMember[]
+  companies        CompanyMember[]
   creativeTickets  Ticket[]        @relation("CreativeTickets")
   customerTickets  Ticket[]        @relation("CustomerTickets")
   completedTickets Ticket[]        @relation("TicketCompletedBy")
@@ -210,15 +211,15 @@ model UserAccount {
   feedbackRevisions  TicketRevision[] @relation("TicketRevisionFeedbackBy")
 
   // Assets & annotations
-  createdAssets       Asset[]
-  createdAssetPins    AssetPin[]        @relation("AssetPinCreatedBy")
-  resolvedAssetPins   AssetPin[]        @relation("AssetPinResolvedBy")
-  assetPinComments    AssetPinComment[]
+  createdAssets     Asset[]
+  createdAssetPins  AssetPin[]        @relation("AssetPinCreatedBy")
+  resolvedAssetPins AssetPin[]        @relation("AssetPinResolvedBy")
+  assetPinComments  AssetPinComment[]
 
   // Notifications
-  notifications        Notification[]           @relation("UserNotifications")
-  actedNotifications   Notification[]           @relation("NotificationActor")
-  notificationPrefs    NotificationPreference[]
+  notifications      Notification[]           @relation("UserNotifications")
+  actedNotifications Notification[]           @relation("NotificationActor")
+  notificationPrefs  NotificationPreference[]
 
   // Creative skills (job type capabilities)
   creativeSkills CreativeSkill[] @relation("CreativeSkills")
@@ -231,7 +232,7 @@ model UserAccount {
   createdMoodboardItems MoodboardItem[] @relation("MoodboardItemCreatedBy")
 
   // Creative ratings (admin-only signal; creative does NOT see their own ratings)
-  receivedRatings CreativeRating[] @relation("CreativeRatingsReceived")
+  receivedRatings  CreativeRating[] @relation("CreativeRatingsReceived")
   submittedRatings CreativeRating[] @relation("CreativeRatingsGiven")
 
   // Consultations requested by this user
@@ -455,18 +456,18 @@ model JobType {
   id String @id @default(cuid())
 
   name                 String
-  category             String?           // legacy free-text category (kept for migration)
+  category             String? // legacy free-text category (kept for migration)
   categoryId           String?
-  categoryRef          JobTypeCategory?  @relation(fields: [categoryId], references: [id])
+  categoryRef          JobTypeCategory? @relation(fields: [categoryId], references: [id])
   description          String?
   tokenCost            Int
-  creativePayoutTokens Int               @map("designerPayoutTokens")
-  estimatedHours       Int?              // from service catalog (for reference)
+  creativePayoutTokens Int              @map("designerPayoutTokens")
+  estimatedHours       Int? // from service catalog (for reference)
 
   // Quantity support — some jobs are per-unit (e.g. banner sizes, pages)
-  hasQuantity      Boolean @default(false) // show quantity stepper in form
-  quantityLabel    String?                 // e.g. "Number of sizes", "Number of pages"
-  defaultQuantity  Int     @default(1)     // pre-filled quantity for this job type
+  hasQuantity     Boolean @default(false) // show quantity stepper in form
+  quantityLabel   String? // e.g. "Number of sizes", "Number of pages"
+  defaultQuantity Int     @default(1) // pre-filled quantity for this job type
 
   /// Optional per-job-type prompt template. Spliced into AI image-generation
   /// prompts as additional context so each job type gets tuned output
@@ -529,11 +530,11 @@ model OutputSizePreset {
   /// UI label (English)
   label String
 
-  width Int
+  width  Int
   height Int
-  unit String @default("px")
+  unit   String @default("px")
 
-  sortOrder Int @default(0)
+  sortOrder Int     @default(0)
   isActive  Boolean @default(true)
 
   ticketSpecs TicketOutputSpec[]
@@ -589,8 +590,8 @@ model Ticket {
   createdBy   UserAccount @relation("CustomerTickets", fields: [createdById], references: [id])
 
   // Assigned creative
-  creativeId String?              @map("designerId")
-  creative   UserAccount?         @relation("CreativeTickets", fields: [creativeId], references: [id])
+  creativeId String?      @map("designerId")
+  creative   UserAccount? @relation("CreativeTickets", fields: [creativeId], references: [id])
 
   jobTypeId String?
   jobType   JobType? @relation(fields: [jobTypeId], references: [id])
@@ -600,7 +601,7 @@ model Ticket {
 
   // Admin overrides — when set, these replace the calculated (jobType cost * quantity).
   tokenCostOverride      Int?
-  creativePayoutOverride Int?     @map("designerPayoutOverride")
+  creativePayoutOverride Int? @map("designerPayoutOverride")
 
   // Completion tracking (who approved the final revision)
   completedAt   DateTime?
@@ -745,11 +746,11 @@ model TicketRevision {
   /// Revision number for this ticket (v1, v2, v3, ...)
   version Int
 
-  submittedByCreativeId String?          @map("submittedByDesignerId")
-  submittedByCreative   UserAccount?     @relation("TicketRevisionSubmittedBy", fields: [submittedByCreativeId], references: [id])
+  submittedByCreativeId String?      @map("submittedByDesignerId")
+  submittedByCreative   UserAccount? @relation("TicketRevisionSubmittedBy", fields: [submittedByCreativeId], references: [id])
 
-  submittedAt DateTime @default(now())
-  creativeMessage String?                @map("designerMessage")
+  submittedAt     DateTime @default(now())
+  creativeMessage String?  @map("designerMessage")
 
   feedbackByCustomerId String?
   feedbackByCustomer   UserAccount? @relation("TicketRevisionFeedbackBy", fields: [feedbackByCustomerId], references: [id])
@@ -801,7 +802,7 @@ model Asset {
   createdById String
   createdBy   UserAccount @relation(fields: [createdById], references: [id])
 
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   deletedAt DateTime?
 
   pins AssetPin[]
@@ -815,7 +816,7 @@ model AssetPin {
   id String @id @default(cuid())
 
   assetId String
-  asset   Asset @relation(fields: [assetId], references: [id])
+  asset   Asset  @relation(fields: [assetId], references: [id])
 
   createdById String
   createdBy   UserAccount @relation("AssetPinCreatedBy", fields: [createdById], references: [id])
@@ -825,8 +826,8 @@ model AssetPin {
   y Float
 
   /// UI order/number (1..N) per asset
-  order Int
-  label String?
+  order  Int
+  label  String?
   status PinStatus @default(OPEN)
 
   resolvedAt   DateTime?
@@ -899,8 +900,8 @@ model TokenLedger {
 model Withdrawal {
   id String @id @default(cuid())
 
-  creativeId String       @map("designerId")
-  creative   UserAccount  @relation(fields: [creativeId], references: [id])
+  creativeId String      @map("designerId")
+  creative   UserAccount @relation(fields: [creativeId], references: [id])
 
   amountTokens Int
   status       WithdrawalStatus @default(PENDING)
@@ -1004,8 +1005,8 @@ model TicketAssignmentLog {
   ticket   Ticket @relation(fields: [ticketId], references: [id])
 
   // Which creative was assigned to the ticket?
-  creativeId String?          @map("designerId")
-  creative   UserAccount?     @relation(fields: [creativeId], references: [id])
+  creativeId String?      @map("designerId")
+  creative   UserAccount? @relation(fields: [creativeId], references: [id])
 
   /// reason examples:
   /// - AUTO_ASSIGN
@@ -1099,16 +1100,16 @@ model BlogPost {
 // -----------------------------------------------------------------------------
 
 model CmsPage {
-  id                 String   @id @default(cuid())
-  pageKey            String   @unique // "about", "contact", "documentation"
-  title              String
-  subtitle           String?
-  heroStorageKey     String?
-  heroUrl            String?
-  body               String?  // Rich HTML
-  metaTitle          String?
-  metaDescription    String?
-  updatedAt          DateTime @updatedAt
+  id              String   @id @default(cuid())
+  pageKey         String   @unique // "about", "contact", "documentation"
+  title           String
+  subtitle        String?
+  heroStorageKey  String?
+  heroUrl         String?
+  body            String? // Rich HTML
+  metaTitle       String?
+  metaDescription String?
+  updatedAt       DateTime @updatedAt
 }
 
 // -----------------------------------------------------------------------------
@@ -1116,24 +1117,24 @@ model CmsPage {
 // -----------------------------------------------------------------------------
 
 model NewsArticle {
-  id                   String     @id @default(cuid())
-  title                String
-  slug                 String     @unique
-  excerpt              String?
-  authorName           String?
-  category             String?
-  tags                 String[]   @default([])
-  thumbnailStorageKey  String?
-  thumbnailUrl         String?
-  heroStorageKey       String?
-  heroUrl              String?
-  body                 String?    // Rich HTML
-  metaTitle            String?
-  metaDescription      String?
-  status               CmsStatus  @default(DRAFT)
-  publishedAt          DateTime?
-  createdAt            DateTime   @default(now())
-  updatedAt            DateTime   @updatedAt
+  id                  String    @id @default(cuid())
+  title               String
+  slug                String    @unique
+  excerpt             String?
+  authorName          String?
+  category            String?
+  tags                String[]  @default([])
+  thumbnailStorageKey String?
+  thumbnailUrl        String?
+  heroStorageKey      String?
+  heroUrl             String?
+  body                String? // Rich HTML
+  metaTitle           String?
+  metaDescription     String?
+  status              CmsStatus @default(DRAFT)
+  publishedAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   @@index([status, publishedAt])
 }
@@ -1153,7 +1154,7 @@ model DocCategory {
   title       String
   slug        String      @unique
   description String?
-  icon        String?     // emoji or icon identifier
+  icon        String? // emoji or icon identifier
   audience    DocAudience @default(GENERAL)
   sortOrder   Int         @default(0)
 
@@ -1197,8 +1198,8 @@ model AiGeneration {
   id       String     @id @default(cuid())
   toolType AiToolType
 
-  userId    String
-  user      UserAccount @relation(fields: [userId], references: [id])
+  userId String
+  user   UserAccount @relation(fields: [userId], references: [id])
 
   companyId String
   company   Company @relation(fields: [companyId], references: [id])
@@ -1229,12 +1230,12 @@ model AiGeneration {
   outputParams   Json?
 
   /// Cost tracking
-  tokenCost    Int  @default(0)
+  tokenCost    Int   @default(0)
   providerCost Json? // Actual API cost details for internal tracking
 
   /// Error handling
   errorMessage String?
-  retryCount   Int    @default(0)
+  retryCount   Int     @default(0)
 
   /// Timing
   startedAt   DateTime?
@@ -1274,13 +1275,13 @@ model AiToolConfig {
 // -----------------------------------------------------------------------------
 
 model AuthUser {
-  id            String    @id
+  id            String   @id
   name          String
-  email         String    @unique
-  emailVerified Boolean   @default(false)
+  email         String   @unique
+  emailVerified Boolean  @default(false)
   image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   sessions AuthSession[]
   accounts AuthAccount[]
@@ -1356,7 +1357,7 @@ model Moodboard {
   createdBy   UserAccount @relation("MoodboardCreatedBy", fields: [createdById], references: [id])
 
   items       MoodboardItem[]
-  connections Json             @default("[]")
+  connections Json            @default("[]")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1521,12 +1522,12 @@ model ConsultationSettings {
   /// Tokens persisted here plaintext for now — rotating encryption key is a
   /// follow-up; low blast radius since the DB is single-tenant and the
   /// refresh token only scopes calendar.events + calendar.freebusy.
-  googleAccountEmail     String?
-  googleCalendarId       String?  @default("primary")
-  googleAccessToken      String?
-  googleRefreshToken     String?
-  googleTokenExpiresAt   DateTime?
-  googleConnectedAt      DateTime?
+  googleAccountEmail   String?
+  googleCalendarId     String?   @default("primary")
+  googleAccessToken    String?
+  googleRefreshToken   String?
+  googleTokenExpiresAt DateTime?
+  googleConnectedAt    DateTime?
 
   updatedAt DateTime @updatedAt
 
