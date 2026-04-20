@@ -172,7 +172,12 @@ export function AppSidebar({ role }: { role: NavRole }) {
         />
       )}
 
-      {/* Sidebar — fixed on md+, drawer on mobile */}
+      {/* Sidebar — fixed on md+, drawer on mobile. We intentionally do NOT
+          set overflow-x-hidden on the aside because the notification popup
+          is absolutely positioned and extends past the sidebar's right
+          edge into the main content area; clipping here would hide it.
+          The compact collapsed logo (below) + nav-level overflow-x-hidden
+          (further down) cover the horizontal-overflow cases. */}
       <aside
         aria-label="Primary navigation"
         className={[
@@ -197,13 +202,35 @@ export function AppSidebar({ role }: { role: NavRole }) {
             className="flex min-w-0 items-center gap-1.5 outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)]"
             aria-label={`${config.brand} home`}
           >
+            {/*
+              Collapsed rail is only 64px wide; the full brandbite-logo.svg
+              at h-7 is ~112px wide and would overflow. We swap to the
+              compact b-favicon mark in collapsed mode so the logo fills
+              the rail sensibly and no horizontal scroll can appear.
+            */}
+            {collapsed ? (
+              <Image
+                src="/b-favicon.svg"
+                alt="Brandbite"
+                width={32}
+                height={32}
+                priority
+                className="hidden h-7 w-7 shrink-0 md:block"
+              />
+            ) : null}
             <Image
               src="/brandbite-logo.svg"
               alt="Brandbite"
               width={120}
               height={30}
               priority
-              className="h-7 w-auto shrink-0"
+              className={[
+                "h-7 w-auto shrink-0",
+                // On md+ screens, hide the full logo when collapsed (the
+                // compact mark above takes its place). On mobile drawer
+                // we always show the full logo.
+                collapsed ? "md:hidden" : "",
+              ].join(" ")}
             />
             {!collapsed && config.roleLabel && (
               <span className="font-brand truncate text-base font-light tracking-tight text-[var(--bb-text-muted)]">
@@ -266,7 +293,12 @@ export function AppSidebar({ role }: { role: NavRole }) {
               className="flex items-center justify-center rounded-lg p-1 text-[var(--bb-text-secondary)]"
               title="Notifications"
             >
-              <NotificationBell role={role} />
+              {/* `top-right` placement: the bell lives in the bottom-left
+                  corner of the fixed sidebar, so the panel needs to open
+                  upward and align to the bell's left edge — otherwise it
+                  disappears off-screen to the left (collapsed rail) or
+                  below the viewport (short screens). */}
+              <NotificationBell role={role} placement="top-right" />
             </div>
 
             <button
