@@ -75,7 +75,7 @@ export async function POST(
         creativeMode: "AI",
       },
       include: {
-        jobType: { select: { name: true } },
+        jobType: { select: { name: true, aiPromptTemplate: true } },
         project: {
           select: {
             brandLogoUrl: true,
@@ -108,7 +108,11 @@ export async function POST(
 
     const prompt = buildImagePrompt(
       `${ticket.title}${ticket.description ? `. ${ticket.description}` : ""}${brandSuffix}`,
-      { jobType: ticket.jobType?.name, style },
+      {
+        jobType: ticket.jobType?.name,
+        jobTypeTemplate: ticket.jobType?.aiPromptTemplate ?? null,
+        style,
+      },
     );
 
     // Create AiGeneration record linked to ticket. Race-safe on the

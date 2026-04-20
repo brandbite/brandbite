@@ -39,6 +39,7 @@ type JobType = {
   hasQuantity: boolean;
   quantityLabel: string | null;
   defaultQuantity: number;
+  aiPromptTemplate: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -79,6 +80,7 @@ export default function AdminJobTypesPage() {
   const [formHasQuantity, setFormHasQuantity] = useState(false);
   const [formQuantityLabel, setFormQuantityLabel] = useState("");
   const [formDefaultQuantity, setFormDefaultQuantity] = useState("1");
+  const [formAiPromptTemplate, setFormAiPromptTemplate] = useState("");
   const [formIsActive, setFormIsActive] = useState(true);
 
   const [saving, setSaving] = useState(false);
@@ -161,6 +163,7 @@ export default function AdminJobTypesPage() {
     setFormHasQuantity(false);
     setFormQuantityLabel("");
     setFormDefaultQuantity("1");
+    setFormAiPromptTemplate("");
     setFormIsActive(true);
     setSaveError(null);
     setSaveSuccess(null);
@@ -177,6 +180,7 @@ export default function AdminJobTypesPage() {
     setFormHasQuantity(jt.hasQuantity);
     setFormQuantityLabel(jt.quantityLabel ?? "");
     setFormDefaultQuantity(String(jt.defaultQuantity));
+    setFormAiPromptTemplate(jt.aiPromptTemplate ?? "");
     setFormIsActive(jt.isActive);
     setSaveError(null);
     setSaveSuccess(null);
@@ -260,6 +264,7 @@ export default function AdminJobTypesPage() {
         hasQuantity: formHasQuantity,
         quantityLabel: formHasQuantity ? formQuantityLabel.trim() || null : null,
         defaultQuantity: formHasQuantity ? Math.max(1, parseInt(formDefaultQuantity, 10) || 1) : 1,
+        aiPromptTemplate: formAiPromptTemplate.trim() || null,
         isActive: formIsActive,
       };
 
@@ -693,6 +698,32 @@ export default function AdminJobTypesPage() {
                 </div>
               </div>
             )}
+
+            {/* AI prompt template — tuned guidance appended to every
+                image generation for tickets of this job type. */}
+            <div className="space-y-1">
+              <label
+                htmlFor="job-ai-prompt"
+                className="text-xs font-medium text-[var(--bb-secondary)]"
+              >
+                AI prompt template <span className="text-[var(--bb-text-muted)]">(optional)</span>
+              </label>
+              <textarea
+                id="job-ai-prompt"
+                value={formAiPromptTemplate}
+                onChange={(e) => setFormAiPromptTemplate(e.target.value)}
+                rows={3}
+                maxLength={2000}
+                placeholder={
+                  'e.g. "For logos: emphasize simplicity and scalability; should remain recognizable down to 24px square."'
+                }
+                className="w-full rounded-md border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-2 text-sm text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
+              />
+              <p className="text-[11px] text-[var(--bb-text-muted)]">
+                Appended to every AI image generation for tickets of this job type. Composes with
+                the project-level brand guide when set.
+              </p>
+            </div>
 
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-2 text-xs font-medium text-[var(--bb-secondary)]">

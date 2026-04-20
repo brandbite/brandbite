@@ -9,12 +9,21 @@
 
 export function buildImagePrompt(
   brief: string,
-  options: { jobType?: string; style?: string } = {},
+  options: {
+    jobType?: string;
+    /** Optional per-job-type tuned guidance (from JobType.aiPromptTemplate). */
+    jobTypeTemplate?: string | null;
+    style?: string;
+  } = {},
 ): string {
   const parts = [brief];
 
   if (options.jobType) {
     parts.push(`This is for a ${options.jobType} project.`);
+  }
+
+  if (options.jobTypeTemplate) {
+    parts.push(`Job-type guidance: ${options.jobTypeTemplate.trim()}`);
   }
 
   if (options.style) {
