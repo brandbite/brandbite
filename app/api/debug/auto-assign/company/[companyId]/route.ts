@@ -33,7 +33,7 @@ export async function PATCH(
       );
     }
 
-    // Next.js 16: params bir Promise, önce await etmeliyiz
+    // Next.js 16: params is a Promise, so we must await it first
     const { companyId } = await params;
 
     const body = (await req.json().catch(() => null)) as CompanyPatchPayload | null;
@@ -51,7 +51,7 @@ export async function PATCH(
 
     const updated = await prisma.company.update({
       where: { id: companyId },
-      // Prisma tipleri henüz alanı tanımıyorsa data'yı any olarak cast ediyoruz
+      // Cast data to any while Prisma types don't yet know about the field
       data: {
         autoAssignDefaultEnabled: body.autoAssignDefaultEnabled,
       } as any,

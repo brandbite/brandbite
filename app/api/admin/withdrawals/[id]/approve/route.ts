@@ -52,7 +52,7 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
       );
     }
 
-    // Ledger + status update tek transaction içinde
+    // Ledger write + status update in a single transaction.
     const result = await prisma.$transaction(async (tx) => {
       // Ledger DEBIT
       const ledgerResult = await applyUserLedgerEntry({

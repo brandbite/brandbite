@@ -41,8 +41,8 @@ export async function GET(_req: NextRequest) {
       );
     }
 
-    // Basit v1: tüm DONE ticket'lar (son güncellenenler önce)
-    // İleride: date filter, company filter vs. eklenebilir.
+    // Simple v1: all DONE tickets, most recently updated first.
+    // Future: add date filter, company filter, etc.
     const tickets = await prisma.ticket.findMany({
       where: {
         status: "DONE",
@@ -50,7 +50,7 @@ export async function GET(_req: NextRequest) {
       orderBy: {
         updatedAt: "desc",
       },
-      take: 100, // v1 için hard limit
+      take: 100, // v1 hard limit
       select: {
         id: true,
         title: true,

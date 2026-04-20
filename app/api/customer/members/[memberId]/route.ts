@@ -99,7 +99,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Invalid role." }, { status: 400 });
     }
 
-    // PM'ler OWNER'ları değiştiremez
+    // PMs cannot modify OWNERs.
     const isActorOwner = companyRole === "OWNER";
     const isTargetOwner = targetMember.roleInCompany === "OWNER";
     const isSelf = targetMember.userId === user.id;
@@ -111,7 +111,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // OWNER → başka role: en az 1 OWNER kalmalı
+    // Demoting an OWNER → keep at least one OWNER on the workspace.
     if (isTargetOwner && nextRole !== "OWNER") {
       const ownersCount = await getOwnersCount(user.activeCompanyId);
       if (ownersCount <= 1) {
@@ -124,7 +124,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       }
     }
 
-    // Hiç değişiklik yoksa
+    // No change — early return.
     if (targetMember.roleInCompany === nextRole) {
       return NextResponse.json({ ok: true }, { status: 200 });
     }
@@ -185,12 +185,12 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams) {
     const isTargetOwner = targetMember.roleInCompany === "OWNER";
     const isSelf = targetMember.userId === user.id;
 
-    // PM'ler OWNER'ı silemez
+    // PMs cannot remove an OWNER.
     if (isTargetOwner && !isActorOwner) {
       return NextResponse.json({ error: "Only owners can remove another owner." }, { status: 403 });
     }
 
-    // Son OWNER'ı silme
+    // Block removing the last OWNER.
     if (isTargetOwner) {
       const ownersCount = await getOwnersCount(user.activeCompanyId);
       if (ownersCount <= 1) {

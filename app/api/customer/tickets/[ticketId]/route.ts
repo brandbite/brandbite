@@ -22,16 +22,16 @@ type RouteContext = {
   }>;
 };
 
-// Board üzerinden status değiştirebilecek roller:
+// Roles allowed to change ticket status from the board:
 // - OWNER
 // - PM
 // - MEMBER
-// (BILLING sadece finans odaklı, o yüzden şimdilik hariç bırakıyoruz)
+// (BILLING is finance-only, so it's excluded for now)
 const ALLOWED_UPDATE_ROLES: CompanyRole[] = ["OWNER", "PM", "MEMBER"];
 
 // -----------------------------------------------------------------------------
 // GET /api/customer/tickets/[ticketId]
-// Tek bir ticket'ın detayını döner (sadece current company scope'unda)
+// Returns the details of a single ticket (scoped to the current company only)
 // -----------------------------------------------------------------------------
 
 export async function GET(_req: NextRequest, { params }: RouteContext) {
@@ -210,7 +210,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   try {
     const user = await getCurrentUserOrThrow();
 
-    // Sadece CUSTOMER rolü ticket update edebilsin
+    // Only users with the CUSTOMER role can update tickets
     if (user.role !== "CUSTOMER") {
       return NextResponse.json({ error: "Only customers can update tickets" }, { status: 403 });
     }

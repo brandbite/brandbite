@@ -18,7 +18,7 @@ type RouteContext = {
   }>;
 };
 
-// Prisma client için tip hack'i (TicketComment delegate'i henüz type tarafında görünmüyorsa)
+// Prisma client type hack (in case the TicketComment delegate is missing from generated types)
 const prismaAny = prisma as any;
 
 // -----------------------------------------------------------------------------
@@ -46,7 +46,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: "Missing ticketId in route params" }, { status: 400 });
     }
 
-    // Ticket gerçekten bu company'e ait mi?
+    // Verify this ticket actually belongs to the user's company
     const ticket = await prisma.ticket.findFirst({
       where: {
         id: ticketId,
@@ -130,7 +130,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     if (!parsed.success) return parsed.response;
     const rawBody = parsed.data.body;
 
-    // Ticket gerçekten bu company'e ait mi?
+    // Verify this ticket actually belongs to the user's company
     const ticket = await prisma.ticket.findFirst({
       where: {
         id: ticketId,

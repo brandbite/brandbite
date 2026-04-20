@@ -45,8 +45,8 @@ export async function PATCH(req: NextRequest) {
       if (!plan) {
         return NextResponse.json({ error: "Plan not found" }, { status: 404 });
       }
-      // İstersen burada aktif olmayan plana atamayı da engelleyebiliriz;
-      // şimdilik sadece var olması yeterli.
+      // We could additionally reject assignment to an inactive plan here;
+      // for now, existence is enough.
     }
 
     const updated = await prisma.company.update({

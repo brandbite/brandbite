@@ -76,7 +76,7 @@ function reasonBadgeVariant(reason: string): BadgeVariant {
 }
 
 function formatDateTime(value: Date) {
-  // Basit, okunabilir bir tarih-saat formatı
+  // Simple, human-readable date/time format
   return value.toLocaleString();
 }
 

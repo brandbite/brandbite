@@ -259,7 +259,7 @@ export async function PATCH(req: NextRequest) {
       },
     });
   } catch (error: any) {
-    // tx içinden Response fırlattıysak onu aynen geçir
+    // If we threw a Response from inside the tx, forward it unchanged.
     if (error instanceof Response) {
       const text = await error.text();
       return NextResponse.json({ error: text || "Request failed" }, { status: error.status });

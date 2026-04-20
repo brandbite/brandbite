@@ -9,7 +9,7 @@ import { LedgerDirection, Prisma, TicketStatus } from "@prisma/client";
 import { prisma } from "./prisma";
 
 /**
- * Token hareketleri için daha okunabilir reason kodları.
+ * Human-readable reason codes for token movements.
  */
 export type TokenReason =
   | "PLAN_PURCHASE"
@@ -143,23 +143,23 @@ export async function evaluateCreativePayoutPercent(
 }
 
 // -----------------------------------------------------------------------------
-// Company-level tokens (müşteri bakiyesi)
+// Company-level tokens (customer balance)
 // -----------------------------------------------------------------------------
 
 export interface ApplyCompanyLedgerInput {
   companyId: string;
   ticketId?: string | null;
-  amount: number; // her zaman pozitif
-  direction: LedgerDirection; // CREDIT veya DEBIT
+  amount: number; // always positive
+  direction: LedgerDirection; // CREDIT or DEBIT
   reason?: TokenReason;
   notes?: string | null;
   metadata?: TokenMetadata;
 }
 
 /**
- * Şirketin (company) token bakiyesini günceller ve ilgili TokenLedger kaydını oluşturur.
- * - amount: pozitif integer
- * - direction: CREDIT => bakiye artar, DEBIT => bakiye azalır
+ * Updates the company's token balance and creates the corresponding TokenLedger entry.
+ * - amount: positive integer
+ * - direction: CREDIT => balance increases, DEBIT => balance decreases
  */
 export async function applyCompanyLedgerEntry(input: ApplyCompanyLedgerInput) {
   const { companyId, ticketId, amount, direction, reason, notes, metadata } = input;
@@ -208,9 +208,9 @@ export async function applyCompanyLedgerEntry(input: ApplyCompanyLedgerInput) {
 }
 
 /**
- * Güvenlik/repair fonksiyonu:
- * - Verilen şirket için tüm ledger kayıtlarını okuyup gerçek bakiyeyi hesaplar.
- * - Company.tokenBalance alanını bu değere set eder.
+ * Safety / repair helper:
+ * - Reads every ledger entry for the given company and computes the real balance.
+ * - Sets Company.tokenBalance to that value.
  */
 export async function recalculateCompanyTokenBalance(companyId: string) {
   return prisma.$transaction(async (tx) => {
@@ -241,12 +241,12 @@ export async function recalculateCompanyTokenBalance(companyId: string) {
 }
 
 // -----------------------------------------------------------------------------
-// User-level tokens (creative bakiyesi)
+// User-level tokens (creative balance)
 // -----------------------------------------------------------------------------
 
 export interface ApplyUserLedgerInput {
   userId: string;
-  companyId?: string | null; // opsiyonel: hangi company job'ı üzerinden kazanıldı
+  companyId?: string | null; // optional: which company's job this was earned on
   ticketId?: string | null;
   amount: number;
   direction: LedgerDirection;
@@ -256,9 +256,9 @@ export interface ApplyUserLedgerInput {
 }
 
 /**
- * Creative (UserAccount) için token ledger kaydı oluşturur.
- * Şu an için UserAccount üzerinde ayrı bir tokenBalance alanımız yok;
- * bu yüzden balanceBefore / balanceAfter değerlerini ledger üzerinden hesaplıyoruz.
+ * Create a token ledger entry for a creative (UserAccount).
+ * UserAccount has no tokenBalance column, so balanceBefore / balanceAfter
+ * are derived from the ledger aggregate.
  */
 export async function applyUserLedgerEntry(input: ApplyUserLedgerInput) {
   const { userId, companyId, ticketId, amount, direction, reason, notes, metadata } = input;
@@ -266,7 +266,7 @@ export async function applyUserLedgerEntry(input: ApplyUserLedgerInput) {
   const { signedAmount, rawAmount } = computeSignedAmount(amount, direction);
 
   return prisma.$transaction(async (tx) => {
-    // Kullanıcı bazlı mevcut bakiye: CREDIT - DEBIT
+    // Per-user balance = CREDIT - DEBIT
     const creditAgg = await tx.tokenLedger.aggregate({
       where: { userId, direction: "CREDIT" },
       _sum: { amount: true },
@@ -306,9 +306,8 @@ export async function applyUserLedgerEntry(input: ApplyUserLedgerInput) {
 }
 
 /**
- * Mevcut user ledger'ına göre creative token bakiyesini hesaplar.
- * Bu fonksiyon, örneğin withdraw talebi öncesi "ne kadar token çekebilir?" sorusuna
- * cevap olmak için kullanılabilir.
+ * Computes the creative's token balance from their ledger.
+ * Useful for answering "how many tokens can they withdraw?" before a withdrawal request.
  */
 export async function getUserTokenBalance(userId: string) {
   const [credits, debits] = await Promise.all([
@@ -329,7 +328,7 @@ export async function getUserTokenBalance(userId: string) {
 }
 
 // -----------------------------------------------------------------------------
-// Ticket completion flow (ticket DONE + token hareketleri)
+// Ticket completion flow (ticket DONE + token movements)
 // -----------------------------------------------------------------------------
 
 export interface TicketCompletionResult {
@@ -348,14 +347,14 @@ export interface TicketCompletionResult {
 }
 
 /**
- * Ticket tamamlandığında:
+ * When a ticket is marked complete:
  * - Ticket.status => DONE
- * - Company'den jobType.tokenCost kadar DEBIT
- * - Creative'e jobType.creativePayoutTokens kadar CREDIT
+ * - DEBIT jobType.tokenCost from the company
+ * - CREDIT jobType.creativePayoutTokens to the creative
  *
- * İdempotent yaklaşım:
- * - Ticket zaten DONE ise veya bu ticket için reason = "JOB_PAYMENT" ledger kaydı varsa,
- *   "alreadyCompleted = true" ile döner ve yeni hareket yaratmaz.
+ * Idempotent:
+ * - If the ticket is already DONE, or a ledger entry with reason = "JOB_PAYMENT" already
+ *   exists for this ticket, returns "alreadyCompleted = true" without creating new entries.
  */
 export async function completeTicketAndApplyTokens(
   ticketId: string,
@@ -380,7 +379,7 @@ export async function completeTicketAndApplyTokens(
       throw new Error(`Ticket ${ticketId} has no jobType. Token costs are not defined.`);
     }
 
-    // Eğer zaten DONE ise veya JOB_PAYMENT ledger'ı varsa idempotent kabul edelim
+    // Idempotency guard: already DONE, or a JOB_PAYMENT ledger exists for this ticket.
     const existingPayment = await tx.tokenLedger.findFirst({
       where: {
         ticketId: ticket.id,
@@ -439,7 +438,7 @@ export async function completeTicketAndApplyTokens(
     const companyLedgerEntry = null;
     const companyBalanceAfter = null;
 
-    // --- Creative tarafı (CREDIT) ---
+    // --- Creative side (CREDIT) ---
     let creativeLedgerEntry: { id: string } | null = null;
     let creativeBalanceAfter: number | null = null;
 

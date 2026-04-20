@@ -30,7 +30,7 @@ export default function DemoPersonaBanner() {
     let cancelled = false;
 
     const load = async () => {
-      // İlk seferde / route değişimlerinde state'i loading'e çekelim
+      // On first render / route changes, move state into loading
       setState((prev) => {
         if (prev.status === "ready") {
           return { status: "loading" };
@@ -88,7 +88,7 @@ export default function DemoPersonaBanner() {
   }, [pathname]);
 
   if (state.status !== "ready") {
-    // Persona yoksa veya henüz yükleniyorsa banner göstermiyoruz
+    // Don't show the banner while no persona is present or still loading
     return null;
   }
 

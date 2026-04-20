@@ -1205,7 +1205,7 @@ export default function CustomerBoardPage() {
       try {
         json = await res.json();
       } catch {
-        // JSON dönmeyebilir, problem değil
+        // The response may not return JSON — that's fine
       }
 
       const hasExplicitSuccessFlag = json && typeof json.success === "boolean";
@@ -1223,7 +1223,7 @@ export default function CustomerBoardPage() {
         );
       }
 
-      // Response içinde ticket + stats varsa, lokal state'i hızlı güncelle
+      // If the response includes ticket + stats, update local state quickly
       if (json && json.ticket && json.stats) {
         setData((prev) => {
           if (!prev) {
@@ -1241,7 +1241,7 @@ export default function CustomerBoardPage() {
           };
         });
       } else {
-        // Response şekline güvenemiyorsak, tüm board'u yeniden yükle
+        // If we can't trust the response shape, reload the whole board
         await load();
       }
 
@@ -1315,7 +1315,7 @@ export default function CustomerBoardPage() {
       return;
     }
 
-    // Customer sadece IN_REVIEW kartlarını sürükleyebilsin
+    // Customers can only drag IN_REVIEW cards
     if (ticketStatus !== "IN_REVIEW") {
       event.preventDefault();
       return;
@@ -1330,7 +1330,7 @@ export default function CustomerBoardPage() {
       try {
         event.dataTransfer.setData("text/plain", ticketId);
       } catch {
-        // bazı browser'lar keyfi limit koyabilir, önemli değil
+        // some browsers impose arbitrary limits — not important
       }
     }
   };
@@ -1346,7 +1346,7 @@ export default function CustomerBoardPage() {
     const ticket = tickets.find((t) => t.id === draggingTicketId);
     if (!ticket) return;
 
-    // drop'un gerçekleşebilmesi için her durumda preventDefault
+    // preventDefault in all cases so the drop is accepted
     event.preventDefault();
 
     const decision = canDropTicketToStatus(ticket, status);

@@ -13,11 +13,11 @@ import { getCurrentUserOrThrow } from "@/lib/auth";
 const MAX_ENTRIES = 50;
 
 /**
- * Tasarım (v1.1.0):
- * - userId artık query param üzerinden gelmiyor.
- * - Aktif creative, demo auth (bb-demo-user) + gelecekte BetterAuth üzerinden
- *   getCurrentUserOrThrow() ile belirleniyor.
- * - Sadece role === DESIGNER olan kullanıcılar bu endpoint'e erişebiliyor.
+ * Design (v1.1.0):
+ * - userId is no longer passed via query param.
+ * - The active creative is determined via demo auth (bb-demo-user) — and via
+ *   BetterAuth in the future — through getCurrentUserOrThrow().
+ * - Only users with role === DESIGNER can access this endpoint.
  */
 export async function GET(_request: Request) {
   try {

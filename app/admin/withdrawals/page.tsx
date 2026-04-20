@@ -194,7 +194,7 @@ export default function AdminWithdrawalsPage() {
             : prev,
         );
       } else if (updatedStats) {
-        // Stats geldi ama tekil withdrawal yoksa, sadece stats'i güncelle
+        // Got stats back but no individual withdrawal — just update stats.
         setData((prev) =>
           prev
             ? {

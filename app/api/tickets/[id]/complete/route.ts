@@ -11,11 +11,11 @@ import { prisma } from "@/lib/prisma";
 import { createNotification } from "@/lib/notifications";
 
 /**
- * Geçici tasarım:
- * - Auth kontrolü yok; BetterAuth entegrasyonu sonrası yalnızca yetkili kullanıcılar
- *   (örn: atanmış creative veya admin) ticket'ı tamamlayabilecek.
+ * Temporary design:
+ * - No auth check yet; after the BetterAuth integration, only authorized users
+ *   (e.g. the assigned creative or an admin) will be able to complete a ticket.
  *
- * Kullanım:
+ * Usage:
  * POST /api/tickets/:id/complete
  */
 export async function POST(_request: Request, context: { params: Promise<{ id: string }> }) {

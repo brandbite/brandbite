@@ -18,7 +18,7 @@ type RouteContext = {
   }>;
 };
 
-// Prisma client için tip hack'i (TicketComment delegate'i VSCode tipinde görünmüyorsa)
+// Prisma client type hack (TicketComment delegate is missing from the VSCode types)
 const prismaAny = prisma as any;
 
 // -----------------------------------------------------------------------------
@@ -42,7 +42,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: "Missing ticketId in route params" }, { status: 400 });
     }
 
-    // Ticket gerçekten bu creativea mı ait?
+    // Does this ticket actually belong to this creative?
     const ticket = await prisma.ticket.findFirst({
       where: {
         id: ticketId,
@@ -128,7 +128,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     if (!parsed.success) return parsed.response;
     const rawBody = parsed.data.body;
 
-    // Ticket gerçekten bu creativea mı ait?
+    // Does this ticket actually belong to this creative?
     const ticket = await prisma.ticket.findFirst({
       where: {
         id: ticketId,
