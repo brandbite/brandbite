@@ -9,9 +9,15 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma, WithdrawalStatus } from "@prisma/client";
 import { applyUserLedgerEntry, getUserTokenBalance } from "@/lib/token-engine";
+import { getCurrentUserOrThrow } from "@/lib/auth";
+import { canApproveWithdrawals } from "@/lib/roles";
 
 /**
  * POST /api/admin/withdrawals/:id/approve
+ *
+ * SITE_OWNER only — approving a withdrawal commits the platform to paying
+ * the creative. The sibling PATCH /api/admin/withdrawals route enforces the
+ * same policy via canApproveWithdrawals.
  */
 export async function POST(_request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
@@ -21,6 +27,14 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
   }
 
   try {
+    const user = await getCurrentUserOrThrow();
+    if (!canApproveWithdrawals(user.role)) {
+      return NextResponse.json(
+        { error: "Only site owners can approve withdrawals." },
+        { status: 403 },
+      );
+    }
+
     const withdrawal = await prisma.withdrawal.findUnique({
       where: { id },
     });
@@ -99,6 +113,9 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
       { status: 200 },
     );
   } catch (error) {
+    if ((error as { code?: string })?.code === "UNAUTHENTICATED") {
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    }
     console.error("[POST /api/admin/withdrawals/:id/approve] error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

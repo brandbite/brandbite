@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { canOverrideTicketFinancials } from "@/lib/roles";
 import { applyCompanyLedgerEntry, getEffectiveTokenValues } from "@/lib/token-engine";
 
 type PatchPayload = {
@@ -239,6 +240,24 @@ export async function PATCH(req: NextRequest) {
     // -----------------------------------------------------------------------
     const hasCostOverrideChange = "tokenCostOverride" in body;
     const hasPayoutOverrideChange = "creativePayoutOverride" in body;
+
+    // Owner-only guard on financial overrides. These fields bypass the
+    // normal job-type cost + quantity calculation and directly affect
+    // both the company's billing and the creative's payout. SITE_ADMIN
+    // can edit every other ticket field; the financial overrides are
+    // locked down to SITE_OWNER so a compromised admin can't silently
+    // rewrite completed-job economics.
+    if (
+      (hasCostOverrideChange || hasPayoutOverrideChange) &&
+      !canOverrideTicketFinancials(user.role)
+    ) {
+      return NextResponse.json(
+        {
+          error: "Only site owners can override a ticket's token cost or creative payout.",
+        },
+        { status: 403 },
+      );
+    }
 
     // -----------------------------------------------------------------------
     // Guardrails: integer, >= 0, and a sanity cap to prevent typo-disasters

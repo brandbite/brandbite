@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { FormInput, FormSelect, FormTextarea } from "@/components/ui/form-field";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { LoadingState } from "@/components/ui/loading-state";
+import { OwnerOnlyBanner } from "@/components/admin/owner-only-banner";
 
 type Settings = {
   id: string;
@@ -210,6 +211,8 @@ export default function AdminConsultationSettingsPage() {
           ← Back to queue
         </Link>
       </header>
+
+      <OwnerOnlyBanner action="edit consultation pricing, availability, or Google Calendar settings" />
 
       {error && (
         <InlineAlert variant="error" className="mb-4">

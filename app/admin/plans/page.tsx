@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from "react";
 import { DataTable, THead, TH, TD } from "@/components/ui/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { InlineAlert } from "@/components/ui/inline-alert";
+import { OwnerOnlyBanner } from "@/components/admin/owner-only-banner";
 import { useToast } from "@/components/ui/toast-provider";
 import { Button } from "@/components/ui/button";
 import { FormInput } from "@/components/ui/form-field";
@@ -237,6 +238,8 @@ export default function AdminPlansPage() {
         </div>
         <Button onClick={handleNewPlan}>New plan</Button>
       </div>
+
+      <OwnerOnlyBanner action="create, edit, or delete plans" />
 
       {/* Error */}
       {error && (

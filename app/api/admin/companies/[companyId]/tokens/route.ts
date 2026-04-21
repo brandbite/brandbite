@@ -10,7 +10,7 @@ import { z } from "zod";
 
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { isSiteAdminRole } from "@/lib/roles";
+import { canGrantCompanyTokens } from "@/lib/roles";
 import { parseBody } from "@/lib/schemas/helpers";
 import { applyCompanyLedgerEntry } from "@/lib/token-engine";
 
@@ -30,8 +30,11 @@ export async function POST(
 ) {
   try {
     const user = await getCurrentUserOrThrow();
-    if (!isSiteAdminRole(user.role)) {
-      return NextResponse.json({ error: "Admin only" }, { status: 403 });
+    if (!canGrantCompanyTokens(user.role)) {
+      return NextResponse.json(
+        { error: "Only site owners can grant or revoke company tokens." },
+        { status: 403 },
+      );
     }
 
     const { companyId } = await params;

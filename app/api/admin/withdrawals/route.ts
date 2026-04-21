@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { LedgerDirection } from "@prisma/client";
 import { getCurrentUserOrThrow } from "@/lib/auth";
-import { isSiteAdminRole } from "@/lib/roles";
+import { canApproveWithdrawals, canMarkWithdrawalsPaid, isSiteAdminRole } from "@/lib/roles";
 
 const MAX_WITHDRAWALS = 200;
 
@@ -109,6 +109,23 @@ export async function PATCH(req: NextRequest) {
 
     if (!id || !action) {
       return NextResponse.json({ error: "Missing id or action" }, { status: 400 });
+    }
+
+    // Owner-only guard for money-moving actions. APPROVE commits the
+    // platform toward paying the creative; MARK_PAID records that the
+    // money actually left. REJECT stays admin-allowed — rejecting a
+    // pending request isn't a financial commitment.
+    if (action === "APPROVE" && !canApproveWithdrawals(user.role)) {
+      return NextResponse.json(
+        { error: "Only site owners can approve withdrawals." },
+        { status: 403 },
+      );
+    }
+    if (action === "MARK_PAID" && !canMarkWithdrawalsPaid(user.role)) {
+      return NextResponse.json(
+        { error: "Only site owners can mark withdrawals as paid." },
+        { status: 403 },
+      );
     }
 
     const updated = await prisma.$transaction(async (tx) => {

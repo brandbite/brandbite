@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
-import { isSiteAdminRole } from "@/lib/roles";
+import { canAssignCompanyPlan } from "@/lib/roles";
 import { parseBody } from "@/lib/schemas/helpers";
 import { assignPlanSchema } from "@/lib/schemas/plan-assignment.schemas";
 
@@ -17,8 +17,11 @@ export async function PATCH(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
 
-    if (!isSiteAdminRole(user.role)) {
-      return NextResponse.json({ error: "Only site admins can assign plans" }, { status: 403 });
+    if (!canAssignCompanyPlan(user.role)) {
+      return NextResponse.json(
+        { error: "Only site owners can assign a plan to a company." },
+        { status: 403 },
+      );
     }
 
     const parsed = await parseBody(req, assignPlanSchema);

@@ -16,7 +16,7 @@ import {
   readGoogleOauthConfig,
 } from "@/lib/google/oauth";
 import { prisma } from "@/lib/prisma";
-import { isSiteAdminRole } from "@/lib/roles";
+import { canEditConsultationSettings } from "@/lib/roles";
 
 const STATE_COOKIE = "brandbite_google_oauth_state";
 const SETTINGS_PATH = "/admin/consultations/settings";
@@ -33,7 +33,7 @@ function redirectWithFlag(req: NextRequest, flag: string, message?: string): Nex
 export async function GET(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
-    if (!isSiteAdminRole(user.role)) {
+    if (!canEditConsultationSettings(user.role)) {
       return redirectWithFlag(req, "error", "Admin only");
     }
 

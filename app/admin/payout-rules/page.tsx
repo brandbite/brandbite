@@ -11,6 +11,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { InlineAlert } from "@/components/ui/inline-alert";
+import { OwnerOnlyBanner } from "@/components/admin/owner-only-banner";
 import { useToast } from "@/components/ui/toast-provider";
 import { Button } from "@/components/ui/button";
 import { FormInput } from "@/components/ui/form-field";
@@ -247,6 +248,8 @@ export default function AdminPayoutRulesPage() {
         </div>
         <Button onClick={handleNewClick}>New rule</Button>
       </div>
+
+      <OwnerOnlyBanner action="create, edit, or delete payout rules" />
 
       {/* Error */}
       {error && (

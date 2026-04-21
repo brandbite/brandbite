@@ -17,6 +17,7 @@ import { FormSelect } from "@/components/ui/form-field";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { LoadingState } from "@/components/ui/loading-state";
 import { useToast } from "@/components/ui/toast-provider";
+import { OwnerOnlyBanner } from "@/components/admin/owner-only-banner";
 
 type WithdrawalStatus = "PENDING" | "APPROVED" | "REJECTED" | "PAID";
 
@@ -265,6 +266,8 @@ export default function AdminWithdrawalsPage() {
           </p>
         </div>
       </div>
+
+      <OwnerOnlyBanner action="approve withdrawals or mark them as paid" />
 
       {/* Error */}
       {error && (

@@ -4,8 +4,22 @@
 // -----------------------------------------------------------------------------
 
 import { describe, it, expect } from "vitest";
+import type { UserRole } from "@prisma/client";
 import {
+  canApproveWithdrawals,
+  canAssignCompanyPlan,
+  canEditAiToolPricing,
+  canEditConsultationSettings,
+  canEditPayoutRules,
+  canGrantCompanyTokens,
+  canHardDeleteUsers,
+  canManagePlans,
+  canMarkWithdrawalsPaid,
+  canOverrideTicketFinancials,
+  canPromoteToSiteAdmin,
+  canToggleAiToolEnabled,
   isSiteAdminRole,
+  isSiteOwnerRole,
   isCreativeRole,
   isCustomerRole,
   hasActiveCompany,
@@ -144,5 +158,73 @@ describe("formatRole", () => {
 
   it("formats CUSTOMER", () => {
     expect(formatRole("CUSTOMER")).toBe("Customer");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isSiteOwnerRole — strict owner check
+// ---------------------------------------------------------------------------
+
+describe("isSiteOwnerRole", () => {
+  it("returns true only for SITE_OWNER", () => {
+    expect(isSiteOwnerRole("SITE_OWNER")).toBe(true);
+    expect(isSiteOwnerRole("SITE_ADMIN")).toBe(false);
+    expect(isSiteOwnerRole("DESIGNER")).toBe(false);
+    expect(isSiteOwnerRole("CUSTOMER")).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Owner-only capability helpers
+//
+// Every helper below gates an action that can move money, change
+// compensation, or escalate privileges. They MUST all behave identically
+// to isSiteOwnerRole. If one drifts (e.g. someone accidentally widens it
+// to SITE_ADMIN), these tests fail loudly.
+// ---------------------------------------------------------------------------
+
+const OWNER_ONLY_HELPERS: ReadonlyArray<[string, (role: UserRole) => boolean]> = [
+  ["canPromoteToSiteAdmin", canPromoteToSiteAdmin],
+  ["canApproveWithdrawals", canApproveWithdrawals],
+  ["canMarkWithdrawalsPaid", canMarkWithdrawalsPaid],
+  ["canManagePlans", canManagePlans],
+  ["canAssignCompanyPlan", canAssignCompanyPlan],
+  ["canEditPayoutRules", canEditPayoutRules],
+  ["canGrantCompanyTokens", canGrantCompanyTokens],
+  ["canOverrideTicketFinancials", canOverrideTicketFinancials],
+  ["canEditConsultationSettings", canEditConsultationSettings],
+  ["canEditAiToolPricing", canEditAiToolPricing],
+  ["canHardDeleteUsers", canHardDeleteUsers],
+];
+
+describe("owner-only capability helpers", () => {
+  for (const [name, fn] of OWNER_ONLY_HELPERS) {
+    describe(name, () => {
+      it("grants SITE_OWNER", () => {
+        expect(fn("SITE_OWNER")).toBe(true);
+      });
+
+      for (const role of ["SITE_ADMIN", "DESIGNER", "CUSTOMER"] as UserRole[]) {
+        it(`denies ${role}`, () => {
+          expect(fn(role)).toBe(false);
+        });
+      }
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// canToggleAiToolEnabled — admin-allowed (distinct from pricing edit)
+// ---------------------------------------------------------------------------
+
+describe("canToggleAiToolEnabled", () => {
+  it("grants SITE_OWNER and SITE_ADMIN", () => {
+    expect(canToggleAiToolEnabled("SITE_OWNER")).toBe(true);
+    expect(canToggleAiToolEnabled("SITE_ADMIN")).toBe(true);
+  });
+
+  it("denies DESIGNER and CUSTOMER", () => {
+    expect(canToggleAiToolEnabled("DESIGNER")).toBe(false);
+    expect(canToggleAiToolEnabled("CUSTOMER")).toBe(false);
   });
 });

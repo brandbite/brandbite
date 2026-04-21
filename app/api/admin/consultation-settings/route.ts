@@ -10,12 +10,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { getConsultationSettings } from "@/lib/consultation/settings";
 import { prisma } from "@/lib/prisma";
+import { canEditConsultationSettings, isSiteAdminRole } from "@/lib/roles";
+import type { UserRole } from "@prisma/client";
 import { parseBody } from "@/lib/schemas/helpers";
 import { updateConsultationSettingsSchema } from "@/lib/schemas/consultation-settings.schemas";
 
-function ensureAdmin(role: string | null | undefined) {
-  if (role !== "SITE_OWNER" && role !== "SITE_ADMIN") {
+function ensureAdminCanRead(role: UserRole) {
+  if (!isSiteAdminRole(role)) {
     return NextResponse.json({ error: "Admin only" }, { status: 403 });
+  }
+  return null;
+}
+
+function ensureOwnerCanWrite(role: UserRole) {
+  if (!canEditConsultationSettings(role)) {
+    return NextResponse.json(
+      { error: "Only site owners can edit consultation settings." },
+      { status: 403 },
+    );
   }
   return null;
 }
@@ -23,7 +35,7 @@ function ensureAdmin(role: string | null | undefined) {
 export async function GET() {
   try {
     const user = await getCurrentUserOrThrow();
-    const gate = ensureAdmin(user.role);
+    const gate = ensureAdminCanRead(user.role);
     if (gate) return gate;
 
     const settings = await getConsultationSettings();
@@ -58,7 +70,7 @@ export async function GET() {
 export async function PUT(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
-    const gate = ensureAdmin(user.role);
+    const gate = ensureOwnerCanWrite(user.role);
     if (gate) return gate;
 
     const parsed = await parseBody(req, updateConsultationSettingsSchema);

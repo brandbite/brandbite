@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
-import { isSiteAdminRole } from "@/lib/roles";
+import { canEditPayoutRules, isSiteAdminRole } from "@/lib/roles";
 import { BASE_PAYOUT_PERCENT } from "@/lib/token-engine";
 import { parseBody } from "@/lib/schemas/helpers";
 import { createPayoutRuleSchema, updatePayoutRuleSchema } from "@/lib/schemas/payout-rule.schemas";
@@ -64,9 +64,9 @@ export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
 
-    if (!isSiteAdminRole(user.role)) {
+    if (!canEditPayoutRules(user.role)) {
       return NextResponse.json(
-        { error: "Only site admins can create payout rules" },
+        { error: "Only site owners can create payout rules." },
         { status: 403 },
       );
     }
@@ -137,9 +137,9 @@ export async function PATCH(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
 
-    if (!isSiteAdminRole(user.role)) {
+    if (!canEditPayoutRules(user.role)) {
       return NextResponse.json(
-        { error: "Only site admins can update payout rules" },
+        { error: "Only site owners can update payout rules." },
         { status: 403 },
       );
     }
@@ -206,9 +206,9 @@ export async function DELETE(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
 
-    if (!isSiteAdminRole(user.role)) {
+    if (!canEditPayoutRules(user.role)) {
       return NextResponse.json(
-        { error: "Only site admins can delete payout rules" },
+        { error: "Only site owners can delete payout rules." },
         { status: 403 },
       );
     }

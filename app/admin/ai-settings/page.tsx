@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { FormInput } from "@/components/ui/form-field";
 import { Badge } from "@/components/ui/badge";
 import { InlineAlert } from "@/components/ui/inline-alert";
+import { OwnerOnlyBanner } from "@/components/admin/owner-only-banner";
 
 type ToolConfig = {
   toolType: string;
@@ -103,6 +104,8 @@ export default function AdminAiSettingsPage() {
           Configure AI tools, token costs, and rate limits.
         </p>
       </div>
+
+      <OwnerOnlyBanner action="change token costs or rate limits (admins can still enable or disable tools)" />
 
       {error && <InlineAlert variant="error">{error}</InlineAlert>}
       {success && <InlineAlert variant="success">{success}</InlineAlert>}

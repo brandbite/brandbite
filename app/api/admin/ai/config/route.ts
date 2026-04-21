@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserOrThrow } from "@/lib/auth";
-import { isSiteAdminRole } from "@/lib/roles";
+import { canEditAiToolPricing, isSiteAdminRole } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import type { AiToolType } from "@prisma/client";
 
@@ -98,6 +98,19 @@ export async function PATCH(req: NextRequest) {
 
     if (!toolType || !AI_TOOL_TYPES.includes(toolType)) {
       return NextResponse.json({ error: "Invalid tool type" }, { status: 400 });
+    }
+
+    // Splitting the PATCH: SITE_ADMIN can flip a tool on/off (operational
+    // controls), but only SITE_OWNER can change the tokenCost or
+    // rateLimit since those directly affect what we charge customers.
+    const wantsPricingEdit =
+      (typeof tokenCost === "number" && tokenCost >= 0) ||
+      (typeof rateLimit === "number" && rateLimit >= 1);
+    if (wantsPricingEdit && !canEditAiToolPricing(user.role)) {
+      return NextResponse.json(
+        { error: "Only site owners can change AI tool pricing or rate limits." },
+        { status: 403 },
+      );
     }
 
     const data: Record<string, unknown> = {};

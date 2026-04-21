@@ -11,14 +11,14 @@ import { NextResponse } from "next/server";
 
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { buildAuthorizeUrl, readGoogleOauthConfig } from "@/lib/google/oauth";
-import { isSiteAdminRole } from "@/lib/roles";
+import { canEditConsultationSettings } from "@/lib/roles";
 
 const STATE_COOKIE = "brandbite_google_oauth_state";
 
 export async function GET() {
   try {
     const user = await getCurrentUserOrThrow();
-    if (!isSiteAdminRole(user.role)) {
+    if (!canEditConsultationSettings(user.role)) {
       return NextResponse.json({ error: "Admin only" }, { status: 403 });
     }
 
