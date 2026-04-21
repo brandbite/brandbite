@@ -14,6 +14,7 @@ import DemoPersonaBanner from "../components/demo-persona-banner";
 import { ToastProvider } from "@/components/ui/toast-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthGuard } from "@/components/auth-guard";
+import { A11yDevMonitor } from "@/components/a11y-dev-monitor";
 
 const josefin = Josefin_Sans({
   subsets: ["latin"],
@@ -91,6 +92,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <ToastProvider>
             <AuthGuard />
+            {/* Dev-only: logs axe-core WCAG violations to the browser
+                console as pages render. Dead-code-eliminated in prod. */}
+            <A11yDevMonitor />
             {/*
               Skip link — first tabbable element on every page. Hidden
               off-screen until focused, at which point it moves into view.
