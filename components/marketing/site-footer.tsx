@@ -4,6 +4,17 @@
 // -----------------------------------------------------------------------------
 
 import Image from "next/image";
+import Link from "next/link";
+
+// The bottom orange bar repeats a subset of the Legal column so visitors
+// reach legal copy from the end of any marketing page without scrolling
+// past the link grid. Keep in sync with the Legal column above.
+const BOTTOM_LEGAL_LINKS = [
+  { label: "Terms of Service", href: "/terms" },
+  { label: "Privacy Policy", href: "/privacy" },
+  { label: "Cookies", href: "/cookies" },
+  { label: "Accessibility", href: "/accessibility" },
+];
 
 const FOOTER_COLS = [
   {
@@ -69,12 +80,12 @@ export function SiteFooter() {
               <ul className="space-y-2">
                 {col.links.map((link) => (
                   <li key={link.label}>
-                    <a
+                    <Link
                       href={link.href}
                       className="text-sm text-gray-300 transition-colors hover:text-white"
                     >
                       {link.label}
-                    </a>
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -116,16 +127,12 @@ export function SiteFooter() {
           <p className="text-xs text-white/80">
             &copy; {new Date().getFullYear()} Brandbite. All rights reserved.
           </p>
-          <div className="flex gap-4 text-xs text-white/80">
-            <a href="#" className="hover:text-white">
-              Terms of Service
-            </a>
-            <a href="#" className="hover:text-white">
-              Privacy Policy
-            </a>
-            <a href="#" className="hover:text-white">
-              Cookies
-            </a>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/80">
+            {BOTTOM_LEGAL_LINKS.map((link) => (
+              <Link key={link.href} href={link.href} className="hover:text-white">
+                {link.label}
+              </Link>
+            ))}
           </div>
         </div>
       </div>
