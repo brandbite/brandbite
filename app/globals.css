@@ -130,6 +130,38 @@ body {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
+   Accessibility (Phase 1)
+
+   Global baseline focus indicator and motion preference respect. Scoped
+   at the :root level so every interactive element inherits sensible
+   defaults; components can still override with their own focus ring.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* Visible focus outline for every interactive element that receives
+   keyboard focus. `:focus-visible` means this only triggers on keyboard
+   (Tab/Shift-Tab) — mouse clicks don't add the ring. */
+:focus-visible {
+  outline: 2px solid var(--bb-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Respect the user's OS-level preference to reduce animation. Cuts every
+   transition/animation to a near-instant duration so motion-sensitive
+   users don't get vestibular triggers from the sidebar collapse,
+   modal fade-in, pin drop, etc. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
    Themed thin scrollbars (Vercel-style)
 
    - Firefox / modern Chromium: `scrollbar-width: thin` + `scrollbar-color`

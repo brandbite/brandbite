@@ -27,7 +27,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             viewport; bumping content padding further squeezes pages
             designed for the old full-width top-nav layout (e.g. /admin/plans
             2-col grid). */}
-        <main className="px-4 py-6 md:px-6 md:py-8 lg:px-8 lg:py-10">{children}</main>
+        <main id="main-content" className="px-4 py-6 md:px-6 md:py-8 lg:px-8 lg:py-10">
+          {children}
+        </main>
       </div>
     </div>
   );

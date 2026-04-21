@@ -91,6 +91,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <ToastProvider>
             <AuthGuard />
+            {/*
+              Skip link — first tabbable element on every page. Hidden
+              off-screen until focused, at which point it moves into view.
+              Anchors to #main-content which each dashboard layout sets
+              on its <main>. Pages without a #main-content target simply
+              don't jump anywhere; the link still works as "first focus"
+              without breaking the page visually.
+            */}
+            <a
+              href="#main-content"
+              className="sr-only fixed top-2 left-2 z-[100] rounded-md bg-[var(--bb-primary)] px-3 py-2 text-sm font-semibold text-white shadow-lg focus:not-sr-only focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bb-primary)]"
+            >
+              Skip to main content
+            </a>
             {isDemoMode && <DemoPersonaBanner />}
             {children}
           </ToastProvider>
