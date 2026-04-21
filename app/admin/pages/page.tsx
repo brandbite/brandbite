@@ -1,5 +1,8 @@
 // @file: app/admin/pages/page.tsx
-// @purpose: Admin CMS page editor for single pages (About, Contact, Documentation)
+// @purpose: Admin CMS page editor for single marketing + legal pages
+//           (About, Contact, Documentation, Privacy, Terms, Cookies,
+//           Accessibility). Legal pages auto-create on first save via
+//           an upsert in /api/admin/pages/[pageKey].
 
 "use client";
 
@@ -30,11 +33,67 @@ type CmsPage = {
 
 type ImageValue = { storageKey: string; url: string } | null;
 
+// Known pages. Marketing pages come first, legal pages grouped below.
+// Legal pages auto-seed on first open (PATCH upserts), so an admin can
+// edit them even if the database row doesn't exist yet.
 const PAGE_LABELS: Record<string, string> = {
   about: "About",
   contact: "Contact",
   documentation: "Documentation",
+  privacy: "Privacy Policy",
+  terms: "Terms of Service",
+  cookies: "Cookie Policy",
+  accessibility: "Accessibility",
 };
+
+// Keys we always want to expose in the admin editor, even if the
+// CmsPage row hasn't been created yet. The editor injects a
+// placeholder entry; saving it upserts the row.
+const REQUIRED_PAGE_KEYS: ReadonlyArray<string> = [
+  "about",
+  "contact",
+  "documentation",
+  "privacy",
+  "terms",
+  "cookies",
+  "accessibility",
+];
+
+function placeholderPage(pageKey: string): CmsPage {
+  return {
+    id: `placeholder-${pageKey}`,
+    pageKey,
+    title: PAGE_LABELS[pageKey] ?? pageKey,
+    subtitle: null,
+    heroStorageKey: null,
+    heroUrl: null,
+    body: null,
+    metaTitle: null,
+    metaDescription: null,
+    updatedAt: new Date(0).toISOString(),
+  };
+}
+
+// Stable ordering so the left rail doesn't jump around when the API
+// returns pages in insertion order.
+const PAGE_ORDER = new Map(REQUIRED_PAGE_KEYS.map((key, i) => [key, i] as const));
+
+function orderPages(list: CmsPage[]): CmsPage[] {
+  return [...list].sort((a, b) => {
+    const ai = PAGE_ORDER.get(a.pageKey) ?? Number.MAX_SAFE_INTEGER;
+    const bi = PAGE_ORDER.get(b.pageKey) ?? Number.MAX_SAFE_INTEGER;
+    if (ai !== bi) return ai - bi;
+    return a.pageKey.localeCompare(b.pageKey);
+  });
+}
+
+function mergeWithPlaceholders(existing: CmsPage[]): CmsPage[] {
+  const byKey = new Map(existing.map((p) => [p.pageKey, p] as const));
+  for (const key of REQUIRED_PAGE_KEYS) {
+    if (!byKey.has(key)) byKey.set(key, placeholderPage(key));
+  }
+  return orderPages(Array.from(byKey.values()));
+}
 
 /* -------------------------------------------------------------------------- */
 /*  Component                                                                  */
@@ -66,12 +125,13 @@ export default function AdminPagesPage() {
       const res = await fetch("/api/admin/pages", { cache: "no-store" });
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(json?.error || "Failed to load pages.");
-      const data = (json?.pages ?? []) as CmsPage[];
-      setPages(data);
+      const existing = (json?.pages ?? []) as CmsPage[];
+      const merged = mergeWithPlaceholders(existing);
+      setPages(merged);
       // Auto-select first page if none selected
-      if (!selectedKey && data.length > 0) {
-        setSelectedKey(data[0].pageKey);
-        loadFormFromPage(data[0]);
+      if (!selectedKey && merged.length > 0) {
+        setSelectedKey(merged[0].pageKey);
+        loadFormFromPage(merged[0]);
       }
     } catch (err: any) {
       showToast({ type: "error", title: err?.message || "Failed to load pages." });
@@ -162,7 +222,8 @@ export default function AdminPagesPage() {
       <div className="mb-4">
         <h1 className="text-2xl font-semibold tracking-tight">Pages</h1>
         <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-          Edit content for static marketing pages.
+          Edit content for marketing and legal pages. Legal pages (Privacy, Terms, Cookies,
+          Accessibility) are created automatically the first time you save them.
         </p>
       </div>
 
