@@ -1401,6 +1401,34 @@ async function main() {
   }
 
   console.log("✅ AI tool configs seeded.");
+
+  // ---------------------------------------------------------------------------
+  // CMS pages — stub rows so the admin editor has something to open on day 1.
+  // Admin fills in body via /admin/pages; PATCH route upserts, so these
+  // placeholders are only needed to ensure public /privacy, /terms, etc.
+  // render a "Content coming soon" state instead of a 404 before first edit.
+  // ---------------------------------------------------------------------------
+
+  const cmsPageStubs = [
+    { pageKey: "about", title: "About Brandbite" },
+    { pageKey: "contact", title: "Contact" },
+    { pageKey: "documentation", title: "Documentation" },
+    { pageKey: "privacy", title: "Privacy Policy" },
+    { pageKey: "terms", title: "Terms of Service" },
+    { pageKey: "cookies", title: "Cookie Policy" },
+    { pageKey: "accessibility", title: "Accessibility" },
+  ];
+
+  for (const stub of cmsPageStubs) {
+    await prisma.cmsPage.upsert({
+      where: { pageKey: stub.pageKey },
+      create: { pageKey: stub.pageKey, title: stub.title },
+      // Don't clobber admin-authored content on re-seed.
+      update: {},
+    });
+  }
+
+  console.log("✅ CMS page stubs seeded.");
   console.log("🌱 Seed completed successfully.");
 }
 

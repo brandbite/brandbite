@@ -35,6 +35,8 @@ const FOOTER_COLS = [
     links: [
       { label: "Privacy policy", href: "/privacy" },
       { label: "Terms of service", href: "/terms" },
+      { label: "Cookie policy", href: "/cookies" },
+      { label: "Accessibility", href: "/accessibility" },
     ],
   },
 ];
