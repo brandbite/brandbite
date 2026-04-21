@@ -292,6 +292,8 @@ export default function LoginPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Your name"
+                  autoComplete="name"
+                  aria-describedby={error ? "login-error" : undefined}
                   className="w-full rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] px-3.5 py-2.5 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
                 />
               </div>
@@ -311,6 +313,7 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@company.com"
                 autoComplete="email"
+                aria-describedby={error ? "login-error" : undefined}
                 className="w-full rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] px-3.5 py-2.5 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
               />
             </div>
@@ -329,6 +332,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder={mode === "signup" ? "Min. 8 characters" : "Your password"}
                 autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                aria-describedby={error ? "login-error" : undefined}
                 className="w-full rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] px-3.5 py-2.5 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
               />
               {mode === "signin" && (
@@ -341,9 +345,15 @@ export default function LoginPage() {
               )}
             </div>
 
-            {/* Error message */}
+            {/* Error message — aria-describedby on each input above points
+                at this id so screen readers associate the error with the
+                failing field. role=alert announces it immediately. */}
             {error && (
-              <p className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600 dark:bg-red-900/20 dark:text-red-400">
+              <p
+                id="login-error"
+                role="alert"
+                className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600 dark:bg-red-900/20 dark:text-red-400"
+              >
                 {error}
               </p>
             )}

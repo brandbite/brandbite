@@ -97,60 +97,94 @@ These are the items I'd refuse to launch without. Each is tractable in 1–2 PRs
 
 ---
 
-## Nice-but-not-blockers (Phase D remaining)
+## Phase D status
 
-Ranked by honest customer/ops impact. Small/Medium/Large are my effort estimates.
+Updated as of 2026-04-21 — most of Phase D landed during the recent sprint.
 
-| Item                                        | Size | Why it matters                                                              | Can wait?      |
-| ------------------------------------------- | ---- | --------------------------------------------------------------------------- | -------------- |
-| **D11** prompt templates per job type       | S    | AI quality bump — each job type gets a tuned system prompt. Cheap win.      | Yes, post-v1.0 |
-| **D15** creative utilization dashboard      | S    | Admin sees who's overloaded at a glance. Needed once you have >3 creatives. | Yes, v1.1      |
-| **D9** creative portfolio auto-populated    | S    | Marketing — public portfolio page per creative. Not core.                   | Yes, v1.2      |
-| **D14** cohort retention in token-analytics | M    | Your insight, not customer-facing.                                          | Yes, v1.2+     |
-| **D10** streaming text generation           | M    | Perceived speed. Real UX polish.                                            | Yes, v1.1      |
-| **D12** image upscaling / variations        | M    | AI polish. Single-button adds.                                              | Yes, v1.2      |
-| **D7** time tracking per ticket             | M    | Adds creative friction (start/stop timer). Optional.                        | Yes or skip    |
-| **D18** referral / affiliate program        | L    | Needs marketing + legal alignment first.                                    | Yes, v2.0+     |
+| Item                                        | Size | Status                                                              |
+| ------------------------------------------- | ---- | ------------------------------------------------------------------- |
+| **D11** prompt templates per job type       | S    | ✅ Shipped (#127)                                                   |
+| **D15** creative utilization dashboard      | S    | ✅ Shipped (#129)                                                   |
+| **D9** creative portfolio auto-populated    | S    | ✅ Shipped (#132)                                                   |
+| **D10** streaming text generation           | M    | ✅ Shipped (#131)                                                   |
+| **D12** image upscaling / variations        | M    | ✅ Shipped (#133)                                                   |
+| **D7** time tracking per ticket             | M    | ✅ Shipped (#134)                                                   |
+| **D14** cohort retention in token-analytics | M    | ⏸️ Deferred post-v1.0 (admin insight, not customer-facing)          |
+| **D18** referral / affiliate program        | L    | ⏸️ Deferred v2.0+ (needs marketing + legal alignment)               |
+| **D6** real-time ticket chat                | L    | ⏸️ Deferred (build only if user feedback demands it)                |
+| **Moodboard track** (D1–D5)                 | L    | ⏸️ Moodboard disabled in v1.0 launch; re-enable after user research |
+
+---
+
+## Deferred backlog — one place for everything parked
+
+Grouped by track so nothing gets orphaned. Revisit this section when planning the next sprint.
+
+### Accessibility (Phases 1–3 shipped; see docs/a11y-audit.md for what's done)
+
+- **Lighthouse CI GitHub Action** (~1 hr) — add `.github/workflows/lighthouse.yml` hitting public pages on every PR; fail on score regression
+- **Motion-only UI alternatives** (~1–2 hrs) — pin drops + revision highlights currently signal meaning via animation only. Reduced-motion users miss the signal. Add a static equivalent (e.g. 2-second coloured border on a new pin)
+- **`/accessibility` public statement page** (~30 min) — required in EU (EAA from June 2025), best practice everywhere. Draft copy + route
+- **Form `autocomplete` audit on billing/profile forms** (~1 hr) — login + reset-password already done in PR #143. Check company billing form, profile edit, consultation-booking fields
+- **Session-timeout warning** (~1 hr) — WCAG 2.2.1; needs a "your session expires in 2 min" toast tied to BetterAuth session
+- **Page `<title>` uniqueness audit** — spot-check every route has a distinct descriptive title via the Next metadata template
+- **Moodboard canvas keyboard accessibility** (~M) — drag-place items, connect lines, add notes — all mouse-only today
+- **Manual screen-reader walkthrough** (VoiceOver / NVDA) — human step, unreplaceable
+- **Keyboard walkthrough of critical flows** — sign-in → create ticket → approve revision → sign out, note friction
+- **VPAT / ACR document** — only needed for enterprise / government sales
+- **Third-party formal audit** ($5–15k external, only if a specific customer requires it)
+
+### Operational cutover (user tasks — not code)
+
+- **AI provider keys** on demo Vercel: `OPENAI_API_KEY`, `REPLICATE_API_TOKEN` (+ optional `OPENAI_ORG_ID`) — without these, every AI tool fails at call time
+- **Stripe live keys** swap: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` — stay on test mode until v1.0
+- **Resend sending domain** verification — `brandbite.studio` SPF + DKIM + DMARC records
+- **`SENTRY_DSN`** on production — `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`
+- **Legal copy** for `/privacy` + `/terms` at `/admin/pages` (pageKeys already scaffolded)
+- **`prisma migrate deploy` automation on main** — today migrations are applied manually (D7, D12 on demo). Add a step to Vercel build or a GH Action
+- **Pre-launch checklist** — run through the full checklist below before announcing v1.0
+
+### Post-v1.0 polish (from earlier sprints, still parked)
+
+- Moodboard re-enablement (currently deferred from v1.0 launch)
+- Stripe Connect for automated creative payouts (replaces manual mark-paid flow)
 
 ---
 
 ## Phased release plan
 
-### v1.0 — "Can actually take money from strangers" (target: ~2 weeks)
+### v1.0 — "Can actually take money from strangers" (target: ~1 week once cutover tasks done)
 
-**Must-land**:
+Most of v1.0 engineering is complete (Phase D features, a11y Phases 1–3, sidebar nav, theme system). Remaining is operational cutover + legal:
 
-- Blockers 1–6 from above
-- Stripe product catalog finalized (real prices, not test prices)
-- Domain verified in Resend
+**Must-land** (user tasks, mostly non-code):
+
+- Blockers 1–6 from above (email verification ✅, auth rate limits ✅, GDPR ✅, health check ✅ already shipped; legal copy + Stripe live keys remain)
+- AI provider keys on Vercel
+- Resend domain verification + `EMAIL_FROM`
 - `SENTRY_DSN` set, errors reach a Sentry project
 - `CRON_SECRET` set, Monday payout cron verified running
-- Privacy + TOS published
-
-**Should-land** (only if quick):
-
-- D11 prompt templates per job type (~1 PR)
+- Privacy + TOS authored + published at `/privacy` + `/terms`
+- Lighthouse CI GitHub Action (prevents a11y / perf regressions post-launch)
 
 ### v1.1 — "First polish pass" (target: 2 weeks after v1.0)
 
-- D15 creative utilization dashboard (admin safety net as creative count grows)
-- D10 streaming text generation (perceived AI speed)
-- Housekeeping: B3 split ticket routes (for maintainability), English-ize Turkish comments, resolve any 240-token-drift-style data anomalies
-- Customer feedback loop wiring (in-app "report an issue" or similar)
+- Accessibility Phase 4 deferred items — motion alternatives, `/accessibility` statement page, session-timeout warning
+- Customer feedback loop wiring (in-app "report an issue")
+- Housekeeping: resolve any outstanding data anomalies post-launch
 
 ### v1.2 — "Growth features"
 
-- D9 portfolio auto-population
-- D12 image upscaling
-- D14 cohort retention analytics
-- Moodboard re-enablement (currently deferred — decide if/when to bring back)
+- D14 cohort retention analytics (admin insight)
+- Moodboard re-enablement (currently disabled for v1.0 — decide based on user research)
 
 ### v2.0+ — "Scale features"
 
 - D18 referral / affiliate program
-- Stripe Connect for automated creative payouts (replaces the current manual mark-paid)
+- Stripe Connect for automated creative payouts (replaces manual mark-paid)
 - D6 real-time ticket chat (if user feedback demands it)
-- D7 time tracking (if creatives request it; don't build until asked)
+- Moodboard keyboard accessibility overhaul
+- VPAT / third-party a11y audit (only if enterprise sales pipeline requires)
 
 ---
 
