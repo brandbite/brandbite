@@ -1,11 +1,23 @@
-# Accessibility audit — Phase 2 findings
+# Accessibility audit — Phase 2 findings + Phase 3 resolutions
 
 **Date**: 2026-04-21
 **Standard targeted**: WCAG 2.2 Level AA
 **Scope**: `app/`, `components/`, `lib/` — production code
 **Method**: static code analysis (grep + file review) + dev-time [@axe-core/react](https://github.com/dequelabs/axe-core-npm/tree/develop/packages/react) runtime monitor
 
-This document is the input for [Phase 3](#phase-3-fix-order). Phase 1 (skip link, `prefers-reduced-motion`, global `:focus-visible`, aria-live toasts) is already shipped on `main`.
+Phase 1 (skip link, `prefers-reduced-motion`, global `:focus-visible`, aria-live toasts) shipped earlier on `main`. Phase 3 resolved the findings below — status updated inline.
+
+## Resolved in Phase 3
+
+| Area                                                      | Resolution                                                                                                                                                                                              |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Color contrast — `--bb-text-muted` / `--bb-text-tertiary` | Darkened in light mode (`#8a8883` / `#6b6a63`), lightened in dark mode (`#7a7a85` / `#9a9aa3`). Both modes now clear AA thresholds.                                                                     |
+| Focus rings — 8 elements                                  | Added `focus-visible:ring-*` to tag-badge close button, tag-multi-select combobox + edit input, customer/creative settings toggles, customer settings inline inputs.                                    |
+| `LoadingState` silent to AT                               | Component now renders with `role="status" aria-live="polite"` — every caller inherits automatically.                                                                                                    |
+| Notification bell "Loading..."                            | Wrapped in `role="status" aria-live="polite"`.                                                                                                                                                          |
+| Tag color picker lacks accessible name                    | Added `aria-label` and `aria-pressed`.                                                                                                                                                                  |
+| Kanban KeyboardSensor (flagged for verify)                | N/A — boards use native HTML5 drag-drop, not @dnd-kit. Keyboard users have an equivalent alternative: click card → detail modal → status action buttons, all keyboard-accessible. Not a WCAG violation. |
+| Duplicate `<h1>` on customer board                        | False positive from regex — two `<h1>` are in separate `if/else` branches, only one renders at a time. No change needed.                                                                                |
 
 ---
 

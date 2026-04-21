@@ -1269,7 +1269,7 @@ export default function CustomerSettingsPage() {
                           aria-checked={enabled}
                           disabled={isTogglingInApp}
                           onClick={() => handleTogglePref(pref.type, "enabled", enabled)}
-                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2 disabled:opacity-50 ${
                             enabled ? "bg-[var(--bb-primary)]" : "bg-[var(--bb-border-input)]"
                           }`}
                         >
@@ -1287,7 +1287,7 @@ export default function CustomerSettingsPage() {
                           aria-checked={emailEnabled}
                           disabled={isTogglingEmail}
                           onClick={() => handleTogglePref(pref.type, "emailEnabled", emailEnabled)}
-                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2 disabled:opacity-50 ${
                             emailEnabled ? "bg-[var(--bb-primary)]" : "bg-[var(--bb-border-input)]"
                           }`}
                         >
@@ -1338,7 +1338,8 @@ export default function CustomerSettingsPage() {
                             value={editTagName}
                             onChange={(e) => setEditTagName(e.target.value)}
                             maxLength={30}
-                            className="w-32 rounded border border-[var(--bb-border)] px-2 py-1 text-[12px] text-[var(--bb-secondary)] focus:border-[var(--bb-primary)] focus:outline-none"
+                            aria-label={`Edit tag ${tag.name}`}
+                            className="w-32 rounded border border-[var(--bb-border)] px-2 py-1 text-[12px] text-[var(--bb-secondary)] focus:border-[var(--bb-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)]/30"
                             autoFocus
                             onKeyDown={(e) => {
                               if (e.key === "Enter") {
@@ -1438,7 +1439,8 @@ export default function CustomerSettingsPage() {
                     onChange={(e) => setNewTagName(e.target.value)}
                     placeholder="Tag name"
                     maxLength={30}
-                    className="w-40 rounded border border-[var(--bb-border)] px-2 py-1.5 text-[12px] text-[var(--bb-secondary)] placeholder:text-[var(--bb-text-tertiary)] focus:border-[var(--bb-primary)] focus:outline-none"
+                    aria-label="New tag name"
+                    className="w-40 rounded border border-[var(--bb-border)] px-2 py-1.5 text-[12px] text-[var(--bb-secondary)] placeholder:text-[var(--bb-text-tertiary)] focus:border-[var(--bb-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)]/30"
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();

@@ -11,6 +11,10 @@ type LoadingStateProps = {
   className?: string;
 };
 
+// `role="status"` + `aria-live="polite"` is what makes the loading text
+// audible to screen readers. Without it, AT users silently see an empty
+// list with no signal that the app is busy. Polite (not assertive) so it
+// waits for the user to finish their current utterance before announcing.
 export function LoadingState({
   message = "Loading…",
   display = "block",
@@ -19,6 +23,8 @@ export function LoadingState({
   if (display === "inline") {
     return (
       <span
+        role="status"
+        aria-live="polite"
         className={`rounded-full bg-[var(--bb-bg-card)] px-3 py-1 text-[11px] text-[var(--bb-text-secondary)] ${className}`}
       >
         {message}
@@ -27,7 +33,11 @@ export function LoadingState({
   }
 
   return (
-    <div className={`py-6 text-center text-sm text-[var(--bb-text-secondary)] ${className}`}>
+    <div
+      role="status"
+      aria-live="polite"
+      className={`py-6 text-center text-sm text-[var(--bb-text-secondary)] ${className}`}
+    >
       {message}
     </div>
   );
