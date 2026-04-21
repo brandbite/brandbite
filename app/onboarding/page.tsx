@@ -10,6 +10,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { generateAbbreviation } from "@/lib/abbreviation";
 
@@ -561,10 +562,19 @@ export default function OnboardingPage() {
       <footer className="bg-[var(--bb-primary)] px-6 py-3">
         <div className="mx-auto flex max-w-5xl items-center justify-between text-[11px] text-white/70">
           <p>&copy; 2025 Brandbite Inc. All rights reserved.</p>
-          <div className="flex gap-4">
-            <span className="cursor-pointer hover:text-white">Terms of Service</span>
-            <span className="cursor-pointer hover:text-white">Privacy Policy</span>
-            <span className="cursor-pointer hover:text-white">Cookies</span>
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            <Link href="/terms" className="hover:text-white">
+              Terms of Service
+            </Link>
+            <Link href="/privacy" className="hover:text-white">
+              Privacy Policy
+            </Link>
+            <Link href="/cookies" className="hover:text-white">
+              Cookies
+            </Link>
+            <Link href="/accessibility" className="hover:text-white">
+              Accessibility
+            </Link>
           </div>
         </div>
       </footer>

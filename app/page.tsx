@@ -743,16 +743,19 @@ function SiteFooter() {
           <p className="text-xs text-white/80">
             &copy; {new Date().getFullYear()} Brandbite. All rights reserved.
           </p>
-          <div className="flex gap-4 text-xs text-white/80">
-            <a href="#" className="hover:text-white">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/80">
+            <Link href="/terms" className="hover:text-white">
               Terms of Service
-            </a>
-            <a href="#" className="hover:text-white">
+            </Link>
+            <Link href="/privacy" className="hover:text-white">
               Privacy Policy
-            </a>
-            <a href="#" className="hover:text-white">
+            </Link>
+            <Link href="/cookies" className="hover:text-white">
               Cookies
-            </a>
+            </Link>
+            <Link href="/accessibility" className="hover:text-white">
+              Accessibility
+            </Link>
           </div>
         </div>
       </div>
