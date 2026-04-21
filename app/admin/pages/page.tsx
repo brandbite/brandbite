@@ -222,9 +222,8 @@ export default function AdminPagesPage() {
       <div className="mb-4">
         <h1 className="text-2xl font-semibold tracking-tight">Pages</h1>
         <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-          Edit content for marketing and legal pages. Legal pages (Privacy,
-          Terms, Cookies, Accessibility) are created automatically the first
-          time you save them.
+          Edit content for marketing and legal pages. Legal pages (Privacy, Terms, Cookies,
+          Accessibility) are created automatically the first time you save them.
         </p>
       </div>
 
