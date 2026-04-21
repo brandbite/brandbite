@@ -123,12 +123,37 @@ type ToastViewportProps = {
 function ToastViewport({ toasts, onClose }: ToastViewportProps) {
   if (!toasts.length) return null;
 
+  // Success/info toasts are polite (waits for user to finish what they're
+  // saying). Error/warning toasts are assertive (interrupts immediately).
+  // Splitting into two regions lets each use its own politeness level —
+  // a single region can only set one.
+  const politeToasts = toasts.filter((t) => t.type === "success" || t.type === "info");
+  const assertiveToasts = toasts.filter((t) => t.type === "error" || t.type === "warning");
+
   return (
     <div className="pointer-events-none fixed inset-x-0 top-3 z-50 flex justify-end px-4 sm:top-4 sm:px-6">
-      <div className="flex w-full max-w-sm flex-col gap-2">
-        {toasts.map((toast) => (
-          <ToastItem key={toast.id} toast={toast} onClose={onClose} />
-        ))}
+      {/*
+        aria-live regions: visually empty wrappers whose only job is to
+        announce new toasts to screen readers. The actual visual toast
+        stack sits below and is the same DOM that screen readers read out
+        — we set role + aria-live on the viewport itself so new children
+        are announced automatically.
+      */}
+      <div className="flex w-full max-w-sm flex-col gap-2" role="region" aria-label="Notifications">
+        {politeToasts.length > 0 && (
+          <div role="status" aria-live="polite" aria-atomic="false" className="contents">
+            {politeToasts.map((toast) => (
+              <ToastItem key={toast.id} toast={toast} onClose={onClose} />
+            ))}
+          </div>
+        )}
+        {assertiveToasts.length > 0 && (
+          <div role="alert" aria-live="assertive" aria-atomic="false" className="contents">
+            {assertiveToasts.map((toast) => (
+              <ToastItem key={toast.id} toast={toast} onClose={onClose} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
