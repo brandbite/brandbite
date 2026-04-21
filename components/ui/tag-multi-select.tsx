@@ -158,7 +158,7 @@ export function TagMultiSelect({
                   setSearch("");
                 }
               }}
-              className="w-full border-none bg-transparent text-[13px] text-[var(--bb-secondary)] placeholder:text-[var(--bb-text-tertiary)] focus:outline-none"
+              className="w-full rounded border-none bg-transparent text-[13px] text-[var(--bb-secondary)] placeholder:text-[var(--bb-text-tertiary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)]"
             />
           </div>
 
@@ -253,7 +253,7 @@ export function TagMultiSelect({
                         setNewName("");
                       }
                     }}
-                    className="w-full rounded border border-[var(--bb-border)] px-2 py-1 text-[13px] text-[var(--bb-secondary)] focus:border-[var(--bb-primary)] focus:outline-none"
+                    className="w-full rounded border border-[var(--bb-border)] px-2 py-1 text-[13px] text-[var(--bb-secondary)] focus:border-[var(--bb-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)]/30"
                     autoFocus
                   />
                   {/* Color picker */}
@@ -263,6 +263,8 @@ export function TagMultiSelect({
                         key={key}
                         type="button"
                         onClick={() => setNewColor(key)}
+                        aria-label={`${TAG_COLORS[key].label} color`}
+                        aria-pressed={newColor === key}
                         className={`h-5 w-5 rounded-full border-2 transition-transform ${
                           newColor === key
                             ? "scale-110 border-[var(--bb-secondary)]"

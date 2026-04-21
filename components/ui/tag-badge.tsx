@@ -31,7 +31,7 @@ export function TagBadge({ name, color, onRemove, className = "" }: TagBadgeProp
             e.stopPropagation();
             onRemove();
           }}
-          className="ml-0.5 inline-flex items-center justify-center rounded-full hover:opacity-70 focus:outline-none"
+          className="ml-0.5 inline-flex items-center justify-center rounded-full hover:opacity-70 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-1"
           aria-label={`Remove ${name}`}
         >
           <svg

@@ -273,7 +273,7 @@ export function NotificationBell({
           {/* Notification list */}
           <div className="max-h-80 overflow-y-auto">
             {loading && notifications.length === 0 && (
-              <div className="px-4 py-8 text-center">
+              <div role="status" aria-live="polite" className="px-4 py-8 text-center">
                 <p className="text-xs text-[var(--bb-text-tertiary)]">Loading...</p>
               </div>
             )}

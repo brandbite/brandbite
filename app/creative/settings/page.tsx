@@ -410,7 +410,7 @@ export default function CreativeSettingsPage() {
                   aria-checked={enabled}
                   disabled={isToggling}
                   onClick={() => handleToggle(pref.type, enabled)}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2 disabled:opacity-50 ${
                     enabled ? "bg-[var(--bb-primary)]" : "bg-[var(--bb-border-input)]"
                   }`}
                 >
