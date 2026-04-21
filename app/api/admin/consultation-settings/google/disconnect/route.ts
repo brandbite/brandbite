@@ -9,12 +9,12 @@ import { getCurrentUserOrThrow } from "@/lib/auth";
 import { getConsultationSettings } from "@/lib/consultation/settings";
 import { revokeToken } from "@/lib/google/oauth";
 import { prisma } from "@/lib/prisma";
-import { isSiteAdminRole } from "@/lib/roles";
+import { canEditConsultationSettings } from "@/lib/roles";
 
 export async function POST() {
   try {
     const user = await getCurrentUserOrThrow();
-    if (!isSiteAdminRole(user.role)) {
+    if (!canEditConsultationSettings(user.role)) {
       return NextResponse.json({ error: "Admin only" }, { status: 403 });
     }
 

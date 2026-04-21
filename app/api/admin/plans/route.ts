@@ -7,8 +7,10 @@
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
+import type { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { canManagePlans, isSiteAdminRole } from "@/lib/roles";
 import { parseBody } from "@/lib/schemas/helpers";
 import { createPlanSchema, updatePlanSchema } from "@/lib/schemas/plan.schemas";
 
@@ -40,10 +42,23 @@ type PlanPayload = {
   stripePriceId?: string | null;
 };
 
-function requireAdmin(userRole: string) {
-  if (userRole !== "SITE_OWNER" && userRole !== "SITE_ADMIN") {
+function requireAdmin(userRole: UserRole) {
+  if (!isSiteAdminRole(userRole)) {
     const error: Error & { code?: string; status?: number } = new Error(
-      "You do not have permission to manage plans.",
+      "You do not have permission to view plans.",
+    );
+    error.code = "FORBIDDEN";
+    error.status = 403;
+    throw error;
+  }
+}
+
+/** Mutations (create / edit / delete / Stripe mapping) are Plan-level
+ *  revenue configuration — locked to SITE_OWNER. */
+function requireOwnerForMutations(userRole: UserRole) {
+  if (!canManagePlans(userRole)) {
+    const error: Error & { code?: string; status?: number } = new Error(
+      "Only site owners can create or edit plans.",
     );
     error.code = "FORBIDDEN";
     error.status = 403;
@@ -107,6 +122,7 @@ export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
     requireAdmin(user.role);
+    requireOwnerForMutations(user.role);
 
     const parsed = await parseBody(req, createPlanSchema);
     if (!parsed.success) return parsed.response;
@@ -159,6 +175,7 @@ export async function PATCH(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
     requireAdmin(user.role);
+    requireOwnerForMutations(user.role);
 
     const parsed = await parseBody(req, updatePlanSchema);
     if (!parsed.success) return parsed.response;

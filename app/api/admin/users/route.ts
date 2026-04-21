@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
-import { isSiteAdminRole } from "@/lib/roles";
+import { canPromoteToSiteAdmin, isSiteAdminRole } from "@/lib/roles";
 import { UserRole, Prisma } from "@prisma/client";
 
 const VALID_ROLES: string[] = ["SITE_OWNER", "SITE_ADMIN", "DESIGNER", "CUSTOMER"];
@@ -131,16 +131,19 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "You cannot change your own role." }, { status: 400 });
     }
 
-    // Only SITE_OWNER can promote to SITE_OWNER or SITE_ADMIN
-    if ((role === "SITE_OWNER" || role === "SITE_ADMIN") && user.role !== "SITE_OWNER") {
-      return NextResponse.json(
-        { error: "Only site owners can assign admin roles." },
-        { status: 403 },
-      );
+    // Role escalation guard — only SITE_OWNER can hand out admin roles
+    // or demote an existing SITE_OWNER. SITE_ADMIN can still change
+    // CUSTOMER / DESIGNER roles (helping customers, managing creatives).
+    if (role === "SITE_OWNER" || role === "SITE_ADMIN") {
+      if (!canPromoteToSiteAdmin(user.role)) {
+        return NextResponse.json(
+          { error: "Only site owners can assign admin roles." },
+          { status: 403 },
+        );
+      }
     }
 
-    // Prevent demoting a SITE_OWNER unless you're also a SITE_OWNER
-    if (target.role === "SITE_OWNER" && user.role !== "SITE_OWNER") {
+    if (target.role === "SITE_OWNER" && !canPromoteToSiteAdmin(user.role)) {
       return NextResponse.json(
         { error: "Only site owners can modify another site owner's role." },
         { status: 403 },
