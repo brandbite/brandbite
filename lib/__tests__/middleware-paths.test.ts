@@ -5,7 +5,10 @@
 
 import { describe, it, expect } from "vitest";
 
-// Recreate the path matching logic from proxy.ts to test it in isolation
+// Recreate the path matching logic from proxy.ts to test it in isolation.
+// Keep this list in sync with PUBLIC_PATHS in proxy.ts — the test below
+// explicitly covers the legal pages, which MUST stay public because
+// unauthenticated users read them from cookie banners and sign-up flows.
 const PUBLIC_PATHS = [
   "/",
   "/login",
@@ -16,6 +19,10 @@ const PUBLIC_PATHS = [
   "/api/billing/webhook",
   "/api/invite",
   "/api/session",
+  "/privacy",
+  "/terms",
+  "/cookies",
+  "/accessibility",
 ];
 
 const DEMO_ONLY_PATHS = ["/api/debug", "/debug"];
@@ -88,6 +95,19 @@ describe("isPublicPath", () => {
   it("marks /api/customer/tickets as protected", () => {
     expect(isPublicPath("/api/customer/tickets")).toBe(false);
   });
+
+  // -------------------------------------------------------------------------
+  // Legal pages — must be public. A signed-out visitor must be able to read
+  // Privacy, Terms, Cookies, and the Accessibility statement (GDPR, Stripe
+  // checkout, cookie banner link targets, WCAG 2.2 AA statement). If any of
+  // these drop off the allow-list, users hit a login redirect instead of the
+  // policy text — a legal and accessibility-compliance failure.
+  // -------------------------------------------------------------------------
+  for (const legalPath of ["/privacy", "/terms", "/cookies", "/accessibility"]) {
+    it(`marks ${legalPath} as public`, () => {
+      expect(isPublicPath(legalPath)).toBe(true);
+    });
+  }
 });
 
 // ---------------------------------------------------------------------------

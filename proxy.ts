@@ -27,6 +27,10 @@ const PUBLIC_PATHS = [
   "/contact", // marketing pages
   "/documentation", // marketing pages
   "/news", // marketing pages
+  "/privacy", // legal — must be readable without auth (GDPR, Stripe)
+  "/terms", // legal — must be readable without auth (Stripe checkout)
+  "/cookies", // legal — cookie policy must be readable from the banner
+  "/accessibility", // legal — WCAG 2.2 AA statement
   "/api/auth", // BetterAuth catch-all (sign-up, sign-in, etc.)
   "/api/billing/webhook",
   "/api/invite",
