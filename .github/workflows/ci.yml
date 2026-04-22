@@ -108,5 +108,15 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
+      # Sanity-check that `prisma migrate deploy` works against a fresh
+      # Postgres — this is exactly what the Vercel production build will run,
+      # so a failure here means production deploys would be broken too. We do
+      # NOT gate on full schema drift (tests/integration/setup.ts uses
+      # `db push` to account for pre-existing drift from historical
+      # `db push` usage — see docs/production-roadmap.md for the backfill
+      # follow-up).
+      - name: Dry-run prisma migrate deploy
+        run: npx prisma migrate deploy
+
       - name: Run integration tests
         run: npm run test:integration

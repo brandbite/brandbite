@@ -1,6 +1,6 @@
 # Brandbite — Production Roadmap
 
-_Last updated: 2026-04-22 — Blocker #3 fully done (creative parity + leave-workspace)_
+_Last updated: 2026-04-22 — Blocker #3 done, migrate-deploy automated_
 
 This file captures **what's ready**, **what's missing**, and **what ships in which version** as we move Brandbite from demo to production. It's a living plan — rewrite sections as reality changes.
 
@@ -24,6 +24,7 @@ This file captures **what's ready**, **what's missing**, and **what ships in whi
 - **SITE_OWNER vs SITE_ADMIN split** (PR #144): money-moving actions (withdrawals approve/mark-paid, plan management, payout rules, company token grants, ticket financial overrides, consultation pricing, AI pricing edits, hard deletes, promote-to-admin, Google OAuth config) locked to `SITE_OWNER`; `SITE_ADMIN` keeps everything else. Server-side role guards in 14 API routes + owner-only banner on affected admin pages + `useSessionRole()` hook + 68 role-matrix unit tests.
 - **CMS-managed legal pages** (PRs #145–#148): `/privacy`, `/terms`, `/cookies`, `/accessibility` all rendered from `CmsPage` rows and editable from `/admin/pages`. Admin PATCH is an upsert against an allow-listed key set, so legal pages materialise on first save. Proxy marks all four public. Site footer (column + bottom bar) and the four inline marketing footers wired up with real `next/link` routes. **Pages are live — legal copy is the remaining pacing item.**
 - **GDPR right-to-erasure** (Blocker #3 — PRs #125 + #150): `DELETE /api/customer/account` and `DELETE /api/creative/account` with shared `lib/account-deletion.ts` (soft-delete + anonymize + FK cleanup). Danger zone on both settings pages with typed-email confirm. Plus a softer **"Leave workspace"** flow (`DELETE /api/customer/members/me`) for team members who want to exit a company without nuking their account — blocks the sole OWNER from orphaning the workspace.
+- **Migration automation** (PR #152): `scripts/vercel-build.mjs` runs `prisma migrate deploy` on every **production** Vercel deploy (gated on `VERCEL_ENV === "production"` so preview deploys don't apply WIP migrations to the shared demo DB). CI gains a `migrate deploy` dry-run step so a broken migration fails the PR instead of the prod deploy. See the "Migration rollback" section below for incident procedure.
 
 ### 🟡 Partial — works in some paths, not all
 
@@ -31,11 +32,9 @@ This file captures **what's ready**, **what's missing**, and **what ships in whi
 
 ### 🔴 Missing — verified absent in the codebase
 
-- **Email verification on sign-up**. No `requireEmailVerification` in BetterAuth config, no verify-email page.
-- **Account deletion / GDPR right-to-erasure**. No `DELETE` endpoint for user accounts, no self-service UI.
 - **Legal copy** for `/privacy`, `/terms`, `/cookies`, `/accessibility`. Routes + admin editor shipped (#145–#148); the actual policy text has not been authored. Needs a lawyer or a vetted template service (Termly / Iubenda).
-- **Health check endpoint**. No `/api/health` or `/healthz` for uptime monitors.
 - **App-level backup automation**. Relies entirely on Neon's point-in-time recovery — fine for v1.0 if we're on a Neon paid tier, but should be called out.
+- **Migration backfill** for historical `db push` models (`AiGeneration`, `Moodboard`, `Notification`, …). Existing demo already has these tables so it's fine day-to-day, but a fresh production DB would be missing them. See the "Operational cutover" bucket.
 
 ---
 
@@ -144,7 +143,7 @@ Grouped by track so nothing gets orphaned. Revisit this section when planning th
 - **Resend sending domain** verification — `brandbite.studio` SPF + DKIM + DMARC records
 - **`SENTRY_DSN`** on production — `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`
 - **Legal copy** for `/privacy` + `/terms` + `/cookies` + `/accessibility` at `/admin/pages` (all four pageKeys scaffolded + routes live as of #145–#148; paste-only, no redeploy needed)
-- **`prisma migrate deploy` automation on main** — today migrations are applied manually (D7, D12 on demo). Add a step to Vercel build or a GH Action
+- **Migration backfill** — historical `AiGeneration`, `Moodboard`, `Notification` models were introduced via `prisma db push` and have no migration file. On the existing demo DB the tables already exist so `migrate deploy` is a no-op for them, but a fresh production database needs a one-time bootstrap. Options: (a) run `prisma db push` once against the fresh prod DB then `prisma migrate resolve --applied` every existing migration, or (b) generate catch-up migrations (`prisma migrate diff --from-empty --to-schema-datamodel` into a dated folder) and ship them so a clean DB can replay history from migrations alone. Pick (b) if we ever expect another prod deploy target
 - **Pre-launch checklist** — run through the full checklist below before announcing v1.0
 
 ### Post-v1.0 polish (from earlier sprints, still parked)
@@ -270,6 +269,26 @@ Confirm each is set in Vercel → Project → Settings → Environment Variables
 - [ ] Watch Stripe dashboard for payment failures / disputes
 - [ ] Monday morning: verify payout cron ran (check logs + `/admin/withdrawals` for new PENDING rows)
 - [ ] Monitor demo user feedback channels (if any) for bug reports before wider launch
+
+---
+
+## Migration rollback (when `migrate deploy` goes sideways)
+
+The Vercel production build runs `prisma migrate deploy` before `next build`. If the migrate step fails, the build fails and the old code keeps serving — safe. If the migrate step **succeeds** but the new code has a bug, or if the migration itself was destructive, follow this sequence:
+
+1. **Revert the code first**, not the database.
+   - In Vercel, go to **Deployments** → pick the last known-good deploy → **Promote to Production**. This is instant and does not touch the DB.
+   - The previous code must still be compatible with the newer DB schema. This is why destructive migrations should follow the **expand → migrate → contract** pattern (add column → backfill + start writing → remove old column in a later deploy) rather than DROP-in-one-PR. The expand step makes the new schema backward-compatible with the previous code.
+
+2. **Only restore the database if the migration was actually destructive** (e.g. dropped a column with data, truncated a table). Use Neon's point-in-time recovery:
+   - Neon console → **Branches** → create a branch from the timestamp just before the migration ran.
+   - Verify the branch has the expected data, then promote it (or point `DATABASE_URL` at it). Coordinate with active sessions — users mid-transaction may see errors during the cutover.
+
+3. **Do not edit `prisma/migrations/` after a deploy.** If a migration is broken, write a _new_ forward migration that undoes the damage. `prisma migrate resolve --rolled-back <name>` is an emergency-only tool for when a migration failed partway through; discuss before using.
+
+4. **Post-mortem cues.** If the migration ran but deploys keep failing because the build errors, check Vercel build logs for the `[vercel-build] Applying Prisma migrations` section — everything above that line is the migrate output.
+
+Preventative: destructive migrations (DROP COLUMN, DROP TABLE, NOT NULL on a nullable column with existing nulls) should go out in their own PR, after the code that stops using the dropped thing has already been deployed and stable for at least a week.
 
 ---
 
