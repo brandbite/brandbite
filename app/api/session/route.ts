@@ -1,17 +1,28 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/session/route.ts
-// @purpose: Expose current session user info (+ demo persona when in demo mode)
-// @version: v1.1.0
+// @purpose: Expose current session user info (+ demo persona when in demo mode).
+//           Also returns the BetterAuth session's expiresAt so the client-side
+//           session-timeout-warning hook can schedule a "your session expires
+//           soon" prompt (WCAG 2.2.1). Fetching this endpoint also extends
+//           the session if BetterAuth's updateAge window is active, so it
+//           doubles as the refresh mechanism for the "Stay signed in" button.
+// @version: v1.2.0
 // @status: active
-// @lastUpdate: 2026-02-22
+// @lastUpdate: 2026-04-22
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { getCurrentUser } from "@/lib/auth";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { getDemoPersonaById, isValidDemoPersona, type DemoPersonaId } from "@/lib/demo-personas";
 import { formatRole } from "@/lib/roles";
+
+const isDemoMode = () => {
+  if (process.env.DEMO_MODE !== "true") return false;
+  if (process.env.NODE_ENV !== "production") return true;
+  return process.env.ALLOW_DEMO_IN_PROD === "true";
+};
 
 export async function GET(req: NextRequest) {
   try {
@@ -49,10 +60,32 @@ export async function GET(req: NextRequest) {
 
     const user = await getCurrentUser();
 
+    // Read the session expiry straight from BetterAuth. In demo mode there is
+    // no server-tracked expiry (the persona cookie is just a persona switch),
+    // so we return null and the client-side timeout hook no-ops.
+    let expiresAt: string | null = null;
+    if (!isDemoMode() && user) {
+      try {
+        const { auth } = await import("@/lib/better-auth");
+        const session = await auth.api.getSession({ headers: await headers() });
+        const iso = session?.session?.expiresAt
+          ? new Date(session.session.expiresAt).toISOString()
+          : null;
+        expiresAt = iso;
+      } catch (err) {
+        // Non-fatal: the warning just won't fire. Log so we notice if this
+        // regresses silently.
+        console.warn("[/api/session] could not read BetterAuth session expiry:", err);
+      }
+    }
+
     return NextResponse.json(
       {
         ok: true,
         demoPersona: demoPersonaSummary,
+        session: {
+          expiresAt, // ISO string or null (demo mode / unauthenticated)
+        },
         user: user
           ? {
               id: user.id,

@@ -6,6 +6,7 @@
 // -----------------------------------------------------------------------------
 
 import { AppSidebar } from "@/components/navigation/app-sidebar";
+import { SessionTimeoutWarning } from "@/components/auth/session-timeout-warning";
 
 // All admin routes are auth-gated. Skip SSG so the build does not prerender
 // pages that depend on the live DB or client-only libraries.
@@ -14,6 +15,9 @@ export const dynamic = "force-dynamic";
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-[var(--bb-bg-card)] text-[var(--bb-secondary)]">
+      {/* WCAG 2.2.1 — warn before the BetterAuth session expires. No-op
+          in demo mode (the /api/session response's expiresAt is null). */}
+      <SessionTimeoutWarning />
       <AppSidebar role="admin" />
       {/*
         Content is offset by the live sidebar width on md+. The sidebar
