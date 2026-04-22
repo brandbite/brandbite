@@ -1,0 +1,30 @@
+{
+  "$schema": "https://raw.githubusercontent.com/GoogleChrome/lighthouse-ci/main/packages/server/src/api/project-build-assertions-schema.json",
+  "ci": {
+    "collect": {
+      "url": [
+        "http://localhost:3000/",
+        "http://localhost:3000/how-it-works",
+        "http://localhost:3000/login"
+      ],
+      "numberOfRuns": 1,
+      "settings": {
+        "preset": "desktop",
+        "chromeFlags": "--no-sandbox --disable-gpu --disable-dev-shm-usage"
+      }
+    },
+    "assert": {
+      "//": "All thresholds are 'warn' on purpose — this CI is a regression monitor, not a gate. Once we see baseline scores over a few PRs we can tighten individual categories to 'error'. Keep the thresholds honest: if we lower one to match the current reality, note why in the commit.",
+      "assertions": {
+        "categories:performance": ["warn", { "minScore": 0.7 }],
+        "categories:accessibility": ["warn", { "minScore": 0.9 }],
+        "categories:best-practices": ["warn", { "minScore": 0.9 }],
+        "categories:seo": ["warn", { "minScore": 0.9 }]
+      }
+    },
+    "upload": {
+      "//": "Temporary public storage posts each run at a unique URL for ~7 days. Fine for PR review; swap for an LHCI server if we want historical trends.",
+      "target": "temporary-public-storage"
+    }
+  }
+}
