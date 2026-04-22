@@ -8,7 +8,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
+import { AdminActionType } from "@prisma/client";
+
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 import { getConsultationSettings } from "@/lib/consultation/settings";
 import {
   decodeIdTokenPayload,
@@ -87,6 +90,16 @@ export async function GET(req: NextRequest) {
         googleCalendarId: settings.googleCalendarId ?? "primary",
         updatedById: user.id,
       },
+    });
+
+    await logAdminAction({
+      actor: user,
+      action: AdminActionType.GOOGLE_OAUTH_CONFIG_EDIT,
+      outcome: "SUCCESS",
+      targetType: "ConsultationSettings",
+      targetId: settings.id,
+      metadata: { op: "connect-completed", googleAccountEmail: email },
+      context: extractAuditContext(req),
     });
 
     return redirectWithFlag(req, "connected", email ?? "connected");

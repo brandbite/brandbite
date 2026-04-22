@@ -9,6 +9,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { AdminActionType } from "@prisma/client";
+
+import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 import { canEditPayoutRules, isSiteAdminRole } from "@/lib/roles";
 import { BASE_PAYOUT_PERCENT } from "@/lib/token-engine";
 import { parseBody } from "@/lib/schemas/helpers";
@@ -63,8 +66,16 @@ export async function GET(_req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
+    const auditCtx = extractAuditContext(req);
 
     if (!canEditPayoutRules(user.role)) {
+      await logAdminAction({
+        actor: user,
+        action: AdminActionType.PAYOUT_RULE_EDIT,
+        outcome: "BLOCKED",
+        errorMessage: "Only site owners can create payout rules.",
+        context: auditCtx,
+      });
       return NextResponse.json(
         { error: "Only site owners can create payout rules." },
         { status: 403 },
@@ -103,6 +114,24 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    await logAdminAction({
+      actor: user,
+      action: AdminActionType.PAYOUT_RULE_EDIT,
+      outcome: "SUCCESS",
+      targetType: "PayoutRule",
+      targetId: created.id,
+      metadata: {
+        op: "create",
+        name,
+        minCompletedTickets,
+        timeWindowDays,
+        payoutPercent,
+        priority,
+        isActive,
+      },
+      context: auditCtx,
+    });
+
     return NextResponse.json(
       {
         payoutRule: {
@@ -136,8 +165,16 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
+    const auditCtx = extractAuditContext(req);
 
     if (!canEditPayoutRules(user.role)) {
+      await logAdminAction({
+        actor: user,
+        action: AdminActionType.PAYOUT_RULE_EDIT,
+        outcome: "BLOCKED",
+        errorMessage: "Only site owners can update payout rules.",
+        context: auditCtx,
+      });
       return NextResponse.json(
         { error: "Only site owners can update payout rules." },
         { status: 403 },
@@ -175,6 +212,24 @@ export async function PATCH(req: NextRequest) {
       data,
     });
 
+    await logAdminAction({
+      actor: user,
+      action: AdminActionType.PAYOUT_RULE_EDIT,
+      outcome: "SUCCESS",
+      targetType: "PayoutRule",
+      targetId: updated.id,
+      // Widen Record<string, unknown> to Prisma's InputJsonValue via JSON
+      // round-trip. `data` only holds primitives so this is safe.
+      metadata: JSON.parse(
+        JSON.stringify({
+          op: "update",
+          changedFields: Object.keys(data),
+          after: data,
+        }),
+      ),
+      context: auditCtx,
+    });
+
     return NextResponse.json({
       payoutRule: {
         id: updated.id,
@@ -205,8 +260,16 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
+    const auditCtx = extractAuditContext(req);
 
     if (!canEditPayoutRules(user.role)) {
+      await logAdminAction({
+        actor: user,
+        action: AdminActionType.PAYOUT_RULE_EDIT,
+        outcome: "BLOCKED",
+        errorMessage: "Only site owners can delete payout rules.",
+        context: auditCtx,
+      });
       return NextResponse.json(
         { error: "Only site owners can delete payout rules." },
         { status: 403 },
@@ -221,6 +284,16 @@ export async function DELETE(req: NextRequest) {
     }
 
     await prisma.payoutRule.delete({ where: { id } });
+
+    await logAdminAction({
+      actor: user,
+      action: AdminActionType.PAYOUT_RULE_EDIT,
+      outcome: "SUCCESS",
+      targetType: "PayoutRule",
+      targetId: id,
+      metadata: { op: "delete" },
+      context: auditCtx,
+    });
 
     return NextResponse.json({ deleted: true });
   } catch (error: any) {

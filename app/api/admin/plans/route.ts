@@ -7,9 +7,10 @@
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
-import type { UserRole } from "@prisma/client";
+import { AdminActionType, type UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 import { canManagePlans, isSiteAdminRole } from "@/lib/roles";
 import { parseBody } from "@/lib/schemas/helpers";
 import { createPlanSchema, updatePlanSchema } from "@/lib/schemas/plan.schemas";
@@ -46,19 +47,6 @@ function requireAdmin(userRole: UserRole) {
   if (!isSiteAdminRole(userRole)) {
     const error: Error & { code?: string; status?: number } = new Error(
       "You do not have permission to view plans.",
-    );
-    error.code = "FORBIDDEN";
-    error.status = 403;
-    throw error;
-  }
-}
-
-/** Mutations (create / edit / delete / Stripe mapping) are Plan-level
- *  revenue configuration — locked to SITE_OWNER. */
-function requireOwnerForMutations(userRole: UserRole) {
-  if (!canManagePlans(userRole)) {
-    const error: Error & { code?: string; status?: number } = new Error(
-      "Only site owners can create or edit plans.",
     );
     error.code = "FORBIDDEN";
     error.status = 403;
@@ -121,8 +109,19 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
+    const auditCtx = extractAuditContext(req);
     requireAdmin(user.role);
-    requireOwnerForMutations(user.role);
+
+    if (!canManagePlans(user.role)) {
+      await logAdminAction({
+        actor: user,
+        action: AdminActionType.PLAN_CREATE,
+        outcome: "BLOCKED",
+        errorMessage: "Only site owners can create plans.",
+        context: auditCtx,
+      });
+      return NextResponse.json({ error: "Only site owners can create plans." }, { status: 403 });
+    }
 
     const parsed = await parseBody(req, createPlanSchema);
     if (!parsed.success) return parsed.response;
@@ -146,6 +145,22 @@ export async function POST(req: NextRequest) {
         stripeProductId,
         stripePriceId,
       },
+    });
+
+    await logAdminAction({
+      actor: user,
+      action: AdminActionType.PLAN_CREATE,
+      outcome: "SUCCESS",
+      targetType: "Plan",
+      targetId: created.id,
+      metadata: {
+        name,
+        monthlyTokens,
+        priceCents: priceCents ?? 0,
+        isRecurring,
+        isActive,
+      },
+      context: auditCtx,
     });
 
     return NextResponse.json(
@@ -174,8 +189,19 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
+    const auditCtx = extractAuditContext(req);
     requireAdmin(user.role);
-    requireOwnerForMutations(user.role);
+
+    if (!canManagePlans(user.role)) {
+      await logAdminAction({
+        actor: user,
+        action: AdminActionType.PLAN_EDIT,
+        outcome: "BLOCKED",
+        errorMessage: "Only site owners can edit plans.",
+        context: auditCtx,
+      });
+      return NextResponse.json({ error: "Only site owners can edit plans." }, { status: 403 });
+    }
 
     const parsed = await parseBody(req, updatePlanSchema);
     if (!parsed.success) return parsed.response;
@@ -201,6 +227,32 @@ export async function PATCH(req: NextRequest) {
     const updated = await prisma.plan.update({
       where: { id },
       data: updateData,
+    });
+
+    await logAdminAction({
+      actor: user,
+      action: AdminActionType.PLAN_EDIT,
+      outcome: "SUCCESS",
+      targetType: "Plan",
+      targetId: updated.id,
+      // Round-trip through JSON.parse(JSON.stringify(...)) to widen
+      // Record<string, unknown> to the Prisma InputJsonValue the log column
+      // expects. updateData only holds primitives / nulls here so this is
+      // safe and keeps the audit payload readable.
+      metadata: JSON.parse(
+        JSON.stringify({
+          changedFields: Object.keys(updateData),
+          before: {
+            name: existing.name,
+            monthlyTokens: existing.monthlyTokens,
+            priceCents: existing.priceCents,
+            isActive: existing.isActive,
+            isRecurring: existing.isRecurring,
+          },
+          after: updateData,
+        }),
+      ),
+      context: auditCtx,
     });
 
     return NextResponse.json(

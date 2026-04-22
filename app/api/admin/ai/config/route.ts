@@ -4,7 +4,9 @@
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
+import { AdminActionType } from "@prisma/client";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 import { canEditAiToolPricing, isSiteAdminRole } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import type { AiToolType } from "@prisma/client";
@@ -100,6 +102,8 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Invalid tool type" }, { status: 400 });
     }
 
+    const auditCtx = extractAuditContext(req);
+
     // Splitting the PATCH: SITE_ADMIN can flip a tool on/off (operational
     // controls), but only SITE_OWNER can change the tokenCost or
     // rateLimit since those directly affect what we charge customers.
@@ -107,6 +111,16 @@ export async function PATCH(req: NextRequest) {
       (typeof tokenCost === "number" && tokenCost >= 0) ||
       (typeof rateLimit === "number" && rateLimit >= 1);
     if (wantsPricingEdit && !canEditAiToolPricing(user.role)) {
+      await logAdminAction({
+        actor: user,
+        action: AdminActionType.AI_PRICING_EDIT,
+        outcome: "BLOCKED",
+        targetType: "AiToolConfig",
+        targetId: toolType,
+        metadata: { attemptedTokenCost: tokenCost, attemptedRateLimit: rateLimit },
+        errorMessage: "Only site owners can change AI tool pricing or rate limits.",
+        context: auditCtx,
+      });
       return NextResponse.json(
         { error: "Only site owners can change AI tool pricing or rate limits." },
         { status: 403 },
@@ -128,6 +142,24 @@ export async function PATCH(req: NextRequest) {
       },
       update: data,
     });
+
+    // Only log pricing edits under AI_PRICING_EDIT — on/off toggles are
+    // operational noise and don't need to live in the security audit.
+    if (wantsPricingEdit) {
+      await logAdminAction({
+        actor: user,
+        action: AdminActionType.AI_PRICING_EDIT,
+        outcome: "SUCCESS",
+        targetType: "AiToolConfig",
+        targetId: toolType,
+        metadata: {
+          changedFields: Object.keys(data),
+          newTokenCost: config.tokenCost,
+          newRateLimit: config.rateLimit,
+        },
+        context: auditCtx,
+      });
+    }
 
     return NextResponse.json({
       tool: {
