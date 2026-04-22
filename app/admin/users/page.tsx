@@ -144,9 +144,11 @@ export default function AdminUsersPage() {
       if (res.status === 202 && json?.requiresMfa) {
         setPendingMfa({
           challenge: {
+            method: json.method,
             challengeId: json.challengeId,
             maskedEmail: json.maskedEmail,
             expiresAt: json.expiresAt,
+            actionTag: json.actionTag,
           },
           retry: () => handleRoleChange(userId, newRole, confirmation),
         });

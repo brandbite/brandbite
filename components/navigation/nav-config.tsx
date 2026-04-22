@@ -133,6 +133,12 @@ export const ADMIN_NAV: NavConfig = {
           icon: IconSettings,
           ownerOnly: true,
         },
+        {
+          href: "/admin/settings/mfa",
+          label: "Two-factor",
+          icon: IconSettings,
+          ownerOnly: true,
+        },
         { href: "/admin/settings", label: "Settings", icon: IconSettings },
       ],
     },

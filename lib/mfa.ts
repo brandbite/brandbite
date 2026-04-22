@@ -29,6 +29,7 @@
 import { createHash, randomInt } from "node:crypto";
 
 import { NextResponse } from "next/server";
+import * as OTPAuth from "otpauth";
 
 import { sendNotificationEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
@@ -61,6 +62,56 @@ function generateNumericCode(length: number): string {
   const max = 10 ** length;
   const n = randomInt(0, max);
   return String(n).padStart(length, "0");
+}
+
+// ---------------------------------------------------------------------------
+// TOTP helpers
+//
+// Built on `otpauth` — small library, RFC 6238 TOTP + RFC 4226 HOTP. Secrets
+// are base32-encoded per RFC 4648. The ±1 window tolerates minor clock drift
+// between the user's phone and our server (common 30-second TOTP generators
+// produce codes that shift at the boundary).
+// ---------------------------------------------------------------------------
+
+const TOTP_ISSUER = "Brandbite";
+const TOTP_VALIDATE_WINDOW = 1;
+
+export function generateTotpSecret(): string {
+  // 20 bytes = 160 bits, matches RFC 6238 recommendation for HMAC-SHA1.
+  return new OTPAuth.Secret({ size: 20 }).base32;
+}
+
+export function buildOtpauthUrl(secretBase32: string, accountLabel: string): string {
+  const totp = new OTPAuth.TOTP({
+    issuer: TOTP_ISSUER,
+    label: accountLabel,
+    algorithm: "SHA1",
+    digits: 6,
+    period: 30,
+    secret: OTPAuth.Secret.fromBase32(secretBase32),
+  });
+  return totp.toString();
+}
+
+/**
+ * Verify a TOTP code against a user's stored secret. Allows ±1 time step
+ * (30 s default) of drift so a barely-late tap still works.
+ */
+export function verifyTotpCode(secretBase32: string, code: string): boolean {
+  if (!secretBase32 || !code || !/^\d{6}$/.test(code.trim())) return false;
+  try {
+    const totp = new OTPAuth.TOTP({
+      issuer: TOTP_ISSUER,
+      algorithm: "SHA1",
+      digits: 6,
+      period: 30,
+      secret: OTPAuth.Secret.fromBase32(secretBase32),
+    });
+    const delta = totp.validate({ token: code.trim(), window: TOTP_VALIDATE_WINDOW });
+    return delta !== null;
+  } catch {
+    return false;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -178,10 +229,13 @@ function escapeHtml(value: string): string {
 export type VerifyResult = { ok: true } | { ok: false; status: number; error: string };
 
 /**
- * Verify a challenge. On success, sets consumedAt (unlocking the trust
- * window). On failure, increments attempts. After MAX_ATTEMPTS, the
- * challenge is locked — further attempts reject, new challenge must be
- * issued.
+ * Verify an email-code challenge. Works only for method="email" — TOTP
+ * uses `verifyTotp()` below which writes its own synthetic challenge row
+ * so the trust window lookup still works.
+ *
+ * On success sets consumedAt (unlocks the 30-min trust window). On
+ * failure, increments attempts. After MAX_ATTEMPTS the challenge is
+ * locked and a new one must be issued.
  */
 export async function verifyChallenge(
   userId: string,
@@ -246,6 +300,56 @@ export async function verifyChallenge(
 }
 
 // ---------------------------------------------------------------------------
+// TOTP verify
+//
+// For TOTP-enrolled users we don't create a challenge row up-front (no code
+// is hashed / stored — the server regenerates the expected code from the
+// shared secret each time). On a successful verification we write a
+// synthetic "consumed" MfaChallenge row so the `hasRecentSuccessfulMfa`
+// lookup used by `requireFreshMfa` still returns true for the 30-min
+// trust window.
+// ---------------------------------------------------------------------------
+
+export async function verifyTotp(
+  userId: string,
+  actionTag: string,
+  code: string,
+): Promise<VerifyResult> {
+  if (!code || typeof code !== "string" || !/^\d{6}$/.test(code.trim())) {
+    return { ok: false, status: 400, error: "Enter the 6-digit code from your authenticator app." };
+  }
+
+  const user = await prisma.userAccount.findUnique({
+    where: { id: userId },
+    select: { totpSecret: true },
+  });
+  if (!user?.totpSecret) {
+    return { ok: false, status: 400, error: "TOTP is not enrolled on this account." };
+  }
+
+  if (!verifyTotpCode(user.totpSecret, code)) {
+    return { ok: false, status: 400, error: "Wrong code. Try again." };
+  }
+
+  // Write a synthetic consumed challenge so hasRecentSuccessfulMfa picks
+  // it up inside the trust window. codeHash is a sentinel; attempts=0;
+  // expiresAt=now (irrelevant since consumedAt is also now).
+  const now = new Date();
+  await prisma.mfaChallenge.create({
+    data: {
+      userId,
+      actionTag,
+      codeHash: "TOTP_VERIFIED",
+      expiresAt: now,
+      consumedAt: now,
+      attempts: 0,
+    },
+  });
+
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
 // Route helper — the thing every money route calls
 // ---------------------------------------------------------------------------
 
@@ -276,6 +380,29 @@ export async function requireFreshMfa(
   const recent = await hasRecentSuccessfulMfa(user.id, actionTag);
   if (recent) return { ok: true };
 
+  // Branch by method. TOTP-enrolled users get a faster flow (no email
+  // wait) — the client shows an "enter code from your authenticator"
+  // modal and POSTs to /api/admin/mfa/verify with `method: "totp"`.
+  // Non-enrolled users get the existing email challenge.
+  const profile = await prisma.userAccount.findUnique({
+    where: { id: user.id },
+    select: { totpSecret: true },
+  });
+
+  if (profile?.totpSecret) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        {
+          requiresMfa: true,
+          method: "totp",
+          actionTag,
+        },
+        { status: 202 },
+      ),
+    };
+  }
+
   const { challengeId, expiresAt } = await issueChallenge(
     user.id,
     user.email,
@@ -284,13 +411,12 @@ export async function requireFreshMfa(
     context,
   );
 
-  // 202 Accepted. The action did not run; the client should prompt for a
-  // code and retry the original request once MFA is verified.
   return {
     ok: false,
     response: NextResponse.json(
       {
         requiresMfa: true,
+        method: "email",
         actionTag,
         challengeId,
         expiresAt: expiresAt.toISOString(),

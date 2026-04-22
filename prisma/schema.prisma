@@ -194,6 +194,13 @@ model UserAccount {
   /// Ledger + ticket rows are retained for financial / audit compliance.
   deletedAt DateTime?
 
+  /// Optional TOTP secret for the L4 MFA second factor. When set, money
+  /// actions use TOTP codes from an authenticator app instead of email
+  /// codes. Stored as base32 (RFC 4648). Null = not enrolled / email
+  /// fallback. Generated + saved via /api/admin/mfa/enroll.
+  totpSecret     String?
+  totpEnrolledAt DateTime?
+
   /// Admin-controlled flag: whether this creative can send revision notes to clients
   creativeRevisionNotesEnabled Boolean @default(false) @map("designerRevisionNotesEnabled")
 

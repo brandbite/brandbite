@@ -160,13 +160,15 @@ export default function AdminCompaniesPage() {
       });
       const json = await res.json().catch(() => null);
 
-      // L4 — MFA challenge issued.
+      // L4 — MFA challenge issued (method: "email" | "totp").
       if (res.status === 202 && json?.requiresMfa) {
         setPendingMfa({
           challenge: {
+            method: json.method,
             challengeId: json.challengeId,
             maskedEmail: json.maskedEmail,
             expiresAt: json.expiresAt,
+            actionTag: json.actionTag,
           },
           retry: postIt,
         });
