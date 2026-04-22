@@ -18,6 +18,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { NotificationBell } from "@/components/ui/notification-bell";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { useSessionRole } from "@/lib/hooks/use-session-role";
 import { getNavConfig, type NavConfig, type NavLeaf, type NavRole } from "./nav-config";
 import { IconChevronsLeft, IconLogout, IconMenu, IconX } from "./nav-icons";
 
@@ -81,7 +82,20 @@ function usePersistedCollapse(): [boolean, (next: boolean) => void] {
 export function AppSidebar({ role }: { role: NavRole }) {
   const pathname = usePathname();
   const router = useRouter();
-  const config = getNavConfig(role);
+  const rawConfig = getNavConfig(role);
+  const { isSiteOwner } = useSessionRole();
+
+  // Owner-gated items. Hide them until we know the role; filter them out for
+  // SITE_ADMIN and below. Server-side guards on the routes themselves remain
+  // the real security boundary — this is purely UX hygiene.
+  const config: NavConfig = {
+    ...rawConfig,
+    sections: rawConfig.sections.map((section) => ({
+      ...section,
+      items: section.items.filter((item) => !item.ownerOnly || isSiteOwner),
+    })),
+  };
+
   const [collapsed, setCollapsed] = usePersistedCollapse();
   const [mobileOpen, setMobileOpen] = useState(false);
   const hamburgerRef = useRef<HTMLButtonElement>(null);

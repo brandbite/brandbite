@@ -8,7 +8,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
+import { AdminActionType } from "@prisma/client";
+
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 import { prisma } from "@/lib/prisma";
 import { canGrantCompanyTokens } from "@/lib/roles";
 import { parseBody } from "@/lib/schemas/helpers";
@@ -30,14 +33,24 @@ export async function POST(
 ) {
   try {
     const user = await getCurrentUserOrThrow();
+    const auditCtx = extractAuditContext(req);
+    const { companyId } = await params;
+
     if (!canGrantCompanyTokens(user.role)) {
+      await logAdminAction({
+        actor: user,
+        action: AdminActionType.COMPANY_TOKEN_GRANT,
+        outcome: "BLOCKED",
+        targetType: "Company",
+        targetId: companyId,
+        errorMessage: "Only site owners can grant or revoke company tokens.",
+        context: auditCtx,
+      });
       return NextResponse.json(
         { error: "Only site owners can grant or revoke company tokens." },
         { status: 403 },
       );
     }
-
-    const { companyId } = await params;
     const parsed = await parseBody(req, adjustSchema);
     if (!parsed.success) return parsed.response;
 
@@ -69,6 +82,22 @@ export async function POST(
         adminId: user.id,
         adminEmail: user.email,
       },
+    });
+
+    await logAdminAction({
+      actor: user,
+      action: AdminActionType.COMPANY_TOKEN_GRANT,
+      outcome: "SUCCESS",
+      targetType: "Company",
+      targetId: company.id,
+      metadata: {
+        direction: parsed.data.direction,
+        amount: parsed.data.amount,
+        notes: parsed.data.notes,
+        balanceBefore: company.tokenBalance,
+        balanceAfter,
+      },
+      context: auditCtx,
     });
 
     return NextResponse.json({

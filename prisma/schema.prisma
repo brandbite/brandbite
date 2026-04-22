@@ -259,6 +259,9 @@ model UserAccount {
   // Time-tracking entries owned by this creative (D7)
   creativeTimeEntries TicketTimeEntry[] @relation("CreativeTimeEntries")
 
+  // Admin action log entries this user authored (SITE_OWNER only in practice)
+  adminActionLogs AdminActionLog[] @relation("AdminActionLogActor")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -1587,4 +1590,86 @@ model ConsultationSettings {
 
   updatedById String?
   updatedBy   UserAccount? @relation("ConsultationSettingsUpdatedBy", fields: [updatedById], references: [id])
+}
+
+// -----------------------------------------------------------------------------
+// Admin action audit log (Security Precaution Plan — L1)
+//
+// Write-only ledger of every privileged action. Rows never update; rows
+// never delete (even on UserAccount soft-delete — we anonymize references
+// in app code rather than FK-cascade). This is forensic infrastructure:
+// the first thing we read after a suspected compromise, and the evidence
+// trail for any billing dispute or regulatory audit.
+//
+// The actor snapshot (actorEmail, actorRole) is denormalized on purpose —
+// UserAccount email gets anonymized on GDPR delete, and role may change
+// after the action. The log must show who did what at the time, not who
+// the actor IS today.
+// -----------------------------------------------------------------------------
+
+enum AdminActionType {
+  // Withdrawals
+  WITHDRAWAL_APPROVE
+  WITHDRAWAL_MARK_PAID
+  WITHDRAWAL_REJECT
+  // Plans & billing
+  PLAN_CREATE
+  PLAN_EDIT
+  PLAN_DELETE
+  PLAN_ASSIGN
+  COMPANY_TOKEN_GRANT
+  // Creative payout rules
+  PAYOUT_RULE_EDIT
+  // Ticket financial overrides
+  TICKET_FINANCIAL_OVERRIDE
+  // User / role management
+  USER_PROMOTE_TO_ADMIN
+  USER_HARD_DELETE
+  // Pricing / configuration
+  AI_PRICING_EDIT
+  CONSULTATION_PRICING_EDIT
+  GOOGLE_OAUTH_CONFIG_EDIT
+}
+
+enum AdminActionOutcome {
+  SUCCESS // action completed
+  BLOCKED // guard rejected (403, validation, etc.) — valuable for recon detection
+  ERROR // downstream failure mid-action (DB, external API)
+}
+
+model AdminActionLog {
+  id String @id @default(cuid())
+
+  // Who performed the action, snapshotted for forensic stability
+  actorId    String
+  actor      UserAccount @relation("AdminActionLogActor", fields: [actorId], references: [id])
+  actorEmail String // snapshot at action time; UserAccount.email may anonymize later
+  actorRole  UserRole // snapshot; role may change after the action
+
+  // What the action is + action-specific payload
+  action   AdminActionType
+  metadata Json? // e.g. { amountTokens, oldPrice, newPrice, … }
+
+  // Target object, if the action has one. Soft-linked (no FK) because the
+  // target table varies by action type (Withdrawal, Plan, UserAccount, …).
+  targetType String? // "Withdrawal" | "Plan" | "UserAccount" | "Company" | "Ticket" | …
+  targetId   String?
+
+  // Request context — where did this come from?
+  ipAddress String?
+  userAgent String?
+
+  // Outcome (success / blocked / error)
+  outcome      AdminActionOutcome
+  errorMessage String? // populated when outcome != SUCCESS
+
+  createdAt DateTime @default(now())
+
+  // Query access patterns:
+  //   - "what has this owner done" → actorId + createdAt
+  //   - "who touched this withdrawal" → targetType + targetId + createdAt
+  //   - "show me every MARK_PAID this week" → action + createdAt
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
+  @@index([targetType, targetId, createdAt])
 }

@@ -1,17 +1,17 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/admin/withdrawals/[id]/reject/route.ts
-// @purpose: Reject a creative withdrawal request
-// @version: v1.0.0
-// @lastUpdate: 2025-11-13
+// @purpose: Reject a creative withdrawal request. Admin-level (SITE_OWNER or
+//           SITE_ADMIN) — rejection is not a financial commitment so it's not
+//           restricted to owners.
 // -----------------------------------------------------------------------------
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { Prisma, WithdrawalStatus } from "@prisma/client";
+import { AdminActionType, Prisma, WithdrawalStatus } from "@prisma/client";
+import { getCurrentUserOrThrow } from "@/lib/auth";
+import { isSiteAdminRole } from "@/lib/roles";
+import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 
-/**
- * POST /api/admin/withdrawals/:id/reject
- */
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
 
@@ -29,6 +29,25 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const adminReason = body.reason ?? null;
 
   try {
+    const user = await getCurrentUserOrThrow();
+    const auditCtx = extractAuditContext(request);
+
+    if (!isSiteAdminRole(user.role)) {
+      await logAdminAction({
+        actor: user,
+        action: AdminActionType.WITHDRAWAL_REJECT,
+        outcome: "BLOCKED",
+        targetType: "Withdrawal",
+        targetId: id,
+        errorMessage: "Only site admins can reject withdrawals.",
+        context: auditCtx,
+      });
+      return NextResponse.json(
+        { error: "Only site admins can reject withdrawals." },
+        { status: 403 },
+      );
+    }
+
     const withdrawal = await prisma.withdrawal.findUnique({
       where: { id },
     });
@@ -62,6 +81,20 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       },
     });
 
+    await logAdminAction({
+      actor: user,
+      action: AdminActionType.WITHDRAWAL_REJECT,
+      outcome: "SUCCESS",
+      targetType: "Withdrawal",
+      targetId: updated.id,
+      metadata: {
+        amountTokens: updated.amountTokens,
+        creativeId: updated.creativeId,
+        reason: adminReason,
+      },
+      context: auditCtx,
+    });
+
     return NextResponse.json(
       {
         message: "Withdrawal rejected",
@@ -70,6 +103,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       { status: 200 },
     );
   } catch (error) {
+    if ((error as { code?: string })?.code === "UNAUTHENTICATED") {
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    }
     console.error("[POST /api/admin/withdrawals/:id/reject] error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

@@ -7,9 +7,10 @@
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
-import { UserRole } from "@prisma/client";
+import { AdminActionType, UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 import { canOverrideTicketFinancials } from "@/lib/roles";
 import { applyCompanyLedgerEntry, getEffectiveTokenValues } from "@/lib/token-engine";
 
@@ -251,6 +252,21 @@ export async function PATCH(req: NextRequest) {
       (hasCostOverrideChange || hasPayoutOverrideChange) &&
       !canOverrideTicketFinancials(user.role)
     ) {
+      await logAdminAction({
+        actor: user,
+        action: AdminActionType.TICKET_FINANCIAL_OVERRIDE,
+        outcome: "BLOCKED",
+        targetType: "Ticket",
+        targetId: ticketId,
+        metadata: {
+          attemptedTokenCostOverride: hasCostOverrideChange ? body.tokenCostOverride : undefined,
+          attemptedCreativePayoutOverride: hasPayoutOverrideChange
+            ? body.creativePayoutOverride
+            : undefined,
+        },
+        errorMessage: "Only site owners can override a ticket's token cost or creative payout.",
+        context: extractAuditContext(req),
+      });
       return NextResponse.json(
         {
           error: "Only site owners can override a ticket's token cost or creative payout.",
@@ -370,6 +386,30 @@ export async function PATCH(req: NextRequest) {
         },
       },
     });
+
+    // Log only financial-override changes. Assignment-only or other
+    // edits don't need to live in the security-audit trail (they don't
+    // move money or escalate privileges).
+    if (hasCostOverrideChange || hasPayoutOverrideChange) {
+      await logAdminAction({
+        actor: user,
+        action: AdminActionType.TICKET_FINANCIAL_OVERRIDE,
+        outcome: "SUCCESS",
+        targetType: "Ticket",
+        targetId: updated.id,
+        metadata: {
+          oldTokenCostOverride: ticket.tokenCostOverride,
+          newTokenCostOverride: hasCostOverrideChange
+            ? (newCostOverride ?? null)
+            : ticket.tokenCostOverride,
+          oldCreativePayoutOverride: ticket.creativePayoutOverride,
+          newCreativePayoutOverride: hasPayoutOverrideChange
+            ? (newPayoutOverride ?? null)
+            : ticket.creativePayoutOverride,
+        },
+        context: extractAuditContext(req),
+      });
+    }
 
     return NextResponse.json(updated, { status: 200 });
   } catch (error: any) {

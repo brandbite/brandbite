@@ -45,6 +45,10 @@ export type NavLeaf = {
   icon: NavIcon;
   /** Additional paths that should keep this item in the active state. */
   highlightOnPaths?: string[];
+  /** If true, only render this item for SITE_OWNER. SITE_ADMIN + others
+   *  never see it — the underlying page is expected to also enforce the
+   *  guard server-side (defence in depth). */
+  ownerOnly?: boolean;
 };
 
 export type NavSection = {
@@ -123,6 +127,12 @@ export const ADMIN_NAV: NavConfig = {
       label: "System",
       items: [
         { href: "/admin/ai-settings", label: "AI Settings", icon: IconAiSettings },
+        {
+          href: "/admin/audit-log",
+          label: "Audit Log",
+          icon: IconSettings,
+          ownerOnly: true,
+        },
         { href: "/admin/settings", label: "Settings", icon: IconSettings },
       ],
     },
