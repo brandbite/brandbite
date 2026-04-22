@@ -218,9 +218,11 @@ export default function AdminWithdrawalsPage() {
       if (res.status === 202 && (json as any)?.requiresMfa) {
         setPendingMfa({
           challenge: {
-            challengeId: (json as any).challengeId as string,
+            method: (json as any).method as "email" | "totp" | undefined,
+            challengeId: (json as any).challengeId as string | undefined,
             maskedEmail: (json as any).maskedEmail as string | undefined,
             expiresAt: (json as any).expiresAt as string | undefined,
+            actionTag: (json as any).actionTag as string | undefined,
           },
           retry: () => handleAction(id, action, confirmation),
         });

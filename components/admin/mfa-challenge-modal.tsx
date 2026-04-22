@@ -23,9 +23,13 @@ import { InlineAlert } from "@/components/ui/inline-alert";
 import { Modal, ModalFooter, ModalHeader } from "@/components/ui/modal";
 
 export type MfaChallengeInfo = {
-  challengeId: string;
+  /** Delivery method selected by the server based on enrolment state. */
+  method?: "email" | "totp";
+  /** Present for method="email"; absent for TOTP (no code sent server-side). */
+  challengeId?: string;
   maskedEmail?: string;
   expiresAt?: string;
+  actionTag?: string;
 };
 
 type MfaChallengeModalProps = {
@@ -54,16 +58,29 @@ export function MfaChallengeModal({
   }, [open]);
 
   const canSubmit = code.trim().length === 6 && /^\d{6}$/.test(code.trim()) && !submitting;
+  const method = challenge?.method === "totp" ? "totp" : "email";
 
   const handleSubmit = async () => {
     if (!challenge || !canSubmit) return;
     setSubmitting(true);
     setErrorMessage(null);
     try {
+      const body =
+        method === "totp"
+          ? {
+              method: "totp",
+              code: code.trim(),
+              actionTag: challenge.actionTag,
+            }
+          : {
+              method: "email",
+              challengeId: challenge.challengeId,
+              code: code.trim(),
+            };
       const res = await fetch("/api/admin/mfa/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ challengeId: challenge.challengeId, code: code.trim() }),
+        body: JSON.stringify(body),
       });
       const json = (await res.json().catch(() => null)) as { error?: string } | null;
       if (!res.ok) {
@@ -81,14 +98,22 @@ export function MfaChallengeModal({
     <Modal open={open} onClose={submitting ? () => {} : onClose} size="sm">
       <ModalHeader title="Security check" onClose={submitting ? () => {} : onClose} />
       <div className="space-y-3 px-6 pb-4 text-sm text-[var(--bb-text-secondary)]">
-        <p>
-          We emailed a 6-digit code to{" "}
-          <strong>{challenge?.maskedEmail ?? "your account email"}</strong>. Enter it below to
-          confirm this money-moving action.
-        </p>
+        {method === "totp" ? (
+          <p>
+            Open your authenticator app (Authy, Google Authenticator, 1Password, etc.) and enter the
+            6-digit code it&apos;s currently showing to confirm this money-moving action.
+          </p>
+        ) : (
+          <p>
+            We emailed a 6-digit code to{" "}
+            <strong>{challenge?.maskedEmail ?? "your account email"}</strong>. Enter it below to
+            confirm this money-moving action.
+          </p>
+        )}
         <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-          Codes expire in 10 minutes. After this check, further money actions in the next 30 minutes
-          won&apos;t ask again.
+          {method === "totp"
+            ? "Codes rotate every 30 seconds. After this check, further money actions in the next 30 minutes won\u2019t ask again."
+            : "Codes expire in 10 minutes. After this check, further money actions in the next 30 minutes won\u2019t ask again."}
         </p>
         <FormInput
           type="text"
