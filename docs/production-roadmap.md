@@ -1,6 +1,6 @@
 # Brandbite — Production Roadmap
 
-_Last updated: 2026-04-22 — Phase C perf (next/image on R2 + presign cache) shipped_
+_Last updated: 2026-04-22 — a11y bundle (page titles, autocomplete, motion-alt pin cue) shipped_
 
 This file captures **what's ready**, **what's missing**, and **what ships in which version** as we move Brandbite from demo to production. It's a living plan — rewrite sections as reality changes.
 
@@ -128,11 +128,11 @@ Grouped by track so nothing gets orphaned. Revisit this section when planning th
 ### Accessibility (Phases 1–3 shipped; see docs/a11y-audit.md for what's done)
 
 - ~~**Lighthouse CI GitHub Action**~~ ✅ Shipped (PR #153). `.github/workflows/lighthouse.yml` audits `/`, `/how-it-works`, `/login` on every PR. Thresholds are `warn` only (0.7 performance / 0.9 a11y / 0.9 best-practices / 0.9 SEO) so scores surface without failing PRs. Tighten to `error` once baseline is stable over a few PRs.
-- **Motion-only UI alternatives** (~1–2 hrs) — pin drops + revision highlights currently signal meaning via animation only. Reduced-motion users miss the signal. Add a static equivalent (e.g. 2-second coloured border on a new pin)
+- ~~**Motion-only UI alternatives**~~ ✅ Shipped (PR #159). The active-pin `pulse` animation cuts to 0.01ms under `prefers-reduced-motion`, which turned the existing 2px static ring into a subtle cue. The reduced-motion media query now substitutes a 3px white + 5px primary double-ring so the active-pin signal is still prominent without any vestibular trigger. Other motion-bearing UI (running-timer dot, loading spinners) already have textual equivalents ("Running since …", "Loading …") so no further change needed.
 - **`/accessibility` statement copy** — route + admin editor shipped (#145); the CMS row exists but body needs a drafted WCAG 2.2 AA conformance statement + complaint contact. Part of the legal-copy bundle in Blocker #4
-- **Form `autocomplete` audit on billing/profile forms** (~1 hr) — login + reset-password already done in PR #143. Check company billing form, profile edit, consultation-booking fields
+- ~~**Form `autocomplete` audit**~~ ✅ Shipped (PR #159). Added `autoComplete="name"` to profile name edit, `"organization"` to company name + onboarding company-name, `"url"` to company website, `"off"` to the delete-account confirm email (user must type their own email as a safeguard) and the team invite-email (inviting someone else — own email autofill would be wrong). Consultation booking has no personal-info fields (uses the signed-in user).
 - ~~**Session-timeout warning**~~ ✅ Shipped (PR #157). `useSessionTimeoutWarning` hook reads BetterAuth's `expiresAt` via `/api/session`, schedules an accessible `alertdialog` 2 minutes before expiry with a "Stay signed in" action that extends the session (re-hitting `/api/session` triggers BetterAuth's updateAge refresh). `/login?expired=1` shows a status banner when the countdown runs out. No-op in demo mode.
-- **Page `<title>` uniqueness audit** — spot-check every route has a distinct descriptive title via the Next metadata template
+- ~~**Page `<title>` uniqueness audit**~~ ✅ Shipped (PR #159) for public marketing + auth routes. 12 new sibling `layout.tsx` files contribute metadata to the "use client" pages they wrap (blog, news, showcase, pricing, how-it-works, faq, documentation, about, contact, login, reset-password, verify-email, onboarding). Root template `"%s | Brandbite"` combines each with the brand suffix automatically. Dynamic slug routes (`/blog/[slug]`, `/news/[slug]`, `/showcase/[slug]`) + authenticated dashboards still inherit the generic `"Brandbite"` — deferred as a follow-up (dynamic routes need `generateMetadata` with a Prisma fetch; dashboards are lower-priority for SEO and screen-reader routing cues).
 - **Moodboard canvas keyboard accessibility** (~M) — drag-place items, connect lines, add notes — all mouse-only today
 - **Manual screen-reader walkthrough** (VoiceOver / NVDA) — human step, unreplaceable
 - **Keyboard walkthrough of critical flows** — sign-in → create ticket → approve revision → sign out, note friction

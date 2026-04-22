@@ -841,6 +841,7 @@ export default function CustomerSettingsPage() {
                       setDraftUserName(e.target.value)
                     }
                     placeholder="Your name"
+                    autoComplete="name"
                     disabled={savingUser}
                     className="mt-1"
                     autoFocus
@@ -930,6 +931,7 @@ export default function CustomerSettingsPage() {
                       setDraftCompanyName(e.target.value)
                     }
                     placeholder="Company name"
+                    autoComplete="organization"
                     disabled={savingCompany}
                     className="mt-1"
                     autoFocus
@@ -956,6 +958,7 @@ export default function CustomerSettingsPage() {
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                       setDraftWebsite(e.target.value)
                     }
+                    autoComplete="url"
                     placeholder="https://example.com"
                     disabled={savingCompany}
                     className="mt-1"
@@ -1625,6 +1628,9 @@ export default function CustomerSettingsPage() {
             onChange={(e) => setDeleteConfirmEmail(e.target.value)}
             placeholder="Type your email to confirm"
             disabled={deletingAccount}
+            // Don't let password managers autofill this — the user must
+            // physically type their email as a "yes I meant it" safeguard.
+            autoComplete="off"
           />
           {deleteAccountError && (
             <InlineAlert variant="error" size="sm">

@@ -254,6 +254,7 @@ export default function OnboardingPage() {
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
                   placeholder="e.g. Nova Labs, Horizon Agency"
+                  autoComplete="organization"
                   className="w-full rounded-xl border border-[var(--bb-border)] px-3.5 py-2.5 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
                 />
               </div>
@@ -320,6 +321,9 @@ export default function OnboardingPage() {
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
                   placeholder="colleague@company.com"
+                  // Inviting someone ELSE — don't autofill with the signed-in
+                  // user's own email. "off" is the right signal.
+                  autoComplete="off"
                   className="flex-1 rounded-xl border border-[var(--bb-border)] px-3.5 py-2.5 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handleInvite();

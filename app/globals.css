@@ -173,6 +173,19 @@ body {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+
+  /* Substitute a persistent static ring for the pin-pulse animation. The
+     pulse is the only cue that a pin is the "active" one (i.e. the one
+     whose feedback panel is open); without motion the existing 2px white
+     ring is too subtle. A 3px white + 5px primary double-ring gives the
+     same attention without any vestibular trigger. WCAG 2.2.1 / 1.4.11.
+     Scoped to `.animate-pin-pulse` so only the reduced-motion path gets
+     the heavier static styling — full-motion users still see the ripple. */
+  .animate-pin-pulse {
+    box-shadow:
+      0 0 0 3px rgba(255, 255, 255, 0.95),
+      0 0 0 5px rgba(241, 91, 43, 0.9) !important;
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
