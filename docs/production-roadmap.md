@@ -1,6 +1,6 @@
 # Brandbite — Production Roadmap
 
-_Last updated: 2026-04-22 — Blocker #3 done, migrate-deploy automated_
+_Last updated: 2026-04-22 — Blocker #3 done, migrate-deploy automated, Lighthouse CI monitoring_
 
 This file captures **what's ready**, **what's missing**, and **what ships in which version** as we move Brandbite from demo to production. It's a living plan — rewrite sections as reality changes.
 
@@ -124,7 +124,7 @@ Grouped by track so nothing gets orphaned. Revisit this section when planning th
 
 ### Accessibility (Phases 1–3 shipped; see docs/a11y-audit.md for what's done)
 
-- **Lighthouse CI GitHub Action** (~1 hr) — add `.github/workflows/lighthouse.yml` hitting public pages on every PR; fail on score regression
+- ~~**Lighthouse CI GitHub Action**~~ ✅ Shipped (PR #153). `.github/workflows/lighthouse.yml` audits `/`, `/how-it-works`, `/login` on every PR. Thresholds are `warn` only (0.7 performance / 0.9 a11y / 0.9 best-practices / 0.9 SEO) so scores surface without failing PRs. Tighten to `error` once baseline is stable over a few PRs.
 - **Motion-only UI alternatives** (~1–2 hrs) — pin drops + revision highlights currently signal meaning via animation only. Reduced-motion users miss the signal. Add a static equivalent (e.g. 2-second coloured border on a new pin)
 - **`/accessibility` statement copy** — route + admin editor shipped (#145); the CMS row exists but body needs a drafted WCAG 2.2 AA conformance statement + complaint contact. Part of the legal-copy bundle in Blocker #4
 - **Form `autocomplete` audit on billing/profile forms** (~1 hr) — login + reset-password already done in PR #143. Check company billing form, profile edit, consultation-booking fields

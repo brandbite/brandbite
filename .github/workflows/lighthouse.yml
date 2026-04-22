@@ -1,0 +1,106 @@
+name: Lighthouse CI
+
+# -----------------------------------------------------------------------------
+# Lighthouse-based regression monitor for public marketing pages.
+# Runs on every PR targeting main and on main pushes. Assertions live in
+# .lighthouserc.json and are `warn`-level for now so nothing fails; the job
+# exists to surface score drift before it hits production. Once we have a few
+# PRs of baseline data we can promote selected categories to `error`.
+# -----------------------------------------------------------------------------
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: lighthouse-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  lhci:
+    name: Lighthouse audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Build Next.js
+        # Same dummy env trick as .github/workflows/ci.yml — the build itself
+        # doesn't need real credentials. Pages that hit the DB at request time
+        # will render an error boundary at audit time, which still lets
+        # Lighthouse score layout / a11y / SEO on the page shell. If score
+        # drift is too noisy, spin up a real Postgres service here and run
+        # `prisma db push` to match the integration test setup.
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          BETTER_AUTH_SECRET: ci-only-secret-not-used
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          STRIPE_SECRET_KEY: sk_test_ci_dummy_not_used
+        # Use the plain `next build` (not vercel-build) since we're not on Vercel
+        # and don't want to run prisma migrate deploy here.
+        run: npx next build
+
+      - name: Start Next.js
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          BETTER_AUTH_SECRET: ci-only-secret-not-used
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          STRIPE_SECRET_KEY: sk_test_ci_dummy_not_used
+        run: |
+          npx next start > next-start.log 2>&1 &
+          echo "NEXT_PID=$!" >> $GITHUB_ENV
+
+      - name: Wait for app to be ready
+        # Poll the root URL up to 60s. We expect it to return 200 or a
+        # redirect — anything 2xx/3xx means the app is serving.
+        run: |
+          set +e
+          for i in $(seq 1 30); do
+            status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/ || echo "000")
+            if [[ "$status" =~ ^(2|3)[0-9]{2}$ ]]; then
+              echo "App is ready (HTTP $status) after ${i} attempts"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::App never responded. Tail of next-start.log:"
+          tail -n 50 next-start.log || true
+          exit 1
+
+      - name: Run Lighthouse CI
+        run: npx --yes @lhci/cli@0.14.x autorun --config=./.lighthouserc.json
+
+      - name: Upload Lighthouse artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-results
+          path: .lighthouseci/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Stop Next.js
+        if: always()
+        run: |
+          if [ -n "${NEXT_PID}" ]; then
+            kill "${NEXT_PID}" || true
+          fi
