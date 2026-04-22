@@ -1,6 +1,6 @@
 # Brandbite — Production Roadmap
 
-_Last updated: 2026-04-22 — Blocker #3 done, migrate-deploy automated, Lighthouse CI monitoring, migration baseline squashed_
+_Last updated: 2026-04-22 — Blocker #3 done, migrate-deploy automated, Lighthouse CI, baseline squashed, session-timeout WCAG 2.2.1_
 
 This file captures **what's ready**, **what's missing**, and **what ships in which version** as we move Brandbite from demo to production. It's a living plan — rewrite sections as reality changes.
 
@@ -129,7 +129,7 @@ Grouped by track so nothing gets orphaned. Revisit this section when planning th
 - **Motion-only UI alternatives** (~1–2 hrs) — pin drops + revision highlights currently signal meaning via animation only. Reduced-motion users miss the signal. Add a static equivalent (e.g. 2-second coloured border on a new pin)
 - **`/accessibility` statement copy** — route + admin editor shipped (#145); the CMS row exists but body needs a drafted WCAG 2.2 AA conformance statement + complaint contact. Part of the legal-copy bundle in Blocker #4
 - **Form `autocomplete` audit on billing/profile forms** (~1 hr) — login + reset-password already done in PR #143. Check company billing form, profile edit, consultation-booking fields
-- **Session-timeout warning** (~1 hr) — WCAG 2.2.1; needs a "your session expires in 2 min" toast tied to BetterAuth session
+- ~~**Session-timeout warning**~~ ✅ Shipped (PR #157). `useSessionTimeoutWarning` hook reads BetterAuth's `expiresAt` via `/api/session`, schedules an accessible `alertdialog` 2 minutes before expiry with a "Stay signed in" action that extends the session (re-hitting `/api/session` triggers BetterAuth's updateAge refresh). `/login?expired=1` shows a status banner when the countdown runs out. No-op in demo mode.
 - **Page `<title>` uniqueness audit** — spot-check every route has a distinct descriptive title via the Next metadata template
 - **Moodboard canvas keyboard accessibility** (~M) — drag-place items, connect lines, add notes — all mouse-only today
 - **Manual screen-reader walkthrough** (VoiceOver / NVDA) — human step, unreplaceable

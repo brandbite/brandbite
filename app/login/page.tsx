@@ -246,6 +246,18 @@ export default function LoginPage() {
       {/* Content */}
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-6">
         <div className="w-full rounded-2xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-card)] p-8 shadow-sm">
+          {/* ?expired=1 — arrives here when the SessionTimeoutWarning's
+              countdown reached zero without the user clicking "Stay
+              signed in". Plain banner; `role="status"` so screen readers
+              announce it alongside the form title. */}
+          {searchParams.get("expired") === "1" && (
+            <div
+              role="status"
+              className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+            >
+              Your session expired for security. Sign in again to continue.
+            </div>
+          )}
           {/* Mode toggle */}
           <div className="mb-6 flex rounded-xl bg-[var(--bb-bg-page)] p-1">
             <button
