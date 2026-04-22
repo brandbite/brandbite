@@ -1,12 +1,13 @@
 // -----------------------------------------------------------------------------
-// @file: app/api/customer/account/route.ts
-// @purpose: GDPR right-to-erasure for customers. Delegates the actual
-//           delete/anonymize transaction to lib/account-deletion.ts so
-//           the customer and creative routes stay in lock-step.
+// @file: app/api/creative/account/route.ts
+// @purpose: GDPR right-to-erasure for creatives (DESIGNER role). Mirrors
+//           /api/customer/account — both delegate to lib/account-deletion.ts
+//           so anonymize / cascade / auth-cookie drop stay in lock-step.
 //
-//           The role gate is enforced twice: here (route-specific) and
-//           inside deleteOwnAccount (belt-and-suspenders). Either rejecting
-//           in isolation is enough.
+//           Ledger + withdrawal + completed-ticket rows stay on purpose:
+//           they are financial records with tax/audit retention rules.
+//           Identity fields on UserAccount are anonymized; the rows remain
+//           queryable with "Deleted user".
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
@@ -18,9 +19,9 @@ export async function DELETE(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
 
-    if (user.role !== "CUSTOMER") {
+    if (user.role !== "DESIGNER") {
       return NextResponse.json(
-        { error: "This endpoint is for customer accounts only." },
+        { error: "This endpoint is for creative accounts only." },
         { status: 403 },
       );
     }
@@ -32,7 +33,7 @@ export async function DELETE(req: NextRequest) {
     const result = await deleteOwnAccount({
       userId: user.id,
       sessionEmail: user.email,
-      expectedRole: "CUSTOMER",
+      expectedRole: "DESIGNER",
       confirmEmail: body?.confirmEmail,
     });
 
@@ -50,7 +51,7 @@ export async function DELETE(req: NextRequest) {
     if ((error as { code?: string })?.code === "UNAUTHENTICATED") {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
-    console.error("[customer/account] DELETE error", error);
+    console.error("[creative/account] DELETE error", error);
     return NextResponse.json({ error: "Failed to delete account." }, { status: 500 });
   }
 }

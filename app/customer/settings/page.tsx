@@ -209,6 +209,13 @@ export default function CustomerSettingsPage() {
   const [deleteConfirmEmail, setDeleteConfirmEmail] = useState("");
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null);
+
+  // Leave-workspace state. Softer alternative to deleting the whole account
+  // — severs CompanyMember row only, keeps the UserAccount + ledger. Server
+  // blocks the last OWNER from leaving (must transfer ownership first).
+  const [leaveWorkspaceOpen, setLeaveWorkspaceOpen] = useState(false);
+  const [leavingWorkspace, setLeavingWorkspace] = useState(false);
+  const [leaveWorkspaceError, setLeaveWorkspaceError] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [preview, setPreview] = useState<{
     amountDueCents: number;
@@ -559,6 +566,26 @@ export default function CustomerSettingsPage() {
       setDeleteAccountError(err instanceof Error ? err.message : "Failed to delete account.");
     } finally {
       setDeletingAccount(false);
+    }
+  };
+
+  const handleLeaveWorkspace = async () => {
+    setLeavingWorkspace(true);
+    setLeaveWorkspaceError(null);
+    try {
+      const res = await fetch("/api/customer/members/me", { method: "DELETE" });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(json?.error || "Failed to leave workspace.");
+      }
+      // Hard reload: the server has no opinion about which company to switch
+      // to next; let the app's normal "first company or onboarding" path
+      // decide from a clean state.
+      window.location.href = "/";
+    } catch (err) {
+      setLeaveWorkspaceError(err instanceof Error ? err.message : "Failed to leave workspace.");
+    } finally {
+      setLeavingWorkspace(false);
     }
   };
 
@@ -1482,6 +1509,32 @@ export default function CustomerSettingsPage() {
         </div>
       )}
 
+      {/* Leave workspace — softer alternative to deleting the whole account.
+          Keeps the UserAccount + ledger; only severs the CompanyMember row.
+          Server blocks the last OWNER (must transfer ownership first). */}
+      {!loading && data && (
+        <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50/40 px-5 py-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-amber-900">Leave this workspace</h2>
+          <p className="mt-1 text-[11px] text-[var(--bb-text-tertiary)]">
+            Remove yourself from <strong>{data.company.name}</strong>. Your account stays active and
+            you keep access to any other workspaces you belong to. If you are the only owner, you
+            must promote another member to Owner before leaving.
+          </p>
+          <div className="mt-3">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setLeaveWorkspaceError(null);
+                setLeaveWorkspaceOpen(true);
+              }}
+              className="!border !border-amber-300 !text-amber-800 hover:!bg-amber-50"
+            >
+              Leave workspace
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Danger zone — account deletion (GDPR right-to-erasure). */}
       {!loading && data && (
         <div className="mt-6 rounded-2xl border border-red-200 bg-red-50/40 px-5 py-5 shadow-sm">
@@ -1506,6 +1559,53 @@ export default function CustomerSettingsPage() {
           </div>
         </div>
       )}
+
+      {/* Leave-workspace confirm modal. No email echo — the action is
+          reversible (owner can re-invite) and the server blocks the sole
+          OWNER with a clear error, so a lightweight confirm is enough. */}
+      <Modal open={leaveWorkspaceOpen} onClose={() => setLeaveWorkspaceOpen(false)} size="md">
+        <ModalHeader
+          title={`Leave ${data?.company?.name ?? "this workspace"}?`}
+          onClose={() => setLeaveWorkspaceOpen(false)}
+        />
+        <div className="space-y-3 px-6 pb-4 text-sm text-[var(--bb-text-secondary)]">
+          <p>
+            You&apos;ll lose access to this workspace&apos;s projects, tickets, and members. Your
+            account stays active and you keep any other workspace memberships. An owner can
+            re-invite you later.
+          </p>
+          {data?.user?.companyRole === "OWNER" && (
+            <InlineAlert variant="warning" size="sm">
+              You&apos;re an Owner of this workspace. If you&apos;re the only Owner, this action
+              will be blocked — promote another member to Owner first.
+            </InlineAlert>
+          )}
+          {leaveWorkspaceError && (
+            <InlineAlert variant="error" size="sm">
+              {leaveWorkspaceError}
+            </InlineAlert>
+          )}
+        </div>
+        <ModalFooter>
+          <Button
+            variant="ghost"
+            onClick={() => setLeaveWorkspaceOpen(false)}
+            disabled={leavingWorkspace}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleLeaveWorkspace}
+            loading={leavingWorkspace}
+            loadingText="Leaving…"
+            disabled={leavingWorkspace}
+            className="!bg-amber-600 hover:!bg-amber-700"
+          >
+            Leave workspace
+          </Button>
+        </ModalFooter>
+      </Modal>
 
       {/* Delete account confirm modal — requires the user to type their
           own email as a "yes I meant it" safeguard. */}

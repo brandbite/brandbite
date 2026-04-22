@@ -9,6 +9,10 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/ui/toast-provider";
 import { LoadingState } from "@/components/ui/loading-state";
 import { PauseControl } from "@/components/creative/pause-control";
+import { Button } from "@/components/ui/button";
+import { FormInput } from "@/components/ui/form-field";
+import { InlineAlert } from "@/components/ui/inline-alert";
+import { Modal, ModalFooter, ModalHeader } from "@/components/ui/modal";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -85,6 +89,33 @@ export default function CreativeSettingsPage() {
   const [currentTierName, setCurrentTierName] = useState<string | null>(null);
   const [basePayoutPercent, setBasePayoutPercent] = useState<number>(60);
 
+  // Danger zone — account deletion (GDPR right-to-erasure). We fetch the
+  // session email once so the confirm modal can show "Type <your email>"
+  // and so we can validate the echo client-side before firing the DELETE.
+  const [accountEmail, setAccountEmail] = useState<string | null>(null);
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
+  const [deleteConfirmEmail, setDeleteConfirmEmail] = useState("");
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null);
+
+  // Fetch session email once for the Danger zone confirm modal.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/session", { cache: "no-store" });
+        if (!res.ok) return;
+        const json = (await res.json()) as { user?: { email?: string } | null };
+        if (!cancelled && json?.user?.email) setAccountEmail(json.user.email);
+      } catch {
+        // Best-effort — Danger zone disables itself without an email.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Load preferences + skills
   useEffect(() => {
     let cancelled = false;
@@ -159,6 +190,31 @@ export default function CreativeSettingsPage() {
     },
     [saveSkills],
   );
+
+  // Danger zone — GDPR right-to-erasure. Matches /api/customer/account
+  // flow: confirm-email safeguard, hard reload to /login on success so no
+  // stale client state survives.
+  const handleDeleteAccount = useCallback(async () => {
+    if (!accountEmail) return;
+    setDeletingAccount(true);
+    setDeleteAccountError(null);
+    try {
+      const res = await fetch("/api/creative/account", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmEmail: deleteConfirmEmail }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(json?.error || "Failed to delete account.");
+      }
+      window.location.href = "/login?deleted=1";
+    } catch (err) {
+      setDeleteAccountError(err instanceof Error ? err.message : "Failed to delete account.");
+    } finally {
+      setDeletingAccount(false);
+    }
+  }, [accountEmail, deleteConfirmEmail]);
 
   // Toggle preference
   const handleToggle = useCallback(
@@ -425,6 +481,80 @@ export default function CreativeSettingsPage() {
           })}
         </div>
       </div>
+
+      {/* Danger zone — account deletion (GDPR right-to-erasure). */}
+      <div className="mt-6 rounded-2xl border border-red-200 bg-red-50/40 px-5 py-5 shadow-sm">
+        <h2 className="text-sm font-semibold text-[var(--bb-danger-text)]">Danger zone</h2>
+        <p className="mt-1 text-[11px] text-[var(--bb-text-tertiary)]">
+          Delete your Brandbite account permanently. Completed tickets, ratings, and ledger entries
+          are retained in anonymized form for audit purposes; your email is freed up for future
+          sign-ups.
+        </p>
+        <div className="mt-3">
+          <Button
+            variant="ghost"
+            disabled={!accountEmail}
+            onClick={() => {
+              setDeleteConfirmEmail("");
+              setDeleteAccountError(null);
+              setDeleteAccountOpen(true);
+            }}
+            className="!border !border-red-300 !text-red-700 hover:!bg-red-50"
+          >
+            Delete my account
+          </Button>
+        </div>
+      </div>
+
+      {/* Delete account confirm modal — requires the user to type their
+          own email as a "yes I meant it" safeguard. */}
+      <Modal open={deleteAccountOpen} onClose={() => setDeleteAccountOpen(false)} size="md">
+        <ModalHeader title="Delete your account?" onClose={() => setDeleteAccountOpen(false)} />
+        <div className="space-y-3 px-6 pb-4 text-sm text-[var(--bb-text-secondary)]">
+          <p>
+            This is permanent. Your sign-in credentials are removed immediately. Historical tickets,
+            ratings, and ledger entries are kept but <strong>anonymized</strong>.
+          </p>
+          <p>
+            To confirm, type your account email: <strong>{accountEmail ?? ""}</strong>
+          </p>
+          <FormInput
+            type="email"
+            value={deleteConfirmEmail}
+            onChange={(e) => setDeleteConfirmEmail(e.target.value)}
+            placeholder="Type your email to confirm"
+            disabled={deletingAccount}
+          />
+          {deleteAccountError && (
+            <InlineAlert variant="error" size="sm">
+              {deleteAccountError}
+            </InlineAlert>
+          )}
+        </div>
+        <ModalFooter>
+          <Button
+            variant="ghost"
+            onClick={() => setDeleteAccountOpen(false)}
+            disabled={deletingAccount}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleDeleteAccount}
+            loading={deletingAccount}
+            loadingText="Deleting…"
+            disabled={
+              deletingAccount ||
+              !accountEmail ||
+              deleteConfirmEmail.trim().toLowerCase() !== (accountEmail ?? "").toLowerCase()
+            }
+            className="!bg-red-600 hover:!bg-red-700"
+          >
+            Delete my account
+          </Button>
+        </ModalFooter>
+      </Modal>
     </div>
   );
 }
