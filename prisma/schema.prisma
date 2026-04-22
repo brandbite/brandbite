@@ -11,8 +11,23 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  // Runtime queries use the pooled connection for serverless efficiency.
+  url       = env("DATABASE_URL")
+  // Migrations need a direct (non-pooled) connection because Prisma relies
+  // on Postgres advisory locks to serialize deploys, and connection poolers
+  // (PgBouncer / Neon pooler in transaction mode) release session-scoped
+  // locks at transaction boundaries. Without this, `prisma migrate deploy`
+  // fails with P1002 "Timed out trying to acquire a postgres advisory
+  // lock" (observed in Vercel production builds through Neon's pooler).
+  //
+  // DIRECT_URL must be set in every environment that runs migrations:
+  //   - Vercel Production: the non-pooled Neon URL (same host as
+  //     DATABASE_URL but WITHOUT "-pooler" in the subdomain)
+  //   - CI / local dev / integration tests: fine to mirror DATABASE_URL —
+  //     scripts/vercel-build.mjs and tests/integration/setup.ts set this
+  //     automatically when unset
+  directUrl = env("DIRECT_URL")
 }
 
 // -----------------------------------------------------------------------------
@@ -667,10 +682,10 @@ model TicketTimeEntry {
   creativeId String
   creative   UserAccount @relation("CreativeTimeEntries", fields: [creativeId], references: [id])
 
-  startedAt        DateTime
-  endedAt          DateTime?
-  durationSeconds  Int       @default(0) // 0 while running; set on stop
-  notes            String?
+  startedAt       DateTime
+  endedAt         DateTime?
+  durationSeconds Int       @default(0) // 0 while running; set on stop
+  notes           String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

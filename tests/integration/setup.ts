@@ -40,6 +40,13 @@ function assertTestDatabase() {
 
 beforeAll(async () => {
   assertTestDatabase();
+  // schema.prisma declares directUrl = env("DIRECT_URL"). Prisma CLI
+  // (including `db push`) fails at parse time if that env is undefined.
+  // In tests the DB is a direct connection (no pooler), so mirroring
+  // DATABASE_URL is correct.
+  if (!process.env.DIRECT_URL) {
+    process.env.DIRECT_URL = process.env.DATABASE_URL;
+  }
   // Drop + recreate all tables so the schema matches prisma/schema.prisma
   // exactly. `--force-reset` wipes the DB; safe only because assertTestDatabase
   // has already confirmed DATABASE_URL is a throwaway target.

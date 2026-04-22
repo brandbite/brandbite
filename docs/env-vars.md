@@ -12,12 +12,13 @@ This reference lists every env var the app reads, which environments need it, an
 
 ## Core runtime
 
-| Var                   | Required in Prod | Used by                         | What happens if missing                                                      |
-| --------------------- | ---------------- | ------------------------------- | ---------------------------------------------------------------------------- |
-| `DATABASE_URL`        | ✅ Required      | Prisma (everywhere)             | App boots but every DB call 500s. Set to the Neon pooled URL for serverless. |
-| `BETTER_AUTH_SECRET`  | ✅ Required      | `lib/better-auth.ts`            | Sessions silently broken. Generate ≥32 random chars.                         |
-| `NEXT_PUBLIC_APP_URL` | ✅ Required      | Stripe redirects, Google OAuth  | Stripe + Google redirects fall back to `localhost:3000`. Must be prod URL.   |
-| `NODE_ENV`            | ✅ Required      | Various gates (demo mode, etc.) | Vercel sets this automatically.                                              |
+| Var                   | Required in Prod | Used by                                                  | What happens if missing                                                                                                                                                                                                                                                 |
+| --------------------- | ---------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`        | ✅ Required      | Prisma (everywhere)                                      | App boots but every DB call 500s. Set to the Neon **pooled** URL (subdomain contains `-pooler`) for serverless efficiency.                                                                                                                                              |
+| `DIRECT_URL`          | ✅ Required      | `prisma migrate deploy` on every production Vercel build | `next build` fails at migrate step with P1002 "Timed out trying to acquire a postgres advisory lock" because pooler-held locks drop at transaction boundaries. Set to the **non-pooled** Neon URL (same host as `DATABASE_URL` but without `-pooler` in the subdomain). |
+| `BETTER_AUTH_SECRET`  | ✅ Required      | `lib/better-auth.ts`                                     | Sessions silently broken. Generate ≥32 random chars.                                                                                                                                                                                                                    |
+| `NEXT_PUBLIC_APP_URL` | ✅ Required      | Stripe redirects, Google OAuth                           | Stripe + Google redirects fall back to `localhost:3000`. Must be prod URL.                                                                                                                                                                                              |
+| `NODE_ENV`            | ✅ Required      | Various gates (demo mode, etc.)                          | Vercel sets this automatically.                                                                                                                                                                                                                                         |
 
 ## Payments (Stripe)
 

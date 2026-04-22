@@ -49,11 +49,13 @@ function run(cmd) {
 const vercelEnv = process.env.VERCEL_ENV ?? "(unset)";
 const gitRef = process.env.VERCEL_GIT_COMMIT_REF ?? "(unset)";
 const hasDatabaseUrl = Boolean(process.env.DATABASE_URL);
+const hasDirectUrl = Boolean(process.env.DIRECT_URL);
 
 console.log("[vercel-build] Environment summary");
 console.log(`  VERCEL_ENV             = ${vercelEnv}`);
 console.log(`  VERCEL_GIT_COMMIT_REF  = ${gitRef}`);
 console.log(`  DATABASE_URL present   = ${hasDatabaseUrl}`);
+console.log(`  DIRECT_URL present     = ${hasDirectUrl}`);
 
 // -----------------------------------------------------------------------------
 // Apply migrations only on production deploys. Preview deploys and CI skip
@@ -63,6 +65,21 @@ console.log(`  DATABASE_URL present   = ${hasDatabaseUrl}`);
 const shouldMigrate = vercelEnv === "production" && hasDatabaseUrl;
 
 if (shouldMigrate) {
+  // Prisma migrations need a non-pooled connection so the Postgres advisory
+  // lock can be held for the duration of the migration. Fall back to
+  // DATABASE_URL if DIRECT_URL is unset, and warn loudly — pooled URLs
+  // through Neon's pooler (or PgBouncer in transaction mode) will fail
+  // with P1002 "Timed out trying to acquire a postgres advisory lock".
+  if (!hasDirectUrl) {
+    console.warn(
+      "\n[vercel-build] WARNING: DIRECT_URL is not set. Falling back to DATABASE_URL for migrations.\n" +
+        "  If DATABASE_URL points at a pooled connection (Neon '*-pooler.*'),\n" +
+        "  this WILL fail with P1002. Set DIRECT_URL to the non-pooled Neon URL\n" +
+        "  in Vercel → Settings → Environment Variables → Production.",
+    );
+    process.env.DIRECT_URL = process.env.DATABASE_URL;
+  }
+
   console.log("\n[vercel-build] Applying Prisma migrations (production deploy)");
   run(["npx", "prisma", "migrate", "deploy"]);
 } else {
