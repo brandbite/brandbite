@@ -28,6 +28,7 @@ import type { AdminActionOutcome, AdminActionType, Prisma, UserRole } from "@pri
 import { prisma } from "@/lib/prisma";
 import type { SessionUser } from "@/lib/roles";
 import { getClientIp } from "@/lib/rate-limit";
+import { sendAdminActionReceipt } from "@/lib/admin-action-email";
 
 export type AdminAuditContext = {
   ipAddress: string | null;
@@ -74,6 +75,8 @@ type LogAdminActionInput = {
 export async function logAdminAction(input: LogAdminActionInput): Promise<void> {
   const { actor, action, outcome, metadata, targetType, targetId, errorMessage, context } = input;
 
+  const createdAt = new Date();
+
   try {
     await prisma.adminActionLog.create({
       data: {
@@ -88,6 +91,7 @@ export async function logAdminAction(input: LogAdminActionInput): Promise<void> 
         errorMessage: errorMessage ?? null,
         ipAddress: context?.ipAddress ?? null,
         userAgent: context?.userAgent ?? null,
+        createdAt,
       },
     });
   } catch (err) {
@@ -97,6 +101,25 @@ export async function logAdminAction(input: LogAdminActionInput): Promise<void> 
       action,
       actorId: actor.id,
       err: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  // L3 — email receipt on SUCCESS. Best-effort, non-throwing; skipped in
+  // demo mode; BLOCKED / ERROR outcomes ignored (L5 owns those).
+  // Run after the log write so the recipients always get a receipt for a
+  // row that actually exists in the audit log. Failure here does NOT undo
+  // the log write — the receipt is supplementary.
+  if (outcome === "SUCCESS") {
+    await sendAdminActionReceipt({
+      actorEmail: actor.email,
+      actorRole: actor.role as UserRole,
+      action,
+      outcome,
+      metadata: metadata ?? null,
+      targetType: targetType ?? null,
+      targetId: targetId ?? null,
+      ipAddress: context?.ipAddress ?? null,
+      createdAt,
     });
   }
 }
