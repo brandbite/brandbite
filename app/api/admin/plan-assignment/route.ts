@@ -7,8 +7,10 @@
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
+import { AdminActionType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 import { canAssignCompanyPlan } from "@/lib/roles";
 import { parseBody } from "@/lib/schemas/helpers";
 import { assignPlanSchema } from "@/lib/schemas/plan-assignment.schemas";
@@ -16,8 +18,16 @@ import { assignPlanSchema } from "@/lib/schemas/plan-assignment.schemas";
 export async function PATCH(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
+    const auditCtx = extractAuditContext(req);
 
     if (!canAssignCompanyPlan(user.role)) {
+      await logAdminAction({
+        actor: user,
+        action: AdminActionType.PLAN_ASSIGN,
+        outcome: "BLOCKED",
+        errorMessage: "Only site owners can assign a plan to a company.",
+        context: auditCtx,
+      });
       return NextResponse.json(
         { error: "Only site owners can assign a plan to a company." },
         { status: 403 },
@@ -67,6 +77,19 @@ export async function PATCH(req: NextRequest) {
           },
         },
       },
+    });
+
+    await logAdminAction({
+      actor: user,
+      action: AdminActionType.PLAN_ASSIGN,
+      outcome: "SUCCESS",
+      targetType: "Company",
+      targetId: updated.id,
+      metadata: {
+        newPlanId: planId ?? null,
+        newPlanName: updated.plan?.name ?? null,
+      },
+      context: auditCtx,
     });
 
     return NextResponse.json({

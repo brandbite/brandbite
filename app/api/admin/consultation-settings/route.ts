@@ -7,7 +7,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
+import { AdminActionType } from "@prisma/client";
+
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 import { getConsultationSettings } from "@/lib/consultation/settings";
 import { prisma } from "@/lib/prisma";
 import { canEditConsultationSettings, isSiteAdminRole } from "@/lib/roles";
@@ -18,16 +21,6 @@ import { updateConsultationSettingsSchema } from "@/lib/schemas/consultation-set
 function ensureAdminCanRead(role: UserRole) {
   if (!isSiteAdminRole(role)) {
     return NextResponse.json({ error: "Admin only" }, { status: 403 });
-  }
-  return null;
-}
-
-function ensureOwnerCanWrite(role: UserRole) {
-  if (!canEditConsultationSettings(role)) {
-    return NextResponse.json(
-      { error: "Only site owners can edit consultation settings." },
-      { status: 403 },
-    );
   }
   return null;
 }
@@ -70,8 +63,21 @@ export async function GET() {
 export async function PUT(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
-    const gate = ensureOwnerCanWrite(user.role);
-    if (gate) return gate;
+    const auditCtx = extractAuditContext(req);
+
+    if (!canEditConsultationSettings(user.role)) {
+      await logAdminAction({
+        actor: user,
+        action: AdminActionType.CONSULTATION_PRICING_EDIT,
+        outcome: "BLOCKED",
+        errorMessage: "Only site owners can edit consultation settings.",
+        context: auditCtx,
+      });
+      return NextResponse.json(
+        { error: "Only site owners can edit consultation settings." },
+        { status: 403 },
+      );
+    }
 
     const parsed = await parseBody(req, updateConsultationSettingsSchema);
     if (!parsed.success) return parsed.response;
@@ -85,6 +91,16 @@ export async function PUT(req: NextRequest) {
         ...parsed.data,
         updatedById: user.id,
       },
+    });
+
+    await logAdminAction({
+      actor: user,
+      action: AdminActionType.CONSULTATION_PRICING_EDIT,
+      outcome: "SUCCESS",
+      targetType: "ConsultationSettings",
+      targetId: updated.id,
+      metadata: { changedFields: Object.keys(parsed.data) },
+      context: auditCtx,
     });
 
     const {

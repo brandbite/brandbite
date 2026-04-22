@@ -7,18 +7,31 @@
 
 import { randomUUID } from "node:crypto";
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+
+import { AdminActionType } from "@prisma/client";
 
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 import { buildAuthorizeUrl, readGoogleOauthConfig } from "@/lib/google/oauth";
 import { canEditConsultationSettings } from "@/lib/roles";
 
 const STATE_COOKIE = "brandbite_google_oauth_state";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
+    const auditCtx = extractAuditContext(req);
+
     if (!canEditConsultationSettings(user.role)) {
+      await logAdminAction({
+        actor: user,
+        action: AdminActionType.GOOGLE_OAUTH_CONFIG_EDIT,
+        outcome: "BLOCKED",
+        metadata: { op: "connect-attempt" },
+        errorMessage: "Admin only",
+        context: auditCtx,
+      });
       return NextResponse.json({ error: "Admin only" }, { status: 403 });
     }
 
@@ -32,6 +45,18 @@ export async function GET() {
 
     const state = randomUUID();
     const authorizeUrl = buildAuthorizeUrl(configOrError, state);
+
+    // Log the initiation of the connect flow. We DON'T log the completed
+    // connection here (the callback handler is a separate route) — this is
+    // just "someone kicked off Google OAuth". Useful to correlate with the
+    // callback if a hostile actor tries to intercept the flow.
+    await logAdminAction({
+      actor: user,
+      action: AdminActionType.GOOGLE_OAUTH_CONFIG_EDIT,
+      outcome: "SUCCESS",
+      metadata: { op: "connect-initiated" },
+      context: auditCtx,
+    });
 
     const res = NextResponse.redirect(authorizeUrl);
     // 10-minute TTL is plenty for the consent round-trip.
