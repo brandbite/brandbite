@@ -5,10 +5,11 @@
 
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
+import { PASSWORD_POLICY_BULLETS, validatePasswordStrength } from "@/lib/password-policy";
 
 type Status = "idle" | "submitting" | "sent" | "reset-success" | "error";
 
@@ -77,8 +78,9 @@ export default function ResetPasswordPage() {
       setError("Password is required.");
       return;
     }
-    if (newPassword.length < 8) {
-      setError("Password must be at least 8 characters.");
+    const check = validatePasswordStrength(newPassword);
+    if (!check.ok) {
+      setError(check.error);
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -235,11 +237,12 @@ export default function ResetPasswordPage() {
                   type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Min. 8 characters"
+                  placeholder="At least 12 characters"
                   autoComplete="new-password"
-                  aria-describedby={error ? "reset-error" : undefined}
+                  aria-describedby={error ? "reset-error" : "reset-password-rules"}
                   className="w-full rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] px-3.5 py-2.5 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
                 />
+                <PasswordRulesChecklist id="reset-password-rules" password={newPassword} />
               </div>
               <div>
                 <label
@@ -331,5 +334,39 @@ export default function ResetPasswordPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Live password-policy checklist. Mirrors the one on the sign-up form so
+ * the rules stay visible and in sync. Pulled from lib/password-policy.ts.
+ */
+function PasswordRulesChecklist({ id, password }: { id: string; password: string }) {
+  const results = useMemo(
+    () => PASSWORD_POLICY_BULLETS.map((rule) => ({ ...rule, passed: rule.test(password) })),
+    [password],
+  );
+  return (
+    <ul
+      id={id}
+      className="mt-2 space-y-0.5 text-[11px] text-[var(--bb-text-secondary)]"
+      aria-label="Password requirements"
+    >
+      {results.map((rule) => (
+        <li key={rule.key} className="flex items-center gap-1.5">
+          <span
+            aria-hidden="true"
+            className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold ${
+              rule.passed
+                ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
+                : "bg-[var(--bb-bg-card-muted)] text-[var(--bb-text-tertiary)]"
+            }`}
+          >
+            {rule.passed ? "\u2713" : "\u2022"}
+          </span>
+          <span className={rule.passed ? "text-[var(--bb-text-secondary)]" : ""}>{rule.label}</span>
+        </li>
+      ))}
+    </ul>
   );
 }

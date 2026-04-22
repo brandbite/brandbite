@@ -8,10 +8,11 @@
 
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
+import { PASSWORD_POLICY_BULLETS, validatePasswordStrength } from "@/lib/password-policy";
 
 type Mode = "signin" | "signup";
 type Status = "idle" | "submitting" | "magic-link-sent" | "error";
@@ -85,9 +86,12 @@ export default function LoginPage() {
       setError("Password is required.");
       return;
     }
-    if (mode === "signup" && password.length < 8) {
-      setError("Password must be at least 8 characters.");
-      return;
+    if (mode === "signup") {
+      const check = validatePasswordStrength(password);
+      if (!check.ok) {
+        setError(check.error);
+        return;
+      }
     }
 
     setStatus("submitting");
@@ -342,11 +346,16 @@ export default function LoginPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder={mode === "signup" ? "Min. 8 characters" : "Your password"}
+                placeholder={mode === "signup" ? "At least 12 characters" : "Your password"}
                 autoComplete={mode === "signup" ? "new-password" : "current-password"}
-                aria-describedby={error ? "login-error" : undefined}
+                aria-describedby={
+                  error ? "login-error" : mode === "signup" ? "login-password-rules" : undefined
+                }
                 className="w-full rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] px-3.5 py-2.5 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
               />
+              {mode === "signup" && (
+                <PasswordRulesChecklist id="login-password-rules" password={password} />
+              )}
               {mode === "signin" && (
                 <Link
                   href="/reset-password"
@@ -437,5 +446,40 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Live password-policy checklist shown below the sign-up password field.
+ * Each bullet turns green when its rule passes. Uses `useMemo` so the
+ * test callbacks run once per keystroke rather than on every re-render.
+ */
+function PasswordRulesChecklist({ id, password }: { id: string; password: string }) {
+  const results = useMemo(
+    () => PASSWORD_POLICY_BULLETS.map((rule) => ({ ...rule, passed: rule.test(password) })),
+    [password],
+  );
+  return (
+    <ul
+      id={id}
+      className="mt-2 space-y-0.5 text-[11px] text-[var(--bb-text-secondary)]"
+      aria-label="Password requirements"
+    >
+      {results.map((rule) => (
+        <li key={rule.key} className="flex items-center gap-1.5">
+          <span
+            aria-hidden="true"
+            className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold ${
+              rule.passed
+                ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
+                : "bg-[var(--bb-bg-card-muted)] text-[var(--bb-text-tertiary)]"
+            }`}
+          >
+            {rule.passed ? "\u2713" : "\u2022"}
+          </span>
+          <span className={rule.passed ? "text-[var(--bb-text-secondary)]" : ""}>{rule.label}</span>
+        </li>
+      ))}
+    </ul>
   );
 }

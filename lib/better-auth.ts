@@ -2,19 +2,26 @@
 // @file: lib/better-auth.ts
 // @purpose: BetterAuth server configuration — Prisma adapter, email+password,
 //           magic link via Resend. Only loaded when DEMO_MODE !== "true".
-// @version: v1.0.0
+// @version: v1.1.0
 // @status: active
-// @lastUpdate: 2026-02-22
+// @lastUpdate: 2026-04-23
 // -----------------------------------------------------------------------------
 
 import { betterAuth } from "better-auth";
+import { APIError } from "better-auth/api";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { magicLink } from "better-auth/plugins";
 import { nextCookies } from "better-auth/next-js";
 import { prisma } from "@/lib/prisma";
 import { sendNotificationEmail } from "@/lib/email";
+import { validatePasswordStrength } from "@/lib/password-policy";
 
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
+// Hosts where we emit `Secure` cookies. Anything non-production (localhost
+// dev, http:// previews) sets `secure: false` so the session cookie still
+// attaches in plain HTTP — production deploys are always HTTPS via Vercel.
+const isProd = process.env.NODE_ENV === "production";
 
 export const auth = betterAuth({
   baseURL: baseUrl,
@@ -61,6 +68,14 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
+    // Bump min length from the BetterAuth default of 8. Complexity rules
+    // (uppercase, digit, symbol) enforced in the before-hook below, which
+    // runs for both sign-up and reset-password.
+    minPasswordLength: 12,
+    // On successful password reset, revoke every existing session for
+    // the user so an attacker holding a compromised password can't keep
+    // their stolen session alive for up to 7 days.
+    revokeSessionsOnPasswordReset: true,
     sendResetPassword: async ({ user, url }) => {
       await sendNotificationEmail(
         user.email,
@@ -118,5 +133,56 @@ export const auth = betterAuth({
   session: {
     expiresIn: 60 * 60 * 24 * 7, // 7 days
     updateAge: 60 * 60 * 24, // refresh daily
+  },
+
+  // Explicit cookie attributes. BetterAuth defaults are already sensible
+  // (httpOnly + secure + sameSite=lax) but making them explicit means a
+  // future library-default flip can't silently weaken them.
+  advanced: {
+    defaultCookieAttributes: {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: "lax",
+      path: "/",
+    },
+  },
+
+  // Intercept sign-up / reset-password / change-password / set-password to
+  // enforce the password policy (length + uppercase + digit + symbol).
+  // BetterAuth handles minPasswordLength itself, but complexity rules are
+  // not built-in — this before-hook is the idiomatic extension point.
+  // Throwing APIError short-circuits the endpoint with a structured 400.
+  hooks: {
+    before: async (ctx) => {
+      // BetterAuth's runtime attaches endpoint `path` to the hook
+      // context (see node_modules/better-auth/dist/api/to-auth-endpoints),
+      // but the exported middleware type doesn't surface it. Cast to
+      // read it safely at runtime.
+      const hookCtx = ctx as unknown as {
+        path?: string;
+        body?: { password?: unknown; newPassword?: unknown };
+      };
+      const path = hookCtx.path ?? "";
+      const isPasswordPath =
+        path === "/sign-up/email" ||
+        path === "/reset-password" ||
+        path === "/change-password" ||
+        path === "/set-password";
+      if (!isPasswordPath) return;
+
+      const body = hookCtx.body ?? {};
+      const candidate =
+        typeof body.newPassword === "string"
+          ? body.newPassword
+          : typeof body.password === "string"
+            ? body.password
+            : null;
+      if (!candidate) return; // let BetterAuth surface its own "missing" error
+
+      const check = validatePasswordStrength(candidate);
+      if (!check.ok) {
+        throw new APIError("BAD_REQUEST", { message: check.error });
+      }
+    },
   },
 });

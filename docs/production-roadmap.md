@@ -1,6 +1,6 @@
 # Brandbite — Production Roadmap
 
-_Last updated: 2026-04-23 — Security Plan L1–L6 shipped (audit log, confirmations, receipts, blocked alerts, email MFA + TOTP upgrade, 2-person approval)_
+_Last updated: 2026-04-23 — Security Plan L1–L6 shipped (audit log, confirmations, receipts, blocked alerts, email MFA + TOTP upgrade, 2-person approval) + auth hardening pass (per-email rate limit, password complexity, session revocation on reset, explicit cookie attributes)_
 
 This file captures **what's ready**, **what's missing**, and **what ships in which version** as we move Brandbite from demo to production. It's a living plan — rewrite sections as reality changes.
 
@@ -28,6 +28,7 @@ This file captures **what's ready**, **what's missing**, and **what ships in whi
 - **Migration baseline squash** (PR #154): the 25 pre-existing migrations plus the 22 `db push`-introduced models (AiGeneration, Moodboard, Notification, BetterAuth tables, CMS tables, …) collapsed into a single `20260422000000_baseline` matching the current schema. CI's migrate-deploy dry-run (disabled in #152) re-enabled and green. Demo cut-over is a one-time `DELETE FROM _prisma_migrations` + `prisma migrate resolve --applied 20260422000000_baseline` (see PR body for exact commands).
 - **R2 presigned-URL cache** (PR #97, pre-dates the Phase C audit): `lib/r2.ts` memoises `getSignedUrl` for 10 minutes (presigns for 20, so served URLs are always ≥ 10 min from expiry). Drop-in cache with periodic eviction + `invalidatePresignedUrlCache(storageKey)` export for delete paths. Closes the Phase C2 item from the original optimization plan.
 - **`next/image` on R2 content** (PR #158): marketing surfaces now render R2-hosted images through Next's image optimizer (WebP/AVIF, responsive `sizes`, lazy by default, `priority` on article heroes) — blog / news / showcase listings + details + landing-page showcase thumbnails. Moodboard tiles intentionally skipped (canvas context + moodboard disabled for v1.0). Closes the Phase C1 item.
+- **Auth hardening pass** (2026-04-23 PR): four layers of login-surface defense added as part of the pre-launch audit. **Per-email rate limit** (5 attempts / 15 min keyed on the target email, peeked from the JSON body) added on top of the existing per-IP bucket — stops an attacker rotating IPs from brute-forcing one account or DoS-ing a victim's mailbox + our Resend budget. **Password policy** raised from BetterAuth's default 8-char minimum to **12 chars + uppercase + lowercase + digit + symbol**, enforced both client-side (live checklist on sign-up + reset-password) and server-side (BetterAuth before-hook throwing `APIError("BAD_REQUEST")` on `/sign-up/email`, `/reset-password`, `/change-password`, `/set-password`). Shared rules in `lib/password-policy.ts` with a regression test suite. **Session revocation on password reset** via `emailAndPassword.revokeSessionsOnPasswordReset: true` — an attacker holding a compromised password can no longer keep a 7-day session alive after the real user resets. **Explicit cookie attributes** (`httpOnly`, `secure` in prod, `sameSite: "lax"`, `path: "/"`) so a future BetterAuth default flip can't silently weaken cookie hygiene.
 - **Security Precaution Plan L1–L6** (PRs #160–#166 + TOTP upgrade): a six-layer defense around money-moving admin actions. **L1** — structured audit log (`AuditLogEntry` table) covering every money action + config change + failed auth, with a SITE_OWNER-only viewer at `/admin/audit-log`. **L2** — typed-phrase confirmation modals on grants / withdrawals / role changes. **L3** — real-time email receipts to the acting owner on every money action. **L5** — BLOCKED alerts: every failed confirmation / failed MFA / reject → rate-limited email (1/hr). **L4** — email-code MFA (6-digit, 10-min TTL, 5 attempts, hashed at rest in `MfaChallenge`, 30-minute trust window on the same action tag) in front of money actions. **L4 TOTP upgrade** — SITE_OWNERs can optionally enrol TOTP (`/admin/settings/mfa` → QR scan + confirm, stored as `UserAccount.totpSecret`); when enrolled the server returns `method: "totp"` in the 202 and the modal switches to "enter the code from your authenticator app." Reuses the same verify endpoint + trust window (via a synthetic consumed challenge row with `codeHash: "TOTP_VERIFIED"`). Free, offline-capable, no third-party cost. **L6** — 2-person approval on withdrawals ≥ `WITHDRAWAL_CO_APPROVAL_THRESHOLD_CENTS` (env var, default $500): first owner's approve lands as a pending `WithdrawalApproval` row; the UI shows an "awaiting co-approval" chip until a second owner approves, then the withdrawal marks PAID and both signatures are recorded in the audit log. Auto-bypass if `ownerCount <= 1` so a single-owner team can still ship. **Demo-mode guard** on every layer so `demo.brandbite.studio` doesn't spam real mailboxes or block persona-switching testers.
 
 ### 🟡 Partial — works in some paths, not all
@@ -46,21 +47,22 @@ This file captures **what's ready**, **what's missing**, and **what ships in whi
 
 These are the items I'd refuse to launch without. Each is tractable in 1–2 PRs.
 
-### Blocker #1 — Email verification on sign-up
+### Blocker #1 — Email verification on sign-up ✅ Shipped
 
-**Why it matters**: Without email verification, a bot can sign up with someone else's address, tie up that email, and poison the customer record. For a paid product with Stripe customer records attached to emails, this is a real support-load risk.
+**Shipped in #124.** `lib/better-auth.ts` enables `emailAndPassword.requireEmailVerification` + `emailVerification.sendOnSignUp` + `autoSignInAfterVerification`. Verification email sent via the same Resend helper as password reset. `/verify-email` "check your inbox" page with a resend button. Sign-in errors that look like "email not verified" route to that page with `?reason=unverified`.
 
-**Scope**: Enable `emailVerification.requireEmailVerification` on BetterAuth. Wire the `sendVerificationEmail` callback through existing Resend helper. Add a `/verify-email` page + resend-verification action.
+### Blocker #2 — Auth rate limits ✅ Shipped + hardened
 
-**Estimated effort**: 1 PR, ~2 hours.
+**Shipped in #124 + auth-hardening PR (2026-04-23).**
 
-### Blocker #2 — Auth rate limits
+- **Per-IP bucket** (#124): `app/api/auth/[...all]/route.ts` wraps `toNextJsHandler` with an Upstash-backed rate limiter on POSTs. Two buckets: sensitive (sign-in / sign-up / forget-password / reset-password / send-verification-email / magic-link): 10/60s. General auth: 60/60s. 429 + `Retry-After` header.
+- **Per-email bucket** (auth-hardening PR): a second layer keyed on the target email (parsed from the request body) on sign-in + forget-password + send-verification-email + magic-link paths. 5 attempts / 15 min. Stops an attacker rotating IPs from brute-forcing a single account or DoS'ing a victim's inbox + our Resend budget.
 
-**Why it matters**: `/api/auth/*` (BetterAuth) is currently not rate-limited. Credential stuffing is the #1 way accounts get compromised. Same Upstash infrastructure we use for AI.
+**Related hardening shipped in the same PR**:
 
-**Scope**: Wrap the BetterAuth route handler in a rate limiter keyed on IP (`x-forwarded-for`) with a second bucket keyed on email for password-reset requests. Return 429 with `Retry-After` header.
-
-**Estimated effort**: 1 PR, ~1 hour.
+- `emailAndPassword.minPasswordLength: 12` (up from BetterAuth default 8) + complexity hook (uppercase / lowercase / digit / symbol) on `/sign-up/email`, `/reset-password`, `/change-password`, `/set-password`. Client-side checklist matches via shared `lib/password-policy.ts`.
+- `emailAndPassword.revokeSessionsOnPasswordReset: true` — every existing session for the user is deleted when they complete a reset. An attacker holding a compromised password can't keep a 7-day session alive after the real user resets.
+- `advanced.defaultCookieAttributes`: explicit `httpOnly` + `secure` (prod only) + `sameSite: "lax"` + `path: "/"` so a future BetterAuth default change can't silently weaken cookie hygiene.
 
 ### Blocker #3 — GDPR right-to-erasure ✅ Shipped
 
@@ -82,24 +84,13 @@ Ledger / tickets / ratings are intentionally retained post-deletion — they are
 
 **Estimated effort**: Legal review is the pacing item. **I cannot write the legal text — this needs a lawyer or a vetted template service like Termly / Iubenda.** Paste into `/admin/pages` takes ~10 min once the copy exists.
 
-### Blocker #5 — Health check endpoint + uptime monitoring
+### Blocker #5 — Health check endpoint ✅ Shipped
 
-**Why it matters**: If the app goes down overnight, nobody knows until a customer complains. A 5xx on a single cron job shouldn't take the whole system with it; we need visibility.
+**Shipped in #125.** `GET /api/health` at `app/api/health/route.ts` pings Prisma (`SELECT 1`) and returns `{ ok, service, time, checks }`. 200 when healthy, 503 otherwise so a dumb uptime monitor flags it without parsing the body. Proxy marks `/api/health` public in #155. Configuring the third-party monitor (BetterStack / Upptime / Vercel built-in) remains an ops task — endpoint is ready.
 
-**Scope**:
+### Blocker #6 — Env var audit + hardening ✅ Shipped
 
-- `GET /api/health` returning `{ ok: true, db: "ok"|"down", stripe: "ok"|"down" }` with a Prisma ping + Stripe reachability check.
-- Configure Vercel's built-in monitoring or a third-party (BetterStack, Upptime) to hit it.
-
-**Estimated effort**: 1 PR, ~30 min. Monitoring signup is separate.
-
-### Blocker #6 — Env var audit + hardening
-
-**Why it matters**: Missing secrets in Production would fail silently in places (Sentry, Resend, CRON_SECRET, Google OAuth). A checklist prevents "we forgot to set it and the Monday cron ran as a noop for 3 weeks".
-
-**Scope**: Create `docs/env-vars.md` listing every required env var, which environments need it (Production / Preview / Dev), and what happens if it's missing. Grep `process.env.*` to confirm coverage.
-
-**Estimated effort**: 1 PR, ~1 hour.
+**Shipped in #126.** `docs/env-vars.md` lists every required env var, which environments need it, and the failure mode if it's missing. Remaining work is pasting the values into production Vercel — endpoint inventory is done.
 
 ---
 
