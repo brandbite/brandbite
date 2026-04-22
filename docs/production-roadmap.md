@@ -33,13 +33,14 @@ This file captures **what's ready**, **what's missing**, and **what ships in whi
 
 ### 🟡 Partial — works in some paths, not all
 
-- **Rate limiting**. Upstash Redis wired (`lib/rate-limit.ts`), applied to AI routes. **Not applied to `/api/auth/*`** — login and password-reset are currently unprotected from credential stuffing. _See Blocker #2 below._
+_Nothing currently partial; the last "rate limiting not on /api/auth/\*" item closed in #124 + the 2026-04-23 auth-hardening PR (per-IP + per-email buckets, password policy, session revocation). Previous "Migration backfill" item closed in #154 (baseline squash)._
 
 ### 🔴 Missing — verified absent in the codebase
 
 - **Legal copy** for `/privacy`, `/terms`, `/cookies`, `/accessibility`. Routes + admin editor shipped (#145–#148); the actual policy text has not been authored. Needs a lawyer or a vetted template service (Termly / Iubenda).
 - **App-level backup automation**. Relies entirely on Neon's point-in-time recovery — fine for v1.0 if we're on a Neon paid tier, but should be called out.
-- **Migration backfill** for historical `db push` models (`AiGeneration`, `Moodboard`, `Notification`, …). Existing demo already has these tables so it's fine day-to-day, but a fresh production DB would be missing them. See the "Operational cutover" bucket.
+- **Uptime monitor** pointed at `/api/health`. Endpoint is ready; configuring BetterStack / UptimeRobot / Vercel's built-in monitor is a user-facing ops task (no code left).
+- **Stripe live-mode cutover**. Demo runs on test keys; before the first real charge, switch `STRIPE_SECRET_KEY`, rotate `STRIPE_WEBHOOK_SECRET`, and verify the webhook signs correctly against the new secret.
 
 ---
 
@@ -152,17 +153,18 @@ Grouped by track so nothing gets orphaned. Revisit this section when planning th
 
 ### v1.0 — "Can actually take money from strangers" (target: ~1 week once cutover tasks done)
 
-Most of v1.0 engineering is complete (Phase D features, a11y Phases 1–3, sidebar nav, theme system). Remaining is operational cutover + legal:
+Most of v1.0 engineering is complete (Phase D features, a11y Phases 1–3, sidebar nav, theme system, full Security Precaution Plan L1–L6 + TOTP upgrade, auth hardening pass). Remaining is operational cutover + legal:
 
 **Must-land** (user tasks, mostly non-code):
 
-- Blockers 1–6 from above (email verification ✅, auth rate limits ✅, GDPR ✅ fully closed in #150, health check ✅ already shipped; legal copy + Stripe live keys remain)
+- Blockers 1–6 from above — **all code blockers shipped** (email verification ✅ #124, auth rate limits ✅ #124 + auth-hardening PR 2026-04-23, GDPR ✅ #125 + #150, legal pages infra ✅ #145–#148, health check ✅ #125, env-vars.md ✅ #126). The only open pieces are the legal policy copy itself (needs a lawyer / Termly / Iubenda) and the Stripe live-mode key swap.
 - AI provider keys on Vercel
 - Resend domain verification + `EMAIL_FROM`
 - `SENTRY_DSN` set, errors reach a Sentry project
 - `CRON_SECRET` set, Monday payout cron verified running
 - Privacy + TOS + Cookie Policy + Accessibility statement authored + pasted into `/admin/pages` (routes + editor already live via #145–#148)
-- Lighthouse CI GitHub Action (prevents a11y / perf regressions post-launch)
+- Uptime monitor (BetterStack / UptimeRobot / Vercel built-in) pointed at `/api/health`
+- ~~Lighthouse CI GitHub Action~~ ✅ Shipped (#153) — already prevents a11y / perf regressions on PRs
 
 ### v1.1 — "First polish pass" (target: 2 weeks after v1.0)
 
