@@ -1,6 +1,6 @@
 # Brandbite — Production Roadmap
 
-_Last updated: 2026-04-22 (this doc lives in git; update as we ship.)_
+_Last updated: 2026-04-22 — Blocker #3 fully done (creative parity + leave-workspace)_
 
 This file captures **what's ready**, **what's missing**, and **what ships in which version** as we move Brandbite from demo to production. It's a living plan — rewrite sections as reality changes.
 
@@ -23,6 +23,7 @@ This file captures **what's ready**, **what's missing**, and **what ships in whi
 - **Error boundaries**: per-role boundary pages (`/app/admin/error.tsx`, `/app/customer/error.tsx`, `/app/creative/error.tsx`).
 - **SITE_OWNER vs SITE_ADMIN split** (PR #144): money-moving actions (withdrawals approve/mark-paid, plan management, payout rules, company token grants, ticket financial overrides, consultation pricing, AI pricing edits, hard deletes, promote-to-admin, Google OAuth config) locked to `SITE_OWNER`; `SITE_ADMIN` keeps everything else. Server-side role guards in 14 API routes + owner-only banner on affected admin pages + `useSessionRole()` hook + 68 role-matrix unit tests.
 - **CMS-managed legal pages** (PRs #145–#148): `/privacy`, `/terms`, `/cookies`, `/accessibility` all rendered from `CmsPage` rows and editable from `/admin/pages`. Admin PATCH is an upsert against an allow-listed key set, so legal pages materialise on first save. Proxy marks all four public. Site footer (column + bottom bar) and the four inline marketing footers wired up with real `next/link` routes. **Pages are live — legal copy is the remaining pacing item.**
+- **GDPR right-to-erasure** (Blocker #3 — PRs #125 + #150): `DELETE /api/customer/account` and `DELETE /api/creative/account` with shared `lib/account-deletion.ts` (soft-delete + anonymize + FK cleanup). Danger zone on both settings pages with typed-email confirm. Plus a softer **"Leave workspace"** flow (`DELETE /api/customer/members/me`) for team members who want to exit a company without nuking their account — blocks the sole OWNER from orphaning the workspace.
 
 ### 🟡 Partial — works in some paths, not all
 
@@ -58,17 +59,15 @@ These are the items I'd refuse to launch without. Each is tractable in 1–2 PRs
 
 **Estimated effort**: 1 PR, ~1 hour.
 
-### Blocker #3 — GDPR right-to-erasure
+### Blocker #3 — GDPR right-to-erasure ✅ Shipped
 
-**Why it matters**: Required in the EU/UK for any product collecting personal data. Failing to provide a deletion path is a real legal risk if we sell to European companies (which we likely will, given brandbite.studio's audience).
+**Shipped in #125 + #150.** Customer and creative accounts both have self-delete (`DELETE /api/customer/account`, `DELETE /api/creative/account`) with typed-email confirmation, shared soft-delete + anonymize transaction via `lib/account-deletion.ts`, and role-gated endpoints. Danger zone on both `/customer/settings` and `/creative/settings`. Site-admin self-deletion intentionally out of scope — admins are deleted by `SITE_OWNER`.
 
-**Scope**:
+**Leave-workspace** (softer alternative) landed in #150: `DELETE /api/customer/members/me`, blocks sole-OWNER from orphaning the company, matching the existing guard in `/api/customer/members/[memberId]`.
 
-- `DELETE /api/customer/account` + `/settings` page button.
-- Cascade strategy: **soft-delete** the `UserAccount` (anonymize email, name) and hard-delete the session. Keep ledger/tickets for audit (ledger entries are a financial record; we need to retain them per tax/accounting rules). Document in the privacy policy.
-- Consider a "leave company" flow as a softer alternative for team members.
+Ledger / tickets / ratings are intentionally retained post-deletion — they are financial/audit records with tax retention rules. The `UserAccount` row is anonymized in place so they stay queryable as "Deleted user" without exposing PII.
 
-**Estimated effort**: 1 PR, ~3 hours. Has design decisions — should discuss before implementing.
+**Follow-up (tracked, not blocker):** reference the retention-and-anonymization policy from the Privacy Policy copy when it's authored (Blocker #4).
 
 ### Blocker #4 — Legal copy for Privacy / Terms / Cookies / Accessibility
 
@@ -163,7 +162,7 @@ Most of v1.0 engineering is complete (Phase D features, a11y Phases 1–3, sideb
 
 **Must-land** (user tasks, mostly non-code):
 
-- Blockers 1–6 from above (email verification ✅, auth rate limits ✅, GDPR ✅, health check ✅ already shipped; legal copy + Stripe live keys remain)
+- Blockers 1–6 from above (email verification ✅, auth rate limits ✅, GDPR ✅ fully closed in #150, health check ✅ already shipped; legal copy + Stripe live keys remain)
 - AI provider keys on Vercel
 - Resend domain verification + `EMAIL_FROM`
 - `SENTRY_DSN` set, errors reach a Sentry project
