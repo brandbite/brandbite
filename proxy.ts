@@ -40,6 +40,12 @@ const PUBLIC_PATHS = [
   "/api/pages", // public CMS page read
   "/api/news", // public CMS news read
   "/api/docs", // public docs read
+  "/api/health", // uptime monitors (BetterStack / Upptime / Vercel); route returns 200 or 503
+  // Vercel Cron invocations. Each cron route is defence-in-depth with a
+  // CRON_SECRET Bearer check; the proxy only needs to let the request
+  // reach the handler. Auth-gating here silently breaks every scheduled
+  // job because Vercel Cron does not send a BetterAuth session cookie.
+  "/api/cron",
 ];
 
 // Debug routes are only accessible in demo mode
