@@ -1,6 +1,6 @@
 # Brandbite — Production Roadmap
 
-_Last updated: 2026-04-22 — a11y bundle (page titles, autocomplete, motion-alt pin cue) shipped_
+_Last updated: 2026-04-22 — Security Plan L1 + L2 shipped (audit log, confirmation modals)_
 
 This file captures **what's ready**, **what's missing**, and **what ships in which version** as we move Brandbite from demo to production. It's a living plan — rewrite sections as reality changes.
 

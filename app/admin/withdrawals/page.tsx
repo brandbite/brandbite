@@ -18,6 +18,7 @@ import { InlineAlert } from "@/components/ui/inline-alert";
 import { LoadingState } from "@/components/ui/loading-state";
 import { useToast } from "@/components/ui/toast-provider";
 import { OwnerOnlyBanner } from "@/components/admin/owner-only-banner";
+import { ConfirmTypedPhraseModal } from "@/components/admin/confirm-typed-phrase-modal";
 
 type WithdrawalStatus = "PENDING" | "APPROVED" | "REJECTED" | "PAID";
 
@@ -59,6 +60,15 @@ export default function AdminWithdrawalsPage() {
   const [statusFilter, setStatusFilter] = useState<"ALL" | WithdrawalStatus>("ALL");
   const [creativeFilter, setCreativeFilter] = useState<string>("ALL");
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+
+  // Confirmation modal state for money-moving actions (L2). REJECT is direct —
+  // not a financial commitment — so it doesn't go through this flow.
+  const [pendingConfirm, setPendingConfirm] = useState<{
+    id: string;
+    action: "APPROVE" | "MARK_PAID";
+    amountTokens: number;
+    creativeLabel: string;
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -162,7 +172,7 @@ export default function AdminWithdrawalsPage() {
     }
   };
 
-  const handleAction = async (id: string, action: AdminWithdrawalAction) => {
+  const handleAction = async (id: string, action: AdminWithdrawalAction, confirmation?: string) => {
     setActionLoadingId(`${id}:${action}`);
     setError(null);
 
@@ -172,7 +182,7 @@ export default function AdminWithdrawalsPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ id, action }),
+        body: JSON.stringify({ id, action, confirmation }),
       });
 
       const json = await res.json().catch(() => null);
@@ -420,7 +430,14 @@ export default function AdminWithdrawalsPage() {
                           disabled={!canApprove}
                           loading={isActionLoading(w.id, "APPROVE")}
                           loadingText="Approving…"
-                          onClick={() => handleAction(w.id, "APPROVE")}
+                          onClick={() =>
+                            setPendingConfirm({
+                              id: w.id,
+                              action: "APPROVE",
+                              amountTokens: w.amountTokens,
+                              creativeLabel: w.creative.name || w.creative.email,
+                            })
+                          }
                         >
                           Approve
                         </Button>
@@ -440,7 +457,14 @@ export default function AdminWithdrawalsPage() {
                           disabled={!canMarkPaid}
                           loading={isActionLoading(w.id, "MARK_PAID")}
                           loadingText="Marking…"
-                          onClick={() => handleAction(w.id, "MARK_PAID")}
+                          onClick={() =>
+                            setPendingConfirm({
+                              id: w.id,
+                              action: "MARK_PAID",
+                              amountTokens: w.amountTokens,
+                              creativeLabel: w.creative.name || w.creative.email,
+                            })
+                          }
                         >
                           Mark as paid
                         </Button>
@@ -453,6 +477,50 @@ export default function AdminWithdrawalsPage() {
           </DataTable>
         )}
       </section>
+
+      {/* Typed-phrase confirmation for APPROVE / MARK_PAID (Security Plan L2).
+          REJECT stays direct — rejecting isn't a financial commitment. */}
+      <ConfirmTypedPhraseModal
+        open={pendingConfirm !== null}
+        onClose={() => setPendingConfirm(null)}
+        title={
+          pendingConfirm?.action === "APPROVE" ? "Approve withdrawal?" : "Mark withdrawal as paid?"
+        }
+        description={
+          pendingConfirm ? (
+            <>
+              <p>
+                {pendingConfirm.action === "APPROVE" ? (
+                  <>
+                    You are about to <strong>approve</strong> a withdrawal of{" "}
+                    <strong>{pendingConfirm.amountTokens.toLocaleString()} tokens</strong> for{" "}
+                    <strong>{pendingConfirm.creativeLabel}</strong>. Approval debits the
+                    creative&apos;s balance and commits the platform to paying them.
+                  </>
+                ) : (
+                  <>
+                    You are about to record that{" "}
+                    <strong>{pendingConfirm.amountTokens.toLocaleString()} tokens</strong> worth has
+                    been <strong>paid out</strong> to{" "}
+                    <strong>{pendingConfirm.creativeLabel}</strong>. This moves the withdrawal to
+                    PAID and cannot be reversed from the UI.
+                  </>
+                )}
+              </p>
+            </>
+          ) : null
+        }
+        requiredPhrase={pendingConfirm?.action === "APPROVE" ? "APPROVE" : "PAID"}
+        submitLabel={pendingConfirm?.action === "APPROVE" ? "Approve" : "Mark as paid"}
+        submitTone={pendingConfirm?.action === "APPROVE" ? "primary" : "warning"}
+        onSubmit={async () => {
+          if (!pendingConfirm) return;
+          const { id, action } = pendingConfirm;
+          const phrase = action === "APPROVE" ? "APPROVE" : "PAID";
+          await handleAction(id, action, phrase);
+          setPendingConfirm(null);
+        }}
+      />
     </>
   );
 }

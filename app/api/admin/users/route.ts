@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
+import { CONFIRMATION_PHRASES, checkConfirmationPhrase } from "@/lib/admin-confirmation";
 import { canPromoteToSiteAdmin, isSiteAdminRole } from "@/lib/roles";
 import { AdminActionType, UserRole, Prisma } from "@prisma/client";
 
@@ -86,10 +87,11 @@ export async function PATCH(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { userId, role, creativeRevisionNotesEnabled } = body as {
+    const { userId, role, creativeRevisionNotesEnabled, confirmation } = body as {
       userId?: string;
       role?: string;
       creativeRevisionNotesEnabled?: boolean;
+      confirmation?: string;
     };
 
     if (!userId || typeof userId !== "string") {
@@ -175,6 +177,36 @@ export async function PATCH(req: NextRequest) {
         { error: "Only site owners can modify another site owner's role." },
         { status: 403 },
       );
+    }
+
+    // Typed-phrase confirmation when this is actually a privilege change
+    // (new role is an admin role, or target is currently SITE_OWNER). Other
+    // role changes — CUSTOMER <-> DESIGNER for example — don't require
+    // confirmation because they're not privilege-escalation events.
+    const isPrivilegeChange =
+      role === "SITE_OWNER" || role === "SITE_ADMIN" || target.role === "SITE_OWNER";
+    if (isPrivilegeChange) {
+      const phraseCheck = checkConfirmationPhrase(
+        confirmation,
+        CONFIRMATION_PHRASES.USER_PROMOTE_TO_ADMIN,
+      );
+      if (!phraseCheck.ok) {
+        await logAdminAction({
+          actor: user,
+          action: AdminActionType.USER_PROMOTE_TO_ADMIN,
+          outcome: "BLOCKED",
+          targetType: "UserAccount",
+          targetId: target.id,
+          metadata: {
+            attemptedRole: role,
+            targetEmail: target.email,
+            targetCurrentRole: target.role,
+          },
+          errorMessage: phraseCheck.error,
+          context: auditCtx,
+        });
+        return NextResponse.json({ error: phraseCheck.error }, { status: 400 });
+      }
     }
 
     const updated = await prisma.userAccount.update({

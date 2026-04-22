@@ -64,6 +64,9 @@ export default function AdminCompaniesPage() {
   const [adjustDirection, setAdjustDirection] = useState<"CREDIT" | "DEBIT">("CREDIT");
   const [adjustAmount, setAdjustAmount] = useState<string>("");
   const [adjustNotes, setAdjustNotes] = useState<string>("");
+  // Typed-phrase confirmation (Security Plan — L2). Expected value is
+  // "GRANT" for CREDIT and "DEBIT" for DEBIT; server enforces the match.
+  const [adjustConfirmation, setAdjustConfirmation] = useState<string>("");
   const [adjustSaving, setAdjustSaving] = useState(false);
   const [adjustError, setAdjustError] = useState<string | null>(null);
 
@@ -105,6 +108,7 @@ export default function AdminCompaniesPage() {
     setAdjustDirection("CREDIT");
     setAdjustAmount("");
     setAdjustNotes("");
+    setAdjustConfirmation("");
     setAdjustError(null);
   };
 
@@ -125,6 +129,11 @@ export default function AdminCompaniesPage() {
       setAdjustError("Add a short note (≥ 3 characters) for the audit trail.");
       return;
     }
+    const expectedPhrase = adjustDirection === "CREDIT" ? "GRANT" : "DEBIT";
+    if (adjustConfirmation.trim().toUpperCase() !== expectedPhrase) {
+      setAdjustError(`Type "${expectedPhrase}" to confirm this ${adjustDirection.toLowerCase()}.`);
+      return;
+    }
     setAdjustSaving(true);
     setAdjustError(null);
     try {
@@ -135,6 +144,7 @@ export default function AdminCompaniesPage() {
           direction: adjustDirection,
           amount,
           notes: adjustNotes.trim(),
+          confirmation: adjustConfirmation.trim(),
         }),
       });
       const json = await res.json().catch(() => null);
@@ -406,6 +416,29 @@ export default function AdminCompaniesPage() {
             />
             <p className="mt-1 text-[11px] text-[var(--bb-text-muted)]">
               Shown on the token ledger for audit.
+            </p>
+          </div>
+
+          {/* Typed-phrase confirmation (Security Plan — L2). CREDIT needs
+              "GRANT", DEBIT needs "DEBIT". Server enforces the match. */}
+          <div>
+            <label className="mb-1 block text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-tertiary)] uppercase">
+              Confirm
+            </label>
+            <FormInput
+              type="text"
+              value={adjustConfirmation}
+              onChange={(e) => setAdjustConfirmation(e.target.value)}
+              placeholder={adjustDirection === "CREDIT" ? "GRANT" : "DEBIT"}
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <p className="mt-1 text-[11px] text-[var(--bb-text-muted)]">
+              Type{" "}
+              <strong className="font-mono text-[var(--bb-secondary)]">
+                {adjustDirection === "CREDIT" ? "GRANT" : "DEBIT"}
+              </strong>{" "}
+              to confirm this {adjustDirection === "CREDIT" ? "grant" : "debit"}.
             </p>
           </div>
 

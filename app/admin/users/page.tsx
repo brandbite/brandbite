@@ -10,6 +10,7 @@ import { useToast } from "@/components/ui/toast-provider";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { LoadingState } from "@/components/ui/loading-state";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ConfirmTypedPhraseModal } from "@/components/admin/confirm-typed-phrase-modal";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -108,27 +109,37 @@ export default function AdminUsersPage() {
     };
   }, [roleFilter, debouncedSearch]);
 
-  // Change role
-  const handleRoleChange = async (userId: string, newRole: string) => {
+  // Confirmation-modal state for privilege-escalation role changes (L2).
+  // Non-privilege role swaps (e.g. CUSTOMER <-> DESIGNER) skip the modal
+  // and run directly through the same code path.
+  const [pendingPromote, setPendingPromote] = useState<{
+    userId: string;
+    targetEmail: string;
+    currentRole: string;
+    newRole: string;
+  } | null>(null);
+
+  // Change role. `confirmation` is passed through to the API when the
+  // change involves a SITE_OWNER or SITE_ADMIN on either side.
+  const handleRoleChange = async (userId: string, newRole: string, confirmation?: string) => {
     setSaving(true);
     try {
       const res = await fetch("/api/admin/users", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, role: newRole }),
+        body: JSON.stringify({ userId, role: newRole, confirmation }),
       });
       const json = await res.json().catch(() => null);
 
       if (!res.ok) {
-        showToast({ title: json?.error || "Failed to update role", type: "error" });
-        return;
+        const msg = json?.error || "Failed to update role";
+        showToast({ title: msg, type: "error" });
+        throw new Error(msg); // surface to the modal if one is open
       }
 
       setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)));
       showToast({ title: `Role updated to ${ROLE_LABELS[newRole] || newRole}`, type: "success" });
       setEditingUserId(null);
-    } catch {
-      showToast({ title: "Failed to update role", type: "error" });
     } finally {
       setSaving(false);
     }
@@ -298,7 +309,27 @@ export default function AdminUsersPage() {
                             ))}
                           </select>
                           <button
-                            onClick={() => handleRoleChange(u.id, pendingRole)}
+                            onClick={() => {
+                              // Privilege-escalation changes require the
+                              // typed-phrase confirmation. Everything else
+                              // runs direct.
+                              const isPrivilegeChange =
+                                pendingRole === "SITE_OWNER" ||
+                                pendingRole === "SITE_ADMIN" ||
+                                u.role === "SITE_OWNER";
+                              if (isPrivilegeChange) {
+                                setPendingPromote({
+                                  userId: u.id,
+                                  targetEmail: u.email,
+                                  currentRole: u.role,
+                                  newRole: pendingRole,
+                                });
+                              } else {
+                                void handleRoleChange(u.id, pendingRole).catch(() => {
+                                  // error toast already shown
+                                });
+                              }
+                            }}
                             disabled={saving || pendingRole === u.role}
                             className="rounded-lg bg-[var(--bb-primary)] px-2.5 py-1 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
                           >
@@ -357,6 +388,34 @@ export default function AdminUsersPage() {
           </table>
         </div>
       )}
+
+      {/* Typed-phrase confirmation for privilege-escalation role changes. */}
+      <ConfirmTypedPhraseModal
+        open={pendingPromote !== null}
+        onClose={() => setPendingPromote(null)}
+        title="Change admin role?"
+        description={
+          pendingPromote ? (
+            <p>
+              You are about to change <strong>{pendingPromote.targetEmail}</strong> from{" "}
+              <strong>
+                {ROLE_LABELS[pendingPromote.currentRole] || pendingPromote.currentRole}
+              </strong>{" "}
+              to <strong>{ROLE_LABELS[pendingPromote.newRole] || pendingPromote.newRole}</strong>.
+              This grants or removes access to owner-only money-moving actions (withdrawal
+              approvals, plan edits, token grants).
+            </p>
+          ) : null
+        }
+        requiredPhrase="PROMOTE"
+        submitLabel="Change role"
+        submitTone="danger"
+        onSubmit={async () => {
+          if (!pendingPromote) return;
+          await handleRoleChange(pendingPromote.userId, pendingPromote.newRole, "PROMOTE");
+          setPendingPromote(null);
+        }}
+      />
     </div>
   );
 }

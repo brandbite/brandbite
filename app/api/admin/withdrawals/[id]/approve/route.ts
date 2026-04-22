@@ -12,6 +12,7 @@ import { applyUserLedgerEntry, getUserTokenBalance } from "@/lib/token-engine";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { canApproveWithdrawals } from "@/lib/roles";
 import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
+import { CONFIRMATION_PHRASES, checkConfirmationPhrase } from "@/lib/admin-confirmation";
 
 /**
  * POST /api/admin/withdrawals/:id/approve
@@ -44,6 +45,29 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         { error: "Only site owners can approve withdrawals." },
         { status: 403 },
       );
+    }
+
+    // Parse optional body for the typed-phrase confirmation. Old callers
+    // that don't send one will fail the check below, which is the intent.
+    const body = (await request.json().catch(() => null)) as {
+      confirmation?: string;
+    } | null;
+
+    const phraseCheck = checkConfirmationPhrase(
+      body?.confirmation,
+      CONFIRMATION_PHRASES.WITHDRAWAL_APPROVE,
+    );
+    if (!phraseCheck.ok) {
+      await logAdminAction({
+        actor: user,
+        action: AdminActionType.WITHDRAWAL_APPROVE,
+        outcome: "BLOCKED",
+        targetType: "Withdrawal",
+        targetId: id,
+        errorMessage: phraseCheck.error,
+        context: auditCtx,
+      });
+      return NextResponse.json({ error: phraseCheck.error }, { status: 400 });
     }
 
     const withdrawal = await prisma.withdrawal.findUnique({
