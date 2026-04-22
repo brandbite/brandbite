@@ -52,6 +52,7 @@ jobs:
         # `prisma db push` to match the integration test setup.
         env:
           DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
           BETTER_AUTH_SECRET: ci-only-secret-not-used
           NEXT_PUBLIC_APP_URL: http://localhost:3000
           STRIPE_SECRET_KEY: sk_test_ci_dummy_not_used
@@ -62,6 +63,7 @@ jobs:
       - name: Start Next.js
         env:
           DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
           BETTER_AUTH_SECRET: ci-only-secret-not-used
           NEXT_PUBLIC_APP_URL: http://localhost:3000
           STRIPE_SECRET_KEY: sk_test_ci_dummy_not_used

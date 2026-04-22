@@ -63,6 +63,10 @@ jobs:
         # STRIPE_SECRET_KEY to exist at module-evaluation time.
         env:
           DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          # Unused at build-time (no migrations run) but declared in
+          # prisma/schema.prisma as env("DIRECT_URL"), so Prisma requires it
+          # to be defined to parse the schema.
+          DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
           BETTER_AUTH_SECRET: ci-only-secret-not-used
           NEXT_PUBLIC_APP_URL: http://localhost:3000
           STRIPE_SECRET_KEY: sk_test_ci_dummy_not_used
@@ -91,6 +95,10 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/brandbite_test
+      # CI Postgres is a direct connection (no pooler), so point DIRECT_URL
+      # at the same URL. Required because prisma/schema.prisma declares
+      # `directUrl = env("DIRECT_URL")`.
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/brandbite_test
 
     steps:
       - name: Checkout

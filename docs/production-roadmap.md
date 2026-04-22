@@ -227,7 +227,8 @@ Routes + admin editor shipped in PRs #145–#148. All that remains is pasting re
 
 Confirm each is set in Vercel → Project → Settings → Environment Variables (Production):
 
-- [ ] `DATABASE_URL` (Neon production branch, not the demo branch)
+- [ ] `DATABASE_URL` (Neon production branch, pooled — subdomain contains `-pooler`)
+- [ ] `DIRECT_URL` (same Neon branch, **non-pooled** — same host as `DATABASE_URL` without `-pooler`). Required so `prisma migrate deploy` can hold a Postgres advisory lock — poolers drop session-scoped locks at transaction boundaries and the migrate step fails with P1002 otherwise.
 - [ ] `BETTER_AUTH_SECRET` (random 32+ chars)
 - [ ] `NEXT_PUBLIC_APP_URL` (e.g. `https://app.brandbite.studio`)
 - [ ] `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
