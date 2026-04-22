@@ -1,6 +1,6 @@
 # Brandbite — Production Roadmap
 
-_Last updated: 2026-04-22 — Blocker #3 done, migrate-deploy automated, Lighthouse CI monitoring_
+_Last updated: 2026-04-22 — Blocker #3 done, migrate-deploy automated, Lighthouse CI monitoring, migration baseline squashed_
 
 This file captures **what's ready**, **what's missing**, and **what ships in which version** as we move Brandbite from demo to production. It's a living plan — rewrite sections as reality changes.
 
@@ -25,6 +25,7 @@ This file captures **what's ready**, **what's missing**, and **what ships in whi
 - **CMS-managed legal pages** (PRs #145–#148): `/privacy`, `/terms`, `/cookies`, `/accessibility` all rendered from `CmsPage` rows and editable from `/admin/pages`. Admin PATCH is an upsert against an allow-listed key set, so legal pages materialise on first save. Proxy marks all four public. Site footer (column + bottom bar) and the four inline marketing footers wired up with real `next/link` routes. **Pages are live — legal copy is the remaining pacing item.**
 - **GDPR right-to-erasure** (Blocker #3 — PRs #125 + #150): `DELETE /api/customer/account` and `DELETE /api/creative/account` with shared `lib/account-deletion.ts` (soft-delete + anonymize + FK cleanup). Danger zone on both settings pages with typed-email confirm. Plus a softer **"Leave workspace"** flow (`DELETE /api/customer/members/me`) for team members who want to exit a company without nuking their account — blocks the sole OWNER from orphaning the workspace.
 - **Migration automation** (PR #152): `scripts/vercel-build.mjs` runs `prisma migrate deploy` on every **production** Vercel deploy (gated on `VERCEL_ENV === "production"` so preview deploys don't apply WIP migrations to the shared demo DB). CI gains a `migrate deploy` dry-run step so a broken migration fails the PR instead of the prod deploy. See the "Migration rollback" section below for incident procedure.
+- **Migration baseline squash** (PR #154): the 25 pre-existing migrations plus the 22 `db push`-introduced models (AiGeneration, Moodboard, Notification, BetterAuth tables, CMS tables, …) collapsed into a single `20260422000000_baseline` matching the current schema. CI's migrate-deploy dry-run (disabled in #152) re-enabled and green. Demo cut-over is a one-time `DELETE FROM _prisma_migrations` + `prisma migrate resolve --applied 20260422000000_baseline` (see PR body for exact commands).
 
 ### 🟡 Partial — works in some paths, not all
 
@@ -143,7 +144,7 @@ Grouped by track so nothing gets orphaned. Revisit this section when planning th
 - **Resend sending domain** verification — `brandbite.studio` SPF + DKIM + DMARC records
 - **`SENTRY_DSN`** on production — `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`
 - **Legal copy** for `/privacy` + `/terms` + `/cookies` + `/accessibility` at `/admin/pages` (all four pageKeys scaffolded + routes live as of #145–#148; paste-only, no redeploy needed)
-- **Migration backfill** — historical `AiGeneration`, `Moodboard`, `Notification` models were introduced via `prisma db push` and have no migration file. On the existing demo DB the tables already exist so `migrate deploy` is a no-op for them, but a fresh production database needs a one-time bootstrap. Options: (a) run `prisma db push` once against the fresh prod DB then `prisma migrate resolve --applied` every existing migration, or (b) generate catch-up migrations (`prisma migrate diff --from-empty --to-schema-datamodel` into a dated folder) and ship them so a clean DB can replay history from migrations alone. Pick (b) if we ever expect another prod deploy target
+- ~~**Migration backfill**~~ ✅ Shipped (PR #154) — squashed the 25 historic migrations + 22 `db push`-introduced models into a single baseline. Fresh production DBs deploy in one `prisma migrate deploy`. Demo cut-over is a one-time task covered in the PR body.
 - **Pre-launch checklist** — run through the full checklist below before announcing v1.0
 
 ### Post-v1.0 polish (from earlier sprints, still parked)

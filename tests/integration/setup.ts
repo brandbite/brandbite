@@ -2,10 +2,15 @@
 // @file: tests/integration/setup.ts
 // @purpose: Integration-test bootstrap — verify DATABASE_URL points at a test
 //           database, push the current schema, and hand control to the tests.
-//           Uses `prisma db push --force-reset` because several models in the
-//           schema have no matching migration file (AiGeneration, Moodboard,
-//           Notification, etc. — historically added via db push), so running
-//           `migrate deploy` alone would leave those tables missing.
+//
+//           Uses `prisma db push --force-reset` for speed. Historically this
+//           was also necessary because several models (AiGeneration,
+//           Moodboard, Notification, …) had no matching migration file;
+//           that drift was resolved by the baseline migration
+//           `20260422000000_baseline`, so `prisma migrate deploy` would now
+//           produce the same schema. We still prefer `db push --force-reset`
+//           here because it is faster — tests drop + recreate between
+//           suites and don't need migration-by-migration replay.
 // -----------------------------------------------------------------------------
 
 import { execSync } from "node:child_process";
