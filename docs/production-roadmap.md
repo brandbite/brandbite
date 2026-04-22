@@ -1,6 +1,6 @@
 # Brandbite — Production Roadmap
 
-_Last updated: 2026-04-20 (this doc lives in git; update as we ship.)_
+_Last updated: 2026-04-22 (this doc lives in git; update as we ship.)_
 
 This file captures **what's ready**, **what's missing**, and **what ships in which version** as we move Brandbite from demo to production. It's a living plan — rewrite sections as reality changes.
 
@@ -21,6 +21,8 @@ This file captures **what's ready**, **what's missing**, and **what ships in whi
 - **CI**: lint, type-check, unit tests, Next.js build, Postgres integration tests on every PR.
 - **Sentry**: wired on client + server + edge runtimes; would capture errors _if_ `SENTRY_DSN` is set in Production.
 - **Error boundaries**: per-role boundary pages (`/app/admin/error.tsx`, `/app/customer/error.tsx`, `/app/creative/error.tsx`).
+- **SITE_OWNER vs SITE_ADMIN split** (PR #144): money-moving actions (withdrawals approve/mark-paid, plan management, payout rules, company token grants, ticket financial overrides, consultation pricing, AI pricing edits, hard deletes, promote-to-admin, Google OAuth config) locked to `SITE_OWNER`; `SITE_ADMIN` keeps everything else. Server-side role guards in 14 API routes + owner-only banner on affected admin pages + `useSessionRole()` hook + 68 role-matrix unit tests.
+- **CMS-managed legal pages** (PRs #145–#148): `/privacy`, `/terms`, `/cookies`, `/accessibility` all rendered from `CmsPage` rows and editable from `/admin/pages`. Admin PATCH is an upsert against an allow-listed key set, so legal pages materialise on first save. Proxy marks all four public. Site footer (column + bottom bar) and the four inline marketing footers wired up with real `next/link` routes. **Pages are live — legal copy is the remaining pacing item.**
 
 ### 🟡 Partial — works in some paths, not all
 
@@ -30,7 +32,7 @@ This file captures **what's ready**, **what's missing**, and **what ships in whi
 
 - **Email verification on sign-up**. No `requireEmailVerification` in BetterAuth config, no verify-email page.
 - **Account deletion / GDPR right-to-erasure**. No `DELETE` endpoint for user accounts, no self-service UI.
-- **Privacy policy + Terms of Service pages**. No `/app/legal/`, `/app/privacy/`, `/app/terms/`. The CMS-style `[pageKey]` route exists but no legal content has been authored.
+- **Legal copy** for `/privacy`, `/terms`, `/cookies`, `/accessibility`. Routes + admin editor shipped (#145–#148); the actual policy text has not been authored. Needs a lawyer or a vetted template service (Termly / Iubenda).
 - **Health check endpoint**. No `/api/health` or `/healthz` for uptime monitors.
 - **App-level backup automation**. Relies entirely on Neon's point-in-time recovery — fine for v1.0 if we're on a Neon paid tier, but should be called out.
 
@@ -68,13 +70,15 @@ These are the items I'd refuse to launch without. Each is tractable in 1–2 PRs
 
 **Estimated effort**: 1 PR, ~3 hours. Has design decisions — should discuss before implementing.
 
-### Blocker #4 — Privacy policy + Terms of Service
+### Blocker #4 — Legal copy for Privacy / Terms / Cookies / Accessibility
 
-**Why it matters**: Legally required for any product that takes payment + collects data. Stripe requires it. Many corporate customers won't buy without reviewing these first.
+**Why it matters**: Legally required for any product that takes payment + collects data. Stripe requires Privacy + TOS. Cookie policy is required under EU ePrivacy. Accessibility statement is required under the EAA (June 2025).
 
-**Scope**: Author both docs (with a lawyer, not me) and publish as static pages under `/privacy` and `/terms`. Link from the footer, from sign-up consent, and from the Stripe checkout success page.
+**Status**: Infrastructure shipped (PRs #145–#148) — all four routes live, CMS-managed via `/admin/pages`, wired into site footer + inline footers + login consent. Remaining work is purely the copy.
 
-**Estimated effort**: Legal review is the pacing item. Template draft + publish is half a day. **I cannot write the legal text — this needs a lawyer or a vetted template service like Termly / Iubenda.**
+**Scope**: Author the four documents (with a lawyer, not me). Paste each into `/admin/pages` on production — no redeploy needed. Add a sign-up consent checkbox linking to Privacy + TOS.
+
+**Estimated effort**: Legal review is the pacing item. **I cannot write the legal text — this needs a lawyer or a vetted template service like Termly / Iubenda.** Paste into `/admin/pages` takes ~10 min once the copy exists.
 
 ### Blocker #5 — Health check endpoint + uptime monitoring
 
@@ -124,7 +128,7 @@ Grouped by track so nothing gets orphaned. Revisit this section when planning th
 
 - **Lighthouse CI GitHub Action** (~1 hr) — add `.github/workflows/lighthouse.yml` hitting public pages on every PR; fail on score regression
 - **Motion-only UI alternatives** (~1–2 hrs) — pin drops + revision highlights currently signal meaning via animation only. Reduced-motion users miss the signal. Add a static equivalent (e.g. 2-second coloured border on a new pin)
-- **`/accessibility` public statement page** (~30 min) — required in EU (EAA from June 2025), best practice everywhere. Draft copy + route
+- **`/accessibility` statement copy** — route + admin editor shipped (#145); the CMS row exists but body needs a drafted WCAG 2.2 AA conformance statement + complaint contact. Part of the legal-copy bundle in Blocker #4
 - **Form `autocomplete` audit on billing/profile forms** (~1 hr) — login + reset-password already done in PR #143. Check company billing form, profile edit, consultation-booking fields
 - **Session-timeout warning** (~1 hr) — WCAG 2.2.1; needs a "your session expires in 2 min" toast tied to BetterAuth session
 - **Page `<title>` uniqueness audit** — spot-check every route has a distinct descriptive title via the Next metadata template
@@ -140,7 +144,7 @@ Grouped by track so nothing gets orphaned. Revisit this section when planning th
 - **Stripe live keys** swap: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` — stay on test mode until v1.0
 - **Resend sending domain** verification — `brandbite.studio` SPF + DKIM + DMARC records
 - **`SENTRY_DSN`** on production — `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`
-- **Legal copy** for `/privacy` + `/terms` at `/admin/pages` (pageKeys already scaffolded)
+- **Legal copy** for `/privacy` + `/terms` + `/cookies` + `/accessibility` at `/admin/pages` (all four pageKeys scaffolded + routes live as of #145–#148; paste-only, no redeploy needed)
 - **`prisma migrate deploy` automation on main** — today migrations are applied manually (D7, D12 on demo). Add a step to Vercel build or a GH Action
 - **Pre-launch checklist** — run through the full checklist below before announcing v1.0
 
@@ -164,7 +168,7 @@ Most of v1.0 engineering is complete (Phase D features, a11y Phases 1–3, sideb
 - Resend domain verification + `EMAIL_FROM`
 - `SENTRY_DSN` set, errors reach a Sentry project
 - `CRON_SECRET` set, Monday payout cron verified running
-- Privacy + TOS authored + published at `/privacy` + `/terms`
+- Privacy + TOS + Cookie Policy + Accessibility statement authored + pasted into `/admin/pages` (routes + editor already live via #145–#148)
 - Lighthouse CI GitHub Action (prevents a11y / perf regressions post-launch)
 
 ### v1.1 — "First polish pass" (target: 2 weeks after v1.0)
@@ -194,10 +198,14 @@ Run through this in order. Each row is a blocker that's cheap to miss and expens
 
 ### Legal + compliance
 
-- [ ] Privacy policy published at `/privacy`
-- [ ] Terms of Service published at `/terms`
-- [ ] Cookie banner (if targeting EU users — required under ePrivacy)
-- [ ] Sign-up consent checkbox linking to both
+Routes + admin editor shipped in PRs #145–#148. All that remains is pasting real copy into `/admin/pages` on production.
+
+- [ ] Privacy policy body authored + pasted at `/admin/pages` (pageKey `privacy`)
+- [ ] Terms of Service body authored + pasted at `/admin/pages` (pageKey `terms`)
+- [ ] Cookie Policy body authored + pasted (pageKey `cookies`) — required under EU ePrivacy
+- [ ] Accessibility statement authored + pasted (pageKey `accessibility`) — WCAG 2.2 AA conformance + complaint contact
+- [ ] Cookie banner UI (separate from the policy page) — if targeting EU users
+- [ ] Sign-up consent checkbox linking to Privacy + TOS
 - [ ] Legal review of: token refund policy, creative payout terms, consultation no-show policy
 
 ### Stripe
