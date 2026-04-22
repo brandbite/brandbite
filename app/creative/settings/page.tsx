@@ -524,6 +524,9 @@ export default function CreativeSettingsPage() {
             onChange={(e) => setDeleteConfirmEmail(e.target.value)}
             placeholder="Type your email to confirm"
             disabled={deletingAccount}
+            // Don't let password managers autofill this — the user must
+            // physically type their email as a "yes I meant it" safeguard.
+            autoComplete="off"
           />
           {deleteAccountError && (
             <InlineAlert variant="error" size="sm">
