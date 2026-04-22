@@ -1,6 +1,6 @@
 # Brandbite — Production Roadmap
 
-_Last updated: 2026-04-23 — Security Plan L1 + L2 + L3 + L5 shipped (blocked-attempt alerts)_
+_Last updated: 2026-04-23 — Security Plan complete (L1+L2+L3+L5+L4) — audit log, confirmations, receipts, blocked alerts, MFA_
 
 This file captures **what's ready**, **what's missing**, and **what ships in which version** as we move Brandbite from demo to production. It's a living plan — rewrite sections as reality changes.
 

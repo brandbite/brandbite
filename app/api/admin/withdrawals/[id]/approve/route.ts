@@ -13,6 +13,7 @@ import { getCurrentUserOrThrow } from "@/lib/auth";
 import { canApproveWithdrawals } from "@/lib/roles";
 import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 import { CONFIRMATION_PHRASES, checkConfirmationPhrase } from "@/lib/admin-confirmation";
+import { MFA_ACTION_TAG_MONEY, requireFreshMfa } from "@/lib/mfa";
 
 /**
  * POST /api/admin/withdrawals/:id/approve
@@ -69,6 +70,14 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       });
       return NextResponse.json({ error: phraseCheck.error }, { status: 400 });
     }
+
+    // L4 — MFA check. If no recent MFA, this returns a 202 { requiresMfa }
+    // response the client will use to prompt for the email code.
+    const mfa = await requireFreshMfa(user, MFA_ACTION_TAG_MONEY, {
+      ipAddress: auditCtx.ipAddress,
+      userAgent: auditCtx.userAgent,
+    });
+    if (!mfa.ok) return mfa.response;
 
     const withdrawal = await prisma.withdrawal.findUnique({
       where: { id },

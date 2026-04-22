@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 import { CONFIRMATION_PHRASES, checkConfirmationPhrase } from "@/lib/admin-confirmation";
+import { MFA_ACTION_TAG_MONEY, requireFreshMfa } from "@/lib/mfa";
 import { canPromoteToSiteAdmin, isSiteAdminRole } from "@/lib/roles";
 import { AdminActionType, UserRole, Prisma } from "@prisma/client";
 
@@ -207,6 +208,15 @@ export async function PATCH(req: NextRequest) {
         });
         return NextResponse.json({ error: phraseCheck.error }, { status: 400 });
       }
+
+      // L4 — MFA required for privilege escalation too (same trust window
+      // as money actions; once you've completed MFA for any MONEY_ACTION,
+      // subsequent privilege changes in the next 30 min don't re-challenge).
+      const mfa = await requireFreshMfa(user, MFA_ACTION_TAG_MONEY, {
+        ipAddress: auditCtx.ipAddress,
+        userAgent: auditCtx.userAgent,
+      });
+      if (!mfa.ok) return mfa.response;
     }
 
     const updated = await prisma.userAccount.update({

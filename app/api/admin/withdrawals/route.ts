@@ -13,6 +13,7 @@ import { getCurrentUserOrThrow } from "@/lib/auth";
 import { canApproveWithdrawals, canMarkWithdrawalsPaid, isSiteAdminRole } from "@/lib/roles";
 import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 import { CONFIRMATION_PHRASES, checkConfirmationPhrase } from "@/lib/admin-confirmation";
+import { MFA_ACTION_TAG_MONEY, requireFreshMfa } from "@/lib/mfa";
 
 const MAX_WITHDRAWALS = 200;
 
@@ -173,6 +174,14 @@ export async function PATCH(req: NextRequest) {
         });
         return NextResponse.json({ error: phraseCheck.error }, { status: 400 });
       }
+
+      // L4 — MFA check only for money-moving branches. REJECT still
+      // bypasses the second factor (same rationale as L2).
+      const mfa = await requireFreshMfa(user, MFA_ACTION_TAG_MONEY, {
+        ipAddress: auditCtx.ipAddress,
+        userAgent: auditCtx.userAgent,
+      });
+      if (!mfa.ok) return mfa.response;
     }
 
     const updated = await prisma.$transaction(async (tx) => {

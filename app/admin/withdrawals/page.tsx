@@ -19,6 +19,7 @@ import { LoadingState } from "@/components/ui/loading-state";
 import { useToast } from "@/components/ui/toast-provider";
 import { OwnerOnlyBanner } from "@/components/admin/owner-only-banner";
 import { ConfirmTypedPhraseModal } from "@/components/admin/confirm-typed-phrase-modal";
+import { MfaChallengeModal, type MfaChallengeInfo } from "@/components/admin/mfa-challenge-modal";
 
 type WithdrawalStatus = "PENDING" | "APPROVED" | "REJECTED" | "PAID";
 
@@ -68,6 +69,14 @@ export default function AdminWithdrawalsPage() {
     action: "APPROVE" | "MARK_PAID";
     amountTokens: number;
     creativeLabel: string;
+  } | null>(null);
+
+  // MFA state (L4). When a money-action POST returns 202 { requiresMfa },
+  // we stash the challenge + a retry closure here. The MfaChallengeModal
+  // opens; on verify success, retry() re-runs the original action.
+  const [pendingMfa, setPendingMfa] = useState<{
+    challenge: MfaChallengeInfo;
+    retry: () => Promise<void>;
   } | null>(null);
 
   useEffect(() => {
@@ -186,6 +195,22 @@ export default function AdminWithdrawalsPage() {
       });
 
       const json = await res.json().catch(() => null);
+
+      // L4 — 202 means server is asking for a fresh MFA code. Stash the
+      // retry and let the MfaChallengeModal drive: on verify success it
+      // calls retry() which re-invokes this same handleAction with the
+      // same args, and the server now sees recent MFA → proceeds.
+      if (res.status === 202 && (json as any)?.requiresMfa) {
+        setPendingMfa({
+          challenge: {
+            challengeId: (json as any).challengeId as string,
+            maskedEmail: (json as any).maskedEmail as string | undefined,
+            expiresAt: (json as any).expiresAt as string | undefined,
+          },
+          retry: () => handleAction(id, action, confirmation),
+        });
+        return;
+      }
 
       if (!res.ok) {
         const msg = (json as any)?.error || `Failed to update withdrawal (status ${res.status})`;
@@ -519,6 +544,20 @@ export default function AdminWithdrawalsPage() {
           const phrase = action === "APPROVE" ? "APPROVE" : "PAID";
           await handleAction(id, action, phrase);
           setPendingConfirm(null);
+        }}
+      />
+
+      {/* L4 — MFA second factor. Opens when a money-action POST returned
+          202. On verify success, re-runs the original action. */}
+      <MfaChallengeModal
+        open={pendingMfa !== null}
+        challenge={pendingMfa?.challenge ?? null}
+        onClose={() => setPendingMfa(null)}
+        onVerified={async () => {
+          if (!pendingMfa) return;
+          const retry = pendingMfa.retry;
+          setPendingMfa(null);
+          await retry();
         }}
       />
     </>
