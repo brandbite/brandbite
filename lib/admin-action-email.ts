@@ -16,10 +16,11 @@
 //           block the action or the audit log write.
 // -----------------------------------------------------------------------------
 
-import type { AdminActionLog, AdminActionOutcome, AdminActionType } from "@prisma/client";
+import type { AdminActionLog, AdminActionOutcome, AdminActionType, UserRole } from "@prisma/client";
 
 import { sendNotificationEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
+import { rateLimit } from "@/lib/rate-limit";
 
 // ---------------------------------------------------------------------------
 // Subject lines. Phrased as "you did X" from the recipient's POV — works
@@ -91,6 +92,7 @@ type EmailableLogEntry = {
   targetId: string | null;
   metadata: unknown;
   ipAddress: string | null;
+  errorMessage: string | null;
   createdAt: Date;
 };
 
@@ -180,6 +182,104 @@ export async function sendAdminActionReceipt(entry: EmailableLogEntry): Promise<
     await Promise.all(owners.map((o) => sendNotificationEmail(o.email, subject, html)));
   } catch (err) {
     console.warn("[admin-action-email] failed to send receipt:", {
+      action: entry.action,
+      actorEmail: entry.actorEmail,
+      err: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// L5 — email on BLOCKED attempt
+//
+// Triggered when a non-owner (SITE_ADMIN, or in weird states anyone else who
+// slipped past the proxy) hits an owner-only route and gets 403. Most common
+// real-world case: a compromised or disgruntled SITE_ADMIN trying to
+// self-promote or approve a withdrawal.
+//
+// Explicitly skipped: BLOCKED entries where the actor IS a SITE_OWNER. Those
+// are almost always a typoed confirmation phrase during a legitimate action
+// (L2 safeguard doing its job) — alerting on them is noise, not signal.
+//
+// Rate-limited to 1 alert per {actorId, action} per hour. A flood of 403s
+// from a brute-force tool shouldn't flood the inbox.
+// ---------------------------------------------------------------------------
+
+function buildBlockedEmail(entry: EmailableLogEntry, appUrl: string) {
+  const actionLabel = ACTION_SUBJECT_FRAGMENT[entry.action] ?? entry.action;
+  const subject = `⚠️ Brandbite admin — blocked attempt: ${actionLabel}`;
+  const when = formatWhen(entry.createdAt);
+
+  const html = [
+    `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto;">`,
+    `<div style="background: #b4232e; padding: 16px 24px; border-radius: 10px 10px 0 0;">`,
+    `<span style="font-size: 16px; font-weight: 700; color: #fff;">brandbite · security alert</span>`,
+    `</div>`,
+    `<div style="background: #fff; padding: 24px; border: 1px solid #e3e1dc; border-top: none;">`,
+    `<p style="margin: 0 0 12px; font-size: 14px; color: #424143;"><strong>Someone with insufficient privileges tried to run a privileged action.</strong> The request was blocked; the action did NOT happen. Review below.</p>`,
+    `<table role="presentation" cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: collapse; margin: 12px 0;">`,
+    `<tr><td style="padding: 6px 0; font-size: 12px; color: #7a7a7a; width: 120px; vertical-align: top;">Who tried</td><td style="padding: 6px 0; font-size: 13px; color: #2a2a2b;"><strong>${escapeHtml(entry.actorEmail)}</strong> · ${escapeHtml(entry.actorRole)}</td></tr>`,
+    `<tr><td style="padding: 6px 0; font-size: 12px; color: #7a7a7a; vertical-align: top;">Tried to</td><td style="padding: 6px 0; font-size: 13px; color: #2a2a2b;">${escapeHtml(entry.action)} ${escapeHtml(actionLabel)}</td></tr>`,
+    `<tr><td style="padding: 6px 0; font-size: 12px; color: #7a7a7a; vertical-align: top;">When</td><td style="padding: 6px 0; font-size: 13px; color: #2a2a2b;">${escapeHtml(when)}</td></tr>`,
+    entry.targetType && entry.targetId
+      ? `<tr><td style="padding: 6px 0; font-size: 12px; color: #7a7a7a; vertical-align: top;">Target</td><td style="padding: 6px 0; font-size: 13px; color: #2a2a2b; font-family: ui-monospace, SFMono-Regular, monospace;">${escapeHtml(entry.targetType)} ${escapeHtml(entry.targetId)}</td></tr>`
+      : "",
+    entry.ipAddress
+      ? `<tr><td style="padding: 6px 0; font-size: 12px; color: #7a7a7a; vertical-align: top;">IP</td><td style="padding: 6px 0; font-size: 13px; color: #2a2a2b; font-family: ui-monospace, SFMono-Regular, monospace;">${escapeHtml(entry.ipAddress)}</td></tr>`
+      : "",
+    entry.errorMessage
+      ? `<tr><td style="padding: 6px 0; font-size: 12px; color: #7a7a7a; vertical-align: top;">Reason</td><td style="padding: 6px 0; font-size: 13px; color: #b4232e;">${escapeHtml(entry.errorMessage)}</td></tr>`
+      : "",
+    `</table>`,
+    `<p style="margin: 18px 0 8px; font-size: 13px; color: #424143;">If this actor shouldn't have tried this — rotate their session, revoke their admin role, or investigate further.</p>`,
+    `<p style="margin: 8px 0 0; font-size: 12px; color: #7a7a7a;">Future repeats of this same attempt are rate-limited to one alert per hour — review the full audit log at <a href="${appUrl}/admin/audit-log" style="color: #b4232e;">${appUrl}/admin/audit-log</a>.</p>`,
+    `</div>`,
+    `<div style="background: #faf9f7; padding: 12px 24px; border-radius: 0 0 10px 10px; border: 1px solid #e3e1dc; border-top: none;">`,
+    `<p style="margin: 0; font-size: 11px; color: #9a9892; text-align: center;">Brandbite security monitor — you received this because you are a site owner.</p>`,
+    `</div>`,
+    `</div>`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return { subject, html };
+}
+
+/**
+ * Send a blocked-attempt alert to every SITE_OWNER. Only fires when:
+ *   - entry.outcome === "BLOCKED", AND
+ *   - entry.actorRole is NOT "SITE_OWNER" (owner-on-owner BLOCKED is almost
+ *     always a typoed confirmation phrase from L2; alerting is noise)
+ *
+ * Rate-limited to 1 alert per {actorId, action} per hour so a brute-force
+ * tool can't DoS the owner's inbox.
+ */
+export async function sendAdminActionBlockedAlert(
+  entry: EmailableLogEntry & { actorId: string },
+): Promise<void> {
+  if (isDemoMode()) return;
+  if (entry.outcome !== "BLOCKED") return;
+  if ((entry.actorRole as UserRole) === "SITE_OWNER") return;
+
+  try {
+    // Rate limit: 1 email per hour per {actor, action}. `allowed=false`
+    // means we've already sent one in the current hour window → skip.
+    const limitKey = `admin-blocked-email:${entry.actorId}:${entry.action}`;
+    const rl = await rateLimit(limitKey, { limit: 1, windowSeconds: 60 * 60 });
+    if (!rl.allowed) return;
+
+    const owners = await prisma.userAccount.findMany({
+      where: { role: "SITE_OWNER", deletedAt: null },
+      select: { email: true },
+    });
+    if (owners.length === 0) return;
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://brandbite.studio";
+    const { subject, html } = buildBlockedEmail(entry, appUrl);
+
+    await Promise.all(owners.map((o) => sendNotificationEmail(o.email, subject, html)));
+  } catch (err) {
+    console.warn("[admin-action-email] failed to send blocked-attempt alert:", {
       action: entry.action,
       actorEmail: entry.actorEmail,
       err: err instanceof Error ? err.message : String(err),
