@@ -286,3 +286,74 @@ export async function sendAdminActionBlockedAlert(
     });
   }
 }
+
+// ---------------------------------------------------------------------------
+// L6 — co-approval request on large withdrawals
+//
+// Fires when the first SITE_OWNER signs a large withdrawal and a second
+// signer is needed. Notifies every OTHER non-deleted SITE_OWNER so one of
+// them can step in and co-approve. The initial signer is excluded — they
+// already know they just signed.
+// ---------------------------------------------------------------------------
+
+type CoApprovalRequestInput = {
+  withdrawalId: string;
+  amountTokens: number;
+  creativeEmail?: string;
+  firstApproverEmail: string;
+  /** Owner IDs that have already signed — don't re-notify. */
+  alreadyApproverIds: string[];
+};
+
+export async function sendCoApprovalRequest(input: CoApprovalRequestInput): Promise<void> {
+  if (isDemoMode()) return;
+
+  try {
+    const owners = await prisma.userAccount.findMany({
+      where: {
+        role: "SITE_OWNER",
+        deletedAt: null,
+        id: { notIn: input.alreadyApproverIds },
+      },
+      select: { email: true },
+    });
+    if (owners.length === 0) return;
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://brandbite.studio";
+    const subject = `⏳ Brandbite admin — withdrawal awaiting your co-approval`;
+
+    const html = [
+      `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto;">`,
+      `<div style="background: #f5b82d; padding: 16px 24px; border-radius: 10px 10px 0 0;">`,
+      `<span style="font-size: 16px; font-weight: 700; color: #2a2a2b;">brandbite · co-approval needed</span>`,
+      `</div>`,
+      `<div style="background: #fff; padding: 24px; border: 1px solid #e3e1dc; border-top: none;">`,
+      `<p style="margin: 0 0 12px; font-size: 14px; color: #424143;"><strong>${escapeHtml(input.firstApproverEmail)}</strong> approved a large withdrawal and needs a second site owner to co-sign before it pays out.</p>`,
+      `<table role="presentation" cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: collapse; margin: 12px 0;">`,
+      `<tr><td style="padding: 6px 0; font-size: 12px; color: #7a7a7a; width: 120px; vertical-align: top;">Amount</td><td style="padding: 6px 0; font-size: 13px; color: #2a2a2b;"><strong>${input.amountTokens.toLocaleString()} tokens</strong></td></tr>`,
+      input.creativeEmail
+        ? `<tr><td style="padding: 6px 0; font-size: 12px; color: #7a7a7a; vertical-align: top;">Creative</td><td style="padding: 6px 0; font-size: 13px; color: #2a2a2b;">${escapeHtml(input.creativeEmail)}</td></tr>`
+        : "",
+      `<tr><td style="padding: 6px 0; font-size: 12px; color: #7a7a7a; vertical-align: top;">Withdrawal</td><td style="padding: 6px 0; font-size: 12px; color: #2a2a2b; font-family: ui-monospace, SFMono-Regular, monospace;">${escapeHtml(input.withdrawalId)}</td></tr>`,
+      `<tr><td style="padding: 6px 0; font-size: 12px; color: #7a7a7a; vertical-align: top;">Already signed</td><td style="padding: 6px 0; font-size: 13px; color: #2a2a2b;">${escapeHtml(input.firstApproverEmail)}</td></tr>`,
+      `</table>`,
+      `<p style="margin: 18px 0 0; font-size: 13px; color: #424143;">If you agree this withdrawal should pay out, open the admin panel and click Approve:</p>`,
+      `<p style="margin: 12px 0 0; font-size: 14px;"><a href="${appUrl}/admin/withdrawals" style="display: inline-block; padding: 10px 20px; background: #f15b2b; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600;">Review withdrawals</a></p>`,
+      `<p style="margin: 18px 0 0; font-size: 12px; color: #7a7a7a;">If this wasn't expected — for example if ${escapeHtml(input.firstApproverEmail)} should not be approving withdrawals — do NOT approve. Investigate via <a href="${appUrl}/admin/audit-log" style="color: #f15b2b;">the audit log</a> first.</p>`,
+      `</div>`,
+      `<div style="background: #faf9f7; padding: 12px 24px; border-radius: 0 0 10px 10px; border: 1px solid #e3e1dc; border-top: none;">`,
+      `<p style="margin: 0; font-size: 11px; color: #9a9892; text-align: center;">Brandbite security monitor</p>`,
+      `</div>`,
+      `</div>`,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    await Promise.all(owners.map((o) => sendNotificationEmail(o.email, subject, html)));
+  } catch (err) {
+    console.warn("[admin-action-email] failed to send co-approval request:", {
+      withdrawalId: input.withdrawalId,
+      err: err instanceof Error ? err.message : String(err),
+    });
+  }
+}

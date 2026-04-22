@@ -37,6 +37,17 @@ type AdminWithdrawal = {
     name: string | null;
     role: string;
   };
+  // L6 — 2-person approval state. `needsCoApproval` is true above the
+  // configured threshold; the UI uses this + `approverIds` to render a
+  // "1/2 approved" chip and to disable the Approve button when the
+  // current viewer has already signed.
+  coApproval: {
+    needsCoApproval: boolean;
+    requiredApprovals: number;
+    currentApprovalCount: number;
+    approverIds: string[];
+    approverEmails: string[];
+  };
 };
 
 type AdminWithdrawalsResponse = {
@@ -45,6 +56,10 @@ type AdminWithdrawalsResponse = {
     totalPaid: number;
     pendingCount: number;
     withdrawalsCount: number;
+  };
+  coApproval?: {
+    thresholdTokens: number;
+    requiredApprovals: number;
   };
   withdrawals: AdminWithdrawal[];
 };
@@ -209,6 +224,30 @@ export default function AdminWithdrawalsPage() {
           },
           retry: () => handleAction(id, action, confirmation),
         });
+        return;
+      }
+
+      // L6 — 202 with awaitingCoApproval means the first signature landed
+      // on a large withdrawal and another owner still needs to sign. The
+      // approval row is already in the DB; the UI just needs to refetch
+      // so the progress chip renders, and tell the user what happened.
+      if (res.status === 202 && (json as any)?.awaitingCoApproval) {
+        const msg =
+          (json as any)?.message ||
+          "Your approval is recorded. Another site owner must also approve this withdrawal.";
+        showToast({
+          type: "success",
+          title: "Awaiting co-approval",
+          description: msg,
+        });
+        // Refetch the list so the progress chip updates.
+        const reload = await fetch("/api/admin/withdrawals", { cache: "no-store" });
+        if (reload.ok) {
+          const reloadJson = (await reload
+            .json()
+            .catch(() => null)) as AdminWithdrawalsResponse | null;
+          if (reloadJson) setData(reloadJson);
+        }
         return;
       }
 
@@ -441,6 +480,35 @@ export default function AdminWithdrawalsPage() {
                           <p className="text-[10px] text-[var(--bb-danger-text)]">
                             {w.adminRejectReason}
                           </p>
+                        )}
+                        {/* L6 — 2-person approval progress for PENDING rows
+                            above the threshold. Also show even at 0/2 so the
+                            viewer knows this one will need a co-signer. */}
+                        {w.status === "PENDING" && w.coApproval?.needsCoApproval && (
+                          <div className="mt-0.5">
+                            <span
+                              className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${
+                                w.coApproval.currentApprovalCount >= w.coApproval.requiredApprovals
+                                  ? "bg-[var(--bb-success-bg)] text-[var(--bb-success-text)]"
+                                  : "bg-[var(--bb-warning-bg)] text-[var(--bb-warning-text)]"
+                              }`}
+                              title={
+                                w.coApproval.approverEmails.length > 0
+                                  ? `Signed by: ${w.coApproval.approverEmails.join(", ")}`
+                                  : "Awaiting 2 site owners"
+                              }
+                            >
+                              {w.coApproval.currentApprovalCount}/{w.coApproval.requiredApprovals}{" "}
+                              owners
+                            </span>
+                            {w.coApproval.currentApprovalCount > 0 &&
+                              w.coApproval.currentApprovalCount <
+                                w.coApproval.requiredApprovals && (
+                                <p className="mt-1 max-w-[180px] text-[10px] text-[var(--bb-text-tertiary)]">
+                                  Awaiting second owner
+                                </p>
+                              )}
+                          </div>
                         )}
                       </div>
                     </TD>

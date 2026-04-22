@@ -265,6 +265,9 @@ model UserAccount {
   // MFA challenges issued to this user (email-code second factor)
   mfaChallenges MfaChallenge[]
 
+  // Co-approvals this user has signed on large-withdrawal requests
+  withdrawalCoApprovals WithdrawalApproval[] @relation("WithdrawalCoApprover")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -973,8 +976,43 @@ model Withdrawal {
   approvedAt DateTime?
   paidAt     DateTime?
 
+  approvals WithdrawalApproval[]
+
   @@index([creativeId, createdAt])
   @@index([status, createdAt])
+}
+
+// -----------------------------------------------------------------------------
+// 2-person approval on large withdrawals (Security Precaution Plan — L6)
+//
+// Above a threshold, a single SITE_OWNER approving a withdrawal is NOT
+// enough to flip it to APPROVED. Two distinct owners must each click
+// Approve (with L2 confirmation + L4 MFA each time). The first approval
+// records a row here; the second transitions the withdrawal.
+//
+// If there is only one SITE_OWNER on the platform, the coapproval check
+// bypasses cleanly (otherwise large withdrawals would freeze forever).
+// The bypass itself writes an AdminActionLog entry so it's visible.
+// -----------------------------------------------------------------------------
+
+model WithdrawalApproval {
+  id String @id @default(cuid())
+
+  withdrawalId String
+  withdrawal   Withdrawal @relation(fields: [withdrawalId], references: [id], onDelete: Cascade)
+
+  approverId String
+  approver   UserAccount @relation("WithdrawalCoApprover", fields: [approverId], references: [id])
+
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  // Same owner can't sign the same withdrawal twice — forces two distinct
+  // owners for the 2-person rule to complete.
+  @@unique([withdrawalId, approverId])
+  @@index([withdrawalId])
 }
 
 // -----------------------------------------------------------------------------

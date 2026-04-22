@@ -14,6 +14,13 @@ import { canApproveWithdrawals } from "@/lib/roles";
 import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 import { CONFIRMATION_PHRASES, checkConfirmationPhrase } from "@/lib/admin-confirmation";
 import { MFA_ACTION_TAG_MONEY, requireFreshMfa } from "@/lib/mfa";
+import {
+  evaluateCoApproval,
+  hasAlreadyApproved,
+  recordApproval,
+  requiresCoApproval,
+} from "@/lib/withdrawal-coapproval";
+import { sendCoApprovalRequest } from "@/lib/admin-action-email";
 
 /**
  * POST /api/admin/withdrawals/:id/approve
@@ -81,6 +88,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
     const withdrawal = await prisma.withdrawal.findUnique({
       where: { id },
+      include: {
+        creative: { select: { email: true } },
+      },
     });
 
     if (!withdrawal) {
@@ -108,6 +118,85 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         },
         { status: 400 },
       );
+    }
+
+    // L6 — 2-person approval on large withdrawals. Below the threshold,
+    // a single approver is enough and we fall through to the existing
+    // ledger transaction. At/above the threshold we collect signatures
+    // from two distinct SITE_OWNERs before flipping the status.
+    if (requiresCoApproval(withdrawal.amountTokens)) {
+      // Reject a double-sign with a clear message instead of leaving the
+      // owner confused why their click does nothing.
+      if (await hasAlreadyApproved(withdrawal.id, user.id)) {
+        return NextResponse.json(
+          {
+            error:
+              "You have already signed this withdrawal. A second owner still needs to approve.",
+          },
+          { status: 409 },
+        );
+      }
+
+      // Record the current signer's approval row. This both audits who
+      // signed and drives the count that `evaluateCoApproval` consults.
+      await recordApproval({
+        withdrawalId: withdrawal.id,
+        approverId: user.id,
+        ipAddress: auditCtx.ipAddress,
+        userAgent: auditCtx.userAgent,
+      });
+
+      const snapshot = await evaluateCoApproval(withdrawal.id);
+
+      if (!snapshot.hasEnough) {
+        // First signature landed but we still need another owner.
+        // Notify the OTHER SITE_OWNERs by email and return a 202 so the
+        // UI can render "Awaiting co-approval".
+        await sendCoApprovalRequest({
+          withdrawalId: withdrawal.id,
+          amountTokens: withdrawal.amountTokens,
+          creativeEmail: withdrawal.creative?.email,
+          firstApproverEmail: user.email,
+          alreadyApproverIds: snapshot.approverIds,
+        });
+
+        await logAdminAction({
+          actor: user,
+          action: AdminActionType.WITHDRAWAL_APPROVE,
+          outcome: "SUCCESS",
+          targetType: "Withdrawal",
+          targetId: withdrawal.id,
+          metadata: {
+            op: "coapproval-first-signature",
+            amountTokens: withdrawal.amountTokens,
+            currentApprovalCount: snapshot.currentApprovalCount,
+            requiredApprovals: snapshot.requiredApprovals,
+            thresholdTokens: snapshot.thresholdTokens,
+          },
+          context: auditCtx,
+        });
+
+        return NextResponse.json(
+          {
+            awaitingCoApproval: true,
+            currentApprovalCount: snapshot.currentApprovalCount,
+            requiredApprovals: snapshot.requiredApprovals,
+            thresholdTokens: snapshot.thresholdTokens,
+            message:
+              "Your approval is recorded. Another site owner must also approve this withdrawal before it completes.",
+          },
+          { status: 202 },
+        );
+      }
+
+      // snapshot.hasEnough — either 2 signatures collected, or the
+      // single-owner bypass. Fall through to the ledger transaction with
+      // a flag in the audit metadata for the bypass case.
+      if (snapshot.bypassedSingleOwner) {
+        console.warn(
+          "[withdrawal-coapproval] single-owner bypass on large withdrawal — add a second SITE_OWNER for real 2-person protection.",
+        );
+      }
     }
 
     // Ledger write + status update in a single transaction.

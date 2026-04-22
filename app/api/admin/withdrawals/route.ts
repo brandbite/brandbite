@@ -14,6 +14,15 @@ import { canApproveWithdrawals, canMarkWithdrawalsPaid, isSiteAdminRole } from "
 import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 import { CONFIRMATION_PHRASES, checkConfirmationPhrase } from "@/lib/admin-confirmation";
 import { MFA_ACTION_TAG_MONEY, requireFreshMfa } from "@/lib/mfa";
+import {
+  COAPPROVAL_THRESHOLD_TOKENS,
+  REQUIRED_APPROVALS,
+  evaluateCoApproval,
+  hasAlreadyApproved,
+  recordApproval,
+  requiresCoApproval,
+} from "@/lib/withdrawal-coapproval";
+import { sendCoApprovalRequest } from "@/lib/admin-action-email";
 
 const MAX_WITHDRAWALS = 200;
 
@@ -44,6 +53,14 @@ export async function GET(_req: NextRequest) {
             role: true,
           },
         },
+        approvals: {
+          select: {
+            approverId: true,
+            approver: { select: { email: true } },
+            createdAt: true,
+          },
+          orderBy: { createdAt: "asc" },
+        },
       },
       orderBy: {
         createdAt: "desc",
@@ -69,6 +86,16 @@ export async function GET(_req: NextRequest) {
         name: w.creative.name,
         role: w.creative.role,
       },
+      // L6 co-approval state for the UI. `needsCoApproval` lets the UI
+      // decide whether to render the progress chip at all; `approvers`
+      // tells it whether the current viewer has already signed.
+      coApproval: {
+        needsCoApproval: requiresCoApproval(w.amountTokens),
+        requiredApprovals: REQUIRED_APPROVALS,
+        currentApprovalCount: w.approvals.length,
+        approverIds: w.approvals.map((a) => a.approverId),
+        approverEmails: w.approvals.map((a) => a.approver?.email ?? "(unknown)"),
+      },
     }));
 
     return NextResponse.json({
@@ -77,6 +104,10 @@ export async function GET(_req: NextRequest) {
         totalPaid,
         pendingCount,
         withdrawalsCount: items.length,
+      },
+      coApproval: {
+        thresholdTokens: COAPPROVAL_THRESHOLD_TOKENS,
+        requiredApprovals: REQUIRED_APPROVALS,
       },
       withdrawals: items,
     });
@@ -182,6 +213,69 @@ export async function PATCH(req: NextRequest) {
         userAgent: auditCtx.userAgent,
       });
       if (!mfa.ok) return mfa.response;
+    }
+
+    // L6 — 2-person approval on large APPROVEs. MARK_PAID runs a single
+    // owner only because the approve step already collected the 2 sigs;
+    // re-gating MARK_PAID on coapproval would be redundant friction.
+    if (action === "APPROVE") {
+      const existing = await prisma.withdrawal.findUnique({
+        where: { id },
+        select: { amountTokens: true, creative: { select: { email: true } } },
+      });
+      if (existing && requiresCoApproval(existing.amountTokens)) {
+        if (await hasAlreadyApproved(id, user.id)) {
+          return NextResponse.json(
+            {
+              error:
+                "You have already signed this withdrawal. A second owner still needs to approve.",
+            },
+            { status: 409 },
+          );
+        }
+        await recordApproval({
+          withdrawalId: id,
+          approverId: user.id,
+          ipAddress: auditCtx.ipAddress,
+          userAgent: auditCtx.userAgent,
+        });
+        const snapshot = await evaluateCoApproval(id);
+        if (!snapshot.hasEnough) {
+          await sendCoApprovalRequest({
+            withdrawalId: id,
+            amountTokens: existing.amountTokens,
+            creativeEmail: existing.creative?.email,
+            firstApproverEmail: user.email,
+            alreadyApproverIds: snapshot.approverIds,
+          });
+          await logAdminAction({
+            actor: user,
+            action: AdminActionType.WITHDRAWAL_APPROVE,
+            outcome: "SUCCESS",
+            targetType: "Withdrawal",
+            targetId: id,
+            metadata: {
+              op: "coapproval-first-signature",
+              amountTokens: existing.amountTokens,
+              currentApprovalCount: snapshot.currentApprovalCount,
+              requiredApprovals: snapshot.requiredApprovals,
+              thresholdTokens: snapshot.thresholdTokens,
+            },
+            context: auditCtx,
+          });
+          return NextResponse.json(
+            {
+              awaitingCoApproval: true,
+              currentApprovalCount: snapshot.currentApprovalCount,
+              requiredApprovals: snapshot.requiredApprovals,
+              thresholdTokens: snapshot.thresholdTokens,
+              message:
+                "Your approval is recorded. Another site owner must also approve this withdrawal before it completes.",
+            },
+            { status: 202 },
+          );
+        }
+      }
     }
 
     const updated = await prisma.$transaction(async (tx) => {
