@@ -5,6 +5,7 @@
 
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -107,12 +108,14 @@ export default function BlogListingPage() {
                 className="group overflow-hidden rounded-xl border border-[var(--bb-border-subtle)] bg-white transition-shadow hover:shadow-lg"
               >
                 {/* Thumbnail */}
-                <div className="aspect-[16/9] bg-[#e8dff5]">
+                <div className="relative aspect-[16/9] bg-[#e8dff5]">
                   {post.thumbnailUrl ? (
-                    <img
+                    <Image
                       src={post.thumbnailUrl}
                       alt={post.title}
-                      className="h-full w-full object-cover"
+                      fill
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      className="object-cover"
                     />
                   ) : (
                     <div className="flex h-full items-center justify-center">

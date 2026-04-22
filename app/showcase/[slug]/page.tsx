@@ -213,12 +213,14 @@ export default function ShowcaseDetailPage() {
                 {gallery.map((img, idx) => (
                   <div
                     key={img.storageKey || idx}
-                    className="aspect-[4/3] overflow-hidden rounded-lg"
+                    className="relative aspect-[4/3] overflow-hidden rounded-lg"
                   >
-                    <img
+                    <Image
                       src={img.url}
                       alt={img.alt || `${work.title} gallery image ${idx + 1}`}
-                      className="h-full w-full object-cover"
+                      fill
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      className="object-cover"
                     />
                   </div>
                 ))}

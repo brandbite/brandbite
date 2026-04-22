@@ -5,6 +5,7 @@
 
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -139,10 +140,12 @@ export default function ShowcasePage() {
                 {/* Thumbnail */}
                 <div className="relative aspect-[4/3] bg-[#e8dff5]">
                   {work.thumbnailUrl ? (
-                    <img
+                    <Image
                       src={work.thumbnailUrl}
                       alt={work.title}
-                      className="h-full w-full object-cover"
+                      fill
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      className="object-cover"
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center">
