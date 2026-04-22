@@ -6,9 +6,14 @@
 import { describe, it, expect } from "vitest";
 
 // Recreate the path matching logic from proxy.ts to test it in isolation.
-// Keep this list in sync with PUBLIC_PATHS in proxy.ts — the test below
-// explicitly covers the legal pages, which MUST stay public because
-// unauthenticated users read them from cookie banners and sign-up flows.
+// Keep this list in sync with PUBLIC_PATHS in proxy.ts — the tests below
+// explicitly cover:
+//   - Legal pages: unauthenticated users read them from cookie banners
+//     and sign-up flows (GDPR, Stripe checkout).
+//   - /api/health: external uptime monitors need a 200/503 response
+//     without a session cookie.
+//   - /api/cron: Vercel Cron invocations have no session cookie; the
+//     route handlers enforce their own CRON_SECRET Bearer auth.
 const PUBLIC_PATHS = [
   "/",
   "/login",
@@ -19,6 +24,8 @@ const PUBLIC_PATHS = [
   "/api/billing/webhook",
   "/api/invite",
   "/api/session",
+  "/api/health",
+  "/api/cron",
   "/privacy",
   "/terms",
   "/cookies",
@@ -108,6 +115,31 @@ describe("isPublicPath", () => {
       expect(isPublicPath(legalPath)).toBe(true);
     });
   }
+
+  // -------------------------------------------------------------------------
+  // Infrastructure routes — auth-gating these silently breaks production
+  // without surfacing an error anywhere.
+  //
+  //   /api/health: external uptime monitors (BetterStack / Upptime) hit it
+  //     with no cookie. A 307-to-login is not a 200 or 503 and therefore not
+  //     a useful health signal.
+  //
+  //   /api/cron/*: Vercel Cron invokes these on a schedule with no session
+  //     cookie. Each cron route has its own CRON_SECRET Bearer check, so the
+  //     proxy only needs to let the request through. Gating here means the
+  //     scheduled jobs never run and Vercel logs the 307 as "success".
+  // -------------------------------------------------------------------------
+  it("marks /api/health as public", () => {
+    expect(isPublicPath("/api/health")).toBe(true);
+  });
+
+  it("marks /api/cron/process-payouts as public", () => {
+    expect(isPublicPath("/api/cron/process-payouts")).toBe(true);
+  });
+
+  it("marks any future /api/cron/* route as public", () => {
+    expect(isPublicPath("/api/cron/hypothetical-future-job")).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------
