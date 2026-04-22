@@ -108,5 +108,14 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
+      # NOTE: we'd love to dry-run `prisma migrate deploy` here to catch
+      # broken migrations before they hit production, but the historical
+      # `db push` models (AiGeneration, Moodboard, Notification) mean
+      # `migrate deploy` against a clean Postgres fails at the first
+      # migration that touches those tables. The integration setup works
+      # around this with `db push --force-reset` instead (see
+      # tests/integration/setup.ts). Once the backfill migrations land
+      # (see "Migration backfill" in docs/production-roadmap.md), we can
+      # swap this back to a real `prisma migrate deploy` dry-run.
       - name: Run integration tests
         run: npm run test:integration
