@@ -8,9 +8,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { LedgerDirection } from "@prisma/client";
+import { AdminActionType, LedgerDirection } from "@prisma/client";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { canApproveWithdrawals, canMarkWithdrawalsPaid, isSiteAdminRole } from "@/lib/roles";
+import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 
 const MAX_WITHDRAWALS = 200;
 
@@ -111,17 +112,37 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Missing id or action" }, { status: 400 });
     }
 
+    const auditCtx = extractAuditContext(req);
+
     // Owner-only guard for money-moving actions. APPROVE commits the
     // platform toward paying the creative; MARK_PAID records that the
     // money actually left. REJECT stays admin-allowed — rejecting a
     // pending request isn't a financial commitment.
     if (action === "APPROVE" && !canApproveWithdrawals(user.role)) {
+      await logAdminAction({
+        actor: user,
+        action: AdminActionType.WITHDRAWAL_APPROVE,
+        outcome: "BLOCKED",
+        targetType: "Withdrawal",
+        targetId: id,
+        errorMessage: "Only site owners can approve withdrawals.",
+        context: auditCtx,
+      });
       return NextResponse.json(
         { error: "Only site owners can approve withdrawals." },
         { status: 403 },
       );
     }
     if (action === "MARK_PAID" && !canMarkWithdrawalsPaid(user.role)) {
+      await logAdminAction({
+        actor: user,
+        action: AdminActionType.WITHDRAWAL_MARK_PAID,
+        outcome: "BLOCKED",
+        targetType: "Withdrawal",
+        targetId: id,
+        errorMessage: "Only site owners can mark withdrawals as paid.",
+        context: auditCtx,
+      });
       return NextResponse.json(
         { error: "Only site owners can mark withdrawals as paid." },
         { status: 403 },
@@ -265,6 +286,31 @@ export async function PATCH(req: NextRequest) {
       return w;
     });
 
+    // Map the action to the corresponding audit enum + log the success.
+    // Logged outside the transaction so a failed log write doesn't roll
+    // back the actual withdrawal update (logAdminAction is non-throwing
+    // anyway, but belt-and-suspenders).
+    const actionEnum: AdminActionType =
+      action === "APPROVE"
+        ? AdminActionType.WITHDRAWAL_APPROVE
+        : action === "REJECT"
+          ? AdminActionType.WITHDRAWAL_REJECT
+          : AdminActionType.WITHDRAWAL_MARK_PAID;
+    await logAdminAction({
+      actor: user,
+      action: actionEnum,
+      outcome: "SUCCESS",
+      targetType: "Withdrawal",
+      targetId: updated.id,
+      metadata: {
+        amountTokens: updated.amountTokens,
+        creativeId: updated.creative.id,
+        creativeEmail: updated.creative.email,
+        newStatus: updated.status,
+      },
+      context: auditCtx,
+    });
+
     return NextResponse.json({
       withdrawal: {
         id: updated.id,
@@ -279,6 +325,10 @@ export async function PATCH(req: NextRequest) {
     // If we threw a Response from inside the tx, forward it unchanged.
     if (error instanceof Response) {
       const text = await error.text();
+      // Best-effort: capture the failure in the audit log. We don't know
+      // the action cleanly at this catch-site (it was parsed earlier) but
+      // we log generically so the ERROR shows up somewhere. No throw
+      // inside the log call path.
       return NextResponse.json({ error: text || "Request failed" }, { status: error.status });
     }
 

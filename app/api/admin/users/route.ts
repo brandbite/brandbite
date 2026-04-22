@@ -6,8 +6,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 import { canPromoteToSiteAdmin, isSiteAdminRole } from "@/lib/roles";
-import { UserRole, Prisma } from "@prisma/client";
+import { AdminActionType, UserRole, Prisma } from "@prisma/client";
 
 const VALID_ROLES: string[] = ["SITE_OWNER", "SITE_ADMIN", "DESIGNER", "CUSTOMER"];
 
@@ -131,11 +132,23 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "You cannot change your own role." }, { status: 400 });
     }
 
+    const auditCtx = extractAuditContext(req);
+
     // Role escalation guard — only SITE_OWNER can hand out admin roles
     // or demote an existing SITE_OWNER. SITE_ADMIN can still change
     // CUSTOMER / DESIGNER roles (helping customers, managing creatives).
     if (role === "SITE_OWNER" || role === "SITE_ADMIN") {
       if (!canPromoteToSiteAdmin(user.role)) {
+        await logAdminAction({
+          actor: user,
+          action: AdminActionType.USER_PROMOTE_TO_ADMIN,
+          outcome: "BLOCKED",
+          targetType: "UserAccount",
+          targetId: target.id,
+          metadata: { attemptedRole: role, targetEmail: target.email },
+          errorMessage: "Only site owners can assign admin roles.",
+          context: auditCtx,
+        });
         return NextResponse.json(
           { error: "Only site owners can assign admin roles." },
           { status: 403 },
@@ -144,6 +157,20 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (target.role === "SITE_OWNER" && !canPromoteToSiteAdmin(user.role)) {
+      await logAdminAction({
+        actor: user,
+        action: AdminActionType.USER_PROMOTE_TO_ADMIN,
+        outcome: "BLOCKED",
+        targetType: "UserAccount",
+        targetId: target.id,
+        metadata: {
+          attemptedRole: role,
+          targetEmail: target.email,
+          targetCurrentRole: target.role,
+        },
+        errorMessage: "Only site owners can modify another site owner's role.",
+        context: auditCtx,
+      });
       return NextResponse.json(
         { error: "Only site owners can modify another site owner's role." },
         { status: 403 },
@@ -155,6 +182,25 @@ export async function PATCH(req: NextRequest) {
       data: { role: role as UserRole },
       select: { id: true, email: true, name: true, role: true },
     });
+
+    // Only log a role change to SITE_OWNER / SITE_ADMIN under the
+    // PROMOTE_TO_ADMIN event — changing a CUSTOMER to DESIGNER is not a
+    // privilege-escalation event and shouldn't clutter the log.
+    if (role === "SITE_OWNER" || role === "SITE_ADMIN" || target.role === "SITE_OWNER") {
+      await logAdminAction({
+        actor: user,
+        action: AdminActionType.USER_PROMOTE_TO_ADMIN,
+        outcome: "SUCCESS",
+        targetType: "UserAccount",
+        targetId: updated.id,
+        metadata: {
+          targetEmail: updated.email,
+          previousRole: target.role,
+          newRole: updated.role,
+        },
+        context: auditCtx,
+      });
+    }
 
     return NextResponse.json({ user: updated });
   } catch (error: unknown) {

@@ -7,10 +7,11 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { Prisma, WithdrawalStatus } from "@prisma/client";
+import { AdminActionType, Prisma, WithdrawalStatus } from "@prisma/client";
 import { applyUserLedgerEntry, getUserTokenBalance } from "@/lib/token-engine";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { canApproveWithdrawals } from "@/lib/roles";
+import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 
 /**
  * POST /api/admin/withdrawals/:id/approve
@@ -19,7 +20,7 @@ import { canApproveWithdrawals } from "@/lib/roles";
  * the creative. The sibling PATCH /api/admin/withdrawals route enforces the
  * same policy via canApproveWithdrawals.
  */
-export async function POST(_request: Request, context: { params: Promise<{ id: string }> }) {
+export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
 
   if (!id) {
@@ -28,7 +29,17 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
 
   try {
     const user = await getCurrentUserOrThrow();
+    const auditCtx = extractAuditContext(request);
     if (!canApproveWithdrawals(user.role)) {
+      await logAdminAction({
+        actor: user,
+        action: AdminActionType.WITHDRAWAL_APPROVE,
+        outcome: "BLOCKED",
+        targetType: "Withdrawal",
+        targetId: id,
+        errorMessage: "Only site owners can approve withdrawals.",
+        context: auditCtx,
+      });
       return NextResponse.json(
         { error: "Only site owners can approve withdrawals." },
         { status: 403 },
@@ -101,6 +112,21 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
         ledgerEntryId: ledgerResult.ledger.id,
         creativeBalanceAfter: ledgerResult.balanceAfter,
       };
+    });
+
+    await logAdminAction({
+      actor: user,
+      action: AdminActionType.WITHDRAWAL_APPROVE,
+      outcome: "SUCCESS",
+      targetType: "Withdrawal",
+      targetId: withdrawal.id,
+      metadata: {
+        amountTokens: withdrawal.amountTokens,
+        creativeId: withdrawal.creativeId,
+        ledgerEntryId: result.ledgerEntryId,
+        creativeBalanceAfter: result.creativeBalanceAfter,
+      },
+      context: auditCtx,
     });
 
     return NextResponse.json(
