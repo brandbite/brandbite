@@ -28,7 +28,7 @@ import type { AdminActionOutcome, AdminActionType, Prisma, UserRole } from "@pri
 import { prisma } from "@/lib/prisma";
 import type { SessionUser } from "@/lib/roles";
 import { getClientIp } from "@/lib/rate-limit";
-import { sendAdminActionReceipt } from "@/lib/admin-action-email";
+import { sendAdminActionBlockedAlert, sendAdminActionReceipt } from "@/lib/admin-action-email";
 
 export type AdminAuditContext = {
   ipAddress: string | null;
@@ -104,23 +104,28 @@ export async function logAdminAction(input: LogAdminActionInput): Promise<void> 
     });
   }
 
-  // L3 — email receipt on SUCCESS. Best-effort, non-throwing; skipped in
-  // demo mode; BLOCKED / ERROR outcomes ignored (L5 owns those).
-  // Run after the log write so the recipients always get a receipt for a
-  // row that actually exists in the audit log. Failure here does NOT undo
-  // the log write — the receipt is supplementary.
+  // L3 — email receipt on SUCCESS.
+  // L5 — alert to SITE_OWNERs on BLOCKED from a non-owner actor.
+  // Both are best-effort and non-throwing; both skipped in demo mode.
+  // Run after the log write so recipients get a receipt for a row that
+  // actually exists in the audit log. Failure here does NOT undo the log.
+  const emailEntry = {
+    actorEmail: actor.email,
+    actorRole: actor.role as UserRole,
+    action,
+    outcome,
+    metadata: metadata ?? null,
+    targetType: targetType ?? null,
+    targetId: targetId ?? null,
+    ipAddress: context?.ipAddress ?? null,
+    errorMessage: errorMessage ?? null,
+    createdAt,
+  };
+
   if (outcome === "SUCCESS") {
-    await sendAdminActionReceipt({
-      actorEmail: actor.email,
-      actorRole: actor.role as UserRole,
-      action,
-      outcome,
-      metadata: metadata ?? null,
-      targetType: targetType ?? null,
-      targetId: targetId ?? null,
-      ipAddress: context?.ipAddress ?? null,
-      createdAt,
-    });
+    await sendAdminActionReceipt(emailEntry);
+  } else if (outcome === "BLOCKED") {
+    await sendAdminActionBlockedAlert({ ...emailEntry, actorId: actor.id });
   }
 }
 
