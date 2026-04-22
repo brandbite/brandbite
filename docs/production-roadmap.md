@@ -1,6 +1,6 @@
 # Brandbite — Production Roadmap
 
-_Last updated: 2026-04-22 — Blocker #3 done, migrate-deploy automated, Lighthouse CI, baseline squashed, session-timeout WCAG 2.2.1_
+_Last updated: 2026-04-22 — Phase C perf (next/image on R2 + presign cache) shipped_
 
 This file captures **what's ready**, **what's missing**, and **what ships in which version** as we move Brandbite from demo to production. It's a living plan — rewrite sections as reality changes.
 
@@ -26,6 +26,8 @@ This file captures **what's ready**, **what's missing**, and **what ships in whi
 - **GDPR right-to-erasure** (Blocker #3 — PRs #125 + #150): `DELETE /api/customer/account` and `DELETE /api/creative/account` with shared `lib/account-deletion.ts` (soft-delete + anonymize + FK cleanup). Danger zone on both settings pages with typed-email confirm. Plus a softer **"Leave workspace"** flow (`DELETE /api/customer/members/me`) for team members who want to exit a company without nuking their account — blocks the sole OWNER from orphaning the workspace.
 - **Migration automation** (PR #152): `scripts/vercel-build.mjs` runs `prisma migrate deploy` on every **production** Vercel deploy (gated on `VERCEL_ENV === "production"` so preview deploys don't apply WIP migrations to the shared demo DB). CI gains a `migrate deploy` dry-run step so a broken migration fails the PR instead of the prod deploy. See the "Migration rollback" section below for incident procedure.
 - **Migration baseline squash** (PR #154): the 25 pre-existing migrations plus the 22 `db push`-introduced models (AiGeneration, Moodboard, Notification, BetterAuth tables, CMS tables, …) collapsed into a single `20260422000000_baseline` matching the current schema. CI's migrate-deploy dry-run (disabled in #152) re-enabled and green. Demo cut-over is a one-time `DELETE FROM _prisma_migrations` + `prisma migrate resolve --applied 20260422000000_baseline` (see PR body for exact commands).
+- **R2 presigned-URL cache** (PR #97, pre-dates the Phase C audit): `lib/r2.ts` memoises `getSignedUrl` for 10 minutes (presigns for 20, so served URLs are always ≥ 10 min from expiry). Drop-in cache with periodic eviction + `invalidatePresignedUrlCache(storageKey)` export for delete paths. Closes the Phase C2 item from the original optimization plan.
+- **`next/image` on R2 content** (PR #158): marketing surfaces now render R2-hosted images through Next's image optimizer (WebP/AVIF, responsive `sizes`, lazy by default, `priority` on article heroes) — blog / news / showcase listings + details + landing-page showcase thumbnails. Moodboard tiles intentionally skipped (canvas context + moodboard disabled for v1.0). Closes the Phase C1 item.
 
 ### 🟡 Partial — works in some paths, not all
 

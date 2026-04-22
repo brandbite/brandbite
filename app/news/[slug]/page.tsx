@@ -5,6 +5,7 @@
 
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -109,9 +110,13 @@ export default function NewsArticlePage() {
         <>
           {article.heroUrl && (
             <div className="mx-auto max-h-[500px] overflow-hidden">
-              <img
+              <Image
                 src={article.heroUrl}
                 alt={article.title}
+                width={1600}
+                height={500}
+                sizes="(max-width: 1600px) 100vw, 1600px"
+                priority
                 className="h-full w-full object-cover"
               />
             </div>
