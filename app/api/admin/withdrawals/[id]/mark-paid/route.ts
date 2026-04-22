@@ -11,6 +11,7 @@ import { AdminActionType, WithdrawalStatus } from "@prisma/client";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { canMarkWithdrawalsPaid } from "@/lib/roles";
 import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
+import { CONFIRMATION_PHRASES, checkConfirmationPhrase } from "@/lib/admin-confirmation";
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
@@ -37,6 +38,27 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         { error: "Only site owners can mark withdrawals as paid." },
         { status: 403 },
       );
+    }
+
+    const body = (await request.json().catch(() => null)) as {
+      confirmation?: string;
+    } | null;
+
+    const phraseCheck = checkConfirmationPhrase(
+      body?.confirmation,
+      CONFIRMATION_PHRASES.WITHDRAWAL_MARK_PAID,
+    );
+    if (!phraseCheck.ok) {
+      await logAdminAction({
+        actor: user,
+        action: AdminActionType.WITHDRAWAL_MARK_PAID,
+        outcome: "BLOCKED",
+        targetType: "Withdrawal",
+        targetId: id,
+        errorMessage: phraseCheck.error,
+        context: auditCtx,
+      });
+      return NextResponse.json({ error: phraseCheck.error }, { status: 400 });
     }
 
     const withdrawal = await prisma.withdrawal.findUnique({

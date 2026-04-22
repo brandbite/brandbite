@@ -12,6 +12,7 @@ import { AdminActionType, LedgerDirection } from "@prisma/client";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { canApproveWithdrawals, canMarkWithdrawalsPaid, isSiteAdminRole } from "@/lib/roles";
 import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
+import { CONFIRMATION_PHRASES, checkConfirmationPhrase } from "@/lib/admin-confirmation";
 
 const MAX_WITHDRAWALS = 200;
 
@@ -147,6 +148,31 @@ export async function PATCH(req: NextRequest) {
         { error: "Only site owners can mark withdrawals as paid." },
         { status: 403 },
       );
+    }
+
+    // Typed-phrase confirmation for money-moving actions (L2). REJECT is
+    // allowed without a confirmation — it's not a financial commitment.
+    if (action === "APPROVE" || action === "MARK_PAID") {
+      const expected =
+        action === "APPROVE"
+          ? CONFIRMATION_PHRASES.WITHDRAWAL_APPROVE
+          : CONFIRMATION_PHRASES.WITHDRAWAL_MARK_PAID;
+      const phraseCheck = checkConfirmationPhrase(body?.confirmation, expected);
+      if (!phraseCheck.ok) {
+        await logAdminAction({
+          actor: user,
+          action:
+            action === "APPROVE"
+              ? AdminActionType.WITHDRAWAL_APPROVE
+              : AdminActionType.WITHDRAWAL_MARK_PAID,
+          outcome: "BLOCKED",
+          targetType: "Withdrawal",
+          targetId: id,
+          errorMessage: phraseCheck.error,
+          context: auditCtx,
+        });
+        return NextResponse.json({ error: phraseCheck.error }, { status: 400 });
+      }
     }
 
     const updated = await prisma.$transaction(async (tx) => {

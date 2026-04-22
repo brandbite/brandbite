@@ -12,6 +12,7 @@ import { AdminActionType } from "@prisma/client";
 
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
+import { CONFIRMATION_PHRASES, checkConfirmationPhrase } from "@/lib/admin-confirmation";
 import { prisma } from "@/lib/prisma";
 import { canGrantCompanyTokens } from "@/lib/roles";
 import { parseBody } from "@/lib/schemas/helpers";
@@ -25,6 +26,11 @@ const adjustSchema = z.object({
     .trim()
     .min(3, "Notes are required (at least 3 characters) for audit trail.")
     .max(500),
+  // Typed-phrase confirmation (Security Precaution Plan — L2). Expected
+  // value is "GRANT" for CREDIT, "DEBIT" for DEBIT. Validated below via
+  // checkConfirmationPhrase so the failure messages are consistent with
+  // the other money routes.
+  confirmation: z.string().min(1, "Confirmation phrase is required."),
 });
 
 export async function POST(
@@ -53,6 +59,31 @@ export async function POST(
     }
     const parsed = await parseBody(req, adjustSchema);
     if (!parsed.success) return parsed.response;
+
+    // Direction-specific phrase. CREDIT gives tokens to the company, DEBIT
+    // takes them away — we use different phrases so the admin can't reuse
+    // a GRANT confirmation to sneak in a DEBIT.
+    const expectedPhrase =
+      parsed.data.direction === "CREDIT"
+        ? CONFIRMATION_PHRASES.COMPANY_TOKEN_CREDIT
+        : CONFIRMATION_PHRASES.COMPANY_TOKEN_DEBIT;
+    const phraseCheck = checkConfirmationPhrase(parsed.data.confirmation, expectedPhrase);
+    if (!phraseCheck.ok) {
+      await logAdminAction({
+        actor: user,
+        action: AdminActionType.COMPANY_TOKEN_GRANT,
+        outcome: "BLOCKED",
+        targetType: "Company",
+        targetId: companyId,
+        metadata: {
+          direction: parsed.data.direction,
+          amount: parsed.data.amount,
+        },
+        errorMessage: phraseCheck.error,
+        context: auditCtx,
+      });
+      return NextResponse.json({ error: phraseCheck.error }, { status: 400 });
+    }
 
     const company = await prisma.company.findUnique({
       where: { id: companyId },
