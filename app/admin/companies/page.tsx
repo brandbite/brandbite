@@ -16,6 +16,7 @@ import { FormInput, FormSelect, FormTextarea } from "@/components/ui/form-field"
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { LoadingState } from "@/components/ui/loading-state";
 import { Modal, ModalFooter, ModalHeader } from "@/components/ui/modal";
+import { MfaChallengeModal, type MfaChallengeInfo } from "@/components/admin/mfa-challenge-modal";
 
 type CompanyPlan = {
   id: string;
@@ -69,6 +70,13 @@ export default function AdminCompaniesPage() {
   const [adjustConfirmation, setAdjustConfirmation] = useState<string>("");
   const [adjustSaving, setAdjustSaving] = useState(false);
   const [adjustError, setAdjustError] = useState<string | null>(null);
+
+  // L4 MFA state. Grant POST can return 202 requiresMfa; stash the
+  // challenge + retry closure so the modal can drive the re-submit.
+  const [pendingMfa, setPendingMfa] = useState<{
+    challenge: MfaChallengeInfo;
+    retry: () => Promise<void>;
+  } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -136,21 +144,42 @@ export default function AdminCompaniesPage() {
     }
     setAdjustSaving(true);
     setAdjustError(null);
-    try {
-      const res = await fetch(`/api/admin/companies/${adjustTarget.id}/tokens`, {
+    const targetId = adjustTarget.id;
+    const retryBody = {
+      direction: adjustDirection,
+      amount,
+      notes: adjustNotes.trim(),
+      confirmation: adjustConfirmation.trim(),
+    };
+
+    const postIt = async () => {
+      const res = await fetch(`/api/admin/companies/${targetId}/tokens`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          direction: adjustDirection,
-          amount,
-          notes: adjustNotes.trim(),
-          confirmation: adjustConfirmation.trim(),
-        }),
+        body: JSON.stringify(retryBody),
       });
       const json = await res.json().catch(() => null);
+
+      // L4 — MFA challenge issued.
+      if (res.status === 202 && json?.requiresMfa) {
+        setPendingMfa({
+          challenge: {
+            challengeId: json.challengeId,
+            maskedEmail: json.maskedEmail,
+            expiresAt: json.expiresAt,
+          },
+          retry: postIt,
+        });
+        return;
+      }
+
       if (!res.ok) throw new Error((json && json.error) || "Adjustment failed");
       closeAdjust();
       await load();
+    };
+
+    try {
+      await postIt();
     } catch (err: any) {
       console.error("Adjust tokens error:", err);
       setAdjustError(err?.message || "Failed to adjust tokens.");
@@ -455,6 +484,20 @@ export default function AdminCompaniesPage() {
           </ModalFooter>
         </form>
       </Modal>
+
+      {/* L4 MFA. Opens when the grant POST returns 202; on verify success
+          re-runs the original POST with the same body. */}
+      <MfaChallengeModal
+        open={pendingMfa !== null}
+        challenge={pendingMfa?.challenge ?? null}
+        onClose={() => setPendingMfa(null)}
+        onVerified={async () => {
+          if (!pendingMfa) return;
+          const retry = pendingMfa.retry;
+          setPendingMfa(null);
+          await retry();
+        }}
+      />
     </>
   );
 }

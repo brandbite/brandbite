@@ -11,6 +11,7 @@ import { InlineAlert } from "@/components/ui/inline-alert";
 import { LoadingState } from "@/components/ui/loading-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmTypedPhraseModal } from "@/components/admin/confirm-typed-phrase-modal";
+import { MfaChallengeModal, type MfaChallengeInfo } from "@/components/admin/mfa-challenge-modal";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -119,6 +120,13 @@ export default function AdminUsersPage() {
     newRole: string;
   } | null>(null);
 
+  // L4 MFA state for privilege escalations (shares the MONEY_ACTION
+  // trust window with withdrawals + token grants).
+  const [pendingMfa, setPendingMfa] = useState<{
+    challenge: MfaChallengeInfo;
+    retry: () => Promise<void>;
+  } | null>(null);
+
   // Change role. `confirmation` is passed through to the API when the
   // change involves a SITE_OWNER or SITE_ADMIN on either side.
   const handleRoleChange = async (userId: string, newRole: string, confirmation?: string) => {
@@ -130,6 +138,20 @@ export default function AdminUsersPage() {
         body: JSON.stringify({ userId, role: newRole, confirmation }),
       });
       const json = await res.json().catch(() => null);
+
+      // L4 — 202 means server is asking for MFA. Stash retry and let the
+      // modal drive re-submission once verified.
+      if (res.status === 202 && json?.requiresMfa) {
+        setPendingMfa({
+          challenge: {
+            challengeId: json.challengeId,
+            maskedEmail: json.maskedEmail,
+            expiresAt: json.expiresAt,
+          },
+          retry: () => handleRoleChange(userId, newRole, confirmation),
+        });
+        return;
+      }
 
       if (!res.ok) {
         const msg = json?.error || "Failed to update role";
@@ -414,6 +436,19 @@ export default function AdminUsersPage() {
           if (!pendingPromote) return;
           await handleRoleChange(pendingPromote.userId, pendingPromote.newRole, "PROMOTE");
           setPendingPromote(null);
+        }}
+      />
+
+      {/* L4 MFA second factor for privilege-escalation role changes. */}
+      <MfaChallengeModal
+        open={pendingMfa !== null}
+        challenge={pendingMfa?.challenge ?? null}
+        onClose={() => setPendingMfa(null)}
+        onVerified={async () => {
+          if (!pendingMfa) return;
+          const retry = pendingMfa.retry;
+          setPendingMfa(null);
+          await retry();
         }}
       />
     </div>

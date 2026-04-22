@@ -262,6 +262,9 @@ model UserAccount {
   // Admin action log entries this user authored (SITE_OWNER only in practice)
   adminActionLogs AdminActionLog[] @relation("AdminActionLogActor")
 
+  // MFA challenges issued to this user (email-code second factor)
+  mfaChallenges MfaChallenge[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -1672,4 +1675,56 @@ model AdminActionLog {
   @@index([actorId, createdAt])
   @@index([action, createdAt])
   @@index([targetType, targetId, createdAt])
+}
+
+// -----------------------------------------------------------------------------
+// MFA challenge table (Security Precaution Plan — L4)
+//
+// Email-code second factor for money-moving admin actions. When a SITE_OWNER
+// tries a money action and has no recent successful MFA, the route issues a
+// challenge: generates a 6-digit code, stores the SHA-256 of it here, emails
+// the plaintext code, and returns 202 to the client. The client prompts for
+// the code and POSTs to /api/admin/mfa/verify which sets `consumedAt`.
+//
+// "Recent MFA" is just a query: did this user consume any challenge of this
+// actionTag within the last N minutes? No separate session table needed.
+// -----------------------------------------------------------------------------
+
+model MfaChallenge {
+  id     String      @id @default(cuid())
+  userId String
+  user   UserAccount @relation(fields: [userId], references: [id])
+
+  // actionTag scopes the challenge to a category of action. We use a single
+  // tag "MONEY_ACTION" for all L2-protected routes — completing MFA once
+  // unlocks withdrawals + token grants + role escalations for the window.
+  actionTag String
+
+  // SHA-256 of the 6-digit plaintext code. We never store the code itself.
+  codeHash String
+
+  // Issued codes expire quickly (10 min) so a stale code can't be replayed
+  // hours later. Separate from the "recent successful MFA" window.
+  expiresAt DateTime
+
+  // Set when the code is successfully verified. The presence of a
+  // consumedAt within the last 30 min is what "recent MFA" means.
+  consumedAt DateTime?
+
+  // Count of wrong-code attempts. At 5, the challenge is locked (further
+  // attempts rejected with a clear message, user must issue a new code).
+  attempts Int @default(0)
+
+  // Request context snapshot for forensic correlation with AdminActionLog.
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  // Query patterns:
+  //   - "does this user have a recent consumed challenge?" →
+  //     userId + actionTag + consumedAt
+  //   - housekeeping "delete expired unconsumed" → expiresAt
+  @@index([userId, actionTag, consumedAt])
+  @@index([expiresAt])
 }

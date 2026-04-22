@@ -12,6 +12,7 @@ import { getCurrentUserOrThrow } from "@/lib/auth";
 import { canMarkWithdrawalsPaid } from "@/lib/roles";
 import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 import { CONFIRMATION_PHRASES, checkConfirmationPhrase } from "@/lib/admin-confirmation";
+import { MFA_ACTION_TAG_MONEY, requireFreshMfa } from "@/lib/mfa";
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
@@ -60,6 +61,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       });
       return NextResponse.json({ error: phraseCheck.error }, { status: 400 });
     }
+
+    const mfa = await requireFreshMfa(user, MFA_ACTION_TAG_MONEY, {
+      ipAddress: auditCtx.ipAddress,
+      userAgent: auditCtx.userAgent,
+    });
+    if (!mfa.ok) return mfa.response;
 
     const withdrawal = await prisma.withdrawal.findUnique({
       where: { id },

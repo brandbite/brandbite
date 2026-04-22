@@ -13,6 +13,7 @@ import { AdminActionType } from "@prisma/client";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 import { CONFIRMATION_PHRASES, checkConfirmationPhrase } from "@/lib/admin-confirmation";
+import { MFA_ACTION_TAG_MONEY, requireFreshMfa } from "@/lib/mfa";
 import { prisma } from "@/lib/prisma";
 import { canGrantCompanyTokens } from "@/lib/roles";
 import { parseBody } from "@/lib/schemas/helpers";
@@ -84,6 +85,12 @@ export async function POST(
       });
       return NextResponse.json({ error: phraseCheck.error }, { status: 400 });
     }
+
+    const mfa = await requireFreshMfa(user, MFA_ACTION_TAG_MONEY, {
+      ipAddress: auditCtx.ipAddress,
+      userAgent: auditCtx.userAgent,
+    });
+    if (!mfa.ok) return mfa.response;
 
     const company = await prisma.company.findUnique({
       where: { id: companyId },
