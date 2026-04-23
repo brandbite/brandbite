@@ -175,6 +175,30 @@ rotating IPs against one account.
 - No part of the app becomes globally locked (verify by signing in
   from a different device / network).
 
+### If this test fails (no 429 after many attempts)
+
+This is the exact bug found during the 2026-04-23 walkthrough. Root
+cause: `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` not
+configured on the Vercel project, so `lib/rate-limit.ts` falls back
+to a per-instance in-memory Map — useless in Vercel's serverless
+fleet.
+
+**Fix:**
+
+1. Create or locate an Upstash Redis database (free tier is enough
+   for anything pre-launch).
+2. On the relevant Vercel project (demo, prod, or both): Settings →
+   Environment Variables → add `UPSTASH_REDIS_REST_URL` and
+   `UPSTASH_REDIS_REST_TOKEN` for the Production environment.
+3. Redeploy.
+
+Going forward the boot assertion in `instrumentation.ts` (added in
+the upstash-boot-assertion PR, 2026-04-23) will refuse to start a
+production deploy without these vars, so this class of silent
+failure can't recur. If the deploy fails at boot with
+_"Upstash Redis is required in production…"_, that's the assertion
+catching a missing env var — follow steps 1–3 above.
+
 ---
 
 ## §3 — CMS HTML sanitization (stored-XSS prevention, A1 + dompurify CVE fix)
