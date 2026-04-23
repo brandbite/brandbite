@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { PASSWORD_POLICY_BULLETS, validatePasswordStrength } from "@/lib/password-policy";
+import { PasswordInput } from "@/components/ui/password-input";
 
 type Status = "idle" | "submitting" | "sent" | "reset-success" | "error";
 
@@ -232,15 +233,13 @@ export default function ResetPasswordPage() {
                 >
                   New password <span className="text-[var(--bb-primary)]">*</span>
                 </label>
-                <input
+                <PasswordInput
                   id="new-password"
-                  type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="At least 12 characters"
                   autoComplete="new-password"
                   aria-describedby={error ? "reset-error" : "reset-password-rules"}
-                  className="w-full rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] px-3.5 py-2.5 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
                 />
                 <PasswordRulesChecklist id="reset-password-rules" password={newPassword} />
               </div>
@@ -251,15 +250,13 @@ export default function ResetPasswordPage() {
                 >
                   Confirm password <span className="text-[var(--bb-primary)]">*</span>
                 </label>
-                <input
+                <PasswordInput
                   id="confirm-password"
-                  type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Repeat your password"
                   autoComplete="new-password"
                   aria-describedby={error ? "reset-error" : undefined}
-                  className="w-full rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] px-3.5 py-2.5 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
                 />
               </div>
 

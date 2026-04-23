@@ -13,6 +13,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { PASSWORD_POLICY_BULLETS, validatePasswordStrength } from "@/lib/password-policy";
+import { PasswordInput } from "@/components/ui/password-input";
 
 type Mode = "signin" | "signup";
 type Status = "idle" | "submitting" | "magic-link-sent" | "error";
@@ -341,9 +342,8 @@ export default function LoginPage() {
               >
                 Password <span className="text-[var(--bb-primary)]">*</span>
               </label>
-              <input
+              <PasswordInput
                 id="login-password"
-                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder={mode === "signup" ? "At least 12 characters" : "Your password"}
@@ -351,7 +351,6 @@ export default function LoginPage() {
                 aria-describedby={
                   error ? "login-error" : mode === "signup" ? "login-password-rules" : undefined
                 }
-                className="w-full rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] px-3.5 py-2.5 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
               />
               {mode === "signup" && (
                 <PasswordRulesChecklist id="login-password-rules" password={password} />
