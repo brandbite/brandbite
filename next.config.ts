@@ -13,6 +13,8 @@ const securityHeaders = [
   },
   {
     key: "X-Frame-Options",
+    // Kept alongside CSP frame-ancestors for older browsers that only honour
+    // the legacy header. Modern browsers read frame-ancestors and ignore this.
     value: "DENY",
   },
   {
@@ -28,6 +30,18 @@ const securityHeaders = [
     value: "camera=(), microphone=(), geolocation=()",
   },
   {
+    // window.opener isolation + Spectre mitigation. Blocks a malicious
+    // popup from reading window.opener back to our origin. We don't rely
+    // on cross-origin window.opener communication anywhere, so this is safe.
+    key: "Cross-Origin-Opener-Policy",
+    value: "same-origin",
+  },
+  {
+    // Obsolete Flash/PDF policy file exfil vector — zero-cost hardening.
+    key: "X-Permitted-Cross-Domain-Policies",
+    value: "none",
+  },
+  {
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
@@ -37,8 +51,17 @@ const securityHeaders = [
       "img-src 'self' data: blob: https://*.r2.cloudflarestorage.com https://placehold.co https://img.youtube.com https://i.ytimg.com https://i3.ytimg.com https://i.vimeocdn.com",
       "connect-src 'self' https://api.stripe.com https://*.ingest.sentry.io",
       "frame-src https://js.stripe.com https://www.youtube.com https://player.vimeo.com https://www.loom.com",
+      "worker-src 'self' blob:",
       "object-src 'none'",
       "base-uri 'self'",
+      // Prevents phishing-by-form-exfil: if XSS injects a <form action="https://evil">,
+      // the browser refuses to submit it.
+      "form-action 'self'",
+      // Modern, CSP-native version of X-Frame-Options. DENY-equivalent.
+      "frame-ancestors 'none'",
+      // Auto-upgrade any accidental http:// subresource to https://. Belt-and-braces
+      // with HSTS which forces it at the navigation level.
+      "upgrade-insecure-requests",
     ].join("; "),
   },
 ];
