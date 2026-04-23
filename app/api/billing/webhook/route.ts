@@ -1,15 +1,16 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/billing/webhook/route.ts
 // @purpose: Stripe webhook handler (subscription + token credits)
-// @version: v0.2.1
+// @version: v0.3.0
 // @status: active
-// @lastUpdate: 2025-11-17
+// @lastUpdate: 2026-04-23
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { releaseStripeEvent, reserveStripeEvent } from "@/lib/stripe-webhook-idempotency";
 import type Stripe from "stripe";
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -66,6 +67,31 @@ export async function POST(req: NextRequest) {
   } catch (err: unknown) {
     console.error("[billing.webhook] Signature verification failed.", err);
     return NextResponse.json({ error: "Invalid signature." }, { status: 400 });
+  }
+
+  // -----------------------------------------------------------------
+  // Idempotency gate. Stripe retries webhooks on any non-2xx for up to
+  // 3 days with exponential backoff, and a rare concurrent-delivery
+  // window exists even on 200s (response lost in transit, Stripe worker
+  // races). Inserting a dedup row on the globally-unique `event.id`
+  // turns both cases into a cheap no-op on the retry path.
+  //
+  // Design: reserve → handler body → release-on-failure.
+  // See `lib/stripe-webhook-idempotency.ts` + `ProcessedStripeEvent` model.
+  // -----------------------------------------------------------------
+  let reservation;
+  try {
+    reservation = await reserveStripeEvent(event.id, event.type);
+  } catch (err) {
+    console.error("[billing.webhook] dedup-gate insert failed", err);
+    return NextResponse.json({ error: "Dedup gate failed." }, { status: 500 });
+  }
+  if (!reservation.reserved) {
+    console.log("[billing.webhook] duplicate event, skipping handler", {
+      eventId: event.id,
+      type: event.type,
+    });
+    return NextResponse.json({ received: true, duplicate: true }, { status: 200 });
   }
 
   try {
@@ -456,6 +482,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ received: true }, { status: 200 });
   } catch (err: unknown) {
     console.error("[billing.webhook] Handler error", err);
+    // Roll back the dedup reservation so Stripe's retry can reprocess.
+    await releaseStripeEvent(event.id);
     return NextResponse.json({ error: "Webhook handler failure." }, { status: 500 });
   }
 }

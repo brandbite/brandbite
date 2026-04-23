@@ -1773,3 +1773,35 @@ model MfaChallenge {
   @@index([userId, actionTag, consumedAt])
   @@index([expiresAt])
 }
+
+/// Idempotency ledger for Stripe webhook deliveries. Stripe retries webhook
+/// POSTs on any non-2xx response (for up to 3 days, with exponential backoff).
+/// If the first attempt succeeded but the response was lost in transit — or
+/// two Stripe workers raced on a concurrent delivery — we'd re-run the
+/// handler and double-credit tokens / re-create rows.
+///
+/// Flow in `app/api/billing/webhook/route.ts`:
+///   1. After signature verification, attempt to INSERT this row with
+///      `eventId` = the Stripe event's id (which is globally unique).
+///   2. P2002 unique-constraint violation → this is a retry of an already
+///      processed event → return 200 immediately without running the switch.
+///   3. Insert succeeds → run the event handler.
+///   4. Handler throws → DELETE the ledger row (best-effort) so the retry
+///      that follows is free to reprocess the event.
+///
+/// Rows accumulate slowly (typically ~hundreds to low thousands per year
+/// for a SaaS at our scale). A scheduled cleanup can prune rows older
+/// than 14 days — Stripe never retries past 3 days, so 14 days is ample.
+model ProcessedStripeEvent {
+  /// Stripe event id, e.g. `evt_1OAbcDefGhijKlmn`. Globally unique per Stripe.
+  eventId String @id
+
+  /// Stripe event type, e.g. `invoice.payment_succeeded`. Stored for
+  /// debugging and for the eventual cleanup cron to report what's being
+  /// pruned.
+  eventType String
+
+  processedAt DateTime @default(now())
+
+  @@index([processedAt])
+}
