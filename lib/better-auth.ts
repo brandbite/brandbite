@@ -135,6 +135,45 @@ export const auth = betterAuth({
     updateAge: 60 * 60 * 24, // refresh daily
   },
 
+  // --------------------------------------------------------------------
+  // Rate limiting — BetterAuth's built-in limiter.
+  //
+  // BetterAuth ships a DB-backed limiter with a default special rule
+  // for auth paths of 3 requests / 10 seconds. That threshold fires
+  // WAY before our custom per-IP (10/60s) + per-email (5/15min) gate
+  // in `app/api/auth/[...all]/route.ts`, which means users see
+  // BetterAuth's generic "Too many requests. Please try again later."
+  // instead of our more actionable messages like
+  // "Too many attempts for this email. Wait 15 minutes and try again.
+  // If you didn't request this, you can ignore it."
+  //
+  // We keep BetterAuth's limiter enabled as defense-in-depth — if our
+  // Upstash-backed gate ever has a bug or misses a new endpoint, this
+  // is a backstop. But we loosen every auth path so our gate trips
+  // first under normal conditions.
+  // --------------------------------------------------------------------
+  rateLimit: {
+    enabled: true,
+    // Global default — deliberately loose. Our gate handles real limits.
+    window: 60,
+    max: 120,
+    // Override the library's aggressive 3/10s special-rule defaults for
+    // every auth path our gate already covers. Our gate trips at 10/60s
+    // (per-IP) or 5/15min (per-email); 50/60s here means BetterAuth's
+    // backstop only matters in extreme bursts where our Upstash layer
+    // has somehow failed open.
+    customRules: {
+      "/sign-in/email": { window: 60, max: 50 },
+      "/sign-in/magic-link": { window: 60, max: 50 },
+      "/sign-up/email": { window: 60, max: 50 },
+      "/forget-password": { window: 60, max: 50 },
+      "/reset-password": { window: 60, max: 50 },
+      "/change-password": { window: 60, max: 50 },
+      "/change-email": { window: 60, max: 50 },
+      "/send-verification-email": { window: 60, max: 50 },
+    },
+  },
+
   // Explicit cookie attributes. BetterAuth defaults are already sensible
   // (httpOnly + secure + sameSite=lax) but making them explicit means a
   // future library-default flip can't silently weaken them.
