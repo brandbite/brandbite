@@ -102,11 +102,16 @@ async function gate(req: NextRequest): Promise<NextResponse | null> {
       1,
       Math.ceil((new Date(ipResult.resetAt).getTime() - Date.now()) / 1000),
     );
+    // `message` is the field BetterAuth's authClient reads off error
+    // responses (`signInError.message`), which is how the text surfaces
+    // in the UI. We also keep `error` for any non-BetterAuth callers /
+    // direct fetch consumers that happen to look for it.
+    const body = {
+      message:
+        "Too many attempts from this IP. Wait a minute and try again; if this keeps happening, reach out at support@brandbite.studio.",
+    };
     return NextResponse.json(
-      {
-        error:
-          "Too many attempts from this IP. Wait a minute and try again; if this keeps happening, reach out at support@brandbite.studio.",
-      },
+      { ...body, error: body.message },
       { status: 429, headers: { "Retry-After": String(retryAfter) } },
     );
   }
@@ -129,11 +134,12 @@ async function gate(req: NextRequest): Promise<NextResponse | null> {
           1,
           Math.ceil((new Date(emailResult.resetAt).getTime() - Date.now()) / 1000),
         );
+        const body = {
+          message:
+            "Too many attempts for this email. Wait 15 minutes and try again. If you didn't request this, you can ignore it.",
+        };
         return NextResponse.json(
-          {
-            error:
-              "Too many attempts for this email. Wait 15 minutes and try again. If you didn't request this, you can ignore it.",
-          },
+          { ...body, error: body.message },
           { status: 429, headers: { "Retry-After": String(retryAfter) } },
         );
       }
