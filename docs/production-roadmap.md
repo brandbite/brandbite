@@ -54,12 +54,14 @@ These are the items I'd refuse to launch without. Each is tractable in 1–2 PRs
 
 **Shipped in #124.** `lib/better-auth.ts` enables `emailAndPassword.requireEmailVerification` + `emailVerification.sendOnSignUp` + `autoSignInAfterVerification`. Verification email sent via the same Resend helper as password reset. `/verify-email` "check your inbox" page with a resend button. Sign-in errors that look like "email not verified" route to that page with `?reason=unverified`.
 
-### Blocker #2 — Auth rate limits ✅ Shipped + hardened
+### Blocker #2 — Auth rate limits ✅ Shipped (code) + ⚠️ Ops-required
 
-**Shipped in #124 + auth-hardening PR (2026-04-23).**
+**Code shipped in #124 + auth-hardening PR (2026-04-23).**
+**Ops required: Upstash Redis env vars MUST be set on the Vercel project (demo and prod) — enforced by a boot-time assertion so you cannot silently deploy without it.**
 
 - **Per-IP bucket** (#124): `app/api/auth/[...all]/route.ts` wraps `toNextJsHandler` with an Upstash-backed rate limiter on POSTs. Two buckets: sensitive (sign-in / sign-up / forget-password / reset-password / send-verification-email / magic-link): 10/60s. General auth: 60/60s. 429 + `Retry-After` header.
 - **Per-email bucket** (auth-hardening PR): a second layer keyed on the target email (parsed from the request body) on sign-in + forget-password + send-verification-email + magic-link paths. 5 attempts / 15 min. Stops an attacker rotating IPs from brute-forcing a single account or DoS'ing a victim's inbox + our Resend budget.
+- **Upstash-required boot assertion** (upstash-boot-assertion PR, 2026-04-23): the E2E walkthrough §2 run on demo found that both buckets were _ineffective_ because `UPSTASH_REDIS_REST_URL` / `_TOKEN` weren't set on the demo Vercel project — the limiter was silently falling back to a per-instance in-memory Map across the Vercel serverless fleet, which means each container had its own counter starting at 0 and no real limit was ever enforced. The root-cause fix is operational (set the env vars) but the code fix is an assertion in `instrumentation.ts` that throws on boot for `VERCEL_ENV=production` deploys with no Upstash credentials. This makes the class of silent-failure bug un-shippable going forward — you either configure Upstash or the deploy fails with a clear error pointing at `docs/env-vars.md`.
 
 **Related hardening shipped in the same PR**:
 

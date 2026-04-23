@@ -63,12 +63,14 @@ This reference lists every env var the app reads, which environments need it, an
 
 ## Rate limiter (Upstash Redis)
 
-| Var                        | Required in Prod | Used by             | What happens if missing                                            |
-| -------------------------- | ---------------- | ------------------- | ------------------------------------------------------------------ |
-| `UPSTASH_REDIS_REST_URL`   | Recommended      | `lib/rate-limit.ts` | Rate limiter silently falls back to in-memory (per-instance only). |
-| `UPSTASH_REDIS_REST_TOKEN` | Recommended      | `lib/rate-limit.ts` | Same as above.                                                     |
+| Var                        | Required in Prod              | Used by             | What happens if missing                                                                                                                                                                                                                                                                           |
+| -------------------------- | ----------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UPSTASH_REDIS_REST_URL`   | ✅ **Required** (prod + demo) | `lib/rate-limit.ts` | Production deploys (`VERCEL_ENV=production`) **fail at boot** via the assertion in `instrumentation.ts`. Without this, the rate limiter silently falls back to an ineffective per-instance in-memory Map and every endpoint that depends on it (auth, AI, webhooks) becomes trivially bypassable. |
+| `UPSTASH_REDIS_REST_TOKEN` | ✅ **Required** (prod + demo) | `lib/rate-limit.ts` | Same as above.                                                                                                                                                                                                                                                                                    |
 
-> Vercel's Upstash integration may set these under the prefix `KV_REST_API_*` or `UPSTASH_REDIS_REST_KV_REST_API_*`. `lib/rate-limit.ts` accepts either for compatibility.
+> Vercel's Upstash integration may set these under the prefix `KV_REST_API_*` or `UPSTASH_REDIS_REST_KV_REST_API_*`. Both `lib/rate-limit.ts` and the boot assertion in `instrumentation.ts` accept either for compatibility.
+>
+> Preview deploys (`VERCEL_ENV=preview`), local `next build`, and CI do **not** trigger the assertion — it only fires on real production deploys (demo _and_ prod), which is where the silent-fallback bug actually matters.
 
 ## Scheduled jobs
 
