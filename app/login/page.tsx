@@ -307,7 +307,10 @@ export default function LoginPage() {
                   id="login-name"
                   type="text"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => {
+                    if (error) setError(null);
+                    setName(e.target.value);
+                  }}
                   placeholder="Your name"
                   autoComplete="name"
                   aria-describedby={error ? "login-error" : undefined}
@@ -327,7 +330,10 @@ export default function LoginPage() {
                 id="login-email"
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  if (error) setError(null);
+                  setEmail(e.target.value);
+                }}
                 placeholder="you@company.com"
                 autoComplete="email"
                 aria-describedby={error ? "login-error" : undefined}
@@ -345,7 +351,10 @@ export default function LoginPage() {
               <PasswordInput
                 id="login-password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  if (error) setError(null);
+                  setPassword(e.target.value);
+                }}
                 placeholder={mode === "signup" ? "At least 12 characters" : "Your password"}
                 autoComplete={mode === "signup" ? "new-password" : "current-password"}
                 aria-describedby={

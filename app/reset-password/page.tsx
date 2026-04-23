@@ -236,7 +236,10 @@ export default function ResetPasswordPage() {
                 <PasswordInput
                   id="new-password"
                   value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
+                  onChange={(e) => {
+                    if (error) setError(null);
+                    setNewPassword(e.target.value);
+                  }}
                   placeholder="At least 12 characters"
                   autoComplete="new-password"
                   aria-describedby={error ? "reset-error" : "reset-password-rules"}
@@ -253,7 +256,10 @@ export default function ResetPasswordPage() {
                 <PasswordInput
                   id="confirm-password"
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onChange={(e) => {
+                    if (error) setError(null);
+                    setConfirmPassword(e.target.value);
+                  }}
                   placeholder="Repeat your password"
                   autoComplete="new-password"
                   aria-describedby={error ? "reset-error" : undefined}
@@ -292,7 +298,10 @@ export default function ResetPasswordPage() {
                   id="reset-email"
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    if (error) setError(null);
+                    setEmail(e.target.value);
+                  }}
                   placeholder="you@company.com"
                   autoComplete="email"
                   aria-describedby={error ? "reset-error" : undefined}
