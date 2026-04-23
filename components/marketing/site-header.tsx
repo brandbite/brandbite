@@ -27,13 +27,28 @@ type SiteHeaderProps = {
 };
 
 /**
- * The glass-pill + drop-shadow class string is extracted so the mobile
- * dropdown (which is a sibling pill below the main one) stays visually
- * consistent with the nav bar itself. Changing the background tint,
- * blur amount, or border color should be done here once.
+ * Pill + drop-shadow class string, extracted so the mobile dropdown
+ * (a sibling pill below the main one) stays visually consistent.
+ *
+ * Design intent (matches the clean floating pill from the user's
+ * reference screenshot, not just the raw Figma frame):
+ *
+ *   - Near-opaque white bg (`bg-white/85`) — gives the pill a clear,
+ *     defined surface on any page background. An earlier revision used
+ *     30% opacity which made the pill invisible against the landing
+ *     page's white hero area on the left, while the gray bitemark
+ *     graphic on the right gave it contrast. Result: the pill looked
+ *     "cut off" on the left side.
+ *   - Subtle dark border (`border-black/[0.06]`) — visible on any
+ *     background, including pure white. This is what actually defines
+ *     the pill's edge when the bg behind happens to be white.
+ *   - Layered soft shadow — a short drop shadow for crisp separation
+ *     at the edge, plus a longer diffuse shadow for the floating cue.
+ *   - Backdrop blur + saturate retained so we still get the "glass"
+ *     feel when scrolled content passes behind the pill.
  */
 const GLASS_PILL =
-  "rounded-full border border-white/40 bg-white/30 shadow-[0_8px_32px_rgba(0,0,0,0.08)] backdrop-blur-xl backdrop-saturate-150";
+  "rounded-full border border-black/[0.06] bg-white/85 shadow-[0_2px_8px_rgba(0,0,0,0.04),0_8px_32px_rgba(0,0,0,0.06)] backdrop-blur-xl backdrop-saturate-150";
 
 export function SiteHeader({ activePage }: SiteHeaderProps = {}) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -114,7 +129,7 @@ export function SiteHeader({ activePage }: SiteHeaderProps = {}) {
           a tall multi-line panel shouldn't be a pill. */}
       {mobileOpen && (
         <div className="pointer-events-auto mx-auto mt-2 max-w-6xl px-4 md:hidden">
-          <nav className="rounded-2xl border border-white/40 bg-white/60 px-6 py-4 shadow-[0_8px_32px_rgba(0,0,0,0.08)] backdrop-blur-xl backdrop-saturate-150">
+          <nav className="rounded-2xl border border-black/[0.06] bg-white/90 px-6 py-4 shadow-[0_2px_8px_rgba(0,0,0,0.04),0_8px_32px_rgba(0,0,0,0.06)] backdrop-blur-xl backdrop-saturate-150">
             <div className="flex flex-col gap-3">
               {NAV_LINKS.map((l) => (
                 <Link
