@@ -18,7 +18,7 @@ import { SiteHeader } from "@/components/marketing/site-header";
 const STEPS = [
   {
     title: "Submit a creative request",
-    description: "Tell us what you need — logo, landing page, or ad visuals.",
+    description: "Tell us what you need. Logo, landing page, or ad visuals.",
   },
   {
     title: "Get matched instantly",
@@ -30,34 +30,43 @@ const STEPS = [
   },
 ];
 
-const PLANS = [
-  {
-    name: "Starter",
-    price: 495,
+/**
+ * Static display copy keyed by plan `name`. The price itself is read
+ * from the DB at render time (Stripe-authoritative), but the tagline,
+ * feature bullets, CTA label, and tip line stay hardcoded here \u2014 they
+ * don't change with Stripe and putting them in a CMS adds complexity
+ * we don't need yet. If a new plan name lands in the DB without a
+ * matching entry here, it renders with the FALLBACK_DISPLAY values.
+ */
+type PlanDisplay = {
+  tagline: string;
+  features: string[];
+  cta: string;
+  subtitle: string;
+};
+
+const PLAN_DISPLAY: Record<string, PlanDisplay> = {
+  Starter: {
     tagline: "Best for startups and solo founders",
     features: [
       "1 active creative request at a time",
       "Unlimited revisions & brand asset storage",
-      "Delivery in 2–3 business days per task",
+      "Delivery in 2 to 3 business days per task",
     ],
     cta: "GET STARTED",
     subtitle: "\u201cPause or cancel anytime.\u201d",
   },
-  {
-    name: "Brand",
-    price: 995,
+  Brand: {
     tagline: "Perfect for marketing teams & growing brands",
     features: [
       "2 active creative requests simultaneously",
-      "Priority turnaround (1–2 business days)",
+      "Priority turnaround (1 to 2 business days)",
       "Slack workspace access for real-time collaboration",
     ],
     cta: "CHOOSE BRAND",
     subtitle: "\u201cMost popular choice for performance teams.\u201d",
   },
-  {
-    name: "Full",
-    price: 1895,
+  Full: {
     tagline: "For agencies and fast-moving creative teams",
     features: [
       "Unlimited active requests & team seats",
@@ -67,24 +76,42 @@ const PLANS = [
     cta: "GO WITH FULL",
     subtitle: "\u201cBest value for high-volume creative production.\u201d",
   },
+};
+
+const FALLBACK_DISPLAY: PlanDisplay = {
+  tagline: "Custom subscription",
+  features: [],
+  cta: "GET STARTED",
+  subtitle: "",
+};
+
+/**
+ * Static fallback used only when /api/plans is unreachable or returns
+ * an error. Production should always hit the DB-driven path; this
+ * exists so the page never renders empty pricing if the API hiccups.
+ */
+const FALLBACK_PLANS: { name: string; priceCents: number }[] = [
+  { name: "Starter", priceCents: 49500 },
+  { name: "Brand", priceCents: 99500 },
+  { name: "Full", priceCents: 189500 },
 ];
 
 const WHY_ITEMS = [
-  "Fast turnaround (24–48 h per request)",
+  "Fast turnaround (1 to 2 days per request)",
   "Direct Slack communication",
   "Brand guidelines",
-  "Flexible subscription — pause anytime",
+  "Flexible subscription. Pause anytime.",
   "Access to top European talent",
 ];
 
 const FAQS = [
   {
     q: "How fast will I get my creatives?",
-    a: "Most requests are completed within 24–48 hours. Larger projects like brand identity guides or motion videos may take 3–5 business days depending on complexity.",
+    a: "Most requests are completed within 1 to 2 days. Larger projects like brand identity guides or motion videos may take 3 to 5 business days depending on complexity.",
   },
   {
     q: "Can I cancel anytime?",
-    a: "Yes. You can pause or cancel your subscription at any time — no long-term contracts, no cancellation fees. Your work and assets remain yours.",
+    a: "Yes. You can pause or cancel your subscription at any time. No long-term contracts, no cancellation fees. Your work and assets remain yours.",
   },
   {
     q: "What if I don't like the creative?",
@@ -179,7 +206,7 @@ function HeroBitemarkSection({ signInHref }: { signInHref: string }) {
             All your creatives, <span className="text-[var(--bb-primary)]">one subscription.</span>
           </h1>
           <p className="mx-auto mt-5 max-w-xl text-base text-[var(--bb-text-secondary)] sm:text-lg">
-            From landing pages to social media ads — get unlimited creative tasks, delivered fast by
+            From landing pages to social media ads. Get unlimited creative tasks, delivered fast by
             top-tier creatives.
           </p>
           <div className="mt-8">
@@ -217,7 +244,49 @@ function HeroBitemarkSection({ signInHref }: { signInHref: string }) {
 // Pricing
 // ===========================================================================
 
+type ApiPlan = { id: string; name: string; priceCents: number; monthlyTokens: number };
+
 function PricingSection() {
+  // DB-driven prices — fetched at mount via /api/plans, falls back to a
+  // safe constant if the API is unreachable so the page never renders
+  // with empty cards. The DB row's `priceCents` is itself kept in sync
+  // with Stripe via the webhook handler in /api/billing/webhook.
+  const [plans, setPlans] = useState<ApiPlan[] | null>(null);
+  const [didError, setDidError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/plans")
+      .then((res) => {
+        if (!res.ok) throw new Error(`/api/plans returned ${res.status}`);
+        return res.json();
+      })
+      .then((json: { plans?: ApiPlan[] }) => {
+        if (cancelled) return;
+        setPlans(Array.isArray(json.plans) ? json.plans : []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setDidError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Resolve which list to render: API result if present; static fallback
+  // if API errored; null while still loading (renders skeleton placeholders).
+  const list: ApiPlan[] | null =
+    plans ??
+    (didError
+      ? FALLBACK_PLANS.map((p, i) => ({
+          id: `fallback-${i}`,
+          name: p.name,
+          priceCents: p.priceCents,
+          monthlyTokens: 0,
+        }))
+      : null);
+
   return (
     <section id="pricing" className="bg-white px-6 py-20 sm:py-24">
       <div className="mx-auto max-w-5xl">
@@ -242,79 +311,97 @@ function PricingSection() {
 
         {/* Cards */}
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-          {PLANS.map((plan) => (
-            <div key={plan.name} className="flex flex-col rounded-3xl bg-[#eae6f1] p-7">
-              {/* Name + price */}
-              <div className="mb-2 flex items-start justify-between">
-                <div>
-                  <h3 className="text-lg font-bold text-[var(--bb-secondary)]">{plan.name}</h3>
-                  <p className="mt-0.5 text-xs leading-snug text-[var(--bb-text-secondary)]">
-                    {plan.tagline}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <span className="text-2xl font-extrabold text-[var(--bb-secondary)]">
-                    $ {plan.price.toLocaleString()}
-                  </span>
-                  <span className="block text-[10px] text-[var(--bb-text-muted)]">per month</span>
-                </div>
-              </div>
+          {list === null
+            ? // Loading skeletons — three muted cards while /api/plans is in flight.
+              Array.from({ length: 3 }).map((_, i) => (
+                <div
+                  key={`skeleton-${i}`}
+                  className="h-[360px] animate-pulse rounded-3xl bg-[#eae6f1]"
+                />
+              ))
+            : list.map((plan) => {
+                const display = PLAN_DISPLAY[plan.name] ?? FALLBACK_DISPLAY;
+                const price = Math.round(plan.priceCents / 100);
+                return (
+                  <div key={plan.id} className="flex flex-col rounded-3xl bg-[#eae6f1] p-7">
+                    {/* Name + price */}
+                    <div className="mb-2 flex items-start justify-between">
+                      <div>
+                        <h3 className="text-lg font-bold text-[var(--bb-secondary)]">
+                          {plan.name}
+                        </h3>
+                        <p className="mt-0.5 text-xs leading-snug text-[var(--bb-text-secondary)]">
+                          {display.tagline}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-2xl font-extrabold text-[var(--bb-secondary)]">
+                          $ {price.toLocaleString()}
+                        </span>
+                        <span className="block text-[10px] text-[var(--bb-text-muted)]">
+                          per month
+                        </span>
+                      </div>
+                    </div>
 
-              {/* Separator dash */}
-              <div className="mb-6 h-0.5 w-6 bg-[var(--bb-secondary)]" />
+                    {/* Separator dash */}
+                    <div className="mb-6 h-0.5 w-6 bg-[var(--bb-secondary)]" />
 
-              {/* Features */}
-              <p className="mb-3 text-[11px] font-bold text-[var(--bb-secondary)]">
-                Plan includes :
-              </p>
-              <ul className="mb-6 flex-1 space-y-2.5">
-                {plan.features.map((f) => (
-                  <li
-                    key={f}
-                    className="flex items-start gap-2 text-[13px] leading-snug text-[var(--bb-text-secondary)]"
-                  >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      className="mt-0.5 flex-shrink-0"
+                    {/* Features */}
+                    <p className="mb-3 text-[11px] font-bold text-[var(--bb-secondary)]">
+                      Plan includes :
+                    </p>
+                    <ul className="mb-6 flex-1 space-y-2.5">
+                      {display.features.map((f) => (
+                        <li
+                          key={f}
+                          className="flex items-start gap-2 text-[13px] leading-snug text-[var(--bb-text-secondary)]"
+                        >
+                          <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            className="mt-0.5 flex-shrink-0"
+                          >
+                            <path
+                              d="M5 13l4 4L19 7"
+                              stroke="var(--bb-text-secondary)"
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+
+                    {/* See all features */}
+                    <a
+                      href="#pricing"
+                      className="mb-6 text-xs font-bold text-[var(--bb-secondary)] hover:underline"
                     >
-                      <path
-                        d="M5 13l4 4L19 7"
-                        stroke="var(--bb-text-secondary)"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                    {f}
-                  </li>
-                ))}
-              </ul>
+                      See all features
+                    </a>
 
-              {/* See all features */}
-              <a
-                href="#pricing"
-                className="mb-6 text-xs font-bold text-[var(--bb-secondary)] hover:underline"
-              >
-                See all features
-              </a>
+                    {/* CTA */}
+                    <Link
+                      href="/login"
+                      className="block rounded-full bg-[var(--bb-primary)] px-6 py-2.5 text-center text-[11px] font-bold tracking-wider text-white uppercase transition-colors hover:bg-[var(--bb-primary-hover)]"
+                    >
+                      {display.cta}
+                    </Link>
 
-              {/* CTA */}
-              <Link
-                href="/login"
-                className="block rounded-full bg-[var(--bb-primary)] px-6 py-2.5 text-center text-[11px] font-bold tracking-wider text-white uppercase transition-colors hover:bg-[var(--bb-primary-hover)]"
-              >
-                {plan.cta}
-              </Link>
-
-              {/* Subtitle */}
-              <p className="mt-3 text-center text-[10px] leading-snug text-[var(--bb-text-muted)] italic">
-                {plan.subtitle}
-              </p>
-            </div>
-          ))}
+                    {/* Subtitle */}
+                    {display.subtitle && (
+                      <p className="mt-3 text-center text-[10px] leading-snug text-[var(--bb-text-muted)] italic">
+                        {display.subtitle}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
         </div>
       </div>
     </section>

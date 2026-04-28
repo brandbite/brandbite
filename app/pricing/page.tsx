@@ -7,7 +7,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 // ---------------------------------------------------------------------------
 // Data
@@ -21,39 +21,49 @@ const NAV_LINKS = [
   { href: "/blog", label: "Blog" },
 ];
 
-const PLANS = [
-  {
-    name: "Starter",
-    price: 495,
-    yearlyPrice: 396,
+/**
+ * Static display copy keyed by plan `name`. The price comes from the
+ * DB via /api/plans (which is itself kept in sync with Stripe). Tagline,
+ * features, CTA label, and "Best Value" badge stay hardcoded here \u2014
+ * they don't change with Stripe and putting them in a CMS adds
+ * complexity not worth doing pre-launch.
+ *
+ * Yearly price is computed as a 20% discount from the monthly price
+ * coming back from the API. If marketing wants different yearly
+ * discounts per tier later, this becomes a per-plan override.
+ */
+type PlanDisplay = {
+  tagline: string;
+  features: string[];
+  cta: string;
+  subtitle: string;
+  badge: string | null;
+};
+
+const PLAN_DISPLAY: Record<string, PlanDisplay> = {
+  Starter: {
     tagline: "Best for startups and solo founders",
     features: [
       "1 active creative request at a time",
       "Unlimited revisions & brand asset storage",
-      "Delivery in 2\u20133 business days per task",
+      "Delivery in 2 to 3 business days per task",
     ],
     cta: "GET STARTED",
     subtitle: "\u201cPause or cancel anytime.\u201d",
     badge: null,
   },
-  {
-    name: "Brand",
-    price: 995,
-    yearlyPrice: 796,
+  Brand: {
     tagline: "Perfect for marketing teams & growing brands",
     features: [
       "2 active creative requests simultaneously",
-      "Priority turnaround (1\u20132 business days)",
+      "Priority turnaround (1 to 2 business days)",
       "Slack workspace access for real-time collaboration",
     ],
     cta: "CHOOSE BRAND",
     subtitle: "\u201cMost popular choice for performance teams.\u201d",
     badge: "Best Value",
   },
-  {
-    name: "Full",
-    price: 1895,
-    yearlyPrice: 1516,
+  Full: {
     tagline: "For agencies and fast-moving creative teams",
     features: [
       "Unlimited active requests & team seats",
@@ -64,7 +74,28 @@ const PLANS = [
     subtitle: "\u201cBest value for high-volume creative production.\u201d",
     badge: null,
   },
+};
+
+const FALLBACK_DISPLAY: PlanDisplay = {
+  tagline: "Custom subscription",
+  features: [],
+  cta: "GET STARTED",
+  subtitle: "",
+  badge: null,
+};
+
+/** Static fallback rendered only when /api/plans is unreachable. */
+const FALLBACK_PLANS: { id: string; name: string; priceCents: number; monthlyTokens: number }[] = [
+  { id: "fallback-starter", name: "Starter", priceCents: 49500, monthlyTokens: 0 },
+  { id: "fallback-brand", name: "Brand", priceCents: 99500, monthlyTokens: 0 },
+  { id: "fallback-full", name: "Full", priceCents: 189500, monthlyTokens: 0 },
 ];
+
+/** 20% off monthly when paid yearly. Single number for now; can become
+ *  per-plan overrides later if marketing wants tier-specific discounts. */
+const YEARLY_DISCOUNT = 0.2;
+
+type ApiPlan = { id: string; name: string; priceCents: number; monthlyTokens: number };
 
 const TESTIMONIALS = [
   {
@@ -268,6 +299,34 @@ function PricingHeader({ signInHref }: { signInHref: string }) {
 function HeroCards() {
   const [yearly, setYearly] = useState(false);
 
+  // DB-driven prices via /api/plans. The Plan rows are kept in sync
+  // with Stripe via the webhook handler (price.created branch). Falls
+  // back to a static array if the API errors so the page never empties.
+  const [plans, setPlans] = useState<ApiPlan[] | null>(null);
+  const [didError, setDidError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/plans")
+      .then((res) => {
+        if (!res.ok) throw new Error(`/api/plans returned ${res.status}`);
+        return res.json();
+      })
+      .then((json: { plans?: ApiPlan[] }) => {
+        if (cancelled) return;
+        setPlans(Array.isArray(json.plans) ? json.plans : []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setDidError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const list: ApiPlan[] | null = plans ?? (didError ? FALLBACK_PLANS : null);
+
   return (
     <section className="relative overflow-hidden bg-white px-6 pt-14 pb-20 sm:pt-20 sm:pb-28">
       {/* Bitemark background blob */}
@@ -315,89 +374,109 @@ function HeroCards() {
 
         {/* Cards */}
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-          {PLANS.map((plan) => {
-            const displayPrice = yearly ? plan.yearlyPrice : plan.price;
-            return (
-              <div key={plan.name} className="relative flex flex-col rounded-3xl bg-[#eae6f1] p-7">
-                {/* Best Value badge */}
-                {plan.badge && (
-                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[#7cb342] px-3 py-1 text-[10px] font-bold text-white shadow-sm">
-                    {plan.badge}
-                  </span>
-                )}
+          {list === null
+            ? // Loading skeletons while /api/plans is in flight.
+              Array.from({ length: 3 }).map((_, i) => (
+                <div
+                  key={`skeleton-${i}`}
+                  className="h-[420px] animate-pulse rounded-3xl bg-[#eae6f1]"
+                />
+              ))
+            : list.map((plan) => {
+                const display = PLAN_DISPLAY[plan.name] ?? FALLBACK_DISPLAY;
+                const monthly = Math.round(plan.priceCents / 100);
+                const yearlyMonthlyEquivalent = Math.round(monthly * (1 - YEARLY_DISCOUNT));
+                const displayPrice = yearly ? yearlyMonthlyEquivalent : monthly;
+                return (
+                  <div
+                    key={plan.id}
+                    className="relative flex flex-col rounded-3xl bg-[#eae6f1] p-7"
+                  >
+                    {/* Best Value badge */}
+                    {display.badge && (
+                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[#7cb342] px-3 py-1 text-[10px] font-bold text-white shadow-sm">
+                        {display.badge}
+                      </span>
+                    )}
 
-                {/* Name + price */}
-                <div className="mb-2 flex items-start justify-between">
-                  <div>
-                    <h3 className="text-lg font-bold text-[var(--bb-secondary)]">{plan.name}</h3>
-                    <p className="mt-0.5 text-xs leading-snug text-[var(--bb-text-secondary)]">
-                      {plan.tagline}
+                    {/* Name + price */}
+                    <div className="mb-2 flex items-start justify-between">
+                      <div>
+                        <h3 className="text-lg font-bold text-[var(--bb-secondary)]">
+                          {plan.name}
+                        </h3>
+                        <p className="mt-0.5 text-xs leading-snug text-[var(--bb-text-secondary)]">
+                          {display.tagline}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-2xl font-extrabold text-[var(--bb-secondary)]">
+                          $ {displayPrice.toLocaleString()}
+                        </span>
+                        <span className="block text-[10px] text-[var(--bb-text-muted)]">
+                          per month
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Separator dash */}
+                    <div className="mb-6 h-0.5 w-6 bg-[var(--bb-secondary)]" />
+
+                    {/* Features */}
+                    <p className="mb-3 text-[11px] font-bold text-[var(--bb-secondary)]">
+                      Plan includes :
                     </p>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-2xl font-extrabold text-[var(--bb-secondary)]">
-                      $ {displayPrice.toLocaleString()}
-                    </span>
-                    <span className="block text-[10px] text-[var(--bb-text-muted)]">per month</span>
-                  </div>
-                </div>
+                    <ul className="mb-6 flex-1 space-y-2.5">
+                      {display.features.map((f) => (
+                        <li
+                          key={f}
+                          className="flex items-start gap-2 text-[13px] leading-snug text-[var(--bb-text-secondary)]"
+                        >
+                          <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            className="mt-0.5 flex-shrink-0"
+                          >
+                            <path
+                              d="M5 13l4 4L19 7"
+                              stroke="var(--bb-text-secondary)"
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
 
-                {/* Separator dash */}
-                <div className="mb-6 h-0.5 w-6 bg-[var(--bb-secondary)]" />
-
-                {/* Features */}
-                <p className="mb-3 text-[11px] font-bold text-[var(--bb-secondary)]">
-                  Plan includes :
-                </p>
-                <ul className="mb-6 flex-1 space-y-2.5">
-                  {plan.features.map((f) => (
-                    <li
-                      key={f}
-                      className="flex items-start gap-2 text-[13px] leading-snug text-[var(--bb-text-secondary)]"
+                    {/* See all features */}
+                    <a
+                      href="#compare"
+                      className="mb-6 text-xs font-bold text-[var(--bb-secondary)] hover:underline"
                     >
-                      <svg
-                        width="14"
-                        height="14"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        className="mt-0.5 flex-shrink-0"
-                      >
-                        <path
-                          d="M5 13l4 4L19 7"
-                          stroke="var(--bb-text-secondary)"
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                      {f}
-                    </li>
-                  ))}
-                </ul>
+                      See all features
+                    </a>
 
-                {/* See all features */}
-                <a
-                  href="#compare"
-                  className="mb-6 text-xs font-bold text-[var(--bb-secondary)] hover:underline"
-                >
-                  See all features
-                </a>
+                    {/* CTA */}
+                    <Link
+                      href="/login"
+                      className="block rounded-full bg-[var(--bb-primary)] px-6 py-2.5 text-center text-[11px] font-bold tracking-wider text-white uppercase transition-colors hover:bg-[var(--bb-primary-hover)]"
+                    >
+                      {display.cta}
+                    </Link>
 
-                {/* CTA */}
-                <Link
-                  href="/login"
-                  className="block rounded-full bg-[var(--bb-primary)] px-6 py-2.5 text-center text-[11px] font-bold tracking-wider text-white uppercase transition-colors hover:bg-[var(--bb-primary-hover)]"
-                >
-                  {plan.cta}
-                </Link>
-
-                {/* Subtitle */}
-                <p className="mt-3 text-center text-[10px] leading-snug text-[var(--bb-text-muted)] italic">
-                  {plan.subtitle}
-                </p>
-              </div>
-            );
-          })}
+                    {/* Subtitle */}
+                    {display.subtitle && (
+                      <p className="mt-3 text-center text-[10px] leading-snug text-[var(--bb-text-muted)] italic">
+                        {display.subtitle}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
         </div>
       </div>
     </section>
