@@ -3,13 +3,21 @@
 // @purpose: Reusable FAQ UI — category pills + accordion. Shared between the
 //           public /faq marketing page and the /customer/faq, /creative/faq
 //           dashboard pages.
+//
+//           Reads from the central /api/faq endpoint. The previously
+//           hardcoded FAQS constant in lib/faq-data.ts moved into the
+//           Faq DB table — admin CRUD lands in a follow-up.
 // -----------------------------------------------------------------------------
 
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { FAQ_CATEGORIES, FAQS, type Faq, type FaqCategory } from "@/lib/faq-data";
+type Faq = { id: string; question: string; answer: string; category: string };
+
+type FaqApiResponse = { faqs: Faq[]; categories: string[] };
+
+const ALL_LABEL = "All";
 
 type FaqAccordionProps = {
   faqs: Faq[];
@@ -24,7 +32,7 @@ function FaqAccordion({ faqs }: FaqAccordionProps) {
         const isOpen = openIndex === i;
         return (
           <div
-            key={`${faq.category}-${faq.q}`}
+            key={faq.id}
             // bg-[var(--bb-bg-card)] — theme-aware. Was a literal `bg-white`,
             // which broke in the dashboard's dark mode: the text colours
             // flipped to light via CSS variables but the literal white bg
@@ -39,7 +47,7 @@ function FaqAccordion({ faqs }: FaqAccordionProps) {
             >
               <span className="flex items-center gap-2">
                 <span className="text-[var(--bb-primary)]">+</span>
-                {faq.q}
+                {faq.question}
               </span>
               <svg
                 width="16"
@@ -57,9 +65,9 @@ function FaqAccordion({ faqs }: FaqAccordionProps) {
             </button>
             {isOpen && (
               <div className="border-t border-[var(--bb-border-subtle)] px-5 py-4">
-                <p className="text-sm font-semibold text-[var(--bb-primary)]">{faq.q}</p>
-                <p className="mt-2 text-sm leading-relaxed text-[var(--bb-text-secondary)]">
-                  {faq.a}
+                <p className="text-sm font-semibold text-[var(--bb-primary)]">{faq.question}</p>
+                <p className="mt-2 text-sm leading-relaxed whitespace-pre-line text-[var(--bb-text-secondary)]">
+                  {faq.answer}
                 </p>
               </div>
             )}
@@ -71,25 +79,92 @@ function FaqAccordion({ faqs }: FaqAccordionProps) {
 }
 
 type FaqBrowserProps = {
-  /** Restrict which categories the user sees. Defaults to all. */
-  categories?: readonly FaqCategory[];
+  /** Restrict which categories the user can filter by. Defaults to whatever
+   *  the API returns. Pass an explicit list to scope, e.g. ["General",
+   *  "Pricing & Billing"]. */
+  categories?: readonly string[];
 };
 
-export function FaqBrowser({ categories = FAQ_CATEGORIES }: FaqBrowserProps) {
-  const [activeCategory, setActiveCategory] = useState<FaqCategory>("All");
+export function FaqBrowser({ categories: categoryRestriction }: FaqBrowserProps) {
+  const [data, setData] = useState<FaqApiResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [activeCategory, setActiveCategory] = useState<string>(ALL_LABEL);
 
-  const visibleFaqs = useMemo(
-    () =>
-      activeCategory === "All"
-        ? FAQS.filter((f) => categories.includes(f.category as FaqCategory))
-        : FAQS.filter((f) => f.category === activeCategory),
-    [activeCategory, categories],
-  );
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/faq")
+      .then((res) => {
+        if (!res.ok) throw new Error(`/api/faq returned ${res.status}`);
+        return res.json();
+      })
+      .then((json: FaqApiResponse) => {
+        if (cancelled) return;
+        setData({
+          faqs: Array.isArray(json.faqs) ? json.faqs : [],
+          categories: Array.isArray(json.categories) ? json.categories : [],
+        });
+      })
+      .catch((err) => {
+        console.error("[FaqBrowser] failed to load", err);
+        if (cancelled) return;
+        setData({ faqs: [], categories: [] });
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // The pill list = "All" plus the API-returned categories, optionally
+  // intersected with the caller's restriction. Done with useMemo so the
+  // pill row doesn't reflow when the accordion re-renders.
+  const visibleCategories = useMemo<string[]>(() => {
+    const fromApi = data?.categories ?? [];
+    const allowed = categoryRestriction
+      ? fromApi.filter((c) => categoryRestriction.includes(c))
+      : fromApi;
+    return [ALL_LABEL, ...allowed];
+  }, [data?.categories, categoryRestriction]);
+
+  const visibleFaqs = useMemo<Faq[]>(() => {
+    if (!data) return [];
+    const allowed = categoryRestriction
+      ? data.faqs.filter((f) => categoryRestriction.includes(f.category))
+      : data.faqs;
+    if (activeCategory === ALL_LABEL) return allowed;
+    return allowed.filter((f) => f.category === activeCategory);
+  }, [data, activeCategory, categoryRestriction]);
+
+  if (loading) {
+    return (
+      <div className="space-y-3" aria-busy="true">
+        {/* Three muted skeleton rows. Same height + radius as the real
+            accordion items so the page layout doesn't jump when the
+            data lands. */}
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            className="h-14 animate-pulse rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-warm)]"
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (!data || data.faqs.length === 0) {
+    return (
+      <p className="text-center text-sm text-[var(--bb-text-secondary)]">
+        No questions to show right now.
+      </p>
+    );
+  }
 
   return (
     <div>
       <div className="mb-10 flex flex-wrap justify-center gap-2">
-        {categories.map((cat) => (
+        {visibleCategories.map((cat) => (
           <button
             key={cat}
             type="button"
