@@ -1,0 +1,53 @@
+// -----------------------------------------------------------------------------
+// @file: components/blocks/BlockRenderer.tsx
+// @purpose: Single dispatcher that renders any page block to its
+//           type-specific React component. Phase 0 ships HERO; subsequent
+//           phases add HOW_IT_WORKS, FEATURE_GRID, FAQ, PRICING, SHOWCASE,
+//           and CALL_TO_ACTION as they get migrated off the inline
+//           hardcoded sections in `app/page.tsx`.
+//
+//           Unknown / not-yet-implemented block types render nothing in
+//           production (with a dev-only console warning). That keeps the
+//           page healthy while we migrate sections one at a time.
+// -----------------------------------------------------------------------------
+
+import type { PageBlock } from "@/lib/blocks/get-page-blocks";
+import { BLOCK_TYPES } from "@/lib/blocks/types";
+
+import { HeroBlock } from "./HeroBlock";
+
+type BlockRendererProps = {
+  block: PageBlock;
+  /** Optional contextual data passed to blocks that need it (currently
+   *  just HERO for sign-in href fallback). */
+  signInHref?: string;
+};
+
+export function BlockRenderer({ block, signInHref = "/login" }: BlockRendererProps) {
+  switch (block.type) {
+    case BLOCK_TYPES.HERO:
+      return <HeroBlock data={block.data} signInHref={signInHref} />;
+
+    case BLOCK_TYPES.HOW_IT_WORKS:
+    case BLOCK_TYPES.PRICING:
+    case BLOCK_TYPES.SHOWCASE:
+    case BLOCK_TYPES.FEATURE_GRID:
+    case BLOCK_TYPES.FAQ:
+    case BLOCK_TYPES.CALL_TO_ACTION:
+      // Renderers land in subsequent phases. Until then the section
+      // continues to render via the hardcoded path in app/page.tsx —
+      // we render nothing here so we don't double-render.
+      if (process.env.NODE_ENV !== "production") {
+        console.warn(`[BlockRenderer] block type "${block.type}" not yet wired; skipping render`);
+      }
+      return null;
+
+    default: {
+      // exhaustive-ish: block.type is narrowed to never via the union, so
+      // hitting the default means the registry got out of sync.
+      const _exhaustive: never = block;
+      return null;
+      void _exhaustive;
+    }
+  }
+}
