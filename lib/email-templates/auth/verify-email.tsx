@@ -31,7 +31,7 @@ export function VerifyEmailTemplate({ name, url }: VerifyEmailProps) {
     <BaseLayout previewText="Confirm your email to finish setting up your Brandbite account.">
       <Heading>{greeting}</Heading>
       <Paragraph>
-        Thanks for signing up. Confirm your email address to finish setting up your account — you
+        Thanks for signing up. Confirm your email address to finish setting up your account. You
         won&apos;t be able to sign in until you do.
       </Paragraph>
 

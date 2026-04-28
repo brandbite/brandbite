@@ -80,7 +80,21 @@ export const SECTION_GAP = "24px";
 
 export const BRAND_NAME = "Brandbite";
 export const BRAND_TAGLINE = "All your designs, one subscription.";
-export const BRAND_WEBSITE = "https://brandbite.studio";
+
+/**
+ * Used for absolute URLs inside email HTML — logo image, footer links,
+ * help/docs anchors. Reads from NEXT_PUBLIC_APP_URL so each environment
+ * (demo, prod) self-references correctly:
+ *
+ *   - demo   → https://demo.brandbite.studio
+ *   - prod   → https://brandbite.studio  (or wherever NEXT_PUBLIC_APP_URL points)
+ *   - local  → https://brandbite.studio  (fallback; preview will show a
+ *              broken logo, but the layout is what we're reviewing locally)
+ *
+ * Real emails always render with whichever host actually sent them, so
+ * this stays correct across environments without per-env code changes.
+ */
+export const BRAND_WEBSITE = process.env.NEXT_PUBLIC_APP_URL || "https://brandbite.studio";
 export const BRAND_SUPPORT_EMAIL = "support@brandbite.studio";
 
 /** Postal address line for the CAN-SPAM / EU-required footer. Set when
