@@ -25,7 +25,9 @@ function sanitizeFilename(name: string): string {
   return base.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
 }
 
-function makeStorageKey(type: "showcase" | "blog", originalName?: string | null): string {
+type UploadType = "showcase" | "blog" | "page-block";
+
+function makeStorageKey(type: UploadType, originalName?: string | null): string {
   const safeName = originalName ? sanitizeFilename(originalName) : "file";
   const ts = Date.now();
   const rand = crypto.randomUUID().slice(0, 12);
@@ -46,7 +48,7 @@ export async function POST(req: Request) {
 
     const body = (await req.json()) as any;
 
-    const type = body?.type as "showcase" | "blog" | undefined;
+    const type = body?.type as UploadType | undefined;
     const contentType = body?.contentType as string | undefined;
     const bytes = body?.bytes as number | undefined;
     const originalName = (body?.originalName as string | undefined) ?? null;
@@ -55,7 +57,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
     }
 
-    if (type !== "showcase" && type !== "blog") {
+    if (type !== "showcase" && type !== "blog" && type !== "page-block") {
       return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
     }
 

@@ -9,7 +9,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { HeroBlock } from "@/components/blocks/HeroBlock";
 import { SiteHeader } from "@/components/marketing/site-header";
+
+import { DEFAULT_HERO_DATA } from "@/lib/blocks/defaults";
+import { BLOCK_TYPES, parseBlockData, type HeroData } from "@/lib/blocks/types";
 
 // ---------------------------------------------------------------------------
 // Data
@@ -163,8 +167,11 @@ export default function LandingPage() {
       {/* ─── Header ─────────────────────────────────────────────────────── */}
       <SiteHeader />
 
-      {/* ─── Hero + How it works + Bitemark (one continuous area) ──────── */}
-      <HeroBitemarkSection signInHref={signInHref} />
+      {/* ─── Hero (DB-driven via PageBlock; falls back to defaults) ─────── */}
+      <HeroSection signInHref={signInHref} />
+
+      {/* ─── How it works ───────────────────────────────────────────────── */}
+      <HowItWorksSection />
 
       {/* ─── Pricing ────────────────────────────────────────────────────── */}
       <PricingSection />
@@ -185,56 +192,75 @@ export default function LandingPage() {
 }
 
 // ===========================================================================
-// Hero + How it works + Bitemark (combined section with organic background)
+// Hero
+//
+// Phase 1 of the in-house page editor: the hero is editable via
+// /admin/landing. We fetch /api/page-blocks/home on mount, locate the HERO
+// block, and render it via <HeroBlock>. If the fetch fails or no row
+// exists yet we fall back to DEFAULT_HERO_DATA so the page always has a
+// hero.
+//
+// Initial render uses the defaults so the first paint is identical for
+// every visitor and matches the historical hardcoded look — the API
+// fetch only swaps in the admin-customised content once it lands.
 // ===========================================================================
 
-function HeroBitemarkSection({ signInHref }: { signInHref: string }) {
+type HeroBlockApiPayload = { type?: string; data?: unknown };
+
+function HeroSection({ signInHref }: { signInHref: string }) {
+  const [heroData, setHeroData] = useState<HeroData>(DEFAULT_HERO_DATA);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/page-blocks/home")
+      .then((res) => {
+        if (!res.ok) throw new Error(`/api/page-blocks/home returned ${res.status}`);
+        return res.json();
+      })
+      .then((json: { blocks?: HeroBlockApiPayload[] }) => {
+        if (cancelled) return;
+        const heroRow = json.blocks?.find((b) => b?.type === BLOCK_TYPES.HERO);
+        if (!heroRow) return; // keep defaults
+        // Re-validate client-side. Server already validated on save, but
+        // shape-checking again keeps a bad row from blowing up the page
+        // (e.g. if the schema tightens after the row was written).
+        const parsed = parseBlockData({ type: BLOCK_TYPES.HERO, data: heroRow.data });
+        if (parsed && parsed.type === BLOCK_TYPES.HERO) {
+          setHeroData(parsed.data);
+        }
+      })
+      .catch(() => {
+        // Silent fallback to defaults on network / parse error. The page
+        // already shows the default hero so there's nothing user-facing
+        // to do here.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return <HeroBlock data={heroData} signInHref={signInHref} />;
+}
+
+// ===========================================================================
+// How it works
+// ===========================================================================
+
+function HowItWorksSection() {
   return (
-    <section className="relative overflow-hidden bg-white">
-      {/* Bitemark organic blob — full-section background from Figma SVG */}
-      <img
-        src="/bitemark.svg"
-        alt=""
-        aria-hidden="true"
-        className="pointer-events-none absolute top-0 left-0 h-full w-auto max-w-none object-cover object-left-top select-none"
-      />
-
-      {/* Hero content */}
-      <div className="relative px-6 pt-20 pb-16 text-center sm:pt-28 sm:pb-20">
-        <div className="mx-auto max-w-3xl">
-          <h1 className="font-brand text-4xl leading-tight font-bold tracking-tight sm:text-5xl md:text-6xl">
-            All your creatives, <span className="text-[var(--bb-primary)]">one subscription.</span>
-          </h1>
-          <p className="mx-auto mt-5 max-w-xl text-base text-[var(--bb-text-secondary)] sm:text-lg">
-            From landing pages to social media ads. Get unlimited creative tasks, delivered fast by
-            top-tier creatives.
-          </p>
-          <div className="mt-8">
-            <Link
-              href={signInHref}
-              className="inline-block rounded-full bg-[var(--bb-primary)] px-8 py-3.5 text-sm font-bold tracking-wide text-white uppercase shadow-[var(--bb-primary)]/25 shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-[var(--bb-primary)]/30 hover:shadow-xl"
-            >
-              Get Started
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* How it works — sits within the bitemark area */}
-      <div id="how-it-works" className="relative px-6 pt-8 pb-20 sm:pb-28">
-        <div className="mx-auto grid max-w-5xl grid-cols-1 gap-12 sm:grid-cols-3 sm:gap-8">
-          {STEPS.map((step, i) => (
-            <div key={i} className="flex flex-col items-center text-center">
-              <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--bb-secondary)] text-xl font-bold text-white">
-                {i + 1}
-              </div>
-              <h3 className="mb-2 text-base font-bold text-[var(--bb-secondary)]">{step.title}</h3>
-              <p className="max-w-xs text-sm leading-relaxed text-[var(--bb-text-secondary)]">
-                {step.description}
-              </p>
+    <section id="how-it-works" className="relative bg-white px-6 pt-12 pb-20 sm:pb-28">
+      <div className="mx-auto grid max-w-5xl grid-cols-1 gap-12 sm:grid-cols-3 sm:gap-8">
+        {STEPS.map((step, i) => (
+          <div key={i} className="flex flex-col items-center text-center">
+            <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--bb-secondary)] text-xl font-bold text-white">
+              {i + 1}
             </div>
-          ))}
-        </div>
+            <h3 className="mb-2 text-base font-bold text-[var(--bb-secondary)]">{step.title}</h3>
+            <p className="max-w-xs text-sm leading-relaxed text-[var(--bb-text-secondary)]">
+              {step.description}
+            </p>
+          </div>
+        ))}
       </div>
     </section>
   );
