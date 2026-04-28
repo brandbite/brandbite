@@ -15,6 +15,7 @@ import type { PageBlock } from "@/lib/blocks/get-page-blocks";
 import { BLOCK_TYPES } from "@/lib/blocks/types";
 
 import { HeroBlock } from "./HeroBlock";
+import { HowItWorksBlock } from "./HowItWorksBlock";
 
 type BlockRendererProps = {
   block: PageBlock;
@@ -29,6 +30,8 @@ export function BlockRenderer({ block, signInHref = "/login" }: BlockRendererPro
       return <HeroBlock data={block.data} signInHref={signInHref} />;
 
     case BLOCK_TYPES.HOW_IT_WORKS:
+      return <HowItWorksBlock data={block.data} />;
+
     case BLOCK_TYPES.PRICING:
     case BLOCK_TYPES.SHOWCASE:
     case BLOCK_TYPES.FEATURE_GRID:

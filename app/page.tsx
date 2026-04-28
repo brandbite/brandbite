@@ -10,29 +10,20 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { HeroBlock } from "@/components/blocks/HeroBlock";
+import { HowItWorksBlock } from "@/components/blocks/HowItWorksBlock";
 import { SiteHeader } from "@/components/marketing/site-header";
 
-import { DEFAULT_HERO_DATA } from "@/lib/blocks/defaults";
-import { BLOCK_TYPES, parseBlockData, type HeroData } from "@/lib/blocks/types";
+import { DEFAULT_HERO_DATA, DEFAULT_HOW_IT_WORKS_DATA } from "@/lib/blocks/defaults";
+import {
+  BLOCK_TYPES,
+  parseBlockData,
+  type HeroData,
+  type HowItWorksData,
+} from "@/lib/blocks/types";
 
 // ---------------------------------------------------------------------------
 // Data
 // ---------------------------------------------------------------------------
-
-const STEPS = [
-  {
-    title: "Submit a creative request",
-    description: "Tell us what you need. Logo, landing page, or ad visuals.",
-  },
-  {
-    title: "Get matched instantly",
-    description: "Your personal creative starts working within 24 hours.",
-  },
-  {
-    title: "Review & revise endlessly",
-    description: "Request changes until it's perfect. No limits.",
-  },
-];
 
 /**
  * Static display copy keyed by plan `name`. The price itself is read
@@ -192,20 +183,21 @@ export default function LandingPage() {
 }
 
 // ===========================================================================
-// Hero
+// PageBlock-driven sections
 //
-// Phase 1 of the in-house page editor: the hero is editable via
-// /admin/landing. We fetch /api/page-blocks/home on mount, locate the HERO
-// block, and render it via <HeroBlock>. If the fetch fails or no row
-// exists yet we fall back to DEFAULT_HERO_DATA so the page always has a
-// hero.
+// Phase 1+ of the in-house page editor: each editable section reads its
+// data from /api/page-blocks/home and renders via the matching block
+// component. Initial render uses the defaults so the first paint matches
+// the historical hardcoded look; the API fetch only swaps in the
+// admin-customised content once it lands.
 //
-// Initial render uses the defaults so the first paint is identical for
-// every visitor and matches the historical hardcoded look — the API
-// fetch only swaps in the admin-customised content once it lands.
+// Each section is intentionally a separate small component with its own
+// useEffect fetch. The endpoint is edge-cached (60s + SWR) so the
+// duplicate requests dedupe at the CDN, and keeping them per-section
+// makes adding new editable sections a copy-paste of the same shape.
 // ===========================================================================
 
-type HeroBlockApiPayload = { type?: string; data?: unknown };
+type AnyBlockApiPayload = { type?: string; data?: unknown };
 
 function HeroSection({ signInHref }: { signInHref: string }) {
   const [heroData, setHeroData] = useState<HeroData>(DEFAULT_HERO_DATA);
@@ -217,7 +209,7 @@ function HeroSection({ signInHref }: { signInHref: string }) {
         if (!res.ok) throw new Error(`/api/page-blocks/home returned ${res.status}`);
         return res.json();
       })
-      .then((json: { blocks?: HeroBlockApiPayload[] }) => {
+      .then((json: { blocks?: AnyBlockApiPayload[] }) => {
         if (cancelled) return;
         const heroRow = json.blocks?.find((b) => b?.type === BLOCK_TYPES.HERO);
         if (!heroRow) return; // keep defaults
@@ -242,28 +234,34 @@ function HeroSection({ signInHref }: { signInHref: string }) {
   return <HeroBlock data={heroData} signInHref={signInHref} />;
 }
 
-// ===========================================================================
-// How it works
-// ===========================================================================
-
 function HowItWorksSection() {
-  return (
-    <section id="how-it-works" className="relative bg-white px-6 pt-12 pb-20 sm:pb-28">
-      <div className="mx-auto grid max-w-5xl grid-cols-1 gap-12 sm:grid-cols-3 sm:gap-8">
-        {STEPS.map((step, i) => (
-          <div key={i} className="flex flex-col items-center text-center">
-            <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--bb-secondary)] text-xl font-bold text-white">
-              {i + 1}
-            </div>
-            <h3 className="mb-2 text-base font-bold text-[var(--bb-secondary)]">{step.title}</h3>
-            <p className="max-w-xs text-sm leading-relaxed text-[var(--bb-text-secondary)]">
-              {step.description}
-            </p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
+  const [data, setData] = useState<HowItWorksData>(DEFAULT_HOW_IT_WORKS_DATA);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/page-blocks/home")
+      .then((res) => {
+        if (!res.ok) throw new Error(`/api/page-blocks/home returned ${res.status}`);
+        return res.json();
+      })
+      .then((json: { blocks?: AnyBlockApiPayload[] }) => {
+        if (cancelled) return;
+        const row = json.blocks?.find((b) => b?.type === BLOCK_TYPES.HOW_IT_WORKS);
+        if (!row) return;
+        const parsed = parseBlockData({ type: BLOCK_TYPES.HOW_IT_WORKS, data: row.data });
+        if (parsed && parsed.type === BLOCK_TYPES.HOW_IT_WORKS) {
+          setData(parsed.data);
+        }
+      })
+      .catch(() => {
+        // Silent fallback to defaults.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return <HowItWorksBlock data={data} />;
 }
 
 // ===========================================================================

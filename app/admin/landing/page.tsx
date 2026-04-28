@@ -19,21 +19,29 @@
 
 import { OwnerOnlyBanner } from "@/components/admin/owner-only-banner";
 import { HeroBlockForm } from "@/components/blocks/admin/HeroBlockForm";
+import { HowItWorksBlockForm } from "@/components/blocks/admin/HowItWorksBlockForm";
 
 import { getPageBlocks } from "@/lib/blocks/get-page-blocks";
-import { DEFAULT_HERO_DATA } from "@/lib/blocks/defaults";
-import { BLOCK_TYPES, type HeroData } from "@/lib/blocks/types";
+import { DEFAULT_HERO_DATA, DEFAULT_HOW_IT_WORKS_DATA } from "@/lib/blocks/defaults";
+import { BLOCK_TYPES, type HeroData, type HowItWorksData } from "@/lib/blocks/types";
 
 const PAGE_KEY = "home";
 
 export default async function AdminLandingPage() {
-  // Read existing blocks for the home page. If a HERO row exists we
-  // hydrate the form with it; otherwise we fall back to the
+  // Read existing blocks for the home page. If a row exists for a given
+  // type we hydrate that form with it; otherwise we fall back to the
   // shipped-in-code defaults so the admin doesn't have to retype.
   const blocks = await getPageBlocks(PAGE_KEY);
+
   const heroBlock = blocks.find((b) => b.type === BLOCK_TYPES.HERO);
   const initialHero: HeroData =
     heroBlock && heroBlock.type === BLOCK_TYPES.HERO ? heroBlock.data : DEFAULT_HERO_DATA;
+
+  const howItWorksBlock = blocks.find((b) => b.type === BLOCK_TYPES.HOW_IT_WORKS);
+  const initialHowItWorks: HowItWorksData =
+    howItWorksBlock && howItWorksBlock.type === BLOCK_TYPES.HOW_IT_WORKS
+      ? howItWorksBlock.data
+      : DEFAULT_HOW_IT_WORKS_DATA;
 
   return (
     <>
@@ -64,14 +72,27 @@ export default async function AdminLandingPage() {
         <HeroBlockForm initial={initialHero} pageKey={PAGE_KEY} />
       </section>
 
+      {/* How it works ------------------------------------------------- */}
+      <section className="mt-6 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-6 py-5 shadow-sm">
+        <header className="mb-5 border-b border-[var(--bb-border-subtle)] pb-3">
+          <h2 className="text-lg font-semibold tracking-tight">How it works</h2>
+          <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
+            The numbered steps section under the hero. Add 1 to 5 steps, reorder them, and add an
+            optional eyebrow + section title above the grid.
+          </p>
+        </header>
+
+        <HowItWorksBlockForm initial={initialHowItWorks} pageKey={PAGE_KEY} />
+      </section>
+
       {/* Future sections ---------------------------------------------- */}
       <section className="mt-6 rounded-2xl border border-dashed border-[var(--bb-border)] bg-[var(--bb-bg-warm)] px-6 py-5">
         <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-text-secondary)]">
           More sections coming soon
         </h2>
         <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-          How it works, pricing, showcase, why-Brandbite, and FAQ will become editable in the next
-          phase. Until then, those sections render from the hardcoded copy in the page source.
+          Pricing, showcase, why-Brandbite, and FAQ will become editable in upcoming phases. Until
+          then, those sections render from the hardcoded copy in the page source.
         </p>
       </section>
     </>
