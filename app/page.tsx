@@ -9,14 +9,20 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { FaqBlock } from "@/components/blocks/FaqBlock";
 import { HeroBlock } from "@/components/blocks/HeroBlock";
 import { HowItWorksBlock } from "@/components/blocks/HowItWorksBlock";
 import { SiteHeader } from "@/components/marketing/site-header";
 
-import { DEFAULT_HERO_DATA, DEFAULT_HOW_IT_WORKS_DATA } from "@/lib/blocks/defaults";
+import {
+  DEFAULT_FAQ_DATA,
+  DEFAULT_HERO_DATA,
+  DEFAULT_HOW_IT_WORKS_DATA,
+} from "@/lib/blocks/defaults";
 import {
   BLOCK_TYPES,
   parseBlockData,
+  type FaqData,
   type HeroData,
   type HowItWorksData,
 } from "@/lib/blocks/types";
@@ -97,25 +103,6 @@ const WHY_ITEMS = [
   "Brand guidelines",
   "Flexible subscription. Pause anytime.",
   "Access to top European talent",
-];
-
-const FAQS = [
-  {
-    q: "How fast will I get my creatives?",
-    a: "Most requests are completed within 1 to 2 days. Larger projects like brand identity guides or motion videos may take 3 to 5 business days depending on complexity.",
-  },
-  {
-    q: "Can I cancel anytime?",
-    a: "Yes. You can pause or cancel your subscription at any time. No long-term contracts, no cancellation fees. Your work and assets remain yours.",
-  },
-  {
-    q: "What if I don't like the creative?",
-    a: "No worries! Every plan includes unlimited revisions. We'll keep iterating until you're 100% happy with the result.",
-  },
-  {
-    q: "Do you work with agencies?",
-    a: "Absolutely. Many agencies use Brandbite as their white-label creative arm. We offer agency-friendly plans with multi-seat access and dedicated account managers.",
-  },
 ];
 
 const FOOTER_COLS = [
@@ -620,66 +607,37 @@ function WhySection() {
 }
 
 // ===========================================================================
-// FAQ (accordion)
+// FAQ (accordion) — DB-driven via PageBlock with fallback to defaults
 // ===========================================================================
 
 function FaqSection() {
-  const [openIndex, setOpenIndex] = useState<number | null>(1);
+  const [data, setData] = useState<FaqData>(DEFAULT_FAQ_DATA);
 
-  return (
-    <section id="faq" className="bg-[var(--bb-bg-page)] px-6 py-20 sm:py-24">
-      <div className="mx-auto max-w-2xl">
-        <h2 className="font-brand text-3xl font-bold tracking-tight">FAQ</h2>
-        <p className="mt-1 mb-10 text-sm text-[var(--bb-text-secondary)]">
-          Frequently asked questions.
-        </p>
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/page-blocks/home")
+      .then((res) => {
+        if (!res.ok) throw new Error(`/api/page-blocks/home returned ${res.status}`);
+        return res.json();
+      })
+      .then((json: { blocks?: AnyBlockApiPayload[] }) => {
+        if (cancelled) return;
+        const row = json.blocks?.find((b) => b?.type === BLOCK_TYPES.FAQ);
+        if (!row) return;
+        const parsed = parseBlockData({ type: BLOCK_TYPES.FAQ, data: row.data });
+        if (parsed && parsed.type === BLOCK_TYPES.FAQ) {
+          setData(parsed.data);
+        }
+      })
+      .catch(() => {
+        // Silent fallback to defaults.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-        <div className="space-y-3">
-          {FAQS.map((faq, i) => {
-            const isOpen = openIndex === i;
-            return (
-              <div
-                key={i}
-                className="overflow-hidden rounded-xl border border-[var(--bb-border)] bg-white"
-              >
-                <button
-                  type="button"
-                  onClick={() => setOpenIndex(isOpen ? null : i)}
-                  className="flex w-full items-center justify-between px-5 py-4 text-left text-sm font-semibold text-[var(--bb-secondary)] transition-colors hover:bg-[var(--bb-bg-page)]"
-                >
-                  <span className="flex items-center gap-2">
-                    <span className="text-[var(--bb-primary)]">+</span>
-                    {faq.q}
-                  </span>
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className={`flex-shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
-                  >
-                    <polyline points="6 9 12 15 18 9" />
-                  </svg>
-                </button>
-                {isOpen && (
-                  <div className="border-t border-[var(--bb-border-subtle)] px-5 py-4">
-                    <p className="text-sm font-semibold text-[var(--bb-primary)]">{faq.q}</p>
-                    <p className="mt-2 text-sm leading-relaxed text-[var(--bb-text-secondary)]">
-                      {faq.a}
-                    </p>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </section>
-  );
+  return <FaqBlock data={data} />;
 }
 
 // ===========================================================================

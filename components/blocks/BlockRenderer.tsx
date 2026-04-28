@@ -14,6 +14,7 @@
 import type { PageBlock } from "@/lib/blocks/get-page-blocks";
 import { BLOCK_TYPES } from "@/lib/blocks/types";
 
+import { FaqBlock } from "./FaqBlock";
 import { HeroBlock } from "./HeroBlock";
 import { HowItWorksBlock } from "./HowItWorksBlock";
 
@@ -32,10 +33,12 @@ export function BlockRenderer({ block, signInHref = "/login" }: BlockRendererPro
     case BLOCK_TYPES.HOW_IT_WORKS:
       return <HowItWorksBlock data={block.data} />;
 
+    case BLOCK_TYPES.FAQ:
+      return <FaqBlock data={block.data} />;
+
     case BLOCK_TYPES.PRICING:
     case BLOCK_TYPES.SHOWCASE:
     case BLOCK_TYPES.FEATURE_GRID:
-    case BLOCK_TYPES.FAQ:
     case BLOCK_TYPES.CALL_TO_ACTION:
       // Renderers land in subsequent phases. Until then the section
       // continues to render via the hardcoded path in app/page.tsx —
