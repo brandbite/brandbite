@@ -1257,6 +1257,44 @@ model PageBlock {
 }
 
 // -----------------------------------------------------------------------------
+// FAQ — central question/answer store, shared across all FAQ surfaces.
+//
+// One row per question. Used by:
+//   - Public /faq marketing page
+//   - /customer/faq, /creative/faq dashboard pages
+//   - Landing-page PageBlock (FAQ block, which stores selected Faq IDs)
+//
+// Categories live as a free-form string so adding a new category is data,
+// not a code change. The shipped set is "General", "Pricing & Billing",
+// "Creative Process", "Platform & Tools", "Agencies & Teams" — anything
+// else is fine, FaqBrowser pulls the unique set from the API.
+// -----------------------------------------------------------------------------
+
+model Faq {
+  id        String   @id @default(cuid())
+  /// The user-facing question. Max ~200 chars in the admin UI.
+  question  String
+  /// The user-facing answer. Markdown not rendered yet; line breaks
+  /// preserved via whitespace-pre-line on the renderer side.
+  answer    String
+  /// Category bucket the FAQ falls under, e.g. "Pricing & Billing".
+  /// Free-form string so adding a new category is a CRUD action, not a
+  /// schema change.
+  category  String
+  /// Manual ordering within a category. Lower renders first. We sort by
+  /// (category, position) at query time so admins control the order.
+  position  Int      @default(0)
+  /// Soft-delete / hide flag. Inactive items don't appear on any
+  /// public surface but stay in the admin list for restore.
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category, position])
+  @@index([isActive])
+}
+
+// -----------------------------------------------------------------------------
 // News Articles — listing CMS (like BlogPost)
 // -----------------------------------------------------------------------------
 
