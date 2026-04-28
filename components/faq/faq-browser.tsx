@@ -25,7 +25,11 @@ function FaqAccordion({ faqs }: FaqAccordionProps) {
         return (
           <div
             key={`${faq.category}-${faq.q}`}
-            className="overflow-hidden rounded-xl border border-[var(--bb-border)] bg-white"
+            // bg-[var(--bb-bg-card)] — theme-aware. Was a literal `bg-white`,
+            // which broke in the dashboard's dark mode: the text colours
+            // flipped to light via CSS variables but the literal white bg
+            // stayed white, producing light-on-light invisible text.
+            className="overflow-hidden rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)]"
           >
             <button
               type="button"
