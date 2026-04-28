@@ -5,6 +5,7 @@
 
 "use client";
 
+import { usePathname } from "next/navigation";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 // ---------------------------------------------------------------------------
@@ -21,6 +22,24 @@ type ThemeContextValue = {
 };
 
 const STORAGE_KEY = "bb-theme";
+
+/**
+ * Routes where the user-chosen theme actually applies. Everything else
+ * is forced light because those surfaces (marketing landing, auth flow,
+ * CMS legal pages, etc.) were designed light-only — they use literal
+ * bg-white containers but CSS-variable text colours, so applying
+ * `.dark` there flips text to light without changing the white
+ * background, producing unreadable light-on-light copy.
+ *
+ * Same prefix list lives in the inline FOUC-prevention script in
+ * `app/layout.tsx`. Keep them in sync.
+ */
+const APP_ROUTE_PREFIXES = ["/admin", "/customer", "/creative", "/debug"] as const;
+
+function isAppRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return APP_ROUTE_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
 
 // ---------------------------------------------------------------------------
 // Context
@@ -58,6 +77,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // The real stored value is read in the mount effect below.
   const [theme, setThemeState] = useState<Theme>("light");
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>("light");
+  const pathname = usePathname();
+  const onAppRoute = isAppRoute(pathname);
 
   // Apply .dark class to <html>
   const applyTheme = useCallback((resolved: ResolvedTheme) => {
@@ -78,15 +99,22 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // When theme changes, resolve and apply
+  // When theme or route changes, resolve and apply.
+  // Only authenticated app routes honour the user's theme preference;
+  // marketing / auth / CMS pages are always light. See APP_ROUTE_PREFIXES.
   useEffect(() => {
+    if (!onAppRoute) {
+      applyTheme("light");
+      return;
+    }
     const resolved = resolveTheme(theme);
     applyTheme(resolved);
-  }, [theme, applyTheme]);
+  }, [theme, applyTheme, onAppRoute]);
 
-  // Listen for system preference changes when theme is "system"
+  // Listen for system preference changes when theme is "system" — but
+  // only when the current route actually honours the preference.
   useEffect(() => {
-    if (theme !== "system") return;
+    if (theme !== "system" || !onAppRoute) return;
 
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const handler = (e: MediaQueryListEvent) => {
@@ -95,7 +123,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
-  }, [theme, applyTheme]);
+  }, [theme, applyTheme, onAppRoute]);
 
   const setTheme = useCallback((newTheme: Theme) => {
     setThemeState(newTheme);

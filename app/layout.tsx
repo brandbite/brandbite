@@ -61,11 +61,20 @@ export const metadata: Metadata = {
   },
 };
 
-// Inline script to prevent FOUC — reads localStorage before paint
-// Default to light mode when no preference is stored (marketing pages use light backgrounds)
+// Inline script to prevent FOUC — reads localStorage before paint.
+//
+// Dark mode is intentionally scoped to the authenticated app routes
+// (/admin, /customer, /creative, /debug). Marketing pages, the login
+// flow, and CMS pages were designed light-only with literal bg-white
+// containers; applying .dark there flips the CSS variable colours but
+// leaves the literal backgrounds white, which produces unreadable
+// light-on-light text. Forcing light on those routes prevents that.
 const themeScript = `
 (function(){
   try {
+    var p = window.location.pathname;
+    var isAppRoute = p.indexOf("/admin") === 0 || p.indexOf("/customer") === 0 || p.indexOf("/creative") === 0 || p.indexOf("/debug") === 0;
+    if (!isAppRoute) return;
     var t = localStorage.getItem("bb-theme");
     var dark = t === "dark" || (t === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
     if (dark) document.documentElement.classList.add("dark");
