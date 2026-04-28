@@ -1217,6 +1217,45 @@ model CmsPage {
   updatedAt       DateTime @updatedAt
 }
 
+/// Block-based page editor. Used by the marketing landing page (and
+/// eventually any other CMS-editable page) to compose sections out of
+/// a small library of typed components: hero, feature grid, FAQ,
+/// pricing, etc.
+///
+/// The `data` JSON is Zod-validated against per-type schemas defined
+/// in `lib/blocks/types.ts`. Server-side rendering and the admin
+/// editor both go through that registry, so adding a new block type
+/// is one schema entry plus a render component plus an admin form.
+///
+/// `pageKey` matches `CmsPage.pageKey` semantics (e.g. "home", "about")
+/// but is intentionally NOT a foreign key — legal pages stay on the
+/// rich-text `CmsPage.body` path; marketing/landing pages move onto
+/// blocks. The two systems coexist.
+model PageBlock {
+  id        String   @id @default(cuid())
+  pageKey   String // "home", future: "about", etc.
+  /// Ordering within a page. Unique per (pageKey, position) so
+  /// reordering is a swap of two rows. Drag-and-drop reorder support
+  /// is a Phase 3 follow-up.
+  position  Int
+  /// Block type discriminator. String not enum so adding new types is
+  /// a code change, not a migration. See `lib/blocks/types.ts` for
+  /// the closed set.
+  type      String
+  /// Block-specific payload. Validated by the Zod schema for `type`
+  /// before save. Examples:
+  ///   HERO   → { headline, subhead?, ctaLabel?, ctaHref?,
+  ///             imageStorageKey?, imageUrl?, variant }
+  ///   FAQ    → { title?, qas: [{ q, a }] }
+  ///   FEATURE_GRID → { title?, subtitle?, items: [{ title, body, emoji? }] }
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([pageKey, position])
+  @@index([pageKey])
+}
+
 // -----------------------------------------------------------------------------
 // News Articles — listing CMS (like BlogPost)
 // -----------------------------------------------------------------------------
