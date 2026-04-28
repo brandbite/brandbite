@@ -474,6 +474,147 @@ export async function POST(req: NextRequest) {
         break;
       }
 
+      // -----------------------------------------------------------
+      // 5) Stripe Price created → sync `priceCents` + `stripePriceId`
+      //    onto the matching Plan row.
+      //
+      //    Stripe Prices are immutable, so editing a Price's amount
+      //    in the dashboard creates a NEW Price (the old gets archived).
+      //    We listen for the `price.created` event, find the Plan that
+      //    owns the same Product, and swap its `stripePriceId` to the
+      //    new Price plus update the cached `priceCents`. The next
+      //    request to /api/plans (cached for 60s) reflects the change.
+      //
+      //    No-ops cleanly when:
+      //      - the new Price isn't recurring (one-time top-up packs)
+      //      - the new Price is already inactive (Stripe occasionally
+      //        creates archived Prices for migrations)
+      //      - no Plan matches the Product (Stripe Price for something
+      //        we don't track yet)
+      // -----------------------------------------------------------
+      case "price.created": {
+        const price = event.data.object as Stripe.Price;
+        const productId = typeof price.product === "string" ? price.product : null;
+
+        if (!productId) {
+          console.warn("[billing.webhook] price.created missing product id", {
+            priceId: price.id,
+          });
+          break;
+        }
+        if (price.active === false) {
+          console.log("[billing.webhook] price.created but price is inactive — ignoring", {
+            priceId: price.id,
+            productId,
+          });
+          break;
+        }
+        if (price.unit_amount == null) {
+          console.warn("[billing.webhook] price.created missing unit_amount", {
+            priceId: price.id,
+            productId,
+          });
+          break;
+        }
+        if (price.type !== "recurring") {
+          console.log("[billing.webhook] price.created is one-time, skipping plan sync", {
+            priceId: price.id,
+            productId,
+          });
+          break;
+        }
+
+        const plan = await prisma.plan.findFirst({
+          where: { stripeProductId: productId },
+          select: { id: true, name: true, priceCents: true, stripePriceId: true },
+        });
+
+        if (!plan) {
+          console.log("[billing.webhook] price.created for an untracked product — ignoring", {
+            priceId: price.id,
+            productId,
+          });
+          break;
+        }
+
+        const previous = {
+          stripePriceId: plan.stripePriceId,
+          priceCents: plan.priceCents,
+        };
+
+        await prisma.plan.update({
+          where: { id: plan.id },
+          data: {
+            stripePriceId: price.id,
+            priceCents: price.unit_amount,
+          },
+        });
+
+        console.log("[billing.webhook] plan price synced from Stripe", {
+          planId: plan.id,
+          planName: plan.name,
+          previousPriceCents: previous.priceCents,
+          newPriceCents: price.unit_amount,
+          previousStripePriceId: previous.stripePriceId,
+          newStripePriceId: price.id,
+        });
+
+        break;
+      }
+
+      // -----------------------------------------------------------
+      // 6) Stripe Product updated → sync `name` and `description`
+      //    onto the matching Plan row.
+      //
+      //    Lighter touch than price.created: just keeps display
+      //    metadata current. The Plan's monthlyTokens, isActive,
+      //    isRecurring etc. are app-side concerns and stay
+      //    independent of the Stripe Product record.
+      // -----------------------------------------------------------
+      case "product.updated": {
+        const product = event.data.object as Stripe.Product;
+        const productId = product.id;
+
+        const plan = await prisma.plan.findFirst({
+          where: { stripeProductId: productId },
+          select: { id: true, name: true, description: true },
+        });
+
+        if (!plan) {
+          console.log("[billing.webhook] product.updated for an untracked product — ignoring", {
+            productId,
+          });
+          break;
+        }
+
+        // Only update fields that actually changed; Stripe sends the
+        // full product on every update event, not a diff.
+        const nextName = product.name ?? plan.name;
+        const nextDescription = product.description ?? plan.description;
+        if (nextName === plan.name && nextDescription === plan.description) {
+          console.log("[billing.webhook] product.updated produced no changes — no-op", {
+            productId,
+          });
+          break;
+        }
+
+        await prisma.plan.update({
+          where: { id: plan.id },
+          data: {
+            name: nextName,
+            description: nextDescription,
+          },
+        });
+
+        console.log("[billing.webhook] plan name/description synced from Stripe", {
+          planId: plan.id,
+          previousName: plan.name,
+          newName: nextName,
+        });
+
+        break;
+      }
+
       default: {
         console.log("[billing.webhook] Unhandled event type", event.type);
       }
