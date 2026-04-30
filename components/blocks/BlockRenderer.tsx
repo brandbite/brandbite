@@ -14,6 +14,7 @@
 import type { PageBlock } from "@/lib/blocks/get-page-blocks";
 import { BLOCK_TYPES } from "@/lib/blocks/types";
 
+import { CallToActionBlock } from "./CallToActionBlock";
 import { FaqBlock } from "./FaqBlock";
 import { FeatureGridBlock } from "./FeatureGridBlock";
 import { HeroBlock } from "./HeroBlock";
@@ -57,13 +58,7 @@ export function BlockRenderer({ block, signInHref = "/login" }: BlockRendererPro
       return <ShowcaseHeaderBlock data={block.data} />;
 
     case BLOCK_TYPES.CALL_TO_ACTION:
-      // Renderers land in subsequent phases. Until then the section
-      // continues to render via the hardcoded path in app/page.tsx —
-      // we render nothing here so we don't double-render.
-      if (process.env.NODE_ENV !== "production") {
-        console.warn(`[BlockRenderer] block type "${block.type}" not yet wired; skipping render`);
-      }
-      return null;
+      return <CallToActionBlock data={block.data} />;
 
     default: {
       // exhaustive-ish: block.type is narrowed to never via the union, so

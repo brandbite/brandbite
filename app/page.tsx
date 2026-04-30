@@ -9,6 +9,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { CallToActionBlock } from "@/components/blocks/CallToActionBlock";
 import { FaqBlock } from "@/components/blocks/FaqBlock";
 import { FeatureGridBlock } from "@/components/blocks/FeatureGridBlock";
 import { HeroBlock } from "@/components/blocks/HeroBlock";
@@ -18,6 +19,7 @@ import { ShowcaseHeaderBlock } from "@/components/blocks/ShowcaseHeaderBlock";
 import { SiteHeader } from "@/components/marketing/site-header";
 
 import {
+  DEFAULT_CALL_TO_ACTION_DATA,
   DEFAULT_FAQ_DATA,
   DEFAULT_FEATURE_GRID_DATA,
   DEFAULT_HERO_DATA,
@@ -28,6 +30,7 @@ import {
 import {
   BLOCK_TYPES,
   parseBlockData,
+  type CallToActionData,
   type FaqData,
   type FeatureGridData,
   type HeroData,
@@ -160,6 +163,9 @@ export default function LandingPage() {
 
       {/* ─── Why Brandbite ──────────────────────────────────────────────── */}
       <WhySection />
+
+      {/* ─── Call-to-action band (DB-driven; falls back to defaults) ────── */}
+      <CallToActionSection />
 
       {/* ─── FAQ ────────────────────────────────────────────────────────── */}
       <FaqSection />
@@ -598,6 +604,40 @@ function WhySection() {
   }, []);
 
   return <FeatureGridBlock data={data} />;
+}
+
+// ===========================================================================
+// Call-to-action band — DB-driven via PageBlock with fallback to defaults
+// ===========================================================================
+
+function CallToActionSection() {
+  const [data, setData] = useState<CallToActionData>(DEFAULT_CALL_TO_ACTION_DATA);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/page-blocks/home")
+      .then((res) => {
+        if (!res.ok) throw new Error(`/api/page-blocks/home returned ${res.status}`);
+        return res.json();
+      })
+      .then((json: { blocks?: AnyBlockApiPayload[] }) => {
+        if (cancelled) return;
+        const row = json.blocks?.find((b) => b?.type === BLOCK_TYPES.CALL_TO_ACTION);
+        if (!row) return;
+        const parsed = parseBlockData({ type: BLOCK_TYPES.CALL_TO_ACTION, data: row.data });
+        if (parsed && parsed.type === BLOCK_TYPES.CALL_TO_ACTION) {
+          setData(parsed.data);
+        }
+      })
+      .catch(() => {
+        // Silent fallback to defaults.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return <CallToActionBlock data={data} />;
 }
 
 // ===========================================================================
