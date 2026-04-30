@@ -41,12 +41,24 @@ export type BlockType = (typeof BLOCK_TYPES)[keyof typeof BLOCK_TYPES];
  * displays half-defined content.
  * ------------------------------------------------------------------------- */
 
-/** Common URL string allowing internal paths or absolute URLs. Used for
- *  CTA hrefs. Disallows javascript: / data: schemes (which would be open
- *  XSS / phishing routes if an admin account were compromised). */
+/** Common URL string allowing internal paths, in-page anchors, or
+ *  absolute URLs. Used for CTA hrefs across every block type.
+ *
+ *  Disallows javascript: / data: schemes (which would be open XSS /
+ *  phishing routes if an admin account were compromised) and bare
+ *  identifiers that aren't a real URL.
+ *
+ *  Accepts:
+ *    - "/login"      — internal path
+ *    - "#pricing"    — same-page anchor (used by Why -> Pricing on the
+ *                      landing page; safe, no script execution)
+ *    - "https://..." / "http://..."
+ *    - "mailto:..."
+ */
 const safeUrlSchema = z.string().refine(
   (v) => {
     if (v.startsWith("/")) return true;
+    if (v.startsWith("#") && v.length > 1) return true;
     try {
       const u = new URL(v);
       return u.protocol === "https:" || u.protocol === "http:" || u.protocol === "mailto:";
@@ -54,7 +66,7 @@ const safeUrlSchema = z.string().refine(
       return false;
     }
   },
-  { message: "must be an internal path (/...) or http(s)/mailto URL" },
+  { message: "must be an internal path (/...), anchor (#...), or http(s)/mailto URL" },
 );
 
 /** Image reference. Either a hosted URL (rare — when an admin pastes one)
@@ -145,27 +157,43 @@ export type ShowcaseData = z.infer<typeof showcaseDataSchema>;
 
 /* -- FEATURE_GRID --------------------------------------------------------- */
 
-export const featureGridDataSchema = z.object({
-  title: z.string().max(120).optional(),
-  subtitle: z.string().max(300).optional(),
-  /** 1 to 12 items. The default grid renders 5 nicely with auto-wrap. */
-  items: z
-    .array(
-      z.object({
-        title: z.string().min(1).max(120),
-        body: z.string().max(400).optional(),
-        /** Optional emoji or icon name to render before the title. */
-        emoji: z.string().max(8).optional(),
-      }),
-    )
-    .min(1)
-    .max(12),
-  /** Optional supporting image rendered alongside the grid. */
-  image: imageRefSchema.optional(),
-  /** Optional CTA below the grid. */
-  ctaLabel: z.string().max(50).optional(),
-  ctaHref: safeUrlSchema.optional(),
-});
+export const featureGridDataSchema = z
+  .object({
+    title: z.string().max(120).optional(),
+    subtitle: z.string().max(300).optional(),
+    /** 1 to 12 items. The default grid renders 5 nicely with auto-wrap. */
+    items: z
+      .array(
+        z.object({
+          title: z.string().min(1).max(120),
+          body: z.string().max(400).optional(),
+          /** Optional emoji or icon name to render before the title. */
+          emoji: z.string().max(8).optional(),
+        }),
+      )
+      .min(1)
+      .max(12),
+    /** Optional supporting image rendered alongside the grid. When set
+     *  the renderer switches to a two-column layout (image + content);
+     *  when absent the content centers in a single column. */
+    image: imageRefSchema.optional(),
+    /** Optional CTA below the grid. Same pair-or-omit rule as FAQ —
+     *  label without href (or vice versa) is rejected at parse so the
+     *  renderer never has to deal with a half-set CTA. */
+    ctaLabel: z.string().max(50).optional(),
+    ctaHref: safeUrlSchema.optional(),
+  })
+  .superRefine((val, ctx) => {
+    const hasLabel = Boolean(val.ctaLabel && val.ctaLabel.trim().length > 0);
+    const hasHref = Boolean(val.ctaHref && val.ctaHref.trim().length > 0);
+    if (hasLabel !== hasHref) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "ctaLabel and ctaHref must both be set, or both be omitted.",
+        path: hasLabel ? ["ctaHref"] : ["ctaLabel"],
+      });
+    }
+  });
 
 export type FeatureGridData = z.infer<typeof featureGridDataSchema>;
 
