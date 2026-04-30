@@ -13,6 +13,7 @@ import { FaqBlock } from "@/components/blocks/FaqBlock";
 import { FeatureGridBlock } from "@/components/blocks/FeatureGridBlock";
 import { HeroBlock } from "@/components/blocks/HeroBlock";
 import { HowItWorksBlock } from "@/components/blocks/HowItWorksBlock";
+import { PricingHeaderBlock } from "@/components/blocks/PricingHeaderBlock";
 import { SiteHeader } from "@/components/marketing/site-header";
 
 import {
@@ -20,6 +21,7 @@ import {
   DEFAULT_FEATURE_GRID_DATA,
   DEFAULT_HERO_DATA,
   DEFAULT_HOW_IT_WORKS_DATA,
+  DEFAULT_PRICING_DATA,
 } from "@/lib/blocks/defaults";
 import {
   BLOCK_TYPES,
@@ -28,6 +30,7 @@ import {
   type FeatureGridData,
   type HeroData,
   type HowItWorksData,
+  type PricingData,
 } from "@/lib/blocks/types";
 
 // ---------------------------------------------------------------------------
@@ -260,6 +263,11 @@ function PricingSection() {
   const [plans, setPlans] = useState<ApiPlan[] | null>(null);
   const [didError, setDidError] = useState(false);
 
+  // Section header copy — separately fetched from /api/page-blocks/home.
+  // Prices and per-plan content stay on /api/plans + the Plan model;
+  // the PRICING block only owns the header band above the grid.
+  const [headerData, setHeaderData] = useState<PricingData>(DEFAULT_PRICING_DATA);
+
   useEffect(() => {
     let cancelled = false;
     fetch("/api/plans")
@@ -274,6 +282,30 @@ function PricingSection() {
       .catch(() => {
         if (cancelled) return;
         setDidError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/page-blocks/home")
+      .then((res) => {
+        if (!res.ok) throw new Error(`/api/page-blocks/home returned ${res.status}`);
+        return res.json();
+      })
+      .then((json: { blocks?: AnyBlockApiPayload[] }) => {
+        if (cancelled) return;
+        const row = json.blocks?.find((b) => b?.type === BLOCK_TYPES.PRICING);
+        if (!row) return;
+        const parsed = parseBlockData({ type: BLOCK_TYPES.PRICING, data: row.data });
+        if (parsed && parsed.type === BLOCK_TYPES.PRICING) {
+          setHeaderData(parsed.data);
+        }
+      })
+      .catch(() => {
+        // Silent fallback to defaults.
       });
     return () => {
       cancelled = true;
@@ -296,24 +328,7 @@ function PricingSection() {
   return (
     <section id="pricing" className="bg-white px-6 py-20 sm:py-24">
       <div className="mx-auto max-w-5xl">
-        {/* Heading row */}
-        <div className="mb-12 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-          <div>
-            <p className="text-sm text-[var(--bb-text-secondary)]">Start now your</p>
-            <h2 className="font-brand text-3xl font-bold tracking-tight sm:text-4xl">
-              creative plan
-            </h2>
-          </div>
-          <div className="text-right text-sm">
-            <span className="text-[var(--bb-text-secondary)]">Need a custom plan?</span>{" "}
-            <a
-              href="mailto:hello@brandbite.io"
-              className="font-semibold text-[var(--bb-primary)] hover:underline"
-            >
-              Let&apos;s talk
-            </a>
-          </div>
-        </div>
+        <PricingHeaderBlock data={headerData} />
 
         {/* Cards */}
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">

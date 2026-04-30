@@ -12,7 +12,7 @@
 //           see exactly what's currently shipped, then edit from there.
 // -----------------------------------------------------------------------------
 
-import type { FaqData, FeatureGridData, HeroData, HowItWorksData } from "./types";
+import type { FaqData, FeatureGridData, HeroData, HowItWorksData, PricingData } from "./types";
 
 /** Default hero block matching the currently-shipped landing-page hero. */
 export const DEFAULT_HERO_DATA: HeroData = {
@@ -70,6 +70,18 @@ export const DEFAULT_FAQ_DATA: FaqData = {
   // CTA entirely.
   ctaLabel: "See all questions",
   ctaHref: "/faq",
+};
+
+/** Default pricing block matching the currently-shipped landing-page
+ *  pricing-section header. Per-plan content (tagline, features,
+ *  CTA-label) lives on the Plan model — this block only frames the
+ *  section above the plan-card grid. */
+export const DEFAULT_PRICING_DATA: PricingData = {
+  eyebrow: "Start now your",
+  title: "creative plan",
+  contactNote: "Need a custom plan?",
+  contactLabel: "Let's talk",
+  contactHref: "mailto:hello@brandbite.io",
 };
 
 /** Default feature grid block matching the currently-shipped landing-page
