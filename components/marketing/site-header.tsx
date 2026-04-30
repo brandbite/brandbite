@@ -10,21 +10,21 @@
 //           but abandoned it — a pill with a translucent bg disappears
 //           against a white page background. Full-width keeps the glass
 //           effect reliable regardless of what's behind.
+//
+//           Nav links are DB-driven via PageBlock(pageKey="global",
+//           type="SITE_HEADER"). Editable from /admin/site. The brand
+//           logo + sign-in button stay hardcoded — those change rarely
+//           and the logo asset itself sits in /public.
 // -----------------------------------------------------------------------------
 
 "use client";
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-const NAV_LINKS = [
-  { href: "/how-it-works", label: "How it works?" },
-  { href: "/pricing", label: "Pricing" },
-  { href: "/showcase", label: "Showcase" },
-  { href: "/faq", label: "FAQs" },
-  { href: "/blog", label: "Blog" },
-];
+import { DEFAULT_SITE_HEADER_DATA } from "@/lib/blocks/defaults";
+import { BLOCK_TYPES, parseBlockData, type SiteHeaderData } from "@/lib/blocks/types";
 
 type SiteHeaderProps = {
   /** Highlight the active page in the nav (match by label). */
@@ -49,11 +49,38 @@ type SiteHeaderProps = {
 const GLASS_BAR =
   "sticky top-0 z-50 border-b border-black/[0.06] bg-white/70 backdrop-blur-xl backdrop-saturate-150";
 
+type GlobalBlocksApiPayload = { type?: string; data?: unknown };
+
 export function SiteHeader({ activePage }: SiteHeaderProps = {}) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [data, setData] = useState<SiteHeaderData>(DEFAULT_SITE_HEADER_DATA);
 
   const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
   const signInHref = isDemoMode ? "/debug/demo-user" : "/login";
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/page-blocks/global")
+      .then((res) => {
+        if (!res.ok) throw new Error(`/api/page-blocks/global returned ${res.status}`);
+        return res.json();
+      })
+      .then((json: { blocks?: GlobalBlocksApiPayload[] }) => {
+        if (cancelled) return;
+        const row = json.blocks?.find((b) => b?.type === BLOCK_TYPES.SITE_HEADER);
+        if (!row) return;
+        const parsed = parseBlockData({ type: BLOCK_TYPES.SITE_HEADER, data: row.data });
+        if (parsed && parsed.type === BLOCK_TYPES.SITE_HEADER) {
+          setData(parsed.data);
+        }
+      })
+      .catch(() => {
+        // Silent fallback — the nav still renders the defaults.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <header className={GLASS_BAR}>
@@ -72,7 +99,7 @@ export function SiteHeader({ activePage }: SiteHeaderProps = {}) {
 
         {/* Desktop nav */}
         <nav className="hidden items-center gap-8 md:flex">
-          {NAV_LINKS.map((l) => (
+          {data.navLinks.map((l) => (
             <Link
               key={l.href}
               href={l.href}
@@ -119,7 +146,7 @@ export function SiteHeader({ activePage }: SiteHeaderProps = {}) {
       {mobileOpen && (
         <nav className="border-t border-black/[0.06] px-4 py-4 md:hidden">
           <div className="mx-auto flex max-w-6xl flex-col gap-3">
-            {NAV_LINKS.map((l) => (
+            {data.navLinks.map((l) => (
               <Link
                 key={l.href}
                 href={l.href}

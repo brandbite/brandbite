@@ -20,6 +20,8 @@ import type {
   HowItWorksData,
   PricingData,
   ShowcaseData,
+  SiteFooterData,
+  SiteHeaderData,
 } from "./types";
 
 /** Default hero block matching the currently-shipped landing-page hero. */
@@ -137,4 +139,68 @@ export const DEFAULT_FEATURE_GRID_DATA: FeatureGridData = {
   ],
   ctaLabel: "Explore Pricing",
   ctaHref: "#pricing",
+};
+
+/** Default site header — the nav-link list previously hardcoded in
+ *  components/marketing/site-header.tsx (NAV_LINKS). Renders on every
+ *  marketing page when no DB row is set. */
+export const DEFAULT_SITE_HEADER_DATA: SiteHeaderData = {
+  navLinks: [
+    { label: "How it works?", href: "/how-it-works" },
+    { label: "Pricing", href: "/pricing" },
+    { label: "Showcase", href: "/showcase" },
+    { label: "FAQs", href: "/faq" },
+    { label: "Blog", href: "/blog" },
+  ],
+};
+
+/** Default site footer — brand statement, link columns, and legal-link
+ *  bar previously hardcoded in components/marketing/site-footer.tsx
+ *  (FOOTER_COLS + BOTTOM_LEGAL_LINKS). The "Get the app" column from
+ *  the original footer was a placeholder (links pointed to `#`) and is
+ *  intentionally not seeded — admins can re-add it via the form once
+ *  there are real download URLs. */
+export const DEFAULT_SITE_FOOTER_DATA: SiteFooterData = {
+  brandStatement: "All your creatives, one subscription",
+  columns: [
+    {
+      title: "Platform",
+      links: [
+        { label: "How It Works", href: "/how-it-works" },
+        { label: "Plans & Pricing", href: "/pricing" },
+        { label: "Showcase", href: "/showcase" },
+      ],
+    },
+    {
+      title: "Company",
+      links: [
+        { label: "About", href: "/about" },
+        { label: "Blog", href: "/blog" },
+        { label: "Contact", href: "/contact" },
+      ],
+    },
+    {
+      title: "Resources",
+      links: [
+        { label: "Documentation", href: "/documentation" },
+        { label: "FAQs", href: "/faq" },
+        { label: "News", href: "/news" },
+      ],
+    },
+    {
+      title: "Legal",
+      links: [
+        { label: "Privacy policy", href: "/privacy" },
+        { label: "Terms of service", href: "/terms" },
+        { label: "Cookie policy", href: "/cookies" },
+        { label: "Accessibility", href: "/accessibility" },
+      ],
+    },
+  ],
+  legalLinks: [
+    { label: "Terms of Service", href: "/terms" },
+    { label: "Privacy Policy", href: "/privacy" },
+    { label: "Cookies", href: "/cookies" },
+    { label: "Accessibility", href: "/accessibility" },
+  ],
 };

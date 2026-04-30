@@ -469,3 +469,150 @@ describe("parseBlockData — unknown / malformed", () => {
     expect(parseBlockData({ type: BLOCK_TYPES.HERO, data: "a string" })).toBeNull();
   });
 });
+
+describe("parseBlockData — SITE_HEADER", () => {
+  it("accepts the minimum valid header", () => {
+    const result = parseBlockData({
+      type: BLOCK_TYPES.SITE_HEADER,
+      data: { navLinks: [{ label: "Pricing", href: "/pricing" }] },
+    });
+    expect(result).not.toBeNull();
+  });
+
+  it("rejects an empty navLinks array", () => {
+    expect(
+      parseBlockData({
+        type: BLOCK_TYPES.SITE_HEADER,
+        data: { navLinks: [] },
+      }),
+    ).toBeNull();
+  });
+
+  it("caps navLinks at 10", () => {
+    const navLinks = Array.from({ length: 11 }, (_, i) => ({
+      label: `Link ${i}`,
+      href: `/p${i}`,
+    }));
+    expect(
+      parseBlockData({
+        type: BLOCK_TYPES.SITE_HEADER,
+        data: { navLinks },
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects javascript: hrefs in navLinks", () => {
+    expect(
+      parseBlockData({
+        type: BLOCK_TYPES.SITE_HEADER,
+        data: { navLinks: [{ label: "Bad", href: "javascript:alert(1)" }] },
+      }),
+    ).toBeNull();
+  });
+
+  it("accepts external https hrefs", () => {
+    const result = parseBlockData({
+      type: BLOCK_TYPES.SITE_HEADER,
+      data: { navLinks: [{ label: "Help", href: "https://help.example.com" }] },
+    });
+    expect(result).not.toBeNull();
+  });
+});
+
+describe("parseBlockData — SITE_FOOTER", () => {
+  it("accepts the minimum valid footer (one column, one link)", () => {
+    const result = parseBlockData({
+      type: BLOCK_TYPES.SITE_FOOTER,
+      data: {
+        columns: [
+          {
+            title: "Platform",
+            links: [{ label: "Pricing", href: "/pricing" }],
+          },
+        ],
+      },
+    });
+    expect(result).not.toBeNull();
+  });
+
+  it("accepts the full shape (brand statement + columns + legal links)", () => {
+    const result = parseBlockData({
+      type: BLOCK_TYPES.SITE_FOOTER,
+      data: {
+        brandStatement: "All your creatives, one subscription",
+        columns: [
+          {
+            title: "Platform",
+            links: [
+              { label: "How It Works", href: "/how-it-works" },
+              { label: "Pricing", href: "/pricing" },
+            ],
+          },
+          {
+            title: "Company",
+            links: [{ label: "About", href: "/about" }],
+          },
+        ],
+        legalLinks: [
+          { label: "Privacy", href: "/privacy" },
+          { label: "Terms", href: "/terms" },
+        ],
+      },
+    });
+    expect(result).not.toBeNull();
+  });
+
+  it("rejects an empty columns array", () => {
+    expect(
+      parseBlockData({
+        type: BLOCK_TYPES.SITE_FOOTER,
+        data: { columns: [] },
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects a column with no links", () => {
+    expect(
+      parseBlockData({
+        type: BLOCK_TYPES.SITE_FOOTER,
+        data: { columns: [{ title: "Empty", links: [] }] },
+      }),
+    ).toBeNull();
+  });
+
+  it("caps columns at 6", () => {
+    const columns = Array.from({ length: 7 }, (_, i) => ({
+      title: `Col ${i}`,
+      links: [{ label: "x", href: "/x" }],
+    }));
+    expect(
+      parseBlockData({
+        type: BLOCK_TYPES.SITE_FOOTER,
+        data: { columns },
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects javascript: hrefs in column links", () => {
+    expect(
+      parseBlockData({
+        type: BLOCK_TYPES.SITE_FOOTER,
+        data: {
+          columns: [{ title: "Bad", links: [{ label: "x", href: "javascript:alert(1)" }] }],
+        },
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects javascript: hrefs in legalLinks", () => {
+    expect(
+      parseBlockData({
+        type: BLOCK_TYPES.SITE_FOOTER,
+        data: {
+          columns: [{ title: "Ok", links: [{ label: "x", href: "/x" }] }],
+          legalLinks: [{ label: "Bad", href: "javascript:alert(1)" }],
+        },
+      }),
+    ).toBeNull();
+  });
+});
