@@ -12,7 +12,14 @@
 //           see exactly what's currently shipped, then edit from there.
 // -----------------------------------------------------------------------------
 
-import type { FaqData, FeatureGridData, HeroData, HowItWorksData, PricingData } from "./types";
+import type {
+  FaqData,
+  FeatureGridData,
+  HeroData,
+  HowItWorksData,
+  PricingData,
+  ShowcaseData,
+} from "./types";
 
 /** Default hero block matching the currently-shipped landing-page hero. */
 export const DEFAULT_HERO_DATA: HeroData = {
@@ -82,6 +89,17 @@ export const DEFAULT_PRICING_DATA: PricingData = {
   contactNote: "Need a custom plan?",
   contactLabel: "Let's talk",
   contactHref: "mailto:hello@brandbite.io",
+};
+
+/** Default showcase header block matching the currently-shipped
+ *  landing-page section. Items themselves come from /api/showcase
+ *  (managed via /admin/showcase) — this block only owns the framing
+ *  band above the gallery grid. */
+export const DEFAULT_SHOWCASE_DATA: ShowcaseData = {
+  title: "Showcase",
+  subtitle: "Creatives that speak louder than words.",
+  ctaLabel: "View the full gallery",
+  ctaHref: "/showcase",
 };
 
 /** Default feature grid block matching the currently-shipped landing-page

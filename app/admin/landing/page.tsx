@@ -23,6 +23,7 @@ import { FeatureGridBlockForm } from "@/components/blocks/admin/FeatureGridBlock
 import { HeroBlockForm } from "@/components/blocks/admin/HeroBlockForm";
 import { HowItWorksBlockForm } from "@/components/blocks/admin/HowItWorksBlockForm";
 import { PricingHeaderBlockForm } from "@/components/blocks/admin/PricingHeaderBlockForm";
+import { ShowcaseHeaderBlockForm } from "@/components/blocks/admin/ShowcaseHeaderBlockForm";
 
 import { getPageBlocks } from "@/lib/blocks/get-page-blocks";
 import {
@@ -31,6 +32,7 @@ import {
   DEFAULT_HERO_DATA,
   DEFAULT_HOW_IT_WORKS_DATA,
   DEFAULT_PRICING_DATA,
+  DEFAULT_SHOWCASE_DATA,
 } from "@/lib/blocks/defaults";
 import {
   BLOCK_TYPES,
@@ -39,6 +41,7 @@ import {
   type HeroData,
   type HowItWorksData,
   type PricingData,
+  type ShowcaseData,
 } from "@/lib/blocks/types";
 
 const PAGE_KEY = "home";
@@ -70,6 +73,12 @@ export default async function AdminLandingPage() {
     pricingBlock && pricingBlock.type === BLOCK_TYPES.PRICING
       ? pricingBlock.data
       : DEFAULT_PRICING_DATA;
+
+  const showcaseBlock = blocks.find((b) => b.type === BLOCK_TYPES.SHOWCASE);
+  const initialShowcase: ShowcaseData =
+    showcaseBlock && showcaseBlock.type === BLOCK_TYPES.SHOWCASE
+      ? showcaseBlock.data
+      : DEFAULT_SHOWCASE_DATA;
 
   const faqBlock = blocks.find((b) => b.type === BLOCK_TYPES.FAQ);
   const initialFaq: FaqData =
@@ -131,6 +140,19 @@ export default async function AdminLandingPage() {
         <PricingHeaderBlockForm initial={initialPricing} pageKey={PAGE_KEY} />
       </section>
 
+      {/* Showcase header (SHOWCASE) ----------------------------------- */}
+      <section className="mt-6 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-6 py-5 shadow-sm">
+        <header className="mb-5 border-b border-[var(--bb-border-subtle)] pb-3">
+          <h2 className="text-lg font-semibold tracking-tight">Showcase header</h2>
+          <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
+            The title / subtitle above the gallery grid plus the right-side &ldquo;View the full
+            gallery&rdquo; button. Gallery items themselves are managed in Content &rarr; Showcase.
+          </p>
+        </header>
+
+        <ShowcaseHeaderBlockForm initial={initialShowcase} pageKey={PAGE_KEY} />
+      </section>
+
       {/* Why Brandbite (FEATURE_GRID) --------------------------------- */}
       <section className="mt-6 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-6 py-5 shadow-sm">
         <header className="mb-5 border-b border-[var(--bb-border-subtle)] pb-3">
@@ -163,9 +185,9 @@ export default async function AdminLandingPage() {
           More sections coming soon
         </h2>
         <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-          Per-plan tagline + feature copy (a follow-up Plan-model migration), the showcase-section
-          framing, and a generic call-to-action band will become editable in upcoming phases. Until
-          then those sections render from the hardcoded copy in the page source.
+          A generic call-to-action band (a new full-width conversion section between any two
+          existing blocks) will become editable in an upcoming phase. Until then it renders from
+          hardcoded copy if added.
         </p>
       </section>
     </>

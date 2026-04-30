@@ -392,6 +392,53 @@ describe("parseBlockData — PRICING", () => {
   });
 });
 
+describe("parseBlockData — SHOWCASE", () => {
+  it("accepts an empty payload (all fields optional)", () => {
+    const result = parseBlockData({ type: BLOCK_TYPES.SHOWCASE, data: {} });
+    expect(result).not.toBeNull();
+  });
+
+  it("accepts the full header shape (title/subtitle + CTA pair)", () => {
+    const result = parseBlockData({
+      type: BLOCK_TYPES.SHOWCASE,
+      data: {
+        title: "Showcase",
+        subtitle: "Creatives that speak louder than words.",
+        ctaLabel: "View the full gallery",
+        ctaHref: "/showcase",
+      },
+    });
+    expect(result).not.toBeNull();
+  });
+
+  it("rejects a half-set CTA (label only)", () => {
+    expect(
+      parseBlockData({
+        type: BLOCK_TYPES.SHOWCASE,
+        data: { ctaLabel: "View the full gallery" },
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects a half-set CTA (href only)", () => {
+    expect(
+      parseBlockData({
+        type: BLOCK_TYPES.SHOWCASE,
+        data: { ctaHref: "/showcase" },
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects javascript: ctaHref", () => {
+    expect(
+      parseBlockData({
+        type: BLOCK_TYPES.SHOWCASE,
+        data: { ctaLabel: "Click", ctaHref: "javascript:alert(1)" },
+      }),
+    ).toBeNull();
+  });
+});
+
 describe("parseBlockData — CALL_TO_ACTION", () => {
   it("accepts a complete CTA", () => {
     const result = parseBlockData({
