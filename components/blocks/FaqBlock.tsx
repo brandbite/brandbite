@@ -85,8 +85,7 @@ export function FaqBlock({ data }: FaqBlockProps) {
   // pretend nothing is open. Doing this at render time instead of via a
   // setState effect avoids a re-render cycle and the corresponding
   // `react-hooks/set-state-in-effect` lint warning.
-  const safeOpenIndex =
-    openIndex !== null && openIndex < visibleFaqs.length ? openIndex : null;
+  const safeOpenIndex = openIndex !== null && openIndex < visibleFaqs.length ? openIndex : null;
 
   const title = data.title ?? "FAQ";
   const subtitle = data.subtitle ?? "Frequently asked questions.";
