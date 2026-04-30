@@ -171,18 +171,25 @@ export type FeatureGridData = z.infer<typeof featureGridDataSchema>;
 
 /* -- FAQ ------------------------------------------------------------------ */
 
+/**
+ * FAQ block on a page is a *picker* over the central Faq table — the
+ * inline `qas: [{q, a}]` shape from the original block (PR #190) was
+ * replaced once /admin/faq landed (PR B). The block now stores:
+ *   - optional title + subtitle for the section header
+ *   - selectedFaqIds: ordered list of Faq.id values to render
+ *
+ * Empty selectedFaqIds means "no FAQs selected yet" — the renderer
+ * falls back to showing the first N active FAQs so the demo and any
+ * pre-launch site looks right without explicit selection.
+ *
+ * The cap of 40 mirrors the previous schema; lifting it would require
+ * UX changes on the picker (search/pagination), so 40 is a soft sanity
+ * upper bound that no realistic landing page should hit.
+ */
 export const faqDataSchema = z.object({
   title: z.string().max(120).optional(),
   subtitle: z.string().max(300).optional(),
-  qas: z
-    .array(
-      z.object({
-        q: z.string().min(1).max(200),
-        a: z.string().min(1).max(2000),
-      }),
-    )
-    .min(1)
-    .max(40),
+  selectedFaqIds: z.array(z.string().min(1).max(50)).max(40).default([]),
 });
 
 export type FaqData = z.infer<typeof faqDataSchema>;

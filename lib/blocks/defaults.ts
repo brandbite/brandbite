@@ -44,26 +44,23 @@ export const DEFAULT_HOW_IT_WORKS_DATA: HowItWorksData = {
   ],
 };
 
-/** Default FAQ block matching the currently-shipped landing-page FAQ.
- *  Same four Q&As that have been showing on the public site since the
- *  marketing page launched, in the same order. */
+/**
+ * Default FAQ block. PR C made the block a *picker* over the central
+ * Faq table — the inline `qas` shape from PR #190 is gone.
+ *
+ * Empty `selectedFaqIds` means "no FAQs picked yet"; the renderer falls
+ * back to showing the first N active FAQs from the central store. So a
+ * site with no FAQ block row + no selection still shows a sensible FAQ
+ * section out of the box, while pickers on /admin/landing start from a
+ * blank slate that the admin curates.
+ *
+ * Default cap for the empty-state fallback. Tuned to match the previous
+ * shipped 4-question section on the landing page. The renderer reads
+ * this and slices the central FAQ list accordingly when no IDs are
+ * picked.
+ */
+export const DEFAULT_FAQ_FALLBACK_LIMIT = 5;
+
 export const DEFAULT_FAQ_DATA: FaqData = {
-  qas: [
-    {
-      q: "How fast will I get my creatives?",
-      a: "Most requests are completed within 1 to 2 days. Larger projects like brand identity guides or motion videos may take 3 to 5 business days depending on complexity.",
-    },
-    {
-      q: "Can I cancel anytime?",
-      a: "Yes. You can pause or cancel your subscription at any time. No long-term contracts, no cancellation fees. Your work and assets remain yours.",
-    },
-    {
-      q: "What if I don't like the creative?",
-      a: "No worries! Every plan includes unlimited revisions. We'll keep iterating until you're 100% happy with the result.",
-    },
-    {
-      q: "Do you work with agencies?",
-      a: "Absolutely. Many agencies use Brandbite as their white-label creative arm. We offer agency-friendly plans with multi-seat access and dedicated account managers.",
-    },
-  ],
+  selectedFaqIds: [],
 };

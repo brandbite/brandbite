@@ -1,37 +1,132 @@
 // -----------------------------------------------------------------------------
 // @file: components/blocks/FaqBlock.tsx
-// @purpose: Public-facing FAQ accordion block. Renders a list of
-//           question/answer pairs in a single-open-at-a-time accordion,
-//           preceded by an optional title + subtitle.
+// @purpose: Public-facing FAQ accordion block. Reads the picker selection
+//           from `data.selectedFaqIds` and joins against /api/faq to render
+//           the actual question/answer content.
 //
-//           Matches the visual look of the previously-hardcoded
-//           FaqSection on the landing page so swapping in the
-//           DB-driven version changes nothing visitors can see when
-//           the data matches the defaults.
+//           Empty selection = fallback to the first N active FAQs so a
+//           landing page that hasn't been curated yet still shows
+//           something sensible (the central FAQ store is the source of
+//           truth either way).
 // -----------------------------------------------------------------------------
-// @version: v1.0.0
+// @version: v2.0.0
 // @status: active
-// @lastUpdate: 2026-04-28
+// @lastUpdate: 2026-04-30
 // -----------------------------------------------------------------------------
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import { DEFAULT_FAQ_FALLBACK_LIMIT } from "@/lib/blocks/defaults";
 import type { FaqData } from "@/lib/blocks/types";
 
 type FaqBlockProps = {
   data: FaqData;
 };
 
+type CentralFaq = { id: string; question: string; answer: string; category: string };
+
+type FaqApiResponse = { faqs: CentralFaq[]; categories?: string[] };
+
 export function FaqBlock({ data }: FaqBlockProps) {
+  const [allFaqs, setAllFaqs] = useState<CentralFaq[] | null>(null);
+
   // Open the second item by default to hint that the accordion is
   // interactive without scaring people with everything-collapsed. If
   // there's only one Q&A, open it.
-  const [openIndex, setOpenIndex] = useState<number | null>(data.qas.length > 1 ? 1 : 0);
+  const [openIndex, setOpenIndex] = useState<number | null>(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/faq")
+      .then((res) => {
+        if (!res.ok) throw new Error(`/api/faq returned ${res.status}`);
+        return res.json();
+      })
+      .then((json: FaqApiResponse) => {
+        if (cancelled) return;
+        setAllFaqs(Array.isArray(json.faqs) ? json.faqs : []);
+      })
+      .catch((err) => {
+        console.error("[FaqBlock] failed to load central FAQs", err);
+        if (cancelled) return;
+        setAllFaqs([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Resolve the rendered list. If the admin picked specific IDs, render
+  // those in the order they were picked. If none are picked, fall back
+  // to the first N from the central store so the section never renders
+  // empty out of the box.
+  const visibleFaqs = useMemo<CentralFaq[]>(() => {
+    if (!allFaqs) return [];
+    if (data.selectedFaqIds.length === 0) {
+      return allFaqs.slice(0, DEFAULT_FAQ_FALLBACK_LIMIT);
+    }
+    const byId = new Map(allFaqs.map((f) => [f.id, f] as const));
+    const picked: CentralFaq[] = [];
+    for (const id of data.selectedFaqIds) {
+      const found = byId.get(id);
+      if (found) picked.push(found);
+      // Silently skip IDs that no longer exist in the store (e.g. an
+      // admin deleted a FAQ from /admin/faq without updating the
+      // landing-page picker). The block remains valid; the deleted
+      // entry just disappears.
+    }
+    return picked;
+  }, [allFaqs, data.selectedFaqIds]);
+
+  // Defensive bound — if the picked-IDs list shrinks below the currently
+  // open index (e.g. admin removed an item and the API came back smaller),
+  // pretend nothing is open. Doing this at render time instead of via a
+  // setState effect avoids a re-render cycle and the corresponding
+  // `react-hooks/set-state-in-effect` lint warning.
+  const safeOpenIndex = openIndex !== null && openIndex < visibleFaqs.length ? openIndex : null;
 
   const title = data.title ?? "FAQ";
   const subtitle = data.subtitle ?? "Frequently asked questions.";
+
+  // Loading state: skeleton with the same outer dimensions as the real
+  // accordion so the page doesn't jump when content lands.
+  if (allFaqs === null) {
+    return (
+      <section id="faq" className="bg-[var(--bb-bg-page)] px-6 py-20 sm:py-24">
+        <div className="mx-auto max-w-2xl">
+          <h2 className="font-brand text-3xl font-bold tracking-tight">{title}</h2>
+          {subtitle ? (
+            <p className="mt-1 mb-10 text-sm text-[var(--bb-text-secondary)]">{subtitle}</p>
+          ) : (
+            <div className="mb-10" />
+          )}
+          <div className="space-y-3" aria-busy="true">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="h-14 animate-pulse rounded-xl border border-[var(--bb-border)] bg-white"
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (visibleFaqs.length === 0) {
+    return (
+      <section id="faq" className="bg-[var(--bb-bg-page)] px-6 py-20 sm:py-24">
+        <div className="mx-auto max-w-2xl">
+          <h2 className="font-brand text-3xl font-bold tracking-tight">{title}</h2>
+          {subtitle ? (
+            <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">{subtitle}</p>
+          ) : null}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section id="faq" className="bg-[var(--bb-bg-page)] px-6 py-20 sm:py-24">
@@ -44,11 +139,11 @@ export function FaqBlock({ data }: FaqBlockProps) {
         )}
 
         <div className="space-y-3">
-          {data.qas.map((faq, i) => {
-            const isOpen = openIndex === i;
+          {visibleFaqs.map((faq, i) => {
+            const isOpen = safeOpenIndex === i;
             return (
               <div
-                key={i}
+                key={faq.id}
                 className="overflow-hidden rounded-xl border border-[var(--bb-border)] bg-white"
               >
                 <button
@@ -59,7 +154,7 @@ export function FaqBlock({ data }: FaqBlockProps) {
                 >
                   <span className="flex items-center gap-2">
                     <span className="text-[var(--bb-primary)]">+</span>
-                    {faq.q}
+                    {faq.question}
                   </span>
                   <svg
                     width="16"
@@ -80,9 +175,9 @@ export function FaqBlock({ data }: FaqBlockProps) {
                 </button>
                 {isOpen && (
                   <div className="border-t border-[var(--bb-border-subtle)] px-5 py-4">
-                    <p className="text-sm font-semibold text-[var(--bb-primary)]">{faq.q}</p>
+                    <p className="text-sm font-semibold text-[var(--bb-primary)]">{faq.question}</p>
                     <p className="mt-2 text-sm leading-relaxed whitespace-pre-line text-[var(--bb-text-secondary)]">
-                      {faq.a}
+                      {faq.answer}
                     </p>
                   </div>
                 )}

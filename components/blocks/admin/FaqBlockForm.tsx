@@ -1,27 +1,30 @@
 // -----------------------------------------------------------------------------
 // @file: components/blocks/admin/FaqBlockForm.tsx
-// @purpose: Admin form for editing the FAQ block. Optional title +
-//           subtitle above a list of 1-to-40 question/answer pairs.
-//           Saves via PUT /api/admin/page-blocks/[pageKey]/FAQ.
+// @purpose: Picker for the landing-page FAQ section. Fetches the central
+//           FAQ list (/api/admin/faq for site-owner; falls back to /api/faq)
+//           and lets the admin tick which FAQs to display + reorder them.
 //
-//           Cap of 40 mirrors the Zod schema in lib/blocks/types.ts —
-//           past that the accordion gets unwieldy and the page bloats.
-//           In practice 4-12 Q&As is the realistic range.
+//           This replaces the inline "add question / remove question"
+//           editor from PR #190 — questions themselves now live in the
+//           central /admin/faq page; this form only chooses which ones to
+//           surface on the landing page.
 // -----------------------------------------------------------------------------
-// @version: v1.0.0
+// @version: v2.0.0
 // @status: active
-// @lastUpdate: 2026-04-28
+// @lastUpdate: 2026-04-30
 // -----------------------------------------------------------------------------
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { FormInput } from "@/components/ui/form-field";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { useToast } from "@/components/ui/toast-provider";
 
+import { DEFAULT_FAQ_FALLBACK_LIMIT } from "@/lib/blocks/defaults";
 import type { FaqData } from "@/lib/blocks/types";
 
 type FaqBlockFormProps = {
@@ -31,45 +34,111 @@ type FaqBlockFormProps = {
   pageKey: string;
 };
 
-/** Hard caps on rows. Mirrors the Zod schema in lib/blocks/types.ts so
- *  the client can fail fast before a save round-trip. */
-const MIN_QAS = 1;
-const MAX_QAS = 40;
+type CentralFaq = {
+  id: string;
+  question: string;
+  answer: string;
+  category: string;
+  isActive?: boolean;
+};
 
-type QaDraft = { q: string; a: string };
+type AdminFaqApiResponse = { faqs: CentralFaq[]; categories: string[] };
+
+const ALL_LABEL = "All";
+const MAX_PICKED = 40;
 
 export function FaqBlockForm({ initial, pageKey }: FaqBlockFormProps) {
   const { showToast } = useToast();
 
   const [title, setTitle] = useState<string>(initial.title ?? "");
   const [subtitle, setSubtitle] = useState<string>(initial.subtitle ?? "");
-  const [qas, setQas] = useState<QaDraft[]>(
-    // Defensive deep-copy so React state updates don't accidentally
-    // mutate the caller's defaults.
-    initial.qas.map((qa) => ({ q: qa.q, a: qa.a })),
-  );
+  const [pickedIds, setPickedIds] = useState<string[]>([...initial.selectedFaqIds]);
+
+  const [allFaqs, setAllFaqs] = useState<CentralFaq[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [filterCategory, setFilterCategory] = useState<string>(ALL_LABEL);
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const updateQa = (idx: number, patch: Partial<QaDraft>) => {
-    setQas((prev) => prev.map((qa, i) => (i === idx ? { ...qa, ...patch } : qa)));
+  // Fetch the central FAQ list from the admin endpoint so the picker
+  // can show inactive items (with a "Hidden" hint) — the public list
+  // would silently drop those, which is confusing for the picker.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/admin/faq", { cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok) {
+          // Site-admin gate may reject site-owner-only contexts. Fall
+          // back to the public endpoint so the picker still works,
+          // just without inactive rows surfacing.
+          if (res.status === 403 || res.status === 401) {
+            const fallback = await fetch("/api/faq");
+            if (!fallback.ok) throw new Error(`/api/faq returned ${fallback.status}`);
+            return fallback.json();
+          }
+          throw new Error(`/api/admin/faq returned ${res.status}`);
+        }
+        return res.json();
+      })
+      .then((json: AdminFaqApiResponse) => {
+        if (cancelled) return;
+        setAllFaqs(Array.isArray(json.faqs) ? json.faqs : []);
+      })
+      .catch((err) => {
+        console.error("[FaqBlockForm] failed to load FAQs", err);
+        if (cancelled) return;
+        setLoadError("Couldn't load FAQs. Try refreshing.");
+        setAllFaqs([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Distinct category list. Plus the "All" filter pill in front.
+  const categories = useMemo<string[]>(() => {
+    if (!allFaqs) return [ALL_LABEL];
+    const seen = new Set<string>();
+    for (const f of allFaqs) seen.add(f.category);
+    return [ALL_LABEL, ...Array.from(seen)];
+  }, [allFaqs]);
+
+  // Apply search + category filter to the available pool.
+  const filteredFaqs = useMemo<CentralFaq[]>(() => {
+    if (!allFaqs) return [];
+    const q = searchQuery.trim().toLowerCase();
+    return allFaqs.filter((f) => {
+      if (filterCategory !== ALL_LABEL && f.category !== filterCategory) return false;
+      if (q && !f.question.toLowerCase().includes(q) && !f.answer.toLowerCase().includes(q)) {
+        return false;
+      }
+      return true;
+    });
+  }, [allFaqs, filterCategory, searchQuery]);
+
+  // Map for fast picked-row resolution.
+  const faqsById = useMemo(() => {
+    const m = new Map<string, CentralFaq>();
+    for (const f of allFaqs ?? []) m.set(f.id, f);
+    return m;
+  }, [allFaqs]);
+
+  const isPicked = (id: string) => pickedIds.includes(id);
+
+  const togglePicked = (id: string) => {
+    setPickedIds((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      if (prev.length >= MAX_PICKED) return prev;
+      return [...prev, id];
+    });
   };
 
-  const addQa = () => {
-    if (qas.length >= MAX_QAS) return;
-    setQas((prev) => [...prev, { q: "", a: "" }]);
-  };
-
-  const removeQa = (idx: number) => {
-    if (qas.length <= MIN_QAS) return;
-    setQas((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  const moveQa = (idx: number, direction: -1 | 1) => {
+  const movePicked = (idx: number, direction: -1 | 1) => {
     const target = idx + direction;
-    if (target < 0 || target >= qas.length) return;
-    setQas((prev) => {
+    if (target < 0 || target >= pickedIds.length) return;
+    setPickedIds((prev) => {
       const next = prev.slice();
       const [moved] = next.splice(idx, 1);
       next.splice(target, 0, moved);
@@ -77,38 +146,25 @@ export function FaqBlockForm({ initial, pageKey }: FaqBlockFormProps) {
     });
   };
 
+  const removePicked = (id: string) => {
+    setPickedIds((prev) => prev.filter((x) => x !== id));
+  };
+
+  const clearAllPicked = () => setPickedIds([]);
+
+  // ---- Save ---------------------------------------------------------
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submitting) return;
-
     setError(null);
-
-    if (qas.length < MIN_QAS) {
-      setError("At least one question is required.");
-      return;
-    }
-    if (qas.length > MAX_QAS) {
-      setError(`No more than ${MAX_QAS} questions allowed.`);
-      return;
-    }
-    for (let i = 0; i < qas.length; i++) {
-      const qa = qas[i];
-      if (!qa.q.trim()) {
-        setError(`Question ${i + 1} needs text.`);
-        return;
-      }
-      if (!qa.a.trim()) {
-        setError(`Question ${i + 1} needs an answer.`);
-        return;
-      }
-    }
 
     setSubmitting(true);
     try {
       const data: FaqData = {
         ...(title.trim() ? { title: title.trim() } : {}),
         ...(subtitle.trim() ? { subtitle: subtitle.trim() } : {}),
-        qas: qas.map((qa) => ({ q: qa.q.trim(), a: qa.a.trim() })),
+        selectedFaqIds: pickedIds,
       };
 
       const res = await fetch(`/api/admin/page-blocks/${pageKey}/FAQ`, {
@@ -126,8 +182,11 @@ export function FaqBlockForm({ initial, pageKey }: FaqBlockFormProps) {
 
       showToast({
         type: "success",
-        title: "FAQ saved",
-        description: "Reload the landing page to see your changes.",
+        title: "FAQ section saved",
+        description:
+          pickedIds.length === 0
+            ? `No FAQs selected — landing page falls back to the first ${DEFAULT_FAQ_FALLBACK_LIMIT}.`
+            : "Reload the landing page to see your changes.",
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed.");
@@ -142,13 +201,13 @@ export function FaqBlockForm({ initial, pageKey }: FaqBlockFormProps) {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <label
-            htmlFor="faq-title"
+            htmlFor="faq-block-title"
             className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
           >
             Section title (optional)
           </label>
           <FormInput
-            id="faq-title"
+            id="faq-block-title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="FAQ"
@@ -160,13 +219,13 @@ export function FaqBlockForm({ initial, pageKey }: FaqBlockFormProps) {
         </div>
         <div>
           <label
-            htmlFor="faq-subtitle"
+            htmlFor="faq-block-subtitle"
             className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
           >
             Subtitle (optional)
           </label>
           <FormInput
-            id="faq-subtitle"
+            id="faq-block-subtitle"
             value={subtitle}
             onChange={(e) => setSubtitle(e.target.value)}
             placeholder="Frequently asked questions."
@@ -175,105 +234,201 @@ export function FaqBlockForm({ initial, pageKey }: FaqBlockFormProps) {
         </div>
       </div>
 
-      {/* Q&A list ----------------------------------------------------- */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-[var(--bb-secondary)]">
-            Questions ({qas.length}/{MAX_QAS})
-          </h3>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={addQa}
-            disabled={qas.length >= MAX_QAS}
-          >
-            Add question
-          </Button>
+      {/* Where the FAQs live notice ----------------------------------- */}
+      <InlineAlert variant="info" size="sm">
+        Question text and answers are managed in{" "}
+        <Link href="/admin/faq" className="underline">
+          Content → FAQ
+        </Link>
+        . This form only chooses which questions to surface on the landing page.
+      </InlineAlert>
+
+      {loadError && (
+        <InlineAlert variant="error" size="sm">
+          {loadError}
+        </InlineAlert>
+      )}
+
+      {/* Selection summary -------------------------------------------- */}
+      <div className="rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-warm)] px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-sm font-semibold text-[var(--bb-secondary)]">
+              {pickedIds.length === 0
+                ? "Nothing picked yet"
+                : `${pickedIds.length} ${pickedIds.length === 1 ? "FAQ" : "FAQs"} selected`}
+            </p>
+            <p className="mt-0.5 text-xs text-[var(--bb-text-muted)]">
+              {pickedIds.length === 0
+                ? `Empty selection falls back to the first ${DEFAULT_FAQ_FALLBACK_LIMIT} active FAQs in category order.`
+                : "Drag-equivalent reorder via ↑ / ↓ on each row."}
+            </p>
+          </div>
+          {pickedIds.length > 0 && (
+            <Button type="button" variant="ghost" size="sm" onClick={clearAllPicked}>
+              Clear selection
+            </Button>
+          )}
         </div>
 
-        {qas.map((qa, idx) => (
-          <div
-            key={idx}
-            className="rounded-xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-warm)] px-4 py-4"
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-xs font-semibold tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
-                Question {idx + 1}
-              </span>
-              <div className="flex items-center gap-1">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => moveQa(idx, -1)}
-                  disabled={idx === 0}
-                  aria-label={`Move question ${idx + 1} up`}
+        {pickedIds.length > 0 && (
+          <ol className="mt-3 space-y-1.5">
+            {pickedIds.map((id, idx) => {
+              const faq = faqsById.get(id);
+              if (!faq) {
+                return (
+                  <li
+                    key={id}
+                    className="flex items-center justify-between rounded-md border border-dashed border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-2 text-xs text-[var(--bb-text-tertiary)]"
+                  >
+                    <span>Removed from store ({id})</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removePicked(id)}
+                    >
+                      Drop
+                    </Button>
+                  </li>
+                );
+              }
+              return (
+                <li
+                  key={id}
+                  className="flex items-center justify-between gap-2 rounded-md bg-[var(--bb-bg-page)] px-3 py-2"
                 >
-                  ↑
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => moveQa(idx, 1)}
-                  disabled={idx === qas.length - 1}
-                  aria-label={`Move question ${idx + 1} down`}
-                >
-                  ↓
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeQa(idx)}
-                  disabled={qas.length <= MIN_QAS}
-                  aria-label={`Remove question ${idx + 1}`}
-                >
-                  Remove
-                </Button>
-              </div>
-            </div>
+                  <span className="min-w-0 flex-1 text-xs">
+                    <span className="font-mono text-[10px] text-[var(--bb-text-muted)]">
+                      {idx + 1}.
+                    </span>{" "}
+                    <span className="font-semibold text-[var(--bb-secondary)]">{faq.question}</span>{" "}
+                    <span className="text-[var(--bb-text-muted)]">— {faq.category}</span>
+                  </span>
+                  <span className="flex shrink-0 items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => movePicked(idx, -1)}
+                      disabled={idx === 0}
+                      aria-label="Move up"
+                    >
+                      ↑
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => movePicked(idx, 1)}
+                      disabled={idx === pickedIds.length - 1}
+                      aria-label="Move down"
+                    >
+                      ↓
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removePicked(id)}
+                    >
+                      Remove
+                    </Button>
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </div>
 
-            <div className="space-y-3">
-              <div>
-                <label
-                  htmlFor={`faq-q-${idx}`}
-                  className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-                >
-                  Question <span className="text-[var(--bb-primary)]">*</span>
-                </label>
-                <FormInput
-                  id={`faq-q-${idx}`}
-                  value={qa.q}
-                  onChange={(e) => updateQa(idx, { q: e.target.value })}
-                  placeholder="How fast will I get my creatives?"
-                  maxLength={200}
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor={`faq-a-${idx}`}
-                  className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-                >
-                  Answer <span className="text-[var(--bb-primary)]">*</span>
-                </label>
-                <textarea
-                  id={`faq-a-${idx}`}
-                  value={qa.a}
-                  onChange={(e) => updateQa(idx, { a: e.target.value })}
-                  placeholder="Most requests are completed within 1 to 2 days."
-                  rows={4}
-                  maxLength={2000}
-                  className="w-full rounded-md border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-2 text-sm text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
-                />
-                <p className="mt-1 text-xs text-[var(--bb-text-muted)]">
-                  Line breaks are preserved on the public page.
-                </p>
-              </div>
-            </div>
+      {/* Available pool ----------------------------------------------- */}
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-[var(--bb-secondary)]">Available FAQs</h3>
+          <span className="text-xs text-[var(--bb-text-muted)]">
+            {filteredFaqs.length} {filteredFaqs.length === 1 ? "match" : "matches"}
+          </span>
+        </div>
+
+        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex-1">
+            <FormInput
+              id="faq-block-search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search question or answer text…"
+            />
           </div>
-        ))}
+        </div>
+
+        <div className="mb-3 flex flex-wrap gap-2">
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              type="button"
+              onClick={() => setFilterCategory(cat)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                filterCategory === cat
+                  ? "bg-[var(--bb-primary)] text-white"
+                  : "bg-[var(--bb-bg-warm)] text-[var(--bb-text-secondary)] hover:bg-[#eae6f1]"
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        {allFaqs === null ? (
+          <p className="rounded-xl border border-dashed border-[var(--bb-border)] bg-[var(--bb-bg-warm)] px-4 py-6 text-center text-xs text-[var(--bb-text-muted)]">
+            Loading FAQs…
+          </p>
+        ) : filteredFaqs.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-[var(--bb-border)] bg-[var(--bb-bg-warm)] px-4 py-6 text-center text-xs text-[var(--bb-text-muted)]">
+            No FAQs match this filter. Add new ones in{" "}
+            <Link href="/admin/faq" className="underline">
+              Content → FAQ
+            </Link>
+            .
+          </p>
+        ) : (
+          <ul className="max-h-[420px] space-y-1.5 overflow-auto rounded-xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-page)] p-2">
+            {filteredFaqs.map((faq) => {
+              const checked = isPicked(faq.id);
+              const inactiveHint = faq.isActive === false ? " (Hidden — won't render)" : "";
+              return (
+                <li key={faq.id}>
+                  <label
+                    className={`flex cursor-pointer items-start gap-3 rounded-md px-3 py-2 transition-colors ${
+                      checked ? "bg-[var(--bb-primary-light)]" : "hover:bg-[var(--bb-bg-warm)]"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => togglePicked(faq.id)}
+                      disabled={!checked && pickedIds.length >= MAX_PICKED}
+                      className="mt-1 h-4 w-4 rounded border-[var(--bb-border-input)] text-[var(--bb-primary)] focus:ring-[var(--bb-primary)]"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold text-[var(--bb-secondary)]">
+                        {faq.question}
+                        {inactiveHint && (
+                          <span className="ml-1 text-xs font-normal text-[var(--bb-warning-text)]">
+                            {inactiveHint}
+                          </span>
+                        )}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-[var(--bb-text-muted)]">
+                        {faq.category}
+                      </span>
+                    </span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
 
       {/* Error + submit ---------------------------------------------- */}
@@ -287,7 +442,7 @@ export function FaqBlockForm({ initial, pageKey }: FaqBlockFormProps) {
           loadingText="Saving…"
           disabled={submitting}
         >
-          Save FAQ
+          Save FAQ section
         </Button>
       </div>
     </form>
