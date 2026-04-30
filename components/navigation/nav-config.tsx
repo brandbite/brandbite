@@ -118,6 +118,7 @@ export const ADMIN_NAV: NavConfig = {
       items: [
         { href: "/admin/landing", label: "Landing page", icon: IconContent },
         { href: "/admin/pages", label: "Pages", icon: IconContent },
+        { href: "/admin/faq", label: "FAQ", icon: IconFaq },
         { href: "/admin/showcase", label: "Showcase", icon: IconContent },
         { href: "/admin/blog", label: "Blog", icon: IconContent },
         { href: "/admin/news", label: "News", icon: IconContent },
