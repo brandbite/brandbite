@@ -40,6 +40,21 @@ const PUBLIC_PATHS = [
   "/api/pages", // public CMS page read
   "/api/news", // public CMS news read
   "/api/docs", // public docs read
+  // Stripe-authoritative pricing surface read by the public landing
+  // page + /pricing. No sensitive data, just plan name + priceCents +
+  // monthlyTokens that any visitor would see by rendering the page.
+  "/api/plans",
+  // Central FAQ store read by /faq, /customer/faq, /creative/faq, and
+  // the landing-page FAQ block. Returns active questions only; admin
+  // mutations live behind /api/admin/faq.
+  "/api/faq",
+  // Block-driven landing-page content (hero, how-it-works, FAQ block).
+  // Read by app/page.tsx so admin edits at /admin/landing actually
+  // surface for visitors. Without this entry the proxy 307's the
+  // request to /login and the landing page silently falls back to
+  // the hardcoded defaults — the bug that made the FAQ CTA edit
+  // appear not to take effect on demo.
+  "/api/page-blocks",
   "/api/health", // uptime monitors (BetterStack / Upptime / Vercel); route returns 200 or 503
   // Vercel Cron invocations. Each cron route is defence-in-depth with a
   // CRON_SECRET Bearer check; the proxy only needs to let the request
