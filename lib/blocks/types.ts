@@ -28,6 +28,14 @@ export const BLOCK_TYPES = {
   FEATURE_GRID: "FEATURE_GRID",
   FAQ: "FAQ",
   CALL_TO_ACTION: "CALL_TO_ACTION",
+  /**
+   * Site chrome — header + footer that render on every marketing page,
+   * not just the landing page. Stored as PageBlock rows under
+   * pageKey="global" so they reuse the same admin / fetch / validation
+   * pipeline as page-specific blocks.
+   */
+  SITE_HEADER: "SITE_HEADER",
+  SITE_FOOTER: "SITE_FOOTER",
 } as const;
 
 export type BlockType = (typeof BLOCK_TYPES)[keyof typeof BLOCK_TYPES];
@@ -300,6 +308,55 @@ export const callToActionDataSchema = z.object({
 
 export type CallToActionData = z.infer<typeof callToActionDataSchema>;
 
+/* -- SITE_HEADER ----------------------------------------------------------- */
+
+/**
+ * Site-wide navigation header. Renders on every marketing page (not
+ * landing-specific), so it lives under pageKey="global" rather than
+ * pageKey="home".
+ *
+ * The brand logo + sign-in button stay hardcoded in the renderer — those
+ * change rarely and the logo asset itself sits in /public. This block
+ * just owns the editable bit: the nav-link list.
+ */
+const navLinkSchema = z.object({
+  label: z.string().trim().min(1).max(40),
+  href: safeUrlSchema,
+});
+
+export const siteHeaderDataSchema = z.object({
+  /** Nav links between the logo and the Sign In button. 1-10 items. */
+  navLinks: z.array(navLinkSchema).min(1).max(10),
+});
+
+export type SiteHeaderData = z.infer<typeof siteHeaderDataSchema>;
+
+/* -- SITE_FOOTER ----------------------------------------------------------- */
+
+/**
+ * Site-wide footer. Same global scope as SITE_HEADER. Owns the brand
+ * statement, the multi-column link grid, and the legal-link bar at the
+ * very bottom. Logo + copyright year + brand colour stay in the
+ * renderer.
+ */
+const footerColumnSchema = z.object({
+  title: z.string().trim().min(1).max(40),
+  links: z.array(navLinkSchema).min(1).max(10),
+});
+
+export const siteFooterDataSchema = z.object({
+  /** Optional brand statement under the logo (e.g. "All your creatives,
+   *  one subscription."). Plain text — the renderer wraps the brand
+   *  highlight phrase in primary colour automatically. */
+  brandStatement: z.string().max(200).optional(),
+  /** Multi-column link grid. 1-6 columns, each with 1-10 links. */
+  columns: z.array(footerColumnSchema).min(1).max(6),
+  /** Legal-link bar at the very bottom. 1-10 items. */
+  legalLinks: z.array(navLinkSchema).min(1).max(10).optional(),
+});
+
+export type SiteFooterData = z.infer<typeof siteFooterDataSchema>;
+
 /* ---------------------------------------------------------------------------
  * Discriminated union — one entry per block type. Used by parseBlockData()
  * below to validate any incoming { type, data } pair against the correct
@@ -313,7 +370,9 @@ export type BlockData =
   | { type: typeof BLOCK_TYPES.SHOWCASE; data: ShowcaseData }
   | { type: typeof BLOCK_TYPES.FEATURE_GRID; data: FeatureGridData }
   | { type: typeof BLOCK_TYPES.FAQ; data: FaqData }
-  | { type: typeof BLOCK_TYPES.CALL_TO_ACTION; data: CallToActionData };
+  | { type: typeof BLOCK_TYPES.CALL_TO_ACTION; data: CallToActionData }
+  | { type: typeof BLOCK_TYPES.SITE_HEADER; data: SiteHeaderData }
+  | { type: typeof BLOCK_TYPES.SITE_FOOTER; data: SiteFooterData };
 
 const SCHEMA_BY_TYPE = {
   [BLOCK_TYPES.HERO]: heroDataSchema,
@@ -323,6 +382,8 @@ const SCHEMA_BY_TYPE = {
   [BLOCK_TYPES.FEATURE_GRID]: featureGridDataSchema,
   [BLOCK_TYPES.FAQ]: faqDataSchema,
   [BLOCK_TYPES.CALL_TO_ACTION]: callToActionDataSchema,
+  [BLOCK_TYPES.SITE_HEADER]: siteHeaderDataSchema,
+  [BLOCK_TYPES.SITE_FOOTER]: siteFooterDataSchema,
 } as const;
 
 /**

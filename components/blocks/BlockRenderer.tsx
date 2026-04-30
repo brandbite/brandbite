@@ -60,6 +60,15 @@ export function BlockRenderer({ block, signInHref = "/login" }: BlockRendererPro
     case BLOCK_TYPES.CALL_TO_ACTION:
       return <CallToActionBlock data={block.data} />;
 
+    case BLOCK_TYPES.SITE_HEADER:
+    case BLOCK_TYPES.SITE_FOOTER:
+      // Site chrome is rendered directly by components/marketing/
+      // site-header.tsx and site-footer.tsx, which fetch their own
+      // data from /api/page-blocks/global. BlockRenderer is for
+      // page-sequence blocks (HERO ... CTA), so we deliberately skip
+      // chrome here — never rendered as part of a page's block list.
+      return null;
+
     default: {
       // exhaustive-ish: block.type is narrowed to never via the union, so
       // hitting the default means the registry got out of sync.
