@@ -164,6 +164,57 @@ describe("parseBlockData — FAQ", () => {
       }),
     ).toBeNull();
   });
+
+  it("accepts a paired CTA (label + href)", () => {
+    const result = parseBlockData({
+      type: BLOCK_TYPES.FAQ,
+      data: {
+        selectedFaqIds: [],
+        ctaLabel: "See all questions",
+        ctaHref: "/faq",
+      },
+    });
+    expect(result).not.toBeNull();
+  });
+
+  it("accepts no CTA (both fields omitted)", () => {
+    const result = parseBlockData({
+      type: BLOCK_TYPES.FAQ,
+      data: { selectedFaqIds: [] },
+    });
+    expect(result).not.toBeNull();
+  });
+
+  it("rejects a CTA with label only (no destination)", () => {
+    expect(
+      parseBlockData({
+        type: BLOCK_TYPES.FAQ,
+        data: { selectedFaqIds: [], ctaLabel: "See all" },
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects a CTA with href only (no label)", () => {
+    expect(
+      parseBlockData({
+        type: BLOCK_TYPES.FAQ,
+        data: { selectedFaqIds: [], ctaHref: "/faq" },
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects a CTA with a javascript: href", () => {
+    expect(
+      parseBlockData({
+        type: BLOCK_TYPES.FAQ,
+        data: {
+          selectedFaqIds: [],
+          ctaLabel: "Click",
+          ctaHref: "javascript:alert(1)",
+        },
+      }),
+    ).toBeNull();
+  });
 });
 
 describe("parseBlockData — FEATURE_GRID", () => {

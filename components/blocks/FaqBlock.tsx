@@ -16,6 +16,7 @@
 
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { DEFAULT_FAQ_FALLBACK_LIMIT } from "@/lib/blocks/defaults";
@@ -138,54 +139,117 @@ export function FaqBlock({ data }: FaqBlockProps) {
           <div className="mb-10" />
         )}
 
-        <div className="space-y-3">
-          {visibleFaqs.map((faq, i) => {
-            const isOpen = safeOpenIndex === i;
-            return (
-              <div
-                key={faq.id}
-                className="overflow-hidden rounded-xl border border-[var(--bb-border)] bg-white"
-              >
-                <button
-                  type="button"
-                  onClick={() => setOpenIndex(isOpen ? null : i)}
-                  className="flex w-full items-center justify-between px-5 py-4 text-left text-sm font-semibold text-[var(--bb-secondary)] transition-colors hover:bg-[var(--bb-bg-page)]"
-                  aria-expanded={isOpen}
-                >
-                  <span className="flex items-center gap-2">
-                    <span className="text-[var(--bb-primary)]">+</span>
-                    {faq.question}
-                  </span>
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className={`flex-shrink-0 transition-transform duration-200 ${
-                      isOpen ? "rotate-180" : ""
-                    }`}
-                    aria-hidden="true"
-                  >
-                    <polyline points="6 9 12 15 18 9" />
-                  </svg>
-                </button>
-                {isOpen && (
-                  <div className="border-t border-[var(--bb-border-subtle)] px-5 py-4">
-                    <p className="text-sm font-semibold text-[var(--bb-primary)]">{faq.question}</p>
-                    <p className="mt-2 text-sm leading-relaxed whitespace-pre-line text-[var(--bb-text-secondary)]">
-                      {faq.answer}
-                    </p>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+        <FaqAccordion
+          visibleFaqs={visibleFaqs}
+          safeOpenIndex={safeOpenIndex}
+          setOpenIndex={setOpenIndex}
+        />
+
+        <FaqCta data={data} />
       </div>
     </section>
+  );
+}
+
+/* ---------------------------------------------------------------------------
+ * Accordion sub-component — split out so the CTA can sit in the same parent
+ * <div> at the same nesting level without an awkward fragment-with-key.
+ * ------------------------------------------------------------------------- */
+
+function FaqAccordion({
+  visibleFaqs,
+  safeOpenIndex,
+  setOpenIndex,
+}: {
+  visibleFaqs: CentralFaq[];
+  safeOpenIndex: number | null;
+  setOpenIndex: (idx: number | null) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      {visibleFaqs.map((faq, i) => {
+        const isOpen = safeOpenIndex === i;
+        return (
+          <div
+            key={faq.id}
+            className="overflow-hidden rounded-xl border border-[var(--bb-border)] bg-white"
+          >
+            <button
+              type="button"
+              onClick={() => setOpenIndex(isOpen ? null : i)}
+              className="flex w-full items-center justify-between px-5 py-4 text-left text-sm font-semibold text-[var(--bb-secondary)] transition-colors hover:bg-[var(--bb-bg-page)]"
+              aria-expanded={isOpen}
+            >
+              <span className="flex items-center gap-2">
+                <span className="text-[var(--bb-primary)]">+</span>
+                {faq.question}
+              </span>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`flex-shrink-0 transition-transform duration-200 ${
+                  isOpen ? "rotate-180" : ""
+                }`}
+                aria-hidden="true"
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            {isOpen && (
+              <div className="border-t border-[var(--bb-border-subtle)] px-5 py-4">
+                <p className="text-sm font-semibold text-[var(--bb-primary)]">{faq.question}</p>
+                <p className="mt-2 text-sm leading-relaxed whitespace-pre-line text-[var(--bb-text-secondary)]">
+                  {faq.answer}
+                </p>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------------
+ * "See all questions" CTA below the accordion. Renders only when both
+ * label and href are set (the schema enforces them as a pair). Uses
+ * next/link so internal hrefs benefit from client-side navigation; the
+ * Link component handles absolute URLs as a regular anchor.
+ * ------------------------------------------------------------------------- */
+
+function FaqCta({ data }: { data: FaqData }) {
+  const label = data.ctaLabel?.trim();
+  const href = data.ctaHref?.trim();
+  if (!label || !href) return null;
+
+  return (
+    <div className="mt-10 flex justify-center">
+      <Link
+        href={href}
+        className="inline-flex items-center gap-2 rounded-full border border-[var(--bb-border)] bg-white px-6 py-3 text-sm font-semibold text-[var(--bb-secondary)] transition-all hover:-translate-y-0.5 hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)] hover:shadow-md"
+      >
+        {label}
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <line x1="5" y1="12" x2="19" y2="12" />
+          <polyline points="12 5 19 12 12 19" />
+        </svg>
+      </Link>
+    </div>
   );
 }
