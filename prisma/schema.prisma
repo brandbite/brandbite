@@ -407,6 +407,25 @@ model Plan {
   // Plan-level max concurrent IN_PROGRESS ticket count
   maxConcurrentInProgressTickets Int @default(1)
 
+  /// Public display copy for the landing-page pricing card.
+  ///
+  /// `tagline` is the small line under the plan name ("Best for startups
+  /// and solo founders"). `features` is the bullet list rendered with
+  /// check icons. `displayCtaLabel` overrides the default "Get Started"
+  /// button label per plan. `displaySubtitle` is the small italic line
+  /// below the CTA ("Pause or cancel anytime."). `displayOrder` controls
+  /// landing-page card order, lower-first; ties fall back to priceCents.
+  ///
+  /// All optional — landing page renders sensible fallbacks when blank.
+  /// Edited via /admin/plans (pricing PR 2 of 2). Stripe stays the
+  /// source of truth for `priceCents` and `monthlyTokens`; this column
+  /// set is purely marketing copy, decoupled from billing.
+  tagline         String?
+  features        Json?
+  displayCtaLabel String?
+  displaySubtitle String?
+  displayOrder    Int?
+
   companies Company[]
 
   createdAt DateTime @default(now())

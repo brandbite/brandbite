@@ -253,7 +253,21 @@ function HowItWorksSection() {
 // Pricing
 // ===========================================================================
 
-type ApiPlan = { id: string; name: string; priceCents: number; monthlyTokens: number };
+type ApiPlan = {
+  id: string;
+  name: string;
+  priceCents: number;
+  monthlyTokens: number;
+  /** Public display copy, surfaced from /api/plans (which reads the
+   *  Plan-row columns added in the pricing PR 2 migration). All
+   *  optional — when null, the renderer falls back to the static
+   *  PLAN_DISPLAY map below (for legacy plans pre-migration), then
+   *  to FALLBACK_DISPLAY (for unknown plan names entirely). */
+  tagline?: string | null;
+  features?: string[] | null;
+  displayCtaLabel?: string | null;
+  displaySubtitle?: string | null;
+};
 
 function PricingSection() {
   // DB-driven prices — fetched at mount via /api/plans, falls back to a
@@ -341,7 +355,19 @@ function PricingSection() {
                 />
               ))
             : list.map((plan) => {
-                const display = PLAN_DISPLAY[plan.name] ?? FALLBACK_DISPLAY;
+                // Per-field cascade: DB-driven plan column wins; falls
+                // back to the named static map (covers legacy rows that
+                // pre-date the migration), then to a generic fallback.
+                const staticDisplay = PLAN_DISPLAY[plan.name] ?? FALLBACK_DISPLAY;
+                const display = {
+                  tagline: plan.tagline ?? staticDisplay.tagline,
+                  features:
+                    plan.features && plan.features.length > 0
+                      ? plan.features
+                      : staticDisplay.features,
+                  cta: plan.displayCtaLabel ?? staticDisplay.cta,
+                  subtitle: plan.displaySubtitle ?? staticDisplay.subtitle,
+                };
                 const price = Math.round(plan.priceCents / 100);
                 return (
                   <div key={plan.id} className="flex flex-col rounded-3xl bg-[#eae6f1] p-7">

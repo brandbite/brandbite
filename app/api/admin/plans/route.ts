@@ -7,7 +7,7 @@
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
-import { AdminActionType, type UserRole } from "@prisma/client";
+import { AdminActionType, Prisma, type UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
@@ -24,6 +24,13 @@ type PlanResponseItem = {
   isRecurring: boolean;
   stripeProductId: string | null;
   stripePriceId: string | null;
+  /** Marketing copy fields. Editable in the admin form. Public
+   *  /api/plans surfaces these to the landing-page card. */
+  tagline: string | null;
+  features: string[] | null;
+  displayCtaLabel: string | null;
+  displaySubtitle: string | null;
+  displayOrder: number | null;
   attachedCompanies: number;
   createdAt: string;
   updatedAt: string;
@@ -33,15 +40,11 @@ type PlansResponse = {
   plans: PlanResponseItem[];
 };
 
-type PlanPayload = {
-  id?: string;
-  name?: string;
-  monthlyTokens?: number;
-  priceCents?: number | null;
-  isActive?: boolean;
-  stripeProductId?: string | null;
-  stripePriceId?: string | null;
-};
+function coerceFeatures(raw: unknown): string[] | null {
+  if (!Array.isArray(raw)) return null;
+  const safe = raw.filter((v): v is string => typeof v === "string");
+  return safe.length > 0 ? safe : null;
+}
 
 function requireAdmin(userRole: UserRole) {
   if (!isSiteAdminRole(userRole)) {
@@ -82,6 +85,11 @@ export async function GET() {
         isRecurring: p.isRecurring,
         stripeProductId: p.stripeProductId,
         stripePriceId: p.stripePriceId,
+        tagline: p.tagline,
+        features: coerceFeatures(p.features),
+        displayCtaLabel: p.displayCtaLabel,
+        displaySubtitle: p.displaySubtitle,
+        displayOrder: p.displayOrder,
         attachedCompanies: p._count.companies,
         createdAt: p.createdAt.toISOString(),
         updatedAt: p.updatedAt.toISOString(),
@@ -133,6 +141,11 @@ export async function POST(req: NextRequest) {
       isRecurring,
       stripeProductId,
       stripePriceId,
+      tagline,
+      features,
+      displayCtaLabel,
+      displaySubtitle,
+      displayOrder,
     } = parsed.data;
 
     const created = await prisma.plan.create({
@@ -144,6 +157,15 @@ export async function POST(req: NextRequest) {
         isRecurring,
         stripeProductId,
         stripePriceId,
+        tagline: tagline ?? null,
+        // Prisma's nullable Json columns need `Prisma.DbNull` for SQL
+        // NULL — passing literal `null` is rejected by the generated
+        // types. Use the helper to clear the column when the form
+        // submitted no features.
+        features: features ?? Prisma.DbNull,
+        displayCtaLabel: displayCtaLabel ?? null,
+        displaySubtitle: displaySubtitle ?? null,
+        displayOrder: displayOrder ?? null,
       },
     });
 
@@ -223,6 +245,17 @@ export async function PATCH(req: NextRequest) {
     if (fields.isRecurring !== undefined) updateData.isRecurring = fields.isRecurring;
     if (fields.stripeProductId !== undefined) updateData.stripeProductId = fields.stripeProductId;
     if (fields.stripePriceId !== undefined) updateData.stripePriceId = fields.stripePriceId;
+    // Display copy. `features` arrives as string[] | null after Zod's
+    // newline-separated transform; nullable Json column stores both
+    // shapes correctly.
+    if (fields.tagline !== undefined) updateData.tagline = fields.tagline;
+    if (fields.features !== undefined) {
+      // Json column needs Prisma.DbNull for SQL NULL — see POST handler.
+      updateData.features = fields.features ?? Prisma.DbNull;
+    }
+    if (fields.displayCtaLabel !== undefined) updateData.displayCtaLabel = fields.displayCtaLabel;
+    if (fields.displaySubtitle !== undefined) updateData.displaySubtitle = fields.displaySubtitle;
+    if (fields.displayOrder !== undefined) updateData.displayOrder = fields.displayOrder;
 
     const updated = await prisma.plan.update({
       where: { id },

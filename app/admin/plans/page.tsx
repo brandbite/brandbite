@@ -29,6 +29,13 @@ type Plan = {
   // Stripe mapping fields
   stripeProductId: string | null;
   stripePriceId: string | null;
+  // Public landing-page display copy (PR 2 of pricing rework). Surfaces
+  // through /api/plans for unauthenticated visitors.
+  tagline: string | null;
+  features: string[] | null;
+  displayCtaLabel: string | null;
+  displaySubtitle: string | null;
+  displayOrder: number | null;
 
   attachedCompanies: number;
   createdAt: string;
@@ -53,6 +60,15 @@ export default function AdminPlansPage() {
   const [isRecurring, setIsRecurring] = useState(true);
   const [stripeProductId, setStripeProductId] = useState("");
   const [stripePriceId, setStripePriceId] = useState("");
+  // Public landing-page display copy. Edited as separate fields here
+  // and surfaced via /api/plans for the unauthenticated landing page.
+  // `featuresText` is a newline-separated textarea — the API splits it
+  // back into a string[] before persisting.
+  const [tagline, setTagline] = useState("");
+  const [featuresText, setFeaturesText] = useState("");
+  const [displayCtaLabel, setDisplayCtaLabel] = useState("");
+  const [displaySubtitle, setDisplaySubtitle] = useState("");
+  const [displayOrder, setDisplayOrder] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -75,6 +91,11 @@ export default function AdminPlansPage() {
     setIsRecurring(true);
     setStripeProductId("");
     setStripePriceId("");
+    setTagline("");
+    setFeaturesText("");
+    setDisplayCtaLabel("");
+    setDisplaySubtitle("");
+    setDisplayOrder("");
     setSaveError(null);
     setSaveSuccess(null);
   };
@@ -88,6 +109,11 @@ export default function AdminPlansPage() {
     setIsRecurring(plan.isRecurring);
     setStripeProductId(plan.stripeProductId ?? "");
     setStripePriceId(plan.stripePriceId ?? "");
+    setTagline(plan.tagline ?? "");
+    setFeaturesText(plan.features?.join("\n") ?? "");
+    setDisplayCtaLabel(plan.displayCtaLabel ?? "");
+    setDisplaySubtitle(plan.displaySubtitle ?? "");
+    setDisplayOrder(plan.displayOrder != null ? String(plan.displayOrder) : "");
     setSaveError(null);
     setSaveSuccess(null);
   };
@@ -178,6 +204,23 @@ export default function AdminPlansPage() {
       const priceId = stripePriceId.trim();
       payload.stripeProductId = productId !== "" ? productId : null;
       payload.stripePriceId = priceId !== "" ? priceId : null;
+
+      // Public display copy. Send as strings; API/schema handle the
+      // newline-split for `features` and the empty-string -> null
+      // coercion for the rest.
+      payload.tagline = tagline.trim() === "" ? null : tagline.trim();
+      payload.features = featuresText.trim() === "" ? null : featuresText;
+      payload.displayCtaLabel = displayCtaLabel.trim() === "" ? null : displayCtaLabel.trim();
+      payload.displaySubtitle = displaySubtitle.trim() === "" ? null : displaySubtitle.trim();
+      if (displayOrder.trim() === "") {
+        payload.displayOrder = null;
+      } else {
+        const ord = parseInt(displayOrder, 10);
+        if (!Number.isFinite(ord) || ord < 0) {
+          throw new Error("Display order must be a non-negative integer.");
+        }
+        payload.displayOrder = ord;
+      }
 
       const isEditing = !!selected;
 
@@ -487,6 +530,103 @@ export default function AdminPlansPage() {
                 </span>
               </label>
             </div>
+
+            {/* Public landing-page display copy ----------------------- */}
+            <fieldset className="rounded-lg border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-page)] p-3">
+              <legend className="px-1 text-[10px] font-semibold tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
+                Public landing-page card
+              </legend>
+              <p className="mb-3 text-[10px] font-normal text-[var(--bb-text-muted)]">
+                Copy shown to unauthenticated visitors on the pricing card. All fields optional —
+                blank = sensible fallback.
+              </p>
+
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1">
+                  <label
+                    htmlFor="plan-tagline"
+                    className="text-xs font-medium text-[var(--bb-secondary)]"
+                  >
+                    Tagline
+                  </label>
+                  <FormInput
+                    id="plan-tagline"
+                    type="text"
+                    value={tagline}
+                    onChange={(e) => setTagline(e.target.value)}
+                    placeholder="Best for startups and solo founders"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label
+                    htmlFor="plan-features"
+                    className="text-xs font-medium text-[var(--bb-secondary)]"
+                  >
+                    Feature bullets (one per line, max 12)
+                  </label>
+                  <textarea
+                    id="plan-features"
+                    value={featuresText}
+                    onChange={(e) => setFeaturesText(e.target.value)}
+                    rows={4}
+                    placeholder={
+                      "1 active creative request at a time\nUnlimited revisions & brand asset storage\nDelivery in 2 to 3 business days per task"
+                    }
+                    className="w-full rounded-md border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-2 text-sm text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label
+                    htmlFor="plan-display-cta-label"
+                    className="text-xs font-medium text-[var(--bb-secondary)]"
+                  >
+                    CTA label (overrides default)
+                  </label>
+                  <FormInput
+                    id="plan-display-cta-label"
+                    type="text"
+                    value={displayCtaLabel}
+                    onChange={(e) => setDisplayCtaLabel(e.target.value)}
+                    placeholder="GET STARTED"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label
+                    htmlFor="plan-display-subtitle"
+                    className="text-xs font-medium text-[var(--bb-secondary)]"
+                  >
+                    Tip line below CTA
+                  </label>
+                  <FormInput
+                    id="plan-display-subtitle"
+                    type="text"
+                    value={displaySubtitle}
+                    onChange={(e) => setDisplaySubtitle(e.target.value)}
+                    placeholder='"Pause or cancel anytime."'
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label
+                    htmlFor="plan-display-order"
+                    className="text-xs font-medium text-[var(--bb-secondary)]"
+                  >
+                    Display order
+                  </label>
+                  <FormInput
+                    id="plan-display-order"
+                    type="number"
+                    min={0}
+                    value={displayOrder}
+                    onChange={(e) => setDisplayOrder(e.target.value)}
+                    placeholder="0 = leftmost; ties broken by price asc"
+                  />
+                </div>
+              </div>
+            </fieldset>
 
             <Button type="submit" loading={saving} loadingText="Saving…" className="mt-2">
               {selected ? "Save changes" : "Create plan"}
