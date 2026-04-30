@@ -14,6 +14,7 @@ import { FeatureGridBlock } from "@/components/blocks/FeatureGridBlock";
 import { HeroBlock } from "@/components/blocks/HeroBlock";
 import { HowItWorksBlock } from "@/components/blocks/HowItWorksBlock";
 import { PricingHeaderBlock } from "@/components/blocks/PricingHeaderBlock";
+import { ShowcaseHeaderBlock } from "@/components/blocks/ShowcaseHeaderBlock";
 import { SiteHeader } from "@/components/marketing/site-header";
 
 import {
@@ -22,6 +23,7 @@ import {
   DEFAULT_HERO_DATA,
   DEFAULT_HOW_IT_WORKS_DATA,
   DEFAULT_PRICING_DATA,
+  DEFAULT_SHOWCASE_DATA,
 } from "@/lib/blocks/defaults";
 import {
   BLOCK_TYPES,
@@ -31,6 +33,7 @@ import {
   type HeroData,
   type HowItWorksData,
   type PricingData,
+  type ShowcaseData,
 } from "@/lib/blocks/types";
 
 // ---------------------------------------------------------------------------
@@ -471,6 +474,11 @@ function ShowcaseSection() {
     }[]
   >([]);
 
+  // Header copy — separately fetched from /api/page-blocks/home. Items
+  // continue to come from /api/showcase (Showcase table, managed via
+  // /admin/showcase). The block only owns the framing band above.
+  const [headerData, setHeaderData] = useState<ShowcaseData>(DEFAULT_SHOWCASE_DATA);
+
   useEffect(() => {
     fetch("/api/showcase")
       .then((r) => (r.ok ? r.json() : { works: [] }))
@@ -478,36 +486,34 @@ function ShowcaseSection() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/page-blocks/home")
+      .then((res) => {
+        if (!res.ok) throw new Error(`/api/page-blocks/home returned ${res.status}`);
+        return res.json();
+      })
+      .then((json: { blocks?: AnyBlockApiPayload[] }) => {
+        if (cancelled) return;
+        const row = json.blocks?.find((b) => b?.type === BLOCK_TYPES.SHOWCASE);
+        if (!row) return;
+        const parsed = parseBlockData({ type: BLOCK_TYPES.SHOWCASE, data: row.data });
+        if (parsed && parsed.type === BLOCK_TYPES.SHOWCASE) {
+          setHeaderData(parsed.data);
+        }
+      })
+      .catch(() => {
+        // Silent fallback to defaults.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <section id="showcase" className="bg-[var(--bb-bg-page)] px-6 py-20 sm:py-24">
       <div className="mx-auto max-w-5xl">
-        {/* Heading */}
-        <div className="mb-10 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-          <div>
-            <h2 className="font-brand text-3xl font-bold tracking-tight">Showcase</h2>
-            <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-              Creatives that speak louder than words.
-            </p>
-          </div>
-          <Link
-            href="/showcase"
-            className="inline-flex items-center gap-1 rounded-full bg-[var(--bb-secondary)] px-5 py-2.5 text-xs font-bold text-white transition-colors hover:bg-[#333]"
-          >
-            View the full gallery
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M5 12h14M12 5l7 7-7 7" />
-            </svg>
-          </Link>
-        </div>
+        <ShowcaseHeaderBlock data={headerData} />
 
         {/* Grid */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

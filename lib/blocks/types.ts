@@ -170,14 +170,35 @@ export type PricingData = z.infer<typeof pricingDataSchema>;
 
 /* -- SHOWCASE ------------------------------------------------------------- */
 
-/** Showcase block similarly defers to the existing /api/showcase data
- *  source. Block stores only the section's framing copy. */
-export const showcaseDataSchema = z.object({
-  title: z.string().max(120).optional(),
-  subtitle: z.string().max(300).optional(),
-  ctaLabel: z.string().max(50).optional(),
-  ctaHref: safeUrlSchema.optional(),
-});
+/** Showcase block defers to the existing /api/showcase data source for
+ *  the actual gallery items — admins manage those at /admin/showcase.
+ *  This block stores only the section's header band:
+ *    - title + subtitle (left side, above the gallery grid)
+ *    - ctaLabel + ctaHref (right side; the "View the full gallery" pill
+ *      that links to the full /showcase index)
+ *
+ *  CTA fields are paired via the same superRefine pattern the FAQ /
+ *  FEATURE_GRID blocks use — a half-set CTA is rejected at parse time
+ *  so the renderer never has to guard against it.
+ */
+export const showcaseDataSchema = z
+  .object({
+    title: z.string().max(120).optional(),
+    subtitle: z.string().max(300).optional(),
+    ctaLabel: z.string().max(50).optional(),
+    ctaHref: safeUrlSchema.optional(),
+  })
+  .superRefine((val, ctx) => {
+    const hasLabel = Boolean(val.ctaLabel && val.ctaLabel.trim().length > 0);
+    const hasHref = Boolean(val.ctaHref && val.ctaHref.trim().length > 0);
+    if (hasLabel !== hasHref) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "ctaLabel and ctaHref must both be set, or both be omitted.",
+        path: hasLabel ? ["ctaHref"] : ["ctaLabel"],
+      });
+    }
+  });
 
 export type ShowcaseData = z.infer<typeof showcaseDataSchema>;
 

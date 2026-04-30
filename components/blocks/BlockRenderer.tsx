@@ -19,6 +19,7 @@ import { FeatureGridBlock } from "./FeatureGridBlock";
 import { HeroBlock } from "./HeroBlock";
 import { HowItWorksBlock } from "./HowItWorksBlock";
 import { PricingHeaderBlock } from "./PricingHeaderBlock";
+import { ShowcaseHeaderBlock } from "./ShowcaseHeaderBlock";
 
 type BlockRendererProps = {
   block: PageBlock;
@@ -50,6 +51,11 @@ export function BlockRenderer({ block, signInHref = "/login" }: BlockRendererPro
       return <PricingHeaderBlock data={block.data} />;
 
     case BLOCK_TYPES.SHOWCASE:
+      // Same split as PRICING — the gallery items come from /api/showcase
+      // (managed via /admin/showcase), so this block only owns the
+      // framing band above the grid.
+      return <ShowcaseHeaderBlock data={block.data} />;
+
     case BLOCK_TYPES.CALL_TO_ACTION:
       // Renderers land in subsequent phases. Until then the section
       // continues to render via the hardcoded path in app/page.tsx —
