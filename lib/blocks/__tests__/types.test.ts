@@ -330,6 +330,68 @@ describe("parseBlockData — FEATURE_GRID", () => {
   });
 });
 
+describe("parseBlockData — PRICING", () => {
+  it("accepts an empty payload (all fields optional)", () => {
+    const result = parseBlockData({ type: BLOCK_TYPES.PRICING, data: {} });
+    expect(result).not.toBeNull();
+  });
+
+  it("accepts the full header shape (eyebrow/title/subtitle + contact triad)", () => {
+    const result = parseBlockData({
+      type: BLOCK_TYPES.PRICING,
+      data: {
+        eyebrow: "Start now your",
+        title: "creative plan",
+        subtitle: "Pause or cancel anytime.",
+        contactNote: "Need a custom plan?",
+        contactLabel: "Let's talk",
+        contactHref: "mailto:hello@brandbite.io",
+      },
+    });
+    expect(result).not.toBeNull();
+  });
+
+  it("rejects a partial contact triad (note + label, no href)", () => {
+    expect(
+      parseBlockData({
+        type: BLOCK_TYPES.PRICING,
+        data: { contactNote: "Need a custom plan?", contactLabel: "Let's talk" },
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects a partial contact triad (label + href, no note)", () => {
+    expect(
+      parseBlockData({
+        type: BLOCK_TYPES.PRICING,
+        data: { contactLabel: "Let's talk", contactHref: "/contact" },
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects a partial contact triad (note + href, no label)", () => {
+    expect(
+      parseBlockData({
+        type: BLOCK_TYPES.PRICING,
+        data: { contactNote: "Need a custom plan?", contactHref: "/contact" },
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects javascript: contactHref", () => {
+    expect(
+      parseBlockData({
+        type: BLOCK_TYPES.PRICING,
+        data: {
+          contactNote: "Click",
+          contactLabel: "here",
+          contactHref: "javascript:alert(1)",
+        },
+      }),
+    ).toBeNull();
+  });
+});
+
 describe("parseBlockData — CALL_TO_ACTION", () => {
   it("accepts a complete CTA", () => {
     const result = parseBlockData({

@@ -22,6 +22,7 @@ import { FaqBlockForm } from "@/components/blocks/admin/FaqBlockForm";
 import { FeatureGridBlockForm } from "@/components/blocks/admin/FeatureGridBlockForm";
 import { HeroBlockForm } from "@/components/blocks/admin/HeroBlockForm";
 import { HowItWorksBlockForm } from "@/components/blocks/admin/HowItWorksBlockForm";
+import { PricingHeaderBlockForm } from "@/components/blocks/admin/PricingHeaderBlockForm";
 
 import { getPageBlocks } from "@/lib/blocks/get-page-blocks";
 import {
@@ -29,6 +30,7 @@ import {
   DEFAULT_FEATURE_GRID_DATA,
   DEFAULT_HERO_DATA,
   DEFAULT_HOW_IT_WORKS_DATA,
+  DEFAULT_PRICING_DATA,
 } from "@/lib/blocks/defaults";
 import {
   BLOCK_TYPES,
@@ -36,6 +38,7 @@ import {
   type FeatureGridData,
   type HeroData,
   type HowItWorksData,
+  type PricingData,
 } from "@/lib/blocks/types";
 
 const PAGE_KEY = "home";
@@ -61,6 +64,12 @@ export default async function AdminLandingPage() {
     featureGridBlock && featureGridBlock.type === BLOCK_TYPES.FEATURE_GRID
       ? featureGridBlock.data
       : DEFAULT_FEATURE_GRID_DATA;
+
+  const pricingBlock = blocks.find((b) => b.type === BLOCK_TYPES.PRICING);
+  const initialPricing: PricingData =
+    pricingBlock && pricingBlock.type === BLOCK_TYPES.PRICING
+      ? pricingBlock.data
+      : DEFAULT_PRICING_DATA;
 
   const faqBlock = blocks.find((b) => b.type === BLOCK_TYPES.FAQ);
   const initialFaq: FaqData =
@@ -108,6 +117,20 @@ export default async function AdminLandingPage() {
         <HowItWorksBlockForm initial={initialHowItWorks} pageKey={PAGE_KEY} />
       </section>
 
+      {/* Pricing header (PRICING) ------------------------------------- */}
+      <section className="mt-6 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-6 py-5 shadow-sm">
+        <header className="mb-5 border-b border-[var(--bb-border-subtle)] pb-3">
+          <h2 className="text-lg font-semibold tracking-tight">Pricing header</h2>
+          <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
+            The eyebrow / title above the plan cards plus the optional right-side &ldquo;Need a
+            custom plan? Let&apos;s talk&rdquo; prompt. Per-plan prices come from Stripe; per-plan
+            tagline + feature copy will become editable in a follow-up.
+          </p>
+        </header>
+
+        <PricingHeaderBlockForm initial={initialPricing} pageKey={PAGE_KEY} />
+      </section>
+
       {/* Why Brandbite (FEATURE_GRID) --------------------------------- */}
       <section className="mt-6 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-6 py-5 shadow-sm">
         <header className="mb-5 border-b border-[var(--bb-border-subtle)] pb-3">
@@ -140,9 +163,9 @@ export default async function AdminLandingPage() {
           More sections coming soon
         </h2>
         <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-          Pricing-section framing copy, showcase-section framing copy, and a generic call-to-action
-          band will become editable in upcoming phases. Until then those sections render from the
-          hardcoded copy in the page source.
+          Per-plan tagline + feature copy (a follow-up Plan-model migration), the showcase-section
+          framing, and a generic call-to-action band will become editable in upcoming phases. Until
+          then those sections render from the hardcoded copy in the page source.
         </p>
       </section>
     </>

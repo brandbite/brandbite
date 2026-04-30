@@ -18,6 +18,7 @@ import { FaqBlock } from "./FaqBlock";
 import { FeatureGridBlock } from "./FeatureGridBlock";
 import { HeroBlock } from "./HeroBlock";
 import { HowItWorksBlock } from "./HowItWorksBlock";
+import { PricingHeaderBlock } from "./PricingHeaderBlock";
 
 type BlockRendererProps = {
   block: PageBlock;
@@ -41,6 +42,13 @@ export function BlockRenderer({ block, signInHref = "/login" }: BlockRendererPro
       return <FeatureGridBlock data={block.data} />;
 
     case BLOCK_TYPES.PRICING:
+      // The pricing block only owns the section header band — the plan
+      // grid lives in app/page.tsx PricingSection where it joins the
+      // header to the live /api/plans data. BlockRenderer can still
+      // render the header standalone (used by /admin/landing's preview
+      // and any future page that wants just the header).
+      return <PricingHeaderBlock data={block.data} />;
+
     case BLOCK_TYPES.SHOWCASE:
     case BLOCK_TYPES.CALL_TO_ACTION:
       // Renderers land in subsequent phases. Until then the section

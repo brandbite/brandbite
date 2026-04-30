@@ -132,13 +132,39 @@ export type HowItWorksData = z.infer<typeof howItWorksDataSchema>;
 /* -- PRICING -------------------------------------------------------------- */
 
 /** Pricing block has no editable price content — prices come from the DB
- *  (Stripe-driven, see /api/plans). The block just renders the existing
- *  pricing section with optional title / subtitle copy. */
-export const pricingDataSchema = z.object({
-  eyebrow: z.string().max(50).optional(),
-  title: z.string().max(120).optional(),
-  subtitle: z.string().max(300).optional(),
-});
+ *  (Stripe-driven, see /api/plans), and per-plan tagline/features/CTA
+ *  copy lives on the Plan model itself. The block stores only the
+ *  section's framing copy:
+ *
+ *    - eyebrow + title (the left-side header above the plan grid)
+ *    - subtitle (optional descriptive paragraph below the title)
+ *    - contactNote + contactLabel + contactHref (the right-side
+ *      "Need a custom plan? Let's talk" prompt; all-or-nothing pair —
+ *      same superRefine as FAQ/FEATURE_GRID's CTA pair)
+ */
+export const pricingDataSchema = z
+  .object({
+    eyebrow: z.string().max(50).optional(),
+    title: z.string().max(120).optional(),
+    subtitle: z.string().max(300).optional(),
+    /** Right-side prompt. Either set all three or none. */
+    contactNote: z.string().max(120).optional(),
+    contactLabel: z.string().max(50).optional(),
+    contactHref: safeUrlSchema.optional(),
+  })
+  .superRefine((val, ctx) => {
+    const hasNote = Boolean(val.contactNote && val.contactNote.trim().length > 0);
+    const hasLabel = Boolean(val.contactLabel && val.contactLabel.trim().length > 0);
+    const hasHref = Boolean(val.contactHref && val.contactHref.trim().length > 0);
+    const setCount = [hasNote, hasLabel, hasHref].filter(Boolean).length;
+    if (setCount > 0 && setCount < 3) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "contact note, label, and destination must all be set together (or all blank).",
+        path: !hasNote ? ["contactNote"] : !hasLabel ? ["contactLabel"] : ["contactHref"],
+      });
+    }
+  });
 
 export type PricingData = z.infer<typeof pricingDataSchema>;
 
