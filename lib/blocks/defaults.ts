@@ -13,6 +13,7 @@
 // -----------------------------------------------------------------------------
 
 import type {
+  CallToActionData,
   FaqData,
   FeatureGridData,
   HeroData,
@@ -89,6 +90,24 @@ export const DEFAULT_PRICING_DATA: PricingData = {
   contactNote: "Need a custom plan?",
   contactLabel: "Let's talk",
   contactHref: "mailto:hello@brandbite.io",
+};
+
+/**
+ * Default call-to-action block. Unlike the other defaults, this one
+ * isn't a back-fill of pre-existing copy — there was no CTA band on
+ * the landing page before this block existed. The defaults are a
+ * sensible "first conversion moment" prompt admins can override.
+ *
+ * The renderer styles the section as a cream-background band (matching
+ * the "Still have questions?" pattern on /faq) so it's visually
+ * distinct from the white-bg sections around it without overwhelming
+ * the page with brand-primary.
+ */
+export const DEFAULT_CALL_TO_ACTION_DATA: CallToActionData = {
+  headline: "Ready to start your first creative request?",
+  subhead: "Pause or cancel anytime. Your work and assets stay yours.",
+  ctaLabel: "Get Started",
+  ctaHref: "/login",
 };
 
 /** Default showcase header block matching the currently-shipped

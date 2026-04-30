@@ -18,6 +18,7 @@
 // -----------------------------------------------------------------------------
 
 import { OwnerOnlyBanner } from "@/components/admin/owner-only-banner";
+import { CallToActionBlockForm } from "@/components/blocks/admin/CallToActionBlockForm";
 import { FaqBlockForm } from "@/components/blocks/admin/FaqBlockForm";
 import { FeatureGridBlockForm } from "@/components/blocks/admin/FeatureGridBlockForm";
 import { HeroBlockForm } from "@/components/blocks/admin/HeroBlockForm";
@@ -27,6 +28,7 @@ import { ShowcaseHeaderBlockForm } from "@/components/blocks/admin/ShowcaseHeade
 
 import { getPageBlocks } from "@/lib/blocks/get-page-blocks";
 import {
+  DEFAULT_CALL_TO_ACTION_DATA,
   DEFAULT_FAQ_DATA,
   DEFAULT_FEATURE_GRID_DATA,
   DEFAULT_HERO_DATA,
@@ -36,6 +38,7 @@ import {
 } from "@/lib/blocks/defaults";
 import {
   BLOCK_TYPES,
+  type CallToActionData,
   type FaqData,
   type FeatureGridData,
   type HeroData,
@@ -79,6 +82,12 @@ export default async function AdminLandingPage() {
     showcaseBlock && showcaseBlock.type === BLOCK_TYPES.SHOWCASE
       ? showcaseBlock.data
       : DEFAULT_SHOWCASE_DATA;
+
+  const ctaBlock = blocks.find((b) => b.type === BLOCK_TYPES.CALL_TO_ACTION);
+  const initialCta: CallToActionData =
+    ctaBlock && ctaBlock.type === BLOCK_TYPES.CALL_TO_ACTION
+      ? ctaBlock.data
+      : DEFAULT_CALL_TO_ACTION_DATA;
 
   const faqBlock = blocks.find((b) => b.type === BLOCK_TYPES.FAQ);
   const initialFaq: FaqData =
@@ -166,6 +175,20 @@ export default async function AdminLandingPage() {
         <FeatureGridBlockForm initial={initialFeatureGrid} pageKey={PAGE_KEY} />
       </section>
 
+      {/* Call-to-action band (CALL_TO_ACTION) ------------------------- */}
+      <section className="mt-6 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-6 py-5 shadow-sm">
+        <header className="mb-5 border-b border-[var(--bb-border-subtle)] pb-3">
+          <h2 className="text-lg font-semibold tracking-tight">Call-to-action band</h2>
+          <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
+            Full-width conversion band rendered between Why Brandbite and FAQ. Headline + optional
+            subhead + a primary CTA. Cream-background style matches the &ldquo;Still have
+            questions?&rdquo; band on <code>/faq</code>.
+          </p>
+        </header>
+
+        <CallToActionBlockForm initial={initialCta} pageKey={PAGE_KEY} />
+      </section>
+
       {/* FAQ ---------------------------------------------------------- */}
       <section className="mt-6 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-6 py-5 shadow-sm">
         <header className="mb-5 border-b border-[var(--bb-border-subtle)] pb-3">
@@ -179,15 +202,23 @@ export default async function AdminLandingPage() {
         <FaqBlockForm initial={initialFaq} pageKey={PAGE_KEY} />
       </section>
 
-      {/* Future sections ---------------------------------------------- */}
+      {/* Done state — every existing landing-page section is editable */}
       <section className="mt-6 rounded-2xl border border-dashed border-[var(--bb-border)] bg-[var(--bb-bg-warm)] px-6 py-5">
         <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-text-secondary)]">
-          More sections coming soon
+          That&apos;s every section on the landing page
         </h2>
         <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-          A generic call-to-action band (a new full-width conversion section between any two
-          existing blocks) will become editable in an upcoming phase. Until then it renders from
-          hardcoded copy if added.
+          Plan-card copy is on{" "}
+          <code className="rounded bg-[var(--bb-bg-page)] px-1 py-0.5 text-[10px]">
+            /admin/plans
+          </code>{" "}
+          (Stripe drives prices, the form drives tagline / features / CTA). Showcase items are on{" "}
+          <code className="rounded bg-[var(--bb-bg-page)] px-1 py-0.5 text-[10px]">
+            /admin/showcase
+          </code>
+          . FAQ questions are on{" "}
+          <code className="rounded bg-[var(--bb-bg-page)] px-1 py-0.5 text-[10px]">/admin/faq</code>
+          . Site header and footer are still hardcoded — separate Phase.
         </p>
       </section>
     </>
