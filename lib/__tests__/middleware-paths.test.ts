@@ -24,6 +24,14 @@ const PUBLIC_PATHS = [
   "/api/billing/webhook",
   "/api/invite",
   "/api/session",
+  "/api/showcase",
+  "/api/blog",
+  "/api/pages",
+  "/api/news",
+  "/api/docs",
+  "/api/plans",
+  "/api/faq",
+  "/api/page-blocks",
   "/api/health",
   "/api/cron",
   "/privacy",
@@ -140,6 +148,32 @@ describe("isPublicPath", () => {
   it("marks any future /api/cron/* route as public", () => {
     expect(isPublicPath("/api/cron/hypothetical-future-job")).toBe(true);
   });
+
+  // -------------------------------------------------------------------------
+  // Public-content APIs — read by the unauthenticated landing page (and
+  // marketing surfaces). If any of these drop off the allow-list, the proxy
+  // 307's the request to /login and the page silently falls back to its
+  // hardcoded defaults. The visitor sees stale content; the admin's edits
+  // appear to "not take effect". This regressed once already (the
+  // /api/page-blocks omission caused a CTA edit to look like it didn't
+  // save, when really the public read was just being redirected away).
+  // -------------------------------------------------------------------------
+  for (const publicApi of [
+    "/api/showcase",
+    "/api/blog",
+    "/api/pages",
+    "/api/news",
+    "/api/docs",
+    "/api/plans",
+    "/api/faq",
+    "/api/page-blocks",
+    "/api/page-blocks/home",
+    "/api/page-blocks/home-2",
+  ]) {
+    it(`marks ${publicApi} as public`, () => {
+      expect(isPublicPath(publicApi)).toBe(true);
+    });
+  }
 });
 
 // ---------------------------------------------------------------------------
