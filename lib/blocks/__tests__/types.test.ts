@@ -116,28 +116,51 @@ describe("parseBlockData — HERO", () => {
 });
 
 describe("parseBlockData — FAQ", () => {
-  it("accepts a single-Q FAQ", () => {
+  it("accepts a picker selection of Faq IDs", () => {
     const result = parseBlockData({
       type: BLOCK_TYPES.FAQ,
-      data: { qas: [{ q: "Q?", a: "A." }] },
+      data: {
+        title: "Common questions",
+        selectedFaqIds: ["faq_seed_gen_01", "faq_seed_pri_02"],
+      },
     });
     expect(result).not.toBeNull();
   });
 
-  it("rejects FAQ with no questions", () => {
+  it("accepts an empty selection (renderer shows defaults)", () => {
+    const result = parseBlockData({
+      type: BLOCK_TYPES.FAQ,
+      data: { selectedFaqIds: [] },
+    });
+    expect(result).not.toBeNull();
+  });
+
+  it("defaults selectedFaqIds to [] when omitted", () => {
+    const result = parseBlockData({
+      type: BLOCK_TYPES.FAQ,
+      data: { title: "Just framing copy" },
+    });
+    expect(result).not.toBeNull();
+    if (result && result.type === BLOCK_TYPES.FAQ) {
+      expect(result.data.selectedFaqIds).toEqual([]);
+    }
+  });
+
+  it("rejects more than 40 selected IDs", () => {
+    const tooMany = Array.from({ length: 41 }, (_, i) => `faq_${i}`);
     expect(
       parseBlockData({
         type: BLOCK_TYPES.FAQ,
-        data: { qas: [] },
+        data: { selectedFaqIds: tooMany },
       }),
     ).toBeNull();
   });
 
-  it("rejects FAQ with empty question text", () => {
+  it("rejects non-array selectedFaqIds", () => {
     expect(
       parseBlockData({
         type: BLOCK_TYPES.FAQ,
-        data: { qas: [{ q: "", a: "A" }] },
+        data: { selectedFaqIds: "faq_one" as unknown as string[] },
       }),
     ).toBeNull();
   });
