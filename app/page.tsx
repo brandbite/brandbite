@@ -10,12 +10,14 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { FaqBlock } from "@/components/blocks/FaqBlock";
+import { FeatureGridBlock } from "@/components/blocks/FeatureGridBlock";
 import { HeroBlock } from "@/components/blocks/HeroBlock";
 import { HowItWorksBlock } from "@/components/blocks/HowItWorksBlock";
 import { SiteHeader } from "@/components/marketing/site-header";
 
 import {
   DEFAULT_FAQ_DATA,
+  DEFAULT_FEATURE_GRID_DATA,
   DEFAULT_HERO_DATA,
   DEFAULT_HOW_IT_WORKS_DATA,
 } from "@/lib/blocks/defaults";
@@ -23,6 +25,7 @@ import {
   BLOCK_TYPES,
   parseBlockData,
   type FaqData,
+  type FeatureGridData,
   type HeroData,
   type HowItWorksData,
 } from "@/lib/blocks/types";
@@ -95,14 +98,6 @@ const FALLBACK_PLANS: { name: string; priceCents: number }[] = [
   { name: "Starter", priceCents: 49500 },
   { name: "Brand", priceCents: 99500 },
   { name: "Full", priceCents: 189500 },
-];
-
-const WHY_ITEMS = [
-  "Fast turnaround (1 to 2 days per request)",
-  "Direct Slack communication",
-  "Brand guidelines",
-  "Flexible subscription. Pause anytime.",
-  "Access to top European talent",
 ];
 
 const FOOTER_COLS = [
@@ -525,85 +520,37 @@ function ShowcaseSection() {
 }
 
 // ===========================================================================
-// Why Brandbite
+// Why Brandbite — DB-driven FEATURE_GRID block with fallback to defaults
 // ===========================================================================
 
 function WhySection() {
-  return (
-    <section className="bg-white px-6 py-20 sm:py-24">
-      <div className="mx-auto grid max-w-5xl grid-cols-1 items-center gap-12 lg:grid-cols-2">
-        {/* Image placeholder */}
-        <div className="aspect-[4/3] overflow-hidden rounded-2xl bg-[#e8dff5]">
-          <div className="flex h-full items-center justify-center">
-            <div className="text-center">
-              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--bb-border-subtle)]">
-                <svg
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="var(--bb-text-muted)"
-                  strokeWidth="1.5"
-                >
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                  <circle cx="8.5" cy="8.5" r="1.5" />
-                  <path d="M21 15l-5-5L5 21" />
-                </svg>
-              </div>
-              <span className="text-sm font-medium text-[var(--bb-text-muted)]">Featured work</span>
-            </div>
-          </div>
-        </div>
+  const [data, setData] = useState<FeatureGridData>(DEFAULT_FEATURE_GRID_DATA);
 
-        {/* Content */}
-        <div>
-          <h2 className="font-brand text-3xl font-bold tracking-tight sm:text-4xl">
-            Why Brandbite
-          </h2>
-          <p className="mt-2 text-sm text-[var(--bb-text-secondary)]">
-            Why brands choose Brandbite over freelancers.
-          </p>
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/page-blocks/home")
+      .then((res) => {
+        if (!res.ok) throw new Error(`/api/page-blocks/home returned ${res.status}`);
+        return res.json();
+      })
+      .then((json: { blocks?: AnyBlockApiPayload[] }) => {
+        if (cancelled) return;
+        const row = json.blocks?.find((b) => b?.type === BLOCK_TYPES.FEATURE_GRID);
+        if (!row) return;
+        const parsed = parseBlockData({ type: BLOCK_TYPES.FEATURE_GRID, data: row.data });
+        if (parsed && parsed.type === BLOCK_TYPES.FEATURE_GRID) {
+          setData(parsed.data);
+        }
+      })
+      .catch(() => {
+        // Silent fallback to defaults.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-          <p className="mt-6 mb-4 text-[10px] font-semibold tracking-wider text-[var(--bb-text-muted)] uppercase">
-            Plan includes:
-          </p>
-
-          <ul className="space-y-3">
-            {WHY_ITEMS.map((item, i) => (
-              <li key={i} className="flex items-center gap-3 text-sm text-[var(--bb-secondary)]">
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  className="flex-shrink-0"
-                >
-                  <circle cx="12" cy="12" r="10" fill="var(--bb-primary)" fillOpacity="0.1" />
-                  <path
-                    d="M8 12l3 3 5-5"
-                    stroke="var(--bb-primary)"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                {item}
-              </li>
-            ))}
-          </ul>
-
-          <div className="mt-8">
-            <a
-              href="#pricing"
-              className="inline-block rounded-full bg-[var(--bb-secondary)] px-7 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#333]"
-            >
-              Explore Pricing
-            </a>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
+  return <FeatureGridBlock data={data} />;
 }
 
 // ===========================================================================

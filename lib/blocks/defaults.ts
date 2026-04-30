@@ -12,7 +12,7 @@
 //           see exactly what's currently shipped, then edit from there.
 // -----------------------------------------------------------------------------
 
-import type { FaqData, HeroData, HowItWorksData } from "./types";
+import type { FaqData, FeatureGridData, HeroData, HowItWorksData } from "./types";
 
 /** Default hero block matching the currently-shipped landing-page hero. */
 export const DEFAULT_HERO_DATA: HeroData = {
@@ -70,4 +70,22 @@ export const DEFAULT_FAQ_DATA: FaqData = {
   // CTA entirely.
   ctaLabel: "See all questions",
   ctaHref: "/faq",
+};
+
+/** Default feature grid block matching the currently-shipped landing-page
+ *  "Why Brandbite" section. Same five reasons that have been visible on
+ *  the public site since launch, with the same "Explore Pricing" CTA
+ *  pointing back at the pricing anchor on the same page. */
+export const DEFAULT_FEATURE_GRID_DATA: FeatureGridData = {
+  title: "Why Brandbite",
+  subtitle: "Why brands choose Brandbite over freelancers.",
+  items: [
+    { title: "Fast turnaround (1 to 2 days per request)" },
+    { title: "Direct Slack communication" },
+    { title: "Brand guidelines" },
+    { title: "Flexible subscription. Pause anytime." },
+    { title: "Access to top European talent" },
+  ],
+  ctaLabel: "Explore Pricing",
+  ctaHref: "#pricing",
 };

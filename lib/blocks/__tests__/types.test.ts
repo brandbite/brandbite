@@ -98,6 +98,23 @@ describe("parseBlockData — HERO", () => {
     expect(result).not.toBeNull();
   });
 
+  it("accepts an in-page anchor ctaHref", () => {
+    const result = parseBlockData({
+      type: BLOCK_TYPES.HERO,
+      data: { headline: "X", ctaLabel: "Click", ctaHref: "#pricing" },
+    });
+    expect(result).not.toBeNull();
+  });
+
+  it("rejects a bare # without a target", () => {
+    expect(
+      parseBlockData({
+        type: BLOCK_TYPES.HERO,
+        data: { headline: "X", ctaLabel: "Click", ctaHref: "#" },
+      }),
+    ).toBeNull();
+  });
+
   it("accepts an https ctaHref", () => {
     const result = parseBlockData({
       type: BLOCK_TYPES.HERO,
@@ -243,6 +260,73 @@ describe("parseBlockData — FEATURE_GRID", () => {
         data: { items },
       }),
     ).toBeNull();
+  });
+
+  it("accepts items with optional emoji and body", () => {
+    const result = parseBlockData({
+      type: BLOCK_TYPES.FEATURE_GRID,
+      data: {
+        items: [
+          { title: "Fast turnaround", body: "1 to 2 days per request", emoji: "⚡" },
+          { title: "Direct comms" },
+        ],
+      },
+    });
+    expect(result).not.toBeNull();
+  });
+
+  it("accepts a paired CTA (label + href)", () => {
+    const result = parseBlockData({
+      type: BLOCK_TYPES.FEATURE_GRID,
+      data: {
+        items: [{ title: "Fast" }],
+        ctaLabel: "Explore Pricing",
+        ctaHref: "#pricing",
+      },
+    });
+    expect(result).not.toBeNull();
+  });
+
+  it("rejects a CTA with label only", () => {
+    expect(
+      parseBlockData({
+        type: BLOCK_TYPES.FEATURE_GRID,
+        data: { items: [{ title: "Fast" }], ctaLabel: "Explore" },
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects a CTA with href only", () => {
+    expect(
+      parseBlockData({
+        type: BLOCK_TYPES.FEATURE_GRID,
+        data: { items: [{ title: "Fast" }], ctaHref: "#pricing" },
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects a CTA with javascript: href", () => {
+    expect(
+      parseBlockData({
+        type: BLOCK_TYPES.FEATURE_GRID,
+        data: {
+          items: [{ title: "Fast" }],
+          ctaLabel: "Click",
+          ctaHref: "javascript:alert(1)",
+        },
+      }),
+    ).toBeNull();
+  });
+
+  it("accepts an image reference", () => {
+    const result = parseBlockData({
+      type: BLOCK_TYPES.FEATURE_GRID,
+      data: {
+        items: [{ title: "Fast" }],
+        image: { storageKey: "page-block/why.jpg", url: "https://r2.example/why.jpg" },
+      },
+    });
+    expect(result).not.toBeNull();
   });
 });
 
