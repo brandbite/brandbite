@@ -186,11 +186,31 @@ export type FeatureGridData = z.infer<typeof featureGridDataSchema>;
  * UX changes on the picker (search/pagination), so 40 is a soft sanity
  * upper bound that no realistic landing page should hit.
  */
-export const faqDataSchema = z.object({
-  title: z.string().max(120).optional(),
-  subtitle: z.string().max(300).optional(),
-  selectedFaqIds: z.array(z.string().min(1).max(50)).max(40).default([]),
-});
+export const faqDataSchema = z
+  .object({
+    title: z.string().max(120).optional(),
+    subtitle: z.string().max(300).optional(),
+    selectedFaqIds: z.array(z.string().min(1).max(50)).max(40).default([]),
+    /** Optional "see all" CTA shown below the accordion. Both label and
+     *  href are required together — schema enforces it via .superRefine
+     *  below so the public renderer never has to deal with a half-set
+     *  CTA. The defaults in lib/blocks/defaults.ts wire up
+     *  "See all questions" -> /faq so the landing page has a sensible
+     *  out-of-the-box link to the full FAQ index. */
+    ctaLabel: z.string().max(50).optional(),
+    ctaHref: safeUrlSchema.optional(),
+  })
+  .superRefine((val, ctx) => {
+    const hasLabel = Boolean(val.ctaLabel && val.ctaLabel.trim().length > 0);
+    const hasHref = Boolean(val.ctaHref && val.ctaHref.trim().length > 0);
+    if (hasLabel !== hasHref) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "ctaLabel and ctaHref must both be set, or both be omitted.",
+        path: hasLabel ? ["ctaHref"] : ["ctaLabel"],
+      });
+    }
+  });
 
 export type FaqData = z.infer<typeof faqDataSchema>;
 

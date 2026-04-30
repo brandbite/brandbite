@@ -53,6 +53,8 @@ export function FaqBlockForm({ initial, pageKey }: FaqBlockFormProps) {
   const [title, setTitle] = useState<string>(initial.title ?? "");
   const [subtitle, setSubtitle] = useState<string>(initial.subtitle ?? "");
   const [pickedIds, setPickedIds] = useState<string[]>([...initial.selectedFaqIds]);
+  const [ctaLabel, setCtaLabel] = useState<string>(initial.ctaLabel ?? "");
+  const [ctaHref, setCtaHref] = useState<string>(initial.ctaHref ?? "");
 
   const [allFaqs, setAllFaqs] = useState<CentralFaq[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -159,12 +161,28 @@ export function FaqBlockForm({ initial, pageKey }: FaqBlockFormProps) {
     if (submitting) return;
     setError(null);
 
+    // CTA fields are paired — schema enforces this server-side too,
+    // but failing fast in the form gives a clearer message than the
+    // generic Zod error.
+    const trimmedLabel = ctaLabel.trim();
+    const trimmedHref = ctaHref.trim();
+    if (Boolean(trimmedLabel) !== Boolean(trimmedHref)) {
+      setError(
+        trimmedLabel
+          ? "Add a destination for the CTA, or clear the label to hide it."
+          : "Add a label for the CTA, or clear the destination to hide it.",
+      );
+      return;
+    }
+
     setSubmitting(true);
     try {
       const data: FaqData = {
         ...(title.trim() ? { title: title.trim() } : {}),
         ...(subtitle.trim() ? { subtitle: subtitle.trim() } : {}),
         selectedFaqIds: pickedIds,
+        ...(trimmedLabel ? { ctaLabel: trimmedLabel } : {}),
+        ...(trimmedHref ? { ctaHref: trimmedHref } : {}),
       };
 
       const res = await fetch(`/api/admin/page-blocks/${pageKey}/FAQ`, {
@@ -231,6 +249,46 @@ export function FaqBlockForm({ initial, pageKey }: FaqBlockFormProps) {
             placeholder="Frequently asked questions."
             maxLength={300}
           />
+        </div>
+      </div>
+
+      {/* "See all" CTA pair (optional, paired) ------------------------ */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label
+            htmlFor="faq-block-cta-label"
+            className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
+          >
+            CTA label (optional)
+          </label>
+          <FormInput
+            id="faq-block-cta-label"
+            value={ctaLabel}
+            onChange={(e) => setCtaLabel(e.target.value)}
+            placeholder="See all questions"
+            maxLength={50}
+          />
+          <p className="mt-1 text-xs text-[var(--bb-text-muted)]">
+            Shown below the accordion. Clear both label and destination to hide the button.
+          </p>
+        </div>
+        <div>
+          <label
+            htmlFor="faq-block-cta-href"
+            className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
+          >
+            CTA destination (optional)
+          </label>
+          <FormInput
+            id="faq-block-cta-href"
+            value={ctaHref}
+            onChange={(e) => setCtaHref(e.target.value)}
+            placeholder="/faq"
+            maxLength={200}
+          />
+          <p className="mt-1 text-xs text-[var(--bb-text-muted)]">
+            Internal path like <code>/faq</code> or full URL.
+          </p>
         </div>
       </div>
 

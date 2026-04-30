@@ -63,4 +63,11 @@ export const DEFAULT_FAQ_FALLBACK_LIMIT = 5;
 
 export const DEFAULT_FAQ_DATA: FaqData = {
   selectedFaqIds: [],
+  // Out-of-the-box "See all questions" CTA pointing at the full FAQ
+  // index. The landing page only surfaces a curated subset — visitors
+  // who reach the bottom of the section deserve a clear path to the
+  // rest. Admins can clear both fields in the picker form to hide the
+  // CTA entirely.
+  ctaLabel: "See all questions",
+  ctaHref: "/faq",
 };
