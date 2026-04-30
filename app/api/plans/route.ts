@@ -26,22 +26,58 @@ type PublicPlan = {
   name: string;
   priceCents: number;
   monthlyTokens: number;
+  /** Marketing copy for the landing-page card. Optional — landing page
+   *  falls back to a generic placeholder when null. Edited via
+   *  /admin/plans alongside the Stripe-driven price/tokens fields. */
+  tagline: string | null;
+  features: string[] | null;
+  displayCtaLabel: string | null;
+  displaySubtitle: string | null;
 };
+
+/**
+ * Defensive coercion of the JSON `features` column. Prisma returns
+ * `JsonValue` which can be anything; we only render an array of
+ * strings, so anything else collapses to null and the renderer falls
+ * back to its placeholder.
+ */
+function coerceFeatures(raw: unknown): string[] | null {
+  if (!Array.isArray(raw)) return null;
+  const safe = raw.filter((v): v is string => typeof v === "string");
+  return safe.length > 0 ? safe : null;
+}
 
 export async function GET() {
   try {
     const plans = await prisma.plan.findMany({
       where: { isActive: true, isRecurring: true },
-      orderBy: { priceCents: "asc" },
+      // Display order primary, price ascending as tie-break (and as
+      // historical fallback for plans that haven't been ordered yet).
+      orderBy: [{ displayOrder: { sort: "asc", nulls: "last" } }, { priceCents: "asc" }],
       select: {
         id: true,
         name: true,
         priceCents: true,
         monthlyTokens: true,
+        tagline: true,
+        features: true,
+        displayCtaLabel: true,
+        displaySubtitle: true,
       },
     });
 
-    const body: { plans: PublicPlan[] } = { plans };
+    const body: { plans: PublicPlan[] } = {
+      plans: plans.map((p) => ({
+        id: p.id,
+        name: p.name,
+        priceCents: p.priceCents,
+        monthlyTokens: p.monthlyTokens,
+        tagline: p.tagline,
+        features: coerceFeatures(p.features),
+        displayCtaLabel: p.displayCtaLabel,
+        displaySubtitle: p.displaySubtitle,
+      })),
+    };
 
     return NextResponse.json(body, {
       headers: {
