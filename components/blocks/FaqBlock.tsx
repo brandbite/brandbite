@@ -218,9 +218,13 @@ function FaqAccordion({
 
 /* ---------------------------------------------------------------------------
  * "See all questions" CTA below the accordion. Renders only when both
- * label and href are set (the schema enforces them as a pair). Uses
- * next/link so internal hrefs benefit from client-side navigation; the
- * Link component handles absolute URLs as a regular anchor.
+ * label and href are set (the schema enforces them as a pair).
+ *
+ * Style matches the Showcase section's "View the full gallery" pill and
+ * the Why section's "Explore Pricing" button — dark secondary background,
+ * white bold text, arrow icon, hover to #333. Keeping section-conclusion
+ * CTAs visually consistent across the landing page so visitors recognise
+ * the pattern from one section to the next.
  * ------------------------------------------------------------------------- */
 
 function FaqCta({ data }: { data: FaqData }) {
@@ -232,7 +236,7 @@ function FaqCta({ data }: { data: FaqData }) {
     <div className="mt-10 flex justify-center">
       <Link
         href={href}
-        className="inline-flex items-center gap-2 rounded-full border border-[var(--bb-border)] bg-white px-6 py-3 text-sm font-semibold text-[var(--bb-secondary)] transition-all hover:-translate-y-0.5 hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)] hover:shadow-md"
+        className="inline-flex items-center gap-1 rounded-full bg-[var(--bb-secondary)] px-7 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#333]"
       >
         {label}
         <svg
@@ -241,13 +245,12 @@ function FaqCta({ data }: { data: FaqData }) {
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="2"
+          strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
           aria-hidden="true"
         >
-          <line x1="5" y1="12" x2="19" y2="12" />
-          <polyline points="12 5 19 12 12 19" />
+          <path d="M5 12h14M12 5l7 7-7 7" />
         </svg>
       </Link>
     </div>
