@@ -166,8 +166,8 @@ export function PricingHeaderBlockForm({ initial, pageKey }: PricingHeaderBlockF
         </legend>
         <p className="mt-1 text-xs text-[var(--bb-text-muted)]">
           Renders on the right of the header band as
-          <em> &ldquo;Need a custom plan? Let&apos;s talk&rdquo;</em>. Set all three fields to
-          show, or leave all three blank to hide.
+          <em> &ldquo;Need a custom plan? Let&apos;s talk&rdquo;</em>. Set all three fields to show,
+          or leave all three blank to hide.
         </p>
 
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
