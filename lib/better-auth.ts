@@ -94,6 +94,14 @@ export const auth = betterAuth({
   // Failures are logged for ops; the user is told to "check email" and
   // can request a resend if it didn't actually go out.
   emailVerification: {
+    // After clicking the verify link, BetterAuth signs the user in
+    // (autoSignInAfterVerification below) and then redirects here.
+    // Default is "/" (the marketing landing page) which leaves the user
+    // confused on prod — the route-by-role redirect that handles
+    // onboarding lives in app/login/page.tsx and never runs after
+    // verification. Send them to /onboarding directly; the page itself
+    // routes existing-company users away.
+    callbackURL: "/onboarding",
     // Don't send the verification email on demo — RESEND_API_KEY isn't
     // configured there, so it'd silently no-op while the user waits for
     // a link that never arrives. See `isDemoBuild` above.
