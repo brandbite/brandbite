@@ -137,6 +137,28 @@ export const auth = betterAuth({
   },
 
   // --------------------------------------------------------------------
+  // Error surfacing
+  //
+  // BetterAuth's default onError silently swallows any error whose
+  // message contains "column" / "relation" / "table" / "does not exist"
+  // (its naive Postgres-schema-mismatch detector at
+  // node_modules/better-auth/dist/api/index.mjs:185-190). When that
+  // happens the framework returns an empty 500 — which is what surfaced
+  // on the demo /login as "Sign up failed." with no detail and a 0-byte
+  // body that no amount of route-level catch wrapping could see.
+  //
+  // `onAPIError.throw: true` makes BetterAuth throw the underlying error
+  // instead of swallowing it. Our catch-all in app/api/auth/[...all]/
+  // route.ts then catches the real exception, logs the message + stack,
+  // and returns a structured JSON 500 the /login UI can surface. Schema
+  // mismatches turn into "ERROR: column ... does not exist" — the
+  // operator sees what's wrong and can run the missing migration.
+  // --------------------------------------------------------------------
+  onAPIError: {
+    throw: true,
+  },
+
+  // --------------------------------------------------------------------
   // Rate limiting — BetterAuth's built-in limiter.
   //
   // BetterAuth ships a DB-backed limiter with a default special rule
