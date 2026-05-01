@@ -99,6 +99,12 @@ jobs:
       # at the same URL. Required because prisma/schema.prisma declares
       # `directUrl = env("DIRECT_URL")`.
       DIRECT_URL: postgresql://postgres:postgres@localhost:5432/brandbite_test
+      # The auth-flow integration test exercises real BetterAuth sign-up,
+      # which calls `betterAuth({ secret })` at module load. Without a
+      # secret the factory throws and the test crashes during import.
+      # The value here is unused — sign-in cookies stay inside the test
+      # process — but it has to satisfy BetterAuth's length check.
+      BETTER_AUTH_SECRET: ci-only-secret-not-used-in-real-deploys
 
     steps:
       - name: Checkout
