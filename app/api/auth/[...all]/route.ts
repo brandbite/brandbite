@@ -163,13 +163,50 @@ async function gate(req: NextRequest): Promise<NextResponse | null> {
  * /login page can actually show the cause; in production we keep the
  * message generic to avoid leaking internals to the network.
  */
+/**
+ * Bound how long we'll wait for BetterAuth's POST pipeline before
+ * giving up. Vercel kills serverless functions at 10s on Hobby (60s on
+ * Pro); 8s here keeps us under either ceiling so we can return a
+ * structured error to the client instead of an empty 500 from the
+ * platform timeout.
+ *
+ * If this fires it means something downstream (DB write, email send,
+ * BetterAuth internal) is hanging. The error message includes that
+ * context so the /login UI can surface it and the operator can see
+ * what's stuck.
+ */
+const AUTH_HANDLER_TIMEOUT_MS = 8_000;
+
 export async function POST(req: NextRequest) {
+  // Snapshot the path early — a hung handler means we won't get to
+  // read req.url after the timeout fires, so capture it now.
+  const pathname = new URL(req.url).pathname;
+  const startedAt = Date.now();
   try {
     const limited = await gate(req);
     if (limited) return limited;
-    return await baseHandlers.POST(req);
+
+    const result = await Promise.race([
+      baseHandlers.POST(req),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () =>
+            reject(
+              new Error(
+                `Auth handler timed out after ${AUTH_HANDLER_TIMEOUT_MS}ms (path=${pathname})`,
+              ),
+            ),
+          AUTH_HANDLER_TIMEOUT_MS,
+        ),
+      ),
+    ]);
+    return result;
   } catch (err) {
-    console.error("[api/auth] POST handler crashed", err);
+    const elapsed = Date.now() - startedAt;
+    console.error(`[api/auth] POST handler crashed after ${elapsed}ms`, {
+      pathname,
+      error: err instanceof Error ? { message: err.message, stack: err.stack } : err,
+    });
     const message =
       process.env.NODE_ENV !== "production" && err instanceof Error
         ? `Auth handler crashed: ${err.message}`
