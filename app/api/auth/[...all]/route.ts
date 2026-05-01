@@ -231,6 +231,37 @@ export async function POST(req: NextRequest) {
         ),
       ),
     ]);
+
+    // BetterAuth itself sometimes RETURNS (rather than throws) a
+    // Response with status >= 500 and an empty body when its internal
+    // pipeline errors in a path that doesn't get formatted. Our
+    // try/catch only fires on throws, so an empty-body 500 would pass
+    // through unchanged and the /login UI surfaces "Sign up failed."
+    // with no detail. Inspect the response and re-shape it into a
+    // structured JSON body so the client sees a real message and we
+    // get a log line we can correlate with Vercel function logs.
+    if (result instanceof Response && result.status >= 500) {
+      let bodyText = "";
+      try {
+        bodyText = await result.clone().text();
+      } catch {
+        bodyText = "<unreadable>";
+      }
+      const elapsed = Date.now() - startedAt;
+      console.error(
+        `[api/auth] BetterAuth returned ${result.status} after ${elapsed}ms (path=${pathname}) body-preview=${JSON.stringify(bodyText).slice(0, 500)}`,
+      );
+      if (!bodyText.trim()) {
+        return NextResponse.json(
+          {
+            error: `Auth pipeline returned empty ${result.status} (path=${pathname}, elapsed=${elapsed}ms). Vercel function logs hold the upstream error.`,
+            message: "Sign-in service hit an internal error. Please try again in a moment.",
+          },
+          { status: result.status },
+        );
+      }
+    }
+
     return result;
   } catch (err) {
     const elapsed = Date.now() - startedAt;
