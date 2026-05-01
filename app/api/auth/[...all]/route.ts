@@ -269,8 +269,14 @@ export async function POST(req: NextRequest) {
       pathname,
       error: err instanceof Error ? { message: err.message, stack: err.stack } : err,
     });
+    // Expose the underlying error message in non-production OR when
+    // ALLOW_DEMO_IN_PROD=true (demo deploys want diagnostics over
+    // mystery). Real production without that flag returns a generic
+    // message so we don't leak internals to the network.
+    const showReal =
+      process.env.NODE_ENV !== "production" || process.env.ALLOW_DEMO_IN_PROD === "true";
     const message =
-      process.env.NODE_ENV !== "production" && err instanceof Error
+      showReal && err instanceof Error
         ? `Auth handler crashed: ${err.message}`
         : "Sign-in service is temporarily unavailable. Please try again in a moment.";
     return NextResponse.json({ error: message, message }, { status: 500 });
