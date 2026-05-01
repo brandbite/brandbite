@@ -1,10 +1,14 @@
 // -----------------------------------------------------------------------------
 // @file: proxy.ts
-// @purpose: Auth gateway — redirect unauthenticated users from protected routes.
-//           Dual mode: demo cookie (DEMO_MODE=true) or BetterAuth session cookie.
-// @version: v1.2.0
+// @purpose: Auth gateway — redirect unauthenticated users from protected
+//           routes. In demo mode either cookie counts (real BetterAuth
+//           session OR demo persona); outside demo only the BetterAuth
+//           session cookie does. The "real session also valid on demo"
+//           rule mirrors lib/auth.ts (PR #213) so signed-in users on the
+//           demo deploy can actually reach the protected APIs they own.
+// @version: v1.3.0
 // @status: active
-// @lastUpdate: 2026-02-22
+// @lastUpdate: 2026-05-01
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
@@ -97,16 +101,32 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Protected routes — check for auth cookie
+  // Protected routes — check for an auth cookie.
+  //
+  // Cookie presence only (no DB call). Whichever cookie we accept here,
+  // route-level getCurrentUserOrThrow() does the real validation and
+  // returns 401 if the cookie is bogus.
+  //
+  // BetterAuth's secure cookie name is `__Secure-better-auth.session_token`
+  // on HTTPS deploys (Vercel demo + prod), `better-auth.session_token` on
+  // plain HTTP (localhost). Check both so the gate behaves the same in
+  // every environment.
+  const sessionCookie =
+    request.cookies.get("better-auth.session_token")?.value ||
+    request.cookies.get("__Secure-better-auth.session_token")?.value;
+
   if (isDemoMode) {
-    // Demo mode: check bb-demo-user cookie
+    // Demo: either cookie is enough. Real signed-in user OR persona
+    // browser. Without this, a signed-in real user gets 307'd to /login
+    // on every protected request because their session cookie was
+    // ignored — the bug that surfaced as a non-JSON response in the
+    // /onboarding "Create Company" call.
     const demoCookie = request.cookies.get("bb-demo-user")?.value;
-    if (!demoCookie) {
+    if (!sessionCookie && !demoCookie) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
   } else {
-    // BetterAuth mode: check session cookie presence (no DB call)
-    const sessionCookie = request.cookies.get("better-auth.session_token")?.value;
+    // Outside demo: only the BetterAuth session cookie counts.
     if (!sessionCookie) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
