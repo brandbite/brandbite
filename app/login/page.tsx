@@ -109,9 +109,21 @@ export default function LoginPage() {
           setStatus("error");
           return;
         }
-        // Email verification is required before sign-in — BetterAuth has
-        // sent the link; send the user to the "check your email" notice.
-        router.push(`/verify-email?email=${encodeURIComponent(email.trim())}`);
+
+        // Try to sign in immediately. On the demo build (no
+        // RESEND_API_KEY), `requireEmailVerification` is off in
+        // lib/better-auth.ts, so this succeeds and lands the user in
+        // the app. In production it fails with EMAIL_NOT_VERIFIED and
+        // we fall through to /verify-email — same UX as before.
+        const { error: signInError } = await authClient.signIn.email({
+          email: email.trim(),
+          password,
+        });
+        if (signInError) {
+          router.push(`/verify-email?email=${encodeURIComponent(email.trim())}`);
+          return;
+        }
+        await handlePostLogin();
         return;
       }
 

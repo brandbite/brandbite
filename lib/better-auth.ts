@@ -24,6 +24,29 @@ const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 // attaches in plain HTTP — production deploys are always HTTPS via Vercel.
 const isProd = process.env.NODE_ENV === "production";
 
+// ---------------------------------------------------------------------------
+// Demo-build detection
+//
+// On the demo deployment (DEMO_MODE=true + ALLOW_DEMO_IN_PROD=true) we
+// don't have RESEND_API_KEY configured, so the verification email never
+// actually goes out — the user signs up, gets `emailVerified: false`, and
+// can never click the link to flip it. They're effectively locked out
+// even though the account row exists.
+//
+// To keep the demo loop usable we detect demo mode here and:
+//   - skip `sendOnSignUp` so we don't pretend to send an email
+//   - skip `requireEmailVerification` so the user can sign in immediately
+//
+// Real production (DEMO_MODE unset OR ALLOW_DEMO_IN_PROD unset) keeps the
+// full verification gate. Local dev (NODE_ENV !== "production" with
+// DEMO_MODE=true) also skips, which matches what every other demo-aware
+// gate in the app does (see `app/api/auth/[...all]/route.ts`'s
+// `showReal` check).
+// ---------------------------------------------------------------------------
+const isDemoBuild =
+  process.env.DEMO_MODE === "true" &&
+  (process.env.NODE_ENV !== "production" || process.env.ALLOW_DEMO_IN_PROD === "true");
+
 export const auth = betterAuth({
   baseURL: baseUrl,
   secret: process.env.BETTER_AUTH_SECRET,
@@ -71,7 +94,10 @@ export const auth = betterAuth({
   // Failures are logged for ops; the user is told to "check email" and
   // can request a resend if it didn't actually go out.
   emailVerification: {
-    sendOnSignUp: true,
+    // Don't send the verification email on demo — RESEND_API_KEY isn't
+    // configured there, so it'd silently no-op while the user waits for
+    // a link that never arrives. See `isDemoBuild` above.
+    sendOnSignUp: !isDemoBuild,
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, url }) => {
       try {
@@ -88,7 +114,9 @@ export const auth = betterAuth({
 
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: true,
+    // Demo skips verification because the email never actually sends
+    // there (no RESEND_API_KEY). Real production keeps the gate.
+    requireEmailVerification: !isDemoBuild,
     // Bump min length from the BetterAuth default of 8. Complexity rules
     // (uppercase, digit, symbol) enforced in the before-hook below, which
     // runs for both sign-up and reset-password.
