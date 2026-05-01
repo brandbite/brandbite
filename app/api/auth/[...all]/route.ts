@@ -149,10 +149,33 @@ async function gate(req: NextRequest): Promise<NextResponse | null> {
   return null;
 }
 
+/**
+ * Crash boundary around the BetterAuth POST handler. BetterAuth itself
+ * catches its own errors and returns structured JSON, but anything
+ * upstream of it (this gate, an env-config issue, a Prisma adapter
+ * crash, an email-template render error) bubbles past as an unhandled
+ * exception and Next.js returns a 500 with an empty body. Empty 500s
+ * surface in the /login UI as the unhelpful "Sign up failed." with no
+ * detail.
+ *
+ * Wrapping here means every failure mode gets a JSON body the client can
+ * surface. In non-production we include the error message so the
+ * /login page can actually show the cause; in production we keep the
+ * message generic to avoid leaking internals to the network.
+ */
 export async function POST(req: NextRequest) {
-  const limited = await gate(req);
-  if (limited) return limited;
-  return baseHandlers.POST(req);
+  try {
+    const limited = await gate(req);
+    if (limited) return limited;
+    return await baseHandlers.POST(req);
+  } catch (err) {
+    console.error("[api/auth] POST handler crashed", err);
+    const message =
+      process.env.NODE_ENV !== "production" && err instanceof Error
+        ? `Auth handler crashed: ${err.message}`
+        : "Sign-in service is temporarily unavailable. Please try again in a moment.";
+    return NextResponse.json({ error: message, message }, { status: 500 });
+  }
 }
 
 export const GET = baseHandlers.GET;

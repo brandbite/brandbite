@@ -128,6 +128,13 @@ function rateLimitInMemory(identifier: string, config: RateLimitConfig): RateLim
  * development.
  *
  * `identifier` scopes the counter (e.g. IP address, user ID, route name).
+ *
+ * Fail-open semantics: if the Upstash call throws (token revoked, host
+ * unreachable, Redis behind a firewall), we swallow the error, log a
+ * warning, and fall back to the in-memory limiter for that request. The
+ * alternative — letting the throw bubble up — would take down every auth
+ * endpoint (sign-in, sign-up, magic link) the moment Upstash hiccups,
+ * which is what surfaced as "Sign up failed." with empty 500s on demo.
  */
 export async function rateLimit(
   identifier: string,
@@ -135,12 +142,18 @@ export async function rateLimit(
 ): Promise<RateLimitResult> {
   const upstash = getUpstashLimiter(config);
   if (upstash) {
-    const result = await upstash.limit(identifier);
-    return {
-      allowed: result.success,
-      remaining: Math.max(0, result.remaining),
-      resetAt: result.reset,
-    };
+    try {
+      const result = await upstash.limit(identifier);
+      return {
+        allowed: result.success,
+        remaining: Math.max(0, result.remaining),
+        resetAt: result.reset,
+      };
+    } catch (err) {
+      // One-time-per-process warn so logs don't fill up — but loud
+      // enough that an ops scan sees it.
+      console.warn("[rate-limit] Upstash failed, falling back to in-memory", err);
+    }
   }
   return rateLimitInMemory(identifier, config);
 }
