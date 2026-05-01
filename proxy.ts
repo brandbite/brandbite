@@ -20,6 +20,13 @@ const PUBLIC_PATHS = [
   "/",
   "/login",
   "/reset-password",
+  // Post-signup landing page when email verification is required.
+  // Reached BEFORE the user has a session cookie, so it MUST be public —
+  // otherwise the proxy 307s to /login and the auto-sign-in fallback in
+  // app/login/page.tsx silently bounces, leaving the form stuck on
+  // "Please wait...". Surfaced when prod (DEMO_MODE off) enabled real
+  // verification.
+  "/verify-email",
   "/onboarding",
   "/invite", // covers /invite/[token]
   "/how-it-works",
