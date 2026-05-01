@@ -1,9 +1,10 @@
 // -----------------------------------------------------------------------------
 // @file: app/debug/demo-user/page.tsx
-// @purpose: Simple demo persona switcher (sets bb-demo-user cookie via API)
-// @version: v1.2.0
+// @purpose: Demo persona switcher — pick a persona to overlay, or clear the
+//           active persona to fall back to real BetterAuth auth.
+// @version: v1.3.0
 // @status: active
-// @lastUpdate: 2025-11-15
+// @lastUpdate: 2026-05-01
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -18,7 +19,28 @@ const personas = DEMO_PERSONAS;
 export default function DebugDemoUserPage() {
   const router = useRouter();
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [clearing, setClearing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleClearPersona = async () => {
+    setError(null);
+    setClearing(true);
+    try {
+      const res = await fetch("/api/debug/demo-user", { method: "DELETE" });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(json?.error || "Failed to clear persona. Please try again.");
+        return;
+      }
+      router.push("/");
+      router.refresh();
+    } catch (err) {
+      console.error("[debug.demo-user] clear error", err);
+      setError("Unexpected error while clearing persona.");
+    } finally {
+      setClearing(false);
+    }
+  };
 
   const handleSelectPersona = async (personaId: string, redirectTo: string) => {
     setError(null);
@@ -78,6 +100,29 @@ export default function DebugDemoUserPage() {
               {error}
             </InlineAlert>
           )}
+
+          {/* Clear persona — leaves demo overlay so getCurrentUser falls
+              through to BetterAuth. Useful when a real signed-in user
+              wants to see their own account instead of a persona. */}
+          <div className="mb-4 flex items-center justify-between rounded-xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-card)] px-4 py-3">
+            <div>
+              <p className="text-[12px] font-semibold text-[var(--bb-secondary)]">
+                Clear active persona
+              </p>
+              <p className="mt-0.5 text-[11px] text-[var(--bb-text-muted)]">
+                Removes the persona overlay and uses your real signed-in account (or signs you out
+                of demo if you have no account).
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleClearPersona}
+              disabled={clearing}
+              className="shrink-0 rounded-full border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-1.5 text-[11px] font-medium text-[var(--bb-secondary)] transition hover:border-[var(--bb-primary)]/40 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {clearing ? "Clearing…" : "Clear persona"}
+            </button>
+          </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             {personas.map((p) => {

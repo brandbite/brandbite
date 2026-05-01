@@ -1,11 +1,13 @@
 // -----------------------------------------------------------------------------
 // @file: lib/auth.ts
-// @purpose: Auth integration boundary — dual mode (demo cookie + BetterAuth).
-//           DEMO_MODE=true  → demo persona cookie → email → UserAccount
-//           DEMO_MODE=false → BetterAuth session → authUserId → UserAccount
-// @version: v1.0.0
+// @purpose: Auth integration boundary. Real BetterAuth sessions ALWAYS win;
+//           the demo persona cookie is only consulted when no real session
+//           exists and DEMO_MODE is on. Previously the order was reversed
+//           and a stale persona cookie silently masked a freshly signed-in
+//           user — the "Sign in to demo, still see Site Owner persona" bug.
+// @version: v2.0.0
 // @status: active
-// @lastUpdate: 2026-02-22
+// @lastUpdate: 2026-05-01
 // -----------------------------------------------------------------------------
 
 import { cookies, headers } from "next/headers";
@@ -34,14 +36,23 @@ const isDemoMode = () => {
 
 /**
  * Resolve the current authenticated user.
- * Returns null if not authenticated. The underlying mechanism depends on
- * DEMO_MODE: demo cookie in dev, BetterAuth session in production.
+ * Returns null if not authenticated.
+ *
+ * Order of precedence (intentional — see file header):
+ *   1. Real BetterAuth session, if one is active.
+ *   2. Demo persona cookie, when DEMO_MODE is on AND no real session.
+ *   3. null.
+ *
+ * This ordering means once a user signs in for real on a demo deploy,
+ * they see THEIR account, not whichever persona was clicked earlier.
  */
 export async function getCurrentUser(): Promise<SessionUser | null> {
+  const real = await getCurrentUserFromBetterAuth();
+  if (real) return real;
   if (isDemoMode()) {
     return getCurrentUserFromDemo();
   }
-  return getCurrentUserFromBetterAuth();
+  return null;
 }
 
 /**
@@ -93,7 +104,10 @@ async function getCurrentUserFromDemo(): Promise<SessionUser | null> {
 // ---------------------------------------------------------------------------
 
 async function getCurrentUserFromBetterAuth(): Promise<SessionUser | null> {
-  // Dynamic import to avoid loading BetterAuth when in demo mode
+  // Dynamic import keeps BetterAuth out of the cold-start critical path.
+  // BetterAuth.getSession() is cookie-gated internally — no session cookie
+  // means an early return with no DB query, so calling this on every
+  // request (including demo-mode requests with no real session) is cheap.
   const { auth } = await import("@/lib/better-auth");
 
   const session = await auth.api.getSession({
