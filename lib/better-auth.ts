@@ -30,6 +30,34 @@ export const auth = betterAuth({
 
   database: prismaAdapter(prisma, { provider: "postgresql" }),
 
+  // --------------------------------------------------------------------
+  // Prisma model-name overrides
+  //
+  // Our Prisma schema names the auth tables `AuthUser`, `AuthSession`,
+  // `AuthAccount`, `AuthVerification` (each `@@map`-ed to the lowercase
+  // SQL table BetterAuth expects: `user`, `session`, etc.). The SQL
+  // table names match BetterAuth's expectations, but the Prisma client
+  // METHOD names follow the model name — `prisma.authUser`, not
+  // `prisma.user`. BetterAuth's Prisma adapter calls `db[model].create()`
+  // using the model name it was told about, so without these overrides
+  // it does `db.user.create()` and gets:
+  //
+  //   "Model user does not exist in the database. If you haven't
+  //    generated the Prisma client, you need to run 'npx prisma generate'"
+  //
+  // (This is the actual error that was masquerading as the "Sign up
+  // failed." empty-500 on demo for hours — BetterAuth's onError swallows
+  // anything containing the words "column" / "table" / "does not exist"
+  // and returns nothing, which the framework defaults to empty 500.)
+  //
+  // Tell BetterAuth our Prisma model names. The adapter takes the
+  // string verbatim and does `db[modelName]`, so we use the camelCase
+  // form Prisma generates (`authUser`, not `AuthUser`).
+  // --------------------------------------------------------------------
+  user: { modelName: "authUser" },
+  account: { modelName: "authAccount" },
+  verification: { modelName: "authVerification" },
+
   // Email verification — users who sign up with email+password must click
   // a verification link before they can sign in. Template lives in
   // lib/email-templates/auth/verify-email.tsx so the HTML stays brand-
@@ -132,6 +160,7 @@ export const auth = betterAuth({
   ],
 
   session: {
+    modelName: "authSession",
     expiresIn: 60 * 60 * 24 * 7, // 7 days
     updateAge: 60 * 60 * 24, // refresh daily
   },
