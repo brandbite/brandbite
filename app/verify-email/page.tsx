@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { authClient } from "@/lib/auth-client";
+import { mapAuthError, type AuthClientError } from "@/lib/auth-error-messages";
 
 export default function VerifyEmailPage() {
   const router = useRouter();
@@ -54,9 +55,11 @@ export default function VerifyEmailPage() {
       } else {
         const { error: sendErr } = await client.sendVerificationEmail({
           email,
-          callbackURL: "/login",
+          callbackURL: "/onboarding",
         });
-        if (sendErr) throw new Error(sendErr.message || "Resend failed");
+        if (sendErr) {
+          throw new Error(mapAuthError(sendErr as AuthClientError, "Could not resend the email."));
+        }
       }
       setResentAt(new Date());
     } catch (err) {

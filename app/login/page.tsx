@@ -12,6 +12,11 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
+import {
+  isUnverifiedEmailError,
+  mapAuthError,
+  type AuthClientError,
+} from "@/lib/auth-error-messages";
 import { PASSWORD_POLICY_BULLETS, validatePasswordStrength } from "@/lib/password-policy";
 import { PasswordInput } from "@/components/ui/password-input";
 
@@ -105,25 +110,33 @@ export default function LoginPage() {
           name: name.trim() || email.trim().split("@")[0],
         });
         if (signUpError) {
-          setError(signUpError.message || "Sign up failed.");
+          setError(mapAuthError(signUpError as AuthClientError, "Sign up failed."));
           setStatus("error");
           return;
         }
 
-        // Try to sign in immediately. On the demo build (no
-        // RESEND_API_KEY), `requireEmailVerification` is off in
-        // lib/better-auth.ts, so this succeeds and lands the user in
-        // the app. In production it fails with EMAIL_NOT_VERIFIED and
-        // we fall through to /verify-email — same UX as before.
-        const { error: signInError } = await authClient.signIn.email({
-          email: email.trim(),
-          password,
-        });
-        if (signInError) {
-          router.push(`/verify-email?email=${encodeURIComponent(email.trim())}`);
-          return;
+        // On demo (DEMO_MODE=true), email verification is disabled in
+        // lib/better-auth.ts, so the user can sign in immediately.
+        // Auto-attempt sign-in and route by role.
+        if (isDemoMode) {
+          const { error: signInError } = await authClient.signIn.email({
+            email: email.trim(),
+            password,
+          });
+          if (!signInError) {
+            await handlePostLogin();
+            return;
+          }
+          // Demo edge case (sign-in failed despite verification being
+          // off) — fall through to the verify-email page so the user has
+          // a clear next step instead of a stuck form.
         }
-        await handlePostLogin();
+
+        // Real prod flow: sign-up succeeded, BetterAuth has dispatched
+        // a verification email, the user has no session yet. Show them
+        // the "check your inbox" page directly. Resending or escaping
+        // happens from there.
+        router.push(`/verify-email?email=${encodeURIComponent(email.trim())}`);
         return;
       }
 
@@ -132,15 +145,11 @@ export default function LoginPage() {
         password,
       });
       if (signInError) {
-        const msg = (signInError.message || "").toLowerCase();
-        const code = (signInError as { code?: string }).code ?? "";
-        const looksUnverified =
-          msg.includes("verif") || code.toUpperCase().includes("EMAIL_NOT_VERIFIED");
-        if (looksUnverified) {
+        if (isUnverifiedEmailError(signInError as AuthClientError)) {
           router.push(`/verify-email?email=${encodeURIComponent(email.trim())}&reason=unverified`);
           return;
         }
-        setError(signInError.message || "Invalid email or password.");
+        setError(mapAuthError(signInError as AuthClientError, "Invalid email or password."));
         setStatus("error");
         return;
       }
@@ -173,7 +182,7 @@ export default function LoginPage() {
       });
 
       if (mlError) {
-        setError(mlError.message || "Failed to send magic link.");
+        setError(mapAuthError(mlError as AuthClientError, "Failed to send magic link."));
         setStatus("error");
         return;
       }
