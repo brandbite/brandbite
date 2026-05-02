@@ -108,6 +108,15 @@ export default function LoginPage() {
           email: email.trim(),
           password,
           name: name.trim() || email.trim().split("@")[0],
+          // Where to land the user AFTER they click the verification link.
+          // BetterAuth bakes this into the verify-email URL it puts in the
+          // mail (see node_modules/better-auth/dist/api/routes/sign-up.mjs:197).
+          // Without it, the default is "/" — which dropped freshly-verified
+          // users on the marketing landing page instead of the onboarding
+          // wizard. PR #215 tried to fix this via the global
+          // emailVerification.callbackURL config option but BetterAuth doesn't
+          // read that for the sign-up flow; only the request body counts.
+          callbackURL: "/onboarding",
         });
         if (signUpError) {
           setError(mapAuthError(signUpError as AuthClientError, "Sign up failed."));
