@@ -2,12 +2,17 @@
 // @file: lib/auth.ts
 // @purpose: Auth integration boundary. Real BetterAuth sessions ALWAYS win;
 //           the demo persona cookie is only consulted when no real session
-//           exists and DEMO_MODE is on. Previously the order was reversed
-//           and a stale persona cookie silently masked a freshly signed-in
-//           user — the "Sign in to demo, still see Site Owner persona" bug.
-// @version: v2.0.0
+//           exists and DEMO_MODE is on.
+//
+//           Also implements the BOOTSTRAP_SITE_OWNER_EMAIL convention: when
+//           the env var lists a comma-separated set of addresses, the first
+//           sign-in for each (or any subsequent sign-in if the role hasn't
+//           caught up) auto-promotes the UserAccount to SITE_OWNER. Lets
+//           the operator designate the first owner on a fresh deploy
+//           without running SQL by hand.
+// @version: v2.1.0
 // @status: active
-// @lastUpdate: 2026-05-01
+// @lastUpdate: 2026-05-02
 // -----------------------------------------------------------------------------
 
 import { cookies, headers } from "next/headers";
@@ -29,6 +34,32 @@ const isDemoMode = () => {
   if (process.env.NODE_ENV !== "production") return true;
   return process.env.ALLOW_DEMO_IN_PROD === "true";
 };
+
+/**
+ * Parse the BOOTSTRAP_SITE_OWNER_EMAIL env var into a list of normalized
+ * lowercase emails. Comma-separated, whitespace tolerant. Returns an
+ * empty array when the var is unset, which disables the feature.
+ *
+ * Used by the auto-create / first-login path to grant SITE_OWNER to
+ * specific addresses without running ad-hoc SQL. Designed for the
+ * bootstrap moment after a fresh deploy or DB wipe — set the var, sign
+ * up, optionally unset and redeploy. Re-using the same email later is a
+ * no-op (we only update the role when it isn't already SITE_OWNER).
+ */
+function parseBootstrapEmails(): string[] {
+  const raw = process.env.BOOTSTRAP_SITE_OWNER_EMAIL ?? "";
+  return raw
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter((e) => e.length > 0 && e.includes("@"));
+}
+
+/** True when this email should be auto-promoted to SITE_OWNER on first
+ *  sign-in. Case-insensitive match. */
+function shouldBootstrapAsSiteOwner(email: string): boolean {
+  const normalized = email.trim().toLowerCase();
+  return parseBootstrapEmails().includes(normalized);
+}
 
 // ---------------------------------------------------------------------------
 // Public API (unchanged signatures — used by all 59 API routes)
@@ -149,17 +180,39 @@ async function getCurrentUserFromBetterAuth(): Promise<SessionUser | null> {
         include: { companies: true },
       });
     } else {
-      // Create new UserAccount — default to CUSTOMER for self-service signups
+      // Create new UserAccount — bootstrap-listed emails get SITE_OWNER
+      // straight away so the operator doesn't have to follow up with a
+      // SQL UPDATE. Everyone else lands as CUSTOMER, the default role
+      // for self-service signups.
+      const initialRole = shouldBootstrapAsSiteOwner(authEmail) ? "SITE_OWNER" : "CUSTOMER";
+      if (initialRole === "SITE_OWNER") {
+        console.log(
+          `[auth] bootstrapping ${authEmail} as SITE_OWNER via BOOTSTRAP_SITE_OWNER_EMAIL`,
+        );
+      }
       user = await prisma.userAccount.create({
         data: {
           authUserId,
           email: authEmail,
           name: authName || null,
-          role: "CUSTOMER",
+          role: initialRole,
         },
         include: { companies: true },
       });
     }
+  }
+
+  // Late-bootstrap: if the env var was set AFTER an account already existed
+  // (e.g. operator forgot to set it before signing up, or invitation
+  // pre-created the row as a non-owner), promote on next sign-in. Idempotent:
+  // a user already at SITE_OWNER is left alone, no needless write.
+  if (shouldBootstrapAsSiteOwner(user.email) && user.role !== "SITE_OWNER") {
+    console.log(`[auth] promoting ${user.email} to SITE_OWNER via BOOTSTRAP_SITE_OWNER_EMAIL`);
+    user = await prisma.userAccount.update({
+      where: { id: user.id },
+      data: { role: "SITE_OWNER" },
+      include: { companies: true },
+    });
   }
 
   const primaryMembership = user.companies[0] ?? null;

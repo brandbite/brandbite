@@ -20,6 +20,14 @@ This reference lists every env var the app reads, which environments need it, an
 | `NEXT_PUBLIC_APP_URL` | ✅ Required      | Stripe redirects, Google OAuth                           | Stripe + Google redirects fall back to `localhost:3000`. Must be prod URL.                                                                                                                                                                                              |
 | `NODE_ENV`            | ✅ Required      | Various gates (demo mode, etc.)                          | Vercel sets this automatically.                                                                                                                                                                                                                                         |
 
+## Bootstrap
+
+| Var                          | Required in Prod | Used by       | What happens if missing                                                                                                                                                                                                                                                                                            |
+| ---------------------------- | ---------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `BOOTSTRAP_SITE_OWNER_EMAIL` | Optional         | `lib/auth.ts` | Comma-separated emails (e.g. `owner@brandbite.studio,co@brandbite.studio`). On first sign-in for any listed address, the user's role is auto-set to `SITE_OWNER`. Without it, fresh deploys have zero site owners and the operator must manually run `UPDATE "UserAccount" SET role='SITE_OWNER' WHERE email='…'`. |
+
+Set this on Vercel for the prod project before signing up the first owner. Idempotent — safe to leave set; only takes effect when role isn't already `SITE_OWNER`. Once your owner accounts exist you can remove it (no functional impact either way).
+
 ## Payments (Stripe)
 
 | Var                     | Required in Prod | Used by                | What happens if missing                                                  |
