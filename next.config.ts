@@ -45,12 +45,20 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com",
+      // - js.stripe.com: Stripe.js for checkout
+      // - challenges.cloudflare.com: Cloudflare Turnstile widget script (PR #218)
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://challenges.cloudflare.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob: https://*.r2.cloudflarestorage.com https://placehold.co https://img.youtube.com https://i.ytimg.com https://i3.ytimg.com https://i.vimeocdn.com",
-      "connect-src 'self' https://api.stripe.com https://*.ingest.sentry.io",
-      "frame-src https://js.stripe.com https://www.youtube.com https://player.vimeo.com https://www.loom.com",
+      // - api.stripe.com: Stripe.js calls home from the browser during checkout
+      // - sentry: error reporting
+      // - challenges.cloudflare.com: Turnstile widget posts the token here for verification
+      "connect-src 'self' https://api.stripe.com https://*.ingest.sentry.io https://challenges.cloudflare.com",
+      // - js.stripe.com: Stripe checkout iframe
+      // - challenges.cloudflare.com: Turnstile renders inside an iframe, must be allowed here
+      // - youtube/vimeo/loom: embedded media
+      "frame-src https://js.stripe.com https://challenges.cloudflare.com https://www.youtube.com https://player.vimeo.com https://www.loom.com",
       "worker-src 'self' blob:",
       "object-src 'none'",
       "base-uri 'self'",
