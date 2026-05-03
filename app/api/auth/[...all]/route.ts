@@ -26,6 +26,12 @@ import { turnstileErrorMessage, verifyTurnstileToken } from "@/lib/turnstile";
 const SENSITIVE_PATTERNS = [
   /\/sign-in(\/|$)/,
   /\/sign-up(\/|$)/,
+  // BetterAuth ≥1.4 calls this `/request-password-reset`. The legacy
+  // `/forget-password` and `/forgot-password` patterns are kept so any
+  // older client still in the wild also lands in the sensitive bucket
+  // (they'll 404 downstream from BetterAuth, but the rate limiter
+  // should still fire for that probe traffic).
+  /\/request-password-reset(\/|$)/,
   /\/forget-password(\/|$)/,
   /\/forgot-password(\/|$)/,
   /\/reset-password(\/|$)/,
@@ -39,6 +45,9 @@ const SENSITIVE_PATTERNS = [
  *  both. Keys are substrings matched against the pathname. */
 const EMAIL_BUCKET_PATHS = [
   "/sign-in",
+  // Current BetterAuth (≥1.4) endpoint name; the two legacy spellings
+  // below stay so probes against the old paths also hit the bucket.
+  "/request-password-reset",
   "/forget-password",
   "/forgot-password",
   "/send-verification-email",
