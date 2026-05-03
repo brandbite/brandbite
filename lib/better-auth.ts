@@ -255,7 +255,7 @@ export const auth = betterAuth({
       "/sign-in/email": { window: 60, max: 50 },
       "/sign-in/magic-link": { window: 60, max: 50 },
       "/sign-up/email": { window: 60, max: 50 },
-      "/forget-password": { window: 60, max: 50 },
+      "/request-password-reset": { window: 60, max: 50 },
       "/reset-password": { window: 60, max: 50 },
       "/change-password": { window: 60, max: 50 },
       "/change-email": { window: 60, max: 50 },

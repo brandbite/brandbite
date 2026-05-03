@@ -44,7 +44,11 @@ export default function ResetPasswordPage() {
     setStatus("submitting");
 
     try {
-      const res = await fetch("/api/auth/forget-password", {
+      // Better Auth ≥1.4 renamed this endpoint from `/forget-password`
+      // to `/request-password-reset`. Keep the fetch (rather than
+      // authClient.requestPasswordReset) so the existing JSON error
+      // shape `{ message }` continues to flow through unchanged.
+      const res = await fetch("/api/auth/request-password-reset", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
