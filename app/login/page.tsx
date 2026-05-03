@@ -8,9 +8,10 @@
 
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 import { authClient } from "@/lib/auth-client";
 import {
   isUnverifiedEmailError,
@@ -39,8 +40,11 @@ export default function LoginPage() {
   const [name, setName] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileInstance | null>(null);
 
   const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
 
   // ---------------------------------------------------------------------------
   // Post-login redirect
@@ -104,6 +108,16 @@ export default function LoginPage() {
 
     try {
       if (mode === "signup") {
+        // Turnstile gate — when the site key is present we require a token
+        // before submitting. The widget renders below the form; this check
+        // makes the failure UX immediate rather than letting the server
+        // reject after a roundtrip.
+        if (turnstileSiteKey && !turnstileToken) {
+          setError("Please complete the security check below before submitting.");
+          setStatus("error");
+          return;
+        }
+
         const { error: signUpError } = await authClient.signUp.email({
           email: email.trim(),
           password,
@@ -113,12 +127,23 @@ export default function LoginPage() {
           // mail (see node_modules/better-auth/dist/api/routes/sign-up.mjs:197).
           // Without it, the default is "/" — which dropped freshly-verified
           // users on the marketing landing page instead of the onboarding
-          // wizard. PR #215 tried to fix this via the global
-          // emailVerification.callbackURL config option but BetterAuth doesn't
-          // read that for the sign-up flow; only the request body counts.
+          // wizard.
           callbackURL: "/onboarding",
-        });
+          // Cloudflare Turnstile token. The auth catch-all verifies it
+          // server-side via lib/turnstile.ts before BetterAuth's handler
+          // runs. Empty string when Turnstile isn't configured (local dev,
+          // CI) — the server-side check fails open in that case.
+          turnstileToken: turnstileToken ?? "",
+          // BetterAuth's body schema is .and(z.record(z.any())) so unknown
+          // fields like turnstileToken pass through. Cast keeps TS happy
+          // since the SDK's inferred body type doesn't include them.
+        } as unknown as Parameters<typeof authClient.signUp.email>[0]);
         if (signUpError) {
+          // Refresh the Turnstile token — it's single-use, even on the
+          // server side. If we don't reset, the next submit re-uses the
+          // already-spent token and gets 403'd.
+          turnstileRef.current?.reset();
+          setTurnstileToken(null);
           setError(mapAuthError(signUpError as AuthClientError, "Sign up failed."));
           setStatus("error");
           return;
@@ -403,6 +428,27 @@ export default function LoginPage() {
                 </Link>
               )}
             </div>
+
+            {/* Cloudflare Turnstile — anti-bot challenge on signup only.
+                "Managed" mode means most humans see nothing (invisible);
+                bots and suspicious traffic get an interactive challenge.
+                We only render this when the site key is configured —
+                local dev/CI without Cloudflare keeps working. */}
+            {mode === "signup" && turnstileSiteKey && (
+              <div className="flex justify-center pt-1">
+                <Turnstile
+                  ref={turnstileRef}
+                  siteKey={turnstileSiteKey}
+                  onSuccess={(token) => setTurnstileToken(token)}
+                  onError={() => setTurnstileToken(null)}
+                  onExpire={() => setTurnstileToken(null)}
+                  options={{
+                    theme: "light",
+                    size: "flexible",
+                  }}
+                />
+              </div>
+            )}
 
             {/* Error message — aria-describedby on each input above points
                 at this id so screen readers associate the error with the
