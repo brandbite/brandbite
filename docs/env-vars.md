@@ -53,6 +53,15 @@ This reference lists every env var the app reads, which environments need it, an
 | `RESEND_API_KEY` | ✅ Required      | `lib/email.ts` | Password reset + verification emails silently no-op. Users can't sign up.          |
 | `EMAIL_FROM`     | Recommended      | `lib/email.ts` | Defaults to `"BrandBite <notifications@brandbite.studio>"`. Needs verified domain. |
 
+## Anti-bot (Cloudflare Turnstile)
+
+| Var                              | Required in Prod | Used by                     | What happens if missing                                                                                             |
+| -------------------------------- | ---------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | ✅ Required      | `app/login/page.tsx` widget | Widget never renders → no token sent → server-side verifier fails open (when secret also unset) or rejects.         |
+| `TURNSTILE_SECRET_KEY`           | ✅ Required      | `lib/turnstile.ts`          | Server-side Turnstile gate falls open (logs a warning). Bots can sign up freely. Only acceptable in local dev / CI. |
+
+Get both at: Cloudflare dashboard → Turnstile → Add site → choose "Managed" mode.
+
 ## Google Calendar OAuth (consultation feature)
 
 | Var                          | Required in Prod        | Used by               | What happens if missing                                                          |

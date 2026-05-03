@@ -19,6 +19,7 @@ import { toNextJsHandler } from "better-auth/next-js";
 
 import { auth } from "@/lib/better-auth";
 import { getClientIp, rateLimit } from "@/lib/rate-limit";
+import { turnstileErrorMessage, verifyTurnstileToken } from "@/lib/turnstile";
 
 /** Auth endpoints that deserve tighter limits (write-style, brute-force
  *  targets). Everything else falls through to the broader bucket. */
@@ -44,8 +45,19 @@ const EMAIL_BUCKET_PATHS = [
   "/magic-link",
 ];
 
+/** Paths where the Turnstile CAPTCHA is required. Only sign-up for now —
+ *  the other email-sending endpoints already have aggressive per-email
+ *  rate limits (5/15min). Sign-up has no per-email limit because every
+ *  attempt is by definition a different email; Turnstile is the
+ *  abuse-prevention layer there. Extend this list as needed. */
+const TURNSTILE_PATTERNS = [/\/sign-up(\/|$)/];
+
 function isSensitive(pathname: string): boolean {
   return SENSITIVE_PATTERNS.some((re) => re.test(pathname));
+}
+
+function needsTurnstile(pathname: string): boolean {
+  return TURNSTILE_PATTERNS.some((re) => re.test(pathname));
 }
 
 function needsEmailBucket(pathname: string): boolean {
@@ -76,6 +88,23 @@ async function extractEmail(req: NextRequest): Promise<string | null> {
     // can't meaningfully throttle on. Real validation happens downstream.
     if (email.length > 320 || !email.includes("@")) return null;
     return email;
+  } catch {
+    return null;
+  }
+}
+
+/** Read `turnstileToken` off the JSON body. Returns null if absent or
+ *  malformed; the caller decides whether that's a fatal error.  */
+async function extractTurnstileToken(req: NextRequest): Promise<string | null> {
+  try {
+    const cloned = req.clone();
+    const contentType = cloned.headers.get("content-type") ?? "";
+    if (!contentType.includes("application/json")) return null;
+    const body = (await cloned.json().catch(() => null)) as { turnstileToken?: unknown } | null;
+    if (!body) return null;
+    const token = typeof body.turnstileToken === "string" ? body.turnstileToken.trim() : null;
+    if (!token || token.length < 10) return null;
+    return token;
   } catch {
     return null;
   }
@@ -114,6 +143,21 @@ async function gate(req: NextRequest): Promise<NextResponse | null> {
       { ...body, error: body.message },
       { status: 429, headers: { "Retry-After": String(retryAfter) } },
     );
+  }
+
+  // Layer 1.5 — Turnstile CAPTCHA on sign-up.
+  //
+  // Verified BEFORE the per-email bucket because failed Turnstile
+  // verifications shouldn't burn a victim's per-email quota. Skipped
+  // when TURNSTILE_SECRET_KEY isn't set (lib/turnstile.ts fails open
+  // for dev/CI).
+  if (needsTurnstile(pathname)) {
+    const token = await extractTurnstileToken(req);
+    const result = await verifyTurnstileToken(token, ip);
+    if (!result.ok) {
+      const message = turnstileErrorMessage(result.reason);
+      return NextResponse.json({ message, error: message }, { status: 403 });
+    }
   }
 
   // Layer 2 — per-email bucket (only on paths that take an email). Quiet
