@@ -14,4 +14,5 @@ export * from "./admin-settings.schemas";
 export * from "./plan-assignment.schemas";
 export * from "./payout-rule.schemas";
 export * from "./job-type-category.schemas";
+export * from "./talent-application.schemas";
 export * from "./ticket-update.schemas";
