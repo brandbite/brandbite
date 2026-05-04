@@ -628,3 +628,24 @@ export function findCountryByName(name: string | null | undefined): CountryRow |
 
 /** Sorted name list for any UI that just needs strings. */
 export const COUNTRY_NAMES: string[] = COUNTRIES.map((c) => c.name);
+
+/** Convert an ISO 3166-1 alpha-2 code to its emoji flag.
+ *
+ * Uses the Unicode regional-indicator-symbol trick: a flag emoji is two
+ * regional indicators glued together, where each indicator is the letter
+ * shifted to the U+1F1E6..U+1F1FF block ('A' → 🇦, 'B' → 🇧, …). Render
+ * support is universal in modern browsers + macOS / iOS; on Windows the
+ * symbols render as plain letter pairs ("DE", "TR") which is degraded
+ * but not broken — the picker UI still works because the country name
+ * + dial code are always shown next to the flag.
+ *
+ * Returns the empty string for invalid input so callers can render
+ * something sensible without null-checking. */
+export function isoToFlag(iso2: string | null | undefined): string {
+  if (!iso2 || iso2.length !== 2) return "";
+  const upper = iso2.toUpperCase();
+  if (!/^[A-Z]{2}$/.test(upper)) return "";
+  const a = upper.charCodeAt(0) - 0x41 + 0x1f1e6;
+  const b = upper.charCodeAt(1) - 0x41 + 0x1f1e6;
+  return String.fromCodePoint(a, b);
+}

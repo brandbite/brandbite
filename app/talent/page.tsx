@@ -22,6 +22,7 @@ import Link from "next/link";
 import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 
 import { Button } from "@/components/ui/button";
+import { CountryCodePicker } from "@/components/ui/country-code-picker";
 import { FormInput, FormSelect, FormTextarea } from "@/components/ui/form-field";
 import { COUNTRIES, findCountryByIso } from "@/lib/countries";
 import {
@@ -455,34 +456,41 @@ export default function TalentApplicationPage() {
               />
             </Field>
             <Field label="WhatsApp number" required htmlFor="t-whatsapp-local">
-              {/* Two-input pattern: dial-code dropdown sets the country
-                  prefix, local input takes the rest. The submitted value
-                  is the concatenated E.164 string (see `whatsappNumber`
-                  derived above) so the API/DB shape doesn't change. */}
-              <div className="grid grid-cols-[160px_1fr] gap-2">
-                <FormSelect
+              {/* PR6: replaced the native dial-code <select> with a
+                  searchable CountryCodePicker (flag trigger + popover with
+                  search + filtered list). The trigger, dial-code prefix
+                  label, and local-number input live inside the same
+                  rounded container so visually it reads as one combined
+                  control. The picker manages no submission state itself
+                  — we still own `whatsappCountryIso` + `whatsappLocal`
+                  here and derive the E.164 submit string from them. */}
+              <div className="flex items-stretch">
+                <CountryCodePicker
                   id="t-whatsapp-cc"
-                  aria-label="Country code"
+                  ariaLabel="WhatsApp country code"
                   value={whatsappCountryIso}
-                  onChange={(e) => setWhatsappCountryIso(e.target.value)}
-                  aria-required
-                >
-                  <option value="">Code</option>
-                  {COUNTRIES.map((c) => (
-                    <option key={`wa-${c.iso2}`} value={c.iso2}>
-                      {c.dialCode} ({c.iso2}) {c.name}
-                    </option>
-                  ))}
-                </FormSelect>
-                <FormInput
+                  onChange={setWhatsappCountryIso}
+                />
+                {whatsappDialCode && (
+                  <span
+                    aria-hidden
+                    className="flex items-center border-y border-[var(--bb-border)] bg-white px-2 text-sm text-[var(--bb-text-muted)]"
+                  >
+                    {whatsappDialCode}
+                  </span>
+                )}
+                <input
                   id="t-whatsapp-local"
+                  type="text"
                   value={whatsappLocal}
                   onChange={(e) => setWhatsappLocal(e.target.value)}
                   aria-required
                   inputMode="tel"
                   autoComplete="tel-national"
-                  placeholder="555 555 5555"
+                  placeholder={whatsappDialCode ? "555 555 5555" : "Pick a country first"}
                   maxLength={24}
+                  disabled={!whatsappCountryIso}
+                  className="h-10 flex-1 rounded-r-xl border border-l-0 border-[var(--bb-border)] bg-white px-3 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] disabled:bg-[var(--bb-bg-warm)] disabled:opacity-60"
                 />
               </div>
             </Field>
