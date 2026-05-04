@@ -164,6 +164,15 @@ describe("isPublicPath", () => {
     "/talent",
     "/api/talent/categories",
     "/api/talent/applications",
+    // PR4 — tokenized booking page reachable only via the email link.
+    // Covered by the existing /talent and /api/talent prefix entries
+    // (proxy uses startsWith), but pin the dynamic-segment shapes
+    // explicitly so a refactor that tightens the matcher to exact
+    // equality doesn't silently break the booking flow.
+    "/talent/schedule/EXAMPLE_TOKEN",
+    "/api/talent/schedule/EXAMPLE_TOKEN",
+    "/api/talent/schedule/EXAMPLE_TOKEN/pick",
+    "/api/talent/schedule/EXAMPLE_TOKEN/propose",
   ]) {
     it(`marks ${publicTalentPath} as public`, () => {
       expect(isPublicPath(publicTalentPath)).toBe(true);

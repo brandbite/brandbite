@@ -28,7 +28,13 @@ import { useToast } from "@/components/ui/toast-provider";
 // Mirror the API response shape. We avoid importing the route module
 // because Next.js client components can't import server-only modules
 // (the route imports prisma).
-type TalentApplicationStatus = "SUBMITTED" | "IN_REVIEW" | "ACCEPTED" | "DECLINED";
+type TalentApplicationStatus =
+  | "SUBMITTED"
+  | "IN_REVIEW"
+  | "AWAITING_CANDIDATE_CHOICE"
+  | "CANDIDATE_PROPOSED_TIME"
+  | "ACCEPTED"
+  | "DECLINED";
 
 type Application = {
   id: string;
@@ -62,6 +68,11 @@ type Application = {
   meetLink: string | null;
   interviewAt: string | null;
   declineReason: string | null;
+  // PR4 — 3-slot booking flow
+  proposedSlotsJson: unknown;
+  bookingTokenExpiresAt: string | null;
+  customMessage: string | null;
+  candidateProposedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -71,16 +82,20 @@ type Filter = TalentApplicationStatus | "ALL";
 const STATUS_LABELS: Record<TalentApplicationStatus, string> = {
   SUBMITTED: "New",
   IN_REVIEW: "In review",
+  AWAITING_CANDIDATE_CHOICE: "Awaiting candidate",
+  CANDIDATE_PROPOSED_TIME: "Candidate proposed",
   ACCEPTED: "Accepted",
   DECLINED: "Declined",
 };
 
 const STATUS_BADGE_VARIANT: Record<
   TalentApplicationStatus,
-  "info" | "primary" | "success" | "neutral"
+  "info" | "primary" | "success" | "neutral" | "warning"
 > = {
   SUBMITTED: "info",
   IN_REVIEW: "primary",
+  AWAITING_CANDIDATE_CHOICE: "primary",
+  CANDIDATE_PROPOSED_TIME: "warning",
   ACCEPTED: "success",
   DECLINED: "neutral",
 };
@@ -147,7 +162,11 @@ export default function TalentApplicationsPage() {
 
   // Per-action UI state — kept local because at most one action runs
   // at a time and the reset between selections is automatic.
-  const [interviewLocal, setInterviewLocal] = useState(""); // datetime-local value
+  // PR4: ACCEPT now offers 3 slots + a custom message instead of booking
+  // a single time. ACCEPT_PROPOSED has no fields (confirms the candidate's
+  // proposal in-place). DECLINE is unchanged.
+  const [proposedSlotsLocal, setProposedSlotsLocal] = useState<string[]>(["", "", ""]);
+  const [customMessage, setCustomMessage] = useState("");
   const [declineReason, setDeclineReason] = useState("");
   const [actionStatus, setActionStatus] = useState<"idle" | "submitting">("idle");
   const [actionError, setActionError] = useState<string | null>(null);
@@ -186,7 +205,8 @@ export default function TalentApplicationsPage() {
   // When the user switches selection (or the list re-loads after an
   // action), clear stale per-action UI state.
   useEffect(() => {
-    setInterviewLocal("");
+    setProposedSlotsLocal(["", "", ""]);
+    setCustomMessage("");
     setDeclineReason("");
     setActionStatus("idle");
     setActionError(null);
@@ -209,13 +229,13 @@ export default function TalentApplicationsPage() {
       if (!res.ok || !body?.ok) {
         throw new Error(body?.error || `HTTP ${res.status}`);
       }
-      toast.showToast({
-        type: "success",
-        title:
-          payload.action === "ACCEPT"
-            ? "Interview booked. Candidate notified."
-            : "Application declined.",
-      });
+      const successTitle =
+        payload.action === "ACCEPT"
+          ? "Slots offered. Candidate emailed a booking link."
+          : payload.action === "ACCEPT_PROPOSED"
+            ? "Interview booked at the candidate's proposed time."
+            : "Application declined.";
+      toast.showToast({ type: "success", title: successTitle });
       setSelectedId(null);
       await refresh();
     } catch (err) {
@@ -227,15 +247,33 @@ export default function TalentApplicationsPage() {
   }
 
   function handleAccept() {
-    if (!interviewLocal) {
-      setActionError("Pick a date and time for the interview.");
+    // Validate all 3 slots are filled. The Zod schema also catches this
+    // server-side; we surface it inline here so the user doesn't waste
+    // a round-trip.
+    if (proposedSlotsLocal.some((s) => !s)) {
+      setActionError("Fill in all three proposed slots.");
       return;
     }
-    // datetime-local has no timezone. Convert to a UTC ISO string by
-    // letting the browser interpret the local string in its own
-    // timezone (which is the admin's), then `.toISOString()`.
-    const interviewStartIso = new Date(interviewLocal).toISOString();
-    void submitAction({ action: "ACCEPT", interviewStartIso });
+    // datetime-local has no timezone. Convert each to a UTC ISO string
+    // by letting the browser interpret in its own timezone (admin's),
+    // then `.toISOString()`. Server cross-validates uniqueness +
+    // future + within-horizon.
+    let proposedSlotsIso: string[];
+    try {
+      proposedSlotsIso = proposedSlotsLocal.map((s) => new Date(s).toISOString());
+    } catch {
+      setActionError("One of the proposed slots isn't a valid date.");
+      return;
+    }
+    void submitAction({
+      action: "ACCEPT",
+      proposedSlotsIso,
+      customMessage: customMessage.trim() || null,
+    });
+  }
+
+  function handleAcceptProposed() {
+    void submitAction({ action: "ACCEPT_PROPOSED" });
   }
 
   function handleDecline() {
@@ -251,8 +289,9 @@ export default function TalentApplicationsPage() {
         <div>
           <h1 className="text-2xl font-bold text-[var(--bb-secondary)]">Talent applications</h1>
           <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-            Review submissions from the public /talent form. Accept to book a 30-minute interview
-            (Google Calendar + Meet); decline to send a polite rejection.
+            Review submissions from the public /talent form. Accept to offer the candidate three
+            interview slots; if they propose their own time, confirm it from the detail panel.
+            Decline to send a polite rejection.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -268,6 +307,11 @@ export default function TalentApplicationsPage() {
               New ({total > 0 && filter === "SUBMITTED" ? total : "—"})
             </option>
             <option value="IN_REVIEW">In review</option>
+            <option value="AWAITING_CANDIDATE_CHOICE">Awaiting candidate</option>
+            <option value="CANDIDATE_PROPOSED_TIME">
+              Candidate proposed
+              {total > 0 && filter === "CANDIDATE_PROPOSED_TIME" ? ` (${total})` : ""}
+            </option>
             <option value="ACCEPTED">Accepted</option>
             <option value="DECLINED">Declined</option>
             <option value="ALL">All</option>
@@ -343,13 +387,22 @@ export default function TalentApplicationsPage() {
                         <DetailPanel
                           item={it}
                           categoryNames={categoryNames}
-                          interviewLocal={interviewLocal}
-                          onInterviewChange={setInterviewLocal}
+                          proposedSlotsLocal={proposedSlotsLocal}
+                          onProposedSlotChange={(idx, v) =>
+                            setProposedSlotsLocal((prev) => {
+                              const next = [...prev];
+                              next[idx] = v;
+                              return next;
+                            })
+                          }
+                          customMessage={customMessage}
+                          onCustomMessageChange={setCustomMessage}
                           declineReason={declineReason}
                           onDeclineReasonChange={setDeclineReason}
                           actionStatus={actionStatus}
                           actionError={actionError}
                           onAccept={handleAccept}
+                          onAcceptProposed={handleAcceptProposed}
                           onDecline={handleDecline}
                         />
                       </td>
@@ -372,27 +425,44 @@ export default function TalentApplicationsPage() {
 function DetailPanel({
   item,
   categoryNames,
-  interviewLocal,
-  onInterviewChange,
+  proposedSlotsLocal,
+  onProposedSlotChange,
+  customMessage,
+  onCustomMessageChange,
   declineReason,
   onDeclineReasonChange,
   actionStatus,
   actionError,
   onAccept,
+  onAcceptProposed,
   onDecline,
 }: {
   item: Application;
   categoryNames: Map<string, string>;
-  interviewLocal: string;
-  onInterviewChange: (v: string) => void;
+  proposedSlotsLocal: string[];
+  onProposedSlotChange: (idx: number, v: string) => void;
+  customMessage: string;
+  onCustomMessageChange: (v: string) => void;
   declineReason: string;
   onDeclineReasonChange: (v: string) => void;
   actionStatus: "idle" | "submitting";
   actionError: string | null;
   onAccept: () => void;
+  onAcceptProposed: () => void;
   onDecline: () => void;
 }) {
-  const isActionable = item.status === "SUBMITTED" || item.status === "IN_REVIEW";
+  // PR4 — three actionable states:
+  //   - SUBMITTED / IN_REVIEW: admin can offer 3 slots (ACCEPT) or DECLINE
+  //   - AWAITING_CANDIDATE_CHOICE: admin can DECLINE (revoking the offer)
+  //   - CANDIDATE_PROPOSED_TIME: admin can ACCEPT_PROPOSED or DECLINE
+  // ACCEPTED + DECLINED are terminal — the action panel hides.
+  const canOfferSlots = item.status === "SUBMITTED" || item.status === "IN_REVIEW";
+  const canConfirmProposed = item.status === "CANDIDATE_PROPOSED_TIME";
+  const canDecline =
+    item.status === "SUBMITTED" ||
+    item.status === "IN_REVIEW" ||
+    item.status === "AWAITING_CANDIDATE_CHOICE" ||
+    item.status === "CANDIDATE_PROPOSED_TIME";
   const social = formatList(item.socialLinks);
   const categoryIds = formatList(item.categoryIds);
   // Resolve raw cuids to human category names; show "(removed)" for any
@@ -480,6 +550,51 @@ function DetailPanel({
 
       {/* ----- Right: action panel ----- */}
       <div className="space-y-6">
+        {/* Awaiting-candidate state — admin already offered slots, candidate hasn't picked. */}
+        {item.status === "AWAITING_CANDIDATE_CHOICE" && (
+          <InlineAlert variant="info" title="Awaiting candidate">
+            <div className="space-y-1 text-sm">
+              <div>3 slots offered. Booking link expires:</div>
+              <div className="text-xs text-[var(--bb-text-muted)]">
+                {formatDateTime(item.bookingTokenExpiresAt)}
+              </div>
+              <div className="text-xs text-[var(--bb-text-muted)]">
+                Sent by {item.reviewedByUserEmail ?? "—"} · {formatDateTime(item.reviewedAt)}
+              </div>
+            </div>
+          </InlineAlert>
+        )}
+
+        {/* Candidate-proposed state — primary action surface for this status. */}
+        {item.status === "CANDIDATE_PROPOSED_TIME" && (
+          <div className="space-y-3 rounded-xl border border-[var(--bb-warning-border)] bg-[var(--bb-warning-bg)] p-4">
+            <div>
+              <SectionHeading>Candidate proposed a time</SectionHeading>
+              <p className="mt-1 text-sm text-[var(--bb-secondary)]">
+                <strong>{formatDateTime(item.candidateProposedAt, item.timezone)}</strong> (
+                {item.timezone})
+              </p>
+              {item.customMessage && (
+                <p className="mt-2 text-sm text-[var(--bb-text-secondary)] italic">
+                  &ldquo;{item.customMessage}&rdquo;
+                </p>
+              )}
+            </div>
+            <Button
+              className="w-full"
+              onClick={onAcceptProposed}
+              loading={actionStatus === "submitting"}
+              loadingText="Booking…"
+              disabled={actionStatus === "submitting"}
+            >
+              Confirm this time &amp; book interview
+            </Button>
+            <p className="text-xs text-[var(--bb-text-muted)]">
+              Or counter-propose by offering 3 fresh slots below.
+            </p>
+          </div>
+        )}
+
         {item.status === "ACCEPTED" && (
           <InlineAlert variant="success" title="Interview booked">
             <div className="space-y-1 text-sm">
@@ -514,65 +629,95 @@ function DetailPanel({
           </InlineAlert>
         )}
 
-        {isActionable && (
-          <>
-            <div className="rounded-xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-card)] p-4">
-              <SectionHeading>Accept &amp; book interview</SectionHeading>
-              <p className="mt-1 mb-3 text-xs text-[var(--bb-text-muted)]">
-                Pick a 30-minute slot. We&apos;ll create a Google Calendar event with a Meet link
-                and notify the candidate. Times are in your local timezone; Google translates them
-                for the candidate.
-              </p>
-              <FormInput
-                type="datetime-local"
-                value={interviewLocal}
-                onChange={(e) => onInterviewChange(e.target.value)}
-                aria-label="Interview start"
-              />
-              <Button
-                className="mt-3 w-full"
-                onClick={onAccept}
-                loading={actionStatus === "submitting"}
-                loadingText="Booking…"
-                disabled={!interviewLocal || actionStatus === "submitting"}
-              >
-                Accept &amp; send invite
-              </Button>
+        {/* ACCEPT — offer 3 slots. Available on SUBMITTED / IN_REVIEW only. */}
+        {canOfferSlots && (
+          <div className="rounded-xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-card)] p-4">
+            <SectionHeading>Accept &amp; offer 3 slots</SectionHeading>
+            <p className="mt-1 mb-3 text-xs text-[var(--bb-text-muted)]">
+              Offer the candidate three 30-minute slots. They&apos;ll get an email with a tokenized
+              link to pick one (or propose another time). Calendar event is created when they pick.
+              Times are in your local timezone; the candidate sees them in theirs.
+            </p>
+            <div className="space-y-2">
+              {[0, 1, 2].map((idx) => (
+                <FormInput
+                  key={idx}
+                  type="datetime-local"
+                  value={proposedSlotsLocal[idx] ?? ""}
+                  onChange={(e) => onProposedSlotChange(idx, e.target.value)}
+                  aria-label={`Slot ${idx + 1}`}
+                  placeholder={`Slot ${idx + 1}`}
+                />
+              ))}
             </div>
-
-            <div className="rounded-xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-card)] p-4">
-              <SectionHeading>Decline politely</SectionHeading>
-              <p className="mt-1 mb-3 text-xs text-[var(--bb-text-muted)]">
-                Optional one-line reason — surfaced verbatim in the email above the generic copy.
-                Leave blank to send the standard rejection.
-              </p>
+            <div className="mt-3">
               <FormTextarea
                 rows={3}
-                value={declineReason}
-                onChange={(e) => onDeclineReasonChange(e.target.value)}
-                placeholder="e.g. We're focused on motion designers this quarter."
+                value={customMessage}
+                onChange={(e) => onCustomMessageChange(e.target.value)}
+                placeholder="Optional personal note for the email — e.g. 'Loved your motion reel — really excited to chat.'"
                 maxLength={500}
-                aria-label="Decline reason (optional)"
+                aria-label="Custom message (optional)"
               />
-              <Button
-                variant="danger"
-                className="mt-3 w-full"
-                onClick={onDecline}
-                loading={actionStatus === "submitting"}
-                loadingText="Sending…"
-                disabled={actionStatus === "submitting"}
-              >
-                Decline &amp; send email
-              </Button>
             </div>
-
-            {actionError && (
-              <InlineAlert variant="error" title="Action failed">
-                {actionError}
-              </InlineAlert>
-            )}
-          </>
+            <Button
+              className="mt-3 w-full"
+              onClick={onAccept}
+              loading={actionStatus === "submitting"}
+              loadingText="Sending…"
+              disabled={proposedSlotsLocal.some((s) => !s) || actionStatus === "submitting"}
+            >
+              Accept &amp; email booking link
+            </Button>
+          </div>
         )}
+
+        {/* DECLINE — available pre-final. */}
+        {canDecline && (
+          <div className="rounded-xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-card)] p-4">
+            <SectionHeading>Decline politely</SectionHeading>
+            <p className="mt-1 mb-3 text-xs text-[var(--bb-text-muted)]">
+              Optional one-line reason — surfaced verbatim in the email above the generic copy.
+              Leave blank to send the standard rejection.
+            </p>
+            <FormTextarea
+              rows={3}
+              value={declineReason}
+              onChange={(e) => onDeclineReasonChange(e.target.value)}
+              placeholder="e.g. We're focused on motion designers this quarter."
+              maxLength={500}
+              aria-label="Decline reason (optional)"
+            />
+            <Button
+              variant="danger"
+              className="mt-3 w-full"
+              onClick={onDecline}
+              loading={actionStatus === "submitting"}
+              loadingText="Sending…"
+              disabled={actionStatus === "submitting"}
+            >
+              Decline &amp; send email
+            </Button>
+          </div>
+        )}
+
+        {actionError && (canOfferSlots || canConfirmProposed || canDecline) && (
+          <InlineAlert variant="error" title="Action failed">
+            {actionError}
+          </InlineAlert>
+        )}
+
+        {/* Defensive — should be unreachable: status is one of the
+         *  6 enums and every status maps to at least one panel. */}
+        {!canOfferSlots &&
+          !canConfirmProposed &&
+          !canDecline &&
+          item.status !== "ACCEPTED" &&
+          item.status !== "DECLINED" && (
+            <p className="text-sm text-[var(--bb-text-muted)]">
+              No action available for this status.
+            </p>
+          )}
       </div>
     </div>
   );

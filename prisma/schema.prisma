@@ -181,6 +181,12 @@ enum MoodboardItemType {
 enum TalentApplicationStatus {
   SUBMITTED
   IN_REVIEW
+  // Admin clicked "Accept & schedule", three slot offers were emailed to
+  // the candidate via a tokenized booking link. Awaiting their pick.
+  AWAITING_CANDIDATE_CHOICE
+  // Candidate chose "none of the offered slots work" and submitted their
+  // own proposed time. Site owner needs to confirm (or counter-propose).
+  CANDIDATE_PROPOSED_TIME
   ACCEPTED
   DECLINED
 }
@@ -599,6 +605,48 @@ model TalentApplication {
   /// opening a separate inbox thread. Null/empty falls back to the
   /// generic template copy.
   declineReason String?
+
+  // ---------------------------------------------------------------------
+  // 3-slot booking (PR4) — tokenized self-service scheduling.
+  //
+  // When the admin clicks "Accept & schedule", we no longer create a
+  // Google Calendar event immediately. Instead we write three proposed
+  // slot ISOs + a single-use bookingToken, set status to
+  // AWAITING_CANDIDATE_CHOICE, and email the candidate a tokenized link.
+  // The candidate either picks one of the three (→ ACCEPTED, calendar
+  // event created at that point) or proposes their own time
+  // (→ CANDIDATE_PROPOSED_TIME, admin notified, admin's "accept proposed"
+  // action then creates the event).
+  //
+  // All four columns are nullable so existing PR2-era rows in ACCEPTED
+  // /DECLINED keep working without backfill.
+  // ---------------------------------------------------------------------
+
+  /// JSON array of up to three proposed slot ISO strings (UTC). Set when
+  /// status moves to AWAITING_CANDIDATE_CHOICE; cleared (kept for audit)
+  /// once status reaches ACCEPTED or DECLINED.
+  proposedSlotsJson Json?
+
+  /// Single-use, plain (not hashed) booking token. The candidate gets
+  /// it inside an email link; the public /talent/schedule/[token] page
+  /// looks the row up by this column. Plain matches the CompanyInvite
+  /// pattern — simpler, and the surface area is already minimal (one
+  /// row, one URL, single-use, expiring).
+  bookingToken          String?   @unique
+  bookingTokenExpiresAt DateTime? // 7 days from creation
+
+  /// Admin-supplied personal note included in the acceptance email above
+  /// the slot offer block. Free-form, max 500 chars enforced at the
+  /// schema layer.
+  customMessage String?
+
+  /// When the candidate proposed a custom time (filled the "none of
+  /// these work?" form). The proposed instant is stored separately on
+  /// `interviewAt` so we don't need a fifth nullable column — at this
+  /// status interviewAt represents the candidate's *proposal*, not a
+  /// confirmed booking. The admin's accept-proposed action then keeps
+  /// it as-is and creates the calendar event.
+  candidateProposedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

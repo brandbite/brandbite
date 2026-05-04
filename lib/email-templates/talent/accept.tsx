@@ -1,16 +1,21 @@
 // -----------------------------------------------------------------------------
 // @file: lib/email-templates/talent/accept.tsx
-// @purpose: Confirmation email sent to a talent applicant after the SITE_OWNER
-//           accepts their application. Google Calendar separately sends the
-//           ICS invite + Meet link via sendUpdates=all on the event create
-//           call (lib/google/calendar.ts:createConsultationEvent), so this
-//           email is the human, branded follow-up — not the calendar add.
+// @purpose: First email after the SITE_OWNER accepts a talent application.
+//           Replaces the PR2 "your interview is booked" email — under the
+//           PR4 self-service flow we no longer book the calendar event up
+//           front. Instead this email offers the candidate three time
+//           slots and a "none of these work?" link to propose their own.
 //
-//           Brand voice: warm, specific, no corporate throat-clearing. Mirrors
-//           the welcome email's tone. Says exactly what's been booked and
-//           when, links to the Meet, gives the candidate a clear next step
-//           (look out for the calendar invite, optionally reply if the slot
-//           doesn't actually work).
+//           The `bookingUrl` is the tokenized link to
+//           /talent/schedule/[token]. The candidate clicks one of the
+//           three slot buttons (which deep-link to the same page with
+//           ?slot=N pre-selected) or the "propose another time" link.
+//           Either path lands them on the public booking page where the
+//           commit happens.
+//
+//           Brand voice: warm, specific, no corporate throat-clearing.
+//           The optional admin-supplied `customMessage` renders verbatim
+//           above the slot offer so the SITE_OWNER can soft-tailor.
 // -----------------------------------------------------------------------------
 
 import * as React from "react";
@@ -30,24 +35,26 @@ import {
 export type TalentAcceptEmailProps = {
   /** Recipient display name; greeting degrades gracefully if missing. */
   candidateName?: string | null;
-  /** ISO start time of the interview. Rendered in the candidate's own
-   *  timezone — the form captured `timezone`, the API passes it back
-   *  here so the rendered string matches what they'll see in Calendar. */
-  interviewStartIso: string;
-  /** IANA timezone (e.g. "Europe/Istanbul") used to format the date.
-   *  Matches the candidate's submitted timezone. */
+  /** Three ISO instants — the slots the SITE_OWNER picked. Rendered in
+   *  the candidate's own timezone so the displayed times match what
+   *  they'll see when clicking through to the booking page. */
+  proposedSlotsIso: string[];
+  /** IANA timezone (e.g. "Europe/Istanbul") for slot rendering. Comes
+   *  from the candidate's submitted timezone. */
   candidateTimezone: string;
-  /** Google Meet URL extracted from the calendar event. Always non-null
-   *  when this template is rendered — the API only fires this email
-   *  after createConsultationEvent + extractMeetLink succeed. */
-  meetLink: string;
+  /** Tokenized booking URL — `/talent/schedule/[token]`. Each "Choose"
+   *  link below appends `?slot=N` so the page deep-links to the
+   *  pre-selected slot. */
+  bookingUrl: string;
+  /** Optional verbatim note from the admin — e.g. "Loved your motion
+   *  reel — really excited to chat." Null/empty = no note shown. */
+  customMessage?: string | null;
 };
 
 /** Date format: "Wednesday, May 14 2026 at 14:30 (Europe/Istanbul)".
- *  Intl.DateTimeFormat handles the timezone conversion + locale-correct
- *  ordering. We bail to a plain ISO render only if the timezone string
- *  is invalid, which the form's <select> shouldn't allow. */
-function formatInterviewWhen(iso: string, timeZone: string): string {
+ *  Falls back to a plain ISO render if the timezone string is invalid
+ *  (the form's <select> shouldn't allow that, but defensive). */
+function formatSlot(iso: string, timeZone: string): string {
   try {
     const d = new Date(iso);
     const fmt = new Intl.DateTimeFormat("en-GB", {
@@ -60,24 +67,25 @@ function formatInterviewWhen(iso: string, timeZone: string): string {
       hour12: false,
       timeZone,
     });
-    return `${fmt.format(d)} (${timeZone})`;
+    return fmt.format(d);
   } catch {
-    return `${iso} (${timeZone})`;
+    return iso;
   }
 }
 
 export function TalentAcceptEmailTemplate({
   candidateName,
-  interviewStartIso,
+  proposedSlotsIso,
   candidateTimezone,
-  meetLink,
+  bookingUrl,
+  customMessage,
 }: TalentAcceptEmailProps) {
   const greeting = candidateName ? `Hi ${candidateName},` : "Hi,";
-  const when = formatInterviewWhen(interviewStartIso, candidateTimezone);
+  const trimmedNote = customMessage?.trim() || null;
 
   return (
     <BaseLayout
-      previewText="Your Brandbite interview is booked. Here are the details."
+      previewText="Pick a time for your Brandbite interview."
       hero={
         <HeroBand>
           <Heading>You&apos;re through to the next round</Heading>
@@ -87,36 +95,38 @@ export function TalentAcceptEmailTemplate({
         </HeroBand>
       }
     >
-      <Paragraph>
-        We loved your portfolio. The next step is a short 30-minute video call so we can get to know
-        you, hear how you work, and answer any questions you have about Brandbite.
-      </Paragraph>
+      {trimmedNote ? (
+        <Paragraph>
+          <em>{trimmedNote}</em>
+        </Paragraph>
+      ) : (
+        <Paragraph>
+          We loved your portfolio. The next step is a short 30-minute video call so we can get to
+          know you, hear how you work, and answer any questions you have.
+        </Paragraph>
+      )}
 
       <Callout tone="info">
-        <strong>When:</strong> {when}
-        <br />
-        <strong>Where:</strong> <LinkText href={meetLink}>{meetLink}</LinkText>
+        Pick a slot that works for you. Times are shown in <strong>{candidateTimezone}</strong>.
       </Callout>
 
-      <Paragraph>
-        You&apos;ll also receive a calendar invite from Google with the same details. The invite is
-        the canonical version. If you accept it in your calendar, you&apos;re all set.
-      </Paragraph>
+      {proposedSlotsIso.map((iso, idx) => (
+        <Paragraph key={iso}>
+          <strong>Option {idx + 1}:</strong> {formatSlot(iso, candidateTimezone)} &middot;{" "}
+          <LinkText href={`${bookingUrl}?slot=${idx}`}>Choose this slot</LinkText>
+        </Paragraph>
+      ))}
 
-      <Button href={meetLink}>Open the Meet link</Button>
+      <Button href={bookingUrl}>See all options &amp; book</Button>
 
       <Paragraph>
-        If the slot really doesn&apos;t work for you, just reply to this email with two or three
-        windows that do and we&apos;ll re-book. No need to apologise. Schedules are schedules.
+        None of these work for you?{" "}
+        <LinkText href={`${bookingUrl}?propose=1`}>Propose a time that does</LinkText>. We&apos;ll
+        do our best to make it happen.
       </Paragraph>
 
       <Signoff
-        preamble={
-          <>
-            Looking forward to it. If anything is unclear before the call, reply here and
-            you&apos;ll get a real reply, not a ticket number.
-          </>
-        }
+        preamble="The booking link expires in 7 days. After you pick (or propose), you'll get a final confirmation with the Google Meet link."
         from="Alper, Brandbite"
       />
     </BaseLayout>
@@ -128,20 +138,24 @@ export async function renderTalentAcceptEmail(
 ): Promise<{ subject: string; html: string }> {
   const html = await render(<TalentAcceptEmailTemplate {...props} />);
   return {
-    subject: "You're through to the next round at Brandbite",
+    subject: "Pick a time for your Brandbite interview",
     html,
   };
 }
 
-/** Default export so `react-email dev` renders the template in the
- *  preview sidebar. Never called from production. */
+/** Default export for `react-email dev` preview only. */
 export default function TalentAcceptEmailPreview() {
   return (
     <TalentAcceptEmailTemplate
       candidateName="Jane"
-      interviewStartIso="2026-05-14T11:30:00.000Z"
+      proposedSlotsIso={[
+        "2026-05-14T11:30:00.000Z",
+        "2026-05-15T13:00:00.000Z",
+        "2026-05-16T09:00:00.000Z",
+      ]}
       candidateTimezone="Europe/Istanbul"
-      meetLink="https://meet.google.com/abc-defg-hij"
+      bookingUrl="https://brandbite.studio/talent/schedule/EXAMPLE_TOKEN"
+      customMessage="Loved your motion reel — really excited to chat."
     />
   );
 }

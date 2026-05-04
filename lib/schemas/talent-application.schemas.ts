@@ -139,37 +139,76 @@ export const TALENT_INTERVIEW_DURATION_MINUTES = 30;
  *  Past dates are rejected with a separate refinement. */
 const TALENT_INTERVIEW_MAX_HORIZON_DAYS = 60;
 
+/** PR4: number of slot offers the admin presents to the candidate. The
+ *  candidate picks one of these or proposes their own. */
+export const TALENT_PROPOSED_SLOT_COUNT = 3;
+
+/** Helper — single ISO instant in the future, within the horizon. Reused
+ *  by the admin's offer slots, the candidate's proposed time, and the
+ *  admin's accept-proposed confirmation. Pulled into a helper so the
+ *  three schemas can't drift apart. */
+const futureIsoWithinHorizon = z
+  .string()
+  .datetime({ offset: true, message: "Pick a valid date and time" })
+  .refine(
+    (s) => {
+      const t = new Date(s).getTime();
+      return Number.isFinite(t) && t > Date.now();
+    },
+    { message: "Pick a future date and time" },
+  )
+  .refine(
+    (s) => {
+      const t = new Date(s).getTime();
+      return t < Date.now() + TALENT_INTERVIEW_MAX_HORIZON_DAYS * 86_400_000;
+    },
+    { message: `Pick a slot within ${TALENT_INTERVIEW_MAX_HORIZON_DAYS} days` },
+  );
+
+// ---------------------------------------------------------------------------
+// Admin PATCH schema
+// ---------------------------------------------------------------------------
+//
+// Discriminated on `action`. Three actions:
+//   - ACCEPT: offer 3 slots + optional custom message; transitions
+//     SUBMITTED → AWAITING_CANDIDATE_CHOICE; sends the candidate a
+//     tokenized booking link.
+//   - ACCEPT_PROPOSED: confirm a candidate's custom-time proposal;
+//     transitions CANDIDATE_PROPOSED_TIME → ACCEPTED; creates the
+//     Google Calendar event at this point.
+//   - DECLINE: status → DECLINED, sends polite rejection.
+//
+// All paths' from-status checks live in the route handler since they
+// can't be expressed in the discriminated union without baking row state
+// into the schema.
+
 export const talentApplicationActionSchema = z.discriminatedUnion("action", [
   z
     .object({
       action: z.literal("ACCEPT"),
-      /** RFC3339 / ISO-8601 instant in UTC. The admin UI submits a
-       *  datetime-local value converted to UTC; a future PR may add a
-       *  free/busy picker. End time is computed server-side as start
-       *  + 30 min. */
-      interviewStartIso: z.string().datetime({
-        offset: true,
-        message: "Pick a valid date and time",
-      }),
+      /** Exactly 3 offer slots, each a valid future ISO within horizon.
+       *  No de-dup enforcement — admin entering the same slot twice is
+       *  a UI bug, not a security issue. */
+      proposedSlotsIso: z
+        .array(futureIsoWithinHorizon)
+        .length(TALENT_PROPOSED_SLOT_COUNT, `Provide exactly ${TALENT_PROPOSED_SLOT_COUNT} slots`),
+      /** Optional personal note rendered above the offer block in the
+       *  acceptance email. Free-form, kept short for readability. */
+      customMessage: z.string().trim().max(500).optional().nullable(),
     })
     .refine(
       (d) => {
-        const t = new Date(d.interviewStartIso).getTime();
-        return Number.isFinite(t) && t > Date.now();
+        const set = new Set(d.proposedSlotsIso.map((s) => new Date(s).getTime()));
+        return set.size === d.proposedSlotsIso.length;
       },
-      { path: ["interviewStartIso"], message: "Pick a future date and time" },
-    )
-    .refine(
-      (d) => {
-        const t = new Date(d.interviewStartIso).getTime();
-        const horizon = Date.now() + TALENT_INTERVIEW_MAX_HORIZON_DAYS * 86_400_000;
-        return t < horizon;
-      },
-      {
-        path: ["interviewStartIso"],
-        message: `Pick a slot within ${TALENT_INTERVIEW_MAX_HORIZON_DAYS} days`,
-      },
+      { path: ["proposedSlotsIso"], message: "Slots must be unique" },
     ),
+  z.object({
+    action: z.literal("ACCEPT_PROPOSED"),
+    /** Confirms whatever the candidate proposed — handler reads
+     *  `candidateProposedAt` from the row. No body fields needed beyond
+     *  the discriminator. */
+  }),
   z.object({
     action: z.literal("DECLINE"),
     /** Optional admin-supplied note. Rendered verbatim in the email so
@@ -179,3 +218,26 @@ export const talentApplicationActionSchema = z.discriminatedUnion("action", [
 ]);
 
 export type TalentApplicationActionInput = z.infer<typeof talentApplicationActionSchema>;
+
+// ---------------------------------------------------------------------------
+// Candidate-side schemas (public booking page)
+// ---------------------------------------------------------------------------
+
+/** POST /api/talent/schedule/[token]/pick — candidate picks one of the 3
+ *  proposed slots. The chosen ISO must be present in the row's
+ *  `proposedSlotsJson` array; the handler verifies that, the schema only
+ *  shape-checks. */
+export const talentBookingPickSchema = z.object({
+  slotIso: z.string().datetime({ offset: true, message: "Invalid slot" }),
+});
+export type TalentBookingPickInput = z.infer<typeof talentBookingPickSchema>;
+
+/** POST /api/talent/schedule/[token]/propose — candidate proposes their
+ *  own time when none of the three offered slots work. Same future +
+ *  horizon refinements as the admin's offer slots, plus an optional
+ *  short note explaining why. */
+export const talentBookingProposeSchema = z.object({
+  proposedIso: futureIsoWithinHorizon,
+  note: z.string().trim().max(300).optional().nullable(),
+});
+export type TalentBookingProposeInput = z.infer<typeof talentBookingProposeSchema>;
