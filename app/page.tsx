@@ -144,6 +144,9 @@ export default function LandingPage() {
       {/* ─── FAQ ────────────────────────────────────────────────────────── */}
       <FaqSection />
 
+      {/* ─── Talent application banner (recruits creatives to /talent) ──── */}
+      <TalentBanner />
+
       {/* ─── Footer ─────────────────────────────────────────────────────── */}
       <SiteFooter />
     </div>
@@ -646,6 +649,55 @@ function FaqSection() {
   }, []);
 
   return <FaqBlock data={data} />;
+}
+
+// ===========================================================================
+// Talent banner — recruits creatives to the public /talent application form.
+//
+// Hardcoded (not a CMS block) on purpose — copy is short, design is
+// generic, and routing it through the block system would mean modeling
+// the schema, the admin form, the validator, and the migration for what
+// is fundamentally a one-line CTA. If we later need editable copy here,
+// promoting it to a TALENT_BANNER block follows the existing pattern
+// (lib/blocks/types.ts + defaults.ts + FaqSection-style fetcher).
+// ===========================================================================
+
+function TalentBanner() {
+  return (
+    <section
+      aria-labelledby="talent-banner-heading"
+      className="bg-[var(--bb-bg-warm)] py-16 sm:py-20"
+    >
+      <div className="mx-auto max-w-4xl px-4 text-center sm:px-6">
+        <p className="text-xs font-semibold tracking-[0.2em] text-[var(--bb-primary)] uppercase">
+          We&apos;re hiring creatives
+        </p>
+        <h2
+          id="talent-banner-heading"
+          className="mt-3 text-3xl leading-tight font-bold text-balance text-[var(--bb-secondary)] sm:text-4xl"
+        >
+          Are you a designer? Apply to work with us.
+        </h2>
+        <p className="mx-auto mt-4 max-w-2xl text-base text-pretty text-[var(--bb-text-secondary)]">
+          Brandbite is a small team that learns each client&apos;s brand and ships fast. If you want
+          focused work, fair pay per task, and minimal account-management drama, send us your
+          portfolio.
+        </p>
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+          <Link
+            href="/talent"
+            className="inline-flex items-center gap-2 rounded-full bg-[var(--bb-primary)] px-7 py-3 text-sm font-semibold text-white transition-colors hover:bg-[var(--bb-primary-hover)]"
+          >
+            Apply now
+            <span aria-hidden="true">→</span>
+          </Link>
+          <span className="text-xs text-[var(--bb-text-muted)]">
+            Takes about 4 minutes · Reviewed personally
+          </span>
+        </div>
+      </div>
+    </section>
+  );
 }
 
 // Footer is the shared SiteFooter from components/marketing/site-footer.tsx

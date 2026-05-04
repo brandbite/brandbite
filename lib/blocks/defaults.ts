@@ -151,6 +151,10 @@ export const DEFAULT_SITE_HEADER_DATA: SiteHeaderData = {
     { label: "Showcase", href: "/showcase" },
     { label: "FAQs", href: "/faq" },
     { label: "Blog", href: "/blog" },
+    // Surfaces the public talent application form. Sits at the end so
+    // existing visitors don't see the nav order shift; appended via the
+    // CMS by an admin if they want a different position.
+    { label: "Talent", href: "/talent" },
   ],
 };
 
@@ -177,6 +181,10 @@ export const DEFAULT_SITE_FOOTER_DATA: SiteFooterData = {
         { label: "About", href: "/about" },
         { label: "Blog", href: "/blog" },
         { label: "Contact", href: "/contact" },
+        // Talent application form (PR1 #223). Lives in the Company
+        // column rather than its own — careers content is light enough
+        // that a dedicated column would feel sparse.
+        { label: "Apply as talent", href: "/talent" },
       ],
     },
     {
