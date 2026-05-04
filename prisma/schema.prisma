@@ -574,11 +574,38 @@ model TalentApplication {
   ipAddress String?
   userAgent String?
 
+  /// Admin who actioned the most recent state transition (ACCEPTED /
+  /// DECLINED). Null while status is SUBMITTED. Not a relation — actor
+  /// rows can be hard-deleted (USER_HARD_DELETE) and we want the stamp
+  /// to outlive the actor account, mirroring AdminActionLog.actorEmail
+  /// snapshot behavior.
+  reviewedAt          DateTime?
+  reviewedByUserId    String?
+  reviewedByUserEmail String?
+
+  /// Interview booking — populated by the accept flow. `googleEventId`
+  /// is the Calendar event id we'd hit to cancel/update; `meetLink` is
+  /// the Hangouts URL extracted via lib/google/calendar.ts:extractMeetLink;
+  /// `interviewAt` is the UTC start instant for sorting and display.
+  /// All three are written together inside the same Prisma transaction
+  /// as the status flip — partial state ("ACCEPTED but no event") would
+  /// be a regression.
+  googleEventId String?
+  meetLink      String?
+  interviewAt   DateTime?
+
+  /// Optional admin-supplied note on the decline. Surfaced verbatim in
+  /// the decline email so the rejection can be soft-tailored without
+  /// opening a separate inbox thread. Null/empty falls back to the
+  /// generic template copy.
+  declineReason String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([status, createdAt(sort: Desc)])
   @@index([email])
+  @@index([interviewAt]) // PR2 admin filter "show upcoming interviews"
 }
 
 // -----------------------------------------------------------------------------
@@ -1853,6 +1880,9 @@ enum AdminActionType {
   AI_PRICING_EDIT
   CONSULTATION_PRICING_EDIT
   GOOGLE_OAUTH_CONFIG_EDIT
+  // Talent applications (SITE_OWNER only — see canManageTalentApplications)
+  TALENT_APPLICATION_ACCEPTED
+  TALENT_APPLICATION_DECLINED
 }
 
 enum AdminActionOutcome {
