@@ -64,10 +64,13 @@ export const talentApplicationSubmitSchema = z
     linkedinUrl: optionalUrl,
     socialLinks: z.array(url).max(3, "At most 3 social links").default([]),
 
-    // 3. Skills (JobTypeCategory IDs, validated against `isActive` server-side)
+    // 3. Skills (JobTypeCategory IDs, validated against `isActive` server-side).
+    // Lowered from 3 to 1 in polish round 1: many candidates self-identify
+    // as a single discipline (illustrator, copywriter) and were bouncing
+    // off the form rather than padding their selection.
     categoryIds: z
       .array(z.string().min(1))
-      .min(3, "Please select at least 3 categories")
+      .min(1, "Please select at least one category")
       .max(30, "Too many categories selected"),
 
     // 4. Experience snapshot

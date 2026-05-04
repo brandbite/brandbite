@@ -122,6 +122,29 @@ export default function TalentApplicationsPage() {
   // Detail panel: id of the row currently expanded inline.
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  // Map of JobTypeCategory.id -> human name. Loaded once on mount from the
+  // public /api/talent/categories endpoint so the detail panel can render
+  // the candidate's selections as readable names instead of the raw cuids
+  // stored on the row. The endpoint already excludes inactive rows; if a
+  // row references a since-removed category we fall back to "(removed)".
+  const [categoryNames, setCategoryNames] = useState<Map<string, string>>(new Map());
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/talent/categories", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { categories: [] }))
+      .then((j: { categories: { id: string; name: string }[] }) => {
+        if (cancelled) return;
+        setCategoryNames(new Map(j.categories.map((c) => [c.id, c.name])));
+      })
+      .catch(() => {
+        // Silent — detail panel falls back to showing raw IDs.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Per-action UI state — kept local because at most one action runs
   // at a time and the reset between selections is automatic.
   const [interviewLocal, setInterviewLocal] = useState(""); // datetime-local value
@@ -273,13 +296,13 @@ export default function TalentApplicationsPage() {
       ) : (
         <DataTable>
           <THead>
-            <tr>
-              <TH>Candidate</TH>
-              <TH>Status</TH>
-              <TH>Submitted</TH>
-              <TH>Country</TH>
-              <TH align="right">Action</TH>
-            </tr>
+            <TH>Candidate</TH>
+            <TH className="w-[110px]">Status</TH>
+            <TH className="w-[180px]">Submitted</TH>
+            <TH className="w-[140px]">Country</TH>
+            <TH align="right" className="w-[90px]">
+              Action
+            </TH>
           </THead>
           <tbody>
             {items.map((it) => {
@@ -319,6 +342,7 @@ export default function TalentApplicationsPage() {
                       <td colSpan={5} className="bg-[var(--bb-bg-warm)] p-6">
                         <DetailPanel
                           item={it}
+                          categoryNames={categoryNames}
                           interviewLocal={interviewLocal}
                           onInterviewChange={setInterviewLocal}
                           declineReason={declineReason}
@@ -347,6 +371,7 @@ export default function TalentApplicationsPage() {
 
 function DetailPanel({
   item,
+  categoryNames,
   interviewLocal,
   onInterviewChange,
   declineReason,
@@ -357,6 +382,7 @@ function DetailPanel({
   onDecline,
 }: {
   item: Application;
+  categoryNames: Map<string, string>;
   interviewLocal: string;
   onInterviewChange: (v: string) => void;
   declineReason: string;
@@ -368,7 +394,12 @@ function DetailPanel({
 }) {
   const isActionable = item.status === "SUBMITTED" || item.status === "IN_REVIEW";
   const social = formatList(item.socialLinks);
-  const categories = formatList(item.categoryIds);
+  const categoryIds = formatList(item.categoryIds);
+  // Resolve raw cuids to human category names; show "(removed)" for any
+  // ID that no longer maps (category was deleted/deactivated since the
+  // candidate submitted). Falling back to the raw ID would expose
+  // implementation detail to the admin reading the page.
+  const categories = categoryIds.map((id) => categoryNames.get(id) ?? "(removed)");
   const tools = formatList(item.tools);
   const workedWith = formatList(item.workedWith);
 
@@ -420,7 +451,10 @@ function DetailPanel({
           label="Remote experience"
           value={item.hasRemoteExp ? `Yes (${item.yearsRemote ?? "?"} years)` : "No"}
         />
-        <KeyValue label="Worked with" value={workedWith.length > 0 ? workedWith.join(", ") : "—"} />
+        <KeyValue
+          label="Worked at / with"
+          value={workedWith.length > 0 ? workedWith.join(", ") : "—"}
+        />
 
         <SectionHeading>Availability</SectionHeading>
         <KeyValue label="Workload" value={item.workload.replace("_", "-").toLowerCase()} />
@@ -548,9 +582,16 @@ function DetailPanel({
 // Tiny helpers — kept inline because they're not reused outside this page.
 // ---------------------------------------------------------------------------
 
+// Section header for the detail panel. Polish round 1: scale up size +
+// contrast and add a top divider so the eight sections (Contact /
+// Portfolio / Skills / Experience / …) read as discrete blocks rather
+// than a flat run of label-value rows. The first heading suppresses its
+// top border via the `:first-of-type` selector applied at the parent so
+// nothing nests against the panel's outer padding.
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="text-xs font-semibold tracking-wider text-[var(--bb-text-muted)] uppercase">
+    <h3 className="mt-4 flex items-center gap-2 border-t border-[var(--bb-border-subtle)] pt-3 text-xs font-bold tracking-[0.12em] text-[var(--bb-secondary)] uppercase first-of-type:mt-0 first-of-type:border-t-0 first-of-type:pt-0">
+      <span className="inline-block h-2 w-1 rounded-full bg-[var(--bb-primary)]" aria-hidden />
       {children}
     </h3>
   );

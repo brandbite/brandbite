@@ -84,7 +84,10 @@ type Category = { id: string; name: string; slug: string; sortOrder: number };
 type Status = "idle" | "loading-categories" | "submitting" | "success" | "error";
 
 const MAX_SOCIAL_LINKS = 3;
-const MIN_CATEGORIES = 3;
+// Polish round 1: lowered from 3 to 1 — keep in sync with the Zod
+// `.min(...)` in lib/schemas/talent-application.schemas.ts. The legend
+// + counter copy below also references this value.
+const MIN_CATEGORIES = 1;
 const TURNAROUND_MAX = 120;
 
 export default function TalentApplicationPage() {
@@ -593,7 +596,7 @@ export default function TalentApplicationPage() {
               />
             )}
             <CheckboxGroup
-              legend="Worked with (select all that apply)"
+              legend="Worked at / with (select all that apply)"
               required
               values={workedWith}
               onToggle={(v) => toggleWorkedWith(v as WorkedWith)}
