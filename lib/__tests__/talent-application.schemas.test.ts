@@ -65,12 +65,20 @@ describe("talentApplicationSubmitSchema — happy path", () => {
 });
 
 describe("talentApplicationSubmitSchema — required-field rejections", () => {
-  it("rejects when fewer than 3 categories are selected", () => {
+  it("rejects when zero categories are selected (min lowered to 1 in polish round 1)", () => {
     const r = talentApplicationSubmitSchema.safeParse({
       ...baseValid(),
-      categoryIds: ["a", "b"],
+      categoryIds: [],
     });
     expect(r.success).toBe(false);
+  });
+
+  it("accepts a single category (min is 1 after polish round 1)", () => {
+    const r = talentApplicationSubmitSchema.safeParse({
+      ...baseValid(),
+      categoryIds: ["only-one-id"],
+    });
+    expect(r.success).toBe(true);
   });
 
   it("rejects an unconfirmed communication checkbox", () => {
