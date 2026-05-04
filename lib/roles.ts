@@ -113,6 +113,15 @@ export function canGrantCompanyTokens(role: AppUserRole): boolean {
   return isSiteOwnerRole(role);
 }
 
+/** Review the public talent-application queue: accept (creates Google
+ *  Calendar event + sends interview email) or decline (sends polite
+ *  rejection). SITE_OWNER only by design — hiring decisions are not a
+ *  delegable SITE_ADMIN action, and the Google Calendar event lands on
+ *  the singleton ConsultationSettings calendar (likely owner@). */
+export function canManageTalentApplications(role: AppUserRole): boolean {
+  return isSiteOwnerRole(role);
+}
+
 /** Override a ticket's tokenCost or creativePayout (direct financial
  *  override that sidesteps the normal cost/payout calculation). */
 export function canOverrideTicketFinancials(role: AppUserRole): boolean {

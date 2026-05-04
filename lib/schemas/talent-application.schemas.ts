@@ -115,3 +115,64 @@ export const talentApplicationSubmitSchema = z
   });
 
 export type TalentApplicationSubmitInput = z.infer<typeof talentApplicationSubmitSchema>;
+
+// ---------------------------------------------------------------------------
+// Admin PATCH schema — accept or decline a submitted application.
+// ---------------------------------------------------------------------------
+//
+// Discriminated on `action` so the handler doesn't have to branch on
+// "is interviewStartIso present" guesswork. Accept requires a start
+// time (the slot the SITE_OWNER chose); decline takes an optional
+// reason that the email surfaces verbatim.
+//
+// Both paths only allow transitioning *from* SUBMITTED — the API
+// enforces that with a current-status check separate from this schema
+// so a reverted-by-mistake row can't be re-actioned without an explicit
+// admin rollback workflow.
+
+export const TALENT_INTERVIEW_DURATION_MINUTES = 30;
+/** Sanity bound on the booking horizon: refuse anything more than 60
+ *  days out so a typo on the year doesn't silently book a 2099 event.
+ *  Past dates are rejected with a separate refinement. */
+const TALENT_INTERVIEW_MAX_HORIZON_DAYS = 60;
+
+export const talentApplicationActionSchema = z.discriminatedUnion("action", [
+  z
+    .object({
+      action: z.literal("ACCEPT"),
+      /** RFC3339 / ISO-8601 instant in UTC. The admin UI submits a
+       *  datetime-local value converted to UTC; a future PR may add a
+       *  free/busy picker. End time is computed server-side as start
+       *  + 30 min. */
+      interviewStartIso: z.string().datetime({
+        offset: true,
+        message: "Pick a valid date and time",
+      }),
+    })
+    .refine(
+      (d) => {
+        const t = new Date(d.interviewStartIso).getTime();
+        return Number.isFinite(t) && t > Date.now();
+      },
+      { path: ["interviewStartIso"], message: "Pick a future date and time" },
+    )
+    .refine(
+      (d) => {
+        const t = new Date(d.interviewStartIso).getTime();
+        const horizon = Date.now() + TALENT_INTERVIEW_MAX_HORIZON_DAYS * 86_400_000;
+        return t < horizon;
+      },
+      {
+        path: ["interviewStartIso"],
+        message: `Pick a slot within ${TALENT_INTERVIEW_MAX_HORIZON_DAYS} days`,
+      },
+    ),
+  z.object({
+    action: z.literal("DECLINE"),
+    /** Optional admin-supplied note. Rendered verbatim in the email so
+     *  it must stay within human-readable limits. */
+    reason: z.string().trim().max(500).optional().nullable(),
+  }),
+]);
+
+export type TalentApplicationActionInput = z.infer<typeof talentApplicationActionSchema>;

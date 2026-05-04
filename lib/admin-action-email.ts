@@ -44,6 +44,8 @@ const ACTION_SUBJECT_FRAGMENT: Record<AdminActionType, string> = {
   AI_PRICING_EDIT: "changed AI tool pricing",
   CONSULTATION_PRICING_EDIT: "changed consultation pricing",
   GOOGLE_OAUTH_CONFIG_EDIT: "changed the Google Calendar connection",
+  TALENT_APPLICATION_ACCEPTED: "accepted a talent application",
+  TALENT_APPLICATION_DECLINED: "declined a talent application",
 };
 
 // ---------------------------------------------------------------------------

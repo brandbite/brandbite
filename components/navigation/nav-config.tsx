@@ -111,6 +111,15 @@ export const ADMIN_NAV: NavConfig = {
         { href: "/admin/creative-analytics", label: "Creatives", icon: IconPeople },
         { href: "/admin/time-tracking", label: "Time tracking", icon: IconPeople },
         { href: "/admin/users", label: "Users", icon: IconPeople },
+        // SITE_OWNER only — hiring queue. ownerOnly hides the link from
+        // SITE_ADMIN; the API in app/api/admin/talent-applications/
+        // re-checks the role server-side via canManageTalentApplications.
+        {
+          href: "/admin/talent-applications",
+          label: "Talent applications",
+          icon: IconPeople,
+          ownerOnly: true,
+        },
       ],
     },
     {
