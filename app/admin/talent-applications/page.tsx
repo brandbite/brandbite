@@ -73,6 +73,9 @@ type Application = {
   bookingTokenExpiresAt: string | null;
   customMessage: string | null;
   candidateProposedAt: string | null;
+  // PR5 — true when the email matches an existing UserAccount.
+  // Computed server-side per response, not stored on the row.
+  existingCustomer?: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -356,7 +359,10 @@ export default function TalentApplicationsPage() {
                   <tr key={it.id} className={isSelected ? "bg-[var(--bb-bg-warm)]" : undefined}>
                     <TD>
                       <div className="font-medium text-[var(--bb-secondary)]">{it.fullName}</div>
-                      <div className="text-xs text-[var(--bb-text-muted)]">{it.email}</div>
+                      <div className="flex items-center gap-2 text-xs text-[var(--bb-text-muted)]">
+                        <span>{it.email}</span>
+                        {it.existingCustomer && <Badge variant="warning">Existing customer</Badge>}
+                      </div>
                     </TD>
                     <TD>
                       <Badge variant={STATUS_BADGE_VARIANT[it.status]}>
@@ -477,6 +483,13 @@ function DetailPanel({
     <div className="grid gap-6 lg:grid-cols-2">
       {/* ----- Left: candidate snapshot ----- */}
       <div className="space-y-4">
+        {item.existingCustomer && (
+          <InlineAlert variant="warning" title="Existing customer email">
+            This applicant&apos;s email matches a registered Brandbite UserAccount. Could be
+            intentional (a customer joining the team) or accidental (used their work email by
+            mistake). Worth a check before acting.
+          </InlineAlert>
+        )}
         <SectionHeading>Contact</SectionHeading>
         <KeyValue label="Email" value={<a href={`mailto:${item.email}`}>{item.email}</a>} />
         <KeyValue label="WhatsApp" value={item.whatsappNumber} />
