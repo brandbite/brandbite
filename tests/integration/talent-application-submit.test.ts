@@ -44,7 +44,10 @@ afterEach(async () => {
 /** Build a NextRequest with a unique IP so per-IP rate buckets don't
  *  leak across tests. The route reads x-forwarded-for first via
  *  getClientIp(). */
-function makeRequest(body: unknown, ip = `10.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}.1`): NextRequest {
+function makeRequest(
+  body: unknown,
+  ip = `10.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}.1`,
+): NextRequest {
   return new NextRequest("http://localhost:3000/api/talent/applications", {
     method: "POST",
     headers: {

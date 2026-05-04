@@ -161,9 +161,7 @@ export default function TalentApplicationPage() {
       .catch((err) => {
         if (cancelled) return;
         console.error("[talent] failed to load categories", err);
-        setCategoriesError(
-          "We couldn't load the skill categories. Please refresh the page.",
-        );
+        setCategoriesError("We couldn't load the skill categories. Please refresh the page.");
         setStatus("error");
       });
     return () => {
@@ -219,9 +217,7 @@ export default function TalentApplicationPage() {
 
   // -- Toggle helpers ------------------------------------------------------
   function toggleCategoryId(id: string) {
-    setCategoryIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
+    setCategoryIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
   function toggleWorkedWith(v: WorkedWith) {
     setWorkedWith((prev) => (prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]));
@@ -240,9 +236,7 @@ export default function TalentApplicationPage() {
     setSocialLinks((prev) => prev.map((v, i) => (i === idx ? value : v)));
   }
   function addSocialLink() {
-    setSocialLinks((prev) =>
-      prev.length < MAX_SOCIAL_LINKS ? [...prev, ""] : prev,
-    );
+    setSocialLinks((prev) => (prev.length < MAX_SOCIAL_LINKS ? [...prev, ""] : prev));
   }
   function removeSocialLink(idx: number) {
     setSocialLinks((prev) => (prev.length === 1 ? [""] : prev.filter((_, i) => i !== idx)));
@@ -273,8 +267,7 @@ export default function TalentApplicationPage() {
       yearsRemote: hasRemoteExp ? yearsRemote || null : null,
       workedWith,
       workload,
-      preferredTasksPerWeek:
-        workload === "FULL_TIME" ? preferredTasksPerWeek || null : null,
+      preferredTasksPerWeek: workload === "FULL_TIME" ? preferredTasksPerWeek || null : null,
       turnaroundOk,
       turnaroundComment: turnaroundComment.trim(),
       tools,
@@ -291,12 +284,11 @@ export default function TalentApplicationPage() {
         body: JSON.stringify(payload),
       });
       if (!res.ok) {
-        const json = (await res.json().catch(() => null)) as
-          | { error?: string; message?: string }
-          | null;
-        setSubmitError(
-          json?.message || json?.error || "Submission failed. Please try again.",
-        );
+        const json = (await res.json().catch(() => null)) as {
+          error?: string;
+          message?: string;
+        } | null;
+        setSubmitError(json?.message || json?.error || "Submission failed. Please try again.");
         setStatus("error");
         // Single-use Turnstile token — refresh after every submit attempt.
         turnstileRef.current?.reset();
@@ -344,8 +336,8 @@ export default function TalentApplicationPage() {
               Thanks — application received
             </h1>
             <p className="mt-2 text-sm text-[var(--bb-text-secondary)]">
-              We review every application personally and will reply within a few days.
-              Keep an eye on your inbox.
+              We review every application personally and will reply within a few days. Keep an eye
+              on your inbox.
             </p>
             <Link
               href="/"
@@ -368,12 +360,10 @@ export default function TalentApplicationPage() {
 
       <main id="main-content" className="mx-auto w-full max-w-2xl px-6 py-10">
         <header className="mb-8">
-          <h1 className="text-2xl font-bold text-[var(--bb-secondary)]">
-            Apply to join Brandbite
-          </h1>
+          <h1 className="text-2xl font-bold text-[var(--bb-secondary)]">Apply to join Brandbite</h1>
           <p className="mt-2 text-sm text-[var(--bb-text-secondary)]">
-            Tell us about your work and how you&rsquo;d like to collaborate. The form takes
-            about 4 minutes. Required fields are marked with an asterisk.
+            Tell us about your work and how you&rsquo;d like to collaborate. The form takes about 4
+            minutes. Required fields are marked with an asterisk.
           </p>
         </header>
 
@@ -523,9 +513,7 @@ export default function TalentApplicationPage() {
             <fieldset>
               <legend className="sr-only">Skill categories</legend>
               {status === "loading-categories" ? (
-                <p className="text-sm text-[var(--bb-text-secondary)]">
-                  Loading categories…
-                </p>
+                <p className="text-sm text-[var(--bb-text-secondary)]">Loading categories…</p>
               ) : (
                 <>
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -559,8 +547,7 @@ export default function TalentApplicationPage() {
                     }`}
                     aria-live="polite"
                   >
-                    {categoryIds.length} of {categories.length} selected — minimum{" "}
-                    {MIN_CATEGORIES}
+                    {categoryIds.length} of {categories.length} selected — minimum {MIN_CATEGORIES}
                   </p>
                 </>
               )}
@@ -760,8 +747,8 @@ export default function TalentApplicationPage() {
           </Button>
 
           <p className="text-center text-xs text-[var(--bb-text-muted)]">
-            By submitting you agree we may store and review the information above to
-            evaluate your application.
+            By submitting you agree we may store and review the information above to evaluate your
+            application.
           </p>
         </form>
       </main>
@@ -802,9 +789,7 @@ function Section({
     <section className="space-y-4">
       <div>
         <h2 className="text-base font-semibold text-[var(--bb-secondary)]">{title}</h2>
-        {subtitle && (
-          <p className="mt-1 text-xs text-[var(--bb-text-muted)]">{subtitle}</p>
-        )}
+        {subtitle && <p className="mt-1 text-xs text-[var(--bb-text-muted)]">{subtitle}</p>}
       </div>
       <div className="space-y-4">{children}</div>
     </section>

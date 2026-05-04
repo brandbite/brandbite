@@ -123,9 +123,7 @@ export async function POST(req: NextRequest) {
         workedWith: data.workedWith,
         workload: data.workload,
         preferredTasksPerWeek:
-          data.workload === "FULL_TIME"
-            ? (data.preferredTasksPerWeek ?? null)
-            : null,
+          data.workload === "FULL_TIME" ? (data.preferredTasksPerWeek ?? null) : null,
         turnaroundOk: data.turnaroundOk,
         turnaroundComment: data.turnaroundComment ?? "",
         tools: data.tools,

@@ -32,11 +32,7 @@ export type Tool = (typeof TOOLS)[number];
 // Field-level helpers
 // ---------------------------------------------------------------------------
 
-const url = z
-  .string()
-  .trim()
-  .url("Please enter a valid URL")
-  .max(500, "URL is too long");
+const url = z.string().trim().url("Please enter a valid URL").max(500, "URL is too long");
 
 // Optional URL — empty string treated as absent so the form's empty-input
 // rows don't 400 on submit. After this `.transform`, the value is either
@@ -80,9 +76,7 @@ export const talentApplicationSubmitSchema = z
     }),
     hasRemoteExp: z.boolean(),
     yearsRemote: z.enum(TOTAL_YEARS).optional().nullable(),
-    workedWith: z
-      .array(z.enum(WORKED_WITH))
-      .min(1, "Please select at least one option"),
+    workedWith: z.array(z.enum(WORKED_WITH)).min(1, "Please select at least one option"),
 
     // 5. Availability
     workload: z.enum(WORKLOAD, { message: "Please select your availability" }),

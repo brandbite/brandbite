@@ -27,7 +27,11 @@ function baseValid() {
     // Three valid cuid-shaped IDs. Schema only requires non-empty strings
     // — the cross-validation against JobTypeCategory.isActive happens at
     // the API layer.
-    categoryIds: ["clxxx0000000000000000000a", "clxxx0000000000000000000b", "clxxx0000000000000000000c"],
+    categoryIds: [
+      "clxxx0000000000000000000a",
+      "clxxx0000000000000000000b",
+      "clxxx0000000000000000000c",
+    ],
     totalYears: "5-10" as const,
     hasRemoteExp: false,
     yearsRemote: null,

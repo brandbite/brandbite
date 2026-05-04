@@ -42,15 +42,11 @@ export async function GET() {
       headers: {
         // Same posture as /api/plans: short max-age + generous SWR so admin
         // edits surface within ~5 min and the public form load stays fast.
-        "Cache-Control":
-          "public, max-age=300, s-maxage=300, stale-while-revalidate=86400",
+        "Cache-Control": "public, max-age=300, s-maxage=300, stale-while-revalidate=86400",
       },
     });
   } catch (err) {
     console.error("[api/talent/categories] failed to load categories", err);
-    return NextResponse.json(
-      { error: "Failed to load categories" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load categories" }, { status: 500 });
   }
 }
