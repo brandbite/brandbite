@@ -178,6 +178,13 @@ enum MoodboardItemType {
   DRAWING
 }
 
+enum TalentApplicationStatus {
+  SUBMITTED
+  IN_REVIEW
+  ACCEPTED
+  DECLINED
+}
+
 // -----------------------------------------------------------------------------
 // Core User & Auth
 // -----------------------------------------------------------------------------
@@ -499,6 +506,79 @@ model JobTypeCategory {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// Talent Applications
+//
+// Public-facing application form at /talent. Anonymous (no UserAccount) —
+// the email + WhatsApp number are the contact channels. Status transitions
+// (SUBMITTED → ACCEPTED / DECLINED) are driven from the SITE_OWNER admin
+// queue in PR2. The multi-value fields (categoryIds, socialLinks, workedWith,
+// tools) live as JSON arrays because nothing queries against them; admin
+// list filters are by status + createdAt only. JobTypeCategory is the
+// source of truth for the skills multi-select; the form posts category IDs
+// and the API cross-validates that they're still active before insert.
+// -----------------------------------------------------------------------------
+
+model TalentApplication {
+  id String @id @default(cuid())
+
+  // Basic info — all required at submit time.
+  fullName       String
+  whatsappNumber String
+  email          String
+  country        String
+  timezone       String
+
+  // Portfolio & presence
+  portfolioUrl String
+  linkedinUrl  String?
+  /// Array of additional social URLs (Instagram / Behance / Dribbble / …).
+  /// Capped at 3 client-side and validated server-side.
+  socialLinks  Json    @default("[]")
+
+  /// JobTypeCategory.id values the candidate selected. Min 3 enforced at
+  /// submit; cross-validated against `isActive: true` rows so a tampered
+  /// payload referencing a deleted/disabled category is rejected.
+  categoryIds Json @default("[]")
+
+  // Experience snapshot
+  totalYears   String // bucket: "0-2" | "2-5" | "5-10" | "10+"
+  hasRemoteExp Boolean
+  yearsRemote  String? // null when hasRemoteExp = false
+  /// Subset of {STARTUPS,AGENCIES,CORPORATE,FREELANCE}; min 1 enforced.
+  workedWith   Json    @default("[]")
+
+  // Availability
+  workload              String // "PART_TIME" | "FULL_TIME"
+  preferredTasksPerWeek String? // null when PART_TIME
+
+  // Turnaround reality check
+  turnaroundOk      Boolean
+  turnaroundComment String  @default("") // <= 120 chars
+
+  // Tools & stack
+  /// Subset of {FIGMA,ADOBE,WEBFLOW,CANVA,AI_TOOLS,OTHER}; min 1 enforced.
+  tools      Json    @default("[]")
+  toolsOther String? // populated only when "OTHER" is among `tools`
+
+  // Test task + final confirmation
+  testTaskOk             Boolean
+  communicationConfirmed Boolean
+
+  // Audit / lifecycle
+  status    TalentApplicationStatus @default(SUBMITTED)
+  /// IP + user-agent captured at submit for spam triage. Not exposed to
+  /// the candidate; visible to SITE_OWNER in the admin detail panel.
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([email])
 }
 
 // -----------------------------------------------------------------------------
