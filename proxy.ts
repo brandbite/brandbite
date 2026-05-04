@@ -66,6 +66,14 @@ const PUBLIC_PATHS = [
   // the hardcoded defaults — the bug that made the FAQ CTA edit
   // appear not to take effect on demo.
   "/api/page-blocks",
+  // Public talent application form (PRs #223-#225). The /talent page is
+  // anonymous-with-email; both API endpoints are unauth (categories is
+  // a read of active JobTypeCategory rows, applications is the form
+  // submit gated by Turnstile + per-email rate limit). Without these
+  // entries the proxy 307s every request to /login and the form is
+  // unreachable from the marketing surface that links to it.
+  "/talent",
+  "/api/talent",
   "/api/health", // uptime monitors (BetterStack / Upptime / Vercel); route returns 200 or 503
   // Vercel Cron invocations. Each cron route is defence-in-depth with a
   // CRON_SECRET Bearer check; the proxy only needs to let the request
