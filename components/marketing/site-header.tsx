@@ -51,12 +51,71 @@ const GLASS_BAR =
 
 type GlobalBlocksApiPayload = { type?: string; data?: unknown };
 
+/** Map a SessionUser.role to the entry point of their dashboard. Mirrors
+ *  the post-sign-in redirect logic in app/login. SITE_OWNER + SITE_ADMIN
+ *  both land on /admin; CUSTOMER on the customer board; DESIGNER on the
+ *  creative board. Falls back to "/" for unknown roles so the link is
+ *  never broken. */
+function dashboardHrefForRole(role: string | undefined): string {
+  switch (role) {
+    case "SITE_OWNER":
+    case "SITE_ADMIN":
+      return "/admin";
+    case "CUSTOMER":
+      return "/customer/board";
+    case "DESIGNER":
+      return "/creative/board";
+    default:
+      return "/";
+  }
+}
+
+type SessionApiPayload = {
+  user: { id: string; email: string; role: string; name: string | null } | null;
+};
+
 export function SiteHeader({ activePage }: SiteHeaderProps = {}) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [data, setData] = useState<SiteHeaderData>(DEFAULT_SITE_HEADER_DATA);
 
+  // Session-aware header (PR7): when a real BetterAuth session is active
+  // we replace the "Sign in" CTA with a "Dashboard" link routed to the
+  // role-appropriate entry point. Avoids the "I'm signed in everywhere
+  // but the marketing site says Sign in" confusion.
+  //
+  // Loading state: show nothing where the CTA goes (rather than flashing
+  // "Sign in" then swapping to "Dashboard"). The empty button slot keeps
+  // the layout stable so the sign-in CTA doesn't jump in late.
+  const [sessionUser, setSessionUser] = useState<SessionApiPayload["user"] | null>(null);
+  const [sessionLoaded, setSessionLoaded] = useState(false);
+
   const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
   const signInHref = isDemoMode ? "/debug/demo-user" : "/login";
+  const dashboardHref = dashboardHrefForRole(sessionUser?.role);
+
+  // Fetch the session once on mount. /api/session is rate-limited to
+  // 60/min/IP server-side; we make exactly one call per page load. Demo
+  // mode is included because the same endpoint surfaces the demo
+  // persona as a `user` shape, so the CTA flips correctly there too.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/session", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : { user: null }))
+      .then((j: SessionApiPayload) => {
+        if (cancelled) return;
+        setSessionUser(j.user ?? null);
+        setSessionLoaded(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Treat any error as unauthenticated — the worst case is a stale
+        // "Sign in" button that still works.
+        setSessionLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -112,12 +171,25 @@ export function SiteHeader({ activePage }: SiteHeaderProps = {}) {
               {l.label}
             </Link>
           ))}
-          <Link
-            href={signInHref}
-            className="rounded-full bg-[var(--bb-secondary)] px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#333]"
-          >
-            Sign in
-          </Link>
+          {/* Session-aware CTA. Empty placeholder while the session
+              fetch is in flight so the layout doesn't jump. */}
+          {!sessionLoaded ? (
+            <span aria-hidden className="block h-9 w-[88px]" />
+          ) : sessionUser ? (
+            <Link
+              href={dashboardHref}
+              className="rounded-full bg-[var(--bb-primary)] px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[var(--bb-primary-hover,#d44d20)]"
+            >
+              Dashboard
+            </Link>
+          ) : (
+            <Link
+              href={signInHref}
+              className="rounded-full bg-[var(--bb-secondary)] px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#333]"
+            >
+              Sign in
+            </Link>
+          )}
         </nav>
 
         {/* Mobile hamburger */}
@@ -160,13 +232,25 @@ export function SiteHeader({ activePage }: SiteHeaderProps = {}) {
                 {l.label}
               </Link>
             ))}
-            <Link
-              href={signInHref}
-              onClick={() => setMobileOpen(false)}
-              className="mt-2 rounded-full bg-[var(--bb-secondary)] px-5 py-2 text-center text-sm font-semibold text-white"
-            >
-              Sign in
-            </Link>
+            {/* Session-aware CTA — same pattern as the desktop nav above. */}
+            {sessionLoaded &&
+              (sessionUser ? (
+                <Link
+                  href={dashboardHref}
+                  onClick={() => setMobileOpen(false)}
+                  className="mt-2 rounded-full bg-[var(--bb-primary)] px-5 py-2 text-center text-sm font-semibold text-white"
+                >
+                  Dashboard
+                </Link>
+              ) : (
+                <Link
+                  href={signInHref}
+                  onClick={() => setMobileOpen(false)}
+                  className="mt-2 rounded-full bg-[var(--bb-secondary)] px-5 py-2 text-center text-sm font-semibold text-white"
+                >
+                  Sign in
+                </Link>
+              ))}
           </div>
         </nav>
       )}
