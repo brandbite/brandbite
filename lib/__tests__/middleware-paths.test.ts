@@ -34,6 +34,8 @@ const PUBLIC_PATHS = [
   "/api/page-blocks",
   "/api/health",
   "/api/cron",
+  "/talent",
+  "/api/talent",
   "/privacy",
   "/terms",
   "/cookies",
@@ -147,6 +149,28 @@ describe("isPublicPath", () => {
 
   it("marks any future /api/cron/* route as public", () => {
     expect(isPublicPath("/api/cron/hypothetical-future-job")).toBe(true);
+  });
+
+  // -------------------------------------------------------------------------
+  // Talent application form (PRs #223-#225). Anonymous public form at
+  // /talent posts to /api/talent/applications and reads category options
+  // from /api/talent/categories. Both are unauth by design (Turnstile +
+  // per-email rate limit replace session-cookie gating). The original
+  // PR1 omitted these from PUBLIC_PATHS, so every visitor was 307'd to
+  // /login and the form was unreachable from the marketing banner that
+  // links to it. Pin the regression with explicit cases.
+  // -------------------------------------------------------------------------
+  for (const publicTalentPath of [
+    "/talent",
+    "/api/talent/categories",
+    "/api/talent/applications",
+  ]) {
+    it(`marks ${publicTalentPath} as public`, () => {
+      expect(isPublicPath(publicTalentPath)).toBe(true);
+    });
+  }
+  it("keeps /api/admin/talent-applications protected (SITE_OWNER only)", () => {
+    expect(isPublicPath("/api/admin/talent-applications")).toBe(false);
   });
 
   // -------------------------------------------------------------------------
