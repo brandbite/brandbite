@@ -1,36 +1,40 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/admin/talent-applications/[id]/route.ts
-// @purpose: Per-application admin actions: PATCH to accept (creates Google
-//           Calendar event with Meet, sends interview email) or decline
-//           (sends polite rejection). SITE_OWNER only.
+// @purpose: Per-application admin actions. SITE_OWNER only. Three actions:
 //
-//           Why a separate file from the list route: it matches the URL
+//             ACCEPT          (from SUBMITTED)
+//               Generate a booking token, persist three proposed slots +
+//               an optional custom message, email the candidate the
+//               tokenized booking link. Status → AWAITING_CANDIDATE_CHOICE.
+//               No Google Calendar event yet — that comes after the
+//               candidate picks (or after ACCEPT_PROPOSED below).
+//
+//             ACCEPT_PROPOSED (from CANDIDATE_PROPOSED_TIME)
+//               Confirm the time the candidate proposed via the public
+//               booking page. This is when the calendar event finally
+//               gets created. Status → ACCEPTED.
+//
+//             DECLINE         (from SUBMITTED, AWAITING_CANDIDATE_CHOICE,
+//                              or CANDIDATE_PROPOSED_TIME)
+//               Polite rejection email; no calendar interaction. Status
+//               → DECLINED. Loosened from PR2 to allow declining at any
+//               pre-final stage (e.g. owner changes mind during slot
+//               offering).
+//
+//           Why a separate file from the list route: matches the URL
 //           shape used elsewhere (/admin/plans/[id], /admin/users/[id])
-//           and lets the [id] param come from Next's typed segment instead
-//           of body parsing.
-//
-//           Failure model — accept flow:
-//             1. Read row + assert status === SUBMITTED → 409 if not
-//             2. Read singleton ConsultationSettings + assert Google
-//                connected → 412 with actionable message if not
-//             3. Calendar event create → 502 if Google fails
-//             4. Persist updates inside a transaction → 500 if DB fails
-//             5. Send email (best-effort, never blocks success response)
-//             6. Audit log (best-effort, write-only sink)
-//
-//           Steps 1-4 are atomic per application. If steps 5 or 6 fail,
-//           the row is still ACCEPTED and the calendar event still
-//           exists — that's the right tradeoff (we never want to send a
-//           cancellation email for an event we successfully created).
+//           and lets [id] come from Next's typed segment.
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
+import type { TalentApplication, TalentApplicationStatus } from "@prisma/client";
 
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 import { sendNotificationEmail } from "@/lib/email";
 import { renderTalentAcceptEmail } from "@/lib/email-templates/talent/accept";
 import { renderTalentDeclineEmail } from "@/lib/email-templates/talent/decline";
+import { renderTalentFinalConfirmationEmail } from "@/lib/email-templates/talent/final-confirmation";
 import { createConsultationEvent, extractMeetLink } from "@/lib/google/calendar";
 import { getConsultationSettings } from "@/lib/consultation/settings";
 import { prisma } from "@/lib/prisma";
@@ -40,6 +44,11 @@ import {
   TALENT_INTERVIEW_DURATION_MINUTES,
   talentApplicationActionSchema,
 } from "@/lib/schemas/talent-application.schemas";
+import {
+  bookingTokenExpiresAt,
+  buildBookingUrl,
+  generateBookingToken,
+} from "@/lib/talent-booking-token";
 
 export const runtime = "nodejs";
 // Force the runtime to evaluate per-request — this route writes to two
@@ -53,13 +62,20 @@ function getAppBaseUrl(): string {
   return "http://localhost:3000";
 }
 
+/** Per-action allowed from-statuses. Centralized so the 409 message can
+ *  cite the same source the route enforces against. */
+const ALLOWED_FROM: Record<"ACCEPT" | "ACCEPT_PROPOSED" | "DECLINE", TalentApplicationStatus[]> = {
+  ACCEPT: ["SUBMITTED"],
+  ACCEPT_PROPOSED: ["CANDIDATE_PROPOSED_TIME"],
+  DECLINE: ["SUBMITTED", "AWAITING_CANDIDATE_CHOICE", "CANDIDATE_PROPOSED_TIME"],
+};
+
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const auditContext = extractAuditContext(req);
 
-  // Auth + role gate. Defer the action validation until after we've
-  // confirmed the caller has the right; otherwise a 4xx from Zod would
-  // leak the schema shape to anonymous requests.
+  // Auth + role gate first — schema-shape errors should not leak before
+  // we've confirmed the caller is authorized to see this surface.
   let user;
   try {
     user = await getCurrentUserOrThrow();
@@ -77,21 +93,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!parsed.success) return parsed.response;
   const action = parsed.data;
 
-  // Read the row + assert SUBMITTED. This is a small race window between
-  // here and the eventual UPDATE — two admins clicking at the same time
-  // would both pass this check but only one succeeds the UPDATE (we use
-  // a conditional WHERE in the update). The Calendar create still fires
-  // for both, which would double-book; we accept that as a paper-cut for
-  // now since SITE_OWNER is one person in practice. PR3 / future
-  // hardening: wrap in a SELECT FOR UPDATE.
   const row = await prisma.talentApplication.findUnique({ where: { id } });
   if (!row) {
     return NextResponse.json({ error: "Application not found." }, { status: 404 });
   }
-  if (row.status !== "SUBMITTED") {
+
+  // Per-action from-status guard. Two admins racing on the same row
+  // is handled by the conditional updateMany inside each handler;
+  // this is the read-side fast path that gives a clean message.
+  const allowed = ALLOWED_FROM[action.action];
+  if (!allowed.includes(row.status)) {
     return NextResponse.json(
       {
-        error: `Application has already been actioned (status: ${row.status}).`,
+        error: `Cannot ${action.action} from status ${row.status}.`,
         currentStatus: row.status,
       },
       { status: 409 },
@@ -99,44 +113,119 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   if (action.action === "ACCEPT") {
-    return handleAccept({
-      id,
-      row,
-      action,
-      actor: user,
-      auditContext,
-    });
+    return handleAccept({ id, row, action, actor: user, auditContext });
   }
-
-  return handleDecline({
-    id,
-    row,
-    action,
-    actor: user,
-    auditContext,
-  });
+  if (action.action === "ACCEPT_PROPOSED") {
+    return handleAcceptProposed({ id, row, actor: user, auditContext });
+  }
+  return handleDecline({ id, row, action, actor: user, auditContext });
 }
 
 // ---------------------------------------------------------------------------
-// Accept flow
+// ACCEPT — offer 3 slots
 // ---------------------------------------------------------------------------
 
 async function handleAccept(args: {
   id: string;
-  row: Awaited<ReturnType<typeof prisma.talentApplication.findUnique>>;
-  action: { action: "ACCEPT"; interviewStartIso: string };
+  row: TalentApplication;
+  action: { action: "ACCEPT"; proposedSlotsIso: string[]; customMessage?: string | null };
   actor: Awaited<ReturnType<typeof getCurrentUserOrThrow>>;
   auditContext: ReturnType<typeof extractAuditContext>;
 }): Promise<NextResponse> {
   const { id, row, action, actor, auditContext } = args;
-  if (!row) {
-    // Type guard for the caller's null check; keeps TS happy.
-    return NextResponse.json({ error: "Application not found." }, { status: 404 });
+
+  const token = generateBookingToken();
+  const expiresAt = bookingTokenExpiresAt();
+  const trimmedMessage = action.customMessage?.trim() || null;
+
+  // Conditional write so a race against another admin can't overwrite a
+  // newly-actioned row. updateMany returns count.
+  const writeResult = await prisma.talentApplication.updateMany({
+    where: { id, status: "SUBMITTED" },
+    data: {
+      status: "AWAITING_CANDIDATE_CHOICE",
+      reviewedAt: new Date(),
+      reviewedByUserId: actor.id,
+      reviewedByUserEmail: actor.email,
+      proposedSlotsJson: action.proposedSlotsIso,
+      bookingToken: token,
+      bookingTokenExpiresAt: expiresAt,
+      customMessage: trimmedMessage,
+    },
+  });
+  if (writeResult.count === 0) {
+    return NextResponse.json(
+      { error: "Application status changed under us. Refresh and try again." },
+      { status: 409 },
+    );
   }
 
-  // Confirm Google is connected before we promise the candidate anything.
-  // 412 Precondition Failed reads correctly here — the request is
-  // well-formed but the system isn't in a state to fulfill it.
+  // Best-effort email — a failure here means the row is in
+  // AWAITING_CANDIDATE_CHOICE but the candidate doesn't know yet. The
+  // admin can re-trigger by re-clicking Accept after a transient resend
+  // failure (idempotent because the schema enforces SUBMITTED).
+  try {
+    const { subject, html } = await renderTalentAcceptEmail({
+      candidateName: row.fullName,
+      proposedSlotsIso: action.proposedSlotsIso,
+      candidateTimezone: row.timezone,
+      bookingUrl: buildBookingUrl(token),
+      customMessage: trimmedMessage,
+    });
+    await sendNotificationEmail(row.email, subject, html);
+  } catch (err) {
+    console.error("[talent-application] accept email send failed", err);
+  }
+
+  await logAdminAction({
+    actor: { id: actor.id, email: actor.email, role: actor.role },
+    action: "TALENT_APPLICATION_ACCEPTED",
+    outcome: "SUCCESS",
+    targetType: "TalentApplication",
+    targetId: id,
+    metadata: {
+      candidateEmail: row.email,
+      proposedSlotsIso: action.proposedSlotsIso,
+      hasCustomMessage: !!trimmedMessage,
+      // Token deliberately not logged — it's a credential.
+    },
+    context: auditContext,
+  });
+
+  return NextResponse.json(
+    {
+      ok: true,
+      status: "AWAITING_CANDIDATE_CHOICE",
+      proposedSlotsIso: action.proposedSlotsIso,
+      bookingTokenExpiresAt: expiresAt.toISOString(),
+    },
+    { status: 200 },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ACCEPT_PROPOSED — confirm the candidate's custom-time proposal
+// ---------------------------------------------------------------------------
+
+async function handleAcceptProposed(args: {
+  id: string;
+  row: TalentApplication;
+  actor: Awaited<ReturnType<typeof getCurrentUserOrThrow>>;
+  auditContext: ReturnType<typeof extractAuditContext>;
+}): Promise<NextResponse> {
+  const { id, row, actor, auditContext } = args;
+
+  const proposedAt = row.candidateProposedAt;
+  if (!proposedAt) {
+    // Defensive: from-status check passed but the column is null. Almost
+    // certainly a logic bug elsewhere; surface clearly rather than
+    // proceed with no time.
+    return NextResponse.json(
+      { error: "No proposed time on this application — cannot confirm." },
+      { status: 409 },
+    );
+  }
+
   const settings = await getConsultationSettings();
   if (!settings.googleRefreshToken) {
     return NextResponse.json(
@@ -148,15 +237,13 @@ async function handleAccept(args: {
     );
   }
 
-  const startIso = action.interviewStartIso;
+  const startIso = proposedAt.toISOString();
   const endIso = new Date(
-    new Date(startIso).getTime() + TALENT_INTERVIEW_DURATION_MINUTES * 60_000,
+    proposedAt.getTime() + TALENT_INTERVIEW_DURATION_MINUTES * 60_000,
   ).toISOString();
   const calendarId = settings.googleCalendarId ?? "primary";
 
-  // Step 1 — calendar event with Meet. Throws on Google failure; we
-  // map that to 502 so the admin sees a clear "external system" error
-  // distinct from our own 5xx.
+  // Calendar event create. Same shape as the original PR2 accept flow.
   let event;
   try {
     event = await createConsultationEvent(settings, {
@@ -169,6 +256,7 @@ async function handleAccept(args: {
         row.linkedinUrl ? `LinkedIn: ${row.linkedinUrl}` : null,
         ``,
         `Application id: ${row.id}`,
+        `(Confirmed candidate-proposed time)`,
       ]
         .filter((line): line is string => line !== null)
         .join("\n"),
@@ -199,10 +287,6 @@ async function handleAccept(args: {
 
   const meetLink = extractMeetLink(event);
   if (!meetLink) {
-    // Defensive: free Gmail without Meet enabled occasionally returns
-    // an event with no conference. We refuse rather than silently
-    // sending an email with a broken link. The admin can retry after
-    // enabling Meet on the calendar.
     console.warn("[talent-application] event created but no Meet link returned", {
       eventId: event.id,
     });
@@ -215,30 +299,21 @@ async function handleAccept(args: {
     );
   }
 
-  // Step 2 — DB update. Conditional on status=SUBMITTED so a race with
-  // a second admin click can't double-action. updateMany returns count.
   const writeResult = await prisma.talentApplication.updateMany({
-    where: { id, status: "SUBMITTED" },
+    where: { id, status: "CANDIDATE_PROPOSED_TIME" },
     data: {
       status: "ACCEPTED",
-      reviewedAt: new Date(),
-      reviewedByUserId: actor.id,
-      reviewedByUserEmail: actor.email,
       googleEventId: event.id,
       meetLink,
-      interviewAt: new Date(startIso),
+      interviewAt: proposedAt, // already on the row; redundant write keeps schema explicit
+      // Clear the booking token now that the booking is final — the URL
+      // is single-use and shouldn't survive past the booking moment.
+      bookingToken: null,
+      bookingTokenExpiresAt: null,
     },
   });
   if (writeResult.count === 0) {
-    // Race: another admin actioned this between our read and write.
-    // The calendar event we created is now orphaned; cancel it so the
-    // candidate doesn't get a stale invite.
-    console.warn("[talent-application] race lost during accept; cancelling Google event", {
-      id,
-      eventId: event.id,
-    });
-    // Best-effort cancel — if it fails, the row is consistent and the
-    // event will eventually expire. Don't block the response on it.
+    // Race lost; cancel the orphan event we just created.
     void import("@/lib/google/calendar").then(({ cancelConsultationEvent }) =>
       cancelConsultationEvent(settings, calendarId, event.id).catch((err) =>
         console.error("[talent-application] orphan event cancel failed", err),
@@ -250,12 +325,10 @@ async function handleAccept(args: {
     );
   }
 
-  // Step 3 — branded follow-up email. Best-effort: a failure here means
-  // the candidate still has the Google ICS invite (which carries the
-  // same Meet link) and the row is ACCEPTED. Better to log + continue
-  // than roll back a successful calendar booking.
+  // Best-effort final confirmation email. Google's ICS invite is the
+  // canonical calendar add; this is the branded human follow-up.
   try {
-    const { subject, html } = await renderTalentAcceptEmail({
+    const { subject, html } = await renderTalentFinalConfirmationEmail({
       candidateName: row.fullName,
       interviewStartIso: startIso,
       candidateTimezone: row.timezone,
@@ -263,7 +336,7 @@ async function handleAccept(args: {
     });
     await sendNotificationEmail(row.email, subject, html);
   } catch (err) {
-    console.error("[talent-application] accept email send failed", err);
+    console.error("[talent-application] final confirmation email failed", err);
   }
 
   await logAdminAction({
@@ -277,29 +350,24 @@ async function handleAccept(args: {
       interviewAt: startIso,
       meetLink,
       googleEventId: event.id,
+      via: "ACCEPT_PROPOSED",
     },
     context: auditContext,
   });
 
   return NextResponse.json(
-    {
-      ok: true,
-      status: "ACCEPTED",
-      googleEventId: event.id,
-      meetLink,
-      interviewAt: startIso,
-    },
+    { ok: true, status: "ACCEPTED", googleEventId: event.id, meetLink, interviewAt: startIso },
     { status: 200 },
   );
 }
 
 // ---------------------------------------------------------------------------
-// Decline flow
+// DECLINE
 // ---------------------------------------------------------------------------
 
 async function handleDecline(args: {
   id: string;
-  row: NonNullable<Awaited<ReturnType<typeof prisma.talentApplication.findUnique>>>;
+  row: TalentApplication;
   action: { action: "DECLINE"; reason?: string | null };
   actor: Awaited<ReturnType<typeof getCurrentUserOrThrow>>;
   auditContext: ReturnType<typeof extractAuditContext>;
@@ -307,13 +375,17 @@ async function handleDecline(args: {
   const { id, row, action, actor, auditContext } = args;
 
   const writeResult = await prisma.talentApplication.updateMany({
-    where: { id, status: "SUBMITTED" },
+    where: { id, status: { in: ALLOWED_FROM.DECLINE } },
     data: {
       status: "DECLINED",
       reviewedAt: new Date(),
       reviewedByUserId: actor.id,
       reviewedByUserEmail: actor.email,
       declineReason: action.reason?.trim() || null,
+      // Invalidate any outstanding booking token so the candidate can't
+      // pick a slot on a row that's now declined.
+      bookingToken: null,
+      bookingTokenExpiresAt: null,
     },
   });
   if (writeResult.count === 0) {
@@ -323,7 +395,7 @@ async function handleDecline(args: {
     );
   }
 
-  // Best-effort email — same reasoning as accept.
+  // Best-effort email.
   try {
     const { subject, html } = await renderTalentDeclineEmail({
       candidateName: row.fullName,
@@ -344,6 +416,7 @@ async function handleDecline(args: {
     metadata: {
       candidateEmail: row.email,
       hasReason: !!action.reason?.trim(),
+      previousStatus: row.status,
     },
     context: auditContext,
   });
