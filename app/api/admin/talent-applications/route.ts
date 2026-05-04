@@ -36,7 +36,14 @@ const ALLOWED_STATUSES: TalentApplicationStatus[] = [
   "DECLINED",
 ];
 
-export type AdminTalentApplicationItem = TalentApplication;
+export type AdminTalentApplicationItem = TalentApplication & {
+  /** PR5: true when this application's email matches an existing
+   *  UserAccount (any role, including SITE_OWNER / SITE_ADMIN /
+   *  CUSTOMER). Surfaced as a badge in the admin UI so the reviewer
+   *  notices when an applicant has accidentally used their existing
+   *  customer email. Set on the response, not persisted on the row. */
+  existingCustomer: boolean;
+};
 
 export type AdminTalentApplicationListResponse = {
   applications: AdminTalentApplicationItem[];
@@ -103,8 +110,27 @@ export async function GET(req: NextRequest) {
       prisma.talentApplication.count({ where }),
     ]);
 
+    // PR5 — email-collision flag. Single batched lookup against UserAccount
+    // (indexed on `email @unique`) rather than N per-row queries, so adding
+    // this enrichment to the list view is one extra DB roundtrip regardless
+    // of page size. Skip the lookup entirely on an empty page.
+    const applicantEmails = applications.map((a) => a.email);
+    const customerSet = new Set<string>();
+    if (applicantEmails.length > 0) {
+      const customers = await prisma.userAccount.findMany({
+        where: { email: { in: applicantEmails }, deletedAt: null },
+        select: { email: true },
+      });
+      for (const c of customers) customerSet.add(c.email);
+    }
+
+    const enriched: AdminTalentApplicationItem[] = applications.map((a) => ({
+      ...a,
+      existingCustomer: customerSet.has(a.email),
+    }));
+
     const body: AdminTalentApplicationListResponse = {
-      applications,
+      applications: enriched,
       total,
       filter: { status },
     };

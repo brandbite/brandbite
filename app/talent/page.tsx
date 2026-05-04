@@ -23,6 +23,7 @@ import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 
 import { Button } from "@/components/ui/button";
 import { FormInput, FormSelect, FormTextarea } from "@/components/ui/form-field";
+import { COUNTRIES, findCountryByIso } from "@/lib/countries";
 import {
   TASKS_PER_WEEK,
   TOOLS,
@@ -97,10 +98,33 @@ export default function TalentApplicationPage() {
 
   // -- Form fields ---------------------------------------------------------
   const [fullName, setFullName] = useState("");
-  const [whatsappNumber, setWhatsappNumber] = useState("");
+  // WhatsApp split (PR5): the user picks a country code from a dropdown
+  // and types the local number separately. We submit the concatenated
+  // E.164 string (e.g. "+90 555 555 5555") in `whatsappNumber` so the
+  // schema/DB shape doesn't change.
+  const [whatsappCountryIso, setWhatsappCountryIso] = useState("");
+  const [whatsappLocal, setWhatsappLocal] = useState("");
   const [email, setEmail] = useState("");
-  const [country, setCountry] = useState("");
+  // Country split (PR5): the dropdown's value is the ISO 3166-1 alpha-2
+  // code (stable lookup key into lib/countries.ts). The submitted
+  // `country` field is the display name, kept in sync via a derived
+  // value below.
+  const [countryIso, setCountryIso] = useState("");
   const [timezone, setTimezone] = useState("");
+
+  // Derived: country display name (for submit). Empty until selection.
+  const country = useMemo(() => findCountryByIso(countryIso)?.name ?? "", [countryIso]);
+  // Derived: WhatsApp dial code from the selected country code dropdown.
+  const whatsappDialCode = useMemo(
+    () => findCountryByIso(whatsappCountryIso)?.dialCode ?? "",
+    [whatsappCountryIso],
+  );
+  // Derived: full E.164-style number for the API submission.
+  const whatsappNumber = useMemo(() => {
+    const trimmed = whatsappLocal.trim();
+    if (!trimmed || !whatsappDialCode) return trimmed;
+    return `${whatsappDialCode} ${trimmed}`;
+  }, [whatsappDialCode, whatsappLocal]);
 
   const [portfolioUrl, setPortfolioUrl] = useState("");
   const [linkedinUrl, setLinkedinUrl] = useState("");
@@ -134,11 +158,16 @@ export default function TalentApplicationPage() {
   const [status, setStatus] = useState<Status>("loading-categories");
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // -- Timezone options (computed once, native Intl) -----------------------
+  // -- Timezone options (PR5: filtered by selected country) ----------------
+  // When a country is selected we constrain the timezone <select> to that
+  // country's IANA zones (lib/countries.ts). Single-zone countries get
+  // auto-selected by the effect below. Before any country is picked we
+  // fall back to the unfiltered Intl list so the field isn't empty.
   const timezoneOptions = useMemo(() => {
+    const country = findCountryByIso(countryIso);
+    if (country && country.timezones.length > 0) return country.timezones;
+
     try {
-      // Intl.supportedValuesOf is widely supported in modern browsers and
-      // Node 18+. Fall back to a small set if missing (older browser).
       const intl = Intl as typeof Intl & { supportedValuesOf?: (k: string) => string[] };
       const list = intl.supportedValuesOf?.("timeZone");
       if (list && list.length > 0) return list;
@@ -146,7 +175,37 @@ export default function TalentApplicationPage() {
       // fall through
     }
     return ["UTC", "Europe/Istanbul", "Europe/London", "America/New_York", "Asia/Singapore"];
-  }, []);
+  }, [countryIso]);
+
+  // Country-change handler — drives both the timezone <select> and the
+  // WhatsApp dial-code default. Lives outside an effect because all the
+  // dependent state updates are caused by a user interaction (the
+  // <select onChange>), so the cleaner pattern is to do the work
+  // synchronously in the handler instead of reacting after the fact.
+  function handleCountryChange(nextIso: string) {
+    setCountryIso(nextIso);
+
+    const country = findCountryByIso(nextIso);
+    if (!country) {
+      setTimezone("");
+      return;
+    }
+
+    // Single-zone country → auto-select. Multi-zone country → clear the
+    // timezone if the existing selection isn't valid for the new country
+    // so the form can't submit a stale mismatched value.
+    if (country.timezones.length === 1) {
+      setTimezone(country.timezones[0]!);
+    } else if (timezone && !country.timezones.includes(timezone)) {
+      setTimezone("");
+    }
+
+    // Default the WhatsApp dial code to match (one-shot — only fills if
+    // the user hasn't picked one yet).
+    if (!whatsappCountryIso) {
+      setWhatsappCountryIso(nextIso);
+    }
+  }
 
   // -- Category fetch ------------------------------------------------------
   useEffect(() => {
@@ -177,8 +236,10 @@ export default function TalentApplicationPage() {
   // disabled submit + inline counters are kinder than a 400 round-trip.
   const isSubmittable = useMemo(() => {
     if (status === "submitting" || status === "loading-categories") return false;
-    if (!fullName.trim() || !whatsappNumber.trim() || !email.trim()) return false;
-    if (!country.trim() || !timezone) return false;
+    if (!fullName.trim() || !email.trim()) return false;
+    // PR5: WhatsApp is split into dial-code + local. Require both.
+    if (!whatsappCountryIso || !whatsappLocal.trim()) return false;
+    if (!countryIso || !timezone) return false;
     if (!portfolioUrl.trim()) return false;
     if (categoryIds.length < MIN_CATEGORIES) return false;
     if (!totalYears) return false;
@@ -197,9 +258,10 @@ export default function TalentApplicationPage() {
   }, [
     status,
     fullName,
-    whatsappNumber,
+    whatsappCountryIso,
+    whatsappLocal,
     email,
-    country,
+    countryIso,
     timezone,
     portfolioUrl,
     categoryIds,
@@ -392,17 +454,37 @@ export default function TalentApplicationPage() {
                 maxLength={120}
               />
             </Field>
-            <Field label="WhatsApp number" required htmlFor="t-whatsapp">
-              <FormInput
-                id="t-whatsapp"
-                value={whatsappNumber}
-                onChange={(e) => setWhatsappNumber(e.target.value)}
-                aria-required
-                inputMode="tel"
-                autoComplete="tel"
-                placeholder="+90 555 555 5555"
-                maxLength={32}
-              />
+            <Field label="WhatsApp number" required htmlFor="t-whatsapp-local">
+              {/* Two-input pattern: dial-code dropdown sets the country
+                  prefix, local input takes the rest. The submitted value
+                  is the concatenated E.164 string (see `whatsappNumber`
+                  derived above) so the API/DB shape doesn't change. */}
+              <div className="grid grid-cols-[160px_1fr] gap-2">
+                <FormSelect
+                  id="t-whatsapp-cc"
+                  aria-label="Country code"
+                  value={whatsappCountryIso}
+                  onChange={(e) => setWhatsappCountryIso(e.target.value)}
+                  aria-required
+                >
+                  <option value="">Code</option>
+                  {COUNTRIES.map((c) => (
+                    <option key={`wa-${c.iso2}`} value={c.iso2}>
+                      {c.dialCode} ({c.iso2}) {c.name}
+                    </option>
+                  ))}
+                </FormSelect>
+                <FormInput
+                  id="t-whatsapp-local"
+                  value={whatsappLocal}
+                  onChange={(e) => setWhatsappLocal(e.target.value)}
+                  aria-required
+                  inputMode="tel"
+                  autoComplete="tel-national"
+                  placeholder="555 555 5555"
+                  maxLength={24}
+                />
+              </div>
             </Field>
             <Field label="Email" required htmlFor="t-email">
               <FormInput
@@ -415,15 +497,21 @@ export default function TalentApplicationPage() {
                 maxLength={320}
               />
             </Field>
-            <Field label="Country" required htmlFor="t-country">
-              <FormInput
+            <Field label="Your current country of residence" required htmlFor="t-country">
+              <FormSelect
                 id="t-country"
-                value={country}
-                onChange={(e) => setCountry(e.target.value)}
+                value={countryIso}
+                onChange={(e) => handleCountryChange(e.target.value)}
                 aria-required
                 autoComplete="country-name"
-                maxLength={80}
-              />
+              >
+                <option value="">Select your country</option>
+                {COUNTRIES.map((c) => (
+                  <option key={c.iso2} value={c.iso2}>
+                    {c.name}
+                  </option>
+                ))}
+              </FormSelect>
             </Field>
             <Field label="Timezone" required htmlFor="t-timezone">
               <FormSelect
@@ -431,8 +519,11 @@ export default function TalentApplicationPage() {
                 value={timezone}
                 onChange={(e) => setTimezone(e.target.value)}
                 aria-required
+                disabled={!countryIso}
               >
-                <option value="">Select your timezone</option>
+                <option value="">
+                  {countryIso ? "Select your timezone" : "Pick a country first"}
+                </option>
                 {timezoneOptions.map((tz) => (
                   <option key={tz} value={tz}>
                     {tz}
