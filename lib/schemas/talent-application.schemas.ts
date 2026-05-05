@@ -215,6 +215,40 @@ export const talentApplicationActionSchema = z.discriminatedUnion("action", [
      *  it must stay within human-readable limits. */
     reason: z.string().trim().max(500).optional().nullable(),
   }),
+  // PR9 — post-interview lifecycle actions. Allowed from-statuses are
+  // enforced separately in the route handler's ALLOWED_FROM map.
+  z.object({
+    action: z.literal("MARK_INTERVIEW_HELD"),
+    /** No fields. Just records the timestamp + actor; the candidate
+     *  isn't notified. The next admin action (HIRE / REJECT_POST_INTERVIEW)
+     *  is the one that triggers candidate-facing email. */
+  }),
+  z.object({
+    action: z.literal("HIRE"),
+    /** Free-text working hours from the post-interview onboarding form.
+     *  Negotiated, not constrained — see model comment in schema.prisma. */
+    workingHours: z.string().trim().min(2).max(200),
+    /** Final approved subset of the candidate's applied categories.
+     *  Cuid format matches the JobTypeCategory.id shape. Min 1 because
+     *  hiring with no approved categories has no functional meaning —
+     *  the next PR's CreativeSkill seeding would create zero rows. */
+    approvedCategoryIds: z.array(z.string().cuid()).min(1, "Approve at least one category").max(30),
+    /** Capacity cap. Defaults to a numeric mapping of the application's
+     *  preferredTasksPerWeek bucket when omitted ("1-2"→2, "3-5"→4,
+     *  "6+"→6) so the admin can save the form without typing a number;
+     *  override here if the negotiated cap differs from the bucket. */
+    tasksPerWeekCap: z.number().int().min(1).max(40).optional().nullable(),
+    /** Internal-only admin notes captured at hire time. Free-form. */
+    hireNotes: z.string().trim().max(2000).optional().nullable(),
+  }),
+  z.object({
+    action: z.literal("REJECT_POST_INTERVIEW"),
+    /** Optional admin-supplied note. Rendered verbatim in the
+     *  decline-post-interview email above the standard copy so the
+     *  rejection can be soft-tailored without opening a separate
+     *  inbox thread. */
+    reason: z.string().trim().max(500).optional().nullable(),
+  }),
 ]);
 
 export type TalentApplicationActionInput = z.infer<typeof talentApplicationActionSchema>;
