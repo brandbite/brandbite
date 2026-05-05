@@ -34,6 +34,7 @@ import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 import { sendNotificationEmail } from "@/lib/email";
 import { renderTalentAcceptEmail } from "@/lib/email-templates/talent/accept";
 import { renderTalentDeclineEmail } from "@/lib/email-templates/talent/decline";
+import { renderTalentDeclinePostInterviewEmail } from "@/lib/email-templates/talent/decline-post-interview";
 import { renderTalentFinalConfirmationEmail } from "@/lib/email-templates/talent/final-confirmation";
 import { createConsultationEvent, extractMeetLink } from "@/lib/google/calendar";
 import { getConsultationSettings } from "@/lib/consultation/settings";
@@ -64,11 +65,43 @@ function getAppBaseUrl(): string {
 
 /** Per-action allowed from-statuses. Centralized so the 409 message can
  *  cite the same source the route enforces against. */
-const ALLOWED_FROM: Record<"ACCEPT" | "ACCEPT_PROPOSED" | "DECLINE", TalentApplicationStatus[]> = {
+const ALLOWED_FROM: Record<
+  | "ACCEPT"
+  | "ACCEPT_PROPOSED"
+  | "DECLINE"
+  | "MARK_INTERVIEW_HELD"
+  | "HIRE"
+  | "REJECT_POST_INTERVIEW",
+  TalentApplicationStatus[]
+> = {
   ACCEPT: ["SUBMITTED"],
   ACCEPT_PROPOSED: ["CANDIDATE_PROPOSED_TIME"],
   DECLINE: ["SUBMITTED", "AWAITING_CANDIDATE_CHOICE", "CANDIDATE_PROPOSED_TIME"],
+  // PR9 — post-interview lifecycle. MARK_INTERVIEW_HELD is the gate to
+  // the hire-or-reject decision; HIRE captures onboarding fields and
+  // moves to HIRED (next PR's onboarding orchestrator picks up from
+  // there). REJECT_POST_INTERVIEW sends the soft-toned decline-post-
+  // interview email and reaches a distinct terminal status.
+  MARK_INTERVIEW_HELD: ["ACCEPTED"],
+  HIRE: ["INTERVIEW_HELD"],
+  REJECT_POST_INTERVIEW: ["INTERVIEW_HELD"],
 };
+
+/** Map the candidate's preferredTasksPerWeek bucket to a numeric default
+ *  for the HIRE form's tasksPerWeekCap field. Admin can override; this
+ *  is just so the input pre-fills sensibly instead of being empty. */
+function defaultTasksCapForBucket(bucket: string | null): number {
+  switch (bucket) {
+    case "1-2":
+      return 2;
+    case "3-5":
+      return 4;
+    case "6+":
+      return 6;
+    default:
+      return 3;
+  }
+}
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -117,6 +150,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
   if (action.action === "ACCEPT_PROPOSED") {
     return handleAcceptProposed({ id, row, actor: user, auditContext });
+  }
+  // PR9 — post-interview lifecycle dispatchers.
+  if (action.action === "MARK_INTERVIEW_HELD") {
+    return handleMarkInterviewHeld({ id, actor: user, auditContext });
+  }
+  if (action.action === "HIRE") {
+    return handleHire({ id, row, action, actor: user, auditContext });
+  }
+  if (action.action === "REJECT_POST_INTERVIEW") {
+    return handleRejectPostInterview({ id, row, action, actor: user, auditContext });
   }
   return handleDecline({ id, row, action, actor: user, auditContext });
 }
@@ -422,4 +465,210 @@ async function handleDecline(args: {
   });
 
   return NextResponse.json({ ok: true, status: "DECLINED" }, { status: 200 });
+}
+
+// ---------------------------------------------------------------------------
+// MARK_INTERVIEW_HELD — interview happened, no hire decision yet (PR9)
+// ---------------------------------------------------------------------------
+//
+// Pure status flip + audit. No candidate-facing email — the hire/reject
+// decision (next admin action) is the one that triggers candidate
+// notification. Allowed only from ACCEPTED so an accidental click doesn't
+// re-fire on a row that's already past this stage.
+//
+// Doesn't touch interview metadata (googleEventId, meetLink, interviewAt)
+// — those stay populated for historical reference.
+
+async function handleMarkInterviewHeld(args: {
+  id: string;
+  actor: Awaited<ReturnType<typeof getCurrentUserOrThrow>>;
+  auditContext: ReturnType<typeof extractAuditContext>;
+}): Promise<NextResponse> {
+  const { id, actor, auditContext } = args;
+
+  const writeResult = await prisma.talentApplication.updateMany({
+    where: { id, status: "ACCEPTED" },
+    data: {
+      status: "INTERVIEW_HELD",
+    },
+  });
+  if (writeResult.count === 0) {
+    return NextResponse.json(
+      { error: "Application status changed under us. Refresh and try again." },
+      { status: 409 },
+    );
+  }
+
+  await logAdminAction({
+    actor: { id: actor.id, email: actor.email, role: actor.role },
+    action: "TALENT_INTERVIEW_HELD",
+    outcome: "SUCCESS",
+    targetType: "TalentApplication",
+    targetId: id,
+    context: auditContext,
+  });
+
+  return NextResponse.json({ ok: true, status: "INTERVIEW_HELD" }, { status: 200 });
+}
+
+// ---------------------------------------------------------------------------
+// HIRE — capture onboarding terms; status → HIRED (PR9)
+// ---------------------------------------------------------------------------
+//
+// Persists the negotiated terms (workingHours, approvedCategoryIds,
+// tasksPerWeekCap, hireNotes) plus the hiredBy* audit triple. No
+// UserAccount creation here — that's the next PR's onboarding
+// orchestrator, which reads exactly these columns. No candidate email
+// either; "you've been hired" lands in the same email as the magic-link
+// the next PR sends.
+//
+// Cross-validates that approvedCategoryIds is a subset of the
+// candidate's originally-applied categoryIds. Prevents a tampered
+// admin-form payload from approving categories the candidate never
+// claimed (and prevents a UI bug from quietly approving everything).
+
+async function handleHire(args: {
+  id: string;
+  row: TalentApplication;
+  action: {
+    action: "HIRE";
+    workingHours: string;
+    approvedCategoryIds: string[];
+    tasksPerWeekCap?: number | null;
+    hireNotes?: string | null;
+  };
+  actor: Awaited<ReturnType<typeof getCurrentUserOrThrow>>;
+  auditContext: ReturnType<typeof extractAuditContext>;
+}): Promise<NextResponse> {
+  const { id, row, action, actor, auditContext } = args;
+
+  const appliedIds = new Set(
+    Array.isArray(row.categoryIds)
+      ? (row.categoryIds as unknown[]).filter((v): v is string => typeof v === "string")
+      : [],
+  );
+  const offendingIds = action.approvedCategoryIds.filter((cid) => !appliedIds.has(cid));
+  if (offendingIds.length > 0) {
+    return NextResponse.json(
+      {
+        error:
+          "approvedCategoryIds includes categories the candidate did not apply for. Refresh the form.",
+        offendingIds,
+      },
+      { status: 400 },
+    );
+  }
+
+  const tasksCap =
+    action.tasksPerWeekCap ?? defaultTasksCapForBucket(row.preferredTasksPerWeek ?? null);
+
+  const writeResult = await prisma.talentApplication.updateMany({
+    where: { id, status: "INTERVIEW_HELD" },
+    data: {
+      status: "HIRED",
+      hiredAt: new Date(),
+      hiredByUserId: actor.id,
+      hiredByUserEmail: actor.email,
+      workingHours: action.workingHours,
+      approvedCategoryIds: action.approvedCategoryIds,
+      approvedTasksPerWeekCap: tasksCap,
+      hireNotes: action.hireNotes?.trim() || null,
+    },
+  });
+  if (writeResult.count === 0) {
+    return NextResponse.json(
+      { error: "Application status changed under us. Refresh and try again." },
+      { status: 409 },
+    );
+  }
+
+  await logAdminAction({
+    actor: { id: actor.id, email: actor.email, role: actor.role },
+    action: "TALENT_HIRED",
+    outcome: "SUCCESS",
+    targetType: "TalentApplication",
+    targetId: id,
+    metadata: {
+      candidateEmail: row.email,
+      approvedCategoryIds: action.approvedCategoryIds,
+      tasksPerWeekCap: tasksCap,
+      // hireNotes deliberately omitted — internal-only and may contain
+      // negotiation detail (rates, contract terms) that doesn't belong
+      // in the audit metadata blob.
+    },
+    context: auditContext,
+  });
+
+  return NextResponse.json(
+    {
+      ok: true,
+      status: "HIRED",
+      onboardingPending: true,
+      tasksPerWeekCap: tasksCap,
+    },
+    { status: 200 },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// REJECT_POST_INTERVIEW — soft-toned rejection after the interview (PR9)
+// ---------------------------------------------------------------------------
+//
+// Status flip + decline-post-interview email + audit. Distinct from
+// DECLINE so the email tone can acknowledge the candidate's time
+// investment, and so reporting can distinguish "we said no before vs
+// after the call".
+
+async function handleRejectPostInterview(args: {
+  id: string;
+  row: TalentApplication;
+  action: { action: "REJECT_POST_INTERVIEW"; reason?: string | null };
+  actor: Awaited<ReturnType<typeof getCurrentUserOrThrow>>;
+  auditContext: ReturnType<typeof extractAuditContext>;
+}): Promise<NextResponse> {
+  const { id, row, action, actor, auditContext } = args;
+
+  const writeResult = await prisma.talentApplication.updateMany({
+    where: { id, status: "INTERVIEW_HELD" },
+    data: {
+      status: "REJECTED_AFTER_INTERVIEW",
+      reviewedAt: new Date(),
+      reviewedByUserId: actor.id,
+      reviewedByUserEmail: actor.email,
+      declineReason: action.reason?.trim() || null,
+    },
+  });
+  if (writeResult.count === 0) {
+    return NextResponse.json(
+      { error: "Application status changed under us. Refresh and try again." },
+      { status: 409 },
+    );
+  }
+
+  // Best-effort email — same pattern as decline.tsx send.
+  try {
+    const { subject, html } = await renderTalentDeclinePostInterviewEmail({
+      candidateName: row.fullName,
+      reason: action.reason ?? null,
+      showcaseUrl: `${getAppBaseUrl()}/showcase`,
+    });
+    await sendNotificationEmail(row.email, subject, html);
+  } catch (err) {
+    console.error("[talent-application] post-interview decline email failed", err);
+  }
+
+  await logAdminAction({
+    actor: { id: actor.id, email: actor.email, role: actor.role },
+    action: "TALENT_REJECTED_AFTER_INTERVIEW",
+    outcome: "SUCCESS",
+    targetType: "TalentApplication",
+    targetId: id,
+    metadata: {
+      candidateEmail: row.email,
+      hasReason: !!action.reason?.trim(),
+    },
+    context: auditContext,
+  });
+
+  return NextResponse.json({ ok: true, status: "REJECTED_AFTER_INTERVIEW" }, { status: 200 });
 }

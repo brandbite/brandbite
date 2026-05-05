@@ -34,7 +34,12 @@ type TalentApplicationStatus =
   | "AWAITING_CANDIDATE_CHOICE"
   | "CANDIDATE_PROPOSED_TIME"
   | "ACCEPTED"
-  | "DECLINED";
+  // PR9 — post-interview lifecycle.
+  | "INTERVIEW_HELD"
+  | "HIRED"
+  | "ONBOARDED"
+  | "DECLINED"
+  | "REJECTED_AFTER_INTERVIEW";
 
 type Application = {
   id: string;
@@ -73,6 +78,14 @@ type Application = {
   bookingTokenExpiresAt: string | null;
   customMessage: string | null;
   candidateProposedAt: string | null;
+  // PR9 — post-interview lifecycle fields
+  workingHours: string | null;
+  approvedCategoryIds: unknown;
+  approvedTasksPerWeekCap: number | null;
+  hiredAt: string | null;
+  hiredByUserEmail: string | null;
+  hireNotes: string | null;
+  hiredUserAccountId: string | null;
   // PR5 — true when the email matches an existing UserAccount.
   // Computed server-side per response, not stored on the row.
   existingCustomer?: boolean;
@@ -88,7 +101,11 @@ const STATUS_LABELS: Record<TalentApplicationStatus, string> = {
   AWAITING_CANDIDATE_CHOICE: "Awaiting candidate",
   CANDIDATE_PROPOSED_TIME: "Candidate proposed",
   ACCEPTED: "Accepted",
+  INTERVIEW_HELD: "Interview held",
+  HIRED: "Hired",
+  ONBOARDED: "Onboarded",
   DECLINED: "Declined",
+  REJECTED_AFTER_INTERVIEW: "Declined (post-interview)",
 };
 
 const STATUS_BADGE_VARIANT: Record<
@@ -100,7 +117,11 @@ const STATUS_BADGE_VARIANT: Record<
   AWAITING_CANDIDATE_CHOICE: "primary",
   CANDIDATE_PROPOSED_TIME: "warning",
   ACCEPTED: "success",
+  INTERVIEW_HELD: "warning",
+  HIRED: "success",
+  ONBOARDED: "success",
   DECLINED: "neutral",
+  REJECTED_AFTER_INTERVIEW: "neutral",
 };
 
 /** Format a stored array-shape `unknown` (Prisma JsonValue) into human
@@ -109,6 +130,23 @@ const STATUS_BADGE_VARIANT: Record<
 function formatList(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((v): v is string => typeof v === "string");
+}
+
+/** PR9 — map preferredTasksPerWeek bucket → numeric default for the HIRE
+ *  form's tasksPerWeekCap input. Mirrors the same helper in the API
+ *  route so the pre-fill matches what the server defaults to when the
+ *  field is omitted. */
+function defaultTasksCapForBucket(bucket: string | null): number {
+  switch (bucket) {
+    case "1-2":
+      return 2;
+    case "3-5":
+      return 4;
+    case "6+":
+      return 6;
+    default:
+      return 3;
+  }
 }
 
 function formatDateTime(iso: string | null, timezone?: string): string {
@@ -165,12 +203,18 @@ export default function TalentApplicationsPage() {
 
   // Per-action UI state — kept local because at most one action runs
   // at a time and the reset between selections is automatic.
-  // PR4: ACCEPT now offers 3 slots + a custom message instead of booking
-  // a single time. ACCEPT_PROPOSED has no fields (confirms the candidate's
-  // proposal in-place). DECLINE is unchanged.
+  // PR4: ACCEPT offers 3 slots + a custom message. ACCEPT_PROPOSED has
+  // no fields. DECLINE takes optional reason.
+  // PR9: HIRE captures workingHours / approvedCategoryIds / tasksPerWeekCap
+  // / hireNotes; pre-populated from the row when the user opens an
+  // INTERVIEW_HELD detail (see the reset effect below).
   const [proposedSlotsLocal, setProposedSlotsLocal] = useState<string[]>(["", "", ""]);
   const [customMessage, setCustomMessage] = useState("");
   const [declineReason, setDeclineReason] = useState("");
+  const [workingHoursLocal, setWorkingHoursLocal] = useState("");
+  const [approvedCategoryIdsLocal, setApprovedCategoryIdsLocal] = useState<string[]>([]);
+  const [tasksPerWeekCapLocal, setTasksPerWeekCapLocal] = useState<string>("");
+  const [hireNotesLocal, setHireNotesLocal] = useState("");
   const [actionStatus, setActionStatus] = useState<"idle" | "submitting">("idle");
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -206,14 +250,32 @@ export default function TalentApplicationsPage() {
   }, [refresh]);
 
   // When the user switches selection (or the list re-loads after an
-  // action), clear stale per-action UI state.
+  // action), clear stale per-action UI state. PR9 adds the HIRE form
+  // fields here too — pre-populating when the selected row is at
+  // INTERVIEW_HELD so the admin doesn't re-type categories the
+  // candidate already submitted.
   useEffect(() => {
     setProposedSlotsLocal(["", "", ""]);
     setCustomMessage("");
     setDeclineReason("");
+    setWorkingHoursLocal("");
+    setHireNotesLocal("");
     setActionStatus("idle");
     setActionError(null);
-  }, [selectedId]);
+
+    const sel = items.find((it) => it.id === selectedId);
+    if (sel?.status === "INTERVIEW_HELD") {
+      // Pre-fill HIRE form from the application data.
+      const applied = Array.isArray(sel.categoryIds)
+        ? (sel.categoryIds as unknown[]).filter((v): v is string => typeof v === "string")
+        : [];
+      setApprovedCategoryIdsLocal(applied);
+      setTasksPerWeekCapLocal(String(defaultTasksCapForBucket(sel.preferredTasksPerWeek)));
+    } else {
+      setApprovedCategoryIdsLocal([]);
+      setTasksPerWeekCapLocal("");
+    }
+  }, [selectedId, items]);
 
   async function submitAction(payload: Record<string, unknown>) {
     if (!selected) return;
@@ -232,12 +294,22 @@ export default function TalentApplicationsPage() {
       if (!res.ok || !body?.ok) {
         throw new Error(body?.error || `HTTP ${res.status}`);
       }
-      const successTitle =
-        payload.action === "ACCEPT"
-          ? "Slots offered. Candidate emailed a booking link."
-          : payload.action === "ACCEPT_PROPOSED"
-            ? "Interview booked at the candidate's proposed time."
-            : "Application declined.";
+      const successTitle = ((): string => {
+        switch (payload.action) {
+          case "ACCEPT":
+            return "Slots offered. Candidate emailed a booking link.";
+          case "ACCEPT_PROPOSED":
+            return "Interview booked at the candidate's proposed time.";
+          case "MARK_INTERVIEW_HELD":
+            return "Interview marked as held. Hire or decline next.";
+          case "HIRE":
+            return "Hired. Onboarding pending — UserAccount creation lands in the next PR.";
+          case "REJECT_POST_INTERVIEW":
+            return "Declined after interview. Email sent.";
+          default:
+            return "Application declined.";
+        }
+      })();
       toast.showToast({ type: "success", title: successTitle });
       setSelectedId(null);
       await refresh();
@@ -286,6 +358,44 @@ export default function TalentApplicationsPage() {
     });
   }
 
+  // PR9 — post-interview handlers.
+  function handleMarkInterviewHeld() {
+    void submitAction({ action: "MARK_INTERVIEW_HELD" });
+  }
+
+  function handleHire() {
+    if (!workingHoursLocal.trim()) {
+      setActionError("Working hours is required.");
+      return;
+    }
+    if (approvedCategoryIdsLocal.length === 0) {
+      setActionError("Approve at least one category.");
+      return;
+    }
+    const tasksCapNum = Number.parseInt(tasksPerWeekCapLocal, 10);
+    if (
+      tasksPerWeekCapLocal &&
+      (!Number.isFinite(tasksCapNum) || tasksCapNum < 1 || tasksCapNum > 40)
+    ) {
+      setActionError("Tasks per week cap must be between 1 and 40.");
+      return;
+    }
+    void submitAction({
+      action: "HIRE",
+      workingHours: workingHoursLocal.trim(),
+      approvedCategoryIds: approvedCategoryIdsLocal,
+      tasksPerWeekCap: tasksPerWeekCapLocal ? tasksCapNum : null,
+      hireNotes: hireNotesLocal.trim() || null,
+    });
+  }
+
+  function handleRejectPostInterview() {
+    void submitAction({
+      action: "REJECT_POST_INTERVIEW",
+      reason: declineReason.trim() || null,
+    });
+  }
+
   return (
     <div className="space-y-6">
       <header className="flex items-end justify-between gap-4">
@@ -316,7 +426,11 @@ export default function TalentApplicationsPage() {
               {total > 0 && filter === "CANDIDATE_PROPOSED_TIME" ? ` (${total})` : ""}
             </option>
             <option value="ACCEPTED">Accepted</option>
+            <option value="INTERVIEW_HELD">Interview held</option>
+            <option value="HIRED">Hired</option>
+            <option value="ONBOARDED">Onboarded</option>
             <option value="DECLINED">Declined</option>
+            <option value="REJECTED_AFTER_INTERVIEW">Declined (post-interview)</option>
             <option value="ALL">All</option>
           </FormSelect>
           <Button variant="secondary" onClick={() => void refresh()}>
@@ -405,11 +519,22 @@ export default function TalentApplicationsPage() {
                           onCustomMessageChange={setCustomMessage}
                           declineReason={declineReason}
                           onDeclineReasonChange={setDeclineReason}
+                          workingHoursLocal={workingHoursLocal}
+                          onWorkingHoursChange={setWorkingHoursLocal}
+                          approvedCategoryIdsLocal={approvedCategoryIdsLocal}
+                          onApprovedCategoriesChange={setApprovedCategoryIdsLocal}
+                          tasksPerWeekCapLocal={tasksPerWeekCapLocal}
+                          onTasksPerWeekCapChange={setTasksPerWeekCapLocal}
+                          hireNotesLocal={hireNotesLocal}
+                          onHireNotesChange={setHireNotesLocal}
                           actionStatus={actionStatus}
                           actionError={actionError}
                           onAccept={handleAccept}
                           onAcceptProposed={handleAcceptProposed}
                           onDecline={handleDecline}
+                          onMarkInterviewHeld={handleMarkInterviewHeld}
+                          onHire={handleHire}
+                          onRejectPostInterview={handleRejectPostInterview}
                         />
                       </td>
                     </tr>
@@ -437,11 +562,22 @@ function DetailPanel({
   onCustomMessageChange,
   declineReason,
   onDeclineReasonChange,
+  workingHoursLocal,
+  onWorkingHoursChange,
+  approvedCategoryIdsLocal,
+  onApprovedCategoriesChange,
+  tasksPerWeekCapLocal,
+  onTasksPerWeekCapChange,
+  hireNotesLocal,
+  onHireNotesChange,
   actionStatus,
   actionError,
   onAccept,
   onAcceptProposed,
   onDecline,
+  onMarkInterviewHeld,
+  onHire,
+  onRejectPostInterview,
 }: {
   item: Application;
   categoryNames: Map<string, string>;
@@ -451,17 +587,32 @@ function DetailPanel({
   onCustomMessageChange: (v: string) => void;
   declineReason: string;
   onDeclineReasonChange: (v: string) => void;
+  workingHoursLocal: string;
+  onWorkingHoursChange: (v: string) => void;
+  approvedCategoryIdsLocal: string[];
+  onApprovedCategoriesChange: (v: string[]) => void;
+  tasksPerWeekCapLocal: string;
+  onTasksPerWeekCapChange: (v: string) => void;
+  hireNotesLocal: string;
+  onHireNotesChange: (v: string) => void;
   actionStatus: "idle" | "submitting";
   actionError: string | null;
   onAccept: () => void;
   onAcceptProposed: () => void;
   onDecline: () => void;
+  onMarkInterviewHeld: () => void;
+  onHire: () => void;
+  onRejectPostInterview: () => void;
 }) {
-  // PR4 — three actionable states:
-  //   - SUBMITTED / IN_REVIEW: admin can offer 3 slots (ACCEPT) or DECLINE
-  //   - AWAITING_CANDIDATE_CHOICE: admin can DECLINE (revoking the offer)
-  //   - CANDIDATE_PROPOSED_TIME: admin can ACCEPT_PROPOSED or DECLINE
-  // ACCEPTED + DECLINED are terminal — the action panel hides.
+  // Action availability matrix. Re-derived per render so a status change
+  // (after a submitAction → refresh → status update) immediately flips
+  // which panels are visible.
+  //   - SUBMITTED / IN_REVIEW: offer 3 slots (ACCEPT) or DECLINE
+  //   - AWAITING_CANDIDATE_CHOICE: DECLINE (revoking the offer)
+  //   - CANDIDATE_PROPOSED_TIME: ACCEPT_PROPOSED or DECLINE
+  //   - ACCEPTED (PR9): MARK_INTERVIEW_HELD or REJECT_POST_INTERVIEW (no-show path)
+  //   - INTERVIEW_HELD (PR9): HIRE or REJECT_POST_INTERVIEW
+  //   - HIRED / ONBOARDED / DECLINED / REJECTED_AFTER_INTERVIEW: terminal info
   const canOfferSlots = item.status === "SUBMITTED" || item.status === "IN_REVIEW";
   const canConfirmProposed = item.status === "CANDIDATE_PROPOSED_TIME";
   const canDecline =
@@ -469,6 +620,18 @@ function DetailPanel({
     item.status === "IN_REVIEW" ||
     item.status === "AWAITING_CANDIDATE_CHOICE" ||
     item.status === "CANDIDATE_PROPOSED_TIME";
+  // PR9 — post-interview action gates.
+  const canMarkInterviewHeld = item.status === "ACCEPTED";
+  const canHire = item.status === "INTERVIEW_HELD";
+  const canRejectPostInterview = item.status === "ACCEPTED" || item.status === "INTERVIEW_HELD";
+
+  // Resolve applied categories to display names for the HIRE form's
+  // multi-select. Same lookup as the read-only "Skills" section above.
+  const appliedCategoryIds = formatList(item.categoryIds);
+  const appliedCategoryOptions = appliedCategoryIds.map((id) => ({
+    id,
+    name: categoryNames.get(id) ?? "(removed)",
+  }));
   const social = formatList(item.socialLinks);
   const categoryIds = formatList(item.categoryIds);
   // Resolve raw cuids to human category names; show "(removed)" for any
@@ -642,6 +805,239 @@ function DetailPanel({
           </InlineAlert>
         )}
 
+        {/* PR9 terminal info panels. */}
+        {item.status === "INTERVIEW_HELD" && (
+          <InlineAlert variant="info" title="Interview held — decision pending">
+            <div className="text-xs text-[var(--bb-text-muted)]">
+              Marked held · awaiting hire / decline. Use the Hire form below or &ldquo;Decline
+              after interview&rdquo;.
+            </div>
+          </InlineAlert>
+        )}
+
+        {item.status === "HIRED" && (
+          <InlineAlert variant="success" title="Hired — onboarding pending">
+            <div className="space-y-1 text-sm">
+              {item.workingHours && (
+                <div>
+                  <strong>Working hours:</strong> {item.workingHours}
+                </div>
+              )}
+              {item.approvedTasksPerWeekCap != null && (
+                <div>
+                  <strong>Tasks/week cap:</strong> {item.approvedTasksPerWeekCap}
+                </div>
+              )}
+              {Array.isArray(item.approvedCategoryIds) && item.approvedCategoryIds.length > 0 && (
+                <div>
+                  <strong>Approved categories:</strong>{" "}
+                  {formatList(item.approvedCategoryIds)
+                    .map((id) => categoryNames.get(id) ?? "(removed)")
+                    .join(", ")}
+                </div>
+              )}
+              {item.hireNotes && (
+                <div className="text-xs text-[var(--bb-text-secondary)] italic">
+                  Note: {item.hireNotes}
+                </div>
+              )}
+              <div className="text-xs text-[var(--bb-text-muted)]">
+                Hired by {item.hiredByUserEmail ?? "—"} · {formatDateTime(item.hiredAt)} ·
+                UserAccount auto-create lands in the next PR.
+              </div>
+            </div>
+          </InlineAlert>
+        )}
+
+        {item.status === "ONBOARDED" && (
+          <InlineAlert variant="success" title="Onboarded creative">
+            <div className="text-xs text-[var(--bb-text-muted)]">
+              UserAccount linked: {item.hiredUserAccountId ?? "—"}. Manage at /admin/users.
+            </div>
+          </InlineAlert>
+        )}
+
+        {item.status === "REJECTED_AFTER_INTERVIEW" && (
+          <InlineAlert variant="warning" title="Declined after interview">
+            <div className="space-y-1 text-sm">
+              {item.declineReason && (
+                <div>
+                  <strong>Reason sent:</strong> {item.declineReason}
+                </div>
+              )}
+              <div className="text-xs text-[var(--bb-text-muted)]">
+                Declined by {item.reviewedByUserEmail ?? "—"} · {formatDateTime(item.reviewedAt)}
+              </div>
+            </div>
+          </InlineAlert>
+        )}
+
+        {/* PR9 — MARK_INTERVIEW_HELD on ACCEPTED rows. */}
+        {canMarkInterviewHeld && (
+          <div className="rounded-xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-card)] p-4">
+            <SectionHeading>Did the interview happen?</SectionHeading>
+            <p className="mt-1 mb-3 text-xs text-[var(--bb-text-muted)]">
+              Click &ldquo;Yes&rdquo; to unlock the Hire form. Click &ldquo;No-show&rdquo; to skip
+              straight to the soft-toned post-interview decline.
+            </p>
+            <div className="flex gap-2">
+              <Button
+                onClick={onMarkInterviewHeld}
+                loading={actionStatus === "submitting"}
+                loadingText="Saving…"
+                disabled={actionStatus === "submitting"}
+              >
+                Yes, mark held
+              </Button>
+              <Button
+                variant="danger"
+                onClick={onRejectPostInterview}
+                loading={actionStatus === "submitting"}
+                loadingText="Sending…"
+                disabled={actionStatus === "submitting"}
+              >
+                No-show — decline
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* PR9 — HIRE form on INTERVIEW_HELD rows. */}
+        {canHire && (
+          <div className="rounded-xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-card)] p-4">
+            <SectionHeading>Hire &amp; capture onboarding terms</SectionHeading>
+            <p className="mt-1 mb-3 text-xs text-[var(--bb-text-muted)]">
+              Captures the negotiated terms. The next PR&apos;s onboarding orchestrator turns these
+              into a real DESIGNER UserAccount + CreativeSkill rows + magic-link sign-in email.
+            </p>
+
+            <label className="mb-3 block">
+              <span className="mb-1 block text-xs font-medium text-[var(--bb-text-secondary)]">
+                Working hours
+              </span>
+              <FormInput
+                value={workingHoursLocal}
+                onChange={(e) => onWorkingHoursChange(e.target.value)}
+                placeholder={`e.g. 9-18 weekdays ${item.timezone}`}
+                maxLength={200}
+              />
+            </label>
+
+            <fieldset className="mb-3">
+              <legend className="mb-1 text-xs font-medium text-[var(--bb-text-secondary)]">
+                Approved categories ({approvedCategoryIdsLocal.length} of{" "}
+                {appliedCategoryOptions.length})
+              </legend>
+              <div className="space-y-1.5">
+                {appliedCategoryOptions.map((opt) => {
+                  const checked = approvedCategoryIdsLocal.includes(opt.id);
+                  return (
+                    <label key={opt.id} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            onApprovedCategoriesChange([
+                              ...approvedCategoryIdsLocal.filter((id) => id !== opt.id),
+                              opt.id,
+                            ]);
+                          } else {
+                            onApprovedCategoriesChange(
+                              approvedCategoryIdsLocal.filter((id) => id !== opt.id),
+                            );
+                          }
+                        }}
+                      />
+                      <span>{opt.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <p className="mt-1 text-[11px] text-[var(--bb-text-muted)]">
+                Pre-filled with everything the candidate applied for. Deselect any you&apos;re not
+                hiring them for.
+              </p>
+            </fieldset>
+
+            <label className="mb-3 block">
+              <span className="mb-1 block text-xs font-medium text-[var(--bb-text-secondary)]">
+                Tasks per week cap{" "}
+                <span className="text-[var(--bb-text-muted)]">
+                  (applied bucket: {item.preferredTasksPerWeek ?? "—"})
+                </span>
+              </span>
+              <FormInput
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={40}
+                value={tasksPerWeekCapLocal}
+                onChange={(e) => onTasksPerWeekCapChange(e.target.value)}
+                placeholder="e.g. 4"
+              />
+            </label>
+
+            <label className="mb-3 block">
+              <span className="mb-1 block text-xs font-medium text-[var(--bb-text-secondary)]">
+                Internal hire notes (optional)
+              </span>
+              <FormTextarea
+                rows={3}
+                value={hireNotesLocal}
+                onChange={(e) => onHireNotesChange(e.target.value)}
+                placeholder="Negotiated rate, contract terms, anything for the team to remember. Not shown to the candidate."
+                maxLength={2000}
+              />
+            </label>
+
+            <div className="flex gap-2">
+              <Button
+                onClick={onHire}
+                loading={actionStatus === "submitting"}
+                loadingText="Hiring…"
+                disabled={
+                  actionStatus === "submitting" ||
+                  !workingHoursLocal.trim() ||
+                  approvedCategoryIdsLocal.length === 0
+                }
+              >
+                Hire
+              </Button>
+              <Button
+                variant="danger"
+                onClick={onRejectPostInterview}
+                loading={actionStatus === "submitting"}
+                loadingText="Sending…"
+                disabled={actionStatus === "submitting"}
+              >
+                Decline after interview
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* PR9 — REJECT_POST_INTERVIEW reason field. Shown on ACCEPTED +
+            INTERVIEW_HELD so admin can add a reason before clicking the
+            decline button rendered above (in either the held-or-no-show
+            panel or the Hire form). Reuses `declineReason` state. */}
+        {canRejectPostInterview && (
+          <div className="rounded-xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-card)] p-4">
+            <SectionHeading>Optional decline reason</SectionHeading>
+            <p className="mt-1 mb-3 text-xs text-[var(--bb-text-muted)]">
+              Surfaced verbatim in the post-interview decline email above the standard copy. Leave
+              blank for the generic version.
+            </p>
+            <FormTextarea
+              rows={3}
+              value={declineReason}
+              onChange={(e) => onDeclineReasonChange(e.target.value)}
+              placeholder="e.g. The motion-graphics work you showed was great — we just don't have steady volume in that lane this quarter."
+              maxLength={500}
+            />
+          </div>
+        )}
+
         {/* ACCEPT — offer 3 slots. Available on SUBMITTED / IN_REVIEW only. */}
         {canOfferSlots && (
           <div className="rounded-xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-card)] p-4">
@@ -714,22 +1110,16 @@ function DetailPanel({
           </div>
         )}
 
-        {actionError && (canOfferSlots || canConfirmProposed || canDecline) && (
-          <InlineAlert variant="error" title="Action failed">
-            {actionError}
-          </InlineAlert>
-        )}
-
-        {/* Defensive — should be unreachable: status is one of the
-         *  6 enums and every status maps to at least one panel. */}
-        {!canOfferSlots &&
-          !canConfirmProposed &&
-          !canDecline &&
-          item.status !== "ACCEPTED" &&
-          item.status !== "DECLINED" && (
-            <p className="text-sm text-[var(--bb-text-muted)]">
-              No action available for this status.
-            </p>
+        {actionError &&
+          (canOfferSlots ||
+            canConfirmProposed ||
+            canDecline ||
+            canMarkInterviewHeld ||
+            canHire ||
+            canRejectPostInterview) && (
+            <InlineAlert variant="error" title="Action failed">
+              {actionError}
+            </InlineAlert>
           )}
       </div>
     </div>
