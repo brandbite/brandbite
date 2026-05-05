@@ -809,8 +809,8 @@ function DetailPanel({
         {item.status === "INTERVIEW_HELD" && (
           <InlineAlert variant="info" title="Interview held — decision pending">
             <div className="text-xs text-[var(--bb-text-muted)]">
-              Marked held · awaiting hire / decline. Use the Hire form below or &ldquo;Decline
-              after interview&rdquo;.
+              Marked held · awaiting hire / decline. Use the Hire form below or &ldquo;Decline after
+              interview&rdquo;.
             </div>
           </InlineAlert>
         )}
