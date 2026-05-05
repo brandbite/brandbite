@@ -311,6 +311,15 @@ model UserAccount {
   // remain inspectable. Null for accounts created any other way.
   talentApplication TalentApplication? @relation(name: "TalentApplicationHire")
 
+  /// PR10 — capacity cap mirrored from TalentApplication.approvedTasksPerWeekCap
+  /// during onboarding. Null = no cap (the legacy default for every UserAccount
+  /// that pre-dates the talent funnel). PR3 (#TBD) reads this in
+  /// lib/tickets/create-ticket.ts auto-assign to skip creatives at-or-above
+  /// their cap; the column lives here (not on TalentApplication) so the
+  /// hot-path query stays a single creative-table read per ticket-create
+  /// instead of joining through TalentApplication.
+  tasksPerWeekCap Int?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
