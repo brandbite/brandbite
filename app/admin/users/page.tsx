@@ -12,6 +12,7 @@ import { LoadingState } from "@/components/ui/loading-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmTypedPhraseModal } from "@/components/admin/confirm-typed-phrase-modal";
 import { MfaChallengeModal, type MfaChallengeInfo } from "@/components/admin/mfa-challenge-modal";
+import { useSessionRole } from "@/lib/hooks/use-session-role";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -58,6 +59,10 @@ const ROLE_COLORS: Record<string, string> = {
 
 export default function AdminUsersPage() {
   const { showToast } = useToast();
+  // The Delete-user action is SITE_OWNER only. SITE_ADMIN sees the
+  // rest of the page exactly as before; the delete button never renders
+  // for them. Server-side enforcement still gates the API.
+  const { isSiteOwner } = useSessionRole();
 
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -135,6 +140,58 @@ export default function AdminUsersPage() {
     challenge: MfaChallengeInfo;
     retry: () => Promise<void>;
   } | null>(null);
+
+  // Hard-delete (SITE_OWNER only). Two-stage: first the typed-phrase
+  // modal collects "DELETE", then if the server demands fresh MFA the
+  // shared MFA challenge fires and re-runs on success.
+  const [pendingDelete, setPendingDelete] = useState<{
+    userId: string;
+    targetEmail: string;
+    targetRole: string;
+  } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteUser = async (userId: string, confirmation: string) => {
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, confirmation }),
+      });
+      const json = await res.json().catch(() => null);
+
+      // Server is asking for MFA — stash a retry that re-runs delete
+      // once the MFA modal verifies. Same shape as the role-change flow.
+      if (res.status === 202 && json?.requiresMfa) {
+        setPendingMfa({
+          challenge: {
+            method: json.method,
+            challengeId: json.challengeId,
+            maskedEmail: json.maskedEmail,
+            expiresAt: json.expiresAt,
+            actionTag: json.actionTag,
+          },
+          retry: () => handleDeleteUser(userId, confirmation),
+        });
+        return;
+      }
+
+      if (!res.ok) {
+        const msg = json?.error || "Failed to delete user";
+        showToast({ title: msg, type: "error" });
+        throw new Error(msg); // surface to the modal so it stays open
+      }
+
+      // Soft-delete = remove from the list. The row is anonymized
+      // server-side; a subsequent reload would show "deleted-…" if we
+      // didn't filter, which would be confusing.
+      setUsers((prev) => prev.filter((u) => u.id !== userId));
+      showToast({ title: "User deleted", type: "success" });
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   // Change role. `confirmation` is passed through to the API when the
   // change involves a SITE_OWNER or SITE_ADMIN on either side.
@@ -519,6 +576,24 @@ export default function AdminUsersPage() {
                           </span>
                         </button>
                       ) : null}
+                      {/* Hard-delete — SITE_OWNER only. Hidden for site
+                          owners themselves (the API blocks it too); they
+                          must demote first via Change role. */}
+                      {isSiteOwner && u.role !== "SITE_OWNER" && (
+                        <button
+                          onClick={() =>
+                            setPendingDelete({
+                              userId: u.id,
+                              targetEmail: u.email,
+                              targetRole: u.role,
+                            })
+                          }
+                          className="text-[10px] font-medium text-red-600 transition-colors hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                          title="Permanently anonymize this user and revoke their access. Cannot be undone."
+                        >
+                          Delete user
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -566,6 +641,41 @@ export default function AdminUsersPage() {
           const retry = pendingMfa.retry;
           setPendingMfa(null);
           await retry();
+        }}
+      />
+
+      {/* Hard-delete confirmation. The MFA challenge (if required) is
+          handled by the same shared MfaChallengeModal above — the delete
+          handler stashes a retry there when the server returns 202. */}
+      <ConfirmTypedPhraseModal
+        open={pendingDelete !== null}
+        onClose={() => {
+          if (deleting) return;
+          setPendingDelete(null);
+        }}
+        title="Delete user account?"
+        description={
+          pendingDelete ? (
+            <div className="space-y-2">
+              <p>
+                You are about to permanently delete <strong>{pendingDelete.targetEmail}</strong> (
+                {ROLE_LABELS[pendingDelete.targetRole] || pendingDelete.targetRole}).
+              </p>
+              <p className="text-[var(--bb-text-secondary)]">
+                Their auth credentials are revoked, their identity is anonymized, and any tickets or
+                audit rows they were attached to remain — labelled as a deleted account. This cannot
+                be undone.
+              </p>
+            </div>
+          ) : null
+        }
+        requiredPhrase="DELETE"
+        submitLabel="Delete user"
+        submitTone="danger"
+        onSubmit={async () => {
+          if (!pendingDelete) return;
+          await handleDeleteUser(pendingDelete.userId, "DELETE");
+          setPendingDelete(null);
         }}
       />
     </div>
