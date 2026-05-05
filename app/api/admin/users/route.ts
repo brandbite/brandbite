@@ -5,11 +5,12 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { applyAccountAnonymization } from "@/lib/account-deletion";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 import { CONFIRMATION_PHRASES, checkConfirmationPhrase } from "@/lib/admin-confirmation";
 import { MFA_ACTION_TAG_MONEY, requireFreshMfa } from "@/lib/mfa";
-import { canPromoteToSiteAdmin, isSiteAdminRole } from "@/lib/roles";
+import { canPromoteToSiteAdmin, isSiteAdminRole, isSiteOwnerRole } from "@/lib/roles";
 import { AdminActionType, UserRole, Prisma } from "@prisma/client";
 
 const VALID_ROLES: string[] = ["SITE_OWNER", "SITE_ADMIN", "DESIGNER", "CUSTOMER"];
@@ -293,5 +294,173 @@ export async function PATCH(req: NextRequest) {
     }
     console.error("[PATCH /api/admin/users] error", error);
     return NextResponse.json({ error: "Failed to update user role" }, { status: 500 });
+  }
+}
+
+// -----------------------------------------------------------------------------
+// DELETE — admin-initiated USER_HARD_DELETE
+//
+// SITE_OWNER only. Re-uses the same anonymize-in-place transaction as the
+// self-service GDPR delete (lib/account-deletion.ts) so we never drift on FK
+// cleanup ordering. Gated by:
+//   - Typed-phrase confirmation ("DELETE")
+//   - Fresh MFA (MONEY_ACTION trust window — same as role escalation)
+//   - "Cannot delete yourself" guard
+//   - "Cannot delete another SITE_OWNER directly" guard — demote them
+//     first via PATCH, then delete. Forces a two-step deliberate flow for
+//     the most destructive transition.
+//
+// Audit log row is written for both BLOCKED and SUCCESS outcomes; the
+// SITE_OWNER receipt email then fires automatically via the existing
+// admin-action-email pipeline (USER_HARD_DELETE subject is already
+// declared in lib/admin-action-email.ts).
+// -----------------------------------------------------------------------------
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const user = await getCurrentUserOrThrow();
+    if (!isSiteOwnerRole(user.role)) {
+      return NextResponse.json(
+        { error: "Only site owners can delete user accounts." },
+        { status: 403 },
+      );
+    }
+
+    const body = await req.json().catch(() => null);
+    const { userId, confirmation } = (body ?? {}) as {
+      userId?: string;
+      confirmation?: string;
+    };
+
+    if (!userId || typeof userId !== "string") {
+      return NextResponse.json({ error: "userId is required" }, { status: 400 });
+    }
+
+    if (userId === user.id) {
+      return NextResponse.json(
+        { error: "You cannot delete your own account from here. Use account settings instead." },
+        { status: 400 },
+      );
+    }
+
+    const target = await prisma.userAccount.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        authUserId: true,
+        deletedAt: true,
+        _count: {
+          select: {
+            companies: true,
+            creativeTickets: true,
+          },
+        },
+      },
+    });
+    if (!target) {
+      return NextResponse.json({ error: "User not found." }, { status: 404 });
+    }
+    if (target.deletedAt) {
+      return NextResponse.json({ error: "User is already deleted." }, { status: 400 });
+    }
+
+    const auditCtx = extractAuditContext(req);
+
+    // Refuse to delete another SITE_OWNER directly. Forces the operator to
+    // demote them via PATCH first, which is itself MFA + typed-phrase
+    // gated — so the destructive path is a deliberate two-step.
+    if (isSiteOwnerRole(target.role)) {
+      await logAdminAction({
+        actor: user,
+        action: AdminActionType.USER_HARD_DELETE,
+        outcome: "BLOCKED",
+        targetType: "UserAccount",
+        targetId: target.id,
+        metadata: { targetEmail: target.email, targetRole: target.role },
+        errorMessage: "Demote the site owner to a lower role before deleting.",
+        context: auditCtx,
+      });
+      return NextResponse.json(
+        { error: "Demote the site owner to a lower role before deleting." },
+        { status: 400 },
+      );
+    }
+
+    // Typed-phrase confirmation. Mirrors the role-change flow.
+    const phraseCheck = checkConfirmationPhrase(
+      confirmation,
+      CONFIRMATION_PHRASES.USER_HARD_DELETE,
+    );
+    if (!phraseCheck.ok) {
+      await logAdminAction({
+        actor: user,
+        action: AdminActionType.USER_HARD_DELETE,
+        outcome: "BLOCKED",
+        targetType: "UserAccount",
+        targetId: target.id,
+        metadata: { targetEmail: target.email, targetRole: target.role },
+        errorMessage: phraseCheck.error,
+        context: auditCtx,
+      });
+      return NextResponse.json({ error: phraseCheck.error }, { status: 400 });
+    }
+
+    // Fresh MFA. Same trust window as money actions — once you've cleared
+    // MFA for any MONEY_ACTION in the last 30 min, subsequent deletes
+    // don't re-challenge.
+    const mfa = await requireFreshMfa(user, MFA_ACTION_TAG_MONEY, {
+      ipAddress: auditCtx.ipAddress,
+      userAgent: auditCtx.userAgent,
+    });
+    if (!mfa.ok) return mfa.response;
+
+    // Snapshot identity for the audit log BEFORE we anonymize, since the
+    // anonymized row no longer carries the original email.
+    const auditSnapshot = {
+      targetEmail: target.email,
+      targetRole: target.role,
+      companyCount: target._count.companies,
+      assignedTicketCount: target._count.creativeTickets,
+    };
+
+    try {
+      await applyAccountAnonymization({
+        accountId: target.id,
+        authUserId: target.authUserId,
+      });
+    } catch (err) {
+      console.error("[DELETE /api/admin/users] anonymization failed", err);
+      await logAdminAction({
+        actor: user,
+        action: AdminActionType.USER_HARD_DELETE,
+        outcome: "ERROR",
+        targetType: "UserAccount",
+        targetId: target.id,
+        metadata: auditSnapshot,
+        errorMessage: err instanceof Error ? err.message : "Anonymization transaction failed.",
+        context: auditCtx,
+      });
+      return NextResponse.json({ error: "Failed to delete user." }, { status: 500 });
+    }
+
+    await logAdminAction({
+      actor: user,
+      action: AdminActionType.USER_HARD_DELETE,
+      outcome: "SUCCESS",
+      targetType: "UserAccount",
+      targetId: target.id,
+      metadata: auditSnapshot,
+      context: auditCtx,
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (error: unknown) {
+    if ((error as { code?: string })?.code === "UNAUTHENTICATED") {
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    }
+    console.error("[DELETE /api/admin/users] error", error);
+    return NextResponse.json({ error: "Failed to delete user" }, { status: 500 });
   }
 }

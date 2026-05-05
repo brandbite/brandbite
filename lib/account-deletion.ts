@@ -1,9 +1,10 @@
 // -----------------------------------------------------------------------------
 // @file: lib/account-deletion.ts
 // @purpose: GDPR right-to-erasure — shared soft-delete + anonymize flow used
-//           by customer and creative self-deletion routes. Keeps the two
-//           role-specific endpoints thin and prevents drift (one anonymize
-//           strategy, one FK-cleanup order, one sole-owner guard).
+//           by customer and creative self-deletion routes AND the admin-
+//           initiated USER_HARD_DELETE action. Keeps the call sites thin and
+//           prevents drift (one anonymize strategy, one FK-cleanup order, one
+//           sole-owner guard).
 //
 //           Behaviour (must match /privacy text):
 //           - Hard-delete BetterAuth rows (sessions, accounts, user) so the
@@ -97,23 +98,51 @@ export async function deleteOwnAccount(
   }
 
   // -------------------------------------------------------------------------
-  // 3. All writes inside a transaction so we either fully delete or not at
-  //    all. Ordering: BetterAuth tables first (FK to authUser), then the
-  //    app's UserAccount row (anonymize, keep for ledger).
+  // 3. Anonymize via the shared helper so self-delete and admin-delete
+  //    can never drift on FK cleanup order or anonymization shape.
   // -------------------------------------------------------------------------
+  await applyAccountAnonymization({
+    accountId: account.id,
+    authUserId: account.authUserId,
+  });
+
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Shared anonymize transaction
+// ---------------------------------------------------------------------------
+
+type ApplyAnonymizationParams = {
+  accountId: string;
+  authUserId: string;
+};
+
+/**
+ * The actual anonymize transaction — split out so the admin-initiated
+ * USER_HARD_DELETE flow at /api/admin/users can run the same writes
+ * without duplicating the FK cleanup ordering. Caller is responsible
+ * for any prior validation (already-deleted, role, confirmation, MFA).
+ *
+ * Ordering: BetterAuth tables first (FK to authUser), then the app's
+ * UserAccount row (anonymize, keep for ledger).
+ */
+export async function applyAccountAnonymization(params: ApplyAnonymizationParams): Promise<void> {
+  const { accountId, authUserId } = params;
+
   await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-    await tx.authSession.deleteMany({ where: { userId: account.authUserId } });
-    await tx.authAccount.deleteMany({ where: { userId: account.authUserId } });
-    await tx.authUser.deleteMany({ where: { id: account.authUserId } });
+    await tx.authSession.deleteMany({ where: { userId: authUserId } });
+    await tx.authAccount.deleteMany({ where: { userId: authUserId } });
+    await tx.authUser.deleteMany({ where: { id: authUserId } });
 
     // App side: anonymize in place. New email + random authUserId to free
     // the uniques up for a re-register. Keep id, role, relations so
     // ledger / tickets / ratings stay queryable with "deleted account".
-    const anonymizedEmail = `deleted-${account.id}@deleted.brandbite.local`;
-    const anonymizedAuthId = `deleted-${account.id}-${Date.now()}`;
+    const anonymizedEmail = `deleted-${accountId}@deleted.brandbite.local`;
+    const anonymizedAuthId = `deleted-${accountId}-${Date.now()}`;
 
     await tx.userAccount.update({
-      where: { id: account.id },
+      where: { id: accountId },
       data: {
         deletedAt: new Date(),
         email: anonymizedEmail,
@@ -122,8 +151,6 @@ export async function deleteOwnAccount(
       },
     });
   });
-
-  return { ok: true };
 }
 
 /**
