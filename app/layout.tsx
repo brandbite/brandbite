@@ -14,6 +14,7 @@ import DemoPersonaBanner from "../components/demo-persona-banner";
 import { ToastProvider } from "@/components/ui/toast-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthGuard } from "@/components/auth-guard";
+import { SessionStaleDetector } from "@/components/auth/session-stale-detector";
 import { A11yDevMonitor } from "@/components/a11y-dev-monitor";
 
 const josefin = Josefin_Sans({
@@ -101,6 +102,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <ToastProvider>
             <AuthGuard />
+            {/* Detect when the auth cookie was overwritten by a sign-in
+                in another tab. Surfaces a persistent toast prompting the
+                user to refresh — see component header for details. */}
+            <SessionStaleDetector />
             {/* Dev-only: logs axe-core WCAG violations to the browser
                 console as pages render. Dead-code-eliminated in prod. */}
             <A11yDevMonitor />
