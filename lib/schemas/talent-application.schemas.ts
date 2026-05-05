@@ -249,6 +249,14 @@ export const talentApplicationActionSchema = z.discriminatedUnion("action", [
      *  inbox thread. */
     reason: z.string().trim().max(500).optional().nullable(),
   }),
+  z.object({
+    /** PR10 — runs the onboarding orchestrator (lib/talent-onboarding.ts):
+     *  creates UserAccount(role=DESIGNER), seeds CreativeSkill rows from
+     *  the approved categories, mirrors tasksPerWeekCap, fires magic-link
+     *  + branded welcome email. No body fields — every input comes from
+     *  the TalentApplication row's hire-time capture (PR9). */
+    action: z.literal("ONBOARD"),
+  }),
 ]);
 
 export type TalentApplicationActionInput = z.infer<typeof talentApplicationActionSchema>;

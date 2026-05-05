@@ -306,6 +306,8 @@ export default function TalentApplicationsPage() {
             return "Hired. Onboarding pending — UserAccount creation lands in the next PR.";
           case "REJECT_POST_INTERVIEW":
             return "Declined after interview. Email sent.";
+          case "ONBOARD":
+            return "Onboarded. UserAccount created, magic-link + welcome email sent.";
           default:
             return "Application declined.";
         }
@@ -394,6 +396,12 @@ export default function TalentApplicationsPage() {
       action: "REJECT_POST_INTERVIEW",
       reason: declineReason.trim() || null,
     });
+  }
+
+  // PR10 — kick off the onboarding orchestrator. No body fields; the
+  // orchestrator reads everything from the application row.
+  function handleOnboard() {
+    void submitAction({ action: "ONBOARD" });
   }
 
   return (
@@ -535,6 +543,7 @@ export default function TalentApplicationsPage() {
                           onMarkInterviewHeld={handleMarkInterviewHeld}
                           onHire={handleHire}
                           onRejectPostInterview={handleRejectPostInterview}
+                          onOnboard={handleOnboard}
                         />
                       </td>
                     </tr>
@@ -578,6 +587,7 @@ function DetailPanel({
   onMarkInterviewHeld,
   onHire,
   onRejectPostInterview,
+  onOnboard,
 }: {
   item: Application;
   categoryNames: Map<string, string>;
@@ -603,6 +613,7 @@ function DetailPanel({
   onMarkInterviewHeld: () => void;
   onHire: () => void;
   onRejectPostInterview: () => void;
+  onOnboard: () => void;
 }) {
   // Action availability matrix. Re-derived per render so a status change
   // (after a submitAction → refresh → status update) immediately flips
@@ -816,8 +827,9 @@ function DetailPanel({
         )}
 
         {item.status === "HIRED" && (
-          <InlineAlert variant="success" title="Hired — onboarding pending">
-            <div className="space-y-1 text-sm">
+          <div className="space-y-3 rounded-xl border border-[var(--bb-success-border)] bg-[var(--bb-success-bg)] p-4">
+            <SectionHeading>Hired — ready to onboard</SectionHeading>
+            <div className="space-y-1 text-sm text-[var(--bb-secondary)]">
               {item.workingHours && (
                 <div>
                   <strong>Working hours:</strong> {item.workingHours}
@@ -842,11 +854,24 @@ function DetailPanel({
                 </div>
               )}
               <div className="text-xs text-[var(--bb-text-muted)]">
-                Hired by {item.hiredByUserEmail ?? "—"} · {formatDateTime(item.hiredAt)} ·
-                UserAccount auto-create lands in the next PR.
+                Hired by {item.hiredByUserEmail ?? "—"} · {formatDateTime(item.hiredAt)}
               </div>
             </div>
-          </InlineAlert>
+            <Button
+              className="w-full"
+              onClick={onOnboard}
+              loading={actionStatus === "submitting"}
+              loadingText="Onboarding…"
+              disabled={actionStatus === "submitting"}
+            >
+              Onboard now &middot; create UserAccount + send sign-in
+            </Button>
+            <p className="text-xs text-[var(--bb-text-muted)]">
+              Creates a DESIGNER UserAccount, seeds CreativeSkill rows from the approved categories,
+              mirrors the tasks/week cap, sends magic-link + branded welcome email. Refuses if the
+              email is already a customer.
+            </p>
+          </div>
         )}
 
         {item.status === "ONBOARDED" && (
@@ -1116,7 +1141,8 @@ function DetailPanel({
             canDecline ||
             canMarkInterviewHeld ||
             canHire ||
-            canRejectPostInterview) && (
+            canRejectPostInterview ||
+            item.status === "HIRED") && (
             <InlineAlert variant="error" title="Action failed">
               {actionError}
             </InlineAlert>

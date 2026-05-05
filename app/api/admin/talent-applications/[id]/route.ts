@@ -50,6 +50,7 @@ import {
   buildBookingUrl,
   generateBookingToken,
 } from "@/lib/talent-booking-token";
+import { onboardHiredTalent } from "@/lib/talent-onboarding";
 
 export const runtime = "nodejs";
 // Force the runtime to evaluate per-request — this route writes to two
@@ -71,7 +72,8 @@ const ALLOWED_FROM: Record<
   | "DECLINE"
   | "MARK_INTERVIEW_HELD"
   | "HIRE"
-  | "REJECT_POST_INTERVIEW",
+  | "REJECT_POST_INTERVIEW"
+  | "ONBOARD",
   TalentApplicationStatus[]
 > = {
   ACCEPT: ["SUBMITTED"],
@@ -79,12 +81,16 @@ const ALLOWED_FROM: Record<
   DECLINE: ["SUBMITTED", "AWAITING_CANDIDATE_CHOICE", "CANDIDATE_PROPOSED_TIME"],
   // PR9 — post-interview lifecycle. MARK_INTERVIEW_HELD is the gate to
   // the hire-or-reject decision; HIRE captures onboarding fields and
-  // moves to HIRED (next PR's onboarding orchestrator picks up from
-  // there). REJECT_POST_INTERVIEW sends the soft-toned decline-post-
-  // interview email and reaches a distinct terminal status.
+  // moves to HIRED. REJECT_POST_INTERVIEW sends the soft-toned
+  // decline-post-interview email and reaches a distinct terminal status.
   MARK_INTERVIEW_HELD: ["ACCEPTED"],
   HIRE: ["INTERVIEW_HELD"],
   REJECT_POST_INTERVIEW: ["INTERVIEW_HELD"],
+  // PR10 — runs the onboarding orchestrator (lib/talent-onboarding.ts).
+  // Only valid from HIRED; the orchestrator itself re-asserts inside
+  // its transaction to handle a race window between this check and the
+  // write.
+  ONBOARD: ["HIRED"],
 };
 
 /** Map the candidate's preferredTasksPerWeek bucket to a numeric default
@@ -160,6 +166,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
   if (action.action === "REJECT_POST_INTERVIEW") {
     return handleRejectPostInterview({ id, row, action, actor: user, auditContext });
+  }
+  if (action.action === "ONBOARD") {
+    return handleOnboard({ id, row, actor: user, auditContext });
   }
   return handleDecline({ id, row, action, actor: user, auditContext });
 }
@@ -671,4 +680,73 @@ async function handleRejectPostInterview(args: {
   });
 
   return NextResponse.json({ ok: true, status: "REJECTED_AFTER_INTERVIEW" }, { status: 200 });
+}
+
+// ---------------------------------------------------------------------------
+// ONBOARD — runs the lib/talent-onboarding.ts orchestrator (PR10)
+// ---------------------------------------------------------------------------
+//
+// Thin handler — the heavy lifting (UserAccount create, CreativeSkill
+// seeding, magic-link, welcome email) lives in the orchestrator so a
+// future cron / retry path can call it without re-implementing the
+// guard chain. This handler:
+//   1. Calls onboardHiredTalent(id), which returns either { ok: true,
+//      userAccountId, createdSkillCount, magicLinkSent } or
+//      { ok: false, status, error }.
+//   2. Audit-logs success or BLOCKED depending on the result.
+//   3. Forwards the orchestrator's status code so the client UI can
+//      surface the same 409 / 412 / 500 the orchestrator computed.
+//
+// The orchestrator handles the email-collision refusal (409 with the
+// "promote at /admin/users instead" message). The route doesn't need a
+// separate guard for that.
+
+async function handleOnboard(args: {
+  id: string;
+  row: TalentApplication;
+  actor: Awaited<ReturnType<typeof getCurrentUserOrThrow>>;
+  auditContext: ReturnType<typeof extractAuditContext>;
+}): Promise<NextResponse> {
+  const { id, row, actor, auditContext } = args;
+
+  const result = await onboardHiredTalent(id);
+
+  if (!result.ok) {
+    await logAdminAction({
+      actor: { id: actor.id, email: actor.email, role: actor.role },
+      action: "TALENT_ONBOARDED",
+      outcome: "BLOCKED",
+      targetType: "TalentApplication",
+      targetId: id,
+      errorMessage: result.error,
+      context: auditContext,
+    });
+    return NextResponse.json({ error: result.error }, { status: result.status });
+  }
+
+  await logAdminAction({
+    actor: { id: actor.id, email: actor.email, role: actor.role },
+    action: "TALENT_ONBOARDED",
+    outcome: "SUCCESS",
+    targetType: "TalentApplication",
+    targetId: id,
+    metadata: {
+      candidateEmail: row.email,
+      userAccountId: result.userAccountId,
+      createdSkillCount: result.createdSkillCount,
+      magicLinkSent: result.magicLinkSent,
+    },
+    context: auditContext,
+  });
+
+  return NextResponse.json(
+    {
+      ok: true,
+      status: "ONBOARDED",
+      userAccountId: result.userAccountId,
+      createdSkillCount: result.createdSkillCount,
+      magicLinkSent: result.magicLinkSent,
+    },
+    { status: 200 },
+  );
 }
