@@ -168,10 +168,24 @@ export async function createCustomerTicket(input: CreateTicketInput): Promise<Cr
     //    + load + rating tie-breaker, otherwise FALLBACK unassigned).
     let assignedCreativeId: string | null = null;
     let assignmentReason: "AUTO_ASSIGN" | "FALLBACK" | null = null;
-    let fallbackMode: "settings_disabled" | "no_creatives" | "no_skilled_creatives" | null = null;
+    let fallbackMode:
+      | "settings_disabled"
+      | "no_creatives"
+      | "no_skilled_creatives"
+      // PR11 — every skill-matching creative is at-or-above their
+      // tasksPerWeekCap. Distinct from "no_skilled_creatives" so admin
+      // dashboards can spot the "we ARE hiring but everyone's full"
+      // pattern as a hiring-bandwidth signal rather than a category-coverage
+      // gap.
+      | "all_skilled_at_cap"
+      | null = null;
     let skillFiltered = false;
     let skilledCreativeCount = 0;
     let pausedCreativeCount = 0;
+    // PR11 — count of skill-matching creatives skipped because their open
+    // ticket count was at-or-above their tasksPerWeekCap. Surfaced in the
+    // assignment log metadata for forensic debuggability.
+    let cappedCreativeCount = 0;
 
     if (isAiMode) {
       assignedCreativeId = null;
@@ -193,12 +207,33 @@ export async function createCustomerTicket(input: CreateTicketInput): Promise<Cr
         });
       }
 
+      // Build a single per-creative metadata map covering pause + cap
+      // state. Pulled in one query rather than two so the auto-assign
+      // hot path adds at most one DB roundtrip per ticket-create even
+      // as we layer more candidate filters.
+      const creativeMeta = new Map<
+        string,
+        { isPaused: boolean; pauseExpiresAt: Date | null; tasksPerWeekCap: number | null }
+      >();
+
       if (creatives.length > 0) {
-        const pauseStates = await tx.userAccount.findMany({
+        const states = await tx.userAccount.findMany({
           where: { id: { in: creatives.map((d) => d.id) } },
-          select: { id: true, isPaused: true, pauseExpiresAt: true },
+          select: {
+            id: true,
+            isPaused: true,
+            pauseExpiresAt: true,
+            tasksPerWeekCap: true,
+          },
         });
-        const pausedIds = new Set(pauseStates.filter((d) => isCreativePaused(d)).map((d) => d.id));
+        for (const s of states) {
+          creativeMeta.set(s.id, {
+            isPaused: s.isPaused,
+            pauseExpiresAt: s.pauseExpiresAt,
+            tasksPerWeekCap: s.tasksPerWeekCap,
+          });
+        }
+        const pausedIds = new Set(states.filter((d) => isCreativePaused(d)).map((d) => d.id));
         pausedCreativeCount = pausedIds.size;
         creatives = creatives.filter((d) => !pausedIds.has(d.id));
       }
@@ -228,23 +263,59 @@ export async function createCustomerTicket(input: CreateTicketInput): Promise<Cr
         };
 
         const loadByCreative = new Map<string, number>();
-        for (const id of creativeIds) loadByCreative.set(id, 0);
+        // PR11 — open ticket COUNT (not weighted load) per creative.
+        // Used by the tasksPerWeekCap filter below: cap is "max number
+        // of concurrently open tasks", not "max weighted load". The
+        // weighted load still drives the lowest-load tie-breaker.
+        const openCountByCreative = new Map<string, number>();
+        for (const id of creativeIds) {
+          loadByCreative.set(id, 0);
+          openCountByCreative.set(id, 0);
+        }
         for (const t of openTickets) {
           if (!t.creativeId) continue;
           if (!loadByCreative.has(t.creativeId)) continue;
           const weight = priorityWeights[t.priority as TicketPriority];
           const cost = (t.jobType?.tokenCost ?? 1) * (t.quantity ?? 1);
           loadByCreative.set(t.creativeId, (loadByCreative.get(t.creativeId) ?? 0) + weight * cost);
+          openCountByCreative.set(t.creativeId, (openCountByCreative.get(t.creativeId) ?? 0) + 1);
         }
 
-        const ratingByCreative = await getCreativeRatingSummaries(creativeIds);
-
-        assignedCreativeId = selectCreativeByLoadThenRating({
-          candidateIds: creativeIds,
-          loadByCreative,
-          ratingByCreative,
+        // PR11 — drop creatives at-or-above their tasksPerWeekCap. Null
+        // cap means no limit (legacy behavior, preserves every existing
+        // creative). Done AFTER the load calc so we don't waste a rating
+        // fetch on excluded candidates, and AFTER the pause filter so
+        // the "capped" count reflects real candidates not zombie ones.
+        const cappedIds: string[] = [];
+        creatives = creatives.filter((d) => {
+          const cap = creativeMeta.get(d.id)?.tasksPerWeekCap;
+          if (cap == null) return true; // no cap → keep
+          const open = openCountByCreative.get(d.id) ?? 0;
+          if (open >= cap) {
+            cappedIds.push(d.id);
+            return false;
+          }
+          return true;
         });
-        assignmentReason = "AUTO_ASSIGN";
+        cappedCreativeCount = cappedIds.length;
+
+        if (creatives.length === 0) {
+          // Every skill-matching creative is at cap. Fall through to the
+          // unassigned FALLBACK path with a distinct mode so admin
+          // dashboards can spot it as a hiring-bandwidth signal.
+          assignmentReason = "FALLBACK";
+          fallbackMode = "all_skilled_at_cap";
+        } else {
+          const remainingIds = creatives.map((d) => d.id);
+          const ratingByCreative = await getCreativeRatingSummaries(remainingIds);
+
+          assignedCreativeId = selectCreativeByLoadThenRating({
+            candidateIds: remainingIds,
+            loadByCreative,
+            ratingByCreative,
+          });
+          assignmentReason = "AUTO_ASSIGN";
+        }
       } else {
         assignmentReason = "FALLBACK";
         if (!fallbackMode) fallbackMode = "no_creatives";
@@ -316,7 +387,7 @@ export async function createCustomerTicket(input: CreateTicketInput): Promise<Cr
           creativeId: createdTicket.creativeId,
           reason: "AUTO_ASSIGN",
           metadata: {
-            algorithm: "v3-skill-weighted-token-cost",
+            algorithm: "v4-skill-weighted-cap-aware",
             source: "customer-ticket-create",
             autoAssignEffective: true,
             companyAutoAssignDefault,
@@ -324,6 +395,11 @@ export async function createCustomerTicket(input: CreateTicketInput): Promise<Cr
             skillFiltered,
             skilledCreativeCount,
             pausedCreativeCount,
+            // PR11 — non-zero when the chosen creative was picked from a
+            // pool that excluded N at-cap candidates. Useful when a
+            // ticket gets routed to a slow / new creative because the
+            // experienced ones were full.
+            cappedCreativeCount,
             jobTypeId: jobType?.id ?? null,
           },
         },
@@ -343,13 +419,16 @@ export async function createCustomerTicket(input: CreateTicketInput): Promise<Cr
             skillFiltered,
             skilledCreativeCount,
             pausedCreativeCount,
+            cappedCreativeCount,
             jobTypeId: jobType?.id ?? null,
             note:
               fallbackMode === "settings_disabled"
                 ? "Auto-assign disabled by company/project settings."
                 : fallbackMode === "no_skilled_creatives"
                   ? "No creatives with matching skill found; ticket left unassigned for admin."
-                  : "No active creatives available in pool at assignment time.",
+                  : fallbackMode === "all_skilled_at_cap"
+                    ? "Every skill-matching creative is at-or-above their tasksPerWeekCap; ticket left unassigned for admin (consider raising caps or hiring)."
+                    : "No active creatives available in pool at assignment time.",
           },
         },
       });

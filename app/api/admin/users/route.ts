@@ -48,6 +48,9 @@ export async function GET(req: NextRequest) {
         createdAt: true,
         isPaused: true,
         creativeRevisionNotesEnabled: true,
+        // PR11 — surface the per-creative cap so the admin row can render
+        // and inline-edit it. Null = no cap (existing behavior).
+        tasksPerWeekCap: true,
         _count: {
           select: {
             companies: true,
@@ -67,6 +70,7 @@ export async function GET(req: NextRequest) {
         createdAt: u.createdAt.toISOString(),
         isPaused: u.isPaused,
         creativeRevisionNotesEnabled: u.creativeRevisionNotesEnabled,
+        tasksPerWeekCap: u.tasksPerWeekCap,
         companyCount: u._count.companies,
         assignedTickets: u._count.creativeTickets,
       })),
@@ -88,10 +92,14 @@ export async function PATCH(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { userId, role, creativeRevisionNotesEnabled, confirmation } = body as {
+    const { userId, role, creativeRevisionNotesEnabled, tasksPerWeekCap, confirmation } = body as {
       userId?: string;
       role?: string;
       creativeRevisionNotesEnabled?: boolean;
+      // PR11 — null clears the cap (no-limit), number sets it. The
+      // discriminator below treats `undefined` as "this isn't a cap edit"
+      // so a role-change PATCH doesn't accidentally clear the cap.
+      tasksPerWeekCap?: number | null;
       confirmation?: string;
     };
 
@@ -117,6 +125,40 @@ export async function PATCH(req: NextRequest) {
         where: { id: userId },
         data: { creativeRevisionNotesEnabled },
         select: { id: true, creativeRevisionNotesEnabled: true },
+      });
+
+      return NextResponse.json({ user: updated });
+    }
+
+    // PR11 — set / clear tasksPerWeekCap (designer only). Same shape as
+    // the revision-notes toggle: not MFA-gated, plain audit log, no
+    // role-change side-effects. Null clears, number 1-40 sets.
+    if (tasksPerWeekCap !== undefined) {
+      if (target.role !== "DESIGNER") {
+        return NextResponse.json(
+          { error: "Tasks-per-week cap only applies to creatives." },
+          { status: 400 },
+        );
+      }
+      if (tasksPerWeekCap !== null) {
+        if (
+          typeof tasksPerWeekCap !== "number" ||
+          !Number.isFinite(tasksPerWeekCap) ||
+          !Number.isInteger(tasksPerWeekCap) ||
+          tasksPerWeekCap < 1 ||
+          tasksPerWeekCap > 40
+        ) {
+          return NextResponse.json(
+            { error: "Tasks-per-week cap must be an integer between 1 and 40, or null." },
+            { status: 400 },
+          );
+        }
+      }
+
+      const updated = await prisma.userAccount.update({
+        where: { id: userId },
+        data: { tasksPerWeekCap },
+        select: { id: true, tasksPerWeekCap: true },
       });
 
       return NextResponse.json({ user: updated });

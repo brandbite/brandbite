@@ -25,6 +25,8 @@ type UserRow = {
   createdAt: string;
   isPaused: boolean;
   creativeRevisionNotesEnabled: boolean;
+  // PR11 — capacity cap. Null = no cap (legacy default).
+  tasksPerWeekCap: number | null;
   companyCount: number;
   assignedTickets: number;
 };
@@ -71,6 +73,13 @@ export default function AdminUsersPage() {
   const [pendingRole, setPendingRole] = useState("");
   const [saving, setSaving] = useState(false);
   const [togglingNotesId, setTogglingNotesId] = useState<string | null>(null);
+
+  // PR11 — inline cap editor. Tracks the row currently being edited
+  // and the in-progress draft (string so the input doesn't clamp on
+  // every keystroke).
+  const [editingCapId, setEditingCapId] = useState<string | null>(null);
+  const [pendingCap, setPendingCap] = useState<string>("");
+  const [savingCap, setSavingCap] = useState(false);
 
   // Debounce search
   useEffect(() => {
@@ -166,6 +175,55 @@ export default function AdminUsersPage() {
       setEditingUserId(null);
     } finally {
       setSaving(false);
+    }
+  };
+
+  // PR11 — save the cap edit. Empty string clears (sends null);
+  // otherwise sends a number. Server validates 1..40.
+  const handleSaveCap = async (userId: string) => {
+    setSavingCap(true);
+    try {
+      const trimmed = pendingCap.trim();
+      let nextCap: number | null;
+      if (trimmed === "") {
+        nextCap = null;
+      } else {
+        const parsed = Number.parseInt(trimmed, 10);
+        if (!Number.isFinite(parsed) || parsed < 1 || parsed > 40) {
+          showToast({
+            title: "Cap must be a whole number between 1 and 40, or empty.",
+            type: "error",
+          });
+          setSavingCap(false);
+          return;
+        }
+        nextCap = parsed;
+      }
+
+      const res = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, tasksPerWeekCap: nextCap }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        showToast({ title: json?.error || "Failed to save cap", type: "error" });
+        return;
+      }
+
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, tasksPerWeekCap: nextCap } : u)),
+      );
+      showToast({
+        title: nextCap == null ? "Cap cleared" : `Cap set to ${nextCap}`,
+        type: "success",
+      });
+      setEditingCapId(null);
+      setPendingCap("");
+    } catch {
+      showToast({ title: "Failed to save cap", type: "error" });
+    } finally {
+      setSavingCap(false);
     }
   };
 
@@ -404,6 +462,63 @@ export default function AdminUsersPage() {
                           Revision notes
                         </button>
                       )}
+                      {/* PR11 — inline tasks/week cap editor for DESIGNER rows.
+                          Read-only label until clicked; expands into a small
+                          number input + Save / Cancel. Auto-assign in
+                          lib/tickets/create-ticket.ts skips this creative when
+                          their open count >= cap. Empty input clears (no cap). */}
+                      {u.role === "DESIGNER" && editingCapId === u.id ? (
+                        <div className="flex items-center gap-1 text-[10px]">
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min={1}
+                            max={40}
+                            value={pendingCap}
+                            onChange={(e) => setPendingCap(e.target.value)}
+                            placeholder="—"
+                            className="h-6 w-12 rounded border border-[var(--bb-border)] px-1 text-center text-xs"
+                            aria-label="Tasks per week cap"
+                          />
+                          <button
+                            onClick={() => handleSaveCap(u.id)}
+                            disabled={savingCap}
+                            className="rounded bg-[var(--bb-primary)] px-2 py-0.5 text-[10px] font-medium text-white disabled:opacity-50"
+                          >
+                            {savingCap ? "…" : "Save"}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingCapId(null);
+                              setPendingCap("");
+                            }}
+                            disabled={savingCap}
+                            className="text-[10px] text-[var(--bb-text-muted)] hover:text-[var(--bb-secondary)] disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : u.role === "DESIGNER" ? (
+                        <button
+                          onClick={() => {
+                            setEditingCapId(u.id);
+                            setPendingCap(
+                              u.tasksPerWeekCap == null ? "" : String(u.tasksPerWeekCap),
+                            );
+                          }}
+                          className="flex items-center gap-1 text-[10px] text-[var(--bb-text-muted)] transition-colors hover:text-[var(--bb-secondary)]"
+                          title="Auto-assign skips this creative when their open ticket count reaches this cap. Empty = no cap."
+                        >
+                          <span>Cap:</span>
+                          <span
+                            className={`rounded border border-[var(--bb-border)] px-1.5 py-0.5 ${
+                              u.tasksPerWeekCap == null ? "text-[var(--bb-text-muted)]" : ""
+                            }`}
+                          >
+                            {u.tasksPerWeekCap == null ? "—" : u.tasksPerWeekCap}
+                          </span>
+                        </button>
+                      ) : null}
                     </div>
                   </td>
                 </tr>
