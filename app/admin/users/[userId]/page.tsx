@@ -281,9 +281,9 @@ export default function AdminUserDetailPage() {
             {!user.emailVerified && <Badge variant="warning">Email unverified</Badge>}
             {user.twoFactorEnabled && <Badge variant="success">Login 2FA</Badge>}
             {user.totpEnrolledAt && (
-              <Badge variant="success" title="MFA TOTP enrolled for money actions">
-                MFA TOTP
-              </Badge>
+              <span title="MFA TOTP enrolled for money actions">
+                <Badge variant="success">MFA TOTP</Badge>
+              </span>
             )}
           </div>
           <p className="text-sm break-all text-[var(--bb-text-secondary)]">{user.email}</p>
