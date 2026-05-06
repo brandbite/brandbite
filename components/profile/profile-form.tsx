@@ -9,9 +9,9 @@
 //           MFA enrollment) stays in the existing /<role>/settings page.
 //
 //           Sections:
-//             1. Identity   — name editor + email + role pill (email is
-//                             read-only in v1; the change-with-verify
-//                             flow lands in a follow-up PR).
+//             1. Identity   — name editor + email change (verify-via-email
+//                             flow handled by BetterAuth's /change-email)
+//                             + role pill.
 //             2. Timezone   — IANA zone select + auto-detect.
 //             3. Notifications — toggles per NotificationType, calling
 //                             the existing /api/notifications/preferences
@@ -180,6 +180,18 @@ export function ProfileForm() {
   // just that one toggle without locking the whole list.
   const [prefsSaving, setPrefsSaving] = useState<Set<string>>(new Set());
 
+  // ---- email change ----
+  // The flow: user types newEmail and submits, we POST BetterAuth's
+  // /change-email endpoint. BetterAuth emails the new address with a
+  // confirmation link; the actual swap happens when the user clicks
+  // that link. Until they do, the field UI shows a "Pending — open the
+  // link in {newEmail}'s inbox" hint so they don't think nothing
+  // happened.
+  const [emailDraft, setEmailDraft] = useState("");
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+  const [savingEmail, setSavingEmail] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+
   // ---- delete account modal ----
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteEmail, setDeleteEmail] = useState("");
@@ -210,6 +222,7 @@ export function ProfileForm() {
         setUser(profileJson.user);
         setNameDraft(profileJson.user.name ?? "");
         setTimezoneDraft(profileJson.user.timezone ?? "");
+        setEmailDraft(profileJson.user.email);
 
         if (prefsRes.ok) {
           const json = (await prefsRes.json()) as { preferences: NotificationPreference[] };
@@ -282,6 +295,69 @@ export function ProfileForm() {
       setSavingIdentity(false);
     }
   }, [nameDraft, showToast, user]);
+
+  // -----------------------------------------------------------------
+  // Request email change — POSTs BetterAuth's mounted /change-email
+  // endpoint. BetterAuth handles the verification token + link;
+  // sendChangeEmailVerification (lib/better-auth.ts) emails the new
+  // address; clicking the link triggers the AuthUser update + our
+  // databaseHooks mirror onto UserAccount.email.
+  //
+  // The user stays on this page with a "Pending — open the link in
+  // {newEmail}" hint until they actually click. The hint is purely
+  // local UI state — there's no server-side "pending" column to read
+  // back, since BetterAuth's verification token row is the truth and
+  // we don't expose it. A page refresh clears the hint and the user
+  // sees their original email; that's fine because the token row
+  // still exists and clicking the link still completes the swap.
+  // -----------------------------------------------------------------
+  const handleRequestEmailChange = useCallback(async () => {
+    if (!user) return;
+    const target = emailDraft.trim().toLowerCase();
+    setEmailError(null);
+    if (!target) {
+      setEmailError("Enter the new email address.");
+      return;
+    }
+    if (target === user.email.toLowerCase()) {
+      setEmailError("That's already your current email.");
+      return;
+    }
+    // Light client-side syntax check — BetterAuth does the real
+    // validation server-side via Zod.
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(target)) {
+      setEmailError("Enter a valid email address.");
+      return;
+    }
+    setSavingEmail(true);
+    try {
+      const res = await fetch("/api/auth/change-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newEmail: target, callbackURL: "/profile?emailChanged=1" }),
+      });
+      const body = (await res.json().catch(() => null)) as {
+        status?: boolean;
+        message?: string;
+      } | null;
+      if (!res.ok) {
+        // BetterAuth returns either a structured 400 with { message }
+        // or a generic 500. Surface either as an inline error rather
+        // than a toast — the modal-less flow makes inline more useful.
+        throw new Error(body?.message || "Failed to start email change.");
+      }
+      setPendingEmail(target);
+      showToast({
+        type: "success",
+        title: "Confirmation sent",
+        description: `Open the link we sent to ${target} to complete the change.`,
+      });
+    } catch (err) {
+      setEmailError(err instanceof Error ? err.message : "Failed to start email change.");
+    } finally {
+      setSavingEmail(false);
+    }
+  }, [emailDraft, showToast, user]);
 
   // -----------------------------------------------------------------
   // Save timezone — accepts the empty string as "clear".
@@ -488,21 +564,54 @@ export function ProfileForm() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-[var(--bb-text-secondary)]">
+            <label
+              className="block text-xs font-medium text-[var(--bb-text-secondary)]"
+              htmlFor="profile-email"
+            >
               Email
             </label>
             <div className="mt-1 flex flex-wrap items-center gap-2">
               <FormInput
-                value={user.email}
-                readOnly
-                aria-readonly="true"
-                className="min-w-[200px] flex-1 bg-[var(--bb-bg-page)]"
+                id="profile-email"
+                type="email"
+                value={emailDraft}
+                onChange={(e) => {
+                  setEmailDraft(e.target.value);
+                  if (emailError) setEmailError(null);
+                }}
+                autoComplete="email"
+                placeholder="you@example.com"
+                error={!!emailError}
+                disabled={savingEmail}
+                className="min-w-[200px] flex-1"
               />
+              <Button
+                onClick={() => void handleRequestEmailChange()}
+                disabled={
+                  savingEmail || emailDraft.trim().toLowerCase() === user.email.toLowerCase()
+                }
+                loading={savingEmail}
+                loadingText="Sending…"
+              >
+                Change email
+              </Button>
             </div>
-            <p className="mt-1 text-[11px] text-[var(--bb-text-muted)]">
-              Email changes need verification and will land in a follow-up release. Reach out to
-              support if you need to switch addresses now.
-            </p>
+            {emailError && (
+              <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{emailError}</p>
+            )}
+            {pendingEmail && !emailError && (
+              <p className="mt-1 text-[11px] text-[var(--bb-text-muted)]">
+                Pending — we sent a confirmation link to <strong>{pendingEmail}</strong>. Open it
+                from that inbox to complete the swap. Until then, you stay signed in as{" "}
+                <strong>{user.email}</strong>.
+              </p>
+            )}
+            {!pendingEmail && !emailError && (
+              <p className="mt-1 text-[11px] text-[var(--bb-text-muted)]">
+                We&apos;ll email a confirmation link to the new address. Your current email stays in
+                effect until you open the link.
+              </p>
+            )}
           </div>
         </div>
       </section>

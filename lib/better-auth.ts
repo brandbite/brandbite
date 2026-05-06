@@ -77,9 +77,105 @@ export const auth = betterAuth({
   // string verbatim and does `db[modelName]`, so we use the camelCase
   // form Prisma generates (`authUser`, not `AuthUser`).
   // --------------------------------------------------------------------
-  user: { modelName: "authUser" },
+  user: {
+    modelName: "authUser",
+    // --------------------------------------------------------------------
+    // Email change with verification
+    //
+    // BetterAuth's built-in /change-email endpoint, gated by an email
+    // sent to the NEW address. The user clicks the link, BetterAuth
+    // updates AuthUser.email, and our `databaseHooks.user.update.after`
+    // hook below mirrors the new email onto our app's UserAccount.email
+    // so every app-side query / audit row stays consistent.
+    //
+    // Flow from the user's POV:
+    //   1. Profile page → "Change email" → enters newEmail
+    //   2. Browser POSTs /api/auth/change-email
+    //   3. We email newEmail with a "Confirm this change" link
+    //   4. Click → BetterAuth updates AuthUser → our hook syncs
+    //      UserAccount → user lands on /profile?emailChanged=1
+    //
+    // Demo mode: the send hook is best-effort. If RESEND_API_KEY isn't
+    // configured (demo) the email never sends, but BetterAuth still
+    // generates the token row so a developer can pluck it from the
+    // AuthVerification table to test the verify path manually.
+    // --------------------------------------------------------------------
+    changeEmail: {
+      enabled: true,
+      sendChangeEmailVerification: async ({ user, newEmail, url }) => {
+        try {
+          await sendNotificationEmail(
+            newEmail,
+            "Confirm your new Brandbite email",
+            [
+              "<div style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto;\">",
+              '<div style="background: #f15b2b; padding: 20px 24px; border-radius: 12px 12px 0 0;">',
+              '<span style="font-size: 20px; font-weight: 700; color: #fff;">brandbite</span>',
+              "</div>",
+              '<div style="background: #fff; padding: 28px 24px; border: 1px solid #e3e1dc; border-top: none;">',
+              `<p style="margin: 0 0 16px; font-size: 14px; color: #424143;">Hi${user.name ? ` ${user.name}` : ""},</p>`,
+              `<p style="margin: 0 0 16px; font-size: 14px; color: #424143;">We received a request to change the email on your Brandbite account from <strong>${user.email}</strong> to <strong>${newEmail}</strong>. Click the button below to confirm:</p>`,
+              '<table role="presentation" cellpadding="0" cellspacing="0" style="margin: 24px 0;">',
+              "<tr>",
+              '<td style="border-radius: 8px; background: #f15b2b;">',
+              `<a href="${url}" target="_blank" style="display: inline-block; padding: 12px 28px; font-size: 14px; font-weight: 600; color: #fff; text-decoration: none; border-radius: 8px;">Confirm new email</a>`,
+              "</td>",
+              "</tr>",
+              "</table>",
+              '<p style="margin: 0; font-size: 13px; color: #7a7a7a;">This link expires in 1 hour. If you didn&apos;t request this change, you can ignore this email — your account email won&apos;t change unless the link is clicked.</p>',
+              "</div>",
+              '<div style="background: #faf9f7; padding: 16px 24px; border-radius: 0 0 12px 12px; border: 1px solid #e3e1dc; border-top: none;">',
+              '<p style="margin: 0; font-size: 11px; color: #9a9892; text-align: center;">Brandbite &mdash; Creative-as-a-service platform</p>',
+              "</div>",
+              "</div>",
+            ].join("\n"),
+          );
+        } catch (err) {
+          console.error("[better-auth] sendChangeEmailVerification failed", err);
+        }
+      },
+    },
+  },
   account: { modelName: "authAccount" },
   verification: { modelName: "authVerification" },
+
+  // --------------------------------------------------------------------
+  // Database hooks — mirror AuthUser.email changes onto UserAccount.email
+  //
+  // After a user clicks the change-email confirmation link, BetterAuth
+  // updates AuthUser.email. Our app's UserAccount.email is the source of
+  // truth for every app-side query (admin user list, customer membership
+  // lookup, audit metadata, lib/account-deletion's anonymize) so leaving
+  // the two out of sync would break every email-keyed code path.
+  //
+  // We hook user.update.after rather than user.update.before so the
+  // mirror only happens on commits that BetterAuth has already accepted.
+  // The hook is also skipped when `email` isn't in the partial — name-
+  // only updates and emailVerified flips don't need the mirror.
+  //
+  // updateMany is intentional: scoping by `authUserId` (UserAccount's
+  // FK to AuthUser.id) means a row missing on our side (e.g. an
+  // AuthUser that never linked) is a no-op rather than a throw.
+  // --------------------------------------------------------------------
+  databaseHooks: {
+    user: {
+      update: {
+        after: async (user) => {
+          const userId = (user as { id?: string }).id;
+          const newEmail = (user as { email?: string }).email;
+          if (!userId || !newEmail || typeof newEmail !== "string") return;
+          try {
+            await prisma.userAccount.updateMany({
+              where: { authUserId: userId },
+              data: { email: newEmail },
+            });
+          } catch (err) {
+            console.error("[better-auth] mirror email to UserAccount failed", err);
+          }
+        },
+      },
+    },
+  },
 
   // Email verification — users who sign up with email+password must click
   // a verification link before they can sign in. Template lives in
