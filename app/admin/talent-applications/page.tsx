@@ -415,17 +415,25 @@ export default function TalentApplicationsPage() {
     void submitAction({ action: "ONBOARD" });
   }
 
-  // Filter chips, in the order an operator scans them — left-to-right
-  // matches the funnel direction. Each chip carries its own status key
-  // (or "ALL"); the badge count is hydrated from `statusCounts` on
-  // render. Grouped visually with `tone` so "needs my attention" reads
-  // distinct from "post-decision" without needing a second row.
+  // Filter chips ordered by the actual hiring funnel — left-to-right
+  // walks a candidate's journey from first submission to onboarded
+  // creative, with the two terminal "no" states tucked at the end
+  // before the catch-all. The tone still encodes urgency at a glance
+  // (orange = your turn to act, blue = waiting on the candidate, green
+  // = positive outcome, slate = closed-no), but the order itself is
+  // now narrative so a new operator can read it like a process diagram.
   //
-  //   tone: "action"  — operator must do something next  (orange tint)
-  //   tone: "wait"    — waiting on the candidate         (blue tint)
-  //   tone: "done"    — terminal positive outcome        (green tint)
-  //   tone: "decline" — terminal negative outcome        (neutral tint)
-  //   tone: "all"     — full table, no filter            (neutral)
+  //   1. SUBMITTED                    new application landed
+  //   2. IN_REVIEW                    admin is looking it over
+  //   3. AWAITING_CANDIDATE_CHOICE    admin offered 3 slots, waiting
+  //   4. CANDIDATE_PROPOSED_TIME      candidate countered with own time
+  //   5. ACCEPTED                     slot booked, interview scheduled
+  //   6. INTERVIEW_HELD               call done, hire/no-hire pending
+  //   7. HIRED                        we said yes, onboarding next
+  //   8. ONBOARDED                    UserAccount created, in the system
+  //   9. DECLINED                     pre-interview rejection
+  //  10. REJECTED_AFTER_INTERVIEW     post-interview rejection
+  //  11. ALL                          full table
   const FILTER_CHIPS: Array<{
     key: Filter;
     label: string;
@@ -433,10 +441,10 @@ export default function TalentApplicationsPage() {
   }> = [
     { key: "SUBMITTED", label: "New", tone: "action" },
     { key: "IN_REVIEW", label: "In review", tone: "action" },
-    { key: "CANDIDATE_PROPOSED_TIME", label: "Candidate proposed", tone: "action" },
-    { key: "INTERVIEW_HELD", label: "Interview held", tone: "action" },
     { key: "AWAITING_CANDIDATE_CHOICE", label: "Awaiting candidate", tone: "wait" },
+    { key: "CANDIDATE_PROPOSED_TIME", label: "Candidate proposed", tone: "action" },
     { key: "ACCEPTED", label: "Accepted", tone: "wait" },
+    { key: "INTERVIEW_HELD", label: "Interview held", tone: "action" },
     { key: "HIRED", label: "Hired", tone: "done" },
     { key: "ONBOARDED", label: "Onboarded", tone: "done" },
     { key: "DECLINED", label: "Declined", tone: "decline" },
