@@ -110,6 +110,19 @@ type DetailResponse = {
       hireNotes: string | null;
       workload: string;
       preferredTasksPerWeek: string | null;
+      // Contact + personal info from the original application.
+      whatsappNumber: string;
+      country: string;
+      applicationTimezone: string;
+      portfolioUrl: string;
+      linkedinUrl: string | null;
+      socialLinks: unknown;
+      totalYears: string;
+      hasRemoteExp: boolean;
+      yearsRemote: string | null;
+      workedWith: unknown;
+      tools: unknown;
+      toolsOther: string | null;
     } | null;
   } | null;
   customer: {
@@ -177,6 +190,34 @@ function relativeTime(iso: string | null): string {
   if (mo < 12) return `${mo} mo ago`;
   const yr = Math.round(mo / 12);
   return `${yr} yr ago`;
+}
+
+/** Defensive read of a Prisma Json column we expect to contain an array
+ *  of strings. Returns [] on any unexpected shape so the page never
+ *  crashes on legacy / malformed rows. */
+function readStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((v): v is string => typeof v === "string");
+}
+
+/** socialLinks is stored as Json — historically as either a flat array
+ *  of strings or an array of `{ platform, url }` objects depending on
+ *  when the row was written. Normalize to `{ label, url }[]` for the
+ *  render so admins always see a clean list. */
+function readSocialLinks(value: unknown): { label: string; url: string }[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => {
+      if (typeof entry === "string") return { label: entry, url: entry };
+      if (entry && typeof entry === "object") {
+        const o = entry as Record<string, unknown>;
+        const url = typeof o.url === "string" ? o.url : "";
+        const label = typeof o.platform === "string" && o.platform.length > 0 ? o.platform : url;
+        if (url) return { label, url };
+      }
+      return null;
+    })
+    .filter((v): v is { label: string; url: string } => v !== null);
 }
 
 // Same simple parser the active-sessions section uses on /profile.
@@ -454,6 +495,126 @@ export default function AdminUserDetailPage() {
                   {designer.ratings.communication?.toFixed(1) ?? "—"} / 5
                 </Row>
                 <Row label="Speed">{designer.ratings.speed?.toFixed(1) ?? "—"} / 5</Row>
+              </dl>
+            </section>
+          )}
+
+          {designer.hiredFrom && (
+            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-5">
+              <h2 className="mb-3 text-sm font-semibold text-[var(--bb-secondary)]">Contact</h2>
+              <dl className="space-y-1.5 text-xs">
+                <Row label="WhatsApp">
+                  {designer.hiredFrom.whatsappNumber ? (
+                    <a
+                      href={`https://wa.me/${designer.hiredFrom.whatsappNumber.replace(/[^0-9]/g, "")}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[var(--bb-primary)] hover:underline"
+                    >
+                      {designer.hiredFrom.whatsappNumber} ↗
+                    </a>
+                  ) : (
+                    "—"
+                  )}
+                </Row>
+                <Row label="Country">{designer.hiredFrom.country || "—"}</Row>
+                <Row label="Timezone (at apply)">
+                  {designer.hiredFrom.applicationTimezone || "—"}
+                  {user.timezone && user.timezone !== designer.hiredFrom.applicationTimezone && (
+                    <span className="ml-1.5 text-[var(--bb-text-muted)]">
+                      (now: {user.timezone})
+                    </span>
+                  )}
+                </Row>
+                <Row label="Portfolio">
+                  {designer.hiredFrom.portfolioUrl ? (
+                    <a
+                      href={designer.hiredFrom.portfolioUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="break-all text-[var(--bb-primary)] hover:underline"
+                    >
+                      {designer.hiredFrom.portfolioUrl} ↗
+                    </a>
+                  ) : (
+                    "—"
+                  )}
+                </Row>
+                <Row label="LinkedIn">
+                  {designer.hiredFrom.linkedinUrl ? (
+                    <a
+                      href={designer.hiredFrom.linkedinUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="break-all text-[var(--bb-primary)] hover:underline"
+                    >
+                      {designer.hiredFrom.linkedinUrl} ↗
+                    </a>
+                  ) : (
+                    "—"
+                  )}
+                </Row>
+                {(() => {
+                  const socials = readSocialLinks(designer.hiredFrom.socialLinks);
+                  if (socials.length === 0) return null;
+                  return (
+                    <Row label="Other links">
+                      <ul className="flex flex-wrap gap-1.5">
+                        {socials.map((s) => (
+                          <li key={s.url}>
+                            <a
+                              href={s.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-block rounded-full border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-2 py-0.5 text-[11px] text-[var(--bb-primary)] hover:underline"
+                            >
+                              {s.label} ↗
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    </Row>
+                  );
+                })()}
+              </dl>
+            </section>
+          )}
+
+          {designer.hiredFrom && (
+            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-5">
+              <h2 className="mb-3 text-sm font-semibold text-[var(--bb-secondary)]">Background</h2>
+              <dl className="space-y-1.5 text-xs">
+                <Row label="Years experience">{designer.hiredFrom.totalYears}</Row>
+                <Row label="Remote experience">
+                  {designer.hiredFrom.hasRemoteExp
+                    ? designer.hiredFrom.yearsRemote
+                      ? `Yes · ${designer.hiredFrom.yearsRemote}`
+                      : "Yes"
+                    : "No"}
+                </Row>
+                {(() => {
+                  const worked = readStringArray(designer.hiredFrom.workedWith);
+                  if (worked.length === 0) return null;
+                  return (
+                    <Row label="Worked with">
+                      <span className="text-[var(--bb-text-secondary)]">{worked.join(" · ")}</span>
+                    </Row>
+                  );
+                })()}
+                {(() => {
+                  const tools = readStringArray(designer.hiredFrom.tools);
+                  if (tools.length === 0 && !designer.hiredFrom.toolsOther) return null;
+                  return (
+                    <Row label="Tools">
+                      <span className="text-[var(--bb-text-secondary)]">
+                        {tools.join(" · ")}
+                        {designer.hiredFrom.toolsOther
+                          ? `${tools.length > 0 ? " · " : ""}Other: ${designer.hiredFrom.toolsOther}`
+                          : ""}
+                      </span>
+                    </Row>
+                  );
+                })()}
               </dl>
             </section>
           )}
