@@ -9,9 +9,10 @@
 //           MFA enrollment) stays in the existing /<role>/settings page.
 //
 //           Sections:
-//             1. Identity   — name editor + email change (verify-via-email
-//                             flow handled by BetterAuth's /change-email)
-//                             + role pill.
+//             1. Identity   — avatar upload (circle preview, Change /
+//                             Remove) + name editor + email change
+//                             (verify-via-email flow handled by
+//                             BetterAuth's /change-email) + role pill.
 //             2. Timezone   — IANA zone select + auto-detect.
 //             3. Notifications — toggles per NotificationType, calling
 //                             the existing /api/notifications/preferences
@@ -37,7 +38,7 @@
 
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { authClient } from "@/lib/auth-client";
 import { Badge } from "@/components/ui/badge";
@@ -61,6 +62,10 @@ type ProfileUser = {
   role: Role;
   timezone: string | null;
   twoFactorEnabled: boolean;
+  /** AuthUser.image — public R2 URL or null. Updated by /api/profile/avatar.
+   *  Optional so older API responses (before this field shipped) don't
+   *  break the type — treated as null when missing. */
+  image: string | null;
 };
 
 type NotificationType =
@@ -256,6 +261,16 @@ export function ProfileForm() {
   const [nameDraft, setNameDraft] = useState("");
   const [savingIdentity, setSavingIdentity] = useState(false);
 
+  // ---- avatar ----
+  // Single-shot upload: file picker → POST multipart to
+  // /api/profile/avatar → server uploads to R2 + updates AuthUser.image
+  // → response carries the new URL → we mutate user.image in state. No
+  // crop/preview step in v1; the image is shown as a circle so the user
+  // notices any framing issue right away.
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [removingAvatar, setRemovingAvatar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   // ---- timezone edit ----
   const [timezoneDraft, setTimezoneDraft] = useState<string>("");
   const [savingTimezone, setSavingTimezone] = useState(false);
@@ -402,6 +417,72 @@ export function ProfileForm() {
       cancelled = true;
     };
   }, []);
+
+  // -----------------------------------------------------------------
+  // Avatar upload + remove. The upload route returns the new public R2
+  // URL we mirror into the user state. We pre-validate size + type
+  // client-side so the server doesn't have to reject obvious mistakes
+  // after a wasted upload — though both checks are duplicated server-
+  // side as the source of truth.
+  // -----------------------------------------------------------------
+  const ALLOWED_AVATAR_TYPES = useMemo(
+    () => new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]),
+    [],
+  );
+  const MAX_AVATAR_BYTES = 2 * 1024 * 1024; // keep in lockstep with the route
+
+  const handleUploadAvatar = useCallback(
+    async (file: File) => {
+      if (!ALLOWED_AVATAR_TYPES.has(file.type)) {
+        showToast({ type: "error", title: "Use a PNG, JPEG, WebP, or GIF image." });
+        return;
+      }
+      if (file.size > MAX_AVATAR_BYTES) {
+        showToast({ type: "error", title: "Image must be 2 MB or smaller." });
+        return;
+      }
+      setUploadingAvatar(true);
+      try {
+        const form = new FormData();
+        form.append("file", file);
+        const res = await fetch("/api/profile/avatar", { method: "POST", body: form });
+        const body = (await res.json().catch(() => null)) as {
+          user?: { image?: string | null };
+          error?: string;
+        } | null;
+        if (!res.ok) {
+          showToast({ type: "error", title: body?.error ?? "Failed to upload avatar." });
+          return;
+        }
+        setUser((prev) => (prev ? { ...prev, image: body?.user?.image ?? null } : prev));
+        showToast({ type: "success", title: "Avatar updated." });
+      } catch (err) {
+        showToast({
+          type: "error",
+          title: err instanceof Error ? err.message : "Failed to upload avatar.",
+        });
+      } finally {
+        setUploadingAvatar(false);
+      }
+    },
+    [ALLOWED_AVATAR_TYPES, MAX_AVATAR_BYTES, showToast],
+  );
+
+  const handleRemoveAvatar = useCallback(async () => {
+    setRemovingAvatar(true);
+    try {
+      const res = await fetch("/api/profile/avatar", { method: "DELETE" });
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      if (!res.ok) {
+        showToast({ type: "error", title: body?.error ?? "Failed to remove avatar." });
+        return;
+      }
+      setUser((prev) => (prev ? { ...prev, image: null } : prev));
+      showToast({ type: "success", title: "Avatar removed." });
+    } finally {
+      setRemovingAvatar(false);
+    }
+  }, [showToast]);
 
   // -----------------------------------------------------------------
   // Save name — only fires if the value actually changed.
@@ -897,6 +978,67 @@ export function ProfileForm() {
             </p>
           </div>
           <Badge variant="neutral">{ROLE_LABELS[user.role]}</Badge>
+        </div>
+
+        {/* Avatar — circle, with initials fallback. Click anywhere on the
+            row to swap, or use the explicit Change/Remove buttons. The
+            file input is hidden and triggered programmatically so the
+            UI can stay restrained. */}
+        <div className="mb-5 flex flex-wrap items-center gap-4">
+          <div
+            className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-[var(--bb-bg-page)] text-lg font-semibold text-[var(--bb-text-secondary)] ring-1 ring-[var(--bb-border)]"
+            aria-label={user.image ? "Your avatar" : "Avatar placeholder with your initials"}
+          >
+            {user.image ? (
+              // Rendered via <img> rather than next/image because the
+              // source is a public R2 URL the optimizer can't help with
+              // and we don't need a layout-shift placeholder.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={user.image} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <span aria-hidden="true">{(user.name || user.email)[0]?.toUpperCase() ?? "?"}</span>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void handleUploadAvatar(f);
+                // Reset so the same file can be re-selected (e.g. after
+                // a failed upload).
+                e.target.value = "";
+              }}
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingAvatar || removingAvatar}
+              loading={uploadingAvatar}
+              loadingText="Uploading…"
+            >
+              {user.image ? "Change avatar" : "Upload avatar"}
+            </Button>
+            {user.image && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => void handleRemoveAvatar()}
+                disabled={uploadingAvatar || removingAvatar}
+                loading={removingAvatar}
+                loadingText="Removing…"
+              >
+                Remove
+              </Button>
+            )}
+          </div>
+          <p className="basis-full text-[11px] text-[var(--bb-text-muted)]">
+            PNG, JPEG, WebP, or GIF. 2&nbsp;MB max. Square images crop best.
+          </p>
         </div>
 
         <div className="space-y-4">
