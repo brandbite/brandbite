@@ -96,6 +96,12 @@ export default function TalentApplicationPage() {
   // -- Categories load -----------------------------------------------------
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesError, setCategoriesError] = useState<string | null>(null);
+  // Kill-switch hint from /api/talent/state — null while loading, then
+  // boolean. We render a closed banner + disable submit when false. The
+  // server still gates the actual POST so a stale `null` here is safe;
+  // the worst case is a candidate sees the form for 100ms and the submit
+  // gets a clean 503.
+  const [applicationsOpen, setApplicationsOpen] = useState<boolean | null>(null);
 
   // -- Form fields ---------------------------------------------------------
   const [fullName, setFullName] = useState("");
@@ -226,6 +232,29 @@ export default function TalentApplicationPage() {
         console.error("[talent] failed to load categories", err);
         setCategoriesError("We couldn't load the skill categories. Please refresh the page.");
         setStatus("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // -- Open/closed kill-switch ---------------------------------------------
+  // Public read of /api/talent/state. Independent of the categories fetch
+  // so a transient state-endpoint failure (which fails open) doesn't
+  // poison category loading or vice versa.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/talent/state", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : { open: true }))
+      .then((body: { open?: boolean }) => {
+        if (cancelled) return;
+        setApplicationsOpen(body.open !== false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Fail open — the server is the real gate; a banner failure
+        // shouldn't block someone from at least trying to submit.
+        setApplicationsOpen(true);
       });
     return () => {
       cancelled = true;
@@ -440,6 +469,23 @@ export default function TalentApplicationPage() {
           >
             {categoriesError}
           </p>
+        )}
+
+        {applicationsOpen === false && (
+          <div
+            role="alert"
+            className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200"
+          >
+            <p className="font-semibold">Applications are temporarily closed.</p>
+            <p className="mt-0.5 text-xs">
+              We&rsquo;re at capacity right now. Follow{" "}
+              <a href="https://brandbite.studio" className="underline hover:no-underline">
+                brandbite.studio
+              </a>{" "}
+              and check back soon — we&rsquo;ll re-open intake when we can take new creatives. The
+              form below is read-only until then.
+            </p>
+          </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-10" noValidate>
@@ -840,12 +886,12 @@ export default function TalentApplicationPage() {
             variant="primary"
             size="lg"
             className="w-full"
-            disabled={!isSubmittable}
-            aria-disabled={!isSubmittable}
+            disabled={!isSubmittable || applicationsOpen === false}
+            aria-disabled={!isSubmittable || applicationsOpen === false}
             loading={status === "submitting"}
             loadingText="Submitting…"
           >
-            Submit application
+            {applicationsOpen === false ? "Applications closed" : "Submit application"}
           </Button>
 
           <p className="text-center text-xs text-[var(--bb-text-muted)]">

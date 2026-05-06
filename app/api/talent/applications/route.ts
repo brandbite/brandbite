@@ -22,6 +22,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
+import { getAppSetting } from "@/lib/app-settings";
 import { prisma } from "@/lib/prisma";
 import { getClientIp, rateLimit } from "@/lib/rate-limit";
 import { parseBody } from "@/lib/schemas/helpers";
@@ -43,6 +44,21 @@ function rateLimitedResponse(message: string, resetAt: number): NextResponse {
 
 export async function POST(req: NextRequest) {
   const ip = getClientIp(req.headers);
+
+  // Kill-switch: admins can pause new applications from /admin/settings
+  // by storing TALENT_APPLICATIONS_OPEN="false". Checked first so
+  // pausing the funnel doesn't waste an IP-bucket token or a Turnstile
+  // verification on candidates whose submit will be refused anyway.
+  const openSetting = await getAppSetting("TALENT_APPLICATIONS_OPEN");
+  if (openSetting === "false") {
+    return NextResponse.json(
+      {
+        error:
+          "Talent applications are currently closed. Follow @brandbite or check back soon — we'll re-open intake when capacity allows.",
+      },
+      { status: 503 },
+    );
+  }
 
   // Layer 1 — per-IP rate limit. Generous because legitimate users from a
   // shared NAT (office, conference WiFi) shouldn't be punished by one
