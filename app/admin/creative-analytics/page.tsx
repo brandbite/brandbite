@@ -10,6 +10,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingState } from "@/components/ui/loading-state";
@@ -362,7 +363,15 @@ export default function CreativeAnalyticsPage() {
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
                     <div className="min-w-0">
-                      <p className="font-medium text-[var(--bb-secondary)]">{d.name || "—"}</p>
+                      <p className="font-medium text-[var(--bb-secondary)]">
+                        <Link
+                          href={`/admin/users/${d.id}`}
+                          className="hover:text-[var(--bb-primary)] hover:underline"
+                          title="Open profile"
+                        >
+                          {d.name || "—"}
+                        </Link>
+                      </p>
                       <p className="truncate text-[10px] text-[var(--bb-text-tertiary)]">
                         {d.email}
                       </p>
