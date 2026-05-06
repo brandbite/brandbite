@@ -6,6 +6,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useToast } from "@/components/ui/toast-provider";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { LoadingState } from "@/components/ui/loading-state";
@@ -428,7 +429,13 @@ export default function AdminUsersPage() {
                       </div>
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium text-[var(--bb-secondary)]">
-                          {u.name || "\u2014"}
+                          <Link
+                            href={`/admin/users/${u.id}`}
+                            className="hover:text-[var(--bb-primary)] hover:underline"
+                            title="Open profile"
+                          >
+                            {u.name || "\u2014"}
+                          </Link>
                         </p>
                         <p className="truncate text-xs text-[var(--bb-text-muted)]">{u.email}</p>
                       </div>
