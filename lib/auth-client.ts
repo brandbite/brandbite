@@ -8,8 +8,14 @@
 // -----------------------------------------------------------------------------
 
 import { createAuthClient } from "better-auth/react";
-import { magicLinkClient } from "better-auth/client/plugins";
+import { magicLinkClient, twoFactorClient } from "better-auth/client/plugins";
 
 export const authClient = createAuthClient({
-  plugins: [magicLinkClient()],
+  plugins: [
+    magicLinkClient(),
+    // Login 2FA companion. Adds `authClient.twoFactor.enable / verifyTotp /
+    // disable / generateBackupCodes / verifyBackupCode` and the
+    // `twoFactorRedirect` flag on the email sign-in response.
+    twoFactorClient(),
+  ],
 });

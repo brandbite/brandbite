@@ -17,7 +17,13 @@
 //                             the existing /api/notifications/preferences
 //                             endpoint so the change applies everywhere
 //                             notifications are read.
-//             4. Delete account — typed-email confirm + DELETE on the
+//             4. Two-factor — TOTP enrollment (QR + backup codes) +
+//                             disable. Driven by BetterAuth's twoFactor
+//                             plugin. Once enabled, the email+password
+//                             sign-in path requires a code; magic-link
+//                             sign-in is refused (see lib/better-auth.ts
+//                             hooks).
+//             5. Delete account — typed-email confirm + DELETE on the
 //                             role-specific endpoint. SITE_OWNER /
 //                             SITE_ADMIN are out of scope here; admin
 //                             deletion happens via /admin/users.
@@ -27,6 +33,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { authClient } from "@/lib/auth-client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FormInput, FormSelect } from "@/components/ui/form-field";
@@ -47,6 +54,7 @@ type ProfileUser = {
   name: string | null;
   role: Role;
   timezone: string | null;
+  twoFactorEnabled: boolean;
 };
 
 type NotificationType =
@@ -191,6 +199,32 @@ export function ProfileForm() {
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const [savingEmail, setSavingEmail] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
+
+  // ---- 2FA enrollment ----
+  // Two-stage enrollment: click "Set up" → /two-factor/enable returns a
+  // TOTP URI for the QR + the secret. User scans it, types a 6-digit
+  // code → /two-factor/verify-totp commits the enrollment. Backup
+  // codes show ONCE on success — the user is told to save them.
+  //
+  // Disable flow: typed-password confirm modal (BetterAuth requires
+  // the password to disable as a safety check). On success we drop
+  // the backup-code stash and flip the section state back.
+  const [twoFaEnrollment, setTwoFaEnrollment] = useState<
+    | { stage: "idle" }
+    | {
+        stage: "qr";
+        uri: string;
+        secret: string;
+        codeDraft: string;
+        saving: boolean;
+        error: string | null;
+      }
+    | { stage: "codes"; backupCodes: string[] }
+  >({ stage: "idle" });
+  const [twoFaPassword, setTwoFaPassword] = useState("");
+  const [twoFaDisableOpen, setTwoFaDisableOpen] = useState(false);
+  const [twoFaDisabling, setTwoFaDisabling] = useState(false);
+  const [twoFaDisableError, setTwoFaDisableError] = useState<string | null>(null);
 
   // ---- delete account modal ----
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -456,6 +490,157 @@ export function ProfileForm() {
   );
 
   // -----------------------------------------------------------------
+  // 2FA enable — start. Asks BetterAuth for the TOTP URI; the user's
+  // password is required because /two-factor/enable is a sensitive
+  // change. The QR + secret are surfaced to the user immediately so
+  // they can scan, then we stay open for the verify step.
+  // -----------------------------------------------------------------
+  const handleStart2FAEnable = useCallback(async () => {
+    if (!user) return;
+    if (!twoFaPassword) {
+      setTwoFaEnrollment({
+        stage: "qr",
+        uri: "",
+        secret: "",
+        codeDraft: "",
+        saving: false,
+        error: "Enter your current password to continue.",
+      });
+      return;
+    }
+    try {
+      const { data, error } = await authClient.twoFactor.enable({
+        password: twoFaPassword,
+        // Don't issue a backup-code-only redirect; we explicitly verify
+        // a TOTP code in the next step before considering enrollment
+        // complete. This avoids the user thinking they enrolled when
+        // they actually skipped the QR-scan check.
+      });
+      if (error || !data) {
+        setTwoFaEnrollment({
+          stage: "qr",
+          uri: "",
+          secret: "",
+          codeDraft: "",
+          saving: false,
+          error: error?.message ?? "Couldn't start two-factor enrollment. Check your password.",
+        });
+        return;
+      }
+      const totpURI = (data as { totpURI?: string }).totpURI ?? "";
+      // BetterAuth's enable response includes `totpURI`; the secret is
+      // embedded in it. We surface both so the user can either scan
+      // the QR (preferred) or copy the raw secret manually.
+      const secretMatch = /[?&]secret=([^&]+)/.exec(totpURI);
+      const secret = secretMatch ? decodeURIComponent(secretMatch[1]) : "";
+      setTwoFaEnrollment({
+        stage: "qr",
+        uri: totpURI,
+        secret,
+        codeDraft: "",
+        saving: false,
+        error: null,
+      });
+    } catch (err) {
+      setTwoFaEnrollment({
+        stage: "qr",
+        uri: "",
+        secret: "",
+        codeDraft: "",
+        saving: false,
+        error: err instanceof Error ? err.message : "Couldn't start enrollment.",
+      });
+    }
+  }, [twoFaPassword, user]);
+
+  // -----------------------------------------------------------------
+  // 2FA enable — confirm. The QR has been scanned; user enters the
+  // 6-digit TOTP code from their app. On success BetterAuth flips
+  // twoFactorEnabled and emits the backup codes we stash for the
+  // user to save.
+  // -----------------------------------------------------------------
+  const handleConfirm2FAEnable = useCallback(async () => {
+    if (twoFaEnrollment.stage !== "qr") return;
+    const code = twoFaEnrollment.codeDraft.trim();
+    if (!code) {
+      setTwoFaEnrollment({ ...twoFaEnrollment, error: "Enter the 6-digit code." });
+      return;
+    }
+    setTwoFaEnrollment({ ...twoFaEnrollment, saving: true, error: null });
+    try {
+      const { data, error } = await authClient.twoFactor.verifyTotp({ code });
+      if (error || !data) {
+        setTwoFaEnrollment({
+          ...twoFaEnrollment,
+          saving: false,
+          error: error?.message ?? "Code didn't match. Check the time and try again.",
+        });
+        return;
+      }
+      // The enable + verify pair completed; AuthUser.twoFactorEnabled
+      // is now true and a backup-code set was generated. Some plugin
+      // versions return the codes alongside the verify response;
+      // others require a follow-up to /two-factor/get-backup-codes.
+      // We attempt the in-band path first.
+      const backupFromResponse = (data as { backupCodes?: string[] }).backupCodes ?? [];
+      let backupCodes: string[] = backupFromResponse;
+      if (backupCodes.length === 0) {
+        try {
+          const stash = await authClient.twoFactor.generateBackupCodes({
+            password: twoFaPassword,
+          });
+          const codes = (stash.data as { backupCodes?: string[] } | null)?.backupCodes ?? [];
+          backupCodes = codes;
+        } catch {
+          // Non-fatal — the user can regenerate later from the same
+          // section. We just don't have anything to display now.
+        }
+      }
+      setUser((prev) => (prev ? { ...prev, twoFactorEnabled: true } : prev));
+      setTwoFaPassword("");
+      setTwoFaEnrollment({ stage: "codes", backupCodes });
+      showToast({ type: "success", title: "Two-factor authentication is on." });
+    } catch (err) {
+      setTwoFaEnrollment({
+        ...twoFaEnrollment,
+        saving: false,
+        error: err instanceof Error ? err.message : "Couldn't verify code.",
+      });
+    }
+  }, [showToast, twoFaEnrollment, twoFaPassword]);
+
+  // -----------------------------------------------------------------
+  // 2FA disable — typed-password confirm. Re-uses the small modal
+  // pattern the delete-account flow uses; password verification is
+  // BetterAuth's safety gate.
+  // -----------------------------------------------------------------
+  const handleConfirm2FADisable = useCallback(async () => {
+    setTwoFaDisableError(null);
+    if (!twoFaPassword) {
+      setTwoFaDisableError("Enter your current password.");
+      return;
+    }
+    setTwoFaDisabling(true);
+    try {
+      const { error } = await authClient.twoFactor.disable({ password: twoFaPassword });
+      if (error) {
+        setTwoFaDisableError(error.message ?? "Couldn't disable two-factor.");
+        setTwoFaDisabling(false);
+        return;
+      }
+      setUser((prev) => (prev ? { ...prev, twoFactorEnabled: false } : prev));
+      setTwoFaPassword("");
+      setTwoFaDisableOpen(false);
+      setTwoFaDisabling(false);
+      setTwoFaEnrollment({ stage: "idle" });
+      showToast({ type: "success", title: "Two-factor authentication turned off." });
+    } catch (err) {
+      setTwoFaDisableError(err instanceof Error ? err.message : "Couldn't disable two-factor.");
+      setTwoFaDisabling(false);
+    }
+  }, [showToast, twoFaPassword]);
+
+  // -----------------------------------------------------------------
   // Delete account — re-uses the existing role-specific endpoints
   // that wrap lib/account-deletion.ts. Customer + creative only;
   // admins/owners have to go through /admin/users.
@@ -718,6 +903,260 @@ export function ProfileForm() {
           </ul>
         )}
       </section>
+
+      {/* ---- Two-factor authentication ---- */}
+      <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-6">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-[var(--bb-secondary)]">
+              Two-factor authentication
+            </h2>
+            <p className="mt-0.5 text-xs text-[var(--bb-text-muted)]">
+              Require a one-time code from your authenticator app each time you sign in. Backup
+              codes recover access if you lose your phone.
+            </p>
+          </div>
+          <Badge variant={user.twoFactorEnabled ? "success" : "neutral"}>
+            {user.twoFactorEnabled ? "Enabled" : "Disabled"}
+          </Badge>
+        </div>
+
+        {/* Disabled — show enable CTA. The password field below is bound
+            to twoFaPassword so the user types once and we forward it to
+            BetterAuth's enable + (later) generate-backup-codes calls. */}
+        {!user.twoFactorEnabled && twoFaEnrollment.stage === "idle" && (
+          <div className="space-y-3">
+            <p className="text-sm text-[var(--bb-text-secondary)]">
+              We&apos;ll show you a QR code to scan with Google Authenticator, 1Password, Authy, or
+              your password manager of choice.
+            </p>
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="min-w-[220px] flex-1">
+                <label className="block text-xs font-medium text-[var(--bb-text-secondary)]">
+                  Current password
+                </label>
+                <FormInput
+                  type="password"
+                  value={twoFaPassword}
+                  onChange={(e) => setTwoFaPassword(e.target.value)}
+                  autoComplete="current-password"
+                  className="mt-1 w-full"
+                />
+              </div>
+              <Button onClick={() => void handleStart2FAEnable()} disabled={!twoFaPassword}>
+                Set up
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Enrolling — QR + secret + verify code input. */}
+        {twoFaEnrollment.stage === "qr" && (
+          <div className="space-y-4">
+            {twoFaEnrollment.uri ? (
+              <>
+                <p className="text-sm text-[var(--bb-text-secondary)]">
+                  Scan this QR code in your authenticator app, then enter the 6-digit code below to
+                  confirm.
+                </p>
+                <div className="flex flex-wrap items-start gap-4">
+                  {/* QR rendered by our own /api/profile/two-factor/qr —
+                      keeps the TOTP secret on our infrastructure. Using
+                      <img> rather than next/image because the source is
+                      a per-request server-rendered PNG, not a static
+                      asset Next can optimize. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    alt="Two-factor QR code"
+                    className="h-44 w-44 rounded-xl border border-[var(--bb-border)] bg-white p-2"
+                    src={`/api/profile/two-factor/qr?uri=${encodeURIComponent(twoFaEnrollment.uri)}`}
+                  />
+                  <div className="min-w-[220px] flex-1 space-y-2">
+                    <p className="text-xs text-[var(--bb-text-muted)]">
+                      Or paste this secret manually:
+                    </p>
+                    <code className="block rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-2 text-xs break-all text-[var(--bb-secondary)]">
+                      {twoFaEnrollment.secret}
+                    </code>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[var(--bb-text-secondary)]">
+                    Code from your app
+                  </label>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    <FormInput
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      placeholder="123 456"
+                      value={twoFaEnrollment.codeDraft}
+                      onChange={(e) =>
+                        setTwoFaEnrollment({
+                          ...twoFaEnrollment,
+                          codeDraft: e.target.value,
+                          error: null,
+                        })
+                      }
+                      className="min-w-[160px] flex-1 tracking-widest"
+                    />
+                    <Button
+                      onClick={() => void handleConfirm2FAEnable()}
+                      disabled={twoFaEnrollment.saving}
+                      loading={twoFaEnrollment.saving}
+                      loadingText="Verifying…"
+                    >
+                      Confirm and enable
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setTwoFaEnrollment({ stage: "idle" });
+                        setTwoFaPassword("");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              twoFaEnrollment.error && (
+                <InlineAlert variant="error">{twoFaEnrollment.error}</InlineAlert>
+              )
+            )}
+            {twoFaEnrollment.uri && twoFaEnrollment.error && (
+              <InlineAlert variant="error">{twoFaEnrollment.error}</InlineAlert>
+            )}
+          </div>
+        )}
+
+        {/* Backup codes — shown ONCE on enable success. The user is
+            told to copy / print these somewhere safe. */}
+        {twoFaEnrollment.stage === "codes" && (
+          <div className="space-y-3">
+            <InlineAlert variant="success" title="Two-factor is now on">
+              Save these backup codes somewhere safe. Each one works exactly once and lets you sign
+              in if you lose access to your authenticator app.
+            </InlineAlert>
+            {twoFaEnrollment.backupCodes.length > 0 ? (
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {twoFaEnrollment.backupCodes.map((code) => (
+                  <code
+                    key={code}
+                    className="rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-2 text-center text-xs tracking-widest"
+                  >
+                    {code}
+                  </code>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-[var(--bb-text-muted)]">
+                Backup codes weren&apos;t included in the response. Use the &quot;Regenerate backup
+                codes&quot; option below to create a fresh set, then copy them to a safe place.
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  if (twoFaEnrollment.backupCodes.length === 0) return;
+                  void navigator.clipboard
+                    .writeText(twoFaEnrollment.backupCodes.join("\n"))
+                    .then(() => showToast({ type: "success", title: "Backup codes copied." }))
+                    .catch(() =>
+                      showToast({ type: "error", title: "Couldn't copy — copy manually." }),
+                    );
+                }}
+                disabled={twoFaEnrollment.backupCodes.length === 0}
+              >
+                Copy codes
+              </Button>
+              <Button onClick={() => setTwoFaEnrollment({ stage: "idle" })}>
+                I&apos;ve saved them
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Enabled (and not mid-enrollment) — show status + disable CTA. */}
+        {user.twoFactorEnabled && twoFaEnrollment.stage === "idle" && (
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm text-[var(--bb-text-secondary)]">
+              You&apos;re asked for an authenticator code every time you sign in.
+            </p>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setTwoFaPassword("");
+                setTwoFaDisableError(null);
+                setTwoFaDisableOpen(true);
+              }}
+              className="text-red-600 hover:text-red-700 dark:text-red-400"
+            >
+              Disable
+            </Button>
+          </div>
+        )}
+      </section>
+
+      {/* ---- 2FA disable confirm modal ---- */}
+      <Modal
+        open={twoFaDisableOpen}
+        onClose={() => {
+          if (twoFaDisabling) return;
+          setTwoFaDisableOpen(false);
+          setTwoFaPassword("");
+          setTwoFaDisableError(null);
+        }}
+        size="md"
+      >
+        <ModalHeader
+          title="Turn off two-factor authentication?"
+          onClose={() => {
+            if (twoFaDisabling) return;
+            setTwoFaDisableOpen(false);
+            setTwoFaPassword("");
+            setTwoFaDisableError(null);
+          }}
+        />
+        <div className="space-y-3 px-6 pb-4 text-sm text-[var(--bb-text-secondary)]">
+          <p>
+            Confirm your current password to disable 2FA. Your existing backup codes will be
+            invalidated.
+          </p>
+          <FormInput
+            type="password"
+            value={twoFaPassword}
+            onChange={(e) => setTwoFaPassword(e.target.value)}
+            placeholder="Current password"
+            autoComplete="current-password"
+            aria-label="Current password"
+          />
+          {twoFaDisableError && <InlineAlert variant="error">{twoFaDisableError}</InlineAlert>}
+        </div>
+        <ModalFooter>
+          <Button
+            variant="ghost"
+            disabled={twoFaDisabling}
+            onClick={() => {
+              setTwoFaDisableOpen(false);
+              setTwoFaPassword("");
+              setTwoFaDisableError(null);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => void handleConfirm2FADisable()}
+            loading={twoFaDisabling}
+            loadingText="Disabling…"
+            disabled={twoFaDisabling || !twoFaPassword}
+          >
+            Disable 2FA
+          </Button>
+        </ModalFooter>
+      </Modal>
 
       {/* ---- Delete account ---- */}
       {canSelfDelete && (

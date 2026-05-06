@@ -1733,10 +1733,39 @@ model AuthUser {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  sessions AuthSession[]
-  accounts AuthAccount[]
+  /// Whether this account has BetterAuth login two-factor enabled.
+  /// When true, the email+password sign-in step requires a second
+  /// factor (TOTP code or a backup code) before a session is issued,
+  /// and the magic-link sign-in path is refused — see
+  /// lib/better-auth.ts hooks.
+  twoFactorEnabled Boolean @default(false)
+
+  sessions  AuthSession[]
+  accounts  AuthAccount[]
+  twoFactor AuthTwoFactor[]
 
   @@map("user")
+}
+
+/// BetterAuth two-factor secrets + backup codes. One row per enrolled
+/// AuthUser. The plugin's default schema names this `twoFactor`; we
+/// expose it as `AuthTwoFactor` in Prisma to match the rest of the
+/// auth tables (AuthUser, AuthSession, AuthAccount, AuthVerification)
+/// and `@@map` it back to the plugin's expected SQL name.
+model AuthTwoFactor {
+  id          String @id @default(cuid())
+  secret      String
+  /// Comma-separated list of single-use backup codes (BetterAuth's
+  /// default storage shape). Hashed in newer plugin versions; trust
+  /// the plugin to manage the contents.
+  backupCodes String
+
+  userId String
+  user   AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([secret])
+  @@map("twoFactor")
 }
 
 model AuthSession {

@@ -33,6 +33,10 @@ type ProfileResponseUser = {
   name: string | null;
   role: string;
   timezone: string | null;
+  /** Whether the linked AuthUser has BetterAuth login 2FA enabled.
+   *  Joined here so the profile page can render the 2FA section state
+   *  without a second round-trip. */
+  twoFactorEnabled: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -51,6 +55,7 @@ export async function GET() {
         name: true,
         role: true,
         timezone: true,
+        authUserId: true,
       },
     });
     if (!row) {
@@ -60,12 +65,24 @@ export async function GET() {
       return NextResponse.json({ error: "Account not found" }, { status: 404 });
     }
 
+    // Read 2FA state from the linked AuthUser. We do this as a separate
+    // query rather than a Prisma relation lookup because UserAccount
+    // doesn't define a Prisma relation back to AuthUser — they're
+    // intentionally loosely coupled (UserAccount uses authUserId as a
+    // string FK without `@relation`) so admin-side hard deletes don't
+    // run into Prisma's referential-action machinery.
+    const authRow = await prisma.authUser.findUnique({
+      where: { id: row.authUserId },
+      select: { twoFactorEnabled: true },
+    });
+
     const user: ProfileResponseUser = {
       id: row.id,
       email: row.email,
       name: row.name,
       role: row.role,
       timezone: row.timezone,
+      twoFactorEnabled: !!authRow?.twoFactorEnabled,
     };
     return NextResponse.json({ user });
   } catch (err: unknown) {
@@ -170,17 +187,43 @@ export async function PATCH(req: NextRequest) {
       // separate GET round-trip.
       const row = await prisma.userAccount.findUniqueOrThrow({
         where: { id: session.id },
-        select: { id: true, email: true, name: true, role: true, timezone: true },
+        select: { id: true, email: true, name: true, role: true, timezone: true, authUserId: true },
       });
-      return NextResponse.json({ user: row });
+      const auth = await prisma.authUser.findUnique({
+        where: { id: row.authUserId },
+        select: { twoFactorEnabled: true },
+      });
+      return NextResponse.json({
+        user: {
+          id: row.id,
+          email: row.email,
+          name: row.name,
+          role: row.role,
+          timezone: row.timezone,
+          twoFactorEnabled: !!auth?.twoFactorEnabled,
+        } satisfies ProfileResponseUser,
+      });
     }
 
     const updated = await prisma.userAccount.update({
       where: { id: session.id },
       data,
-      select: { id: true, email: true, name: true, role: true, timezone: true },
+      select: { id: true, email: true, name: true, role: true, timezone: true, authUserId: true },
     });
-    return NextResponse.json({ user: updated });
+    const auth = await prisma.authUser.findUnique({
+      where: { id: updated.authUserId },
+      select: { twoFactorEnabled: true },
+    });
+    return NextResponse.json({
+      user: {
+        id: updated.id,
+        email: updated.email,
+        name: updated.name,
+        role: updated.role,
+        timezone: updated.timezone,
+        twoFactorEnabled: !!auth?.twoFactorEnabled,
+      } satisfies ProfileResponseUser,
+    });
   } catch (err: unknown) {
     if ((err as { code?: string })?.code === "UNAUTHENTICATED") {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
