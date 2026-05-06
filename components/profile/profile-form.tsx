@@ -14,6 +14,10 @@
 //                             (verify-via-email flow handled by
 //                             BetterAuth's /change-email) + role pill.
 //             2. Timezone   — IANA zone select + auto-detect.
+//             2a. Workload (DESIGNER only) — working-hours text + cap on
+//                             concurrent open tasks. Edits go to
+//                             /api/profile which gates these fields to
+//                             role=DESIGNER server-side.
 //             3. Notifications — toggles per NotificationType, calling
 //                             the existing /api/notifications/preferences
 //                             endpoint so the change applies everywhere
@@ -66,6 +70,10 @@ type ProfileUser = {
    *  Optional so older API responses (before this field shipped) don't
    *  break the type — treated as null when missing. */
   image: string | null;
+  /** Creative-only: free-text working hours. Null on non-DESIGNER. */
+  workingHours: string | null;
+  /** Creative-only: max concurrent open tickets. 1..40 or null (no cap). */
+  tasksPerWeekCap: number | null;
 };
 
 type NotificationType =
@@ -275,6 +283,16 @@ export function ProfileForm() {
   const [timezoneDraft, setTimezoneDraft] = useState<string>("");
   const [savingTimezone, setSavingTimezone] = useState(false);
 
+  // ---- workload (creative-only) ----
+  // Two free-form fields. Working hours is text — we don't parse it
+  // server-side; admins read it as a hint when scheduling. Cap is a
+  // number 1..40 or null (no cap), matching the value the auto-assign
+  // reads in lib/tickets/create-ticket.ts.
+  const [workingHoursDraft, setWorkingHoursDraft] = useState<string>("");
+  const [savingWorkingHours, setSavingWorkingHours] = useState(false);
+  const [tasksCapDraft, setTasksCapDraft] = useState<string>("");
+  const [savingTasksCap, setSavingTasksCap] = useState(false);
+
   // ---- notification prefs ----
   const [prefs, setPrefs] = useState<Record<NotificationType, NotificationPreference> | null>(null);
   const [prefsLoading, setPrefsLoading] = useState(true);
@@ -367,6 +385,10 @@ export function ProfileForm() {
         setNameDraft(profileJson.user.name ?? "");
         setTimezoneDraft(profileJson.user.timezone ?? "");
         setEmailDraft(profileJson.user.email);
+        setWorkingHoursDraft(profileJson.user.workingHours ?? "");
+        setTasksCapDraft(
+          profileJson.user.tasksPerWeekCap == null ? "" : String(profileJson.user.tasksPerWeekCap),
+        );
 
         if (prefsRes.ok) {
           const json = (await prefsRes.json()) as { preferences: NotificationPreference[] };
@@ -631,6 +653,100 @@ export function ProfileForm() {
     },
     [showToast, user],
   );
+
+  // -----------------------------------------------------------------
+  // Workload save handlers (creative-only). Each saves independently
+  // so a creative can update only the field they meant to change.
+  // Server enforces role=DESIGNER on these fields and rejects edits
+  // from any other role with a 403 — that's defence-in-depth; the
+  // section itself only renders for DESIGNER.
+  // -----------------------------------------------------------------
+  const handleSaveWorkingHours = useCallback(async () => {
+    if (!user) return;
+    const next = workingHoursDraft.trim();
+    const current = user.workingHours ?? "";
+    if (next === current) {
+      showToast({ type: "info", title: "No changes to save." });
+      return;
+    }
+    setSavingWorkingHours(true);
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workingHours: next === "" ? null : next }),
+      });
+      const body = (await res.json().catch(() => null)) as {
+        user?: ProfileUser;
+        error?: string;
+      } | null;
+      if (!res.ok || !body?.user) {
+        throw new Error(body?.error || "Failed to save");
+      }
+      setUser(body.user);
+      setWorkingHoursDraft(body.user.workingHours ?? "");
+      showToast({ type: "success", title: "Working hours updated" });
+    } catch (err) {
+      showToast({
+        type: "error",
+        title: err instanceof Error ? err.message : "Failed to save working hours",
+      });
+    } finally {
+      setSavingWorkingHours(false);
+    }
+  }, [showToast, user, workingHoursDraft]);
+
+  const handleSaveTasksCap = useCallback(async () => {
+    if (!user) return;
+    const trimmed = tasksCapDraft.trim();
+    const current = user.tasksPerWeekCap == null ? "" : String(user.tasksPerWeekCap);
+    if (trimmed === current) {
+      showToast({ type: "info", title: "No changes to save." });
+      return;
+    }
+    let nextCap: number | null;
+    if (trimmed === "") {
+      nextCap = null;
+    } else {
+      const parsed = Number.parseInt(trimmed, 10);
+      if (!Number.isFinite(parsed) || parsed < 1 || parsed > 40) {
+        showToast({
+          type: "error",
+          title: "Cap must be a whole number between 1 and 40, or empty.",
+        });
+        return;
+      }
+      nextCap = parsed;
+    }
+    setSavingTasksCap(true);
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tasksPerWeekCap: nextCap }),
+      });
+      const body = (await res.json().catch(() => null)) as {
+        user?: ProfileUser;
+        error?: string;
+      } | null;
+      if (!res.ok || !body?.user) {
+        throw new Error(body?.error || "Failed to save");
+      }
+      setUser(body.user);
+      setTasksCapDraft(body.user.tasksPerWeekCap == null ? "" : String(body.user.tasksPerWeekCap));
+      showToast({
+        type: "success",
+        title: nextCap == null ? "Cap cleared" : `Cap set to ${nextCap}`,
+      });
+    } catch (err) {
+      showToast({
+        type: "error",
+        title: err instanceof Error ? err.message : "Failed to save cap",
+      });
+    } finally {
+      setSavingTasksCap(false);
+    }
+  }, [showToast, tasksCapDraft, user]);
 
   const handleAutoDetectTimezone = useCallback(() => {
     const tz = detectBrowserTimezone();
@@ -1175,6 +1291,98 @@ export function ProfileForm() {
           </p>
         )}
       </section>
+
+      {/* ---- Workload (creative-only) ---- */}
+      {user.role === "DESIGNER" && (
+        <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-6">
+          <div className="mb-4">
+            <h2 className="text-base font-semibold text-[var(--bb-secondary)]">Workload</h2>
+            <p className="mt-0.5 text-xs text-[var(--bb-text-muted)]">
+              When you&apos;re available and how many tickets you&apos;re willing to hold at once.
+              Auto-assign uses the cap to skip you when you&apos;re already at capacity; admins use
+              the working-hours hint when scheduling rush work.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-[var(--bb-text-secondary)]">
+                Working hours
+              </label>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <FormInput
+                  value={workingHoursDraft}
+                  onChange={(e) => setWorkingHoursDraft(e.target.value)}
+                  placeholder="e.g. 9–18 weekdays, Europe/Istanbul"
+                  maxLength={200}
+                  className="min-w-[220px] flex-1"
+                />
+                <Button
+                  onClick={() => void handleSaveWorkingHours()}
+                  disabled={
+                    savingWorkingHours || workingHoursDraft.trim() === (user.workingHours ?? "")
+                  }
+                  loading={savingWorkingHours}
+                  loadingText="Saving…"
+                >
+                  Save
+                </Button>
+              </div>
+              <p className="mt-1 text-[11px] text-[var(--bb-text-muted)]">
+                Free-form text — describe the days and hours you&apos;re typically online. Anything
+                an admin can read at a glance works.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-[var(--bb-text-secondary)]">
+                Concurrent task cap
+              </label>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <FormInput
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={40}
+                  value={tasksCapDraft}
+                  onChange={(e) => setTasksCapDraft(e.target.value)}
+                  placeholder="No cap"
+                  aria-label="Concurrent task cap"
+                  className="w-32"
+                />
+                <Button
+                  onClick={() => void handleSaveTasksCap()}
+                  disabled={
+                    savingTasksCap ||
+                    tasksCapDraft.trim() ===
+                      (user.tasksPerWeekCap == null ? "" : String(user.tasksPerWeekCap))
+                  }
+                  loading={savingTasksCap}
+                  loadingText="Saving…"
+                >
+                  Save
+                </Button>
+                {user.tasksPerWeekCap != null && (
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setTasksCapDraft("");
+                      void handleSaveTasksCap();
+                    }}
+                    disabled={savingTasksCap}
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
+              <p className="mt-1 text-[11px] text-[var(--bb-text-muted)]">
+                Auto-assign skips you when your open ticket count reaches this number. Empty means
+                no cap (the legacy behavior). Admin can also adjust this.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ---- Notifications ---- */}
       <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-6">

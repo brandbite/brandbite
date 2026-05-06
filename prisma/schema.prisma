@@ -231,6 +231,13 @@ model UserAccount {
   /// invalid at format time anyway.
   timezone String?
 
+  /// Free-text working hours (e.g. "9-18 weekdays, Europe/Istanbul").
+  /// Populated at hire-time from TalentApplication.workingHours; the
+  /// creative can amend it later from /profile and admins can edit it
+  /// from /admin/users. Not parsed — it's a hint operators read when
+  /// scheduling; no business logic depends on the format.
+  workingHours String?
+
   /// Optional TOTP secret for the L4 MFA second factor. When set, money
   /// actions use TOTP codes from an authenticator app instead of email
   /// codes. Stored as base32 (RFC 4648). Null = not enrolled / email

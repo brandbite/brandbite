@@ -42,6 +42,10 @@ type CreativeMetrics = {
   ratingQuality: number | null;
   ratingCommunication: number | null;
   ratingSpeed: number | null;
+  // Workload PR
+  workingHours: string | null;
+  tasksPerWeekCap: number | null;
+  completedThisWeek: number;
 };
 
 type CreativeAnalyticsResponse = {
@@ -334,6 +338,12 @@ export default function CreativeAnalyticsPage() {
               <th className="px-4 py-3">Creative</th>
               <th className="px-3 py-3 text-center">Completed</th>
               <th className="px-3 py-3 text-center">Active (T / IP / IR)</th>
+              <th
+                className="px-3 py-3 text-center"
+                title="Concurrent task cap (auto-assign skips this creative when active reaches the cap) and tasks completed in the current ISO week"
+              >
+                Capacity
+              </th>
               <th className="px-3 py-3 text-center">Rate</th>
               <th className="px-3 py-3 text-center">Avg Rev.</th>
               <th className="px-3 py-3 text-center">Turnaround</th>
@@ -351,9 +361,19 @@ export default function CreativeAnalyticsPage() {
               >
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
-                    <div>
+                    <div className="min-w-0">
                       <p className="font-medium text-[var(--bb-secondary)]">{d.name || "—"}</p>
-                      <p className="text-[10px] text-[var(--bb-text-tertiary)]">{d.email}</p>
+                      <p className="truncate text-[10px] text-[var(--bb-text-tertiary)]">
+                        {d.email}
+                      </p>
+                      {d.workingHours && (
+                        <p
+                          className="truncate text-[10px] text-[var(--bb-text-muted)]"
+                          title={d.workingHours}
+                        >
+                          ⌚ {d.workingHours}
+                        </p>
+                      )}
                     </div>
                     {d.isPaused && (
                       <span
@@ -378,6 +398,39 @@ export default function CreativeAnalyticsPage() {
                     ({d.statusBreakdown.TODO} / {d.statusBreakdown.IN_PROGRESS} /{" "}
                     {d.statusBreakdown.IN_REVIEW})
                   </span>
+                </td>
+                <td className="px-3 py-3 text-center">
+                  {/* Capacity column. Top: active vs cap (the auto-
+                      assign filter); bottom: completed in the current
+                      ISO week (a productivity hint, distinct from the
+                      lifetime "Completed" column on the left). */}
+                  <div
+                    className="leading-tight"
+                    title={
+                      d.tasksPerWeekCap == null
+                        ? `${d.activeTickets} active. No cap. ${d.completedThisWeek} done this week.`
+                        : d.activeTickets >= d.tasksPerWeekCap
+                          ? `${d.activeTickets} / ${d.tasksPerWeekCap} active. AT CAP — auto-assign will skip until this drops. ${d.completedThisWeek} done this week.`
+                          : `${d.activeTickets} / ${d.tasksPerWeekCap} active. ${d.tasksPerWeekCap - d.activeTickets} slots free. ${d.completedThisWeek} done this week.`
+                    }
+                  >
+                    <span
+                      className={`font-semibold ${
+                        d.tasksPerWeekCap != null && d.activeTickets >= d.tasksPerWeekCap
+                          ? "text-amber-600 dark:text-amber-400"
+                          : "text-[var(--bb-secondary)]"
+                      }`}
+                    >
+                      {d.activeTickets}
+                      <span className="text-[var(--bb-text-tertiary)]">
+                        {" "}
+                        / {d.tasksPerWeekCap == null ? "—" : d.tasksPerWeekCap}
+                      </span>
+                    </span>
+                    <p className="text-[10px] text-[var(--bb-text-muted)]">
+                      {d.completedThisWeek} this wk
+                    </p>
+                  </div>
                 </td>
                 <td className="px-3 py-3 text-center">
                   <span

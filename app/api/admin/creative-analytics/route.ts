@@ -34,7 +34,9 @@ export async function GET() {
 
     const [creatives, tickets, revisions, earningsGrouped, withdrawalsGrouped, ratingsGrouped] =
       await Promise.all([
-        // 1. All creatives (+ pause state for the utilization view)
+        // 1. All creatives (+ pause state for the utilization view).
+        //    Workload PR: include workingHours + tasksPerWeekCap so the
+        //    analytics row can render capacity at a glance.
         prisma.userAccount.findMany({
           where: { role: "DESIGNER" },
           select: {
@@ -44,6 +46,8 @@ export async function GET() {
             isPaused: true,
             pausedAt: true,
             pauseExpiresAt: true,
+            workingHours: true,
+            tasksPerWeekCap: true,
           },
         }),
 
@@ -153,6 +157,21 @@ export async function GET() {
     // Compute per-creative metrics
     // -----------------------------------------------------------------------
 
+    // Workload PR — current ISO week window (Monday 00:00 UTC → next
+    // Monday 00:00 UTC). Done once outside the loop so every creative
+    // row uses an identical window. Day-of-week is computed in UTC
+    // intentionally; we don't have per-creative timezone yet on the
+    // analytics side and a stable window is more important than a
+    // locally-aligned one for "completed this week" trending.
+    const now = new Date();
+    const dayOfWeek = now.getUTCDay(); // 0=Sun … 6=Sat
+    const daysSinceMonday = (dayOfWeek + 6) % 7; // 0 if Mon, 6 if Sun
+    const weekStart = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysSinceMonday),
+    );
+    const weekStartUtc = weekStart.getTime();
+    const weekEndUtc = weekStartUtc + 7 * 24 * 60 * 60 * 1000;
+
     let platformTotalCompleted = 0;
     let platformRevisionSum = 0;
     let platformRevisionTicketCount = 0;
@@ -211,6 +230,19 @@ export async function GET() {
         }
       }
 
+      // Workload PR — completed-this-week count. Uses the dTickets list
+      // we already filtered above, scoped to status=DONE and an
+      // updatedAt within the current ISO week (Monday → Sunday in the
+      // server's UTC frame). Cheap because the array is already in
+      // memory; no extra DB call.
+      const completedThisWeek = dTickets.filter(
+        (t) =>
+          t.status === "DONE" &&
+          t.updatedAt &&
+          t.updatedAt.getTime() >= weekStartUtc &&
+          t.updatedAt.getTime() < weekEndUtc,
+      ).length;
+
       // Earnings & withdrawals
       const earnings = earningsMap.get(d.id);
       const withdrawals = withdrawalsMap.get(d.id);
@@ -249,6 +281,10 @@ export async function GET() {
         ratingQuality: rating ? Math.round(rating.quality * 10) / 10 : null,
         ratingCommunication: rating ? Math.round(rating.communication * 10) / 10 : null,
         ratingSpeed: rating ? Math.round(rating.speed * 10) / 10 : null,
+        // Workload PR
+        workingHours: d.workingHours,
+        tasksPerWeekCap: d.tasksPerWeekCap,
+        completedThisWeek,
       };
     });
 

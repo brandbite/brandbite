@@ -41,6 +41,12 @@ type ProfileResponseUser = {
    *  unset. Joined from AuthUser since that's BetterAuth's source of
    *  truth for the field. */
   image: string | null;
+  /** Creative-only fields (null on customer / admin payloads). The
+   *  profile page renders the workload section only when the role is
+   *  DESIGNER, so these are populated unconditionally on the server
+   *  side and the client decides whether to surface them. */
+  workingHours: string | null;
+  tasksPerWeekCap: number | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -60,6 +66,8 @@ export async function GET() {
         role: true,
         timezone: true,
         authUserId: true,
+        workingHours: true,
+        tasksPerWeekCap: true,
       },
     });
     if (!row) {
@@ -88,6 +96,8 @@ export async function GET() {
       timezone: row.timezone,
       twoFactorEnabled: !!authRow?.twoFactorEnabled,
       image: authRow?.image ?? null,
+      workingHours: row.workingHours,
+      tasksPerWeekCap: row.tasksPerWeekCap,
     };
     return NextResponse.json({ user });
   } catch (err: unknown) {
@@ -103,14 +113,21 @@ export async function GET() {
 // PATCH /api/profile — update name and/or timezone.
 //
 // Body shape:
-//   { name?: string, timezone?: string | null }
+//   { name?: string, timezone?: string | null,
+//     workingHours?: string | null,        // DESIGNER only
+//     tasksPerWeekCap?: number | null }    // DESIGNER only
 //
-// Both fields are optional; sending neither is a no-op (returns the
-// current row unchanged). `timezone: null` explicitly clears the
-// stored value, falling back to UTC display everywhere. Email changes
-// are NOT handled here — they need BetterAuth's verification flow and
-// will land in a follow-up PR.
+// All fields are optional; sending none is a no-op (returns the current
+// row unchanged). `null` on any nullable field explicitly clears it.
+// Email changes are NOT handled here — they need BetterAuth's
+// verification flow and live on /api/auth/change-email.
+//
+// Workload fields (workingHours, tasksPerWeekCap) are creative-self-edit:
+// rejected from non-DESIGNER callers so a CUSTOMER can't accidentally
+// set a workload that the auto-assign would later read back as a cap.
 // ---------------------------------------------------------------------------
+
+const MAX_WORKING_HOURS_LENGTH = 200;
 
 export async function PATCH(req: NextRequest) {
   try {
@@ -119,12 +136,19 @@ export async function PATCH(req: NextRequest) {
     const body = (await req.json().catch(() => null)) as {
       name?: unknown;
       timezone?: unknown;
+      workingHours?: unknown;
+      tasksPerWeekCap?: unknown;
     } | null;
     if (!body || typeof body !== "object") {
       return NextResponse.json({ error: "Invalid body" }, { status: 400 });
     }
 
-    const data: { name?: string; timezone?: string | null } = {};
+    const data: {
+      name?: string;
+      timezone?: string | null;
+      workingHours?: string | null;
+      tasksPerWeekCap?: number | null;
+    } = {};
 
     // ----- name -----
     if (body.name !== undefined) {
@@ -187,12 +211,84 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
+    // ----- workingHours (DESIGNER only) -----
+    if (body.workingHours !== undefined) {
+      if (session.role !== "DESIGNER") {
+        return NextResponse.json(
+          { error: "Working hours are a creative-only field." },
+          { status: 403 },
+        );
+      }
+      if (body.workingHours === null || body.workingHours === "") {
+        data.workingHours = null;
+      } else if (typeof body.workingHours !== "string") {
+        return NextResponse.json(
+          { error: "workingHours must be a string or null" },
+          { status: 400 },
+        );
+      } else {
+        const trimmed = body.workingHours.trim();
+        if (trimmed.length === 0) {
+          data.workingHours = null;
+        } else if (trimmed.length > MAX_WORKING_HOURS_LENGTH) {
+          return NextResponse.json(
+            { error: `Working hours must be ${MAX_WORKING_HOURS_LENGTH} characters or fewer.` },
+            { status: 400 },
+          );
+        } else {
+          data.workingHours = trimmed;
+        }
+      }
+    }
+
+    // ----- tasksPerWeekCap (DESIGNER only) -----
+    // Mirrors the validation in /api/admin/users PATCH so the value
+    // the creative sets through self-edit can never bypass the same
+    // 1..40 + integer constraint admins enforce.
+    if (body.tasksPerWeekCap !== undefined) {
+      if (session.role !== "DESIGNER") {
+        return NextResponse.json(
+          { error: "Tasks-per-week cap is a creative-only field." },
+          { status: 403 },
+        );
+      }
+      if (body.tasksPerWeekCap === null) {
+        data.tasksPerWeekCap = null;
+      } else if (typeof body.tasksPerWeekCap !== "number") {
+        return NextResponse.json(
+          { error: "tasksPerWeekCap must be a number or null" },
+          { status: 400 },
+        );
+      } else if (
+        !Number.isFinite(body.tasksPerWeekCap) ||
+        !Number.isInteger(body.tasksPerWeekCap) ||
+        body.tasksPerWeekCap < 1 ||
+        body.tasksPerWeekCap > 40
+      ) {
+        return NextResponse.json(
+          { error: "Tasks per week cap must be a whole number between 1 and 40, or null." },
+          { status: 400 },
+        );
+      } else {
+        data.tasksPerWeekCap = body.tasksPerWeekCap;
+      }
+    }
+
     if (Object.keys(data).length === 0) {
       // No-op — return current row so the client can sync without a
       // separate GET round-trip.
       const row = await prisma.userAccount.findUniqueOrThrow({
         where: { id: session.id },
-        select: { id: true, email: true, name: true, role: true, timezone: true, authUserId: true },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          timezone: true,
+          authUserId: true,
+          workingHours: true,
+          tasksPerWeekCap: true,
+        },
       });
       const auth = await prisma.authUser.findUnique({
         where: { id: row.authUserId },
@@ -207,6 +303,8 @@ export async function PATCH(req: NextRequest) {
           timezone: row.timezone,
           twoFactorEnabled: !!auth?.twoFactorEnabled,
           image: auth?.image ?? null,
+          workingHours: row.workingHours,
+          tasksPerWeekCap: row.tasksPerWeekCap,
         } satisfies ProfileResponseUser,
       });
     }
@@ -214,7 +312,16 @@ export async function PATCH(req: NextRequest) {
     const updated = await prisma.userAccount.update({
       where: { id: session.id },
       data,
-      select: { id: true, email: true, name: true, role: true, timezone: true, authUserId: true },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        timezone: true,
+        authUserId: true,
+        workingHours: true,
+        tasksPerWeekCap: true,
+      },
     });
     const auth = await prisma.authUser.findUnique({
       where: { id: updated.authUserId },
@@ -229,6 +336,8 @@ export async function PATCH(req: NextRequest) {
         timezone: updated.timezone,
         twoFactorEnabled: !!auth?.twoFactorEnabled,
         image: auth?.image ?? null,
+        workingHours: updated.workingHours,
+        tasksPerWeekCap: updated.tasksPerWeekCap,
       } satisfies ProfileResponseUser,
     });
   } catch (err: unknown) {

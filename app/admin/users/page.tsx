@@ -28,6 +28,8 @@ type UserRow = {
   creativeRevisionNotesEnabled: boolean;
   // PR11 — capacity cap. Null = no cap (legacy default).
   tasksPerWeekCap: number | null;
+  // Workload PR — free-text working hours. Null = unset.
+  workingHours: string | null;
   companyCount: number;
   assignedTickets: number;
 };
@@ -85,6 +87,12 @@ export default function AdminUsersPage() {
   const [editingCapId, setEditingCapId] = useState<string | null>(null);
   const [pendingCap, setPendingCap] = useState<string>("");
   const [savingCap, setSavingCap] = useState(false);
+
+  // Workload PR — inline working-hours editor. Same shape as the cap
+  // editor: one row at a time, free-text draft, server-validated.
+  const [editingHoursId, setEditingHoursId] = useState<string | null>(null);
+  const [pendingHours, setPendingHours] = useState<string>("");
+  const [savingHours, setSavingHours] = useState(false);
 
   // Debounce search
   useEffect(() => {
@@ -281,6 +289,36 @@ export default function AdminUsersPage() {
       showToast({ title: "Failed to save cap", type: "error" });
     } finally {
       setSavingCap(false);
+    }
+  };
+
+  // Workload PR — save free-text working hours. Empty string clears.
+  const handleSaveHours = async (userId: string) => {
+    setSavingHours(true);
+    try {
+      const trimmed = pendingHours.trim();
+      const next = trimmed === "" ? null : trimmed;
+      const res = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, workingHours: next }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        showToast({ title: json?.error || "Failed to save working hours", type: "error" });
+        return;
+      }
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, workingHours: next } : u)));
+      showToast({
+        title: next == null ? "Working hours cleared" : "Working hours updated",
+        type: "success",
+      });
+      setEditingHoursId(null);
+      setPendingHours("");
+    } catch {
+      showToast({ title: "Failed to save working hours", type: "error" });
+    } finally {
+      setSavingHours(false);
     }
   };
 
@@ -573,6 +611,59 @@ export default function AdminUsersPage() {
                             }`}
                           >
                             {u.tasksPerWeekCap == null ? "—" : u.tasksPerWeekCap}
+                          </span>
+                        </button>
+                      ) : null}
+                      {/* Workload PR — inline working-hours editor.
+                          DESIGNER only. Same shape as the cap editor:
+                          read-only badge until clicked; expands into a
+                          text input + Save / Cancel. Empty saves null
+                          (clears the value). */}
+                      {u.role === "DESIGNER" && editingHoursId === u.id ? (
+                        <div className="flex items-center gap-1 text-[10px]">
+                          <input
+                            type="text"
+                            value={pendingHours}
+                            onChange={(e) => setPendingHours(e.target.value)}
+                            placeholder="9–18 weekdays, Europe/Istanbul"
+                            maxLength={200}
+                            className="h-6 w-48 rounded border border-[var(--bb-border)] px-1.5 text-xs"
+                            aria-label="Working hours"
+                          />
+                          <button
+                            onClick={() => handleSaveHours(u.id)}
+                            disabled={savingHours}
+                            className="rounded bg-[var(--bb-primary)] px-2 py-0.5 text-[10px] font-medium text-white disabled:opacity-50"
+                          >
+                            {savingHours ? "…" : "Save"}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingHoursId(null);
+                              setPendingHours("");
+                            }}
+                            disabled={savingHours}
+                            className="text-[10px] text-[var(--bb-text-muted)] hover:text-[var(--bb-secondary)] disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : u.role === "DESIGNER" ? (
+                        <button
+                          onClick={() => {
+                            setEditingHoursId(u.id);
+                            setPendingHours(u.workingHours ?? "");
+                          }}
+                          className="flex max-w-[260px] items-center gap-1 truncate text-[10px] text-[var(--bb-text-muted)] transition-colors hover:text-[var(--bb-secondary)]"
+                          title="Free-form availability hint shown to scheduling admins. Empty = unset."
+                        >
+                          <span className="shrink-0">Hours:</span>
+                          <span
+                            className={`min-w-0 truncate rounded border border-[var(--bb-border)] px-1.5 py-0.5 ${
+                              u.workingHours == null ? "text-[var(--bb-text-muted)]" : ""
+                            }`}
+                          >
+                            {u.workingHours == null ? "—" : u.workingHours}
                           </span>
                         </button>
                       ) : null}
