@@ -238,8 +238,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ use
           })
         : Promise.resolve([]),
       // Designer-only: link back to the talent application that hired them
-      // (when they came in through that flow). Useful for "where did this
-      // person come from" investigations.
+      // (when they came in through that flow). Source of every personal-
+      // info field admins might need for support — WhatsApp, country,
+      // portfolio + socials, background. Also the only place we have
+      // structured contact info; UserAccount only carries email + name.
       user.role === "DESIGNER"
         ? prisma.talentApplication.findFirst({
             where: { hiredUserAccountId: user.id },
@@ -251,6 +253,21 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ use
               hireNotes: true,
               workload: true,
               preferredTasksPerWeek: true,
+              // Contact
+              whatsappNumber: true,
+              country: true,
+              timezone: true,
+              // Portfolio + presence
+              portfolioUrl: true,
+              linkedinUrl: true,
+              socialLinks: true,
+              // Background
+              totalYears: true,
+              hasRemoteExp: true,
+              yearsRemote: true,
+              workedWith: true,
+              tools: true,
+              toolsOther: true,
             },
           })
         : Promise.resolve(null),
@@ -372,6 +389,21 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ use
                     hireNotes: hiredFromApplication.hireNotes,
                     workload: hiredFromApplication.workload,
                     preferredTasksPerWeek: hiredFromApplication.preferredTasksPerWeek,
+                    // Contact + personal info captured at application time.
+                    // Surfaced verbatim so admins reaching for support
+                    // info don't have to bounce through the talent queue.
+                    whatsappNumber: hiredFromApplication.whatsappNumber,
+                    country: hiredFromApplication.country,
+                    applicationTimezone: hiredFromApplication.timezone,
+                    portfolioUrl: hiredFromApplication.portfolioUrl,
+                    linkedinUrl: hiredFromApplication.linkedinUrl,
+                    socialLinks: hiredFromApplication.socialLinks,
+                    totalYears: hiredFromApplication.totalYears,
+                    hasRemoteExp: hiredFromApplication.hasRemoteExp,
+                    yearsRemote: hiredFromApplication.yearsRemote,
+                    workedWith: hiredFromApplication.workedWith,
+                    tools: hiredFromApplication.tools,
+                    toolsOther: hiredFromApplication.toolsOther,
                   }
                 : null,
             }
