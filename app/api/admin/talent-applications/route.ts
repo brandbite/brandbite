@@ -29,11 +29,23 @@ export const dynamic = "force-dynamic";
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 
+// Every status the queue surfaces in its filter chips. Originally this
+// list lagged behind the schema (only the v1 statuses), causing any
+// filter against a post-interview status — INTERVIEW_HELD, HIRED,
+// ONBOARDED, REJECTED_AFTER_INTERVIEW — to silently fall back to "ALL".
+// Keeping it in sync with the Prisma enum is now load-bearing for the
+// filter UX.
 const ALLOWED_STATUSES: TalentApplicationStatus[] = [
   "SUBMITTED",
   "IN_REVIEW",
+  "AWAITING_CANDIDATE_CHOICE",
+  "CANDIDATE_PROPOSED_TIME",
   "ACCEPTED",
+  "INTERVIEW_HELD",
+  "HIRED",
+  "ONBOARDED",
   "DECLINED",
+  "REJECTED_AFTER_INTERVIEW",
 ];
 
 export type AdminTalentApplicationItem = TalentApplication & {
@@ -53,6 +65,12 @@ export type AdminTalentApplicationListResponse = {
   filter: {
     status: TalentApplicationStatus | "ALL";
   };
+  /** Per-status counts across the entire table, regardless of the
+   *  current filter. Powers the badge on each filter chip so the
+   *  operator can see at a glance which buckets need attention without
+   *  cycling through the dropdown. Zero values are included so the
+   *  client doesn't need to defensively default missing keys. */
+  counts: Record<TalentApplicationStatus, number>;
 };
 
 function parseStatus(raw: string | null): TalentApplicationStatus | "ALL" {
@@ -96,10 +114,11 @@ export async function GET(req: NextRequest) {
 
     const where = status === "ALL" ? {} : { status };
 
-    // Two queries are cheaper than a single findMany + manual count when
-    // the filter is index-aligned (status + createdAt is the primary
-    // index). Run them in parallel.
-    const [applications, total] = await Promise.all([
+    // Three queries in parallel: the filtered page, the filtered total,
+    // and the always-unfiltered per-status counts that drive the chip
+    // badges. groupBy is index-aligned on (status) and the table caps in
+    // the low hundreds for the foreseeable future, so this is cheap.
+    const [applications, total, statusCounts] = await Promise.all([
       prisma.talentApplication.findMany({
         where,
         // Newest first within each status grouping. Matches the index.
@@ -108,7 +127,25 @@ export async function GET(req: NextRequest) {
         skip: offset,
       }),
       prisma.talentApplication.count({ where }),
+      prisma.talentApplication.groupBy({
+        by: ["status"],
+        _count: { _all: true },
+      }),
     ]);
+
+    // Hydrate every status key with 0 so the client doesn't need to
+    // defensively default missing keys. Mirrors the order of the
+    // ALLOWED_STATUSES constant above.
+    const counts = ALLOWED_STATUSES.reduce(
+      (acc, s) => {
+        acc[s] = 0;
+        return acc;
+      },
+      {} as Record<TalentApplicationStatus, number>,
+    );
+    for (const row of statusCounts) {
+      counts[row.status] = row._count._all;
+    }
 
     // PR5 — email-collision flag. Single batched lookup against UserAccount
     // (indexed on `email @unique`) rather than N per-row queries, so adding
@@ -133,6 +170,7 @@ export async function GET(req: NextRequest) {
       applications: enriched,
       total,
       filter: { status },
+      counts,
     };
 
     return NextResponse.json(body, { status: 200 });
