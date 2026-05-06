@@ -15,6 +15,7 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { createR2Client, getR2BucketName, getR2PublicBaseUrl, resolveAssetUrl } from "@/lib/r2";
+import { MAX_UPLOAD_BYTES } from "@/lib/upload-helpers";
 
 function sanitizeFilename(name: string): string {
   const base = name.trim().replace(/\s+/g, "_");
@@ -29,7 +30,10 @@ function makeStorageKey(args: { moodboardId: string; originalName?: string | nul
   return `moodboards/${args.moodboardId}/${ts}_${rand}_${safeName}`;
 }
 
-const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
+// Aligned with Vercel's serverless function body-size cap (~4.5 MB).
+// See lib/upload-helpers.ts MAX_UPLOAD_BYTES for the rationale and the
+// shared client-server limit constant.
+const MAX_FILE_SIZE = MAX_UPLOAD_BYTES;
 
 export async function POST(req: Request) {
   try {

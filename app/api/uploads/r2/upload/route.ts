@@ -19,6 +19,7 @@ import { getCurrentUserOrThrow } from "@/lib/auth";
 import { createR2Client, getR2BucketName, getR2PublicBaseUrl } from "@/lib/r2";
 import { resolveAssetUrl } from "@/lib/r2";
 import { isCompanyAdminRole } from "@/lib/permissions/companyRoles";
+import { MAX_UPLOAD_BYTES } from "@/lib/upload-helpers";
 
 function sanitizeFilename(name: string): string {
   const base = name.trim().replace(/\s+/g, "_");
@@ -38,7 +39,13 @@ function makeStorageKey(args: {
   return `tickets/${args.ticketId}/${folder}/${ts}_${rand}_${safeName}`;
 }
 
-const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
+// Aligned with Vercel's serverless function body-size cap (~4.5 MB on
+// Hobby/Pro). The previous 20 MB ceiling was misleading: Vercel rejects
+// the request before our route runs, so files between 4.5 MB and 20 MB
+// failed silently with a generic platform error. See
+// lib/upload-helpers.ts MAX_UPLOAD_BYTES — single source of truth so
+// client + server agree on the limit.
+const MAX_FILE_SIZE = MAX_UPLOAD_BYTES;
 
 export async function POST(req: Request) {
   try {
