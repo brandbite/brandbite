@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable, TD, TH, THead } from "@/components/ui/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
-import { FormInput, FormSelect, FormTextarea } from "@/components/ui/form-field";
+import { FormInput, FormTextarea } from "@/components/ui/form-field";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { LoadingState } from "@/components/ui/loading-state";
 import { useToast } from "@/components/ui/toast-provider";
@@ -170,8 +170,13 @@ export default function TalentApplicationsPage() {
   const toast = useToast();
 
   const [items, setItems] = useState<Application[]>([]);
-  const [total, setTotal] = useState(0);
   const [filter, setFilter] = useState<Filter>("SUBMITTED");
+  // Per-status counts across the entire table — populated from the API
+  // response on each load so the filter chips can show "(N)" badges
+  // for buckets the user isn't currently viewing.
+  const [statusCounts, setStatusCounts] = useState<
+    Partial<Record<TalentApplicationStatus, number>>
+  >({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -234,9 +239,15 @@ export default function TalentApplicationsPage() {
         const body = (await res.json().catch(() => null)) as { error?: string } | null;
         throw new Error(body?.error || `HTTP ${res.status}`);
       }
-      const json = (await res.json()) as { applications: Application[]; total: number };
+      const json = (await res.json()) as {
+        applications: Application[];
+        total: number;
+        counts?: Partial<Record<TalentApplicationStatus, number>>;
+      };
       setItems(json.applications);
-      setTotal(json.total);
+      // Per-status counts are the new source of truth for the chip
+      // badges; the old top-of-header "(N)" beside the dropdown is gone.
+      if (json.counts) setStatusCounts(json.counts);
     } catch (err) {
       console.error("[admin/talent] load failed", err);
       setLoadError(err instanceof Error ? err.message : "Failed to load");
@@ -404,48 +415,148 @@ export default function TalentApplicationsPage() {
     void submitAction({ action: "ONBOARD" });
   }
 
+  // Filter chips, in the order an operator scans them — left-to-right
+  // matches the funnel direction. Each chip carries its own status key
+  // (or "ALL"); the badge count is hydrated from `statusCounts` on
+  // render. Grouped visually with `tone` so "needs my attention" reads
+  // distinct from "post-decision" without needing a second row.
+  //
+  //   tone: "action"  — operator must do something next  (orange tint)
+  //   tone: "wait"    — waiting on the candidate         (blue tint)
+  //   tone: "done"    — terminal positive outcome        (green tint)
+  //   tone: "decline" — terminal negative outcome        (neutral tint)
+  //   tone: "all"     — full table, no filter            (neutral)
+  const FILTER_CHIPS: Array<{
+    key: Filter;
+    label: string;
+    tone: "action" | "wait" | "done" | "decline" | "all";
+  }> = [
+    { key: "SUBMITTED", label: "New", tone: "action" },
+    { key: "IN_REVIEW", label: "In review", tone: "action" },
+    { key: "CANDIDATE_PROPOSED_TIME", label: "Candidate proposed", tone: "action" },
+    { key: "INTERVIEW_HELD", label: "Interview held", tone: "action" },
+    { key: "AWAITING_CANDIDATE_CHOICE", label: "Awaiting candidate", tone: "wait" },
+    { key: "ACCEPTED", label: "Accepted", tone: "wait" },
+    { key: "HIRED", label: "Hired", tone: "done" },
+    { key: "ONBOARDED", label: "Onboarded", tone: "done" },
+    { key: "DECLINED", label: "Declined", tone: "decline" },
+    { key: "REJECTED_AFTER_INTERVIEW", label: "Declined post-interview", tone: "decline" },
+    { key: "ALL", label: "All", tone: "all" },
+  ];
+
+  // Tone → tailwind classes for the active and inactive chip states.
+  // Active: solid coloured background, white text.
+  // Inactive: bordered, muted text, faint coloured dot for tone hint.
+  const TONE_STYLES: Record<
+    (typeof FILTER_CHIPS)[number]["tone"],
+    { active: string; dot: string }
+  > = {
+    action: {
+      active: "bg-[var(--bb-primary)] text-white border-[var(--bb-primary)]",
+      dot: "bg-[var(--bb-primary)]",
+    },
+    wait: {
+      active: "bg-blue-600 text-white border-blue-600",
+      dot: "bg-blue-500",
+    },
+    done: {
+      active: "bg-emerald-600 text-white border-emerald-600",
+      dot: "bg-emerald-500",
+    },
+    decline: {
+      active: "bg-slate-600 text-white border-slate-600",
+      dot: "bg-slate-400",
+    },
+    all: {
+      active: "bg-[var(--bb-secondary)] text-white border-[var(--bb-secondary)]",
+      dot: "bg-[var(--bb-text-muted)]",
+    },
+  };
+
+  function chipCount(key: Filter): number {
+    if (key === "ALL") {
+      return Object.values(statusCounts).reduce<number>((a, b) => a + (b ?? 0), 0);
+    }
+    return statusCounts[key] ?? 0;
+  }
+
   return (
-    <div className="space-y-6">
-      <header className="flex items-end justify-between gap-4">
-        <div>
+    <div className="space-y-5">
+      {/* Header — title + concise description on one row, refresh
+          tucked at the right. The previous design squeezed a long
+          dropdown next to a long description, which is what made the
+          status filter so easy to miss. */}
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold text-[var(--bb-secondary)]">Talent applications</h1>
           <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-            Review submissions from the public /talent form. Accept to offer the candidate three
-            interview slots; if they propose their own time, confirm it from the detail panel.
-            Decline to send a polite rejection.
+            Review submissions from the public /talent form. Pick a status below to triage.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <FormSelect
-            aria-label="Filter by status"
-            value={filter}
-            onChange={(e) => {
-              setFilter(e.target.value as Filter);
-              setSelectedId(null);
-            }}
-          >
-            <option value="SUBMITTED">
-              New ({total > 0 && filter === "SUBMITTED" ? total : "—"})
-            </option>
-            <option value="IN_REVIEW">In review</option>
-            <option value="AWAITING_CANDIDATE_CHOICE">Awaiting candidate</option>
-            <option value="CANDIDATE_PROPOSED_TIME">
-              Candidate proposed
-              {total > 0 && filter === "CANDIDATE_PROPOSED_TIME" ? ` (${total})` : ""}
-            </option>
-            <option value="ACCEPTED">Accepted</option>
-            <option value="INTERVIEW_HELD">Interview held</option>
-            <option value="HIRED">Hired</option>
-            <option value="ONBOARDED">Onboarded</option>
-            <option value="DECLINED">Declined</option>
-            <option value="REJECTED_AFTER_INTERVIEW">Declined (post-interview)</option>
-            <option value="ALL">All</option>
-          </FormSelect>
-          <Button variant="secondary" onClick={() => void refresh()}>
-            Refresh
-          </Button>
-        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => void refresh()}
+          aria-label="Refresh applications"
+        >
+          ↻ Refresh
+        </Button>
       </header>
+
+      {/* Filter chips — each lifecycle status as its own chip with a
+          live count. Horizontally scrollable on mobile (no clipping,
+          no need for a hidden dropdown), wraps on desktop. Active chip
+          is filled in the bucket's tone; inactive chips show a small
+          coloured dot so the tone is still readable. */}
+      <nav
+        aria-label="Filter applications by status"
+        className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0"
+      >
+        <div className="flex flex-nowrap gap-2 sm:flex-wrap">
+          {FILTER_CHIPS.map((chip) => {
+            const count = chipCount(chip.key);
+            const active = filter === chip.key;
+            const styles = TONE_STYLES[chip.tone];
+            return (
+              <button
+                key={chip.key}
+                type="button"
+                onClick={() => {
+                  setFilter(chip.key);
+                  setSelectedId(null);
+                }}
+                aria-pressed={active}
+                className={[
+                  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors",
+                  active
+                    ? styles.active
+                    : "border-[var(--bb-border)] bg-[var(--bb-bg-card)] text-[var(--bb-text-secondary)] hover:border-[var(--bb-primary)] hover:text-[var(--bb-secondary)]",
+                ].join(" ")}
+              >
+                {!active && (
+                  <span
+                    aria-hidden="true"
+                    className={`inline-block h-1.5 w-1.5 rounded-full ${styles.dot}`}
+                  />
+                )}
+                <span>{chip.label}</span>
+                {count > 0 && (
+                  <span
+                    className={[
+                      "inline-flex min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums",
+                      active
+                        ? "bg-white/20 text-white"
+                        : "bg-[var(--bb-bg-page)] text-[var(--bb-text-secondary)]",
+                    ].join(" ")}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
 
       <OwnerOnlyBanner action="accept or decline talent applications" />
 
