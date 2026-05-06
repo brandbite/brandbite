@@ -22,7 +22,8 @@ import { PASSWORD_POLICY_BULLETS, validatePasswordStrength } from "@/lib/passwor
 import { PasswordInput } from "@/components/ui/password-input";
 
 type Mode = "signin" | "signup";
-type Status = "idle" | "submitting" | "magic-link-sent" | "error";
+type Status = "idle" | "submitting" | "magic-link-sent" | "awaiting-2fa" | "error";
+type TwoFactorMode = "totp" | "backup";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -42,6 +43,15 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileRef = useRef<TurnstileInstance | null>(null);
+
+  // Login 2FA: when password sign-in succeeds against a 2FA-enrolled
+  // account, BetterAuth deletes the session it just created and
+  // returns `{ twoFactorRedirect: true }`. The page swaps into a TOTP /
+  // backup-code input that POSTs the same auth client to the
+  // verify-totp / verify-backup-code endpoints. The original session
+  // doesn't issue until the second factor passes.
+  const [twoFactorCode, setTwoFactorCode] = useState("");
+  const [twoFactorMode, setTwoFactorMode] = useState<TwoFactorMode>("totp");
 
   const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
@@ -174,7 +184,7 @@ export default function LoginPage() {
         return;
       }
 
-      const { error: signInError } = await authClient.signIn.email({
+      const { data: signInData, error: signInError } = await authClient.signIn.email({
         email: email.trim(),
         password,
       });
@@ -188,10 +198,62 @@ export default function LoginPage() {
         return;
       }
 
+      // 2FA gate: BetterAuth's twoFactor plugin returns
+      // `twoFactorRedirect: true` (and no session) when the account
+      // has 2FA enabled. Swap the page into the TOTP input — the
+      // password is correct but we're not signed in yet until the
+      // second factor verifies.
+      if ((signInData as { twoFactorRedirect?: boolean } | null)?.twoFactorRedirect) {
+        setStatus("awaiting-2fa");
+        setTwoFactorMode("totp");
+        setTwoFactorCode("");
+        return;
+      }
+
       await handlePostLogin();
     } catch {
       setError("Something went wrong. Please try again.");
       setStatus("error");
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Login 2FA verify handler — TOTP or backup code, swapped from the
+  // same submit button. BetterAuth bound the temporary 2FA cookie when
+  // the password sign-in returned twoFactorRedirect; these endpoints
+  // trade that cookie for a real session on success.
+  // ---------------------------------------------------------------------------
+
+  async function handleTwoFactorSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const code = twoFactorCode.trim();
+    if (!code) {
+      setError(twoFactorMode === "totp" ? "Enter the 6-digit code." : "Enter a backup code.");
+      return;
+    }
+    setStatus("submitting");
+    try {
+      const { error: verifyError } =
+        twoFactorMode === "totp"
+          ? await authClient.twoFactor.verifyTotp({ code })
+          : await authClient.twoFactor.verifyBackupCode({ code });
+      if (verifyError) {
+        setError(
+          mapAuthError(
+            verifyError as AuthClientError,
+            twoFactorMode === "totp"
+              ? "Code didn't match. Try again, or use a backup code."
+              : "Backup code didn't match. Each code only works once.",
+          ),
+        );
+        setStatus("awaiting-2fa");
+        return;
+      }
+      await handlePostLogin();
+    } catch {
+      setError("Something went wrong. Please try again.");
+      setStatus("awaiting-2fa");
     }
   }
 
@@ -288,6 +350,103 @@ export default function LoginPage() {
         </div>
       </div>
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // 2FA challenge — password verified, awaiting second factor
+  //
+  // Rendered when sign-in returned `twoFactorRedirect: true`. The
+  // BetterAuth temporary cookie holds the pending session for 10 min
+  // by default; we don't surface the timer because the user typically
+  // grabs a code in a few seconds. "Use a backup code" toggle swaps
+  // the input + endpoint without leaving the page.
+  // ---------------------------------------------------------------------------
+
+  if (status === "awaiting-2fa" || status === "submitting") {
+    if (status === "awaiting-2fa") {
+      return (
+        <div className="flex min-h-screen flex-col bg-[var(--bb-bg-page)]">
+          <header className="flex items-center border-b border-[var(--bb-border-subtle)] px-6 py-4">
+            <Link href="/" className="text-lg font-bold text-[var(--bb-secondary)]">
+              <span className="text-[var(--bb-primary)]">b</span>randbite
+            </Link>
+          </header>
+          <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-6">
+            <div className="w-full rounded-2xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-card)] p-8 shadow-sm">
+              <h2 className="text-xl font-bold text-[var(--bb-secondary)]">
+                Two-factor authentication
+              </h2>
+              <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
+                {twoFactorMode === "totp"
+                  ? "Open your authenticator app and enter the 6-digit code."
+                  : "Enter one of the backup codes you saved when you set up 2FA. Each code only works once."}
+              </p>
+              <form onSubmit={handleTwoFactorSubmit} className="mt-6 space-y-4">
+                <div>
+                  <label
+                    htmlFor="twoFactorCode"
+                    className="block text-xs font-medium text-[var(--bb-text-secondary)]"
+                  >
+                    {twoFactorMode === "totp" ? "Authenticator code" : "Backup code"}
+                  </label>
+                  <input
+                    id="twoFactorCode"
+                    type="text"
+                    inputMode={twoFactorMode === "totp" ? "numeric" : "text"}
+                    autoComplete="one-time-code"
+                    autoFocus
+                    value={twoFactorCode}
+                    onChange={(e) => setTwoFactorCode(e.target.value)}
+                    placeholder={twoFactorMode === "totp" ? "123 456" : "abcd-efgh-ijkl"}
+                    className="mt-1 w-full rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] px-3 py-2 text-base tracking-widest text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
+                  />
+                </div>
+                {error && (
+                  <div
+                    role="alert"
+                    className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"
+                  >
+                    {error}
+                  </div>
+                )}
+                <button
+                  type="submit"
+                  className="w-full rounded-xl bg-[var(--bb-primary)] px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                >
+                  Verify and continue
+                </button>
+                <div className="flex items-center justify-between text-xs">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTwoFactorMode((m) => (m === "totp" ? "backup" : "totp"));
+                      setTwoFactorCode("");
+                      setError(null);
+                    }}
+                    className="font-medium text-[var(--bb-primary)] hover:underline"
+                  >
+                    {twoFactorMode === "totp"
+                      ? "Use a backup code instead"
+                      : "Use the authenticator app instead"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStatus("idle");
+                      setTwoFactorCode("");
+                      setError(null);
+                    }}
+                    className="text-[var(--bb-text-muted)] hover:underline"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      );
+    }
   }
 
   // ---------------------------------------------------------------------------

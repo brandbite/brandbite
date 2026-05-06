@@ -10,7 +10,7 @@
 import { betterAuth } from "better-auth";
 import { APIError } from "better-auth/api";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import { magicLink } from "better-auth/plugins";
+import { magicLink, twoFactor } from "better-auth/plugins";
 import { nextCookies } from "better-auth/next-js";
 import { prisma } from "@/lib/prisma";
 import { sendNotificationEmail } from "@/lib/email";
@@ -138,6 +138,15 @@ export const auth = betterAuth({
   },
   account: { modelName: "authAccount" },
   verification: { modelName: "authVerification" },
+  // The two-factor plugin's default schema names this `twoFactor`. Our
+  // Prisma model is `AuthTwoFactor` (capitalized to match the rest of
+  // the auth tables in our schema), but Prisma generates the camelCase
+  // method `prisma.authTwoFactor` — that's the string the BetterAuth
+  // adapter uses verbatim, so we tell it the model name here. The
+  // `@@map("twoFactor")` on the model maps the SQL table back to
+  // BetterAuth's expected name without forcing the rest of our code to
+  // see the lowercase form.
+  twoFactor: { modelName: "authTwoFactor" },
 
   // --------------------------------------------------------------------
   // Database hooks — mirror AuthUser.email changes onto UserAccount.email
@@ -265,6 +274,29 @@ export const auth = betterAuth({
   },
 
   plugins: [
+    // ----------------------------------------------------------------
+    // Login two-factor authentication
+    //
+    // Adds TOTP-based 2FA for the email+password sign-in path. After
+    // a user enables 2FA from /profile, BetterAuth's /sign-in/email
+    // returns `{ twoFactorRedirect: true }` instead of issuing a
+    // session — the client then sends the user to a code-entry step
+    // (POST /two-factor/verify-totp). Backup codes recover from
+    // a lost authenticator app.
+    //
+    // Issuer: shows up as the account label inside Authy / Google
+    // Authenticator / 1Password's TOTP UI. "Brandbite" mirrors the
+    // brand the user just signed in to.
+    //
+    // Magic-link sign-in is intentionally NOT gated by the plugin —
+    // we add our own `before` hook below that refuses magic-link sign-
+    // in entirely for users with `twoFactorEnabled = true`. Otherwise
+    // a stolen email could bypass the second factor by clicking a
+    // magic link instead of entering a password.
+    // ----------------------------------------------------------------
+    twoFactor({
+      issuer: "Brandbite",
+    }),
     magicLink({
       sendMagicLink: async ({ email, url }) => {
         try {
@@ -356,6 +388,19 @@ export const auth = betterAuth({
       "/change-password": { window: 60, max: 50 },
       "/change-email": { window: 60, max: 50 },
       "/send-verification-email": { window: 60, max: 50 },
+      // Login 2FA endpoints. The plugin's own rateLimit defaults are
+      // an aggressive 3/10s on /two-factor/* — fine for the verify
+      // step (an attacker brute-forcing a 6-digit TOTP wants way
+      // more), but it also throttles the legitimate enable / disable
+      // / regenerate-backup-codes flows. Loosen here so a user
+      // running through the QR-and-confirm enrollment doesn't get
+      // tripped by their own legitimate rapid clicks; verify-totp
+      // is still further bounded by the TOTP window itself.
+      "/two-factor/enable": { window: 60, max: 30 },
+      "/two-factor/disable": { window: 60, max: 30 },
+      "/two-factor/verify-totp": { window: 60, max: 20 },
+      "/two-factor/verify-backup-code": { window: 60, max: 10 },
+      "/two-factor/generate-backup-codes": { window: 60, max: 10 },
     },
   },
 
@@ -384,9 +429,43 @@ export const auth = betterAuth({
       // read it safely at runtime.
       const hookCtx = ctx as unknown as {
         path?: string;
-        body?: { password?: unknown; newPassword?: unknown };
+        body?: { password?: unknown; newPassword?: unknown; email?: unknown };
       };
       const path = hookCtx.path ?? "";
+
+      // ----------------------------------------------------------------
+      // Magic-link refusal for 2FA-enrolled users
+      //
+      // The two-factor plugin gates only the email+password path. A
+      // magic-link sign-in would silently bypass it: an attacker who
+      // knew a victim's email could request a magic link and click it
+      // from their own machine, never seeing the TOTP challenge.
+      //
+      // Refuse the request when the target email belongs to an
+      // AuthUser with twoFactorEnabled = true. Users who lose access
+      // to their authenticator can recover via a backup code on the
+      // password sign-in path; the magic-link route is no longer the
+      // "I forgot everything" escape hatch once 2FA is on.
+      // ----------------------------------------------------------------
+      if (path === "/sign-in/magic-link") {
+        const body = hookCtx.body ?? {};
+        const rawEmail = body.email;
+        if (typeof rawEmail === "string" && rawEmail.length > 0) {
+          const target = await prisma.authUser.findUnique({
+            where: { email: rawEmail.toLowerCase() },
+            select: { twoFactorEnabled: true },
+          });
+          if (target?.twoFactorEnabled) {
+            throw new APIError("BAD_REQUEST", {
+              message:
+                "This account has two-factor authentication enabled. Sign in with your password to complete the 2FA challenge.",
+            });
+          }
+        }
+        // Fall through — non-2FA users keep using the magic link path.
+        return;
+      }
+
       const isPasswordPath =
         path === "/sign-up/email" ||
         path === "/reset-password" ||
