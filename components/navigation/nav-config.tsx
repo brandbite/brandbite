@@ -151,6 +151,7 @@ export const ADMIN_NAV: NavConfig = {
           icon: IconSettings,
           ownerOnly: true,
         },
+        { href: "/admin/profile", label: "Profile", icon: IconMembers },
         { href: "/admin/settings", label: "Settings", icon: IconSettings },
       ],
     },
@@ -190,6 +191,7 @@ export const CUSTOMER_NAV: NavConfig = {
     {
       label: "Account",
       items: [
+        { href: "/customer/profile", label: "Profile", icon: IconMembers },
         { href: "/customer/members", label: "Members", icon: IconMembers },
         { href: "/customer/settings", label: "Settings", icon: IconSettings },
         { href: "/customer/faq", label: "FAQ", icon: IconFaq },
@@ -223,10 +225,11 @@ export const CREATIVE_NAV: NavConfig = {
       ],
     },
     {
-      label: "Help",
+      label: "Account",
       items: [
-        { href: "/creative/faq", label: "FAQ", icon: IconFaq },
+        { href: "/creative/profile", label: "Profile", icon: IconMembers },
         { href: "/creative/settings", label: "Settings", icon: IconSettings },
+        { href: "/creative/faq", label: "FAQ", icon: IconFaq },
       ],
     },
   ],
