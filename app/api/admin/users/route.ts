@@ -52,6 +52,10 @@ export async function GET(req: NextRequest) {
         // PR11 — surface the per-creative cap so the admin row can render
         // and inline-edit it. Null = no cap (existing behavior).
         tasksPerWeekCap: true,
+        // Workload PR — free-text hours (e.g. "9-18 weekdays Europe/Istanbul").
+        // Null = unset; the row renders an em dash and lets the admin
+        // type one in.
+        workingHours: true,
         _count: {
           select: {
             companies: true,
@@ -72,6 +76,7 @@ export async function GET(req: NextRequest) {
         isPaused: u.isPaused,
         creativeRevisionNotesEnabled: u.creativeRevisionNotesEnabled,
         tasksPerWeekCap: u.tasksPerWeekCap,
+        workingHours: u.workingHours,
         companyCount: u._count.companies,
         assignedTickets: u._count.creativeTickets,
       })),
@@ -93,7 +98,14 @@ export async function PATCH(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { userId, role, creativeRevisionNotesEnabled, tasksPerWeekCap, confirmation } = body as {
+    const {
+      userId,
+      role,
+      creativeRevisionNotesEnabled,
+      tasksPerWeekCap,
+      workingHours,
+      confirmation,
+    } = body as {
       userId?: string;
       role?: string;
       creativeRevisionNotesEnabled?: boolean;
@@ -101,6 +113,10 @@ export async function PATCH(req: NextRequest) {
       // discriminator below treats `undefined` as "this isn't a cap edit"
       // so a role-change PATCH doesn't accidentally clear the cap.
       tasksPerWeekCap?: number | null;
+      // Workload PR — free text. Null clears, string sets. `undefined`
+      // means "this isn't a workingHours edit", so a role-change PATCH
+      // can't blow away an existing schedule.
+      workingHours?: string | null;
       confirmation?: string;
     };
 
@@ -160,6 +176,46 @@ export async function PATCH(req: NextRequest) {
         where: { id: userId },
         data: { tasksPerWeekCap },
         select: { id: true, tasksPerWeekCap: true },
+      });
+
+      return NextResponse.json({ user: updated });
+    }
+
+    // Workload PR — set / clear workingHours (designer only). Free text
+    // capped at 200 chars; null clears. Same audit shape as the cap
+    // editor above (no MFA, no role-change side-effects).
+    if (workingHours !== undefined) {
+      if (target.role !== "DESIGNER") {
+        return NextResponse.json(
+          { error: "Working hours only apply to creatives." },
+          { status: 400 },
+        );
+      }
+      let nextValue: string | null = null;
+      if (workingHours !== null) {
+        if (typeof workingHours !== "string") {
+          return NextResponse.json(
+            { error: "workingHours must be a string or null." },
+            { status: 400 },
+          );
+        }
+        const trimmed = workingHours.trim();
+        if (trimmed.length === 0) {
+          nextValue = null;
+        } else if (trimmed.length > 200) {
+          return NextResponse.json(
+            { error: "Working hours must be 200 characters or fewer." },
+            { status: 400 },
+          );
+        } else {
+          nextValue = trimmed;
+        }
+      }
+
+      const updated = await prisma.userAccount.update({
+        where: { id: userId },
+        data: { workingHours: nextValue },
+        select: { id: true, workingHours: true },
       });
 
       return NextResponse.json({ user: updated });
