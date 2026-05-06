@@ -23,7 +23,13 @@
 //                             sign-in path requires a code; magic-link
 //                             sign-in is refused (see lib/better-auth.ts
 //                             hooks).
-//             5. Delete account — typed-email confirm + DELETE on the
+//             5. Active sessions — every browser the user is signed in
+//                             from, with revoke-one and "sign out
+//                             everywhere else" actions. Driven by
+//                             BetterAuth's listSessions / revokeSession.
+//                             "This device" badge is set by matching
+//                             session ids against /api/session.
+//             6. Delete account — typed-email confirm + DELETE on the
 //                             role-specific endpoint. SITE_OWNER /
 //                             SITE_ADMIN are out of scope here; admin
 //                             deletion happens via /admin/users.
@@ -69,6 +75,19 @@ type NotificationPreference = {
   type: NotificationType;
   enabled: boolean;
   emailEnabled: boolean;
+};
+
+// Subset of BetterAuth's listSessions response shape we render. Token is
+// included because /two-factor/revoke-session takes it; we never display
+// it. Created/updated come back as ISO strings on the wire.
+type SessionListItem = {
+  id: string;
+  token: string;
+  createdAt: string;
+  updatedAt: string;
+  expiresAt: string;
+  ipAddress: string | null;
+  userAgent: string | null;
 };
 
 const ROLE_LABELS: Record<Role, string> = {
@@ -162,6 +181,66 @@ function detectBrowserTimezone(): string | null {
 }
 
 // ---------------------------------------------------------------------------
+// Session-row formatting helpers
+// ---------------------------------------------------------------------------
+
+/** Pick a friendly "Browser on OS" label from a User-Agent string. We
+ *  do this client-side because we don't need the granularity of a
+ *  full UA-parsing library and it'd be wasteful to pull one in. */
+function describeUserAgent(ua: string | null): string {
+  if (!ua) return "Unknown device";
+  let browser = "Browser";
+  if (/Edg\//.test(ua)) browser = "Edge";
+  else if (/OPR\//.test(ua)) browser = "Opera";
+  else if (/Chrome\//.test(ua)) browser = "Chrome";
+  else if (/Firefox\//.test(ua)) browser = "Firefox";
+  else if (/Safari\//.test(ua)) browser = "Safari";
+  let os = "Unknown";
+  if (/Windows NT/.test(ua)) os = "Windows";
+  else if (/Mac OS X/.test(ua)) os = "macOS";
+  else if (/Android/.test(ua)) os = "Android";
+  else if (/iPhone|iPad|iPod/.test(ua)) os = "iOS";
+  else if (/Linux/.test(ua)) os = "Linux";
+  return `${browser} on ${os}`;
+}
+
+/** Mask the trailing octets of an IPv4 address for the UI. We have the
+ *  full IP server-side for forensics; the user just needs enough to
+ *  recognize their own address. IPv6 returns the first segment. */
+function maskIp(ip: string | null): string {
+  if (!ip) return "—";
+  if (ip.includes(":")) {
+    // IPv6 — keep the first hextet for the visual hint.
+    const head = ip.split(":")[0];
+    return `${head}:****`;
+  }
+  const parts = ip.split(".");
+  if (parts.length !== 4) return "—";
+  return `${parts[0]}.${parts[1]}.x.x`;
+}
+
+/** "5 minutes ago" / "2 days ago" — simple relative formatter so the
+ *  session list reads naturally without bringing in date-fns just for
+ *  this page. */
+function relativeTime(iso: string): string {
+  const then = new Date(iso).getTime();
+  const now = Date.now();
+  const diff = Math.max(0, now - then);
+  const sec = Math.round(diff / 1000);
+  if (sec < 60) return "just now";
+  const min = Math.round(sec / 60);
+  if (min < 60) return `${min} min ago`;
+  const hr = Math.round(min / 60);
+  if (hr < 24) return `${hr} hr ago`;
+  const day = Math.round(hr / 24);
+  if (day < 30) return `${day} day${day === 1 ? "" : "s"} ago`;
+  const mo = Math.round(day / 30);
+  if (mo < 12) return `${mo} month${mo === 1 ? "" : "s"} ago`;
+  const yr = Math.round(mo / 12);
+  return `${yr} year${yr === 1 ? "" : "s"} ago`;
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -200,6 +279,18 @@ export function ProfileForm() {
   const [savingEmail, setSavingEmail] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
 
+  // ---- active sessions ----
+  // Loaded once on mount via authClient.listSessions(); refreshed after
+  // every revoke. Each session row shows a parsed device hint, last
+  // activity, masked IP, and a "this device" badge derived by matching
+  // against the current session id from /api/session.
+  const [sessionsList, setSessionsList] = useState<SessionListItem[] | null>(null);
+  const [sessionsLoading, setSessionsLoading] = useState(true);
+  const [sessionsError, setSessionsError] = useState<string | null>(null);
+  const [revokingTokens, setRevokingTokens] = useState<Set<string>>(new Set());
+  const [revokingOthers, setRevokingOthers] = useState(false);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+
   // ---- 2FA enrollment ----
   // Two-stage enrollment: click "Set up" → /two-factor/enable returns a
   // TOTP URI for the QR + the secret. User scans it, types a 6-digit
@@ -233,7 +324,9 @@ export function ProfileForm() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // -----------------------------------------------------------------
-  // Initial load — profile + notification prefs in parallel.
+  // Initial load — profile + notification prefs + active sessions in
+  // parallel. /api/session also gives us the current session id so the
+  // sessions list can flag the "this device" row.
   // -----------------------------------------------------------------
   useEffect(() => {
     let cancelled = false;
@@ -242,9 +335,11 @@ export function ProfileForm() {
       setLoading(true);
       setLoadError(null);
       try {
-        const [profileRes, prefsRes] = await Promise.all([
+        const [profileRes, prefsRes, sessionRes, sessionsRes] = await Promise.all([
           fetch("/api/profile", { cache: "no-store" }),
           fetch("/api/notifications/preferences", { cache: "no-store" }),
+          fetch("/api/session", { cache: "no-store" }),
+          authClient.listSessions(),
         ]);
 
         if (!profileRes.ok) {
@@ -273,6 +368,24 @@ export function ProfileForm() {
           }
           setPrefs(indexed);
         }
+
+        // Current session id — used to flag "this device" in the
+        // sessions list. Skip silently on error; the list still renders
+        // without a "this device" badge in that case.
+        if (sessionRes.ok) {
+          const json = (await sessionRes.json()) as { session?: { id?: string | null } | null };
+          if (!cancelled) setCurrentSessionId(json.session?.id ?? null);
+        }
+
+        // Active sessions list. authClient.listSessions returns a
+        // structured response; on error we surface to the section
+        // (rather than the whole page) since the rest of the profile is
+        // still useful.
+        if (sessionsRes.error) {
+          if (!cancelled) setSessionsError(sessionsRes.error.message ?? "Couldn't load sessions");
+        } else if (sessionsRes.data) {
+          if (!cancelled) setSessionsList(sessionsRes.data as unknown as SessionListItem[]);
+        }
       } catch (err) {
         if (cancelled) return;
         setLoadError(err instanceof Error ? err.message : "Failed to load profile");
@@ -280,6 +393,7 @@ export function ProfileForm() {
         if (!cancelled) {
           setLoading(false);
           setPrefsLoading(false);
+          setSessionsLoading(false);
         }
       }
     }
@@ -488,6 +602,68 @@ export function ProfileForm() {
     },
     [prefs, showToast],
   );
+
+  // -----------------------------------------------------------------
+  // Sessions: refresh, revoke one, revoke all others. We re-fetch the
+  // list after each mutation so the UI reflects the truth rather than
+  // optimistically guessing — sessions can also expire on their own
+  // and a stale list would mislead the user.
+  // -----------------------------------------------------------------
+  const refreshSessions = useCallback(async () => {
+    const res = await authClient.listSessions();
+    if (res.error) {
+      setSessionsError(res.error.message ?? "Couldn't refresh sessions");
+      return;
+    }
+    setSessionsError(null);
+    setSessionsList((res.data as unknown as SessionListItem[]) ?? []);
+  }, []);
+
+  const handleRevokeSession = useCallback(
+    async (token: string) => {
+      setRevokingTokens((prev) => new Set(prev).add(token));
+      try {
+        const { error } = await authClient.revokeSession({ token });
+        if (error) {
+          showToast({
+            type: "error",
+            title: error.message ?? "Couldn't sign that session out.",
+          });
+          return;
+        }
+        showToast({ type: "success", title: "Session signed out." });
+        await refreshSessions();
+      } finally {
+        setRevokingTokens((prev) => {
+          const copy = new Set(prev);
+          copy.delete(token);
+          return copy;
+        });
+      }
+    },
+    [refreshSessions, showToast],
+  );
+
+  const handleRevokeOtherSessions = useCallback(async () => {
+    setRevokingOthers(true);
+    try {
+      const { error } = await authClient.revokeOtherSessions();
+      if (error) {
+        showToast({
+          type: "error",
+          title: error.message ?? "Couldn't sign out other sessions.",
+        });
+        return;
+      }
+      showToast({
+        type: "success",
+        title: "Signed out from all other devices.",
+      });
+      await refreshSessions();
+    } finally {
+      setRevokingOthers(false);
+    }
+  }, [refreshSessions, showToast]);
 
   // -----------------------------------------------------------------
   // 2FA enable — start. Asks BetterAuth for the TOTP URI; the user's
@@ -1157,6 +1333,78 @@ export function ProfileForm() {
           </Button>
         </ModalFooter>
       </Modal>
+
+      {/* ---- Active sessions ---- */}
+      <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-6">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-[var(--bb-secondary)]">Active sessions</h2>
+            <p className="mt-0.5 text-xs text-[var(--bb-text-muted)]">
+              Every browser you&apos;re signed in with. Sign out individual devices, or everything
+              except this one in a single click.
+            </p>
+          </div>
+          {sessionsList && sessionsList.length > 1 && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => void handleRevokeOtherSessions()}
+              loading={revokingOthers}
+              loadingText="Signing out…"
+              disabled={revokingOthers}
+            >
+              Sign out everywhere else
+            </Button>
+          )}
+        </div>
+
+        {sessionsLoading && (
+          <p className="text-sm text-[var(--bb-text-muted)]">Loading sessions…</p>
+        )}
+        {!sessionsLoading && sessionsError && (
+          <InlineAlert variant="error">{sessionsError}</InlineAlert>
+        )}
+        {!sessionsLoading && !sessionsError && sessionsList && (
+          <ul className="divide-y divide-[var(--bb-border-subtle)]">
+            {sessionsList
+              // Newest first by last activity (updatedAt). Matches Gmail / GitHub UX.
+              .slice()
+              .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+              .map((s) => {
+                const isCurrent = currentSessionId !== null && s.id === currentSessionId;
+                const isRevoking = revokingTokens.has(s.token);
+                return (
+                  <li key={s.id} className="flex flex-wrap items-start gap-3 py-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-medium text-[var(--bb-secondary)]">
+                          {describeUserAgent(s.userAgent)}
+                        </p>
+                        {isCurrent && <Badge variant="success">This device</Badge>}
+                      </div>
+                      <p className="mt-0.5 text-xs text-[var(--bb-text-muted)]">
+                        Last active {relativeTime(s.updatedAt)} &middot; First seen{" "}
+                        {relativeTime(s.createdAt)} &middot; IP {maskIp(s.ipAddress)}
+                      </p>
+                    </div>
+                    {!isCurrent && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => void handleRevokeSession(s.token)}
+                        loading={isRevoking}
+                        loadingText="Signing out…"
+                        disabled={isRevoking}
+                      >
+                        Sign out
+                      </Button>
+                    )}
+                  </li>
+                );
+              })}
+          </ul>
+        )}
+      </section>
 
       {/* ---- Delete account ---- */}
       {canSelfDelete && (

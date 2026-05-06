@@ -60,10 +60,12 @@ export async function GET(req: NextRequest) {
 
     const user = await getCurrentUser();
 
-    // Read the session expiry straight from BetterAuth. In demo mode there is
-    // no server-tracked expiry (the persona cookie is just a persona switch),
-    // so we return null and the client-side timeout hook no-ops.
+    // Read the session expiry + id straight from BetterAuth. In demo mode
+    // there is no server-tracked expiry (the persona cookie is just a
+    // persona switch), so both fields are null and the client-side
+    // timeout hook + active-sessions list both no-op.
     let expiresAt: string | null = null;
+    let sessionId: string | null = null;
     if (!isDemoMode() && user) {
       try {
         const { auth } = await import("@/lib/better-auth");
@@ -72,6 +74,11 @@ export async function GET(req: NextRequest) {
           ? new Date(session.session.expiresAt).toISOString()
           : null;
         expiresAt = iso;
+        // The session id (NOT the token — the token is the bearer secret
+        // we never want to expose to JS) lets the active-sessions list on
+        // /profile flag which row is "this device". Comparing `id` is
+        // safe to surface; BetterAuth's listSessions also returns it.
+        sessionId = session?.session?.id ?? null;
       } catch (err) {
         // Non-fatal: the warning just won't fire. Log so we notice if this
         // regresses silently.
@@ -85,6 +92,7 @@ export async function GET(req: NextRequest) {
         demoPersona: demoPersonaSummary,
         session: {
           expiresAt, // ISO string or null (demo mode / unauthenticated)
+          id: sessionId, // BetterAuth session id, null in demo or unauthenticated
         },
         user: user
           ? {
