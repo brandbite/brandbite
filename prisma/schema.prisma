@@ -223,6 +223,14 @@ model UserAccount {
   /// Ledger + ticket rows are retained for financial / audit compliance.
   deletedAt DateTime?
 
+  /// IANA timezone (e.g. "Europe/Istanbul"). Set on first save from the
+  /// browser's resolved zone via /profile, user-overridable from the
+  /// same page. Null = fall back to UTC display in any user-facing
+  /// date formatting. Not used as a foreign key — it's a free-form
+  /// string we trust because Intl.DateTimeFormat will reject anything
+  /// invalid at format time anyway.
+  timezone String?
+
   /// Optional TOTP secret for the L4 MFA second factor. When set, money
   /// actions use TOTP codes from an authenticator app instead of email
   /// codes. Stored as base32 (RFC 4648). Null = not enrolled / email
