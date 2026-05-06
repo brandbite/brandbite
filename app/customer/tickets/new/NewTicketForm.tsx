@@ -29,6 +29,7 @@ import {
 import { isInsufficientTokensBody } from "@/lib/errors/insufficient-tokens";
 import type { TagColorKey } from "@/lib/tag-colors";
 import { canManageTags as canManageTagsCheck } from "@/lib/permissions/companyRoles";
+import { MAX_UPLOAD_LABEL, readUploadError, validateFileSize } from "@/lib/upload-helpers";
 
 type ProjectOption = {
   id: string;
@@ -243,6 +244,11 @@ export default function NewTicketForm({
   const [submitting, setSubmitting] = useState(false);
   const [uploadingBriefs, setUploadingBriefs] = useState(false);
   const [uploadProgressText, setUploadProgressText] = useState<string | null>(null);
+  // Per-file error messages from the brief upload pass. Surfaced inline
+  // after the upload-loop returns so the user knows *which* files failed
+  // and *why* (e.g. "logo.png is 6.2 MB. The current upload limit is
+  // 4 MB."). Cleared on the next upload attempt.
+  const [uploadErrors, setUploadErrors] = useState<string[]>([]);
 
   const [error, setError] = useState<string | null>(null);
   const [tokenError, setTokenError] = useState<InsufficientTokensInfo | null>(null);
@@ -358,14 +364,27 @@ export default function NewTicketForm({
 
     setUploadingBriefs(true);
     setUploadProgressText("Preparing uploads...");
+    setUploadErrors([]);
 
     let succeeded = 0;
     let failed = 0;
+    const errors: string[] = [];
 
     // Sequential uploads keep it predictable (and easier to debug)
     for (let i = 0; i < briefFiles.length; i += 1) {
       const entry = briefFiles[i];
       const file = entry.file;
+
+      // Pre-validate against the platform body-size cap. Catches the
+      // failure here rather than after a wasted round-trip — Vercel
+      // would otherwise reject the request body before our route runs
+      // and we'd see a generic platform error with no body to read.
+      const sizeErr = validateFileSize(file);
+      if (sizeErr) {
+        failed += 1;
+        errors.push(sizeErr);
+        continue;
+      }
 
       try {
         setUploadProgressText(`Uploading attachment ${i + 1} of ${briefFiles.length}...`);
@@ -384,23 +403,26 @@ export default function NewTicketForm({
           body,
         });
 
-        const json = await res.json().catch(() => null);
-
         if (!res.ok) {
           failed += 1;
-          console.error("[NewTicketForm] Upload failed:", json);
+          const message = await readUploadError(res);
+          errors.push(`${file.name}: ${message}`);
+          console.error("[NewTicketForm] Upload failed:", file.name, message);
           continue;
         }
 
         succeeded += 1;
       } catch (err) {
         failed += 1;
+        const message = err instanceof Error ? err.message : "Unknown error";
+        errors.push(`${file.name}: ${message}`);
         console.error("[NewTicketForm] Brief upload error:", err);
       }
     }
 
     setUploadProgressText(null);
     setUploadingBriefs(false);
+    setUploadErrors(errors);
 
     return { attempted: briefFiles.length, succeeded, failed };
   }
@@ -785,7 +807,8 @@ export default function NewTicketForm({
         <div className="rounded-md border border-dashed border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-3">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-[11px] text-[var(--bb-text-secondary)]">
-              Attach reference images (logos, screenshots, inspiration).
+              Attach reference images (logos, screenshots, inspiration). Max{" "}
+              <strong>{MAX_UPLOAD_LABEL}</strong> per file.
               <span className="ml-1 text-[var(--bb-text-tertiary)]">
                 Total: {formatBytes(totalBriefBytes)}
               </span>
@@ -837,6 +860,24 @@ export default function NewTicketForm({
               <p className="text-[11px] text-[var(--bb-text-tertiary)]">
                 Attachments will be uploaded right after the ticket is created.
               </p>
+            </div>
+          )}
+
+          {/* Per-file upload errors. Surfaces the specific reason each
+              attachment failed (e.g. "logo.png is 6.2 MB. The current
+              upload limit is 4 MB.") rather than the previous generic
+              "X failed" counter. Cleared on the next upload attempt. */}
+          {uploadErrors.length > 0 && (
+            <div
+              role="alert"
+              className="mt-3 space-y-1 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300"
+            >
+              <p className="font-semibold">Some attachments couldn&apos;t upload:</p>
+              <ul className="list-disc space-y-0.5 pl-4">
+                {uploadErrors.map((err, idx) => (
+                  <li key={idx}>{err}</li>
+                ))}
+              </ul>
             </div>
           )}
         </div>
