@@ -37,6 +37,10 @@ type ProfileResponseUser = {
    *  Joined here so the profile page can render the 2FA section state
    *  without a second round-trip. */
   twoFactorEnabled: boolean;
+  /** AuthUser.image — public R2 URL to the user's avatar, or null when
+   *  unset. Joined from AuthUser since that's BetterAuth's source of
+   *  truth for the field. */
+  image: string | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -73,7 +77,7 @@ export async function GET() {
     // run into Prisma's referential-action machinery.
     const authRow = await prisma.authUser.findUnique({
       where: { id: row.authUserId },
-      select: { twoFactorEnabled: true },
+      select: { twoFactorEnabled: true, image: true },
     });
 
     const user: ProfileResponseUser = {
@@ -83,6 +87,7 @@ export async function GET() {
       role: row.role,
       timezone: row.timezone,
       twoFactorEnabled: !!authRow?.twoFactorEnabled,
+      image: authRow?.image ?? null,
     };
     return NextResponse.json({ user });
   } catch (err: unknown) {
@@ -191,7 +196,7 @@ export async function PATCH(req: NextRequest) {
       });
       const auth = await prisma.authUser.findUnique({
         where: { id: row.authUserId },
-        select: { twoFactorEnabled: true },
+        select: { twoFactorEnabled: true, image: true },
       });
       return NextResponse.json({
         user: {
@@ -201,6 +206,7 @@ export async function PATCH(req: NextRequest) {
           role: row.role,
           timezone: row.timezone,
           twoFactorEnabled: !!auth?.twoFactorEnabled,
+          image: auth?.image ?? null,
         } satisfies ProfileResponseUser,
       });
     }
@@ -212,7 +218,7 @@ export async function PATCH(req: NextRequest) {
     });
     const auth = await prisma.authUser.findUnique({
       where: { id: updated.authUserId },
-      select: { twoFactorEnabled: true },
+      select: { twoFactorEnabled: true, image: true },
     });
     return NextResponse.json({
       user: {
@@ -222,6 +228,7 @@ export async function PATCH(req: NextRequest) {
         role: updated.role,
         timezone: updated.timezone,
         twoFactorEnabled: !!auth?.twoFactorEnabled,
+        image: auth?.image ?? null,
       } satisfies ProfileResponseUser,
     });
   } catch (err: unknown) {
