@@ -27,6 +27,12 @@ const ALLOWED_KEYS = [
   "MIN_WITHDRAWAL_TOKENS",
   "AUTO_PAYOUT_ENABLED",
   "AUTO_PAYOUT_THRESHOLD_TOKENS",
+  // Kill-switch for the public /talent submission form. When the
+  // stored value is the literal string "false" the API rejects new
+  // applications with 503 + a clear "applications closed" message
+  // and the public page swaps to a closed-state banner. Default
+  // (unset / "true") = open, matching today's behaviour.
+  "TALENT_APPLICATIONS_OPEN",
 ] as const;
 
 function isAllowedKey(key: string): key is (typeof ALLOWED_KEYS)[number] {
