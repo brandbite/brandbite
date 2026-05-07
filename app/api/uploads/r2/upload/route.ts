@@ -19,7 +19,7 @@ import { getCurrentUserOrThrow } from "@/lib/auth";
 import { createR2Client, getR2BucketName, getR2PublicBaseUrl } from "@/lib/r2";
 import { resolveAssetUrl } from "@/lib/r2";
 import { isCompanyAdminRole } from "@/lib/permissions/companyRoles";
-import { MAX_UPLOAD_BYTES } from "@/lib/upload-helpers";
+import { MAX_UPLOAD_BYTES, isBriefMimeAllowed } from "@/lib/upload-helpers";
 
 function sanitizeFilename(name: string): string {
   const base = name.trim().replace(/\s+/g, "_");
@@ -72,6 +72,37 @@ export async function POST(req: Request) {
         { error: "FILE_TOO_LARGE", maxBytes: MAX_FILE_SIZE },
         { status: 413 },
       );
+    }
+
+    // MIME-type allowlist for customer brief uploads. Defends against a
+    // curl bypass of the client `accept` attribute — the existing client
+    // picker filters to images + PDF/DOC/DOCX/TXT, but the server is the
+    // real gate. OUTPUT_IMAGE (creative deliverables) keeps its current
+    // image-only posture below via the kind check.
+    if (kind === "BRIEF_INPUT") {
+      const mime = file.type || "";
+      if (!isBriefMimeAllowed(mime)) {
+        return NextResponse.json(
+          {
+            error: "UNSUPPORTED_TYPE",
+            message: `Files of type "${mime || "unknown"}" aren't accepted on briefs. Use an image, PDF, DOC, DOCX, or TXT.`,
+          },
+          { status: 415 },
+        );
+      }
+    } else if (kind === "OUTPUT_IMAGE") {
+      // Creative outputs stay image-only for now — that's what the
+      // customer revision view + pin-on-asset annotations expect.
+      const mime = file.type || "";
+      if (!mime.startsWith("image/")) {
+        return NextResponse.json(
+          {
+            error: "UNSUPPORTED_TYPE",
+            message: "Output deliverables must be images.",
+          },
+          { status: 415 },
+        );
+      }
     }
 
     // ----------------------------

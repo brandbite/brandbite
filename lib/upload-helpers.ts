@@ -17,6 +17,39 @@
 export const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 export const MAX_UPLOAD_LABEL = "4 MB";
 
+/** MIME types accepted on customer ticket brief uploads (BRIEF_INPUT
+ *  asset kind). Images plus the common reference-document types
+ *  customers asked for (PDF, DOC, DOCX, TXT). Server-side allowlist
+ *  in /api/uploads/r2/upload mirrors this set so a curl bypass of
+ *  the client picker can't sneak unsupported types into R2. */
+export const BRIEF_ACCEPTED_MIME_TYPES = [
+  // Images
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+  // Documents
+  "application/pdf",
+  "application/msword", // .doc
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+  "text/plain", // .txt
+] as const;
+
+/** `accept` attribute string for a customer brief <input type="file">.
+ *  Mirrors BRIEF_ACCEPTED_MIME_TYPES but uses the broad "image/*" form
+ *  so the picker shows every image variant the OS supports — server
+ *  still validates against the explicit allowlist. */
+export const BRIEF_ACCEPT_ATTR =
+  "image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain";
+
+/** Human-readable extension list for picker hint copy. */
+export const BRIEF_ACCEPTED_LABEL = "images, PDF, DOC, DOCX, TXT";
+
+export function isBriefMimeAllowed(mime: string): boolean {
+  if (mime.startsWith("image/")) return true;
+  return (BRIEF_ACCEPTED_MIME_TYPES as readonly string[]).includes(mime);
+}
+
 /** Pending file awaiting upload */
 export type PendingFile = {
   id: string;
@@ -46,6 +79,12 @@ export async function readUploadError(res: Response): Promise<string> {
   }
   if (json?.error === "FILE_TOO_LARGE") {
     return `File exceeds the ${MAX_UPLOAD_LABEL} upload limit.`;
+  }
+  if (json?.error === "UNSUPPORTED_TYPE") {
+    // Server includes a typed `message` describing the rejected MIME.
+    type WithMessage = { message?: string };
+    const msg = (json as WithMessage)?.message;
+    return msg ?? `That file type isn't supported. Allowed: ${BRIEF_ACCEPTED_LABEL}.`;
   }
   if (json?.error === "R2_NOT_CONFIGURED") {
     return "File storage isn't configured for this environment. Contact support.";

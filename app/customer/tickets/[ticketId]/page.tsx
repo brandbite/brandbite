@@ -23,6 +23,7 @@ import { RateCreativeModal } from "@/components/ratings/rate-creative-modal";
 import { TagBadge } from "@/components/ui/tag-badge";
 import { TagMultiSelect, type TagOption } from "@/components/ui/tag-multi-select";
 import type { TagColorKey } from "@/lib/tag-colors";
+import { BRIEF_ACCEPT_ATTR, BRIEF_ACCEPTED_LABEL } from "@/lib/upload-helpers";
 import {
   RevisionImageLarge,
   RevisionImageGrid,
@@ -844,7 +845,7 @@ export default function CustomerTicketDetailPage() {
                     <label className="inline-flex cursor-pointer items-center rounded-full border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-1 text-[11px] font-medium text-[var(--bb-secondary)] hover:bg-[var(--bb-bg-warm)] disabled:cursor-not-allowed disabled:opacity-60">
                       <input
                         type="file"
-                        accept="image/*"
+                        accept={BRIEF_ACCEPT_ATTR}
                         multiple
                         className="hidden"
                         disabled={uploadingBriefs}
@@ -853,7 +854,7 @@ export default function CustomerTicketDetailPage() {
                           e.currentTarget.value = "";
                         }}
                       />
-                      Add images
+                      Add files
                     </label>
                   </div>
                 )}
@@ -918,7 +919,7 @@ export default function CustomerTicketDetailPage() {
                 {!briefAssetsLoading && !briefAssetsError && briefAssetEntries.length === 0 && (
                   <EmptyState
                     title="No attachments yet."
-                    description="Add reference images to help your creative."
+                    description={`Add reference files (${BRIEF_ACCEPTED_LABEL}) to help your creative.`}
                   />
                 )}
 
