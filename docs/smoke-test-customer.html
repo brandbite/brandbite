@@ -1,0 +1,1116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Brandbite · Customer smoke test</title>
+    <meta
+      name="description"
+      content="Pre-launch end-to-end smoke test for the customer experience on brandbite.studio. Walks through sign-up, onboarding, ticket creation, profile, and feedback with expected results and pass/fail tracking."
+    />
+    <style>
+      :root {
+        --orange: #f15b2b;
+        --orange-soft: #fff1eb;
+        --orange-line: #f5b59b;
+        --ink: #1f2126;
+        --ink-soft: #424143;
+        --muted: #7a7a7a;
+        --line: #e3e1dc;
+        --bg: #faf9f7;
+        --card: #ffffff;
+        --pass: #16a34a;
+        --pass-bg: #dcfce7;
+        --fail: #dc2626;
+        --fail-bg: #fee2e2;
+        --skip: #6b7280;
+        --skip-bg: #f3f4f6;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        background: var(--bg);
+        color: var(--ink-soft);
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap {
+        max-width: 880px;
+        margin: 0 auto;
+        padding: 32px 24px 96px;
+      }
+      header.brand {
+        background: var(--orange);
+        color: #fff;
+        padding: 28px 24px;
+        border-radius: 14px;
+        margin-bottom: 28px;
+      }
+      .brand-mark {
+        display: block;
+        width: 180px;
+        height: auto;
+        margin-bottom: 12px;
+      }
+      .brand-mark path {
+        fill: #fff;
+      }
+      header.brand h1 {
+        margin: 0 0 6px 0;
+        font-size: 24px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+      header.brand p {
+        margin: 0;
+        opacity: 0.9;
+        font-size: 14px;
+        max-width: 640px;
+      }
+      .progress-bar {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 14px 18px;
+        margin-bottom: 24px;
+        position: sticky;
+        top: 8px;
+        z-index: 10;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+      }
+      .progress-bar .row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        font-size: 13px;
+      }
+      .progress-bar .bar {
+        height: 6px;
+        background: var(--line);
+        border-radius: 999px;
+        overflow: hidden;
+        margin-top: 8px;
+      }
+      .progress-bar .fill {
+        height: 100%;
+        background: var(--orange);
+        width: 0%;
+        transition: width 0.2s ease;
+      }
+      .progress-bar .stats {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .progress-bar .stats .pass {
+        color: var(--pass);
+        font-weight: 600;
+      }
+      .progress-bar .stats .fail {
+        color: var(--fail);
+        font-weight: 600;
+      }
+      section.phase {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 22px 22px 8px;
+        margin-bottom: 16px;
+      }
+      section.phase > h2 {
+        margin: 0 0 4px 0;
+        color: var(--ink);
+        font-size: 18px;
+      }
+      section.phase > p.phase-desc {
+        margin: 0 0 14px 0;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .step {
+        border-top: 1px solid var(--line);
+        padding: 16px 0;
+      }
+      .step:first-of-type {
+        border-top: none;
+        padding-top: 4px;
+      }
+      .step h3 {
+        margin: 0 0 8px 0;
+        font-size: 15px;
+        color: var(--ink);
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .step h3 .num {
+        background: var(--orange);
+        color: #fff;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 999px;
+        flex-shrink: 0;
+      }
+      .step p.action {
+        margin: 4px 0;
+        font-size: 13.5px;
+      }
+      .step p.expected {
+        margin: 6px 0;
+        background: var(--orange-soft);
+        border-left: 3px solid var(--orange);
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-size: 13px;
+        color: var(--ink);
+      }
+      .step p.expected strong {
+        color: var(--orange);
+      }
+      .step .results {
+        display: flex;
+        gap: 6px;
+        margin-top: 10px;
+        flex-wrap: wrap;
+      }
+      .step .results label {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 11px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        font-size: 12px;
+        cursor: pointer;
+        transition:
+          background 0.1s,
+          border-color 0.1s;
+        background: var(--card);
+        font-weight: 500;
+        color: var(--ink-soft);
+      }
+      .step .results label:hover {
+        border-color: var(--ink-soft);
+      }
+      .step .results input[type="radio"] {
+        margin: 0;
+        accent-color: var(--orange);
+      }
+      .step .results input[value="pass"]:checked ~ span {
+        color: var(--pass);
+      }
+      .step .results label:has(input[value="pass"]:checked) {
+        background: var(--pass-bg);
+        border-color: var(--pass);
+      }
+      .step .results label:has(input[value="fail"]:checked) {
+        background: var(--fail-bg);
+        border-color: var(--fail);
+      }
+      .step .results label:has(input[value="skip"]:checked) {
+        background: var(--skip-bg);
+        border-color: var(--skip);
+      }
+      .step textarea.notes {
+        margin-top: 8px;
+        width: 100%;
+        min-height: 60px;
+        resize: vertical;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px 10px;
+        font: inherit;
+        font-size: 12.5px;
+        color: var(--ink-soft);
+        background: var(--card);
+      }
+      .step textarea.notes:focus {
+        outline: none;
+        border-color: var(--orange);
+      }
+      .footer-actions {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 32px;
+        padding: 18px 22px;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+      }
+      .footer-actions button {
+        padding: 10px 18px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: var(--card);
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--ink);
+        transition:
+          background 0.1s,
+          border-color 0.1s;
+      }
+      .footer-actions button.primary {
+        background: var(--orange);
+        color: #fff;
+        border-color: var(--orange);
+      }
+      .footer-actions button:hover {
+        border-color: var(--ink-soft);
+      }
+      .footer-actions button.primary:hover {
+        background: var(--ink);
+        border-color: var(--ink);
+      }
+      .footer-actions .spacer {
+        flex: 1;
+      }
+      .pre-flight {
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        border-radius: 12px;
+        padding: 14px 18px;
+        margin-bottom: 24px;
+        font-size: 13px;
+      }
+      .pre-flight strong {
+        color: #92400e;
+      }
+      .pre-flight ul {
+        margin: 6px 0 0 0;
+        padding-left: 18px;
+      }
+      .pre-flight li {
+        margin: 2px 0;
+      }
+      @media print {
+        body {
+          background: #fff;
+        }
+        .progress-bar,
+        .footer-actions {
+          display: none;
+        }
+        section.phase {
+          break-inside: avoid;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="brand">
+        <svg
+          class="brand-mark"
+          viewBox="0 0 600 149"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-label="Brandbite"
+          role="img"
+        >
+          <path
+            d="M95.4,47.4h12.4v13.4c1-2.6,3.5-5.8,7.4-9.5c4-3.7,8.5-5.6,13.7-5.6c0.2,0,0.7,0,1.2,0.1c0.6,0,1.6,0.1,3,0.3v13.7c-0.8-0.1-1.5-0.2-2.1-0.3c-0.7,0-1.4-0.1-2.1-0.1c-6.6,0-11.6,2.1-15.1,6.3c-3.5,4.2-5.3,9.1-5.3,14.6v44.5h-13V47.4z"
+          />
+          <path
+            d="M181.3,77.9c3-0.4,5-1.6,6-3.8c0.6-1.2,0.9-2.8,0.9-5c0-4.5-1.6-7.7-4.7-9.7c-3.1-2-7.7-3-13.5-3c-6.8,0-11.6,1.8-14.4,5.5c-1.6,2-2.6,5.1-3.1,9.1h-12.1c0.2-9.6,3.3-16.2,9.3-20c5.9-3.7,12.8-5.6,20.7-5.6c9.1,0,16.5,1.7,22.2,5.2c5.6,3.5,8.4,8.9,8.4,16.2v44.6c0,1.3,0.3,2.4,0.8,3.3c0.6,0.8,1.7,1.2,3.5,1.2c0.6,0,1.2,0,2-0.1c0.7-0.1,1.5-0.2,2.3-0.3v9.6c-2,0.6-3.6,0.9-4.6,1.1c-1.1,0.1-2.5,0.2-4.3,0.2c-4.5,0-7.7-1.6-9.8-4.8c-1.1-1.7-1.8-4.1-2.2-7.2c-2.7,3.5-6.5,6.5-11.4,9c-5,2.6-10.4,3.8-16.4,3.8c-7.2,0-13-2.2-17.6-6.5c-4.6-4.4-6.8-9.8-6.8-16.3c0-7.2,2.2-12.7,6.7-16.7c4.5-3.9,10.4-6.4,17.6-7.3L181.3,77.9z M153.9,113.1c2.7,2.2,6,3.2,9.8,3.2c4.6,0,9-1.1,13.3-3.2c7.2-3.5,10.8-9.3,10.8-17.2V85.4c-1.6,1-3.6,1.9-6.1,2.5c-2.5,0.7-5,1.2-7.4,1.4l-7.9,1c-4.7,0.6-8.3,1.6-10.6,3c-4,2.3-6,5.9-6,10.8C149.8,108,151.2,110.9,153.9,113.1"
+          />
+          <path
+            d="M217.7,47.4h12.4v11c3.7-4.5,7.5-7.8,11.6-9.8c4.1-2,8.6-3,13.7-3c11,0,18.4,3.8,22.3,11.5c2.1,4.2,3.2,10.2,3.2,18v49.7h-13.2V76c0-4.7-0.7-8.5-2.1-11.4c-2.3-4.8-6.5-7.2-12.6-7.2c-3.1,0-5.6,0.3-7.6,0.9c-3.6,1.1-6.7,3.2-9.4,6.4c-2.2,2.6-3.6,5.2-4.2,7.9c-0.7,2.7-1,6.6-1,11.7v40.5h-13V47.4z"
+          />
+          <path
+            d="M338.1,49.8c2.3,1.4,4.9,4,7.8,7.6V18.2h12.5v106.5h-11.7V114c-3,4.8-6.6,8.2-10.7,10.3c-4.1,2.1-8.9,3.2-14.2,3.2c-8.6,0-16-3.6-22.3-10.9c-6.3-7.3-9.4-16.9-9.4-28.9c0-11.3,2.9-21,8.6-29.3c5.7-8.3,13.9-12.4,24.6-12.4C329.2,46,334.2,47.2,338.1,49.8 M309.1,107.8c3.5,5.6,9.1,8.4,16.8,8.4c6,0,10.9-2.6,14.8-7.8c3.9-5.2,5.8-12.6,5.8-22.3c0-9.8-2-17-6-21.7c-4-4.7-8.9-7-14.7-7c-6.5,0-11.8,2.5-15.9,7.5c-4.1,5-6.1,12.4-6.1,22.1C303.8,95.3,305.6,102.2,309.1,107.8"
+          />
+          <path
+            d="M372.4,18.2h12.6v38.5c2.9-3.7,6.3-6.5,10.2-8.5c4-2,8.3-2.9,12.9-2.9c9.7,0,17.5,3.3,23.5,9.9c6,6.6,9,16.4,9,29.3c0,12.2-3,22.4-8.9,30.5c-5.9,8.1-14.2,12.1-24.7,12.1c-5.9,0-10.9-1.4-14.9-4.3c-2.4-1.7-5-4.4-7.8-8.1v9.9h-12V18.2z M422.1,107.4c3.5-5.6,5.3-13,5.3-22.1c0-8.1-1.8-14.9-5.3-20.2c-3.5-5.3-8.7-8-15.5-8c-5.9,0-11.2,2.2-15.6,6.6c-4.5,4.4-6.7,11.6-6.7,21.7c0,7.3,0.9,13.2,2.8,17.7c3.4,8.5,9.8,12.8,19.2,12.8C413.4,115.7,418.6,112.9,422.1,107.4"
+          />
+          <path d="M451.4,18.6h13.2v14.7h-13.2V18.6z M451.4,47.7h13.2v77h-13.2V47.7z" />
+          <path
+            d="M482.4,25.8h13.2v21.6h12.4V58h-12.4v50.5c0,2.7,0.9,4.5,2.7,5.4c1,0.5,2.7,0.8,5.1,0.8c0.6,0,1.3,0,2,0c0.7,0,1.6-0.1,2.5-0.2v10.3c-1.5,0.4-3,0.7-4.7,0.9c-1.6,0.2-3.4,0.3-5.2,0.3c-6.1,0-10.2-1.6-12.4-4.7c-2.2-3.1-3.3-7.1-3.3-12.1V58h-10.5V47.4h10.5V25.8z"
+          />
+          <path
+            d="M564.3,49.5c5.1,2.6,9,5.9,11.7,10c2.6,3.9,4.3,8.5,5.2,13.7c0.8,3.6,1.2,9.3,1.2,17.1H526c0.2,7.9,2.1,14.2,5.5,19c3.4,4.8,8.8,7.1,16,7.1c6.7,0,12.1-2.3,16.1-6.8c2.2-2.6,3.8-5.6,4.8-9.1h12.8c-0.3,2.8-1.5,6-3.4,9.5c-1.9,3.5-4,6.3-6.4,8.6c-3.9,3.9-8.8,6.5-14.6,7.8c-3.1,0.8-6.6,1.2-10.5,1.2c-9.6,0-17.7-3.5-24.3-10.5c-6.7-7-10-16.8-10-29.5c0-12.4,3.4-22.5,10.1-30.3c6.7-7.8,15.5-11.6,26.3-11.6C553.9,45.6,559.2,46.9,564.3,49.5 M569,79.9c-0.5-5.6-1.7-10.1-3.7-13.5c-3.5-6.3-9.4-9.4-17.7-9.4c-5.9,0-10.9,2.2-14.9,6.5c-4,4.3-6.1,9.8-6.4,16.4H569z"
+          />
+          <path
+            d="M75.4,55.4c-6-6.6-13.9-9.9-23.5-9.9c-4.6,0-8.9,1-12.9,2.9c-4,2-7.4,4.8-10.2,8.5V18.4H16.1v52.1l0.1-0.1c1.8-0.4,3.6-0.6,5.2-0.5c4.2,0.2,9.4,3.1,11.3,7.2c5.4-1.1,11,0.3,14.3,5.3c2.4,3.6,2.8,7.8,1.3,11.3c4.8,1.1,9.1,3.6,10.3,9.2c1.4,6.2-2,10.2-6.6,12.8c1.3,1.2,2.3,2.6,2.9,4.1c0.6,1.4,0.8,3.1,0.4,4.9c-0.2,0.9-0.5,1.7-0.8,2.4c8.8-0.8,15.9-4.8,21.2-12c5.9-8.1,8.9-18.3,8.9-30.5C84.5,71.8,81.5,62.1,75.4,55.4"
+          />
+        </svg>
+        <h1>Customer smoke test</h1>
+        <p>
+          Pre-launch end-to-end check. Walks through sign-up, onboarding, ticket creation, profile,
+          uploads, and feedback on the live brandbite.studio environment. Mark each step Pass / Fail
+          / Skip and add notes for anything weird. Your progress is saved in this browser; you can
+          come back later.
+        </p>
+      </header>
+
+      <div class="pre-flight">
+        <strong>Before you start:</strong>
+        <ul>
+          <li>
+            Use a brand-new email you haven&rsquo;t signed up with before (Gmail + addressing works:
+            <code>you+ct1@gmail.com</code>).
+          </li>
+          <li>Have a 1&ndash;2 MB sample image (JPG or PNG) and a ~500 KB PDF ready to upload.</li>
+          <li>If your plan requires payment, have a test card or your real card ready.</li>
+          <li>
+            Ideally also open <code>brandbite.studio/admin</code> in a different browser / incognito
+            as your existing site-owner account so you can verify the admin side sees the events.
+          </li>
+        </ul>
+      </div>
+
+      <div class="progress-bar">
+        <div class="row">
+          <strong>Progress</strong>
+          <span class="stats">
+            <span class="pass" id="pass-count">0</span> pass &middot;
+            <span class="fail" id="fail-count">0</span> fail &middot;
+            <span id="skip-count">0</span> skip / <span id="total-count">0</span> steps
+          </span>
+        </div>
+        <div class="bar"><div class="fill" id="progress-fill"></div></div>
+      </div>
+
+      <!-- ============================================================== -->
+      <!-- PHASE 1 — Sign up + email verification                          -->
+      <!-- ============================================================== -->
+      <section class="phase">
+        <h2>Phase 1 &middot; Sign up</h2>
+        <p class="phase-desc">
+          Brand-new account. We&rsquo;re testing the BetterAuth + verify-email + Turnstile path that
+          real customers will hit on launch day.
+        </p>
+
+        <div class="step">
+          <h3><span class="num">1.1</span> Visit brandbite.studio</h3>
+          <p class="action">
+            <strong>Action:</strong> Open <code>https://brandbite.studio</code> in a fresh browser
+            tab (or incognito).
+          </p>
+          <p class="expected">
+            <strong>Expected:</strong> Marketing landing page loads. Sign-in / Get-started CTAs are
+            visible in the header. No console errors. The page renders within ~2&nbsp;seconds on a
+            normal connection.
+          </p>
+          <div class="results">
+            <label><input type="radio" name="step-1.1" value="pass" /><span>Pass</span></label>
+            <label><input type="radio" name="step-1.1" value="fail" /><span>Fail</span></label>
+            <label><input type="radio" name="step-1.1" value="skip" /><span>Skip</span></label>
+          </div>
+          <textarea class="notes" data-step="1.1" placeholder="Notes (optional)"></textarea>
+        </div>
+
+        <div class="step">
+          <h3><span class="num">1.2</span> Click Get started / Sign up</h3>
+          <p class="action">
+            <strong>Action:</strong> Click the primary CTA in the header or hero. Should land on
+            <code>/login</code> with the form in &ldquo;Create account&rdquo; mode.
+          </p>
+          <p class="expected">
+            <strong>Expected:</strong> Login page renders. Toggle pill shows &ldquo;Sign in&rdquo; /
+            &ldquo;Create account&rdquo; with Create-account selected (or you can click it).
+            Cloudflare Turnstile widget renders below the form (small puzzle challenge).
+          </p>
+          <div class="results">
+            <label><input type="radio" name="step-1.2" value="pass" /><span>Pass</span></label>
+            <label><input type="radio" name="step-1.2" value="fail" /><span>Fail</span></label>
+            <label><input type="radio" name="step-1.2" value="skip" /><span>Skip</span></label>
+          </div>
+          <textarea class="notes" data-step="1.2" placeholder="Notes (optional)"></textarea>
+        </div>
+
+        <div class="step">
+          <h3><span class="num">1.3</span> Submit sign-up form</h3>
+          <p class="action">
+            <strong>Action:</strong> Enter name, fresh email, password (12+ chars with
+            upper/digit/symbol). Wait for Turnstile to verify, then click &ldquo;Create
+            account&rdquo;.
+          </p>
+          <p class="expected">
+            <strong>Expected:</strong> Page redirects to <code>/verify-email?email=&hellip;</code>.
+            A &ldquo;Check your inbox&rdquo; screen tells you to click the link in the email.
+          </p>
+          <div class="results">
+            <label><input type="radio" name="step-1.3" value="pass" /><span>Pass</span></label>
+            <label><input type="radio" name="step-1.3" value="fail" /><span>Fail</span></label>
+            <label><input type="radio" name="step-1.3" value="skip" /><span>Skip</span></label>
+          </div>
+          <textarea class="notes" data-step="1.3" placeholder="Notes (optional)"></textarea>
+        </div>
+
+        <div class="step">
+          <h3><span class="num">1.4</span> Open verification email</h3>
+          <p class="action">
+            <strong>Action:</strong> Check the inbox of the email you used. Open the verification
+            email from Brandbite.
+          </p>
+          <p class="expected">
+            <strong>Expected:</strong> Email arrives within ~30 seconds. Subject line is sensible
+            (&ldquo;Verify your email&rdquo; or similar). Body has a clear &ldquo;Verify
+            email&rdquo; button + a fallback URL. Brand looks right (orange, wordmark).
+          </p>
+          <div class="results">
+            <label><input type="radio" name="step-1.4" value="pass" /><span>Pass</span></label>
+            <label><input type="radio" name="step-1.4" value="fail" /><span>Fail</span></label>
+            <label><input type="radio" name="step-1.4" value="skip" /><span>Skip</span></label>
+          </div>
+          <textarea class="notes" data-step="1.4" placeholder="Notes (optional)"></textarea>
+        </div>
+
+        <div class="step">
+          <h3><span class="num">1.5</span> Click verification link</h3>
+          <p class="action">
+            <strong>Action:</strong> Click the &ldquo;Verify email&rdquo; button.
+          </p>
+          <p class="expected">
+            <strong>Expected:</strong> Browser opens. You&rsquo;re auto-signed-in and redirected to
+            <code>/onboarding</code>. (No re-prompt for password &mdash; the verification flow
+            auto-signs-in by design.)
+          </p>
+          <div class="results">
+            <label><input type="radio" name="step-1.5" value="pass" /><span>Pass</span></label>
+            <label><input type="radio" name="step-1.5" value="fail" /><span>Fail</span></label>
+            <label><input type="radio" name="step-1.5" value="skip" /><span>Skip</span></label>
+          </div>
+          <textarea class="notes" data-step="1.5" placeholder="Notes (optional)"></textarea>
+        </div>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- PHASE 2 — Onboarding wizard                                     -->
+      <!-- ============================================================== -->
+      <section class="phase">
+        <h2>Phase 2 &middot; Onboarding</h2>
+        <p class="phase-desc">
+          First-touch UX for launch traffic. Creates a Company and (optionally) a plan.
+        </p>
+
+        <div class="step">
+          <h3><span class="num">2.1</span> Create company</h3>
+          <p class="action">
+            <strong>Action:</strong> Fill in company name (e.g. &ldquo;Acme Test Co&rdquo;). Slug
+            should auto-fill from the name and be editable. Optionally add a website. Submit.
+          </p>
+          <p class="expected">
+            <strong>Expected:</strong> Wizard advances to plan selection. Slug is unique (no
+            collision error).
+          </p>
+          <div class="results">
+            <label><input type="radio" name="step-2.1" value="pass" /><span>Pass</span></label>
+            <label><input type="radio" name="step-2.1" value="fail" /><span>Fail</span></label>
+            <label><input type="radio" name="step-2.1" value="skip" /><span>Skip</span></label>
+          </div>
+          <textarea class="notes" data-step="2.1" placeholder="Notes (optional)"></textarea>
+        </div>
+
+        <div class="step">
+          <h3><span class="num">2.2</span> Pick a plan</h3>
+          <p class="action">
+            <strong>Action:</strong> Select a plan from the list. Plans show name, monthly tokens,
+            price.
+          </p>
+          <p class="expected">
+            <strong>Expected:</strong> Plan list renders with at least one option. Prices match
+            what&rsquo;s configured in Stripe (no $0.00 weirdness). Selecting one advances the
+            wizard or starts a Stripe checkout flow.
+          </p>
+          <div class="results">
+            <label><input type="radio" name="step-2.2" value="pass" /><span>Pass</span></label>
+            <label><input type="radio" name="step-2.2" value="fail" /><span>Fail</span></label>
+            <label><input type="radio" name="step-2.2" value="skip" /><span>Skip</span></label>
+          </div>
+          <textarea class="notes" data-step="2.2" placeholder="Notes (optional)"></textarea>
+        </div>
+
+        <div class="step">
+          <h3><span class="num">2.3</span> Complete payment (if required)</h3>
+          <p class="action">
+            <strong>Action:</strong> If the plan requires payment, complete Stripe checkout with a
+            real or test card. (Use Stripe test card <code>4242 4242 4242 4242</code>
+            with any future expiry and any 3-digit CVC if you&rsquo;re in Stripe test mode.)
+          </p>
+          <p class="expected">
+            <strong>Expected:</strong> Stripe Checkout iframe renders cleanly. Successful payment
+            redirects back to Brandbite. Token balance reflects the plan&rsquo;s
+            <code>monthlyTokens</code> on first ticket creation.
+          </p>
+          <div class="results">
+            <label><input type="radio" name="step-2.3" value="pass" /><span>Pass</span></label>
+            <label><input type="radio" name="step-2.3" value="fail" /><span>Fail</span></label>
+            <label><input type="radio" name="step-2.3" value="skip" /><span>Skip</span></label>
+          </div>
+          <textarea class="notes" data-step="2.3" placeholder="Notes (optional)"></textarea>
+        </div>
+
+        <div class="step">
+          <h3><span class="num">2.4</span> Land on dashboard</h3>
+          <p class="action">
+            <strong>Action:</strong> After onboarding finishes, you should land on
+            <code>/customer/board</code>.
+          </p>
+          <p class="expected">
+            <strong>Expected:</strong> Sidebar visible with Workspace / Billing / Account sections.
+            Empty board state (TODO / IN_PROGRESS / IN_REVIEW / DONE columns all empty). Floating
+            &ldquo;Feedback&rdquo; pill bottom-right.
+          </p>
+          <div class="results">
+            <label><input type="radio" name="step-2.4" value="pass" /><span>Pass</span></label>
+            <label><input type="radio" name="step-2.4" value="fail" /><span>Fail</span></label>
+            <label><input type="radio" name="step-2.4" value="skip" /><span>Skip</span></label>
+          </div>
+          <textarea class="notes" data-step="2.4" placeholder="Notes (optional)"></textarea>
+        </div>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- PHASE 3 — Profile setup                                         -->
+      <!-- ============================================================== -->
+      <section class="phase">
+        <h2>Phase 3 &middot; Profile setup</h2>
+        <p class="phase-desc">
+          The personal-account hub we built recently. Touches Identity, Timezone, Notifications, and
+          the Avatar upload path.
+        </p>
+
+        <div class="step">
+          <h3><span class="num">3.1</span> Open profile</h3>
+          <p class="action">
+            <strong>Action:</strong> Sidebar &rarr; Account &rarr; Profile. URL should be
+            <code>/customer/profile</code>.
+          </p>
+          <p class="expected">
+            <strong>Expected:</strong> Profile page loads with sections: Identity, Timezone,
+            Notifications, Two-factor authentication, Active sessions, Delete account.
+          </p>
+          <div class="results">
+            <label><input type="radio" name="step-3.1" value="pass" /><span>Pass</span></label>
+            <label><input type="radio" name="step-3.1" value="fail" /><span>Fail</span></label>
+            <label><input type="radio" name="step-3.1" value="skip" /><span>Skip</span></label>
+          </div>
+          <textarea class="notes" data-step="3.1" placeholder="Notes (optional)"></textarea>
+        </div>
+
+        <div class="step">
+          <h3><span class="num">3.2</span> Update name + upload avatar</h3>
+          <p class="action">
+            <strong>Action:</strong> Edit name. Click &ldquo;Upload avatar&rdquo; and pick a JPG /
+            PNG &le; 2&nbsp;MB.
+          </p>
+          <p class="expected">
+            <strong>Expected:</strong> Name save returns success toast. Avatar uploads, circle
+            preview updates instantly with the image.
+          </p>
+          <div class="results">
+            <label><input type="radio" name="step-3.2" value="pass" /><span>Pass</span></label>
+            <label><input type="radio" name="step-3.2" value="fail" /><span>Fail</span></label>
+            <label><input type="radio" name="step-3.2" value="skip" /><span>Skip</span></label>
+          </div>
+          <textarea class="notes" data-step="3.2" placeholder="Notes (optional)"></textarea>
+        </div>
+
+        <div class="step">
+          <h3><span class="num">3.3</span> Set timezone (Auto-detect)</h3>
+          <p class="action">
+            <strong>Action:</strong> Click &ldquo;Auto-detect&rdquo; in the Timezone section.
+          </p>
+          <p class="expected">
+            <strong>Expected:</strong> Detected zone fills in (e.g. <code>Europe/Istanbul</code>),
+            saves, the &ldquo;Your browser thinks you&rsquo;re in&hellip;&rdquo; helper hint
+            disappears.
+          </p>
+          <div class="results">
+            <label><input type="radio" name="step-3.3" value="pass" /><span>Pass</span></label>
+            <label><input type="radio" name="step-3.3" value="fail" /><span>Fail</span></label>
+            <label><input type="radio" name="step-3.3" value="skip" /><span>Skip</span></label>
+          </div>
+          <textarea class="notes" data-step="3.3" placeholder="Notes (optional)"></textarea>
+        </div>
+
+        <div class="step">
+          <h3><span class="num">3.4</span> Toggle a notification preference</h3>
+          <p class="action">
+            <strong>Action:</strong> Disable the email channel for one of the events (e.g.
+            <em>Status changed</em>). Reload the page.
+          </p>
+          <p class="expected">
+            <strong>Expected:</strong> Toggle stays off after reload (preference persisted).
+          </p>
+          <div class="results">
+            <label><input type="radio" name="step-3.4" value="pass" /><span>Pass</span></label>
+            <label><input type="radio" name="step-3.4" value="fail" /><span>Fail</span></label>
+            <label><input type="radio" name="step-3.4" value="skip" /><span>Skip</span></label>
+          </div>
+          <textarea class="notes" data-step="3.4" placeholder="Notes (optional)"></textarea>
+        </div>
+
+        <div class="step">
+          <h3><span class="num">3.5</span> Enable two-factor (optional but recommended)</h3>
+          <p class="action">
+            <strong>Action:</strong> Enter your password &rarr; Set up &rarr; scan the QR with
+            Google Authenticator / 1Password / Authy &rarr; type the 6-digit code.
+            <strong>Save the backup codes</strong> shown at the end.
+          </p>
+          <p class="expected">
+            <strong>Expected:</strong> QR renders locally (<code>/api/profile/two-factor/qr</code>).
+            Code verifies. Backup codes display once with a Copy button. Enabled badge appears.
+          </p>
+          <div class="results">
+            <label><input type="radio" name="step-3.5" value="pass" /><span>Pass</span></label>
+            <label><input type="radio" name="step-3.5" value="fail" /><span>Fail</span></label>
+            <label><input type="radio" name="step-3.5" value="skip" /><span>Skip</span></label>
+          </div>
+          <textarea class="notes" data-step="3.5" placeholder="Notes (optional)"></textarea>
+        </div>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- PHASE 4 — First ticket                                          -->
+      <!-- ============================================================== -->
+      <section class="phase">
+        <h2>Phase 4 &middot; Create first ticket</h2>
+        <p class="phase-desc">
+          The bread-and-butter customer flow. Includes the new doc-upload path (PDF / DOC / TXT
+          alongside images) at the 4&nbsp;MB cap.
+        </p>
+
+        <div class="step">
+          <h3><span class="num">4.1</span> Open new ticket form</h3>
+          <p class="action">
+            <strong>Action:</strong> Click &ldquo;New ticket&rdquo; or similar CTA on the board.
+          </p>
+          <p class="expected">
+            <strong>Expected:</strong> Lands on <code>/customer/tickets/new</code>. Form has project
+            picker, title, brief, job type, priority, tags, and an attachments section that says
+            &ldquo;Accepts images, PDF, DOC, DOCX, TXT. Max 4&nbsp;MB per file.&rdquo;
+          </p>
+          <div class="results">
+            <label><input type="radio" name="step-4.1" value="pass" /><span>Pass</span></label>
+            <label><input type="radio" name="step-4.1" value="fail" /><span>Fail</span></label>
+            <label><input type="radio" name="step-4.1" value="skip" /><span>Skip</span></label>
+          </div>
+          <textarea class="notes" data-step="4.1" placeholder="Notes (optional)"></textarea>
+        </div>
+
+        <div class="step">
+          <h3><span class="num">4.2</span> Attach a 1&ndash;2 MB image + a PDF</h3>
+          <p class="action">
+            <strong>Action:</strong> Drag (or pick) the image you prepared. Then pick the PDF.
+          </p>
+          <p class="expected">
+            <strong>Expected:</strong> Both files appear in the attachment list with filename + size
+            + MIME. No upload errors.
+          </p>
+          <div class="results">
+            <label><input type="radio" name="step-4.2" value="pass" /><span>Pass</span></label>
+            <label><input type="radio" name="step-4.2" value="fail" /><span>Fail</span></label>
+            <label><input type="radio" name="step-4.2" value="skip" /><span>Skip</span></label>
+          </div>
+          <textarea class="notes" data-step="4.2" placeholder="Notes (optional)"></textarea>
+        </div>
+
+        <div class="step">
+          <h3><span class="num">4.3</span> Try a 5&nbsp;MB file (negative test)</h3>
+          <p class="action"><strong>Action:</strong> Try attaching a file larger than 4&nbsp;MB.</p>
+          <p class="expected">
+            <strong>Expected:</strong> Inline error appears immediately (&ldquo;<em>filename</em> is
+            5.X MB. The current upload limit is 4&nbsp;MB.&rdquo;) without any network round-trip.
+          </p>
+          <div class="results">
+            <label><input type="radio" name="step-4.3" value="pass" /><span>Pass</span></label>
+            <label><input type="radio" name="step-4.3" value="fail" /><span>Fail</span></label>
+            <label><input type="radio" name="step-4.3" value="skip" /><span>Skip</span></label>
+          </div>
+          <textarea class="notes" data-step="4.3" placeholder="Notes (optional)"></textarea>
+        </div>
+
+        <div class="step">
+          <h3><span class="num">4.4</span> Fill brief, pick job type, submit</h3>
+          <p class="action">
+            <strong>Action:</strong> Fill title, write a short brief in the rich-text editor, pick a
+            job type that has a token cost, set priority. Submit.
+          </p>
+          <p class="expected">
+            <strong>Expected:</strong> Form submits, lands on the new ticket detail or board. Ticket
+            appears in TODO. Token balance has decreased by the job type&rsquo;s cost &times;
+            quantity. Attachments are visible in the ticket&rsquo;s brief section.
+          </p>
+          <div class="results">
+            <label><input type="radio" name="step-4.4" value="pass" /><span>Pass</span></label>
+            <label><input type="radio" name="step-4.4" value="fail" /><span>Fail</span></label>
+            <label><input type="radio" name="step-4.4" value="skip" /><span>Skip</span></label>
+          </div>
+          <textarea class="notes" data-step="4.4" placeholder="Notes (optional)"></textarea>
+        </div>
+
+        <div class="step">
+          <h3><span class="num">4.5</span> Verify auto-assign (or fallback)</h3>
+          <p class="action">
+            <strong>Action:</strong> Refresh the ticket detail page after a few seconds.
+          </p>
+          <p class="expected">
+            <strong>Expected:</strong> If a creative on the platform has the matching CreativeSkill
+            and is below their cap, the ticket shows an assigned creative. If no qualified creative
+            exists, the ticket stays unassigned (FALLBACK in audit log) &mdash; that&rsquo;s also a
+            pass for this smoke test.
+          </p>
+          <div class="results">
+            <label><input type="radio" name="step-4.5" value="pass" /><span>Pass</span></label>
+            <label><input type="radio" name="step-4.5" value="fail" /><span>Fail</span></label>
+            <label><input type="radio" name="step-4.5" value="skip" /><span>Skip</span></label>
+          </div>
+          <textarea class="notes" data-step="4.5" placeholder="Notes (optional)"></textarea>
+        </div>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- PHASE 5 — Receive deliverable + revision flow                   -->
+      <!-- ============================================================== -->
+      <section class="phase">
+        <h2>Phase 5 &middot; Revision feedback</h2>
+        <p class="phase-desc">
+          This phase requires a creative to actually submit work. If you&rsquo;re testing solo with
+          no creatives, ask the operator to wear that hat (or skip and come back when there&rsquo;s
+          a real revision).
+        </p>
+
+        <div class="step">
+          <h3><span class="num">5.1</span> Notification email arrives</h3>
+          <p class="action">
+            <strong>Action:</strong> When the creative submits a revision, watch your inbox.
+          </p>
+          <p class="expected">
+            <strong>Expected:</strong> Email arrives within ~1 minute. Subject is sensible
+            (&ldquo;New revision on ticket #&hellip;&rdquo; or similar). CTA links to the ticket.
+          </p>
+          <div class="results">
+            <label><input type="radio" name="step-5.1" value="pass" /><span>Pass</span></label>
+            <label><input type="radio" name="step-5.1" value="fail" /><span>Fail</span></label>
+            <label><input type="radio" name="step-5.1" value="skip" /><span>Skip</span></label>
+          </div>
+          <textarea class="notes" data-step="5.1" placeholder="Notes (optional)"></textarea>
+        </div>
+
+        <div class="step">
+          <h3><span class="num">5.2</span> View revision + leave a pin</h3>
+          <p class="action">
+            <strong>Action:</strong> Open the ticket, click the latest revision&rsquo;s asset. Click
+            somewhere on the image to drop a pin. Type a comment, save.
+          </p>
+          <p class="expected">
+            <strong>Expected:</strong> Pin appears at the click position. Comment posts. Pin count
+            badge updates.
+          </p>
+          <div class="results">
+            <label><input type="radio" name="step-5.2" value="pass" /><span>Pass</span></label>
+            <label><input type="radio" name="step-5.2" value="fail" /><span>Fail</span></label>
+            <label><input type="radio" name="step-5.2" value="skip" /><span>Skip</span></label>
+          </div>
+          <textarea class="notes" data-step="5.2" placeholder="Notes (optional)"></textarea>
+        </div>
+
+        <div class="step">
+          <h3><span class="num">5.3</span> Approve or request revision</h3>
+          <p class="action">
+            <strong>Action:</strong> Use the ticket actions to either approve (move to DONE) or
+            request a revision.
+          </p>
+          <p class="expected">
+            <strong>Expected:</strong> Status updates correctly on the board. Creative receives an
+            email about the decision.
+          </p>
+          <div class="results">
+            <label><input type="radio" name="step-5.3" value="pass" /><span>Pass</span></label>
+            <label><input type="radio" name="step-5.3" value="fail" /><span>Fail</span></label>
+            <label><input type="radio" name="step-5.3" value="skip" /><span>Skip</span></label>
+          </div>
+          <textarea class="notes" data-step="5.3" placeholder="Notes (optional)"></textarea>
+        </div>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- PHASE 6 — Feedback widget + cross-tab session                  -->
+      <!-- ============================================================== -->
+      <section class="phase">
+        <h2>Phase 6 &middot; Feedback widget</h2>
+        <p class="phase-desc">
+          Submit a real test entry through the floating widget so it shows up at
+          <code>/admin/feedback</code>.
+        </p>
+
+        <div class="step">
+          <h3><span class="num">6.1</span> Open feedback modal</h3>
+          <p class="action">
+            <strong>Action:</strong> Click the orange / dark &ldquo;Feedback&rdquo; pill
+            bottom-right of any page. Or hit <kbd>Ctrl + /</kbd> (or <kbd>&#8984; + /</kbd>
+            on Mac).
+          </p>
+          <p class="expected">
+            <strong>Expected:</strong> Modal opens with type select + headline + details.
+          </p>
+          <div class="results">
+            <label><input type="radio" name="step-6.1" value="pass" /><span>Pass</span></label>
+            <label><input type="radio" name="step-6.1" value="fail" /><span>Fail</span></label>
+            <label><input type="radio" name="step-6.1" value="skip" /><span>Skip</span></label>
+          </div>
+          <textarea class="notes" data-step="6.1" placeholder="Notes (optional)"></textarea>
+        </div>
+
+        <div class="step">
+          <h3><span class="num">6.2</span> Submit a praise entry</h3>
+          <p class="action">
+            <strong>Action:</strong> Type: &ldquo;Smoke test &mdash; checking the widget works end
+            to end&rdquo;. Pick &ldquo;This is great&rdquo; type. Submit.
+          </p>
+          <p class="expected">
+            <strong>Expected:</strong> Toast: &ldquo;Thanks &mdash; we got it.&rdquo;. Modal closes.
+          </p>
+          <div class="results">
+            <label><input type="radio" name="step-6.2" value="pass" /><span>Pass</span></label>
+            <label><input type="radio" name="step-6.2" value="fail" /><span>Fail</span></label>
+            <label><input type="radio" name="step-6.2" value="skip" /><span>Skip</span></label>
+          </div>
+          <textarea class="notes" data-step="6.2" placeholder="Notes (optional)"></textarea>
+        </div>
+
+        <div class="step">
+          <h3><span class="num">6.3</span> Verify it lands on /admin/feedback</h3>
+          <p class="action">
+            <strong>Action:</strong> Switch to your admin browser tab, refresh
+            <code>/admin/feedback</code>.
+          </p>
+          <p class="expected">
+            <strong>Expected:</strong> The praise entry appears under &ldquo;New&rdquo; with your
+            customer email + role + page URL the test was submitted from. Status chips count
+            updates.
+          </p>
+          <div class="results">
+            <label><input type="radio" name="step-6.3" value="pass" /><span>Pass</span></label>
+            <label><input type="radio" name="step-6.3" value="fail" /><span>Fail</span></label>
+            <label><input type="radio" name="step-6.3" value="skip" /><span>Skip</span></label>
+          </div>
+          <textarea class="notes" data-step="6.3" placeholder="Notes (optional)"></textarea>
+        </div>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- PHASE 7 — Sign in with 2FA + sessions                           -->
+      <!-- ============================================================== -->
+      <section class="phase">
+        <h2>Phase 7 &middot; Sign-in &amp; sessions</h2>
+        <p class="phase-desc">
+          Verify the 2FA challenge fires for the password sign-in path and that active sessions
+          appear correctly.
+        </p>
+
+        <div class="step">
+          <h3><span class="num">7.1</span> Sign out</h3>
+          <p class="action">
+            <strong>Action:</strong> Sidebar &rarr; sign out (or hit
+            <code>/api/auth/sign-out</code> via wherever the menu lives).
+          </p>
+          <p class="expected">
+            <strong>Expected:</strong> Redirected to <code>/</code> or <code>/login</code>.
+          </p>
+          <div class="results">
+            <label><input type="radio" name="step-7.1" value="pass" /><span>Pass</span></label>
+            <label><input type="radio" name="step-7.1" value="fail" /><span>Fail</span></label>
+            <label><input type="radio" name="step-7.1" value="skip" /><span>Skip</span></label>
+          </div>
+          <textarea class="notes" data-step="7.1" placeholder="Notes (optional)"></textarea>
+        </div>
+
+        <div class="step">
+          <h3><span class="num">7.2</span> Sign in with email + password</h3>
+          <p class="action"><strong>Action:</strong> Enter your password. Submit.</p>
+          <p class="expected">
+            <strong>Expected:</strong> If you enabled 2FA in 3.5, the page swaps to a TOTP input
+            (&ldquo;Two-factor authentication&rdquo;). If not, you land on the board directly.
+          </p>
+          <div class="results">
+            <label><input type="radio" name="step-7.2" value="pass" /><span>Pass</span></label>
+            <label><input type="radio" name="step-7.2" value="fail" /><span>Fail</span></label>
+            <label><input type="radio" name="step-7.2" value="skip" /><span>Skip</span></label>
+          </div>
+          <textarea class="notes" data-step="7.2" placeholder="Notes (optional)"></textarea>
+        </div>
+
+        <div class="step">
+          <h3><span class="num">7.3</span> Verify TOTP / backup code</h3>
+          <p class="action">
+            <strong>Action:</strong> Enter the 6-digit TOTP from your authenticator. Or click
+            &ldquo;Use a backup code instead&rdquo; and try one of the codes you saved in 3.5.
+          </p>
+          <p class="expected">
+            <strong>Expected:</strong> Code verifies, real session issues, you land on the board.
+            (Skip if you didn&rsquo;t enable 2FA.)
+          </p>
+          <div class="results">
+            <label><input type="radio" name="step-7.3" value="pass" /><span>Pass</span></label>
+            <label><input type="radio" name="step-7.3" value="fail" /><span>Fail</span></label>
+            <label><input type="radio" name="step-7.3" value="skip" /><span>Skip</span></label>
+          </div>
+          <textarea class="notes" data-step="7.3" placeholder="Notes (optional)"></textarea>
+        </div>
+
+        <div class="step">
+          <h3><span class="num">7.4</span> Active sessions list</h3>
+          <p class="action"><strong>Action:</strong> Profile &rarr; Active sessions.</p>
+          <p class="expected">
+            <strong>Expected:</strong> At least one session listed, badged &ldquo;This
+            device&rdquo;. Browser + OS parsed from User-Agent. IP shown masked (1.2.x.x).
+          </p>
+          <div class="results">
+            <label><input type="radio" name="step-7.4" value="pass" /><span>Pass</span></label>
+            <label><input type="radio" name="step-7.4" value="fail" /><span>Fail</span></label>
+            <label><input type="radio" name="step-7.4" value="skip" /><span>Skip</span></label>
+          </div>
+          <textarea class="notes" data-step="7.4" placeholder="Notes (optional)"></textarea>
+        </div>
+      </section>
+
+      <div class="footer-actions">
+        <button class="primary" id="copy-issues">Copy failed steps to clipboard</button>
+        <button id="export-json">Export results (JSON)</button>
+        <div class="spacer"></div>
+        <button id="reset">Reset all checks</button>
+      </div>
+
+      <p style="margin-top: 28px; font-size: 12px; color: var(--muted); text-align: center">
+        Brandbite &middot; Customer smoke test &middot; v1
+      </p>
+    </div>
+
+    <script>
+      // ---------------------------------------------------------------
+      // Local-storage persistence — every radio + textarea state is
+      // keyed by element name/data-step so a refresh keeps your progress.
+      // ---------------------------------------------------------------
+      const KEY = "bb-smoke-customer-v1";
+
+      function loadState() {
+        try {
+          return JSON.parse(localStorage.getItem(KEY) || "{}");
+        } catch {
+          return {};
+        }
+      }
+      function saveState(s) {
+        localStorage.setItem(KEY, JSON.stringify(s));
+      }
+
+      const state = loadState();
+
+      // Hydrate
+      document.querySelectorAll('input[type="radio"]').forEach((el) => {
+        if (state[el.name] === el.value) el.checked = true;
+        el.addEventListener("change", () => {
+          state[el.name] = el.value;
+          saveState(state);
+          recomputeProgress();
+        });
+      });
+      document.querySelectorAll("textarea.notes").forEach((el) => {
+        const k = "notes-" + el.dataset.step;
+        el.value = state[k] || "";
+        el.addEventListener("input", () => {
+          state[k] = el.value;
+          saveState(state);
+        });
+      });
+
+      // ---- Progress meter --------------------------------------------
+      const total = document.querySelectorAll(".step").length;
+      document.getElementById("total-count").textContent = total;
+      function recomputeProgress() {
+        let pass = 0,
+          fail = 0,
+          skip = 0;
+        for (const k in state) {
+          if (k.startsWith("notes-")) continue;
+          if (state[k] === "pass") pass++;
+          else if (state[k] === "fail") fail++;
+          else if (state[k] === "skip") skip++;
+        }
+        document.getElementById("pass-count").textContent = pass;
+        document.getElementById("fail-count").textContent = fail;
+        document.getElementById("skip-count").textContent = skip;
+        const done = pass + fail + skip;
+        const pct = total === 0 ? 0 : Math.round((done / total) * 100);
+        document.getElementById("progress-fill").style.width = pct + "%";
+      }
+      recomputeProgress();
+
+      // ---- Footer actions --------------------------------------------
+      function gatherFailures() {
+        const lines = ["# Customer smoke test — failed steps\n"];
+        document.querySelectorAll(".step").forEach((step) => {
+          const radio = step.querySelector('input[type="radio"]');
+          if (!radio) return;
+          const name = radio.name;
+          const status = state[name];
+          if (status === "fail") {
+            const heading = step.querySelector("h3").innerText.trim();
+            const action = step.querySelector("p.action")?.innerText?.trim() ?? "";
+            const expected = step.querySelector("p.expected")?.innerText?.trim() ?? "";
+            const noteKey = "notes-" + step.querySelector("textarea")?.dataset?.step;
+            const notes = state[noteKey] || "";
+            lines.push("---");
+            lines.push("### " + heading);
+            lines.push(action);
+            lines.push("");
+            lines.push(expected);
+            if (notes) {
+              lines.push("");
+              lines.push("**Notes:** " + notes);
+            }
+            lines.push("");
+          }
+        });
+        if (lines.length === 1) lines.push("(No failed steps recorded.)");
+        return lines.join("\n");
+      }
+
+      document.getElementById("copy-issues").addEventListener("click", async () => {
+        const text = gatherFailures();
+        try {
+          await navigator.clipboard.writeText(text);
+          alert("Copied to clipboard. Paste it wherever you're sharing the report.");
+        } catch {
+          // Fallback for older browsers
+          const ta = document.createElement("textarea");
+          ta.value = text;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          ta.remove();
+          alert("Copied (fallback).");
+        }
+      });
+
+      document.getElementById("export-json").addEventListener("click", () => {
+        const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "smoke-test-customer-results.json";
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+
+      document.getElementById("reset").addEventListener("click", () => {
+        if (!confirm("Reset all your checks and notes for this run?")) return;
+        localStorage.removeItem(KEY);
+        location.reload();
+      });
+    </script>
+  </body>
+</html>
