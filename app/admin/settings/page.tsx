@@ -25,7 +25,7 @@ import { useToast } from "@/components/ui/toast-provider";
 
 type SettingsMap = Record<string, string | null>;
 
-type SectionKey = "finance" | "talent";
+type SectionKey = "finance" | "talent" | "notifications";
 
 type SettingMeta = {
   label: string;
@@ -66,6 +66,13 @@ const SETTING_META: Record<string, SettingMeta> = {
     type: "boolean",
     section: "talent",
   },
+  ADMIN_EVENT_EMAILS_ENABLED: {
+    label: "Email site owners on system events",
+    description:
+      "When on, every SITE_OWNER receives an email when a meaningful event happens — new feedback submitted, new ticket created, new company finishes onboarding, new payment received, new talent application, new withdrawal request. Default on. Mute globally with this toggle when the inbox gets noisy.",
+    type: "boolean",
+    section: "notifications",
+  },
 };
 
 const SECTION_TITLES: Record<SectionKey, { title: string; description: string }> = {
@@ -77,6 +84,11 @@ const SECTION_TITLES: Record<SectionKey, { title: string; description: string }>
     title: "Talent funnel",
     description:
       "Controls for the public /talent application form. The funnel is independent from existing hires — pausing intake doesn't affect creatives already on the platform.",
+  },
+  notifications: {
+    title: "Notifications",
+    description:
+      "What we email site owners about. Per-event opt-outs aren't here yet — flip the master switch off if it gets too noisy and we'll add granular toggles when you tell us which events matter.",
   },
 };
 
@@ -191,9 +203,15 @@ export default function AdminSettingsPage() {
           for (const key of Object.keys(SETTING_META)) {
             const meta = SETTING_META[key];
             if (meta.type === "boolean" && map[key] == null) {
-              // TALENT_APPLICATIONS_OPEN defaults to "true" when unset;
-              // AUTO_PAYOUT_ENABLED defaults to "false" historically.
-              initial[key] = key === "TALENT_APPLICATIONS_OPEN" ? "true" : "false";
+              // Defaults that should read as "true" when the row is
+              // missing — keep this list in sync with the server-side
+              // helpers that read each setting (see e.g.
+              // lib/admin-event-email.ts eventEmailsEnabled).
+              const ON_BY_DEFAULT = new Set([
+                "TALENT_APPLICATIONS_OPEN",
+                "ADMIN_EVENT_EMAILS_ENABLED",
+              ]);
+              initial[key] = ON_BY_DEFAULT.has(key) ? "true" : "false";
             } else {
               initial[key] = map[key] ?? "";
             }

@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
+import { notifySiteOwnersOfEvent } from "@/lib/admin-event-email";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { insufficientTokensResponse } from "@/lib/errors/insufficient-tokens";
 import { canCreateTickets } from "@/lib/permissions/companyRoles";
@@ -286,6 +287,29 @@ export async function POST(req: NextRequest) {
       companyTicketNumber: ticket.companyTicketNumber,
       ticketId: ticket.id,
     });
+
+    // Best-effort SITE_OWNER notification — "$company opened a new task".
+    // Looking up the company name with a single select keeps the helper
+    // signature small (it doesn't need the full company row). Wrapped
+    // in its own try/catch so a notification failure can't break ticket
+    // creation.
+    try {
+      const company = await prisma.company.findUnique({
+        where: { id: user.activeCompanyId },
+        select: { name: true },
+      });
+      void notifySiteOwnersOfEvent({
+        kind: "NEW_TICKET",
+        ticketId: ticket.id,
+        ticketCode,
+        title: ticket.title,
+        companyName: company?.name ?? "(unknown company)",
+        createdByEmail: user.email,
+        jobTypeName: ticket.jobType?.name ?? null,
+      });
+    } catch (err) {
+      console.error("[customer/tickets POST] event-email lookup failed", err);
+    }
 
     return NextResponse.json(
       {

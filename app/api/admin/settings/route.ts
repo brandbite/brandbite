@@ -33,6 +33,12 @@ const ALLOWED_KEYS = [
   // and the public page swaps to a closed-state banner. Default
   // (unset / "true") = open, matching today's behaviour.
   "TALENT_APPLICATIONS_OPEN",
+  // Master kill-switch for the SITE_OWNER event notification emails
+  // (new feedback / new ticket / new company / new payment / new
+  // talent application / new withdrawal). Default unset = "true" =
+  // enabled. Set "false" to mute everything globally — useful during
+  // demos, data imports, or when the inbox simply gets too loud.
+  "ADMIN_EVENT_EMAILS_ENABLED",
 ] as const;
 
 function isAllowedKey(key: string): key is (typeof ALLOWED_KEYS)[number] {

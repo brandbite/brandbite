@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { notifySiteOwnersOfEvent } from "@/lib/admin-event-email";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { getUserTokenBalance } from "@/lib/token-engine";
 import { getAppSettingInt } from "@/lib/app-settings";
@@ -118,6 +119,15 @@ export async function POST(req: NextRequest) {
         amountTokens,
         status: "PENDING",
       },
+    });
+
+    // Best-effort SITE_OWNER notification — "$creative requested a payout".
+    // Fire-and-forget so the creative's response isn't blocked on Resend.
+    void notifySiteOwnersOfEvent({
+      kind: "NEW_WITHDRAWAL_REQUEST",
+      withdrawalId: withdrawal.id,
+      creativeEmail: user.email,
+      amountTokens: withdrawal.amountTokens,
     });
 
     return NextResponse.json(

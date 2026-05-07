@@ -7,6 +7,7 @@
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
+import { notifySiteOwnersOfEvent } from "@/lib/admin-event-email";
 import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
@@ -270,6 +271,29 @@ export async function POST(req: NextRequest) {
           stripeSubscriptionId,
           isFirstSubscription,
         });
+
+        // Best-effort SITE_OWNER notification on successful checkout.
+        // Fire-and-forget — Stripe needs a 200 from the webhook handler
+        // promptly, so we don't await the email pipeline.
+        try {
+          const session = event.data.object as Stripe.Checkout.Session;
+          const amountTotal = session.amount_total ?? 0;
+          const currency = (session.currency ?? "usd").toUpperCase();
+          const amountFormatted = `${currency} ${(amountTotal / 100).toFixed(2)}`;
+          const companyForNotify = await prisma.company.findUnique({
+            where: { id: companyId as string },
+            select: { name: true, plan: { select: { name: true } } },
+          });
+          void notifySiteOwnersOfEvent({
+            kind: "NEW_PAYMENT",
+            companyName: companyForNotify?.name ?? "(unknown company)",
+            amountFormatted,
+            planName: companyForNotify?.plan?.name ?? null,
+            stripeCustomerEmail: session.customer_details?.email ?? null,
+          });
+        } catch (err) {
+          console.error("[billing.webhook] payment notification failed", err);
+        }
 
         break;
       }
