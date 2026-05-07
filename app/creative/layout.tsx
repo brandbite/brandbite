@@ -5,6 +5,7 @@
 
 import { AppSidebar } from "@/components/navigation/app-sidebar";
 import { SessionTimeoutWarning } from "@/components/auth/session-timeout-warning";
+import { FeedbackWidget } from "@/components/feedback/feedback-widget";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,8 @@ export default function CreativeLayout({ children }: { children: React.ReactNode
           {children}
         </main>
       </div>
+      {/* Floating feedback pill — see component header. */}
+      <FeedbackWidget />
     </div>
   );
 }
