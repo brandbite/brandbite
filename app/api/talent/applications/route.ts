@@ -22,6 +22,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
+import { notifySiteOwnersOfEvent } from "@/lib/admin-event-email";
 import { getAppSetting } from "@/lib/app-settings";
 import { prisma } from "@/lib/prisma";
 import { getClientIp, rateLimit } from "@/lib/rate-limit";
@@ -152,6 +153,16 @@ export async function POST(req: NextRequest) {
         userAgent: req.headers.get("user-agent")?.slice(0, 500) ?? null,
       },
       select: { id: true },
+    });
+
+    // Best-effort SITE_OWNER notification — "$candidate just applied".
+    // Fire-and-forget so the public form doesn't block on Resend.
+    void notifySiteOwnersOfEvent({
+      kind: "NEW_TALENT_APPLICATION",
+      applicationId: created.id,
+      candidateName: created.fullName,
+      candidateEmail: created.email,
+      country: created.country,
     });
 
     return NextResponse.json({ id: created.id }, { status: 201 });

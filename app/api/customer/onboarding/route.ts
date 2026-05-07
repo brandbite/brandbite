@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { notifySiteOwnersOfEvent } from "@/lib/admin-event-email";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 
 // ---------------------------------------------------------------------------
@@ -111,9 +112,20 @@ export async function PATCH() {
       return NextResponse.json({ error: "No active company found." }, { status: 400 });
     }
 
-    await prisma.company.update({
+    const updated = await prisma.company.update({
       where: { id: user.activeCompanyId },
       data: { onboardingCompletedAt: new Date() },
+      select: { id: true, name: true },
+    });
+
+    // Best-effort site-owner notification — "$company finished onboarding".
+    // Fire-and-forget so a slow Resend call doesn't block the wizard's
+    // "you're done" redirect.
+    void notifySiteOwnersOfEvent({
+      kind: "NEW_COMPANY",
+      companyId: updated.id,
+      companyName: updated.name,
+      ownerEmail: user.email,
     });
 
     return NextResponse.json({ success: true });

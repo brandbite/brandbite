@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import type { FeedbackType } from "@prisma/client";
 
+import { notifySiteOwnersOfEvent } from "@/lib/admin-event-email";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
@@ -87,15 +88,29 @@ export async function POST(req: NextRequest) {
     });
 
     // Defensive log — also doubles as a "we got new feedback" signal in
-    // server logs / Sentry breadcrumbs without us needing to wire up a
-    // separate notification channel for v1. Per-IP for forensic linkage
-    // if the admin queue spots a spammer.
+    // server logs / Sentry breadcrumbs. Per-IP for forensic linkage if
+    // the admin queue spots a spammer.
     console.info("[feedback] submitted", {
       id: created.id,
       type: data.type,
       userId: user.id,
       role: user.role,
       ip,
+    });
+
+    // Best-effort fan-out to SITE_OWNERs. Awaited deliberately so the
+    // per-user rate limit token isn't released until the email pipeline
+    // has had its turn — the helper is itself best-effort and never
+    // throws, so a slow Resend call won't block the response either way.
+    await notifySiteOwnersOfEvent({
+      kind: "NEW_FEEDBACK",
+      feedbackId: created.id,
+      type: data.type,
+      submitterEmail: user.email,
+      submitterRole: user.role,
+      subject: data.subject?.trim() || null,
+      message: data.message,
+      pageUrl: data.pageUrl ?? null,
     });
 
     return NextResponse.json({ id: created.id }, { status: 201 });
