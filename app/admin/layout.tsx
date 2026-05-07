@@ -7,6 +7,7 @@
 
 import { AppSidebar } from "@/components/navigation/app-sidebar";
 import { SessionTimeoutWarning } from "@/components/auth/session-timeout-warning";
+import { FeedbackWidget } from "@/components/feedback/feedback-widget";
 
 // All admin routes are auth-gated. Skip SSG so the build does not prerender
 // pages that depend on the live DB or client-only libraries.
@@ -35,6 +36,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {children}
         </main>
       </div>
+      {/* Floating feedback pill — see component header. Useful for admins
+          too: dogfooding catches paper cuts before they hit customers. */}
+      <FeedbackWidget />
     </div>
   );
 }

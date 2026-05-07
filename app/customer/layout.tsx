@@ -7,6 +7,7 @@
 import { redirect } from "next/navigation";
 import { AppSidebar } from "@/components/navigation/app-sidebar";
 import { SessionTimeoutWarning } from "@/components/auth/session-timeout-warning";
+import { FeedbackWidget } from "@/components/feedback/feedback-widget";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -50,6 +51,9 @@ export default async function CustomerLayout({ children }: { children: React.Rea
           {children}
         </main>
       </div>
+      {/* Floating feedback pill — bottom-right of every customer page.
+          Hidden in demo mode (see component header). */}
+      <FeedbackWidget />
     </div>
   );
 }

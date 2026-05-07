@@ -313,6 +313,11 @@ model UserAccount {
   // Admin action log entries this user authored (SITE_OWNER only in practice)
   adminActionLogs AdminActionLog[] @relation("AdminActionLogActor")
 
+  // Feedback submitted by this user via the floating feedback widget
+  // — bug reports, feature requests, praise, questions. Reviewable at
+  // /admin/feedback.
+  submittedFeedback Feedback[] @relation("FeedbackSubmitter")
+
   // MFA challenges issued to this user (email-code second factor)
   mfaChallenges MfaChallenge[]
 
@@ -1353,6 +1358,81 @@ model AppSetting {
   value String
 
   updatedAt DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// Feedback — bug reports, feature requests, praise, and questions submitted
+// by signed-in customers / creatives / admins. Drives the /admin/feedback
+// triage surface so the team can sort future-development priorities by
+// what real users actually ask for.
+//
+// Why a separate model (and not, say, a generic Notification or Comment):
+// the data shape is genuinely different — type + status + page-context
+// metadata + admin-only triage notes — and keeping it in its own table
+// means the admin list query stays narrow.
+// -----------------------------------------------------------------------------
+
+enum FeedbackType {
+  BUG // something is broken
+  FEATURE // request for new capability
+  PRAISE // positive note (still useful — tells us what's working)
+  QUESTION // user is confused / needs an answer
+}
+
+enum FeedbackStatus {
+  NEW // just submitted, untriaged
+  TRIAGED // admin has read it
+  PLANNED // committed to ship
+  DONE // shipped
+  WONT_DO // explicit decline (with adminNotes for the why)
+}
+
+model Feedback {
+  id String @id @default(cuid())
+
+  type    FeedbackType
+  /// The user-typed body. Free-form, capped at 4000 chars to keep the
+  /// admin list scannable and prevent log pollution.
+  message String       @db.Text
+
+  /// Optional one-line summary the user can attach. Displayed first in
+  /// the admin list when present.
+  subject String?
+
+  // ---- Submission context (auto-captured by the widget) ----
+  /// The full URL the user was on when they hit submit (path + query +
+  /// hash). Lets admins reproduce the context without playing detective.
+  pageUrl   String?
+  userAgent String?
+  /// Viewport WxH when submitted, e.g. "1440x900". Tiny string but
+  /// surprisingly useful when triaging "the button is misaligned"
+  /// reports across breakpoints.
+  viewport  String?
+
+  // ---- Submitter (snapshotted for forensic stability) ----
+  // Real FK to UserAccount — feedback is tied to a signed-in user; the
+  // widget doesn't render for anon visitors.
+  submittedById    String
+  submittedBy      UserAccount @relation("FeedbackSubmitter", fields: [submittedById], references: [id])
+  /// Snapshot of email + role at submit time. Survives a later
+  /// USER_HARD_DELETE that would anonymize the linked UserAccount.
+  submittedByEmail String
+  submittedByRole  UserRole
+
+  // ---- Admin triage ----
+  status     FeedbackStatus @default(NEW)
+  /// Internal notes from the admin reviewing the entry. Never shown to
+  /// the submitter; populated when an admin updates status (e.g. "dup
+  /// of #123" / "shipped in PR 248").
+  adminNotes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Triage list filters by status + recency; a per-user index covers
+  // "show me my own feedback history" if we add that later.
+  @@index([status, createdAt(sort: Desc)])
+  @@index([submittedById])
 }
 
 // -----------------------------------------------------------------------------
