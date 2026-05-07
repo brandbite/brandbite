@@ -29,7 +29,13 @@ import {
 import { isInsufficientTokensBody } from "@/lib/errors/insufficient-tokens";
 import type { TagColorKey } from "@/lib/tag-colors";
 import { canManageTags as canManageTagsCheck } from "@/lib/permissions/companyRoles";
-import { MAX_UPLOAD_LABEL, readUploadError, validateFileSize } from "@/lib/upload-helpers";
+import {
+  BRIEF_ACCEPT_ATTR,
+  BRIEF_ACCEPTED_LABEL,
+  MAX_UPLOAD_LABEL,
+  readUploadError,
+  validateFileSize,
+} from "@/lib/upload-helpers";
 
 type ProjectOption = {
   id: string;
@@ -807,8 +813,8 @@ export default function NewTicketForm({
         <div className="rounded-md border border-dashed border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-3">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-[11px] text-[var(--bb-text-secondary)]">
-              Attach reference images (logos, screenshots, inspiration). Max{" "}
-              <strong>{MAX_UPLOAD_LABEL}</strong> per file.
+              Attach reference files (logos, screenshots, briefs, inspiration). Accepts{" "}
+              {BRIEF_ACCEPTED_LABEL}. Max <strong>{MAX_UPLOAD_LABEL}</strong> per file.
               <span className="ml-1 text-[var(--bb-text-tertiary)]">
                 Total: {formatBytes(totalBriefBytes)}
               </span>
@@ -817,7 +823,7 @@ export default function NewTicketForm({
             <label className="inline-flex cursor-pointer items-center justify-center rounded-full border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-4 py-2 text-xs font-medium text-[var(--bb-secondary)] hover:bg-[var(--bb-bg-warm)] disabled:cursor-not-allowed disabled:opacity-60">
               <input
                 type="file"
-                accept="image/*"
+                accept={BRIEF_ACCEPT_ATTR}
                 multiple
                 className="hidden"
                 disabled={isBusy || isLimitedAccess || !canAddMoreBriefs}
@@ -827,7 +833,7 @@ export default function NewTicketForm({
                   e.currentTarget.value = "";
                 }}
               />
-              Add images
+              Add files
             </label>
           </div>
 

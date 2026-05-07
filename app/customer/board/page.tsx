@@ -45,6 +45,7 @@ import {
 } from "@/lib/board";
 import { Badge } from "@/components/ui/badge";
 import { TagBadge } from "@/components/ui/tag-badge";
+import { BRIEF_ACCEPT_ATTR } from "@/lib/upload-helpers";
 import { TagMultiSelect, type TagOption } from "@/components/ui/tag-multi-select";
 import type { TagColorKey } from "@/lib/tag-colors";
 import { Modal, ModalHeader, ModalFooter } from "@/components/ui/modal";
@@ -2638,7 +2639,7 @@ export default function CustomerBoardPage() {
                               <label className="inline-flex cursor-pointer items-center rounded-full border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-1 text-[11px] font-medium text-[var(--bb-secondary)] hover:bg-[var(--bb-bg-warm)] disabled:cursor-not-allowed disabled:opacity-60">
                                 <input
                                   type="file"
-                                  accept="image/*"
+                                  accept={BRIEF_ACCEPT_ATTR}
                                   multiple
                                   className="hidden"
                                   disabled={uploadingBriefs}
@@ -2647,7 +2648,7 @@ export default function CustomerBoardPage() {
                                     e.currentTarget.value = "";
                                   }}
                                 />
-                                Add images
+                                Add files
                               </label>
                             )}
                             {hasAssets && (
