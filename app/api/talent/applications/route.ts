@@ -156,13 +156,15 @@ export async function POST(req: NextRequest) {
     });
 
     // Best-effort SITE_OWNER notification — "$candidate just applied".
-    // Fire-and-forget so the public form doesn't block on Resend.
+    // Fire-and-forget so the public form doesn't block on Resend. The
+    // create() above selects only `id`, so we pull the human fields off
+    // the validated `data` object instead of re-querying.
     void notifySiteOwnersOfEvent({
       kind: "NEW_TALENT_APPLICATION",
       applicationId: created.id,
-      candidateName: created.fullName,
-      candidateEmail: created.email,
-      country: created.country,
+      candidateName: data.fullName,
+      candidateEmail: data.email,
+      country: data.country,
     });
 
     return NextResponse.json({ id: created.id }, { status: 201 });
