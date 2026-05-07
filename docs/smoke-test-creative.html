@@ -38,8 +38,7 @@
       }
       body {
         font-family:
-          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
-          sans-serif;
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         background: var(--bg);
         color: var(--ink-soft);
         line-height: 1.55;
@@ -367,12 +366,12 @@
         </svg>
         <h1>Creative / talent smoke test</h1>
         <p>
-          Pre-launch end-to-end check for the talent funnel and the creative experience.
-          Walks through the public application, admin hiring, magic-link onboarding,
-          ticket assignment, deliverables, withdrawals, and feedback. Phases with a
-          <span class="hat candidate">CANDIDATE</span> badge are done from the candidate
-          / creative side; phases with <span class="hat admin">ADMIN</span> need you in
-          your existing site-owner browser tab. Progress saved in this browser.
+          Pre-launch end-to-end check for the talent funnel and the creative experience. Walks
+          through the public application, admin hiring, magic-link onboarding, ticket assignment,
+          deliverables, withdrawals, and feedback. Phases with a
+          <span class="hat candidate">CANDIDATE</span> badge are done from the candidate / creative
+          side; phases with <span class="hat admin">ADMIN</span> need you in your existing
+          site-owner browser tab. Progress saved in this browser.
         </p>
       </header>
 
@@ -384,17 +383,17 @@
             <code>you+ct1@gmail.com</code>).
           </li>
           <li>
-            Have a portfolio URL ready (any real one), and a 1&ndash;2 MB sample image to
-            submit as a deliverable later.
+            Have a portfolio URL ready (any real one), and a 1&ndash;2 MB sample image to submit as
+            a deliverable later.
           </li>
           <li>
-            Open <code>brandbite.studio/admin</code> in a different browser / incognito as
-            your existing SITE_OWNER account so you can switch hats easily.
+            Open <code>brandbite.studio/admin</code> in a different browser / incognito as your
+            existing SITE_OWNER account so you can switch hats easily.
           </li>
           <li>
-            For the assignment phase you&rsquo;ll need a real customer ticket waiting in the
-            system &mdash; either pre-create one as a customer, or pair this run with the
-            customer smoke test (do that one first up to phase 4).
+            For the assignment phase you&rsquo;ll need a real customer ticket waiting in the system
+            &mdash; either pre-create one as a customer, or pair this run with the customer smoke
+            test (do that one first up to phase 4).
           </li>
         </ul>
       </div>
@@ -405,8 +404,7 @@
           <span class="stats">
             <span class="pass" id="pass-count">0</span> pass &middot;
             <span class="fail" id="fail-count">0</span> fail &middot;
-            <span id="skip-count">0</span> skip /
-            <span id="total-count">0</span> steps
+            <span id="skip-count">0</span> skip / <span id="total-count">0</span> steps
           </span>
         </div>
         <div class="bar"><div class="fill" id="progress-fill"></div></div>
@@ -418,8 +416,8 @@
       <section class="phase">
         <h2>Phase 1 &middot; Public application <span class="hat candidate">Candidate</span></h2>
         <p class="phase-desc">
-          Anonymous form at <code>/talent</code>. This is what every prospective creative
-          fills out first.
+          Anonymous form at <code>/talent</code>. This is what every prospective creative fills out
+          first.
         </p>
 
         <div class="step">
@@ -428,9 +426,9 @@
             <strong>Action:</strong> Open <code>https://brandbite.studio/talent</code>.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Application form renders. Brand looks right
-            (orange wordmark up top). Categories load. Scroll: every section is reachable.
-            No closed-state banner (unless you toggled the kill-switch on).
+            <strong>Expected:</strong> Application form renders. Brand looks right (orange wordmark
+            up top). Categories load. Scroll: every section is reachable. No closed-state banner
+            (unless you toggled the kill-switch on).
           </p>
           <div class="results">
             <label><input type="radio" name="step-1.1" value="pass" /><span>Pass</span></label>
@@ -443,16 +441,14 @@
         <div class="step">
           <h3><span class="num">1.2</span> Fill the form</h3>
           <p class="action">
-            <strong>Action:</strong> Fill name, WhatsApp (with country code), email
-            (fresh / the one you prepared), country, timezone (auto-fills if available),
-            portfolio URL, optional LinkedIn, pick at least one category, set total years,
-            answer the remote / workload / tools / turnaround questions, tick the
-            communication confirm.
+            <strong>Action:</strong> Fill name, WhatsApp (with country code), email (fresh / the one
+            you prepared), country, timezone (auto-fills if available), portfolio URL, optional
+            LinkedIn, pick at least one category, set total years, answer the remote / workload /
+            tools / turnaround questions, tick the communication confirm.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Inline validation behaves: empty required fields
-            disable submit. Conditional sections appear (e.g. yearsRemote when
-            hasRemoteExp = true).
+            <strong>Expected:</strong> Inline validation behaves: empty required fields disable
+            submit. Conditional sections appear (e.g. yearsRemote when hasRemoteExp = true).
           </p>
           <div class="results">
             <label><input type="radio" name="step-1.2" value="pass" /><span>Pass</span></label>
@@ -465,12 +461,12 @@
         <div class="step">
           <h3><span class="num">1.3</span> Solve Turnstile + submit</h3>
           <p class="action">
-            <strong>Action:</strong> Wait for Cloudflare Turnstile to verify (or solve the
-            challenge if it appears). Click Submit application.
+            <strong>Action:</strong> Wait for Cloudflare Turnstile to verify (or solve the challenge
+            if it appears). Click Submit application.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Submit succeeds, page swaps to a thank-you state.
-            No 429 / 400 errors.
+            <strong>Expected:</strong> Submit succeeds, page swaps to a thank-you state. No 429 /
+            400 errors.
           </p>
           <div class="results">
             <label><input type="radio" name="step-1.3" value="pass" /><span>Pass</span></label>
@@ -497,8 +493,8 @@
             <code>/admin/talent-applications</code>.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Submission appears at the top of the New chip with
-            the candidate&rsquo;s name + email. Counts on the New chip increment by 1.
+            <strong>Expected:</strong> Submission appears at the top of the New chip with the
+            candidate&rsquo;s name + email. Counts on the New chip increment by 1.
           </p>
           <div class="results">
             <label><input type="radio" name="step-2.1" value="pass" /><span>Pass</span></label>
@@ -511,13 +507,12 @@
         <div class="step">
           <h3><span class="num">2.2</span> Open detail panel + Accept</h3>
           <p class="action">
-            <strong>Action:</strong> Click Open. Click Accept. Pick three interview slots
-            in the next 7 days (use the datetime pickers). Optionally add a custom
-            message. Confirm.
+            <strong>Action:</strong> Click Open. Click Accept. Pick three interview slots in the
+            next 7 days (use the datetime pickers). Optionally add a custom message. Confirm.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Status flips to AWAITING_CANDIDATE_CHOICE. Toast
-            confirms slots offered. Status chip count moves from New to Awaiting candidate.
+            <strong>Expected:</strong> Status flips to AWAITING_CANDIDATE_CHOICE. Toast confirms
+            slots offered. Status chip count moves from New to Awaiting candidate.
           </p>
           <div class="results">
             <label><input type="radio" name="step-2.2" value="pass" /><span>Pass</span></label>
@@ -532,20 +527,20 @@
       <!-- PHASE 3 — Candidate books the slot                              -->
       <!-- ============================================================== -->
       <section class="phase">
-        <h2>Phase 3 &middot; Candidate books a slot <span class="hat candidate">Candidate</span></h2>
+        <h2>
+          Phase 3 &middot; Candidate books a slot <span class="hat candidate">Candidate</span>
+        </h2>
         <p class="phase-desc">
-          The candidate gets a tokenised booking link in their email. They click,
-          pick one of the three slots (or propose their own time).
+          The candidate gets a tokenised booking link in their email. They click, pick one of the
+          three slots (or propose their own time).
         </p>
 
         <div class="step">
           <h3><span class="num">3.1</span> Slot-offer email arrives</h3>
-          <p class="action">
-            <strong>Action:</strong> Check the candidate&rsquo;s inbox.
-          </p>
+          <p class="action"><strong>Action:</strong> Check the candidate&rsquo;s inbox.</p>
           <p class="expected">
-            <strong>Expected:</strong> Branded email with three time slots and a
-            &ldquo;Pick a slot&rdquo; button. Sender + subject look professional.
+            <strong>Expected:</strong> Branded email with three time slots and a &ldquo;Pick a
+            slot&rdquo; button. Sender + subject look professional.
           </p>
           <div class="results">
             <label><input type="radio" name="step-3.1" value="pass" /><span>Pass</span></label>
@@ -558,12 +553,11 @@
         <div class="step">
           <h3><span class="num">3.2</span> Click booking link, pick a slot</h3>
           <p class="action">
-            <strong>Action:</strong> Click the button. On the booking page, pick the
-            soonest slot.
+            <strong>Action:</strong> Click the button. On the booking page, pick the soonest slot.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Confirmation screen renders. A second email lands
-            with the Google Meet link + Calendar invite.
+            <strong>Expected:</strong> Confirmation screen renders. A second email lands with the
+            Google Meet link + Calendar invite.
           </p>
           <div class="results">
             <label><input type="radio" name="step-3.2" value="pass" /><span>Pass</span></label>
@@ -576,12 +570,12 @@
         <div class="step">
           <h3><span class="num">3.3</span> Verify Google Calendar event</h3>
           <p class="action">
-            <strong>Action:</strong> Check Google Calendar (the brandbite owner&rsquo;s
-            calendar configured in env).
+            <strong>Action:</strong> Check Google Calendar (the brandbite owner&rsquo;s calendar
+            configured in env).
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Event appears at the chosen slot with Meet link +
-            both attendees (owner + candidate). Description includes candidate context.
+            <strong>Expected:</strong> Event appears at the chosen slot with Meet link + both
+            attendees (owner + candidate). Description includes candidate context.
           </p>
           <div class="results">
             <label><input type="radio" name="step-3.3" value="pass" /><span>Pass</span></label>
@@ -598,15 +592,15 @@
       <section class="phase">
         <h2>Phase 4 &middot; Admin: interview + hire <span class="hat admin">Admin</span></h2>
         <p class="phase-desc">
-          Skip the actual interview for the smoke test &mdash; just walk through the
-          status transitions.
+          Skip the actual interview for the smoke test &mdash; just walk through the status
+          transitions.
         </p>
 
         <div class="step">
           <h3><span class="num">4.1</span> Mark interview held</h3>
           <p class="action">
-            <strong>Action:</strong> In <code>/admin/talent-applications</code>, find the
-            row (now under Accepted). Open detail. Click &ldquo;Mark interview held&rdquo;.
+            <strong>Action:</strong> In <code>/admin/talent-applications</code>, find the row (now
+            under Accepted). Open detail. Click &ldquo;Mark interview held&rdquo;.
           </p>
           <p class="expected">
             <strong>Expected:</strong> Status flips to INTERVIEW_HELD. Hire form appears.
@@ -623,12 +617,12 @@
           <h3><span class="num">4.2</span> Fill hire form + click Hire</h3>
           <p class="action">
             <strong>Action:</strong> Working hours: <code>9-18 weekdays Europe/Istanbul</code>.
-            Approve the categories the candidate applied for (deselect any you don&rsquo;t
-            want). Set tasks/week cap (e.g. 3). Optional notes. Click Hire.
+            Approve the categories the candidate applied for (deselect any you don&rsquo;t want).
+            Set tasks/week cap (e.g. 3). Optional notes. Click Hire.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Status flips to HIRED. Banner now reads
-            &ldquo;onboarding pending&rdquo;.
+            <strong>Expected:</strong> Status flips to HIRED. Banner now reads &ldquo;onboarding
+            pending&rdquo;.
           </p>
           <div class="results">
             <label><input type="radio" name="step-4.2" value="pass" /><span>Pass</span></label>
@@ -641,13 +635,12 @@
         <div class="step">
           <h3><span class="num">4.3</span> Click Onboard now</h3>
           <p class="action">
-            <strong>Action:</strong> Click the &ldquo;Onboard now&rdquo; button on the
-            HIRED row.
+            <strong>Action:</strong> Click the &ldquo;Onboard now&rdquo; button on the HIRED row.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Status flips to ONBOARDED. A new
-            UserAccount(role=DESIGNER) is created with the candidate&rsquo;s email. Two
-            emails go out: a magic-link sign-in and a branded welcome. Toast confirms.
+            <strong>Expected:</strong> Status flips to ONBOARDED. A new UserAccount(role=DESIGNER)
+            is created with the candidate&rsquo;s email. Two emails go out: a magic-link sign-in and
+            a branded welcome. Toast confirms.
           </p>
           <div class="results">
             <label><input type="radio" name="step-4.3" value="pass" /><span>Pass</span></label>
@@ -660,13 +653,12 @@
         <div class="step">
           <h3><span class="num">4.4</span> Spot-check the new user in /admin/users</h3>
           <p class="action">
-            <strong>Action:</strong> Visit <code>/admin/users</code>, filter by Creative,
-            find the new row. Click the name to open <code>/admin/users/[id]</code>.
+            <strong>Action:</strong> Visit <code>/admin/users</code>, filter by Creative, find the
+            new row. Click the name to open <code>/admin/users/[id]</code>.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Detail page shows Creative role + the working hours
-            you set + the cap + the talent-application link + the contact info (WhatsApp,
-            country, portfolio).
+            <strong>Expected:</strong> Detail page shows Creative role + the working hours you set +
+            the cap + the talent-application link + the contact info (WhatsApp, country, portfolio).
           </p>
           <div class="results">
             <label><input type="radio" name="step-4.4" value="pass" /><span>Pass</span></label>
@@ -683,18 +675,15 @@
       <section class="phase">
         <h2>Phase 5 &middot; Creative first sign-in <span class="hat candidate">Creative</span></h2>
         <p class="phase-desc">
-          Switch back to the candidate&rsquo;s inbox. The magic-link email is the entry
-          point.
+          Switch back to the candidate&rsquo;s inbox. The magic-link email is the entry point.
         </p>
 
         <div class="step">
           <h3><span class="num">5.1</span> Welcome email arrives</h3>
-          <p class="action">
-            <strong>Action:</strong> Check inbox.
-          </p>
+          <p class="action"><strong>Action:</strong> Check inbox.</p>
           <p class="expected">
-            <strong>Expected:</strong> Two emails: &ldquo;Welcome to the team&rdquo; (brand)
-            and a BetterAuth magic-link &ldquo;Sign in to Brandbite&rdquo;. Both look right.
+            <strong>Expected:</strong> Two emails: &ldquo;Welcome to the team&rdquo; (brand) and a
+            BetterAuth magic-link &ldquo;Sign in to Brandbite&rdquo;. Both look right.
           </p>
           <div class="results">
             <label><input type="radio" name="step-5.1" value="pass" /><span>Pass</span></label>
@@ -707,13 +696,12 @@
         <div class="step">
           <h3><span class="num">5.2</span> Click magic link</h3>
           <p class="action">
-            <strong>Action:</strong> Click the &ldquo;Sign in&rdquo; button in the magic-link
-            email.
+            <strong>Action:</strong> Click the &ldquo;Sign in&rdquo; button in the magic-link email.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Auto-signed-in. Lands on
-            <code>/creative/board</code>. Sidebar shows Creative-specific navigation.
-            Floating Feedback pill is visible bottom-right.
+            <strong>Expected:</strong> Auto-signed-in. Lands on <code>/creative/board</code>.
+            Sidebar shows Creative-specific navigation. Floating Feedback pill is visible
+            bottom-right.
           </p>
           <div class="results">
             <label><input type="radio" name="step-5.2" value="pass" /><span>Pass</span></label>
@@ -730,15 +718,13 @@
       <section class="phase">
         <h2>Phase 6 &middot; Profile + workload <span class="hat candidate">Creative</span></h2>
         <p class="phase-desc">
-          Sanity-check that hire-time data was migrated to the creative&rsquo;s editable
-          profile, and that creative-only sections render.
+          Sanity-check that hire-time data was migrated to the creative&rsquo;s editable profile,
+          and that creative-only sections render.
         </p>
 
         <div class="step">
           <h3><span class="num">6.1</span> Open /creative/profile</h3>
-          <p class="action">
-            <strong>Action:</strong> Sidebar &rarr; Account &rarr; Profile.
-          </p>
+          <p class="action"><strong>Action:</strong> Sidebar &rarr; Account &rarr; Profile.</p>
           <p class="expected">
             <strong>Expected:</strong> Sections: Identity, Timezone, <strong>Workload</strong>
             (creative-only), Notifications, Two-factor, Active sessions, Delete account.
@@ -753,13 +739,10 @@
 
         <div class="step">
           <h3><span class="num">6.2</span> Workload pre-fill</h3>
-          <p class="action">
-            <strong>Action:</strong> Look at the Workload section.
-          </p>
+          <p class="action"><strong>Action:</strong> Look at the Workload section.</p>
           <p class="expected">
-            <strong>Expected:</strong> Working hours field is pre-filled with what the
-            admin set in 4.2. Concurrent task cap shows the same number set during hire.
-            Both fields editable.
+            <strong>Expected:</strong> Working hours field is pre-filled with what the admin set in
+            4.2. Concurrent task cap shows the same number set during hire. Both fields editable.
           </p>
           <div class="results">
             <label><input type="radio" name="step-6.2" value="pass" /><span>Pass</span></label>
@@ -772,13 +755,11 @@
         <div class="step">
           <h3><span class="num">6.3</span> Adjust working hours</h3>
           <p class="action">
-            <strong>Action:</strong> Change the working hours text to something else,
-            click Save.
+            <strong>Action:</strong> Change the working hours text to something else, click Save.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Toast confirms. Reload the page &mdash; new value
-            persists. Verify in admin <code>/admin/users/[id]</code> that the change
-            shows up there too.
+            <strong>Expected:</strong> Toast confirms. Reload the page &mdash; new value persists.
+            Verify in admin <code>/admin/users/[id]</code> that the change shows up there too.
           </p>
           <div class="results">
             <label><input type="radio" name="step-6.3" value="pass" /><span>Pass</span></label>
@@ -791,12 +772,12 @@
         <div class="step">
           <h3><span class="num">6.4</span> Skills + categories visible</h3>
           <p class="action">
-            <strong>Action:</strong> In your admin browser, open
-            <code>/admin/users/[id]</code> for the new creative.
+            <strong>Action:</strong> In your admin browser, open <code>/admin/users/[id]</code> for
+            the new creative.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Skills card lists every JobType under the categories
-            you approved during hire. Hired-from card links back to the talent application.
+            <strong>Expected:</strong> Skills card lists every JobType under the categories you
+            approved during hire. Hired-from card links back to the talent application.
           </p>
           <div class="results">
             <label><input type="radio" name="step-6.4" value="pass" /><span>Pass</span></label>
@@ -811,7 +792,9 @@
       <!-- PHASE 7 — Auto-assign + deliverable                             -->
       <!-- ============================================================== -->
       <section class="phase">
-        <h2>Phase 7 &middot; Receive + deliver a ticket <span class="hat candidate">Creative</span></h2>
+        <h2>
+          Phase 7 &middot; Receive + deliver a ticket <span class="hat candidate">Creative</span>
+        </h2>
         <p class="phase-desc">
           Requires a customer ticket waiting in the system whose JobType matches one of the
           creative&rsquo;s approved categories. Pre-create one if needed.
@@ -820,12 +803,12 @@
         <div class="step">
           <h3><span class="num">7.1</span> Trigger auto-assign</h3>
           <p class="action">
-            <strong>Action:</strong> As a customer, create a new ticket using one of the
-            JobTypes the creative has skills for. Or grab an unassigned one and re-trigger.
+            <strong>Action:</strong> As a customer, create a new ticket using one of the JobTypes
+            the creative has skills for. Or grab an unassigned one and re-trigger.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Within seconds, the ticket is auto-assigned to your
-            new creative. Email + in-app notification fire.
+            <strong>Expected:</strong> Within seconds, the ticket is auto-assigned to your new
+            creative. Email + in-app notification fire.
           </p>
           <div class="results">
             <label><input type="radio" name="step-7.1" value="pass" /><span>Pass</span></label>
@@ -841,8 +824,8 @@
             <strong>Action:</strong> As the creative, open the ticket from the board.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Ticket detail loads. Brief, attachments, and tags
-            visible. Status TODO. Action to start work / submit revision visible.
+            <strong>Expected:</strong> Ticket detail loads. Brief, attachments, and tags visible.
+            Status TODO. Action to start work / submit revision visible.
           </p>
           <div class="results">
             <label><input type="radio" name="step-7.2" value="pass" /><span>Pass</span></label>
@@ -855,12 +838,12 @@
         <div class="step">
           <h3><span class="num">7.3</span> Submit a revision (output)</h3>
           <p class="action">
-            <strong>Action:</strong> Move ticket to IN_PROGRESS, then submit a new revision
-            with the sample image you prepared.
+            <strong>Action:</strong> Move ticket to IN_PROGRESS, then submit a new revision with the
+            sample image you prepared.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Image uploads (4&nbsp;MB cap). Revision saves.
-            Status moves to IN_REVIEW. Customer notified by email.
+            <strong>Expected:</strong> Image uploads (4&nbsp;MB cap). Revision saves. Status moves
+            to IN_REVIEW. Customer notified by email.
           </p>
           <div class="results">
             <label><input type="radio" name="step-7.3" value="pass" /><span>Pass</span></label>
@@ -877,20 +860,19 @@
       <section class="phase">
         <h2>Phase 8 &middot; Earnings + withdrawal <span class="hat candidate">Creative</span></h2>
         <p class="phase-desc">
-          Verify the ledger credits the creative for the work and the withdrawal flow
-          works end-to-end.
+          Verify the ledger credits the creative for the work and the withdrawal flow works
+          end-to-end.
         </p>
 
         <div class="step">
           <h3><span class="num">8.1</span> Customer approves the revision</h3>
           <p class="action">
-            <strong>Action:</strong> Switch to the customer browser, approve the revision
-            (move to DONE).
+            <strong>Action:</strong> Switch to the customer browser, approve the revision (move to
+            DONE).
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Ticket status DONE. Creative receives a
-            ticket-completed email. Ledger credits the creative per the payout rule for
-            the JobType.
+            <strong>Expected:</strong> Ticket status DONE. Creative receives a ticket-completed
+            email. Ledger credits the creative per the payout rule for the JobType.
           </p>
           <div class="results">
             <label><input type="radio" name="step-8.1" value="pass" /><span>Pass</span></label>
@@ -902,12 +884,10 @@
 
         <div class="step">
           <h3><span class="num">8.2</span> Check creative balance</h3>
-          <p class="action">
-            <strong>Action:</strong> As creative, sidebar &rarr; Balance.
-          </p>
+          <p class="action"><strong>Action:</strong> As creative, sidebar &rarr; Balance.</p>
           <p class="expected">
-            <strong>Expected:</strong> Balance reflects the credit. Lifetime earnings +
-            available balance both correct.
+            <strong>Expected:</strong> Balance reflects the credit. Lifetime earnings + available
+            balance both correct.
           </p>
           <div class="results">
             <label><input type="radio" name="step-8.2" value="pass" /><span>Pass</span></label>
@@ -920,14 +900,13 @@
         <div class="step">
           <h3><span class="num">8.3</span> Request a withdrawal</h3>
           <p class="action">
-            <strong>Action:</strong> Sidebar &rarr; Withdrawals. Request the available
-            balance (or test below the MIN_WITHDRAWAL_TOKENS threshold to verify the
-            block).
+            <strong>Action:</strong> Sidebar &rarr; Withdrawals. Request the available balance (or
+            test below the MIN_WITHDRAWAL_TOKENS threshold to verify the block).
           </p>
           <p class="expected">
             <strong>Expected:</strong> If above min &mdash; PENDING withdrawal lands at
-            <code>/admin/withdrawals</code>. If below min &mdash; clean error showing the
-            required threshold.
+            <code>/admin/withdrawals</code>. If below min &mdash; clean error showing the required
+            threshold.
           </p>
           <div class="results">
             <label><input type="radio" name="step-8.3" value="pass" /><span>Pass</span></label>
@@ -954,9 +933,7 @@
             <strong>Action:</strong> Click the floating Feedback pill bottom-right or hit
             <kbd>Ctrl + /</kbd> (<kbd>&#8984; + /</kbd> on Mac).
           </p>
-          <p class="expected">
-            <strong>Expected:</strong> Modal opens.
-          </p>
+          <p class="expected"><strong>Expected:</strong> Modal opens.</p>
           <div class="results">
             <label><input type="radio" name="step-9.1" value="pass" /><span>Pass</span></label>
             <label><input type="radio" name="step-9.1" value="fail" /><span>Fail</span></label>
@@ -985,13 +962,11 @@
         <div class="step">
           <h3><span class="num">9.3</span> Verify in /admin/feedback</h3>
           <p class="action">
-            <strong>Action:</strong> Switch to admin browser, open
-            <code>/admin/feedback</code>.
+            <strong>Action:</strong> Switch to admin browser, open <code>/admin/feedback</code>.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Both customer and creative entries visible. Each
-            shows the submitter&rsquo;s email + role + page URL the test was submitted
-            from. Counts add up.
+            <strong>Expected:</strong> Both customer and creative entries visible. Each shows the
+            submitter&rsquo;s email + role + page URL the test was submitted from. Counts add up.
           </p>
           <div class="results">
             <label><input type="radio" name="step-9.3" value="pass" /><span>Pass</span></label>
@@ -1009,14 +984,7 @@
         <button id="reset">Reset all checks</button>
       </div>
 
-      <p
-        style="
-          margin-top: 28px;
-          font-size: 12px;
-          color: var(--muted);
-          text-align: center;
-        "
-      >
+      <p style="margin-top: 28px; font-size: 12px; color: var(--muted); text-align: center">
         Brandbite &middot; Creative / talent smoke test &middot; v1
       </p>
     </div>

@@ -36,8 +36,7 @@
       }
       body {
         font-family:
-          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
-          sans-serif;
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         background: var(--bg);
         color: var(--ink-soft);
         line-height: 1.55;
@@ -346,10 +345,10 @@
         </svg>
         <h1>Customer smoke test</h1>
         <p>
-          Pre-launch end-to-end check. Walks through sign-up, onboarding, ticket creation,
-          profile, uploads, and feedback on the live brandbite.studio environment. Mark each
-          step Pass / Fail / Skip and add notes for anything weird. Your progress is saved
-          in this browser; you can come back later.
+          Pre-launch end-to-end check. Walks through sign-up, onboarding, ticket creation, profile,
+          uploads, and feedback on the live brandbite.studio environment. Mark each step Pass / Fail
+          / Skip and add notes for anything weird. Your progress is saved in this browser; you can
+          come back later.
         </p>
       </header>
 
@@ -357,17 +356,14 @@
         <strong>Before you start:</strong>
         <ul>
           <li>
-            Use a brand-new email you haven&rsquo;t signed up with before (Gmail + addressing
-            works: <code>you+ct1@gmail.com</code>).
+            Use a brand-new email you haven&rsquo;t signed up with before (Gmail + addressing works:
+            <code>you+ct1@gmail.com</code>).
           </li>
-          <li>
-            Have a 1&ndash;2 MB sample image (JPG or PNG) and a ~500 KB PDF ready to upload.
-          </li>
+          <li>Have a 1&ndash;2 MB sample image (JPG or PNG) and a ~500 KB PDF ready to upload.</li>
           <li>If your plan requires payment, have a test card or your real card ready.</li>
           <li>
-            Ideally also open <code>brandbite.studio/admin</code> in a different browser /
-            incognito as your existing site-owner account so you can verify the admin side
-            sees the events.
+            Ideally also open <code>brandbite.studio/admin</code> in a different browser / incognito
+            as your existing site-owner account so you can verify the admin side sees the events.
           </li>
         </ul>
       </div>
@@ -378,8 +374,7 @@
           <span class="stats">
             <span class="pass" id="pass-count">0</span> pass &middot;
             <span class="fail" id="fail-count">0</span> fail &middot;
-            <span id="skip-count">0</span> skip /
-            <span id="total-count">0</span> steps
+            <span id="skip-count">0</span> skip / <span id="total-count">0</span> steps
           </span>
         </div>
         <div class="bar"><div class="fill" id="progress-fill"></div></div>
@@ -391,20 +386,20 @@
       <section class="phase">
         <h2>Phase 1 &middot; Sign up</h2>
         <p class="phase-desc">
-          Brand-new account. We&rsquo;re testing the BetterAuth + verify-email + Turnstile
-          path that real customers will hit on launch day.
+          Brand-new account. We&rsquo;re testing the BetterAuth + verify-email + Turnstile path that
+          real customers will hit on launch day.
         </p>
 
         <div class="step">
           <h3><span class="num">1.1</span> Visit brandbite.studio</h3>
           <p class="action">
-            <strong>Action:</strong> Open <code>https://brandbite.studio</code> in a fresh
-            browser tab (or incognito).
+            <strong>Action:</strong> Open <code>https://brandbite.studio</code> in a fresh browser
+            tab (or incognito).
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Marketing landing page loads. Sign-in / Get-started
-            CTAs are visible in the header. No console errors. The page renders within
-            ~2&nbsp;seconds on a normal connection.
+            <strong>Expected:</strong> Marketing landing page loads. Sign-in / Get-started CTAs are
+            visible in the header. No console errors. The page renders within ~2&nbsp;seconds on a
+            normal connection.
           </p>
           <div class="results">
             <label><input type="radio" name="step-1.1" value="pass" /><span>Pass</span></label>
@@ -417,14 +412,13 @@
         <div class="step">
           <h3><span class="num">1.2</span> Click Get started / Sign up</h3>
           <p class="action">
-            <strong>Action:</strong> Click the primary CTA in the header or hero. Should land
-            on <code>/login</code> with the form in &ldquo;Create account&rdquo; mode.
+            <strong>Action:</strong> Click the primary CTA in the header or hero. Should land on
+            <code>/login</code> with the form in &ldquo;Create account&rdquo; mode.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Login page renders. Toggle pill shows &ldquo;Sign
-            in&rdquo; / &ldquo;Create account&rdquo; with Create-account selected (or you can
-            click it). Cloudflare Turnstile widget renders below the form (small puzzle
-            challenge).
+            <strong>Expected:</strong> Login page renders. Toggle pill shows &ldquo;Sign in&rdquo; /
+            &ldquo;Create account&rdquo; with Create-account selected (or you can click it).
+            Cloudflare Turnstile widget renders below the form (small puzzle challenge).
           </p>
           <div class="results">
             <label><input type="radio" name="step-1.2" value="pass" /><span>Pass</span></label>
@@ -442,9 +436,8 @@
             account&rdquo;.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Page redirects to
-            <code>/verify-email?email=&hellip;</code>. A &ldquo;Check your inbox&rdquo;
-            screen tells you to click the link in the email.
+            <strong>Expected:</strong> Page redirects to <code>/verify-email?email=&hellip;</code>.
+            A &ldquo;Check your inbox&rdquo; screen tells you to click the link in the email.
           </p>
           <div class="results">
             <label><input type="radio" name="step-1.3" value="pass" /><span>Pass</span></label>
@@ -457,14 +450,13 @@
         <div class="step">
           <h3><span class="num">1.4</span> Open verification email</h3>
           <p class="action">
-            <strong>Action:</strong> Check the inbox of the email you used. Open the
-            verification email from Brandbite.
+            <strong>Action:</strong> Check the inbox of the email you used. Open the verification
+            email from Brandbite.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Email arrives within ~30 seconds. Subject line is
-            sensible (&ldquo;Verify your email&rdquo; or similar). Body has a clear
-            &ldquo;Verify email&rdquo; button + a fallback URL. Brand looks right (orange,
-            wordmark).
+            <strong>Expected:</strong> Email arrives within ~30 seconds. Subject line is sensible
+            (&ldquo;Verify your email&rdquo; or similar). Body has a clear &ldquo;Verify
+            email&rdquo; button + a fallback URL. Brand looks right (orange, wordmark).
           </p>
           <div class="results">
             <label><input type="radio" name="step-1.4" value="pass" /><span>Pass</span></label>
@@ -480,9 +472,9 @@
             <strong>Action:</strong> Click the &ldquo;Verify email&rdquo; button.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Browser opens. You&rsquo;re auto-signed-in and
-            redirected to <code>/onboarding</code>. (No re-prompt for password &mdash; the
-            verification flow auto-signs-in by design.)
+            <strong>Expected:</strong> Browser opens. You&rsquo;re auto-signed-in and redirected to
+            <code>/onboarding</code>. (No re-prompt for password &mdash; the verification flow
+            auto-signs-in by design.)
           </p>
           <div class="results">
             <label><input type="radio" name="step-1.5" value="pass" /><span>Pass</span></label>
@@ -505,13 +497,12 @@
         <div class="step">
           <h3><span class="num">2.1</span> Create company</h3>
           <p class="action">
-            <strong>Action:</strong> Fill in company name (e.g. &ldquo;Acme Test Co&rdquo;).
-            Slug should auto-fill from the name and be editable. Optionally add a website.
-            Submit.
+            <strong>Action:</strong> Fill in company name (e.g. &ldquo;Acme Test Co&rdquo;). Slug
+            should auto-fill from the name and be editable. Optionally add a website. Submit.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Wizard advances to plan selection. Slug is unique
-            (no collision error).
+            <strong>Expected:</strong> Wizard advances to plan selection. Slug is unique (no
+            collision error).
           </p>
           <div class="results">
             <label><input type="radio" name="step-2.1" value="pass" /><span>Pass</span></label>
@@ -524,13 +515,13 @@
         <div class="step">
           <h3><span class="num">2.2</span> Pick a plan</h3>
           <p class="action">
-            <strong>Action:</strong> Select a plan from the list. Plans show name, monthly
-            tokens, price.
+            <strong>Action:</strong> Select a plan from the list. Plans show name, monthly tokens,
+            price.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Plan list renders with at least one option. Prices
-            match what&rsquo;s configured in Stripe (no $0.00 weirdness). Selecting one
-            advances the wizard or starts a Stripe checkout flow.
+            <strong>Expected:</strong> Plan list renders with at least one option. Prices match
+            what&rsquo;s configured in Stripe (no $0.00 weirdness). Selecting one advances the
+            wizard or starts a Stripe checkout flow.
           </p>
           <div class="results">
             <label><input type="radio" name="step-2.2" value="pass" /><span>Pass</span></label>
@@ -543,13 +534,13 @@
         <div class="step">
           <h3><span class="num">2.3</span> Complete payment (if required)</h3>
           <p class="action">
-            <strong>Action:</strong> If the plan requires payment, complete Stripe checkout
-            with a real or test card. (Use Stripe test card <code>4242 4242 4242 4242</code>
+            <strong>Action:</strong> If the plan requires payment, complete Stripe checkout with a
+            real or test card. (Use Stripe test card <code>4242 4242 4242 4242</code>
             with any future expiry and any 3-digit CVC if you&rsquo;re in Stripe test mode.)
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Stripe Checkout iframe renders cleanly. Successful
-            payment redirects back to Brandbite. Token balance reflects the plan&rsquo;s
+            <strong>Expected:</strong> Stripe Checkout iframe renders cleanly. Successful payment
+            redirects back to Brandbite. Token balance reflects the plan&rsquo;s
             <code>monthlyTokens</code> on first ticket creation.
           </p>
           <div class="results">
@@ -567,9 +558,9 @@
             <code>/customer/board</code>.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Sidebar visible with Workspace / Billing / Account
-            sections. Empty board state (TODO / IN_PROGRESS / IN_REVIEW / DONE columns all
-            empty). Floating &ldquo;Feedback&rdquo; pill bottom-right.
+            <strong>Expected:</strong> Sidebar visible with Workspace / Billing / Account sections.
+            Empty board state (TODO / IN_PROGRESS / IN_REVIEW / DONE columns all empty). Floating
+            &ldquo;Feedback&rdquo; pill bottom-right.
           </p>
           <div class="results">
             <label><input type="radio" name="step-2.4" value="pass" /><span>Pass</span></label>
@@ -586,8 +577,8 @@
       <section class="phase">
         <h2>Phase 3 &middot; Profile setup</h2>
         <p class="phase-desc">
-          The personal-account hub we built recently. Touches Identity, Timezone,
-          Notifications, and the Avatar upload path.
+          The personal-account hub we built recently. Touches Identity, Timezone, Notifications, and
+          the Avatar upload path.
         </p>
 
         <div class="step">
@@ -611,12 +602,12 @@
         <div class="step">
           <h3><span class="num">3.2</span> Update name + upload avatar</h3>
           <p class="action">
-            <strong>Action:</strong> Edit name. Click &ldquo;Upload avatar&rdquo; and pick a
-            JPG / PNG &le; 2&nbsp;MB.
+            <strong>Action:</strong> Edit name. Click &ldquo;Upload avatar&rdquo; and pick a JPG /
+            PNG &le; 2&nbsp;MB.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Name save returns success toast. Avatar uploads,
-            circle preview updates instantly with the image.
+            <strong>Expected:</strong> Name save returns success toast. Avatar uploads, circle
+            preview updates instantly with the image.
           </p>
           <div class="results">
             <label><input type="radio" name="step-3.2" value="pass" /><span>Pass</span></label>
@@ -647,8 +638,8 @@
         <div class="step">
           <h3><span class="num">3.4</span> Toggle a notification preference</h3>
           <p class="action">
-            <strong>Action:</strong> Disable the email channel for one of the events
-            (e.g. <em>Status changed</em>). Reload the page.
+            <strong>Action:</strong> Disable the email channel for one of the events (e.g.
+            <em>Status changed</em>). Reload the page.
           </p>
           <p class="expected">
             <strong>Expected:</strong> Toggle stays off after reload (preference persisted).
@@ -664,14 +655,13 @@
         <div class="step">
           <h3><span class="num">3.5</span> Enable two-factor (optional but recommended)</h3>
           <p class="action">
-            <strong>Action:</strong> Enter your password &rarr; Set up &rarr; scan the QR
-            with Google Authenticator / 1Password / Authy &rarr; type the 6-digit code.
+            <strong>Action:</strong> Enter your password &rarr; Set up &rarr; scan the QR with
+            Google Authenticator / 1Password / Authy &rarr; type the 6-digit code.
             <strong>Save the backup codes</strong> shown at the end.
           </p>
           <p class="expected">
             <strong>Expected:</strong> QR renders locally (<code>/api/profile/two-factor/qr</code>).
-            Code verifies. Backup codes display once with a Copy button. Enabled badge
-            appears.
+            Code verifies. Backup codes display once with a Copy button. Enabled badge appears.
           </p>
           <div class="results">
             <label><input type="radio" name="step-3.5" value="pass" /><span>Pass</span></label>
@@ -688,21 +678,19 @@
       <section class="phase">
         <h2>Phase 4 &middot; Create first ticket</h2>
         <p class="phase-desc">
-          The bread-and-butter customer flow. Includes the new doc-upload path
-          (PDF / DOC / TXT alongside images) at the 4&nbsp;MB cap.
+          The bread-and-butter customer flow. Includes the new doc-upload path (PDF / DOC / TXT
+          alongside images) at the 4&nbsp;MB cap.
         </p>
 
         <div class="step">
           <h3><span class="num">4.1</span> Open new ticket form</h3>
           <p class="action">
-            <strong>Action:</strong> Click &ldquo;New ticket&rdquo; or similar CTA on the
-            board.
+            <strong>Action:</strong> Click &ldquo;New ticket&rdquo; or similar CTA on the board.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Lands on <code>/customer/tickets/new</code>. Form has
-            project picker, title, brief, job type, priority, tags, and an attachments
-            section that says &ldquo;Accepts images, PDF, DOC, DOCX, TXT. Max 4&nbsp;MB per
-            file.&rdquo;
+            <strong>Expected:</strong> Lands on <code>/customer/tickets/new</code>. Form has project
+            picker, title, brief, job type, priority, tags, and an attachments section that says
+            &ldquo;Accepts images, PDF, DOC, DOCX, TXT. Max 4&nbsp;MB per file.&rdquo;
           </p>
           <div class="results">
             <label><input type="radio" name="step-4.1" value="pass" /><span>Pass</span></label>
@@ -715,12 +703,11 @@
         <div class="step">
           <h3><span class="num">4.2</span> Attach a 1&ndash;2 MB image + a PDF</h3>
           <p class="action">
-            <strong>Action:</strong> Drag (or pick) the image you prepared. Then pick the
-            PDF.
+            <strong>Action:</strong> Drag (or pick) the image you prepared. Then pick the PDF.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Both files appear in the attachment list with
-            filename + size + MIME. No upload errors.
+            <strong>Expected:</strong> Both files appear in the attachment list with filename + size
+            + MIME. No upload errors.
           </p>
           <div class="results">
             <label><input type="radio" name="step-4.2" value="pass" /><span>Pass</span></label>
@@ -732,13 +719,10 @@
 
         <div class="step">
           <h3><span class="num">4.3</span> Try a 5&nbsp;MB file (negative test)</h3>
-          <p class="action">
-            <strong>Action:</strong> Try attaching a file larger than 4&nbsp;MB.
-          </p>
+          <p class="action"><strong>Action:</strong> Try attaching a file larger than 4&nbsp;MB.</p>
           <p class="expected">
-            <strong>Expected:</strong> Inline error appears immediately
-            (&ldquo;<em>filename</em> is 5.X MB. The current upload limit is 4&nbsp;MB.&rdquo;)
-            without any network round-trip.
+            <strong>Expected:</strong> Inline error appears immediately (&ldquo;<em>filename</em> is
+            5.X MB. The current upload limit is 4&nbsp;MB.&rdquo;) without any network round-trip.
           </p>
           <div class="results">
             <label><input type="radio" name="step-4.3" value="pass" /><span>Pass</span></label>
@@ -751,13 +735,13 @@
         <div class="step">
           <h3><span class="num">4.4</span> Fill brief, pick job type, submit</h3>
           <p class="action">
-            <strong>Action:</strong> Fill title, write a short brief in the rich-text editor,
-            pick a job type that has a token cost, set priority. Submit.
+            <strong>Action:</strong> Fill title, write a short brief in the rich-text editor, pick a
+            job type that has a token cost, set priority. Submit.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Form submits, lands on the new ticket detail or board.
-            Ticket appears in TODO. Token balance has decreased by the job type&rsquo;s cost
-            &times; quantity. Attachments are visible in the ticket&rsquo;s brief section.
+            <strong>Expected:</strong> Form submits, lands on the new ticket detail or board. Ticket
+            appears in TODO. Token balance has decreased by the job type&rsquo;s cost &times;
+            quantity. Attachments are visible in the ticket&rsquo;s brief section.
           </p>
           <div class="results">
             <label><input type="radio" name="step-4.4" value="pass" /><span>Pass</span></label>
@@ -773,10 +757,10 @@
             <strong>Action:</strong> Refresh the ticket detail page after a few seconds.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> If a creative on the platform has the matching
-            CreativeSkill and is below their cap, the ticket shows an assigned creative.
-            If no qualified creative exists, the ticket stays unassigned (FALLBACK in audit
-            log) &mdash; that&rsquo;s also a pass for this smoke test.
+            <strong>Expected:</strong> If a creative on the platform has the matching CreativeSkill
+            and is below their cap, the ticket shows an assigned creative. If no qualified creative
+            exists, the ticket stays unassigned (FALLBACK in audit log) &mdash; that&rsquo;s also a
+            pass for this smoke test.
           </p>
           <div class="results">
             <label><input type="radio" name="step-4.5" value="pass" /><span>Pass</span></label>
@@ -793,9 +777,9 @@
       <section class="phase">
         <h2>Phase 5 &middot; Revision feedback</h2>
         <p class="phase-desc">
-          This phase requires a creative to actually submit work. If you&rsquo;re testing
-          solo with no creatives, ask the operator to wear that hat (or skip and come back
-          when there&rsquo;s a real revision).
+          This phase requires a creative to actually submit work. If you&rsquo;re testing solo with
+          no creatives, ask the operator to wear that hat (or skip and come back when there&rsquo;s
+          a real revision).
         </p>
 
         <div class="step">
@@ -805,8 +789,7 @@
           </p>
           <p class="expected">
             <strong>Expected:</strong> Email arrives within ~1 minute. Subject is sensible
-            (&ldquo;New revision on ticket #&hellip;&rdquo; or similar). CTA links to the
-            ticket.
+            (&ldquo;New revision on ticket #&hellip;&rdquo; or similar). CTA links to the ticket.
           </p>
           <div class="results">
             <label><input type="radio" name="step-5.1" value="pass" /><span>Pass</span></label>
@@ -819,12 +802,12 @@
         <div class="step">
           <h3><span class="num">5.2</span> View revision + leave a pin</h3>
           <p class="action">
-            <strong>Action:</strong> Open the ticket, click the latest revision&rsquo;s
-            asset. Click somewhere on the image to drop a pin. Type a comment, save.
+            <strong>Action:</strong> Open the ticket, click the latest revision&rsquo;s asset. Click
+            somewhere on the image to drop a pin. Type a comment, save.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Pin appears at the click position. Comment posts.
-            Pin count badge updates.
+            <strong>Expected:</strong> Pin appears at the click position. Comment posts. Pin count
+            badge updates.
           </p>
           <div class="results">
             <label><input type="radio" name="step-5.2" value="pass" /><span>Pass</span></label>
@@ -837,12 +820,12 @@
         <div class="step">
           <h3><span class="num">5.3</span> Approve or request revision</h3>
           <p class="action">
-            <strong>Action:</strong> Use the ticket actions to either approve (move to DONE)
-            or request a revision.
+            <strong>Action:</strong> Use the ticket actions to either approve (move to DONE) or
+            request a revision.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Status updates correctly on the board. Creative
-            receives an email about the decision.
+            <strong>Expected:</strong> Status updates correctly on the board. Creative receives an
+            email about the decision.
           </p>
           <div class="results">
             <label><input type="radio" name="step-5.3" value="pass" /><span>Pass</span></label>
@@ -884,12 +867,11 @@
         <div class="step">
           <h3><span class="num">6.2</span> Submit a praise entry</h3>
           <p class="action">
-            <strong>Action:</strong> Type: &ldquo;Smoke test &mdash; checking the widget
-            works end to end&rdquo;. Pick &ldquo;This is great&rdquo; type. Submit.
+            <strong>Action:</strong> Type: &ldquo;Smoke test &mdash; checking the widget works end
+            to end&rdquo;. Pick &ldquo;This is great&rdquo; type. Submit.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Toast: &ldquo;Thanks &mdash; we got it.&rdquo;.
-            Modal closes.
+            <strong>Expected:</strong> Toast: &ldquo;Thanks &mdash; we got it.&rdquo;. Modal closes.
           </p>
           <div class="results">
             <label><input type="radio" name="step-6.2" value="pass" /><span>Pass</span></label>
@@ -906,9 +888,9 @@
             <code>/admin/feedback</code>.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> The praise entry appears under &ldquo;New&rdquo; with
-            your customer email + role + page URL the test was submitted from. Status
-            chips count updates.
+            <strong>Expected:</strong> The praise entry appears under &ldquo;New&rdquo; with your
+            customer email + role + page URL the test was submitted from. Status chips count
+            updates.
           </p>
           <div class="results">
             <label><input type="radio" name="step-6.3" value="pass" /><span>Pass</span></label>
@@ -925,8 +907,8 @@
       <section class="phase">
         <h2>Phase 7 &middot; Sign-in &amp; sessions</h2>
         <p class="phase-desc">
-          Verify the 2FA challenge fires for the password sign-in path and that active
-          sessions appear correctly.
+          Verify the 2FA challenge fires for the password sign-in path and that active sessions
+          appear correctly.
         </p>
 
         <div class="step">
@@ -948,13 +930,10 @@
 
         <div class="step">
           <h3><span class="num">7.2</span> Sign in with email + password</h3>
-          <p class="action">
-            <strong>Action:</strong> Enter your password. Submit.
-          </p>
+          <p class="action"><strong>Action:</strong> Enter your password. Submit.</p>
           <p class="expected">
-            <strong>Expected:</strong> If you enabled 2FA in 3.5, the page swaps to a TOTP
-            input (&ldquo;Two-factor authentication&rdquo;). If not, you land on the
-            board directly.
+            <strong>Expected:</strong> If you enabled 2FA in 3.5, the page swaps to a TOTP input
+            (&ldquo;Two-factor authentication&rdquo;). If not, you land on the board directly.
           </p>
           <div class="results">
             <label><input type="radio" name="step-7.2" value="pass" /><span>Pass</span></label>
@@ -967,13 +946,12 @@
         <div class="step">
           <h3><span class="num">7.3</span> Verify TOTP / backup code</h3>
           <p class="action">
-            <strong>Action:</strong> Enter the 6-digit TOTP from your authenticator. Or
-            click &ldquo;Use a backup code instead&rdquo; and try one of the codes you
-            saved in 3.5.
+            <strong>Action:</strong> Enter the 6-digit TOTP from your authenticator. Or click
+            &ldquo;Use a backup code instead&rdquo; and try one of the codes you saved in 3.5.
           </p>
           <p class="expected">
-            <strong>Expected:</strong> Code verifies, real session issues, you land on the
-            board. (Skip if you didn&rsquo;t enable 2FA.)
+            <strong>Expected:</strong> Code verifies, real session issues, you land on the board.
+            (Skip if you didn&rsquo;t enable 2FA.)
           </p>
           <div class="results">
             <label><input type="radio" name="step-7.3" value="pass" /><span>Pass</span></label>
@@ -985,13 +963,10 @@
 
         <div class="step">
           <h3><span class="num">7.4</span> Active sessions list</h3>
-          <p class="action">
-            <strong>Action:</strong> Profile &rarr; Active sessions.
-          </p>
+          <p class="action"><strong>Action:</strong> Profile &rarr; Active sessions.</p>
           <p class="expected">
-            <strong>Expected:</strong> At least one session listed, badged
-            &ldquo;This device&rdquo;. Browser + OS parsed from User-Agent. IP shown
-            masked (1.2.x.x).
+            <strong>Expected:</strong> At least one session listed, badged &ldquo;This
+            device&rdquo;. Browser + OS parsed from User-Agent. IP shown masked (1.2.x.x).
           </p>
           <div class="results">
             <label><input type="radio" name="step-7.4" value="pass" /><span>Pass</span></label>
@@ -1009,14 +984,7 @@
         <button id="reset">Reset all checks</button>
       </div>
 
-      <p
-        style="
-          margin-top: 28px;
-          font-size: 12px;
-          color: var(--muted);
-          text-align: center;
-        "
-      >
+      <p style="margin-top: 28px; font-size: 12px; color: var(--muted); text-align: center">
         Brandbite &middot; Customer smoke test &middot; v1
       </p>
     </div>
