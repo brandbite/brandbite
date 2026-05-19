@@ -52,7 +52,7 @@ export async function GET(
         creative: { select: { id: true, email: true, name: true, role: true } },
         completedBy: { select: { id: true, email: true, name: true } },
         jobType: { select: { id: true, name: true, tokenCost: true } },
-        tags: {
+        tagAssignments: {
           select: { tag: { select: { id: true, name: true, color: true } } },
         },
       },
@@ -215,7 +215,7 @@ export async function GET(
         completedBy: ticket.completedBy,
         completedAt: ticket.completedAt?.toISOString() ?? null,
         jobType: ticket.jobType,
-        tags: ticket.tags.map((t) => t.tag),
+        tags: ticket.tagAssignments.map((ta) => ta.tag),
         tokenCostBase: baseCost,
         tokenCostOverride: ticket.tokenCostOverride,
         tokenCostEffective: effectiveCost,
