@@ -34,7 +34,7 @@ import { LoadingState } from "@/components/ui/loading-state";
 // compiles without leaking server-only Prisma imports.
 // ---------------------------------------------------------------------------
 
-type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
+type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE" | "CANCELED";
 type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 type Role = "SITE_OWNER" | "SITE_ADMIN" | "DESIGNER" | "CUSTOMER";
 
