@@ -9,6 +9,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { BoardViewToggle } from "@/components/board/board-view-toggle";
 import { useToast } from "@/components/ui/toast-provider";
 import { InlineAlert } from "@/components/ui/inline-alert";
@@ -417,9 +418,11 @@ export default function AdminBoardPage() {
                             t.creative?.name || t.creative?.email || "Unassigned";
 
                           return (
-                            <div
+                            <Link
                               key={t.id}
-                              className="rounded-xl bg-[var(--bb-bg-page)] p-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                              href={`/admin/tickets/${t.id}`}
+                              className="block rounded-xl bg-[var(--bb-bg-page)] p-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                              title="Open ticket detail"
                             >
                               {/* Company name */}
                               <p className="text-[10px] font-semibold tracking-[0.16em] text-[var(--bb-text-tertiary)] uppercase">
@@ -453,7 +456,7 @@ export default function AdminBoardPage() {
                                   </div>
                                 </div>
                               </div>
-                            </div>
+                            </Link>
                           );
                         })
                       )}

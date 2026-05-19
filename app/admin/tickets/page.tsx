@@ -10,6 +10,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import { BoardViewToggle } from "@/components/board/board-view-toggle";
 import { DataTable, THead, TH, TD } from "@/components/ui/data-table";
 import { InlineAlert } from "@/components/ui/inline-alert";
@@ -587,7 +588,13 @@ export default function AdminTicketsPage() {
                   <TD className="hidden md:table-cell">{formatDateTime(t.createdAt)}</TD>
                   <TD>{t.company?.name ?? "—"}</TD>
                   <TD>
-                    <div className="max-w-xs truncate">{t.title}</div>
+                    <Link
+                      href={`/admin/tickets/${t.id}`}
+                      className="block max-w-xs truncate text-[var(--bb-secondary)] hover:text-[var(--bb-primary)] hover:underline"
+                      title="Open ticket detail"
+                    >
+                      {t.title}
+                    </Link>
                   </TD>
                   <TD>{t.status}</TD>
                   <TD className="hidden md:table-cell">
