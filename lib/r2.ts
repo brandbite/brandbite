@@ -23,8 +23,22 @@ export function getR2BucketName(): string {
   return requireEnv("R2_BUCKET");
 }
 
+/**
+ * Returns the configured public base URL, but ONLY when it looks like
+ * an absolute http(s) URL. A misconfigured env (empty string, literal
+ * "undefined", ".", "/", a hostname without scheme, etc.) is treated
+ * as unset — otherwise we'd happily concatenate `${"."} + "/" + storageKey`
+ * and ship `./tickets/<id>/brief/foo.png` to the browser, which then
+ * resolves it relative to the current page URL and produces the broken
+ * `/admin/tickets/<id>/tickets/<id>/brief/foo.png` request we keep
+ * debugging.
+ */
 export function getR2PublicBaseUrl(): string | null {
-  return process.env.R2_PUBLIC_BASE_URL ?? null;
+  const raw = process.env.R2_PUBLIC_BASE_URL;
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!/^https?:\/\//i.test(trimmed)) return null;
+  return trimmed;
 }
 
 export function createR2Client(): S3Client {
@@ -136,6 +150,11 @@ export async function resolveAssetUrl(
     const bucket = getR2BucketName();
     const cmd = new GetObjectCommand({ Bucket: bucket, Key: storageKey });
     const url = await getSignedUrl(r2, cmd, { expiresIn: PRESIGNED_URL_VALIDITY_SECONDS });
+    // Defensive: only cache + return if the SDK actually produced an
+    // absolute URL. If R2_ENDPOINT is misconfigured the SDK can return
+    // something the browser would treat as relative — better to render
+    // a placeholder than a broken `<img>`.
+    if (!isAbsoluteHttpUrl(url)) return null;
     presignedUrlCache.set(storageKey, { url, cachedUntil: now + PRESIGNED_CACHE_TTL_MS });
     return url;
   } catch {
