@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { isTagsEnabled } from "@/lib/feature-flags";
 
 export async function GET(_req: NextRequest) {
   try {
@@ -34,6 +35,8 @@ export async function GET(_req: NextRequest) {
     if (!company) {
       return NextResponse.json({ error: "Company not found for current user" }, { status: 404 });
     }
+
+    const tagsEnabled = await isTagsEnabled();
 
     const [projects, jobTypes, tags] = await Promise.all([
       prisma.project.findMany({
@@ -62,17 +65,21 @@ export async function GET(_req: NextRequest) {
           name: "asc",
         },
       }),
-      prisma.ticketTag.findMany({
-        where: { companyId: company.id },
-        select: {
-          id: true,
-          name: true,
-          color: true,
-        },
-        orderBy: {
-          name: "asc",
-        },
-      }),
+      // Skip the tag query entirely when the flag is off — saves a roundtrip
+      // and the client treats `[]` + `tagsEnabled: false` as "hide tag UI".
+      tagsEnabled
+        ? prisma.ticketTag.findMany({
+            where: { companyId: company.id },
+            select: {
+              id: true,
+              name: true,
+              color: true,
+            },
+            orderBy: {
+              name: "asc",
+            },
+          })
+        : Promise.resolve([]),
     ]);
 
     return NextResponse.json(
@@ -82,6 +89,7 @@ export async function GET(_req: NextRequest) {
         projects,
         jobTypes,
         tags,
+        tagsEnabled,
       },
       { status: 200 },
     );

@@ -12,6 +12,7 @@ import { getCurrentUserOrThrow } from "@/lib/auth";
 import { normalizeCompanyRole, canManageTags } from "@/lib/permissions/companyRoles";
 import { parseBody } from "@/lib/schemas/helpers";
 import { updateTagSchema } from "@/lib/schemas/tag.schemas";
+import { isTagsEnabled } from "@/lib/feature-flags";
 
 type RouteContext = { params: Promise<{ tagId: string }> };
 
@@ -29,6 +30,12 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
 
     if (!user.activeCompanyId) {
       return NextResponse.json({ error: "No active company selected." }, { status: 400 });
+    }
+
+    // Feature flag gate — block all writes when tags are globally off.
+    const tagsEnabled = await isTagsEnabled();
+    if (!tagsEnabled) {
+      return NextResponse.json({ error: "Tag system is currently disabled." }, { status: 403 });
     }
 
     const companyRole = normalizeCompanyRole(user.companyRole);
@@ -99,6 +106,12 @@ export async function DELETE(_req: NextRequest, ctx: RouteContext) {
 
     if (!user.activeCompanyId) {
       return NextResponse.json({ error: "No active company selected." }, { status: 400 });
+    }
+
+    // Feature flag gate — block all writes when tags are globally off.
+    const tagsEnabled = await isTagsEnabled();
+    if (!tagsEnabled) {
+      return NextResponse.json({ error: "Tag system is currently disabled." }, { status: 403 });
     }
 
     const companyRole = normalizeCompanyRole(user.companyRole);

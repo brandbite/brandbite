@@ -12,6 +12,7 @@ import { getCurrentUserOrThrow } from "@/lib/auth";
 import { normalizeCompanyRole, canManageTags } from "@/lib/permissions/companyRoles";
 import { parseBody } from "@/lib/schemas/helpers";
 import { createTagSchema } from "@/lib/schemas/tag.schemas";
+import { isTagsEnabled } from "@/lib/feature-flags";
 
 // ---------------------------------------------------------------------------
 // GET — List all tags for the current user's company
@@ -29,13 +30,22 @@ export async function GET(_req: NextRequest) {
       return NextResponse.json({ error: "No active company selected." }, { status: 400 });
     }
 
+    // Feature flag: when TAGS_ENABLED is off, return an empty list +
+    // tagsEnabled=false so the client can hide its tag UI entirely.
+    // We deliberately don't 403 here — a GET returning [] is the least
+    // disruptive behaviour for any page that fetches tags on mount.
+    const tagsEnabled = await isTagsEnabled();
+    if (!tagsEnabled) {
+      return NextResponse.json({ tags: [], tagsEnabled: false }, { status: 200 });
+    }
+
     const tags = await prisma.ticketTag.findMany({
       where: { companyId: user.activeCompanyId },
       select: { id: true, name: true, color: true },
       orderBy: { name: "asc" },
     });
 
-    return NextResponse.json({ tags }, { status: 200 });
+    return NextResponse.json({ tags, tagsEnabled: true }, { status: 200 });
   } catch (error: any) {
     if (error?.code === "UNAUTHENTICATED") {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
@@ -60,6 +70,15 @@ export async function POST(req: NextRequest) {
 
     if (!user.activeCompanyId) {
       return NextResponse.json({ error: "No active company selected." }, { status: 400 });
+    }
+
+    // Feature-flag gate before the permission check — when tags are
+    // globally disabled, no one (even an OWNER) should be able to mint
+    // new rows. The UI hides the entry point already, so this is just
+    // defence in depth against a direct API call.
+    const tagsEnabled = await isTagsEnabled();
+    if (!tagsEnabled) {
+      return NextResponse.json({ error: "Tag system is currently disabled." }, { status: 403 });
     }
 
     const companyRole = normalizeCompanyRole(user.companyRole);

@@ -126,6 +126,10 @@ type NewTicketMetadata = {
   projects: { id: string; name: string; code: string | null }[];
   jobTypes: { id: string; name: string; description: string | null }[];
   tags: { id: string; name: string; color: string }[];
+  // Mirrors the global TAGS_ENABLED AppSetting. When false, the Tags
+  // row in the edit panel is hidden. Treated as `true` when undefined
+  // so older deploys keep working.
+  tagsEnabled?: boolean;
 };
 
 type TicketComment = {
@@ -1215,8 +1219,12 @@ export default function CustomerTicketDetailPage() {
                   )}
                 </div>
 
-                {/* Tags */}
-                <div>
+                {/* Tags — entire row hidden when the global TAGS_ENABLED
+                    feature flag is off. editMeta is fetched lazily on
+                    enter-edit, so before that we show the row optimistically
+                    (the read-only chip area below stays empty when the API
+                    has stripped tags). */}
+                <div hidden={editMeta?.tagsEnabled === false}>
                   <p className="text-[var(--bb-text-tertiary)]">Tags</p>
                   {editing ? (
                     <div className="mt-1">

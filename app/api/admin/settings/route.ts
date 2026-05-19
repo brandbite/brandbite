@@ -39,6 +39,14 @@ const ALLOWED_KEYS = [
   // enabled. Set "false" to mute everything globally — useful during
   // demos, data imports, or when the inbox simply gets too loud.
   "ADMIN_EVENT_EMAILS_ENABLED",
+  // Feature flag for the per-company ticket tagging system. Default
+  // unset = "false" = OFF. Flipping to "true" re-enables the
+  // TagMultiSelect on the ticket form, the tag management section
+  // in /customer/settings, and the chip rendering across every
+  // board / detail page. Existing TicketTag + TicketTagAssignment
+  // rows are preserved while the flag is off — toggle is reversible
+  // without data loss.
+  "TAGS_ENABLED",
 ] as const;
 
 function isAllowedKey(key: string): key is (typeof ALLOWED_KEYS)[number] {

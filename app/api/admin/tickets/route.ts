@@ -13,6 +13,7 @@ import { getCurrentUserOrThrow } from "@/lib/auth";
 import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 import { canOverrideTicketFinancials } from "@/lib/roles";
 import { applyCompanyLedgerEntry, getEffectiveTokenValues } from "@/lib/token-engine";
+import { isTagsEnabled } from "@/lib/feature-flags";
 
 type PatchPayload = {
   ticketId?: string;
@@ -155,13 +156,16 @@ export async function GET(req: NextRequest) {
 
     // Flatten tagAssignments → tags so the admin board card can render
     // the same shape /customer/board + /creative/board cards expect.
+    // When the global TAGS_ENABLED flag is off, return `tags: []` for
+    // every row — DB rows are preserved, just stripped from the response.
+    const tagsEnabled = await isTagsEnabled();
     const ticketsPayload = tickets.map((t) => {
       const { tagAssignments, ...rest } = t as typeof t & {
         tagAssignments: { tag: { id: string; name: string; color: string } }[];
       };
       return {
         ...rest,
-        tags: tagAssignments.map((ta) => ta.tag),
+        tags: tagsEnabled ? tagAssignments.map((ta) => ta.tag) : [],
       };
     });
 

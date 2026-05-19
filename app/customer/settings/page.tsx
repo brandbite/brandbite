@@ -169,6 +169,11 @@ export default function CustomerSettingsPage() {
   type SettingsTag = { id: string; name: string; color: TagColorKey };
   const [tags, setTags] = useState<SettingsTag[]>([]);
   const [tagsLoading, setTagsLoading] = useState(true);
+  // Mirrors the global TAGS_ENABLED AppSetting via the GET response.
+  // Starts true (optimistic) — the section is also gated by `canEditCompany`
+  // anyway, so a brief flash before fetch can't leak the UI to ineligible
+  // users. Flipped to false hides the entire tag management card.
+  const [tagsEnabled, setTagsEnabled] = useState(true);
   const [newTagName, setNewTagName] = useState("");
   const [newTagColor, setNewTagColor] = useState<TagColorKey>("BLUE");
   const [addingTag, setAddingTag] = useState(false);
@@ -651,6 +656,11 @@ export default function CustomerSettingsPage() {
         const json = await res.json().catch(() => null);
         if (!cancelled && json?.tags) {
           setTags(json.tags as SettingsTag[]);
+        }
+        // API returns `tagsEnabled: false` when the global flag is off.
+        // Treat missing as `true` so older deploys keep working.
+        if (!cancelled && typeof json?.tagsEnabled === "boolean") {
+          setTagsEnabled(json.tagsEnabled);
         }
       } catch {
         // silent
@@ -1337,8 +1347,11 @@ export default function CustomerSettingsPage() {
         </div>
       )}
 
-      {/* Tag management — OWNER + PM only */}
-      {!loading && data && canEditCompany && (
+      {/* Tag management — OWNER + PM only, and only when the global
+          TAGS_ENABLED feature flag is on. When off, the whole card is
+          hidden so the company doesn't see a manage-UI for a feature
+          that's globally disabled. Existing rows are preserved. */}
+      {!loading && data && canEditCompany && tagsEnabled && (
         <div className="mt-6 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
           <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">Tags</h2>
           <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
