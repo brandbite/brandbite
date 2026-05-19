@@ -25,7 +25,7 @@ import { useToast } from "@/components/ui/toast-provider";
 
 type SettingsMap = Record<string, string | null>;
 
-type SectionKey = "finance" | "talent" | "notifications";
+type SectionKey = "finance" | "talent" | "notifications" | "features";
 
 type SettingMeta = {
   label: string;
@@ -73,6 +73,13 @@ const SETTING_META: Record<string, SettingMeta> = {
     type: "boolean",
     section: "notifications",
   },
+  TAGS_ENABLED: {
+    label: "Ticket tags",
+    description:
+      "Per-company tagging system on tickets. When off, the TagMultiSelect is hidden on the new-ticket form, the tag-management section is hidden in /customer/settings, and tag chips don't render on any board card or detail page. Existing tag data is preserved — flipping back on restores everything instantly. Currently shipped off until the board filter UI lands.",
+    type: "boolean",
+    section: "features",
+  },
 };
 
 const SECTION_TITLES: Record<SectionKey, { title: string; description: string }> = {
@@ -89,6 +96,11 @@ const SECTION_TITLES: Record<SectionKey, { title: string; description: string }>
     title: "Notifications",
     description:
       "What we email site owners about. Per-event opt-outs aren't here yet — flip the master switch off if it gets too noisy and we'll add granular toggles when you tell us which events matter.",
+  },
+  features: {
+    title: "Features",
+    description:
+      "Product capabilities that can be toggled on/off without a code change. Existing data is preserved when a feature is disabled — flipping back on restores the surface instantly.",
   },
 };
 

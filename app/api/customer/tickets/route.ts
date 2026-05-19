@@ -20,6 +20,7 @@ import { parseBody } from "@/lib/schemas/helpers";
 import { createTicketSchema } from "@/lib/schemas/ticket.schemas";
 import { buildTicketCode } from "@/lib/ticket-code";
 import { createCustomerTicket } from "@/lib/tickets/create-ticket";
+import { isTagsEnabled } from "@/lib/feature-flags";
 
 // -----------------------------------------------------------------------------
 // GET: list tickets for the current customer's active company
@@ -60,6 +61,12 @@ export async function GET(req: NextRequest) {
     const limit = Math.min(Math.max(parseInt(url.searchParams.get("limit") || "50", 10), 1), 200);
     const offset = Math.max(parseInt(url.searchParams.get("offset") || "0", 10), 0);
 
+    // Read the global tags feature flag once per request. When off, we
+    // both ignore the ?tag= filter and strip tag arrays from the response
+    // — existing TicketTagAssignment rows stay untouched in the DB so the
+    // toggle is fully reversible.
+    const tagsEnabled = await isTagsEnabled();
+
     // ── Build where clause ──────────────────────────────────────────────
     const where: any = { companyId: company.id };
 
@@ -75,7 +82,7 @@ export async function GET(req: NextRequest) {
       where.projectId = projectId;
     }
 
-    if (tagId) {
+    if (tagId && tagsEnabled) {
       where.tagAssignments = { some: { tagId } };
     }
 
@@ -170,11 +177,13 @@ export async function GET(req: NextRequest) {
           dueDate: t.dueDate ? t.dueDate.toISOString() : null,
           thumbnailUrl,
           thumbnailAssetId: asset?.id ?? null,
-          tags: t.tagAssignments.map((ta: any) => ({
-            id: ta.tag.id,
-            name: ta.tag.name,
-            color: ta.tag.color,
-          })),
+          tags: tagsEnabled
+            ? t.tagAssignments.map((ta: any) => ({
+                id: ta.tag.id,
+                name: ta.tag.name,
+                color: ta.tag.color,
+              }))
+            : [],
         };
       }),
     );
@@ -230,6 +239,12 @@ export async function POST(req: NextRequest) {
     const parsed = await parseBody(req, createTicketSchema);
     if (!parsed.success) return parsed.response;
 
+    // When the tag system is globally disabled, drop any tagIds the client
+    // sent — even a stale form shouldn't be able to attach tags while the
+    // feature is off. The form already hides the picker, so this is just
+    // belt-and-braces against tampered requests.
+    const tagsEnabledForCreate = await isTagsEnabled();
+
     const outcome = await createCustomerTicket({
       actorUserId: user.id,
       companyId: user.activeCompanyId,
@@ -241,7 +256,7 @@ export async function POST(req: NextRequest) {
         quantity: parsed.data.quantity,
         priority: parsed.data.priority,
         dueDate: parsed.data.dueDate,
-        tagIds: parsed.data.tagIds,
+        tagIds: tagsEnabledForCreate ? parsed.data.tagIds : [],
         creativeMode: parsed.data.creativeMode,
         moodboardId: parsed.data.moodboardId,
       },

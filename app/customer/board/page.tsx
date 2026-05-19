@@ -157,6 +157,11 @@ type NewTicketMetadataResponse = {
     name: string;
     color: string;
   }[];
+  // Mirrors the global TAGS_ENABLED AppSetting. Falsy → hide the
+  // entire tag row in the edit panel and the new-ticket form's tag
+  // picker. Treated as `true` when missing so older deploys keep
+  // working.
+  tagsEnabled?: boolean;
 };
 
 // priorityIconMap, priorityColorClass, columnAccentColor, PROJECT_COLORS,
@@ -2180,7 +2185,11 @@ export default function CustomerBoardPage() {
             jobTypes={newTicketMeta.jobTypes}
             tokenBalance={newTicketMeta.tokenBalance}
             tags={(newTicketMeta.tags ?? []) as TagOption[]}
-            canCreateTags={canManageTags(companyRole)}
+            // Force-hide tag picker when the global flag is off — passing
+            // `false` overrides the form's internal canManageTags fallback
+            // (the form uses ?? on this prop). Treated as enabled when
+            // undefined on the response (older deploys).
+            canCreateTags={newTicketMeta.tagsEnabled === false ? false : canManageTags(companyRole)}
             onTagCreated={(tag) => {
               setNewTicketMeta((prev) =>
                 prev
@@ -2985,7 +2994,12 @@ export default function CustomerBoardPage() {
                         </p>
                       )}
                     </div>
-                    <div>
+                    {/* Tag row hidden when the TAGS_ENABLED feature
+                        flag is off. The /api/customer/tickets/new-metadata
+                        response carries tagsEnabled; treated as `true`
+                        when undefined so older clients/deploys keep
+                        rendering. */}
+                    <div hidden={newTicketMeta?.tagsEnabled === false}>
                       <p className="text-[var(--bb-text-tertiary)]">Tags</p>
                       {isEditingDetail ? (
                         <div className="mt-1">

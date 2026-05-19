@@ -23,6 +23,7 @@ import { prisma } from "@/lib/prisma";
 import { resolveAssetUrl } from "@/lib/r2";
 import { isSiteAdminRole } from "@/lib/roles";
 import { buildTicketCode } from "@/lib/ticket-code";
+import { isTagsEnabled } from "@/lib/feature-flags";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -215,7 +216,9 @@ export async function GET(
         completedBy: ticket.completedBy,
         completedAt: ticket.completedAt?.toISOString() ?? null,
         jobType: ticket.jobType,
-        tags: ticket.tagAssignments.map((ta) => ta.tag),
+        // Tag chips hidden when the global TAGS_ENABLED flag is off.
+        // Existing assignments stay in the DB; just stripped from response.
+        tags: (await isTagsEnabled()) ? ticket.tagAssignments.map((ta) => ta.tag) : [],
         tokenCostBase: baseCost,
         tokenCostOverride: ticket.tokenCostOverride,
         tokenCostEffective: effectiveCost,

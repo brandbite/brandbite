@@ -15,6 +15,7 @@ import {
   updateTicketStatusSchema,
   updateTicketFieldsSchema,
 } from "@/lib/schemas/ticket-update.schemas";
+import { isTagsEnabled } from "@/lib/feature-flags";
 
 type RouteContext = {
   params: Promise<{
@@ -162,11 +163,16 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
                 creativePayoutTokens: ticket.jobType.creativePayoutTokens,
               }
             : null,
-          tags: ticket.tagAssignments.map((ta) => ({
-            id: ta.tag.id,
-            name: ta.tag.name,
-            color: ta.tag.color,
-          })),
+          // Tags hidden when the global TAGS_ENABLED flag is off — DB
+          // rows are preserved, just stripped from the response so chips
+          // don't render anywhere.
+          tags: (await isTagsEnabled())
+            ? ticket.tagAssignments.map((ta) => ({
+                id: ta.tag.id,
+                name: ta.tag.name,
+                color: ta.tag.color,
+              }))
+            : [],
           createdBy: ticket.createdBy
             ? {
                 id: ticket.createdBy.id,
@@ -379,9 +385,13 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
         }
       }
 
-      // tagIds — replace all tag assignments
+      // tagIds — replace all tag assignments. When the global flag is
+      // off, silently ignore any tagIds the client sent. Existing
+      // assignments stay untouched (no destructive write) so the toggle
+      // is fully reversible.
+      const tagsEnabledForUpdate = await isTagsEnabled();
       let newTagIds: string[] | null = null;
-      if (fields.tagIds !== undefined) {
+      if (fields.tagIds !== undefined && tagsEnabledForUpdate) {
         newTagIds = fields.tagIds;
 
         // Validate all tags belong to user's company
@@ -479,11 +489,13 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
             jobTypeName: updated.jobType?.name ?? null,
             isAssigned: updated.creativeId != null,
             creativeMode: updated.creativeMode,
-            tags: updated.tagAssignments.map((ta) => ({
-              id: ta.tag.id,
-              name: ta.tag.name,
-              color: ta.tag.color,
-            })),
+            tags: tagsEnabledForUpdate
+              ? updated.tagAssignments.map((ta) => ({
+                  id: ta.tag.id,
+                  name: ta.tag.name,
+                  color: ta.tag.color,
+                }))
+              : [],
           },
         },
         { status: 200 },
