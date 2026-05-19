@@ -264,6 +264,10 @@ export default function NewTicketForm({
   const [briefText, setBriefText] = useState("");
   const [briefParsing, setBriefParsing] = useState(false);
   const [briefHint, setBriefHint] = useState<string | null>(null);
+  // AI assist drawer state — the AI brief textarea used to be its own
+  // banner block above the form. It's now an opt-in drawer inside the
+  // Brief section so the customer reads "Brief" as a single concept.
+  const [briefAiOpen, setBriefAiOpen] = useState(false);
 
   // ---------------------------------------------------------------------------
   // Company role (for limited access / billing-only users)
@@ -481,6 +485,12 @@ export default function NewTicketForm({
       setBriefHint(
         "Fields pre-filled from your brief. Tweak anything before submitting — you're the author.",
       );
+      // Collapse the AI drawer on success — the parsed content is now
+      // visible in the rich-text editor below, no need to keep the
+      // paste textarea open. Keeps it open on error so the user can
+      // retry without retyping.
+      setBriefAiOpen(false);
+      setBriefText("");
     } catch (err) {
       console.error("[NewTicketForm] handleParseBrief error", err);
       setBriefHint(err instanceof Error ? err.message : "Something went wrong parsing the brief.");
@@ -711,58 +721,6 @@ export default function NewTicketForm({
         </div>
       </div>
 
-      {/* AI brief parsing — pre-fills title / description / jobType / quantity
-          / priority from a free-text brief. Skip if you already know the
-          fields you want. */}
-      {!isLimitedAccess && (
-        <div className="rounded-lg border border-[var(--bb-primary)] bg-[var(--bb-primary-light)] px-3 py-3">
-          <p className="text-[11px] font-semibold tracking-[0.14em] text-[var(--bb-primary)] uppercase">
-            Start with a brief (optional)
-          </p>
-          <p className="mt-0.5 text-[11px] text-[var(--bb-text-muted)]">
-            Paste or type what you need. AI pre-fills the fields below — you can edit anything
-            before submitting.
-          </p>
-          <textarea
-            value={briefText}
-            onChange={(e) => setBriefText(e.target.value)}
-            disabled={briefParsing}
-            rows={3}
-            placeholder="e.g. We need a square social post for our new espresso blend launching next Tuesday. Moody, warm tones, inspired by old Italian cafes. Needs to be ready by Monday."
-            className="mt-2 w-full rounded-md border border-[var(--bb-border-input)] bg-white px-2 py-1.5 text-xs text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
-            maxLength={4000}
-          />
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              onClick={handleParseBrief}
-              loading={briefParsing}
-              loadingText="Parsing…"
-              disabled={briefParsing || briefText.trim().length < 10}
-            >
-              ✨ Fill with AI
-            </Button>
-            {briefText && !briefParsing && (
-              <button
-                type="button"
-                onClick={() => {
-                  setBriefText("");
-                  setBriefHint(null);
-                }}
-                className="text-[11px] font-medium text-[var(--bb-text-muted)] hover:text-[var(--bb-secondary)] hover:underline"
-              >
-                Clear brief
-              </button>
-            )}
-            {briefHint && (
-              <span className="text-[11px] text-[var(--bb-text-secondary)]">{briefHint}</span>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Title */}
       <div className="space-y-1">
         <label className="text-xs font-medium text-[var(--bb-secondary)]">Title</label>
@@ -784,9 +742,80 @@ export default function NewTicketForm({
         </p>
       </div>
 
-      {/* Description */}
+      {/* Brief — merged "Details" + "AI brief assist" into a single
+          section so customers read it as one concept. The AI textarea
+          is an opt-in drawer inside this block; the rich-text editor
+          is always the source of truth for what gets persisted as
+          Ticket.description. */}
       <div className="space-y-1">
-        <label className="text-xs font-medium text-[var(--bb-secondary)]">Details</label>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <label className="text-xs font-medium text-[var(--bb-secondary)]">Brief</label>
+          {!isLimitedAccess && !briefAiOpen && (
+            <button
+              type="button"
+              onClick={() => {
+                setBriefAiOpen(true);
+                setBriefHint(null);
+              }}
+              disabled={isBusy}
+              className="inline-flex items-center gap-1 rounded-full border border-[var(--bb-primary)] bg-[var(--bb-primary-light)] px-2.5 py-1 text-[11px] font-semibold text-[var(--bb-primary)] transition-colors hover:bg-[var(--bb-primary)] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+              title="Paste plain text — AI structures it into Title + Brief + Job type + Priority"
+            >
+              ✨ Fill with AI
+            </button>
+          )}
+        </div>
+
+        {/* AI assist drawer — collapsed by default. When open, the
+            customer pastes plain text and clicks Fill; on success the
+            drawer auto-closes and the rich editor + Title + JobType +
+            Priority are populated from the parsed result. */}
+        {!isLimitedAccess && briefAiOpen && (
+          <div className="rounded-lg border border-[var(--bb-primary)] bg-[var(--bb-primary-light)] px-3 py-3">
+            <p className="text-[11px] text-[var(--bb-text-secondary)]">
+              Paste your request as plain text. AI fills Title, Brief, Job type, and Priority below
+              — you can edit anything before submitting.
+            </p>
+            <textarea
+              value={briefText}
+              onChange={(e) => setBriefText(e.target.value)}
+              disabled={briefParsing}
+              rows={3}
+              placeholder="e.g. We need a square social post for our new espresso blend launching next Tuesday. Moody, warm tones, inspired by old Italian cafes. Needs to be ready by Monday."
+              className="mt-2 w-full rounded-md border border-[var(--bb-border-input)] bg-white px-2 py-1.5 text-xs text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
+              maxLength={4000}
+            />
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={handleParseBrief}
+                loading={briefParsing}
+                loadingText="Parsing…"
+                disabled={briefParsing || briefText.trim().length < 10}
+              >
+                ✨ Fill
+              </Button>
+              <button
+                type="button"
+                onClick={() => {
+                  setBriefAiOpen(false);
+                  setBriefText("");
+                  setBriefHint(null);
+                }}
+                disabled={briefParsing}
+                className="text-[11px] font-medium text-[var(--bb-text-muted)] hover:text-[var(--bb-secondary)] hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              {briefHint && (
+                <span className="text-[11px] text-[var(--bb-text-secondary)]">{briefHint}</span>
+              )}
+            </div>
+          </div>
+        )}
+
         <RichTextEditor
           value={description}
           onChange={setDescription}
@@ -795,7 +824,9 @@ export default function NewTicketForm({
           minHeight="60px"
         />
         <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-          You can always add more context later from the ticket view.
+          {!briefAiOpen && briefHint
+            ? briefHint
+            : "Write directly above, or paste plain text and click ✨ Fill with AI. You can add more context later from the ticket view."}
         </p>
       </div>
 
