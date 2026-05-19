@@ -53,6 +53,18 @@ function isPresignedUrl(url: string): boolean {
   return url.includes("X-Amz-Signature=") || url.includes("X-Amz-Credential=");
 }
 
+/**
+ * Returns true when the string is an absolute http(s) URL we can hand to
+ * the browser as-is. Legacy asset rows stored the bare storageKey
+ * (e.g. "tickets/abc/brief/foo.jpeg") into Asset.url; if we returned
+ * that the <img src> would resolve it relative to the current page URL
+ * and request something like /admin/tickets/<id>/tickets/abc/brief/foo
+ * — silent 404 that just looks like a broken image.
+ */
+function isAbsoluteHttpUrl(url: string): boolean {
+  return /^https?:\/\//i.test(url);
+}
+
 // ---------------------------------------------------------------------------
 // Presigned URL cache
 //
@@ -99,8 +111,13 @@ export async function resolveAssetUrl(
   storageKey: string,
   existingUrl: string | null,
 ): Promise<string | null> {
-  // If it's a stable (non-presigned) URL, return as-is
-  if (existingUrl && !isPresignedUrl(existingUrl)) return existingUrl;
+  // If it's a stable, absolute (non-presigned) URL, return as-is.
+  // The absolute-URL guard prevents legacy rows that stored the raw
+  // storage key in the `url` column from being handed to the browser
+  // as a relative path — see isAbsoluteHttpUrl above.
+  if (existingUrl && isAbsoluteHttpUrl(existingUrl) && !isPresignedUrl(existingUrl)) {
+    return existingUrl;
+  }
 
   const base = getR2PublicBaseUrl();
   if (base) {

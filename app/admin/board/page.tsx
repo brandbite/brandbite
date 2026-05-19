@@ -17,22 +17,41 @@ import { EmptyState } from "@/components/ui/empty-state";
 import {
   STATUS_ORDER,
   STATUS_LABELS,
-  formatBoardDate,
+  formatDueDateShort,
+  isDueDateOverdue,
   columnAccentColor,
   PROJECT_COLORS,
   avatarColor,
   getInitials,
+  priorityIconMap,
+  priorityColorClass,
+  formatPriorityLabel,
 } from "@/lib/board";
 import type { TicketStatus } from "@/lib/board";
+import { TagBadge } from "@/components/ui/tag-badge";
+import type { TagColorKey } from "@/lib/tag-colors";
+import { stripHtml } from "@/components/ui/safe-html";
+import { buildTicketCode } from "@/lib/ticket-code";
 
 type AdminTicket = {
   id: string;
   title: string;
+  /// Sanitized rich-text description. Stripped + truncated client-side
+  /// for the card preview; the full body lives at /admin/tickets/[id].
+  description: string | null;
+  priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+  dueDate: string | null;
+  /// Per-company ticket number — used together with project code +
+  /// fallback id to build the human-readable ticket code in the card
+  /// footer.
+  companyTicketNumber: number | null;
   status: TicketStatus;
   createdAt: string;
   company: { id: string; name: string } | null;
   project: { id: string; name: string; code: string | null } | null;
   creative: { id: string; name: string | null; email: string } | null;
+  jobType: { id: string; name: string } | null;
+  tags: { id: string; name: string; color: string }[];
 };
 
 type AdminTicketsResponse = {
@@ -416,6 +435,13 @@ export default function AdminBoardPage() {
                           const projectCode = t.project?.code ?? null;
                           const creativeLabel =
                             t.creative?.name || t.creative?.email || "Unassigned";
+                          const dueLabel = formatDueDateShort(t.dueDate);
+                          const overdue = isDueDateOverdue(t.dueDate);
+                          const ticketCode = buildTicketCode({
+                            projectCode: t.project?.code,
+                            companyTicketNumber: t.companyTicketNumber,
+                            ticketId: t.id,
+                          });
 
                           return (
                             <Link
@@ -424,7 +450,8 @@ export default function AdminBoardPage() {
                               className="block rounded-xl bg-[var(--bb-bg-page)] p-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
                               title="Open ticket detail"
                             >
-                              {/* Company name */}
+                              {/* Company name — admin-only context the
+                                  customer / creative boards don't need */}
                               <p className="text-[10px] font-semibold tracking-[0.16em] text-[var(--bb-text-tertiary)] uppercase">
                                 {companyName}
                               </p>
@@ -433,15 +460,71 @@ export default function AdminBoardPage() {
                                 {t.title}
                               </p>
 
-                              {/* Footer separator */}
-                              <div className="mt-2.5 border-t border-[var(--bb-border-subtle)] pt-2">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2 text-[10px] text-[var(--bb-text-tertiary)]">
-                                    {projectCode && (
-                                      <span className="font-medium">{projectCode}</span>
-                                    )}
-                                  </div>
-                                  {/* Creative avatar */}
+                              {/* Description preview — same line-clamp-2
+                                  pattern customer board uses. Stripped
+                                  through stripHtml so admins don't see
+                                  raw markup. */}
+                              {t.description && (
+                                <p className="mt-1 line-clamp-2 text-xs text-[var(--bb-text-secondary)]">
+                                  {stripHtml(t.description)}
+                                </p>
+                              )}
+
+                              {/* Due-date pill — red when overdue, blue otherwise */}
+                              {dueLabel && (
+                                <div className="mt-2">
+                                  <span
+                                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                      overdue
+                                        ? "bg-[var(--bb-danger-bg)] text-[var(--bb-danger-text)]"
+                                        : "bg-[var(--bb-info-bg)] text-[var(--bb-info-text)]"
+                                    }`}
+                                  >
+                                    <span className="text-[9px]">📅</span>
+                                    {dueLabel}
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Tags row (truncate to 3 + count remainder) */}
+                              {t.tags && t.tags.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-1">
+                                  {t.tags.slice(0, 3).map((tag) => (
+                                    <TagBadge
+                                      key={tag.id}
+                                      name={tag.name}
+                                      color={tag.color as TagColorKey}
+                                    />
+                                  ))}
+                                  {t.tags.length > 3 && (
+                                    <span className="inline-flex items-center text-[10px] text-[var(--bb-text-tertiary)]">
+                                      +{t.tags.length - 3}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Footer: ticket code + priority icon + creative avatar */}
+                              <div className="mt-2.5 flex items-center justify-between border-t border-[var(--bb-border-subtle)] pt-2 text-[10px] text-[var(--bb-text-tertiary)]">
+                                <div className="flex items-center gap-2">
+                                  {projectCode ? (
+                                    <span className="font-medium">{projectCode}</span>
+                                  ) : (
+                                    <span className="font-medium">{ticketCode}</span>
+                                  )}
+                                  {t.jobType && (
+                                    <span className="hidden text-[var(--bb-text-tertiary)] sm:inline">
+                                      · {t.jobType.name}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className={`text-[11px] ${priorityColorClass(t.priority)}`}
+                                    title={formatPriorityLabel(t.priority)}
+                                  >
+                                    {priorityIconMap[t.priority]}
+                                  </span>
                                   <div
                                     title={creativeLabel}
                                     className="flex h-6 w-6 items-center justify-center rounded-full text-[8px] font-bold text-white"

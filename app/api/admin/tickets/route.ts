@@ -91,6 +91,14 @@ export async function GET(req: NextRequest) {
         select: {
           id: true,
           title: true,
+          // Board-card extras — kept lean (one short string, two booleans
+          // worth of pills, a tag list, one date) to match the
+          // /customer/board + /creative/board card density without
+          // ballooning the admin list payload.
+          description: true,
+          priority: true,
+          dueDate: true,
+          companyTicketNumber: true,
           status: true,
           createdAt: true,
           quantity: true,
@@ -124,6 +132,9 @@ export async function GET(req: NextRequest) {
               creativePayoutTokens: true,
             },
           },
+          tagAssignments: {
+            select: { tag: { select: { id: true, name: true, color: true } } },
+          },
         },
       }),
       prisma.ticket.count({ where }),
@@ -142,9 +153,21 @@ export async function GET(req: NextRequest) {
       }),
     ]);
 
+    // Flatten tagAssignments → tags so the admin board card can render
+    // the same shape /customer/board + /creative/board cards expect.
+    const ticketsPayload = tickets.map((t) => {
+      const { tagAssignments, ...rest } = t as typeof t & {
+        tagAssignments: { tag: { id: string; name: string; color: string } }[];
+      };
+      return {
+        ...rest,
+        tags: tagAssignments.map((ta) => ta.tag),
+      };
+    });
+
     return NextResponse.json(
       {
-        tickets,
+        tickets: ticketsPayload,
         creatives,
         pagination: {
           total: totalCount,
