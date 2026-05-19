@@ -322,7 +322,6 @@ export default function CustomerTicketDetailPage() {
     } finally {
       setCancelling(false);
     }
-     
   }, [ticket?.id, router, fromBoard]);
 
   // Brief assets converted to AssetEntry for shared components
