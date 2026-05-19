@@ -18,6 +18,7 @@ import {
   canEditTickets,
   canManageTags,
   canManageProjects,
+  isCompanyAdminRole,
 } from "@/lib/permissions/companyRoles";
 import { TicketStatus, TicketPriority } from "@prisma/client";
 import { useToast } from "@/components/ui/toast-provider";
@@ -49,6 +50,7 @@ import { BRIEF_ACCEPT_ATTR } from "@/lib/upload-helpers";
 import { TagMultiSelect, type TagOption } from "@/components/ui/tag-multi-select";
 import type { TagColorKey } from "@/lib/tag-colors";
 import { Modal, ModalHeader, ModalFooter } from "@/components/ui/modal";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   RevisionImage,
   RevisionImageGrid,
@@ -209,6 +211,9 @@ const computeStats = (tickets: CustomerBoardTicket[]): BoardStats => {
     IN_PROGRESS: 0,
     IN_REVIEW: 0,
     DONE: 0,
+    // Cancelled tickets are filtered out at the API; this key is only
+    // here to satisfy Record<TicketStatus, …>.
+    CANCELED: 0,
   };
 
   const byPriority: Record<TicketPriority, number> = {
@@ -405,6 +410,13 @@ export default function CustomerBoardPage() {
   const [deleteProject, setDeleteProject] = useState<SidebarProject | null>(null);
   const [deleteProjectSaving, setDeleteProjectSaving] = useState(false);
   const [deleteProjectError, setDeleteProjectError] = useState<string | null>(null);
+
+  // Cancel-ticket confirmation. Holds the ticket id while the modal is
+  // open + a saving flag so we can disable the confirm button while the
+  // POST is in flight. Distinct from `deleteProject` etc. so we don't
+  // accidentally cross-wire dialogs.
+  const [cancelTicketId, setCancelTicketId] = useState<string | null>(null);
+  const [cancellingTicket, setCancellingTicket] = useState(false);
 
   // Inline edit state for detail modal
   const [isEditingDetail, setIsEditingDetail] = useState(false);
@@ -1106,6 +1118,9 @@ export default function CustomerBoardPage() {
       IN_PROGRESS: [],
       IN_REVIEW: [],
       DONE: [],
+      // Cancelled rows are filtered out at the API; bucket exists only
+      // to satisfy Record<TicketStatus, …>.
+      CANCELED: [],
     };
     for (const t of filteredTickets) {
       map[t.status].push(t);
@@ -1450,6 +1465,56 @@ export default function CustomerBoardPage() {
   // ---------------------------------------------------------------------------
 
   const canEditDetail = detailTicket?.status === "TODO" && canEditTickets(companyRole);
+
+  // Cancel-with-refund visibility. OWNER + PM only (matches the
+  // server-side gate), and only while the ticket is still TODO and
+  // un-assigned. Auto-assign moves a ticket out of TODO the moment a
+  // creative picks it up, so this guard plus the API's status check
+  // together mean we never refund a started job.
+  const canCancelDetail =
+    detailTicket?.status === "TODO" && !detailTicket?.isAssigned && isCompanyAdminRole(companyRole);
+
+  const handleCancelTicket = useCallback(
+    async (ticketId: string) => {
+      setCancellingTicket(true);
+      try {
+        const res = await fetch(`/api/customer/tickets/${ticketId}/cancel`, {
+          method: "POST",
+        });
+        const json = await res.json().catch(() => null);
+        if (!res.ok) {
+          showToast({
+            type: "error",
+            title: json?.error || "Failed to cancel ticket",
+          });
+          return;
+        }
+        const refunded = (json?.refundedTokens as number | undefined) ?? 0;
+        showToast({
+          type: "success",
+          title:
+            refunded > 0
+              ? `Ticket cancelled — ${refunded.toLocaleString()} tokens refunded`
+              : "Ticket cancelled",
+        });
+        // Optimistically drop the row from local state + close the
+        // detail panel. We then call load() to refresh stats + token
+        // balance (the refund just landed) so the sidebar number
+        // updates without a hard reload.
+        setData((prev) =>
+          prev ? { ...prev, tickets: prev.tickets.filter((t) => t.id !== ticketId) } : prev,
+        );
+        closeTicketDetails();
+        void load();
+      } catch {
+        showToast({ type: "error", title: "Failed to cancel ticket" });
+      } finally {
+        setCancellingTicket(false);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [showToast],
+  );
 
   const startEditingDetail = () => {
     if (!detailTicket) return;
@@ -2428,6 +2493,25 @@ export default function CustomerBoardPage() {
         </ModalFooter>
       </Modal>
 
+      {/* Cancel-ticket confirmation. OWNER/PM only — server enforces
+          the same gate. Confirming POSTs to /cancel which flips status
+          to CANCELED and writes a REFUND ledger entry atomically. */}
+      <ConfirmDialog
+        open={cancelTicketId !== null}
+        onClose={() => {
+          if (!cancellingTicket) setCancelTicketId(null);
+        }}
+        onConfirm={async () => {
+          if (!cancelTicketId) return;
+          await handleCancelTicket(cancelTicketId);
+          setCancelTicketId(null);
+        }}
+        title="Cancel this ticket?"
+        description="The ticket will be removed from your board and the full token cost will be refunded to your company. Brief uploads stay on file. This can't be undone."
+        confirmLabel="Cancel & refund"
+        loading={cancellingTicket}
+      />
+
       {/* Delete project confirmation modal */}
       <Modal open={!!deleteProject} onClose={closeDeleteProject} size="sm">
         <ModalHeader
@@ -2495,24 +2579,51 @@ export default function CustomerBoardPage() {
 
         {detailTicket && (
           <>
-            {/* Edit button — only for TODO tickets with permission */}
-            {canEditDetail && !isEditingDetail && (
-              <button
-                type="button"
-                onClick={startEditingDetail}
-                className="mb-3 flex items-center gap-1.5 rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-1.5 text-[11px] font-medium text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  className="h-3.5 w-3.5"
-                >
-                  <path d="m5.433 13.917 1.262-3.155A4 4 0 0 1 7.58 9.42l6.92-6.918a2.121 2.121 0 0 1 3 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 0 1-.65-.65Z" />
-                  <path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0 0 10 3H4.75A2.75 2.75 0 0 0 2 5.75v9.5A2.75 2.75 0 0 0 4.75 18h9.5A2.75 2.75 0 0 0 17 15.25V10a.75.75 0 0 0-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5Z" />
-                </svg>
-                Edit ticket
-              </button>
+            {/* Edit + Cancel buttons — only for TODO tickets with
+                appropriate permission. Edit is shown for OWNER/PM/MEMBER
+                (canEditTickets); Cancel is OWNER/PM only (refund gravity). */}
+            {!isEditingDetail && (canEditDetail || canCancelDetail) && (
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                {canEditDetail && (
+                  <button
+                    type="button"
+                    onClick={startEditingDetail}
+                    className="flex items-center gap-1.5 rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-1.5 text-[11px] font-medium text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      className="h-3.5 w-3.5"
+                    >
+                      <path d="m5.433 13.917 1.262-3.155A4 4 0 0 1 7.58 9.42l6.92-6.918a2.121 2.121 0 0 1 3 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 0 1-.65-.65Z" />
+                      <path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0 0 10 3H4.75A2.75 2.75 0 0 0 2 5.75v9.5A2.75 2.75 0 0 0 4.75 18h9.5A2.75 2.75 0 0 0 17 15.25V10a.75.75 0 0 0-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5Z" />
+                    </svg>
+                    Edit ticket
+                  </button>
+                )}
+                {canCancelDetail && detailTicket && (
+                  <button
+                    type="button"
+                    onClick={() => setCancelTicketId(detailTicket.id)}
+                    className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-[var(--bb-bg-page)] px-3 py-1.5 text-[11px] font-medium text-red-600 transition-colors hover:border-red-400 hover:bg-red-50"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      className="h-3.5 w-3.5"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    Cancel & refund
+                  </button>
+                )}
+              </div>
             )}
 
             {/* Status / priority pills */}

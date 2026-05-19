@@ -12,6 +12,8 @@ import { buildTicketCode } from "@/lib/ticket-code";
 export async function GET() {
   try {
     const tickets = await prisma.ticket.findMany({
+      // Hide soft-cancelled tickets from the global board view.
+      where: { status: { not: "CANCELED" } },
       include: {
         company: {
           select: {

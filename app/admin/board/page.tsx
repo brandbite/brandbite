@@ -136,6 +136,9 @@ export default function AdminBoardPage() {
       IN_PROGRESS: 0,
       IN_REVIEW: 0,
       DONE: 0,
+      // Cancelled rows are filtered out at the API; only here to
+      // satisfy Record<TicketStatus, …>.
+      CANCELED: 0,
     };
 
     for (const t of tickets) {
@@ -218,6 +221,9 @@ export default function AdminBoardPage() {
       IN_PROGRESS: [],
       IN_REVIEW: [],
       DONE: [],
+      // Cancelled rows are filtered out at the API; bucket exists only
+      // to satisfy Record<TicketStatus, …>.
+      CANCELED: [],
     };
 
     for (const t of filteredTickets) {

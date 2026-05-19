@@ -32,6 +32,10 @@ export async function GET(_req: NextRequest) {
     const tickets = await prisma.ticket.findMany({
       where: {
         companyId: user.activeCompanyId,
+        // Exclude soft-cancelled rows from the kanban board. They stay
+        // in the DB so the REFUND ledger entry remains linked, but
+        // don't belong in the active-work view.
+        status: { not: "CANCELED" },
       },
       orderBy: {
         createdAt: "desc",

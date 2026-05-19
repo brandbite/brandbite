@@ -19,6 +19,7 @@ import { FormInput, FormSelect } from "@/components/ui/form-field";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { SafeHtml } from "@/components/ui/safe-html";
 import { Modal, ModalHeader, ModalFooter } from "@/components/ui/modal";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { RateCreativeModal } from "@/components/ratings/rate-creative-modal";
 import { TagBadge } from "@/components/ui/tag-badge";
 import { TagMultiSelect, type TagOption } from "@/components/ui/tag-multi-select";
@@ -51,6 +52,7 @@ import {
   normalizeCompanyRole,
   canEditTickets,
   canManageTags,
+  isCompanyAdminRole,
   canMarkTicketsDoneForCompany,
 } from "@/lib/permissions/companyRoles";
 import { downloadSingleAsset, downloadAssetsAsZip } from "@/lib/download-helpers";
@@ -283,6 +285,45 @@ export default function CustomerTicketDetailPage() {
     [normalizedRole],
   );
   const userCanManageTags = useMemo(() => canManageTags(normalizedRole), [normalizedRole]);
+
+  // Cancel-with-refund permission. OWNER + PM only (matches server-side
+  // isCompanyAdminRole gate). Only available while the ticket is still
+  // TODO and not assigned to a creative — once work has started a refund
+  // would be unfair to the creative who spent prep time.
+  const userCanCancel = useMemo(
+    () => ticket?.status === "TODO" && !ticket?.isAssigned && isCompanyAdminRole(normalizedRole),
+    [ticket?.status, ticket?.isAssigned, normalizedRole],
+  );
+
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+
+  const handleCancel = useCallback(async () => {
+    if (!ticket?.id) return;
+    setCancelling(true);
+    setCancelError(null);
+    try {
+      const res = await fetch(`/api/customer/tickets/${ticket.id}/cancel`, {
+        method: "POST",
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        setCancelError(body?.error || "Failed to cancel ticket");
+        return;
+      }
+      // Send the user back to the list / board with the refund
+      // confirmed. The next list fetch will exclude this row by default
+      // (the API hides CANCELED) so they won't see it on return.
+      setCancelOpen(false);
+      router.push(fromBoard ? "/customer/board" : "/customer/tickets");
+    } catch {
+      setCancelError("Failed to cancel ticket");
+    } finally {
+      setCancelling(false);
+    }
+     
+  }, [ticket?.id, router, fromBoard]);
 
   // Brief assets converted to AssetEntry for shared components
   const briefAssetEntries: AssetEntry[] = useMemo(
@@ -749,11 +790,27 @@ export default function CustomerTicketDetailPage() {
             </div>
           )}
 
-          {/* Edit / Save / Cancel buttons */}
-          {userCanEdit && !editing && (
-            <Button variant="secondary" size="sm" onClick={startEditing}>
-              Edit
-            </Button>
+          {/* Edit / Save / Cancel buttons. Cancel-with-refund is a
+              separate action from "Cancel editing"; it sits next to
+              "Edit" for OWNER/PM when the ticket is still cancellable. */}
+          {!editing && (userCanEdit || userCanCancel) && (
+            <div className="flex items-center gap-2">
+              {userCanEdit && (
+                <Button variant="secondary" size="sm" onClick={startEditing}>
+                  Edit
+                </Button>
+              )}
+              {userCanCancel && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setCancelOpen(true)}
+                  className="!border-red-200 !text-red-600 hover:!border-red-400 hover:!bg-red-50"
+                >
+                  Cancel & refund
+                </Button>
+              )}
+            </div>
           )}
           {editing && (
             <div className="flex items-center gap-2">
@@ -1649,6 +1706,28 @@ export default function CustomerTicketDetailPage() {
           </Button>
         </ModalFooter>
       </Modal>
+
+      {/* Cancel-with-refund confirmation. Server enforces OWNER/PM + TODO
+          + unassigned; UI just gates the entry point and surfaces any
+          server error inline (e.g. lost race with auto-assign). */}
+      <ConfirmDialog
+        open={cancelOpen}
+        onClose={() => {
+          if (!cancelling) {
+            setCancelOpen(false);
+            setCancelError(null);
+          }
+        }}
+        onConfirm={handleCancel}
+        title="Cancel this ticket?"
+        description={
+          cancelError
+            ? cancelError
+            : "The ticket will be removed from your board and the full token cost will be refunded to your company. Brief uploads stay on file. This can't be undone."
+        }
+        confirmLabel="Cancel & refund"
+        loading={cancelling}
+      />
 
       {/* Revision comparison overlay */}
       {showCompare && revisions && revisions.length >= 2 && (

@@ -46,6 +46,12 @@ enum TicketStatus {
   IN_PROGRESS
   IN_REVIEW
   DONE
+  /// Soft-cancelled by a customer OWNER/PM while the ticket was still
+  /// in TODO and unassigned. The row stays in the DB so the linked
+  /// REFUND ledger entry, audit log, and any draft assets remain
+  /// inspectable. Default board/list queries exclude this status; a
+  /// dedicated archive view can be added later if needed.
+  CANCELED
 }
 
 enum TicketPriority {

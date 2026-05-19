@@ -135,6 +135,10 @@ const STATUS_VARIANT: Record<TicketStatus, "info" | "warning" | "primary" | "suc
   IN_PROGRESS: "warning",
   IN_REVIEW: "primary",
   DONE: "success",
+  // Cancelled tickets land on this page only via direct deep-link (the
+  // admin board hides them). Render as muted info so the operator can
+  // still tell at a glance that this row is terminal.
+  CANCELED: "info",
 };
 
 const PRIORITY_VARIANT: Record<TicketPriority, "neutral" | "info" | "warning" | "primary"> = {

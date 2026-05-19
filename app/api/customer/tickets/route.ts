@@ -72,6 +72,13 @@ export async function GET(req: NextRequest) {
 
     if (status && ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"].includes(status)) {
       where.status = status;
+    } else {
+      // No explicit status filter → exclude CANCELED rows from the
+      // board/list by default. Customers can still load a cancelled
+      // ticket directly via /tickets/[ticketId] (the detail endpoint
+      // doesn't apply this filter) so the row + REFUND ledger entry
+      // remain inspectable from a deep link.
+      where.status = { not: "CANCELED" };
     }
 
     if (priority && ["LOW", "MEDIUM", "HIGH", "URGENT"].includes(priority)) {
