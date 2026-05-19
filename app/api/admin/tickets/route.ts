@@ -60,6 +60,12 @@ export async function GET(req: NextRequest) {
 
     if (status && ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"].includes(status)) {
       where.status = status;
+    } else {
+      // Hide cancelled rows from the admin board by default — same as
+      // the customer + creative lists. The /admin/tickets/[ticketId]
+      // detail page still loads CANCELED rows so an operator can
+      // inspect the refund + audit trail via a direct link.
+      where.status = { not: "CANCELED" };
     }
 
     if (companyId) {

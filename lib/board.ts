@@ -17,6 +17,9 @@ export const STATUS_LABELS: Record<TicketStatus, string> = {
   IN_PROGRESS: "In progress",
   IN_REVIEW: "In review",
   DONE: "Done",
+  // Boards never show CANCELED rows (the API filters them out), but the
+  // Record<TicketStatus, …> type needs the key for exhaustiveness.
+  CANCELED: "Cancelled",
 };
 
 export const statusColumnClass = (status: TicketStatus): string => {
@@ -79,6 +82,11 @@ export const statusBadgeVariant = (s: TicketStatus): BadgeVariant => {
       return "warning";
     case "DONE":
       return "success";
+    case "CANCELED":
+      // CANCELED rows are filtered out of every board response, so this
+      // branch only fires on a direct deep-link to a cancelled ticket's
+      // detail page. Render as a muted neutral badge.
+      return "neutral";
   }
 };
 
@@ -123,6 +131,10 @@ export const columnAccentColor: Record<TicketStatus, string> = {
   IN_PROGRESS: "#3B82F6",
   IN_REVIEW: "#F15B2B",
   DONE: "#22C55E",
+  // Boards don't render a CANCELED column; this key only exists to
+  // satisfy Record<TicketStatus, …>. Same neutral grey as TODO so any
+  // accidental render isn't visually loud.
+  CANCELED: "#9CA3AF",
 };
 
 /** Palette for project sidebar icon backgrounds */

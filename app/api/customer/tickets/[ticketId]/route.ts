@@ -284,6 +284,18 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     // Branch A: Status change (existing behavior — drag-and-drop on board)
     // -----------------------------------------------------------------------
     if (hasStatusField && !hasEditFields) {
+      // A CANCELED ticket is terminal — no un-cancelling via a drag.
+      // The refund already landed in the ledger; re-opening would
+      // require an inverse debit which we don't have a workflow for.
+      if (existing.status === "CANCELED") {
+        return NextResponse.json(
+          {
+            error: "Cancelled tickets are read-only. Create a new ticket instead.",
+          },
+          { status: 409 },
+        );
+      }
+
       const statusResult = updateTicketStatusSchema.safeParse(body);
       if (!statusResult.success) {
         return NextResponse.json(

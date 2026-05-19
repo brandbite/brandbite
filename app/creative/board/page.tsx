@@ -378,6 +378,9 @@ export default function CreativeBoardPage() {
       IN_PROGRESS: 0,
       IN_REVIEW: 0,
       DONE: 0,
+      // A cancelled ticket is by definition unassigned, so a creative
+      // can never see one. Bucket exists only to satisfy the Record type.
+      CANCELED: 0,
     };
     const byPriority: Record<TicketPriority, number> = {
       LOW: 0,
@@ -574,6 +577,9 @@ export default function CreativeBoardPage() {
       IN_PROGRESS: [],
       IN_REVIEW: [],
       DONE: [],
+      // A cancelled ticket is by definition unassigned, so creatives
+      // never see one. Bucket exists only to satisfy the Record type.
+      CANCELED: [],
     };
 
     filteredTickets.forEach((t) => {

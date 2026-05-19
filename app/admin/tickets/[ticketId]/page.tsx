@@ -34,7 +34,7 @@ import { LoadingState } from "@/components/ui/loading-state";
 // compiles without leaking server-only Prisma imports.
 // ---------------------------------------------------------------------------
 
-type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
+type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE" | "CANCELED";
 type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 type Role = "SITE_OWNER" | "SITE_ADMIN" | "DESIGNER" | "CUSTOMER";
 
@@ -135,6 +135,10 @@ const STATUS_VARIANT: Record<TicketStatus, "info" | "warning" | "primary" | "suc
   IN_PROGRESS: "warning",
   IN_REVIEW: "primary",
   DONE: "success",
+  // Cancelled tickets land on this page only via direct deep-link (the
+  // admin board hides them). Render as muted info so the operator can
+  // still tell at a glance that this row is terminal.
+  CANCELED: "info",
 };
 
 const PRIORITY_VARIANT: Record<TicketPriority, "neutral" | "info" | "warning" | "primary"> = {
