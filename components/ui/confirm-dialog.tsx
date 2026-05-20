@@ -87,7 +87,7 @@ export function ConfirmDialog({
   const config = VARIANT_CONFIG[variant];
 
   return (
-    <Modal open={open} onClose={loading ? () => {} : onClose} size="sm">
+    <Modal open={open} onClose={loading ? () => {} : onClose} size="sm" elevated>
       <div className="flex flex-col items-center px-2 pt-2 text-center">
         {/* Icon */}
         <div
