@@ -29,6 +29,100 @@ function DownloadIcon({ className = "h-3.5 w-3.5" }: { className?: string }) {
   );
 }
 
+function TrashIcon({ className = "h-3.5 w-3.5" }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      className={className}
+    >
+      <path
+        fillRule="evenodd"
+        d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z"
+        clipRule="evenodd"
+      />
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// DeleteAssetButton — trash trigger + inline confirm overlay on the asset card.
+// Inline (not a modal) so it never has to fight a parent modal's stacking.
+// The parent card must be `relative` and `rounded-*` for the overlay to fit.
+// ---------------------------------------------------------------------------
+
+function DeleteAssetButton({
+  onConfirm,
+  triggerClassName,
+  iconClassName,
+}: {
+  onConfirm: () => void | Promise<void>;
+  triggerClassName: string;
+  iconClassName?: string;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleConfirm = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeleting(true);
+    try {
+      await onConfirm();
+    } finally {
+      setDeleting(false);
+      setConfirming(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        className={triggerClassName}
+        onClick={(e) => {
+          e.stopPropagation();
+          setConfirming(true);
+        }}
+        aria-label="Remove attachment"
+        title="Remove"
+      >
+        <TrashIcon className={iconClassName} />
+      </button>
+
+      {confirming && (
+        <div
+          className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1.5 rounded-[inherit] bg-black/65 p-2 text-center backdrop-blur-sm"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p className="text-[10px] leading-tight font-medium text-white">Remove this file?</p>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleConfirm}
+              disabled={deleting}
+              className="rounded-md bg-red-600 px-2 py-1 text-[10px] font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60"
+            >
+              {deleting ? "Removing…" : "Remove"}
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setConfirming(false);
+              }}
+              disabled={deleting}
+              className="rounded-md bg-white/90 px-2 py-1 text-[10px] font-semibold text-[var(--bb-secondary)] transition-colors hover:bg-white disabled:opacity-60"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -705,6 +799,8 @@ type RevisionImageGridProps = {
   onRevisionSubmitted?: () => void;
   /** Callback for creatives to open upload modal after resolving all pins */
   onUploadWork?: () => void;
+  /** When provided, each asset gets a remove button (used for brief attachments). */
+  onDelete?: (asset: AssetEntry) => void | Promise<void>;
 };
 
 export function RevisionImageGrid({
@@ -802,6 +898,7 @@ export function RevisionImageLarge({
   ticketId,
   onRevisionSubmitted,
   onUploadWork,
+  onDelete,
 }: RevisionImageGridProps) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -862,6 +959,14 @@ export function RevisionImageLarge({
               <div className="absolute top-2 left-2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[var(--bb-primary)] px-1.5 text-[9px] font-bold text-white shadow-sm">
                 📌 {asset.pinCount}
               </div>
+            )}
+            {/* Remove button (brief attachments only) */}
+            {onDelete && (
+              <DeleteAssetButton
+                onConfirm={() => onDelete(asset)}
+                triggerClassName="pointer-events-auto absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/20 text-white/70 backdrop-blur-sm transition-all group-hover:h-8 group-hover:w-8 group-hover:bg-black/50 group-hover:text-white hover:!bg-red-600 hover:!text-white"
+                iconClassName="h-3.5 w-3.5"
+              />
             )}
           </div>
         ))}
@@ -937,7 +1042,13 @@ export function DownloadAllButton({
 // Used when creative work exists so briefs don't dominate the viewport
 // ---------------------------------------------------------------------------
 
-export function BriefThumbnailRow({ assets }: { assets: AssetEntry[] }) {
+export function BriefThumbnailRow({
+  assets,
+  onDelete,
+}: {
+  assets: AssetEntry[];
+  onDelete?: (asset: AssetEntry) => void | Promise<void>;
+}) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
@@ -986,6 +1097,14 @@ export function BriefThumbnailRow({ assets }: { assets: AssetEntry[] }) {
                 <DownloadIcon className="h-2.5 w-2.5" />
               )}
             </button>
+            {/* Remove button (brief attachments only) */}
+            {onDelete && (
+              <DeleteAssetButton
+                onConfirm={() => onDelete(asset)}
+                triggerClassName="pointer-events-auto absolute top-0.5 right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/20 text-white/70 transition-all group-hover/brief:h-5 group-hover/brief:w-5 group-hover/brief:bg-black/50 group-hover/brief:text-white hover:!bg-red-600 hover:!text-white"
+                iconClassName="h-2.5 w-2.5"
+              />
+            )}
           </div>
         ))}
       </div>
