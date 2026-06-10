@@ -738,12 +738,17 @@ function DetailPanel({
   // (after a submitAction → refresh → status update) immediately flips
   // which panels are visible.
   //   - SUBMITTED / IN_REVIEW: offer 3 slots (ACCEPT) or DECLINE
-  //   - AWAITING_CANDIDATE_CHOICE: DECLINE (revoking the offer)
-  //   - CANDIDATE_PROPOSED_TIME: ACCEPT_PROPOSED or DECLINE
+  //   - AWAITING_CANDIDATE_CHOICE: RE-OFFER slots (fresh booking link —
+  //     the unstick path when the link expired or candidate-side booking
+  //     kept failing) or DECLINE (revoking the offer)
+  //   - CANDIDATE_PROPOSED_TIME: ACCEPT_PROPOSED, RE-OFFER (counter-
+  //     propose 3 fresh slots) or DECLINE
   //   - ACCEPTED (PR9): MARK_INTERVIEW_HELD or REJECT_POST_INTERVIEW (no-show path)
   //   - INTERVIEW_HELD (PR9): HIRE or REJECT_POST_INTERVIEW
   //   - HIRED / ONBOARDED / DECLINED / REJECTED_AFTER_INTERVIEW: terminal info
-  const canOfferSlots = item.status === "SUBMITTED" || item.status === "IN_REVIEW";
+  const isReoffer =
+    item.status === "AWAITING_CANDIDATE_CHOICE" || item.status === "CANDIDATE_PROPOSED_TIME";
+  const canOfferSlots = item.status === "SUBMITTED" || item.status === "IN_REVIEW" || isReoffer;
   const canConfirmProposed = item.status === "CANDIDATE_PROPOSED_TIME";
   const canDecline =
     item.status === "SUBMITTED" ||
@@ -866,6 +871,10 @@ function DetailPanel({
               </div>
               <div className="text-xs text-[var(--bb-text-muted)]">
                 Sent by {item.reviewedByUserEmail ?? "—"} · {formatDateTime(item.reviewedAt)}
+              </div>
+              <div className="text-xs text-[var(--bb-text-muted)]">
+                Link expired, or the candidate reports a booking error? Re-offer below — it emails
+                a fresh link and kills this one.
               </div>
             </div>
           </InlineAlert>
@@ -1182,14 +1191,18 @@ function DetailPanel({
           </div>
         )}
 
-        {/* ACCEPT — offer 3 slots. Available on SUBMITTED / IN_REVIEW only. */}
+        {/* ACCEPT — offer 3 slots. On AWAITING_CANDIDATE_CHOICE /
+            CANDIDATE_PROPOSED_TIME the same action re-offers: fresh slots +
+            fresh booking link, old link invalidated. */}
         {canOfferSlots && (
           <div className="rounded-xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-card)] p-4">
-            <SectionHeading>Accept &amp; offer 3 slots</SectionHeading>
+            <SectionHeading>
+              {isReoffer ? "Re-offer 3 slots" : "Accept & offer 3 slots"}
+            </SectionHeading>
             <p className="mt-1 mb-3 text-xs text-[var(--bb-text-muted)]">
-              Offer the candidate three 30-minute slots. They&apos;ll get an email with a tokenized
-              link to pick one (or propose another time). Calendar event is created when they pick.
-              Times are in your local timezone; the candidate sees them in theirs.
+              {isReoffer
+                ? "Offer three fresh 30-minute slots. The candidate gets a new email with a new booking link; the previous link stops working immediately. Use this when the old link expired, the candidate hit a booking error, or their proposed time doesn't work for you."
+                : "Offer the candidate three 30-minute slots. They'll get an email with a tokenized link to pick one (or propose another time). Calendar event is created when they pick. Times are in your local timezone; the candidate sees them in theirs."}
             </p>
             <div className="space-y-2">
               {[0, 1, 2].map((idx) => (
@@ -1220,7 +1233,7 @@ function DetailPanel({
               loadingText="Sending…"
               disabled={proposedSlotsLocal.some((s) => !s) || actionStatus === "submitting"}
             >
-              Accept &amp; email booking link
+              {isReoffer ? "Re-offer & email new booking link" : "Accept & email booking link"}
             </Button>
           </div>
         )}
