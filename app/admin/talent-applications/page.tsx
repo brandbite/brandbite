@@ -873,8 +873,8 @@ function DetailPanel({
                 Sent by {item.reviewedByUserEmail ?? "—"} · {formatDateTime(item.reviewedAt)}
               </div>
               <div className="text-xs text-[var(--bb-text-muted)]">
-                Link expired, or the candidate reports a booking error? Re-offer below — it emails
-                a fresh link and kills this one.
+                Link expired, or the candidate reports a booking error? Re-offer below — it emails a
+                fresh link and kills this one.
               </div>
             </div>
           </InlineAlert>
