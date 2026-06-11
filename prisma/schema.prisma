@@ -2101,6 +2101,18 @@ model ConsultationSettings {
   googleTokenExpiresAt DateTime?
   googleConnectedAt    DateTime?
 
+  /// Set when a token refresh fails with invalid_grant — i.e. Google has
+  /// permanently rejected the stored refresh token (revoked, expired
+  /// under Testing-mode policy, account password reset). Distinct from
+  /// "not connected" (googleRefreshToken null): the admin connected at
+  /// some point and the connection then DIED, which deserves a loud
+  /// banner + owner email rather than the neutral "connect" empty state.
+  /// Cleared on successful refresh (self-heal), reconnect, or disconnect.
+  /// The one-shot owner alert fires only on the null→set transition so a
+  /// retry storm can't spam the inbox. See lib/google/connection-health.ts.
+  googleConnectionBrokenAt  DateTime?
+  googleConnectionLastError String?
+
   updatedAt DateTime @updatedAt
 
   updatedById String?

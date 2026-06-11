@@ -8,6 +8,7 @@
 import { AppSidebar } from "@/components/navigation/app-sidebar";
 import { SessionTimeoutWarning } from "@/components/auth/session-timeout-warning";
 import { FeedbackWidget } from "@/components/feedback/feedback-widget";
+import { GoogleConnectionBanner } from "@/components/admin/google-connection-banner";
 
 // All admin routes are auth-gated. Skip SSG so the build does not prerender
 // pages that depend on the live DB or client-only libraries.
@@ -33,6 +34,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             designed for the old full-width top-nav layout (e.g. /admin/plans
             2-col grid). */}
         <main id="main-content" className="px-4 py-6 md:px-6 md:py-8 lg:px-8 lg:py-10">
+          {/* Sitewide alarm while the Google Calendar connection is dead —
+              bookings silently fail until someone reconnects, so this must
+              not hide on the one settings page admins rarely visit. */}
+          <GoogleConnectionBanner />
           {children}
         </main>
       </div>
