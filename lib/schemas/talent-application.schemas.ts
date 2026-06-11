@@ -128,10 +128,10 @@ export type TalentApplicationSubmitInput = z.infer<typeof talentApplicationSubmi
 // time (the slot the SITE_OWNER chose); decline takes an optional
 // reason that the email surfaces verbatim.
 //
-// Both paths only allow transitioning *from* SUBMITTED — the API
-// enforces that with a current-status check separate from this schema
-// so a reverted-by-mistake row can't be re-actioned without an explicit
-// admin rollback workflow.
+// Allowed from-statuses are enforced by the API's ALLOWED_FROM map,
+// separate from this schema. ACCEPT also doubles as the re-offer /
+// counter-offer action from AWAITING_CANDIDATE_CHOICE and
+// CANDIDATE_PROPOSED_TIME — same payload, fresh slots + booking token.
 
 export const TALENT_INTERVIEW_DURATION_MINUTES = 30;
 /** Sanity bound on the booking horizon: refuse anything more than 60
@@ -170,9 +170,11 @@ const futureIsoWithinHorizon = z
 // ---------------------------------------------------------------------------
 //
 // Discriminated on `action`. Three actions:
-//   - ACCEPT: offer 3 slots + optional custom message; transitions
-//     SUBMITTED → AWAITING_CANDIDATE_CHOICE; sends the candidate a
-//     tokenized booking link.
+//   - ACCEPT: offer 3 slots + optional custom message; transitions to
+//     AWAITING_CANDIDATE_CHOICE and emails the candidate a tokenized
+//     booking link. Re-running it from AWAITING_CANDIDATE_CHOICE /
+//     CANDIDATE_PROPOSED_TIME re-offers: new slots, new link, old link
+//     invalidated.
 //   - ACCEPT_PROPOSED: confirm a candidate's custom-time proposal;
 //     transitions CANDIDATE_PROPOSED_TIME → ACCEPTED; creates the
 //     Google Calendar event at this point.
