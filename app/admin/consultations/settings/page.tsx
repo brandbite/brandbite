@@ -34,6 +34,11 @@ type Settings = {
   googleConnected: boolean;
   googleAccountEmail: string | null;
   googleConnectedAt: string | null;
+  // Set when Google permanently rejected the stored refresh token —
+  // see lib/google/connection-health.ts. Connected-but-broken renders a
+  // red alert instead of the green "Connected as …" box.
+  googleConnectionBrokenAt: string | null;
+  googleConnectionLastError: string | null;
 };
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -326,6 +331,21 @@ export default function AdminConsultationSettingsPage() {
 
           {settings.googleConnected ? (
             <div className="space-y-3">
+              {/* Connected-but-dead: the refresh token exists in the DB but
+                  Google rejects it (invalid_grant). Without this alert the
+                  green box below would claim everything is fine while every
+                  booking 502s. */}
+              {settings.googleConnectionBrokenAt && (
+                <InlineAlert variant="error" title="Connection broken — reconnect required">
+                  Google rejected the stored credentials on{" "}
+                  {new Date(settings.googleConnectionBrokenAt).toLocaleString()}
+                  {settings.googleConnectionLastError
+                    ? ` (${settings.googleConnectionLastError})`
+                    : ""}
+                  . Bookings cannot create calendar events. Click Disconnect below, then Connect
+                  again with the same Google account.
+                </InlineAlert>
+              )}
               <div className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
                 <span className="text-lg">✓</span>
                 <div className="flex-1">

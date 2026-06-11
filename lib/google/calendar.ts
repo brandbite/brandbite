@@ -13,6 +13,11 @@ import type { ConsultationSettings } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 
+import {
+  clearGoogleConnectionBroken,
+  isInvalidGrantError,
+  markGoogleConnectionBroken,
+} from "./connection-health";
 import { readGoogleOauthConfig, refreshAccessToken, type GoogleOauthConfig } from "./oauth";
 
 const CALENDAR_API_BASE = "https://www.googleapis.com/calendar/v3";
@@ -63,7 +68,24 @@ export async function ensureFreshAccessToken(
   }
 
   // Refresh
-  const refreshed = await refreshAccessToken(config, settings.googleRefreshToken);
+  let refreshed;
+  try {
+    refreshed = await refreshAccessToken(config, settings.googleRefreshToken);
+  } catch (err) {
+    // invalid_grant = the refresh token is permanently dead (revoked /
+    // expired / password reset). Flag it so the admin panel banners and
+    // the owners get a one-shot email — then rethrow so the caller's
+    // existing failure handling (502s, candidate-facing copy) runs
+    // unchanged. Transient refresh failures rethrow without flagging.
+    if (isInvalidGrantError(err)) {
+      await markGoogleConnectionBroken({
+        settingsId: settings.id,
+        errorMessage: err instanceof Error ? err.message : "invalid_grant",
+        detectedBy: "a live calendar request",
+      });
+    }
+    throw err;
+  }
   const newExpiresAt = new Date(Date.now() + refreshed.expires_in * 1000);
 
   await prisma.consultationSettings.update({
@@ -73,6 +95,12 @@ export async function ensureFreshAccessToken(
       googleTokenExpiresAt: newExpiresAt,
     },
   });
+
+  // A refresh that succeeds proves the connection is alive — self-heal a
+  // stale broken flag (e.g. Google had an outage that looked permanent).
+  if (settings.googleConnectionBrokenAt) {
+    await clearGoogleConnectionBroken(settings.id);
+  }
 
   return { accessToken: refreshed.access_token, config };
 }

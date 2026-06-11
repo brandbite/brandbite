@@ -80,6 +80,15 @@ export type AdminEvent =
       withdrawalId: string;
       creativeEmail: string;
       amountTokens: number;
+    }
+  | {
+      kind: "GOOGLE_CALENDAR_DISCONNECTED";
+      /** Google account that was connected, for "reconnect as X" guidance. */
+      googleAccountEmail: string | null;
+      /** Short technical detail (the refresh failure message), pre-truncated. */
+      errorDetail: string | null;
+      /** Where the failure was noticed — live request vs health-check cron. */
+      detectedBy: string;
     };
 
 // ---------------------------------------------------------------------------
@@ -221,6 +230,22 @@ function render(event: AdminEvent): Rendered {
         ctaButton(`${ADMIN_BASE}/admin/withdrawals`, "Open withdrawals queue"),
       ].join("");
       return { subject, html: shell("Withdrawal request", body) };
+    }
+
+    case "GOOGLE_CALENDAR_DISCONNECTED": {
+      const subject = `[Brandbite] Google Calendar connection BROKEN — bookings can't be scheduled`;
+      const body = [
+        `<p style="font-size:13px;color:#424143;margin:0 0 6px;">Google permanently rejected the stored refresh token (revoked, expired, or the account password was reset). Until someone reconnects, consultation bookings and talent interview bookings cannot create calendar events.</p>`,
+        event.googleAccountEmail
+          ? `<p style="font-size:12px;color:#7a7a7a;margin:6px 0;">Previously connected as <strong>${escapeHtml(event.googleAccountEmail)}</strong> — reconnect with the same account so events land on the same calendar.</p>`
+          : "",
+        event.errorDetail
+          ? `<p style="font-size:11px;color:#7a7a7a;margin:6px 0;"><code style="font-size:11px;background:#faf9f7;padding:1px 4px;border-radius:3px;">${escapeHtml(event.errorDetail)}</code></p>`
+          : "",
+        `<p style="font-size:12px;color:#7a7a7a;margin:6px 0;">Detected by: ${escapeHtml(event.detectedBy)}. You'll get this email once per outage — the admin panel shows a banner until the connection is restored.</p>`,
+        ctaButton(`${ADMIN_BASE}/admin/consultations/settings`, "Reconnect Google Calendar"),
+      ].join("");
+      return { subject, html: shell("Google Calendar disconnected", body) };
     }
   }
 }
