@@ -15,6 +15,9 @@
 //             3. Confirm Google connected (else 412)
 //             4. createConsultationEvent → 502 on Google failure
 //             5. extractMeetLink → 502 if absent
+//           Steps 3-5 additionally alert every SITE_OWNER via
+//           lib/talent-notify-owners.ts — the candidate-facing error is
+//           otherwise the only signal that the flow stalled.
 //             6. Conditional updateMany (race-safe against another POST
 //                /pick or /propose on the same token) → 409 if lost,
 //                with best-effort orphan-event cancel
@@ -31,6 +34,7 @@ import {
   talentBookingPickSchema,
 } from "@/lib/schemas/talent-application.schemas";
 import { isBookingTokenExpired } from "@/lib/talent-booking-token";
+import { notifySiteOwnersOfBookingFailure } from "@/lib/talent-notify-owners";
 import { sendNotificationEmail } from "@/lib/email";
 import { renderTalentFinalConfirmationEmail } from "@/lib/email-templates/talent/final-confirmation";
 import {
@@ -42,6 +46,19 @@ import { getConsultationSettings } from "@/lib/consultation/settings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+function getAppBaseUrl(): string {
+  const fromEnv = process.env.NEXT_PUBLIC_APP_URL;
+  if (fromEnv && fromEnv.startsWith("http")) return fromEnv.replace(/\/+$/, "");
+  return "http://localhost:3000";
+}
+
+/** Cap the technical detail quoted in the owner alert email — Google
+ *  error bodies can run long and the first line carries the cause. */
+function truncateDetail(err: unknown): string | null {
+  if (!(err instanceof Error) || !err.message) return null;
+  return err.message.length > 300 ? `${err.message.slice(0, 300)}…` : err.message;
+}
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -110,9 +127,31 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     );
   }
 
+  // Failure alert plumbing — every branch below that bounces the
+  // candidate must also wake the owners, because from the admin queue
+  // the row still reads "awaiting candidate" and nothing else surfaces
+  // the stall. Awaited (not fire-and-forget): on Vercel a detached
+  // promise can be killed when the response returns, and the alert IS
+  // the point of these branches. notifySiteOwnersOfBookingFailure never
+  // throws and sendNotificationEmail is time-bounded, so the added
+  // latency on an already-failed request is acceptable.
+  const failureAlertBase = {
+    candidateName: row.fullName,
+    candidateEmail: row.email,
+    slotIso: new Date(slotMs).toISOString(),
+    candidateTimezone: row.timezone,
+    settingsUrl: `${getAppBaseUrl()}/admin/consultations/settings`,
+    adminUrl: `${getAppBaseUrl()}/admin/talent-applications#${row.id}`,
+  };
+
   // Google Calendar must be connected. Same 412 shape as the admin path.
   const settings = await getConsultationSettings();
   if (!settings.googleRefreshToken) {
+    await notifySiteOwnersOfBookingFailure({
+      ...failureAlertBase,
+      stage: "GOOGLE_NOT_CONNECTED",
+      detail: null,
+    });
     return NextResponse.json(
       {
         error:
@@ -149,6 +188,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     });
   } catch (err) {
     console.error("[talent-pick] calendar create failed", err);
+    await notifySiteOwnersOfBookingFailure({
+      ...failureAlertBase,
+      stage: "CALENDAR_CREATE_FAILED",
+      detail: truncateDetail(err),
+    });
     return NextResponse.json(
       {
         error:
@@ -160,6 +204,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
 
   const meetLink = extractMeetLink(event);
   if (!meetLink) {
+    await notifySiteOwnersOfBookingFailure({
+      ...failureAlertBase,
+      stage: "MEET_LINK_MISSING",
+      detail: `Google event id: ${event.id}`,
+    });
     return NextResponse.json(
       {
         error: "Calendar event created but no Meet link returned. Please email the team.",
