@@ -46,6 +46,7 @@ export async function GET(_req: NextRequest) {
       name: c.name,
       slug: c.slug,
       tokenBalance: c.tokenBalance,
+      autoAssignDefaultEnabled: c.autoAssignDefaultEnabled,
       createdAt: c.createdAt.toISOString(),
       updatedAt: c.updatedAt.toISOString(),
       plan: c.plan

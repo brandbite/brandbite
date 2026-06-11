@@ -2156,6 +2156,8 @@ enum AdminActionType {
   AI_PRICING_EDIT
   CONSULTATION_PRICING_EDIT
   GOOGLE_OAUTH_CONFIG_EDIT
+  // Company auto-assign default toggle (/admin/companies)
+  COMPANY_AUTO_ASSIGN_EDIT
   // Talent applications (SITE_OWNER only — see canManageTalentApplications)
   TALENT_APPLICATION_ACCEPTED
   TALENT_APPLICATION_DECLINED

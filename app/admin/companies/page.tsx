@@ -37,6 +37,9 @@ type AdminCompany = {
   name: string;
   slug: string;
   tokenBalance: number;
+  /** Company-wide auto-assign default. Projects in INHERIT mode (the
+   *  default) resolve against this when a new ticket picks a creative. */
+  autoAssignDefaultEnabled: boolean;
   createdAt: string;
   updatedAt: string;
   plan: CompanyPlan | null;
@@ -110,6 +113,31 @@ export default function AdminCompaniesPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Auto-assign toggle. Per-row busy id so a slow PATCH only disables the
+  // pill it belongs to. Errors land in the page-level banner — rare, and a
+  // per-row error surface isn't worth the layout churn.
+  const [autoAssignBusyId, setAutoAssignBusyId] = useState<string | null>(null);
+
+  const toggleAutoAssign = async (c: AdminCompany) => {
+    setAutoAssignBusyId(c.id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/companies/${c.id}/auto-assign`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: !c.autoAssignDefaultEnabled }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error || `Request failed with status ${res.status}`);
+      await load();
+    } catch (err: any) {
+      console.error("Auto-assign toggle error:", err);
+      setError(err?.message || "Failed to update auto-assign setting.");
+    } finally {
+      setAutoAssignBusyId(null);
+    }
+  };
 
   const openAdjust = (c: AdminCompany) => {
     setAdjustTarget(c);
@@ -322,6 +350,7 @@ export default function AdminCompaniesPage() {
               <TH align="right">Members</TH>
               <TH align="right">Projects</TH>
               <TH align="right">Tickets</TH>
+              <TH>Auto-assign</TH>
               <TH align="right">Created</TH>
               <TH align="right">Actions</TH>
             </THead>
@@ -351,6 +380,27 @@ export default function AdminCompaniesPage() {
                   <TD align="right">{c.counts.members}</TD>
                   <TD align="right">{c.counts.projects}</TD>
                   <TD align="right">{c.counts.tickets}</TD>
+                  <TD>
+                    {/* Company default; projects in INHERIT mode follow it.
+                        Per-project ON/OFF overrides keep working unchanged. */}
+                    <button
+                      type="button"
+                      onClick={() => toggleAutoAssign(c)}
+                      disabled={autoAssignBusyId === c.id}
+                      title={
+                        c.autoAssignDefaultEnabled
+                          ? "New tickets are auto-assigned to a matching creative. Click to turn off."
+                          : "New tickets land unassigned for manual triage. Click to turn on."
+                      }
+                      className={`rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors disabled:opacity-50 ${
+                        c.autoAssignDefaultEnabled
+                          ? "border-emerald-300 bg-emerald-50 text-emerald-800 hover:border-emerald-500"
+                          : "border-[var(--bb-border)] bg-white text-[var(--bb-text-secondary)] hover:border-[var(--bb-primary)]"
+                      }`}
+                    >
+                      {autoAssignBusyId === c.id ? "…" : c.autoAssignDefaultEnabled ? "On" : "Off"}
+                    </button>
+                  </TD>
                   <TD align="right" className="text-[var(--bb-text-tertiary)]">
                     {formatDate(c.createdAt)}
                   </TD>
