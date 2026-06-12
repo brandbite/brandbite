@@ -45,6 +45,9 @@ export async function POST(req: NextRequest) {
         googleRefreshToken: null,
         googleTokenExpiresAt: null,
         googleConnectedAt: null,
+        // Deliberate disconnect is the "not connected" state, not "broken".
+        googleConnectionBrokenAt: null,
+        googleConnectionLastError: null,
         updatedById: user.id,
       },
     });

@@ -88,6 +88,9 @@ export async function GET(req: NextRequest) {
         googleTokenExpiresAt: new Date(Date.now() + tokens.expires_in * 1000),
         googleConnectedAt: new Date(),
         googleCalendarId: settings.googleCalendarId ?? "primary",
+        // A fresh consent wipes any broken-connection state — this IS the fix.
+        googleConnectionBrokenAt: null,
+        googleConnectionLastError: null,
         updatedById: user.id,
       },
     });

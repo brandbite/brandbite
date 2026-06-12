@@ -21,6 +21,8 @@ type ModalProps = {
   scrollable?: boolean;
   children: React.ReactNode;
   className?: string;
+  /** Raise above a base modal so confirmation dialogs stack on top. */
+  elevated?: boolean;
 };
 
 const SIZE_CLASSES: Record<ModalSize, string> = {
@@ -42,6 +44,7 @@ export function Modal({
   scrollable = false,
   children,
   className = "",
+  elevated = false,
 }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
@@ -113,7 +116,7 @@ export function Modal({
       role="dialog"
       aria-modal="true"
       aria-labelledby={labelId}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-8"
+      className={`fixed inset-0 ${elevated ? "z-[60]" : "z-50"} flex items-center justify-center bg-black/30 px-4 py-8`}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

@@ -1012,6 +1012,34 @@ export default function CustomerBoardPage() {
     [detailTicketId, loadDetailBriefAssets],
   );
 
+  const handleDeleteBriefAsset = useCallback(
+    async (asset: { id: string }) => {
+      if (!detailTicketId) return;
+      try {
+        const res = await fetch(`/api/customer/tickets/${detailTicketId}/assets/${asset.id}`, {
+          method: "DELETE",
+        });
+        if (!res.ok) {
+          const json = await res.json().catch(() => null);
+          showToast({
+            type: "error",
+            title: "Couldn't remove attachment",
+            description:
+              json?.error === "TICKET_NOT_EDITABLE"
+                ? "Attachments can only be removed while the ticket is in To do."
+                : undefined,
+          });
+          return;
+        }
+        showToast({ type: "success", title: "Attachment removed" });
+        await loadDetailBriefAssets(detailTicketId);
+      } catch {
+        showToast({ type: "error", title: "Couldn't remove attachment" });
+      }
+    },
+    [detailTicketId, loadDetailBriefAssets, showToast],
+  );
+
   // ---------------------------------------------------------------------------
   // Derived values
   // ---------------------------------------------------------------------------
@@ -2787,9 +2815,16 @@ export default function CustomerBoardPage() {
                         {hasAssets && (
                           <>
                             {hasCreativeWork ? (
-                              <BriefThumbnailRow assets={detailBriefAssets} />
+                              <BriefThumbnailRow
+                                assets={detailBriefAssets}
+                                onDelete={canAddImages ? handleDeleteBriefAsset : undefined}
+                              />
                             ) : (
-                              <RevisionImageLarge assets={detailBriefAssets} pinMode="view" />
+                              <RevisionImageLarge
+                                assets={detailBriefAssets}
+                                pinMode="view"
+                                onDelete={canAddImages ? handleDeleteBriefAsset : undefined}
+                              />
                             )}
                           </>
                         )}

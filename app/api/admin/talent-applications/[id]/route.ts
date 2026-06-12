@@ -2,12 +2,19 @@
 // @file: app/api/admin/talent-applications/[id]/route.ts
 // @purpose: Per-application admin actions. SITE_OWNER only. Three actions:
 //
-//             ACCEPT          (from SUBMITTED)
+//             ACCEPT          (from SUBMITTED / IN_REVIEW, or as a RE-OFFER
+//                              from AWAITING_CANDIDATE_CHOICE /
+//                              CANDIDATE_PROPOSED_TIME)
 //               Generate a booking token, persist three proposed slots +
 //               an optional custom message, email the candidate the
 //               tokenized booking link. Status → AWAITING_CANDIDATE_CHOICE.
 //               No Google Calendar event yet — that comes after the
 //               candidate picks (or after ACCEPT_PROPOSED below).
+//               Re-offering replaces the slots and booking token (the
+//               old link dies) — the unstick path when a link expired
+//               or the candidate-side booking kept failing, and the
+//               counter-propose path when the candidate's own suggested
+//               time doesn't work for the owner.
 //
 //             ACCEPT_PROPOSED (from CANDIDATE_PROPOSED_TIME)
 //               Confirm the time the candidate proposed via the public
@@ -76,9 +83,15 @@ const ALLOWED_FROM: Record<
   | "ONBOARD",
   TalentApplicationStatus[]
 > = {
-  ACCEPT: ["SUBMITTED"],
+  // IN_REVIEW was always offerable in the UI gate but the server said
+  // no — latent mismatch fixed alongside the re-offer statuses. The two
+  // re-offer statuses let the owner regenerate slots + booking link when
+  // the old link expired / booking kept failing (AWAITING_CANDIDATE_CHOICE)
+  // or counter-propose against a candidate's suggested time
+  // (CANDIDATE_PROPOSED_TIME).
+  ACCEPT: ["SUBMITTED", "IN_REVIEW", "AWAITING_CANDIDATE_CHOICE", "CANDIDATE_PROPOSED_TIME"],
   ACCEPT_PROPOSED: ["CANDIDATE_PROPOSED_TIME"],
-  DECLINE: ["SUBMITTED", "AWAITING_CANDIDATE_CHOICE", "CANDIDATE_PROPOSED_TIME"],
+  DECLINE: ["SUBMITTED", "IN_REVIEW", "AWAITING_CANDIDATE_CHOICE", "CANDIDATE_PROPOSED_TIME"],
   // PR9 — post-interview lifecycle. MARK_INTERVIEW_HELD is the gate to
   // the hire-or-reject decision; HIRE captures onboarding fields and
   // moves to HIRED. REJECT_POST_INTERVIEW sends the soft-toned
@@ -189,11 +202,16 @@ async function handleAccept(args: {
   const token = generateBookingToken();
   const expiresAt = bookingTokenExpiresAt();
   const trimmedMessage = action.customMessage?.trim() || null;
+  const isReoffer = row.status !== "SUBMITTED" && row.status !== "IN_REVIEW";
 
   // Conditional write so a race against another admin can't overwrite a
-  // newly-actioned row. updateMany returns count.
+  // newly-actioned row. updateMany returns count. Pinned to the status
+  // the admin SAW (row.status), not the whole allowed set — two admins
+  // racing distinct re-offers still both target AWAITING_CANDIDATE_CHOICE
+  // (last write wins, same as before), but an accept can't clobber a row
+  // that moved to a different stage between read and write.
   const writeResult = await prisma.talentApplication.updateMany({
-    where: { id, status: "SUBMITTED" },
+    where: { id, status: row.status },
     data: {
       status: "AWAITING_CANDIDATE_CHOICE",
       reviewedAt: new Date(),
@@ -203,6 +221,10 @@ async function handleAccept(args: {
       bookingToken: token,
       bookingTokenExpiresAt: expiresAt,
       customMessage: trimmedMessage,
+      // A re-offer supersedes any pending candidate proposal — leaving
+      // it set would let a later ACCEPT_PROPOSED book a time both sides
+      // have already moved past.
+      candidateProposedAt: null,
     },
   });
   if (writeResult.count === 0) {
@@ -215,7 +237,8 @@ async function handleAccept(args: {
   // Best-effort email — a failure here means the row is in
   // AWAITING_CANDIDATE_CHOICE but the candidate doesn't know yet. The
   // admin can re-trigger by re-clicking Accept after a transient resend
-  // failure (idempotent because the schema enforces SUBMITTED).
+  // failure — now first-class: AWAITING_CANDIDATE_CHOICE is itself an
+  // allowed from-status, so the retry simply re-offers with a fresh link.
   try {
     const { subject, html } = await renderTalentAcceptEmail({
       candidateName: row.fullName,
@@ -239,6 +262,10 @@ async function handleAccept(args: {
       candidateEmail: row.email,
       proposedSlotsIso: action.proposedSlotsIso,
       hasCustomMessage: !!trimmedMessage,
+      // Distinguishes a first offer from a re-offer/counter-offer in the
+      // audit trail without minting a separate action type.
+      previousStatus: row.status,
+      isReoffer,
       // Token deliberately not logged — it's a credential.
     },
     context: auditContext,
