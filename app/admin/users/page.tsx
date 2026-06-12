@@ -31,6 +31,9 @@ type UserRow = {
   tasksPerWeekCap: number | null;
   // Workload PR — free-text working hours. Null = unset.
   workingHours: string | null;
+  // Set when the account is soft-deleted (anonymized tombstone kept for
+  // ledger / audit integrity). Rows with this set render read-only.
+  deletedAt: string | null;
   companyCount: number;
   assignedTickets: number;
 };
@@ -75,6 +78,9 @@ export default function AdminUsersPage() {
   const [roleFilter, setRoleFilter] = useState("");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  // Soft-deleted (anonymized) accounts are hidden by default; this toggle
+  // includes them so an admin can trace audit rows back to a tombstone.
+  const [showDeleted, setShowDeleted] = useState(false);
 
   // Role editing
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -112,6 +118,7 @@ export default function AdminUsersPage() {
         const params = new URLSearchParams();
         if (roleFilter) params.set("role", roleFilter);
         if (debouncedSearch) params.set("q", debouncedSearch);
+        if (showDeleted) params.set("includeDeleted", "1");
 
         const res = await fetch(`/api/admin/users?${params}`, { cache: "no-store" });
         const json = await res.json().catch(() => null);
@@ -131,7 +138,7 @@ export default function AdminUsersPage() {
     return () => {
       cancelled = true;
     };
-  }, [roleFilter, debouncedSearch]);
+  }, [roleFilter, debouncedSearch, showDeleted]);
 
   // Confirmation-modal state for privilege-escalation role changes (L2).
   // Non-privilege role swaps (e.g. CUSTOMER <-> DESIGNER) skip the modal
@@ -389,6 +396,15 @@ export default function AdminUsersPage() {
             </option>
           ))}
         </select>
+        <label className="flex cursor-pointer items-center gap-1.5 text-xs text-[var(--bb-text-muted)] select-none">
+          <input
+            type="checkbox"
+            checked={showDeleted}
+            onChange={(e) => setShowDeleted(e.target.checked)}
+            className="h-3.5 w-3.5 accent-[var(--bb-primary)]"
+          />
+          Show deleted
+        </label>
         <span className="text-xs text-[var(--bb-text-muted)]">
           {users.length} user{users.length !== 1 ? "s" : ""}
         </span>
@@ -419,7 +435,9 @@ export default function AdminUsersPage() {
               {users.map((u) => (
                 <tr
                   key={u.id}
-                  className="border-b border-[var(--bb-border-subtle)] last:border-b-0"
+                  className={`border-b border-[var(--bb-border-subtle)] last:border-b-0 ${
+                    u.deletedAt ? "opacity-60" : ""
+                  }`}
                 >
                   {/* User info */}
                   <td className="px-4 py-3">
@@ -454,6 +472,11 @@ export default function AdminUsersPage() {
                         (paused)
                       </span>
                     )}
+                    {u.deletedAt && (
+                      <span className="ml-1.5 inline-block rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-semibold text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                        Deleted
+                      </span>
+                    )}
                   </td>
 
                   {/* Companies */}
@@ -477,222 +500,236 @@ export default function AdminUsersPage() {
 
                   {/* Actions */}
                   <td className="px-4 py-3">
-                    <div className="flex flex-col gap-1.5">
-                      {editingUserId === u.id ? (
-                        <div className="flex items-center gap-2">
-                          <select
-                            value={pendingRole}
-                            onChange={(e) => setPendingRole(e.target.value)}
-                            disabled={saving}
-                            className="rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-card)] px-2 py-1 text-xs text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)]"
-                          >
-                            {ROLE_OPTIONS.map((r) => (
-                              <option key={r.value} value={r.value}>
-                                {r.label}
-                              </option>
-                            ))}
-                          </select>
+                    {u.deletedAt ? (
+                      // Tombstone row — auth is revoked and the identity is
+                      // anonymized, so every action here would 400. Show when
+                      // it happened instead.
+                      <span className="text-xs text-[var(--bb-text-muted)]">
+                        Deleted{" "}
+                        {new Date(u.deletedAt).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                      </span>
+                    ) : (
+                      <div className="flex flex-col gap-1.5">
+                        {editingUserId === u.id ? (
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={pendingRole}
+                              onChange={(e) => setPendingRole(e.target.value)}
+                              disabled={saving}
+                              className="rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-card)] px-2 py-1 text-xs text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)]"
+                            >
+                              {ROLE_OPTIONS.map((r) => (
+                                <option key={r.value} value={r.value}>
+                                  {r.label}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={() => {
+                                // Privilege-escalation changes require the
+                                // typed-phrase confirmation. Everything else
+                                // runs direct.
+                                const isPrivilegeChange =
+                                  pendingRole === "SITE_OWNER" ||
+                                  pendingRole === "SITE_ADMIN" ||
+                                  u.role === "SITE_OWNER";
+                                if (isPrivilegeChange) {
+                                  setPendingPromote({
+                                    userId: u.id,
+                                    targetEmail: u.email,
+                                    currentRole: u.role,
+                                    newRole: pendingRole,
+                                  });
+                                } else {
+                                  void handleRoleChange(u.id, pendingRole).catch(() => {
+                                    // error toast already shown
+                                  });
+                                }
+                              }}
+                              disabled={saving || pendingRole === u.role}
+                              className="rounded-lg bg-[var(--bb-primary)] px-2.5 py-1 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                            >
+                              {saving ? "..." : "Save"}
+                            </button>
+                            <button
+                              onClick={() => setEditingUserId(null)}
+                              disabled={saving}
+                              className="text-xs text-[var(--bb-text-muted)] hover:text-[var(--bb-secondary)]"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
                           <button
                             onClick={() => {
-                              // Privilege-escalation changes require the
-                              // typed-phrase confirmation. Everything else
-                              // runs direct.
-                              const isPrivilegeChange =
-                                pendingRole === "SITE_OWNER" ||
-                                pendingRole === "SITE_ADMIN" ||
-                                u.role === "SITE_OWNER";
-                              if (isPrivilegeChange) {
-                                setPendingPromote({
-                                  userId: u.id,
-                                  targetEmail: u.email,
-                                  currentRole: u.role,
-                                  newRole: pendingRole,
-                                });
-                              } else {
-                                void handleRoleChange(u.id, pendingRole).catch(() => {
-                                  // error toast already shown
-                                });
-                              }
+                              setEditingUserId(u.id);
+                              setPendingRole(u.role);
                             }}
-                            disabled={saving || pendingRole === u.role}
-                            className="rounded-lg bg-[var(--bb-primary)] px-2.5 py-1 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                            className="rounded-lg border border-[var(--bb-border)] px-2.5 py-1 text-xs font-medium text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
                           >
-                            {saving ? "..." : "Save"}
+                            Change role
                           </button>
+                        )}
+                        {u.role === "DESIGNER" && (
                           <button
-                            onClick={() => setEditingUserId(null)}
-                            disabled={saving}
-                            className="text-xs text-[var(--bb-text-muted)] hover:text-[var(--bb-secondary)]"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            setEditingUserId(u.id);
-                            setPendingRole(u.role);
-                          }}
-                          className="rounded-lg border border-[var(--bb-border)] px-2.5 py-1 text-xs font-medium text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
-                        >
-                          Change role
-                        </button>
-                      )}
-                      {u.role === "DESIGNER" && (
-                        <button
-                          onClick={() =>
-                            handleToggleRevisionNotes(u.id, u.creativeRevisionNotesEnabled)
-                          }
-                          disabled={togglingNotesId === u.id}
-                          className="flex items-center gap-1.5 text-[10px] text-[var(--bb-text-muted)] transition-colors hover:text-[var(--bb-secondary)] disabled:opacity-50"
-                        >
-                          <span
-                            className={`inline-block h-3 w-5 rounded-full transition-colors ${
-                              u.creativeRevisionNotesEnabled
-                                ? "bg-[var(--bb-primary)]"
-                                : "bg-[var(--bb-border)]"
-                            }`}
+                            onClick={() =>
+                              handleToggleRevisionNotes(u.id, u.creativeRevisionNotesEnabled)
+                            }
+                            disabled={togglingNotesId === u.id}
+                            className="flex items-center gap-1.5 text-[10px] text-[var(--bb-text-muted)] transition-colors hover:text-[var(--bb-secondary)] disabled:opacity-50"
                           >
                             <span
-                              className={`block h-2.5 w-2.5 translate-y-[1px] rounded-full bg-white transition-transform ${
+                              className={`inline-block h-3 w-5 rounded-full transition-colors ${
                                 u.creativeRevisionNotesEnabled
-                                  ? "translate-x-[9px]"
-                                  : "translate-x-[1px]"
+                                  ? "bg-[var(--bb-primary)]"
+                                  : "bg-[var(--bb-border)]"
                               }`}
-                            />
-                          </span>
-                          Revision notes
-                        </button>
-                      )}
-                      {/* PR11 — inline tasks/week cap editor for DESIGNER rows.
+                            >
+                              <span
+                                className={`block h-2.5 w-2.5 translate-y-[1px] rounded-full bg-white transition-transform ${
+                                  u.creativeRevisionNotesEnabled
+                                    ? "translate-x-[9px]"
+                                    : "translate-x-[1px]"
+                                }`}
+                              />
+                            </span>
+                            Revision notes
+                          </button>
+                        )}
+                        {/* PR11 — inline tasks/week cap editor for DESIGNER rows.
                           Read-only label until clicked; expands into a small
                           number input + Save / Cancel. Auto-assign in
                           lib/tickets/create-ticket.ts skips this creative when
                           their open count >= cap. Empty input clears (no cap). */}
-                      {u.role === "DESIGNER" && editingCapId === u.id ? (
-                        <div className="flex items-center gap-1 text-[10px]">
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            min={1}
-                            max={40}
-                            value={pendingCap}
-                            onChange={(e) => setPendingCap(e.target.value)}
-                            placeholder="—"
-                            className="h-6 w-12 rounded border border-[var(--bb-border)] px-1 text-center text-xs"
-                            aria-label="Tasks per week cap"
-                          />
-                          <button
-                            onClick={() => handleSaveCap(u.id)}
-                            disabled={savingCap}
-                            className="rounded bg-[var(--bb-primary)] px-2 py-0.5 text-[10px] font-medium text-white disabled:opacity-50"
-                          >
-                            {savingCap ? "…" : "Save"}
-                          </button>
+                        {u.role === "DESIGNER" && editingCapId === u.id ? (
+                          <div className="flex items-center gap-1 text-[10px]">
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              min={1}
+                              max={40}
+                              value={pendingCap}
+                              onChange={(e) => setPendingCap(e.target.value)}
+                              placeholder="—"
+                              className="h-6 w-12 rounded border border-[var(--bb-border)] px-1 text-center text-xs"
+                              aria-label="Tasks per week cap"
+                            />
+                            <button
+                              onClick={() => handleSaveCap(u.id)}
+                              disabled={savingCap}
+                              className="rounded bg-[var(--bb-primary)] px-2 py-0.5 text-[10px] font-medium text-white disabled:opacity-50"
+                            >
+                              {savingCap ? "…" : "Save"}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditingCapId(null);
+                                setPendingCap("");
+                              }}
+                              disabled={savingCap}
+                              className="text-[10px] text-[var(--bb-text-muted)] hover:text-[var(--bb-secondary)] disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : u.role === "DESIGNER" ? (
                           <button
                             onClick={() => {
-                              setEditingCapId(null);
-                              setPendingCap("");
+                              setEditingCapId(u.id);
+                              setPendingCap(
+                                u.tasksPerWeekCap == null ? "" : String(u.tasksPerWeekCap),
+                              );
                             }}
-                            disabled={savingCap}
-                            className="text-[10px] text-[var(--bb-text-muted)] hover:text-[var(--bb-secondary)] disabled:opacity-50"
+                            className="flex items-center gap-1 text-[10px] text-[var(--bb-text-muted)] transition-colors hover:text-[var(--bb-secondary)]"
+                            title="Auto-assign skips this creative when their open ticket count reaches this cap. Empty = no cap."
                           >
-                            Cancel
+                            <span>Cap:</span>
+                            <span
+                              className={`rounded border border-[var(--bb-border)] px-1.5 py-0.5 ${
+                                u.tasksPerWeekCap == null ? "text-[var(--bb-text-muted)]" : ""
+                              }`}
+                            >
+                              {u.tasksPerWeekCap == null ? "—" : u.tasksPerWeekCap}
+                            </span>
                           </button>
-                        </div>
-                      ) : u.role === "DESIGNER" ? (
-                        <button
-                          onClick={() => {
-                            setEditingCapId(u.id);
-                            setPendingCap(
-                              u.tasksPerWeekCap == null ? "" : String(u.tasksPerWeekCap),
-                            );
-                          }}
-                          className="flex items-center gap-1 text-[10px] text-[var(--bb-text-muted)] transition-colors hover:text-[var(--bb-secondary)]"
-                          title="Auto-assign skips this creative when their open ticket count reaches this cap. Empty = no cap."
-                        >
-                          <span>Cap:</span>
-                          <span
-                            className={`rounded border border-[var(--bb-border)] px-1.5 py-0.5 ${
-                              u.tasksPerWeekCap == null ? "text-[var(--bb-text-muted)]" : ""
-                            }`}
-                          >
-                            {u.tasksPerWeekCap == null ? "—" : u.tasksPerWeekCap}
-                          </span>
-                        </button>
-                      ) : null}
-                      {/* Workload PR — inline working-hours editor.
+                        ) : null}
+                        {/* Workload PR — inline working-hours editor.
                           DESIGNER only. Same shape as the cap editor:
                           read-only badge until clicked; expands into a
                           text input + Save / Cancel. Empty saves null
                           (clears the value). */}
-                      {u.role === "DESIGNER" && editingHoursId === u.id ? (
-                        <div className="flex items-center gap-1 text-[10px]">
-                          <input
-                            type="text"
-                            value={pendingHours}
-                            onChange={(e) => setPendingHours(e.target.value)}
-                            placeholder="9–18 weekdays, Europe/Istanbul"
-                            maxLength={200}
-                            className="h-6 w-48 rounded border border-[var(--bb-border)] px-1.5 text-xs"
-                            aria-label="Working hours"
-                          />
-                          <button
-                            onClick={() => handleSaveHours(u.id)}
-                            disabled={savingHours}
-                            className="rounded bg-[var(--bb-primary)] px-2 py-0.5 text-[10px] font-medium text-white disabled:opacity-50"
-                          >
-                            {savingHours ? "…" : "Save"}
-                          </button>
+                        {u.role === "DESIGNER" && editingHoursId === u.id ? (
+                          <div className="flex items-center gap-1 text-[10px]">
+                            <input
+                              type="text"
+                              value={pendingHours}
+                              onChange={(e) => setPendingHours(e.target.value)}
+                              placeholder="9–18 weekdays, Europe/Istanbul"
+                              maxLength={200}
+                              className="h-6 w-48 rounded border border-[var(--bb-border)] px-1.5 text-xs"
+                              aria-label="Working hours"
+                            />
+                            <button
+                              onClick={() => handleSaveHours(u.id)}
+                              disabled={savingHours}
+                              className="rounded bg-[var(--bb-primary)] px-2 py-0.5 text-[10px] font-medium text-white disabled:opacity-50"
+                            >
+                              {savingHours ? "…" : "Save"}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditingHoursId(null);
+                                setPendingHours("");
+                              }}
+                              disabled={savingHours}
+                              className="text-[10px] text-[var(--bb-text-muted)] hover:text-[var(--bb-secondary)] disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : u.role === "DESIGNER" ? (
                           <button
                             onClick={() => {
-                              setEditingHoursId(null);
-                              setPendingHours("");
+                              setEditingHoursId(u.id);
+                              setPendingHours(u.workingHours ?? "");
                             }}
-                            disabled={savingHours}
-                            className="text-[10px] text-[var(--bb-text-muted)] hover:text-[var(--bb-secondary)] disabled:opacity-50"
+                            className="flex max-w-[260px] items-center gap-1 truncate text-[10px] text-[var(--bb-text-muted)] transition-colors hover:text-[var(--bb-secondary)]"
+                            title="Free-form availability hint shown to scheduling admins. Empty = unset."
                           >
-                            Cancel
+                            <span className="shrink-0">Hours:</span>
+                            <span
+                              className={`min-w-0 truncate rounded border border-[var(--bb-border)] px-1.5 py-0.5 ${
+                                u.workingHours == null ? "text-[var(--bb-text-muted)]" : ""
+                              }`}
+                            >
+                              {u.workingHours == null ? "—" : u.workingHours}
+                            </span>
                           </button>
-                        </div>
-                      ) : u.role === "DESIGNER" ? (
-                        <button
-                          onClick={() => {
-                            setEditingHoursId(u.id);
-                            setPendingHours(u.workingHours ?? "");
-                          }}
-                          className="flex max-w-[260px] items-center gap-1 truncate text-[10px] text-[var(--bb-text-muted)] transition-colors hover:text-[var(--bb-secondary)]"
-                          title="Free-form availability hint shown to scheduling admins. Empty = unset."
-                        >
-                          <span className="shrink-0">Hours:</span>
-                          <span
-                            className={`min-w-0 truncate rounded border border-[var(--bb-border)] px-1.5 py-0.5 ${
-                              u.workingHours == null ? "text-[var(--bb-text-muted)]" : ""
-                            }`}
-                          >
-                            {u.workingHours == null ? "—" : u.workingHours}
-                          </span>
-                        </button>
-                      ) : null}
-                      {/* Hard-delete — SITE_OWNER only. Hidden for site
+                        ) : null}
+                        {/* Hard-delete — SITE_OWNER only. Hidden for site
                           owners themselves (the API blocks it too); they
                           must demote first via Change role. */}
-                      {isSiteOwner && u.role !== "SITE_OWNER" && (
-                        <button
-                          onClick={() =>
-                            setPendingDelete({
-                              userId: u.id,
-                              targetEmail: u.email,
-                              targetRole: u.role,
-                            })
-                          }
-                          className="text-[10px] font-medium text-red-600 transition-colors hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                          title="Permanently anonymize this user and revoke their access. Cannot be undone."
-                        >
-                          Delete user
-                        </button>
-                      )}
-                    </div>
+                        {isSiteOwner && u.role !== "SITE_OWNER" && (
+                          <button
+                            onClick={() =>
+                              setPendingDelete({
+                                userId: u.id,
+                                targetEmail: u.email,
+                                targetRole: u.role,
+                              })
+                            }
+                            className="text-[10px] font-medium text-red-600 transition-colors hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                            title="Permanently anonymize this user and revoke their access. Cannot be undone."
+                          >
+                            Delete user
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
