@@ -25,8 +25,12 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const roleFilter = searchParams.get("role");
     const search = searchParams.get("q")?.trim() || "";
+    const includeDeleted = searchParams.get("includeDeleted") === "1";
 
-    const where: Prisma.UserAccountWhereInput = {};
+    // Anonymized (soft-deleted) accounts are tombstones kept for ledger /
+    // audit integrity — exclude them unless the admin explicitly asks via
+    // the "Show deleted" toggle.
+    const where: Prisma.UserAccountWhereInput = includeDeleted ? {} : { deletedAt: null };
 
     if (roleFilter && VALID_ROLES.includes(roleFilter)) {
       where.role = roleFilter as UserRole;
@@ -56,6 +60,7 @@ export async function GET(req: NextRequest) {
         // Null = unset; the row renders an em dash and lets the admin
         // type one in.
         workingHours: true,
+        deletedAt: true,
         _count: {
           select: {
             companies: true,
@@ -77,6 +82,7 @@ export async function GET(req: NextRequest) {
         creativeRevisionNotesEnabled: u.creativeRevisionNotesEnabled,
         tasksPerWeekCap: u.tasksPerWeekCap,
         workingHours: u.workingHours,
+        deletedAt: u.deletedAt ? u.deletedAt.toISOString() : null,
         companyCount: u._count.companies,
         assignedTickets: u._count.creativeTickets,
       })),
