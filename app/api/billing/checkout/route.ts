@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { canManagePlan } from "@/lib/permissions/companyRoles";
 import { stripe, getAppBaseUrl } from "@/lib/stripe";
 
 type CheckoutRequestBody = {
@@ -30,6 +31,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "No active company selected for this user." },
         { status: 400 },
+      );
+    }
+
+    // Starting a checkout binds the company to a subscription / charge, so it
+    // is OWNER/BILLING only — the same policy change-plan, preview-plan-change
+    // and top-ups already enforce. Without this a plain MEMBER could initiate
+    // billing for the whole company.
+    if (!canManagePlan(user.companyRole)) {
+      return NextResponse.json(
+        { error: "Only OWNER or BILLING members can start a checkout." },
+        { status: 403 },
       );
     }
 

@@ -201,17 +201,34 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
     // Ledger write + status update in a single transaction.
     const result = await prisma.$transaction(async (tx) => {
-      // Ledger DEBIT
-      const ledgerResult = await applyUserLedgerEntry({
-        userId: withdrawal.creativeId,
-        amount: withdrawal.amountTokens,
-        direction: "DEBIT",
-        reason: "WITHDRAW",
-        notes: `Withdrawal approved (id: ${withdrawal.id})`,
-        metadata: {
-          withdrawalId: withdrawal.id,
-        },
+      // Re-assert PENDING inside the transaction and claim the row. If a
+      // concurrent approve (or the PATCH flow) already moved it, count is 0
+      // and we abort before writing a second DEBIT — closes the check-then-act
+      // race that could double-debit the creative.
+      const claimed = await tx.withdrawal.updateMany({
+        where: { id: withdrawal.id, status: WithdrawalStatus.PENDING },
+        data: { status: WithdrawalStatus.APPROVED, approvedAt: new Date() },
       });
+      if (claimed.count === 0) {
+        throw new Response("Withdrawal is no longer pending", { status: 409 });
+      }
+
+      // Ledger DEBIT — pass `tx` so it commits atomically with the status
+      // flip above. Without the shared client applyUserLedgerEntry would open
+      // its own transaction and the debit could survive a rollback here.
+      const ledgerResult = await applyUserLedgerEntry(
+        {
+          userId: withdrawal.creativeId,
+          amount: withdrawal.amountTokens,
+          direction: "DEBIT",
+          reason: "WITHDRAW",
+          notes: `Withdrawal approved (id: ${withdrawal.id})`,
+          metadata: {
+            withdrawalId: withdrawal.id,
+          },
+        },
+        tx,
+      );
 
       const updated = await tx.withdrawal.update({
         where: { id: withdrawal.id },
@@ -261,6 +278,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       { status: 200 },
     );
   } catch (error) {
+    if (error instanceof Response) {
+      return NextResponse.json(
+        { error: error.statusText || "Withdrawal is no longer pending" },
+        { status: error.status },
+      );
+    }
     if ((error as { code?: string })?.code === "UNAUTHENTICATED") {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }

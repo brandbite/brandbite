@@ -80,6 +80,19 @@ export type CreateTicketFailure =
 export type CreateTicketResult = CreateTicketSuccess | CreateTicketFailure;
 
 /**
+ * Thrown inside the create transaction when the guarded balance decrement
+ * finds the company can no longer cover the cost (a concurrent debit landed
+ * between the pre-check and commit). Caught below and mapped to the
+ * INSUFFICIENT_TOKENS failure so the ticket is never created uncharged.
+ */
+class InsufficientTokensAtCommitError extends Error {
+  constructor(public readonly required: number) {
+    super("Insufficient token balance at commit time.");
+    this.name = "InsufficientTokensAtCommitError";
+  }
+}
+
+/**
  * Create a customer ticket end-to-end. See the file header for what this owns.
  *
  * The auto-assign block is kept inline rather than further extracted because
@@ -155,7 +168,8 @@ export async function createCustomerTicket(input: CreateTicketInput): Promise<Cr
   const projectAutoAssignMode = project?.autoAssignMode ?? null;
   const autoAssignEffective = isAutoAssignEnabled(companyAutoAssignDefault, projectAutoAssignMode);
 
-  const created = await prisma.$transaction(async (tx) => {
+  const created = await prisma
+    .$transaction(async (tx) => {
     // 1) Next companyTicketNumber
     const lastTicket = await tx.ticket.findFirst({
       where: { companyId: company.id },
@@ -350,13 +364,26 @@ export async function createCustomerTicket(input: CreateTicketInput): Promise<Cr
 
     // 4) Company token debit + ledger entry
     if (jobType) {
-      const balanceBefore = company.tokenBalance;
-      const balanceAfter = balanceBefore - effectiveCost;
-
-      await tx.company.update({
-        where: { id: company.id },
-        data: { tokenBalance: balanceAfter },
+      // Guarded atomic decrement. The pre-transaction check at the top of this
+      // function can be raced by a concurrent create/booking, so re-assert the
+      // balance here: decrement only if it still covers the cost. count === 0
+      // means it no longer does — abort the whole ticket create rather than
+      // driving the balance negative.
+      const debited = await tx.company.updateMany({
+        where: { id: company.id, tokenBalance: { gte: effectiveCost } },
+        data: { tokenBalance: { decrement: effectiveCost } },
       });
+
+      if (debited.count === 0) {
+        throw new InsufficientTokensAtCommitError(effectiveCost);
+      }
+
+      const refreshed = await tx.company.findUniqueOrThrow({
+        where: { id: company.id },
+        select: { tokenBalance: true },
+      });
+      const balanceAfter = refreshed.tokenBalance;
+      const balanceBefore = balanceAfter + effectiveCost;
 
       await tx.tokenLedger.create({
         data: {
@@ -459,7 +486,28 @@ export async function createCustomerTicket(input: CreateTicketInput): Promise<Cr
     void actorUserId;
 
     return createdTicket;
-  });
+    })
+    .catch((err: unknown) => {
+      // A concurrent debit won the race for the last tokens; the whole create
+      // rolled back. Signal with null so the caller returns INSUFFICIENT_TOKENS
+      // instead of a created-but-uncharged ticket.
+      if (err instanceof InsufficientTokensAtCommitError) return null;
+      throw err;
+    });
+
+  if (!created) {
+    const fresh = await prisma.company.findUnique({
+      where: { id: company.id },
+      select: { tokenBalance: true },
+    });
+    return {
+      success: false,
+      code: "INSUFFICIENT_TOKENS",
+      message: "Insufficient token balance.",
+      required: effectiveCost,
+      balance: fresh?.tokenBalance ?? company.tokenBalance,
+    };
+  }
 
   return {
     success: true,

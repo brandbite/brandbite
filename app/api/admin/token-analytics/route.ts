@@ -29,6 +29,11 @@ export async function GET(_req: NextRequest) {
           companyId: {
             not: null,
           },
+          // Exclude creative-scoped rows (JOB_PAYMENT credits / WITHDRAW debits
+          // that also carry the ticket's companyId). They belong to a
+          // creative's balance, not the company's, and would otherwise inflate
+          // per-company credit/net figures.
+          userId: null,
         },
         orderBy: {
           createdAt: "asc",

@@ -214,13 +214,18 @@ export async function applyCompanyLedgerEntry(input: ApplyCompanyLedgerInput) {
  */
 export async function recalculateCompanyTokenBalance(companyId: string) {
   return prisma.$transaction(async (tx) => {
+    // Only company-scoped rows move Company.tokenBalance. Creative payout
+    // (JOB_PAYMENT CREDIT) and withdrawal (DEBIT) rows also carry this
+    // companyId but belong to a UserAccount's balance (they set userId).
+    // Excluding userId rows keeps this repair helper from inflating the
+    // company balance by every creative payout ever made against it.
     const credits = await tx.tokenLedger.aggregate({
-      where: { companyId, direction: "CREDIT" },
+      where: { companyId, userId: null, direction: "CREDIT" },
       _sum: { amount: true },
     });
 
     const debits = await tx.tokenLedger.aggregate({
-      where: { companyId, direction: "DEBIT" },
+      where: { companyId, userId: null, direction: "DEBIT" },
       _sum: { amount: true },
     });
 
@@ -260,12 +265,21 @@ export interface ApplyUserLedgerInput {
  * UserAccount has no tokenBalance column, so balanceBefore / balanceAfter
  * are derived from the ledger aggregate.
  */
-export async function applyUserLedgerEntry(input: ApplyUserLedgerInput) {
+export async function applyUserLedgerEntry(
+  input: ApplyUserLedgerInput,
+  txClient?: Prisma.TransactionClient,
+) {
   const { userId, companyId, ticketId, amount, direction, reason, notes, metadata } = input;
 
   const { signedAmount, rawAmount } = computeSignedAmount(amount, direction);
 
-  return prisma.$transaction(async (tx) => {
+  // When a caller already holds a transaction (e.g. withdrawal approve, which
+  // must commit the DEBIT and the status flip atomically), run inside it.
+  // Otherwise open our own. Previously this always opened a fresh
+  // prisma.$transaction, so a passed-in `tx` was ignored and the ledger row
+  // committed independently of the caller's transaction — a partial-write /
+  // double-debit hazard on rollback.
+  const run = async (tx: Prisma.TransactionClient) => {
     // Per-user balance = CREDIT - DEBIT
     const creditAgg = await tx.tokenLedger.aggregate({
       where: { userId, direction: "CREDIT" },
@@ -302,7 +316,9 @@ export async function applyUserLedgerEntry(input: ApplyUserLedgerInput) {
       ledger,
       balanceAfter,
     };
-  });
+  };
+
+  return txClient ? run(txClient) : prisma.$transaction(run);
 }
 
 /**

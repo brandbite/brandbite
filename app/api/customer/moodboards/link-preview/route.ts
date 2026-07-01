@@ -3,8 +3,58 @@
 // @purpose: Fetch Open Graph metadata (title, description, image) for a URL
 // -----------------------------------------------------------------------------
 
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+
+export const runtime = "nodejs";
+
+/**
+ * True for IPs we must never let the server fetch: loopback, private RFC1918,
+ * link-local (incl. the 169.254.169.254 cloud-metadata endpoint), CGNAT,
+ * unspecified, and their IPv6 equivalents. Guards against SSRF — the caller
+ * controls the URL and we fetch it from the server's network position.
+ */
+function isBlockedAddress(ip: string): boolean {
+  const v = isIP(ip);
+  if (v === 4) {
+    const p = ip.split(".").map(Number);
+    if (p.length !== 4 || p.some((n) => Number.isNaN(n))) return true;
+    const [a, b] = p;
+    if (a === 0 || a === 10 || a === 127) return true; // this-host, private, loopback
+    if (a === 169 && b === 254) return true; // link-local + cloud metadata
+    if (a === 172 && b >= 16 && b <= 31) return true; // private
+    if (a === 192 && b === 168) return true; // private
+    if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
+    if (a >= 224) return true; // multicast / reserved
+    return false;
+  }
+  if (v === 6) {
+    const lower = ip.toLowerCase();
+    if (lower === "::1" || lower === "::") return true; // loopback / unspecified
+    if (lower.startsWith("fe80")) return true; // link-local
+    if (lower.startsWith("fc") || lower.startsWith("fd")) return true; // unique-local
+    // IPv4-mapped IPv6 (::ffff:a.b.c.d) — re-check the embedded v4 address
+    const mapped = lower.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+    if (mapped) return isBlockedAddress(mapped[1]);
+    return false;
+  }
+  return true; // not a literal IP — caller must resolve first
+}
+
+/** Resolve the hostname and reject if it maps to a blocked address. */
+async function assertPublicHost(hostname: string): Promise<boolean> {
+  const literal = isIP(hostname);
+  if (literal) return !isBlockedAddress(hostname);
+  try {
+    const results = await lookup(hostname, { all: true });
+    if (results.length === 0) return false;
+    return results.every((r) => !isBlockedAddress(r.address));
+  } catch {
+    return false;
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -31,23 +81,59 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
     }
 
-    // Fetch the page with a timeout
+    // SSRF guard: reject URLs whose host resolves to a private/internal
+    // address before we ever touch the network.
+    if (!(await assertPublicHost(parsed.hostname))) {
+      return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
+    }
+
+    // Fetch the page with a timeout. We follow redirects manually so we can
+    // re-run the SSRF guard on every hop — `redirect: "follow"` would let a
+    // public URL bounce us to an internal one.
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
 
     let html: string;
     try {
-      const res = await fetch(parsed.href, {
-        signal: controller.signal,
-        headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; BrandBite/1.0; +https://brandbite.studio)",
-          Accept: "text/html",
-        },
-        redirect: "follow",
-      });
+      let current = parsed;
+      let res: Response | null = null;
+
+      for (let hop = 0; hop < 5; hop++) {
+        res = await fetch(current.href, {
+          signal: controller.signal,
+          headers: {
+            "User-Agent": "Mozilla/5.0 (compatible; BrandBite/1.0; +https://brandbite.studio)",
+            Accept: "text/html",
+          },
+          redirect: "manual",
+        });
+
+        // Not a redirect — done.
+        if (res.status < 300 || res.status >= 400) break;
+
+        const location = res.headers.get("location");
+        if (!location) break;
+
+        let next: URL;
+        try {
+          next = new URL(location, current.href);
+        } catch {
+          clearTimeout(timeout);
+          return NextResponse.json({ title: null, description: null, image: null });
+        }
+        if (next.protocol !== "http:" && next.protocol !== "https:") {
+          clearTimeout(timeout);
+          return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
+        }
+        if (!(await assertPublicHost(next.hostname))) {
+          clearTimeout(timeout);
+          return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
+        }
+        current = next;
+      }
       clearTimeout(timeout);
 
-      if (!res.ok) {
+      if (!res || !res.ok) {
         return NextResponse.json({ title: null, description: null, image: null });
       }
 

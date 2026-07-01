@@ -44,7 +44,13 @@ export async function POST(req: NextRequest) {
 
     const body = (await req.json()) as Body;
     const planId = body.planId;
-    const prorationBehavior = body.prorationBehavior ?? "create_prorations";
+    // Never honor a client-supplied "always_invoice": it forces Stripe to cut
+    // an immediate proration invoice, whose invoice.payment_succeeded the
+    // webhook must not treat as a renewal. We already restrict renewal credits
+    // to subscription_cycle, but rejecting it here keeps the surface minimal.
+    const requestedBehavior = body.prorationBehavior ?? "create_prorations";
+    const prorationBehavior: "create_prorations" | "none" =
+      requestedBehavior === "none" ? "none" : "create_prorations";
     if (!planId) {
       return NextResponse.json({ error: "planId is required." }, { status: 400 });
     }

@@ -10,6 +10,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { canManageMoodboards } from "@/lib/permissions/companyRoles";
+import { deleteR2Objects } from "@/lib/r2";
+
+/** Pull the R2 storage key out of an IMAGE/FILE item's data blob, if any. */
+function itemStorageKey(item: { type: string; data: unknown }): string | null {
+  if (item.type !== "IMAGE" && item.type !== "FILE") return null;
+  const data = item.data;
+  if (data && typeof data === "object" && "storageKey" in data) {
+    const key = (data as { storageKey?: unknown }).storageKey;
+    return typeof key === "string" ? key : null;
+  }
+  return null;
+}
 
 type RouteParams = {
   params: Promise<{ moodboardId: string; itemId: string }>;
@@ -193,6 +205,10 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams) {
     await prisma.moodboardItem.delete({
       where: { id: itemId },
     });
+
+    // Best-effort R2 cleanup so a deleted image/file doesn't linger in the
+    // bucket (and stay reachable via its public URL) after its row is gone.
+    await deleteR2Objects([itemStorageKey(item)]);
 
     return NextResponse.json({ success: true });
   } catch (err: any) {
