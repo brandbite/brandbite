@@ -59,3 +59,42 @@ export async function addCompanyMember(
     data: { companyId, userId, roleInCompany: role },
   });
 }
+
+export async function createJobType(overrides?: {
+  tokenCost?: number;
+  creativePayoutTokens?: number;
+}) {
+  return prisma.jobType.create({
+    data: {
+      name: `Test Job ${nextSuffix()}`,
+      tokenCost: overrides?.tokenCost ?? 30,
+      creativePayoutTokens: overrides?.creativePayoutTokens ?? 10,
+      isActive: true,
+    },
+  });
+}
+
+export async function createTicket(args: {
+  companyId: string;
+  createdById: string;
+  jobTypeId?: string | null;
+  creativeId?: string | null;
+  quantity?: number;
+  status?: "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
+  creativePayoutOverride?: number | null;
+  tokenCostOverride?: number | null;
+}) {
+  return prisma.ticket.create({
+    data: {
+      title: `Test Ticket ${nextSuffix()}`,
+      companyId: args.companyId,
+      createdById: args.createdById,
+      jobTypeId: args.jobTypeId ?? null,
+      creativeId: args.creativeId ?? null,
+      quantity: args.quantity ?? 1,
+      status: args.status ?? "TODO",
+      creativePayoutOverride: args.creativePayoutOverride ?? null,
+      tokenCostOverride: args.tokenCostOverride ?? null,
+    },
+  });
+}
