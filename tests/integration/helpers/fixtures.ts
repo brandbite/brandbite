@@ -60,6 +60,35 @@ export async function addCompanyMember(
   });
 }
 
+export async function createWithdrawal(args: {
+  creativeId: string;
+  amountTokens: number;
+  status?: "PENDING" | "APPROVED" | "PAID" | "REJECTED";
+}) {
+  return prisma.withdrawal.create({
+    data: {
+      creativeId: args.creativeId,
+      amountTokens: args.amountTokens,
+      status: args.status ?? "PENDING",
+      approvedAt: args.status === "APPROVED" || args.status === "PAID" ? new Date() : null,
+    },
+  });
+}
+
+/** Give a creative a starting token balance by writing a CREDIT ledger row. */
+export async function creditCreative(creativeId: string, amount: number) {
+  return prisma.tokenLedger.create({
+    data: {
+      userId: creativeId,
+      direction: "CREDIT",
+      amount,
+      reason: "JOB_PAYMENT",
+      balanceBefore: 0,
+      balanceAfter: amount,
+    },
+  });
+}
+
 export async function createJobType(overrides?: {
   tokenCost?: number;
   creativePayoutTokens?: number;

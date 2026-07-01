@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { AdminActionType, WithdrawalStatus } from "@prisma/client";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { payApprovedWithdrawal } from "@/lib/withdrawals";
 import { canMarkWithdrawalsPaid } from "@/lib/roles";
 import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 import { CONFIRMATION_PHRASES, checkConfirmationPhrase } from "@/lib/admin-confirmation";
@@ -68,31 +69,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     });
     if (!mfa.ok) return mfa.response;
 
-    const withdrawal = await prisma.withdrawal.findUnique({
-      where: { id },
-    });
-
-    if (!withdrawal) {
-      return NextResponse.json({ error: "Withdrawal not found" }, { status: 404 });
-    }
-
-    if (withdrawal.status !== WithdrawalStatus.APPROVED) {
-      return NextResponse.json(
-        {
-          error: "Only APPROVED withdrawals can be marked as PAID",
-          currentStatus: withdrawal.status,
-        },
-        { status: 400 },
-      );
-    }
-
-    const updated = await prisma.withdrawal.update({
-      where: { id },
-      data: {
-        status: WithdrawalStatus.PAID,
-        paidAt: new Date(),
-      },
-    });
+    // Mark PAID + debit the creative atomically via the shared helper — the
+    // single source of truth for the withdrawal debit. Previously this route
+    // flipped the status WITHOUT debiting, so a withdrawal approved via the
+    // PATCH flow (which also doesn't debit at approve) could reach PAID with
+    // the creative's tokens never removed.
+    const updated = await prisma.$transaction((tx) => payApprovedWithdrawal(tx, id, user.email));
 
     await logAdminAction({
       actor: user,
@@ -115,6 +97,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       { status: 200 },
     );
   } catch (error) {
+    // The shared helper signals precondition failures (not approved, already
+    // paid, lost race, insufficient balance) by throwing a Response.
+    if (error instanceof Response) {
+      const text = await error.text();
+      return NextResponse.json({ error: text || "Request failed" }, { status: error.status });
+    }
     if ((error as { code?: string })?.code === "UNAUTHENTICATED") {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
