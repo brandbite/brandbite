@@ -27,9 +27,10 @@ vi.mock("@/lib/notifications", () => ({
 }));
 
 import { prisma } from "@/lib/prisma";
-import { getUserTokenBalance } from "@/lib/token-engine";
+import { BASE_PAYOUT_PERCENT, getUserTokenBalance } from "@/lib/token-engine";
 import { POST as completeTicket } from "@/app/api/tickets/[id]/complete/route";
 import { PATCH as patchMember } from "@/app/api/customer/members/[memberId]/route";
+import { PATCH as patchStatus } from "@/app/api/customer/tickets/status/route";
 import { resetDatabase } from "./helpers/db";
 import {
   addCompanyMember,
@@ -214,5 +215,52 @@ describe("PATCH /api/customer/members/[memberId] — granting OWNER is owner-onl
 
     const after = await prisma.companyMember.findUniqueOrThrow({ where: { id: targetMember.id } });
     expect(after.roleInCompany).toBe("PM");
+  });
+});
+
+describe("PATCH /api/customer/tickets/status — DONE pays via the gamification model", () => {
+  it("completing IN_REVIEW→DONE pays the same amount as the completion engine", async () => {
+    const company = await createCompany({ tokenBalance: 1000 });
+    const customer = await createUser({ role: "CUSTOMER" });
+    const creative = await createUser({ role: "DESIGNER" });
+    const jobType = await createJobType({ tokenCost: 30, creativePayoutTokens: 10 });
+    const ticket = await createTicket({
+      companyId: company.id,
+      createdById: customer.id,
+      creativeId: creative.id,
+      jobTypeId: jobType.id,
+      quantity: 3,
+      status: "IN_REVIEW",
+    });
+
+    // Act as a site admin so the board permission checks pass without needing
+    // a company membership; the payout path is identical regardless of actor.
+    const admin = await createUser({ role: "SITE_ADMIN" });
+    mockGetUser.mockResolvedValue({ id: admin.id, email: "admin@test.local", role: "SITE_ADMIN" });
+
+    const req = new Request("http://localhost/api/customer/tickets/status", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ticketId: ticket.id, status: "DONE" }),
+    });
+    const res = await patchStatus(req as any);
+    expect(res.status).toBe(200);
+
+    const t = await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } });
+    expect(t.status).toBe("DONE");
+    expect(t.completedById).toBe(admin.id);
+
+    // Gamification model: tokenCost 30 × quantity 3 × BASE_PAYOUT_PERCENT,
+    // NOT the old per-unit creativePayoutTokens (which would have been 10).
+    const expected = Math.round(30 * 3 * (BASE_PAYOUT_PERCENT / 100));
+    expect(await getUserTokenBalance(creative.id)).toBe(expected);
+
+    // The payout row now uses the engine's JOB_PAYMENT reason.
+    const payout = await prisma.tokenLedger.findFirst({
+      where: { ticketId: ticket.id, userId: creative.id, direction: "CREDIT" },
+      select: { reason: true, amount: true },
+    });
+    expect(payout?.reason).toBe("JOB_PAYMENT");
+    expect(payout?.amount).toBe(expected);
   });
 });

@@ -86,8 +86,12 @@ export async function GET(_req: NextRequest) {
           },
         },
         ledgerEntries: {
+          // Both reason codes represent a creative payout: the completion
+          // engine (completeTicketAndApplyTokens) writes JOB_PAYMENT, while
+          // legacy board-completed rows carry DESIGNER_JOB_PAYOUT. Match both
+          // so a paid job isn't reported as unpaid.
           where: {
-            reason: "DESIGNER_JOB_PAYOUT",
+            reason: { in: ["JOB_PAYMENT", "DESIGNER_JOB_PAYOUT"] },
           },
           select: {
             id: true,
