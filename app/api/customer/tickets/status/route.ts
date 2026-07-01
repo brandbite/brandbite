@@ -7,7 +7,7 @@
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
-import { TicketStatus, LedgerDirection } from "@prisma/client";
+import { TicketStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import {
@@ -15,7 +15,7 @@ import {
   canMarkTicketsDoneForCompany,
   normalizeCompanyRole,
 } from "@/lib/permissions/companyRoles";
-import { getEffectiveTokenValues } from "@/lib/token-engine";
+import { completeTicketAndApplyTokens } from "@/lib/token-engine";
 
 type PatchPayload = {
   ticketId?: string;
@@ -89,18 +89,9 @@ export async function PATCH(req: NextRequest) {
         id: true,
         status: true,
         companyId: true,
-        creativeId: true,
-        quantity: true,
-        tokenCostOverride: true,
-        creativePayoutOverride: true,
-        jobType: {
-          select: {
-            id: true,
-            name: true,
-            tokenCost: true,
-            creativePayoutTokens: true,
-          },
-        },
+        // jobType presence decides whether there's a payout to apply; the
+        // completion engine loads its own copy for the actual math.
+        jobType: { select: { id: true } },
       },
     });
 
@@ -265,58 +256,45 @@ export async function PATCH(req: NextRequest) {
     }
 
     // -------------------------------------------------------------------------
-    // Status update + (optional) creative payout (on DONE)
-    // + (new) revision feedback record (IN_REVIEW → IN_PROGRESS)
+    // DONE transition — delegate completion + creative payout to the single
+    // source of truth. completeTicketAndApplyTokens owns the gamification
+    // payout (tokenCost × quantity × payoutPercent, honoring override and
+    // payout rules) and is idempotent. This is the SAME implementation the
+    // /api/tickets/[id]/complete path uses, so a ticket pays the creative the
+    // same amount regardless of which endpoint completes it.
     // -------------------------------------------------------------------------
-
-    const updated = await prisma.$transaction(async (tx) => {
-      // 1) Creative payout (when moving to DONE)
-      if (isDoneTransition && ticket.creativeId) {
-        // Use the shared effective-value helper so this board path pays the
-        // same amount as lib/token-engine's completion flow: base payout ×
-        // quantity, or the admin creativePayoutOverride. Previously this used
-        // the raw per-unit creativePayoutTokens, underpaying multi-quantity
-        // and overridden tickets.
-        const { effectivePayout } = getEffectiveTokenValues(ticket);
-
-        if (effectivePayout > 0) {
-          const existingPayout = await tx.tokenLedger.findFirst({
-            where: {
-              ticketId: ticket.id,
-              userId: ticket.creativeId,
-              direction: LedgerDirection.CREDIT,
-              reason: "DESIGNER_JOB_PAYOUT",
-            },
-            select: { id: true },
-          });
-
-          if (!existingPayout) {
-            await tx.tokenLedger.create({
-              data: {
-                companyId: ticket.companyId,
-                ticketId: ticket.id,
-                userId: ticket.creativeId,
-                direction: LedgerDirection.CREDIT,
-                amount: effectivePayout,
-                reason: "DESIGNER_JOB_PAYOUT",
-                notes: `Automatic payout for completed ticket`,
-              },
-            });
-          }
-        }
+    if (isDoneTransition) {
+      // AI / no-jobType tickets carry no token cost or payout — just flip the
+      // status (the engine throws on a missing jobType).
+      if (ticket.jobType) {
+        await completeTicketAndApplyTokens(ticket.id);
+      } else {
+        await prisma.ticket.update({
+          where: { id: ticket.id },
+          data: { status: TicketStatus.DONE },
+        });
       }
 
-      // 2) On IN_REVIEW → IN_PROGRESS, write feedback on the latest TicketRevision
+      const done = await prisma.ticket.update({
+        where: { id: ticket.id },
+        data: { completedAt: new Date(), completedById: user.id },
+        select: { id: true, status: true, updatedAt: true },
+      });
+
+      return NextResponse.json(done, { status: 200 });
+    }
+
+    // -------------------------------------------------------------------------
+    // Non-DONE transitions: (optional) revision feedback + status update.
+    // -------------------------------------------------------------------------
+    const updated = await prisma.$transaction(async (tx) => {
+      // On IN_REVIEW → IN_PROGRESS, write feedback on the latest TicketRevision
       if (isReviewToInProgress) {
         const msg = (body.revisionMessage ?? "").trim();
 
         const lastRevision = await tx.ticketRevision.findFirst({
-          where: {
-            ticketId: ticket.id,
-          },
-          orderBy: {
-            version: "desc",
-          },
+          where: { ticketId: ticket.id },
+          orderBy: { version: "desc" },
         });
 
         if (lastRevision) {
@@ -333,18 +311,10 @@ export async function PATCH(req: NextRequest) {
         // we silently pass; logging could be added later.
       }
 
-      // 3) Ticket status update (+ completion tracking for DONE)
       const updatedTicket = await tx.ticket.update({
         where: { id: ticket.id },
-        data: {
-          status: nextStatus,
-          ...(isDoneTransition ? { completedAt: new Date(), completedById: user.id } : {}),
-        },
-        select: {
-          id: true,
-          status: true,
-          updatedAt: true,
-        },
+        data: { status: nextStatus },
+        select: { id: true, status: true, updatedAt: true },
       });
 
       return updatedTicket;
