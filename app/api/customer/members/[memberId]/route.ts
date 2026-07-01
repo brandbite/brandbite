@@ -116,10 +116,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     // including themselves — and self-escalate to full workspace owner. The
     // invite path already forbids minting owners for the same reason.
     if (nextRole === "OWNER" && !isActorOwner) {
-      return NextResponse.json(
-        { error: "Only owners can grant the owner role." },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Only owners can grant the owner role." }, { status: 403 });
     }
 
     // Demoting an OWNER → keep at least one OWNER on the workspace.

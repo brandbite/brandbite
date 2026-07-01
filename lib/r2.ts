@@ -65,7 +65,9 @@ export function createR2Client(): S3Client {
  * presigned URL so clients don't get a link to a gone object. Safe to call
  * with an empty/whitespace list.
  */
-export async function deleteR2Objects(storageKeys: Array<string | null | undefined>): Promise<void> {
+export async function deleteR2Objects(
+  storageKeys: Array<string | null | undefined>,
+): Promise<void> {
   const keys = storageKeys.filter((k): k is string => typeof k === "string" && k.length > 0);
   if (keys.length === 0) return;
 
