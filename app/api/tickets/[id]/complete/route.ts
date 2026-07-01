@@ -9,14 +9,17 @@ import { NextResponse } from "next/server";
 import { completeTicketAndApplyTokens } from "@/lib/token-engine";
 import { prisma } from "@/lib/prisma";
 import { createNotification } from "@/lib/notifications";
+import { getCurrentUserOrThrow } from "@/lib/auth";
+import { isSiteAdminRole } from "@/lib/roles";
 
 /**
- * Temporary design:
- * - No auth check yet; after the BetterAuth integration, only authorized users
- *   (e.g. the assigned creative or an admin) will be able to complete a ticket.
- *
  * Usage:
  * POST /api/tickets/:id/complete
+ *
+ * Authorization: site admins, or the creative assigned to the ticket. This
+ * endpoint mints a creative payout, so it must never be reachable
+ * unauthenticated. (Customer-side completion goes through
+ * /api/customer/tickets/status, which enforces the board state machine.)
  */
 export async function POST(_request: Request, context: { params: Promise<{ id: string }> }) {
   const { id: ticketId } = await context.params;
@@ -26,6 +29,22 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
   }
 
   try {
+    const user = await getCurrentUserOrThrow();
+
+    const authTicket = await prisma.ticket.findUnique({
+      where: { id: ticketId },
+      select: { creativeId: true },
+    });
+    if (!authTicket) {
+      return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
+    }
+
+    const isSiteAdmin = isSiteAdminRole(user.role);
+    const isAssignedCreative = !!authTicket.creativeId && authTicket.creativeId === user.id;
+    if (!isSiteAdmin && !isAssignedCreative) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const result = await completeTicketAndApplyTokens(ticketId);
 
     if (result.alreadyCompleted) {
@@ -80,6 +99,9 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
       { status: 200 },
     );
   } catch (error) {
+    if ((error as { code?: string })?.code === "UNAUTHENTICATED") {
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    }
     console.error("[POST /api/tickets/:id/complete] error:", error);
     const message = error instanceof Error ? error.message : "Internal server error";
 

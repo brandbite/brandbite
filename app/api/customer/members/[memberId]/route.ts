@@ -111,6 +111,14 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       );
     }
 
+    // Granting OWNER is owner-only. Without this a PM (who passes
+    // canManageMembers) could set nextRole="OWNER" on any non-owner member —
+    // including themselves — and self-escalate to full workspace owner. The
+    // invite path already forbids minting owners for the same reason.
+    if (nextRole === "OWNER" && !isActorOwner) {
+      return NextResponse.json({ error: "Only owners can grant the owner role." }, { status: 403 });
+    }
+
     // Demoting an OWNER → keep at least one OWNER on the workspace.
     if (isTargetOwner && nextRole !== "OWNER") {
       const ownersCount = await getOwnersCount(user.activeCompanyId);

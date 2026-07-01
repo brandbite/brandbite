@@ -80,6 +80,19 @@ export type CreateTicketFailure =
 export type CreateTicketResult = CreateTicketSuccess | CreateTicketFailure;
 
 /**
+ * Thrown inside the create transaction when the guarded balance decrement
+ * finds the company can no longer cover the cost (a concurrent debit landed
+ * between the pre-check and commit). Caught below and mapped to the
+ * INSUFFICIENT_TOKENS failure so the ticket is never created uncharged.
+ */
+class InsufficientTokensAtCommitError extends Error {
+  constructor(public readonly required: number) {
+    super("Insufficient token balance at commit time.");
+    this.name = "InsufficientTokensAtCommitError";
+  }
+}
+
+/**
  * Create a customer ticket end-to-end. See the file header for what this owns.
  *
  * The auto-assign block is kept inline rather than further extracted because
@@ -155,311 +168,349 @@ export async function createCustomerTicket(input: CreateTicketInput): Promise<Cr
   const projectAutoAssignMode = project?.autoAssignMode ?? null;
   const autoAssignEffective = isAutoAssignEnabled(companyAutoAssignDefault, projectAutoAssignMode);
 
-  const created = await prisma.$transaction(async (tx) => {
-    // 1) Next companyTicketNumber
-    const lastTicket = await tx.ticket.findFirst({
-      where: { companyId: company.id },
-      orderBy: { companyTicketNumber: "desc" },
-      select: { companyTicketNumber: true },
-    });
-    const nextCompanyTicketNumber = (lastTicket?.companyTicketNumber ?? 100) + 1;
+  const created = await prisma
+    .$transaction(async (tx) => {
+      // 1) Next companyTicketNumber
+      const lastTicket = await tx.ticket.findFirst({
+        where: { companyId: company.id },
+        orderBy: { companyTicketNumber: "desc" },
+        select: { companyTicketNumber: true },
+      });
+      const nextCompanyTicketNumber = (lastTicket?.companyTicketNumber ?? 100) + 1;
 
-    // 2) Creative assignment (AI mode skips, auto-assign obeys skill filter
-    //    + load + rating tie-breaker, otherwise FALLBACK unassigned).
-    let assignedCreativeId: string | null = null;
-    let assignmentReason: "AUTO_ASSIGN" | "FALLBACK" | null = null;
-    let fallbackMode:
-      | "settings_disabled"
-      | "no_creatives"
-      | "no_skilled_creatives"
-      // PR11 — every skill-matching creative is at-or-above their
-      // tasksPerWeekCap. Distinct from "no_skilled_creatives" so admin
-      // dashboards can spot the "we ARE hiring but everyone's full"
-      // pattern as a hiring-bandwidth signal rather than a category-coverage
-      // gap.
-      | "all_skilled_at_cap"
-      | null = null;
-    let skillFiltered = false;
-    let skilledCreativeCount = 0;
-    let pausedCreativeCount = 0;
-    // PR11 — count of skill-matching creatives skipped because their open
-    // ticket count was at-or-above their tasksPerWeekCap. Surfaced in the
-    // assignment log metadata for forensic debuggability.
-    let cappedCreativeCount = 0;
+      // 2) Creative assignment (AI mode skips, auto-assign obeys skill filter
+      //    + load + rating tie-breaker, otherwise FALLBACK unassigned).
+      let assignedCreativeId: string | null = null;
+      let assignmentReason: "AUTO_ASSIGN" | "FALLBACK" | null = null;
+      let fallbackMode:
+        | "settings_disabled"
+        | "no_creatives"
+        | "no_skilled_creatives"
+        // PR11 — every skill-matching creative is at-or-above their
+        // tasksPerWeekCap. Distinct from "no_skilled_creatives" so admin
+        // dashboards can spot the "we ARE hiring but everyone's full"
+        // pattern as a hiring-bandwidth signal rather than a category-coverage
+        // gap.
+        | "all_skilled_at_cap"
+        | null = null;
+      let skillFiltered = false;
+      let skilledCreativeCount = 0;
+      let pausedCreativeCount = 0;
+      // PR11 — count of skill-matching creatives skipped because their open
+      // ticket count was at-or-above their tasksPerWeekCap. Surfaced in the
+      // assignment log metadata for forensic debuggability.
+      let cappedCreativeCount = 0;
 
-    if (isAiMode) {
-      assignedCreativeId = null;
-    } else if (autoAssignEffective) {
-      let creatives: { id: string }[];
-      if (jobType) {
-        const skilled = await tx.creativeSkill.findMany({
-          where: { jobTypeId: jobType.id },
-          select: { creativeId: true },
-        });
-        creatives = skilled.map((s) => ({ id: s.creativeId }));
-        skilledCreativeCount = creatives.length;
-        skillFiltered = true;
-        if (creatives.length === 0) fallbackMode = "no_skilled_creatives";
-      } else {
-        creatives = await tx.userAccount.findMany({
-          where: { role: UserRole.DESIGNER },
-          select: { id: true },
-        });
-      }
-
-      // Build a single per-creative metadata map covering pause + cap
-      // state. Pulled in one query rather than two so the auto-assign
-      // hot path adds at most one DB roundtrip per ticket-create even
-      // as we layer more candidate filters.
-      const creativeMeta = new Map<
-        string,
-        { isPaused: boolean; pauseExpiresAt: Date | null; tasksPerWeekCap: number | null }
-      >();
-
-      if (creatives.length > 0) {
-        const states = await tx.userAccount.findMany({
-          where: { id: { in: creatives.map((d) => d.id) } },
-          select: {
-            id: true,
-            isPaused: true,
-            pauseExpiresAt: true,
-            tasksPerWeekCap: true,
-          },
-        });
-        for (const s of states) {
-          creativeMeta.set(s.id, {
-            isPaused: s.isPaused,
-            pauseExpiresAt: s.pauseExpiresAt,
-            tasksPerWeekCap: s.tasksPerWeekCap,
+      if (isAiMode) {
+        assignedCreativeId = null;
+      } else if (autoAssignEffective) {
+        let creatives: { id: string }[];
+        if (jobType) {
+          const skilled = await tx.creativeSkill.findMany({
+            where: { jobTypeId: jobType.id },
+            select: { creativeId: true },
           });
-        }
-        const pausedIds = new Set(states.filter((d) => isCreativePaused(d)).map((d) => d.id));
-        pausedCreativeCount = pausedIds.size;
-        creatives = creatives.filter((d) => !pausedIds.has(d.id));
-      }
-
-      if (creatives.length > 0) {
-        const creativeIds = creatives.map((d) => d.id);
-
-        const openTickets = await tx.ticket.findMany({
-          where: {
-            creativeId: { in: creativeIds },
-            status: { in: [TicketStatus.TODO, TicketStatus.IN_PROGRESS, TicketStatus.IN_REVIEW] },
-          },
-          select: {
-            id: true,
-            creativeId: true,
-            priority: true,
-            quantity: true,
-            jobType: { select: { tokenCost: true } },
-          },
-        });
-
-        const priorityWeights: Record<TicketPriority, number> = {
-          LOW: 1,
-          MEDIUM: 2,
-          HIGH: 3,
-          URGENT: 4,
-        };
-
-        const loadByCreative = new Map<string, number>();
-        // PR11 — open ticket COUNT (not weighted load) per creative.
-        // Used by the tasksPerWeekCap filter below: cap is "max number
-        // of concurrently open tasks", not "max weighted load". The
-        // weighted load still drives the lowest-load tie-breaker.
-        const openCountByCreative = new Map<string, number>();
-        for (const id of creativeIds) {
-          loadByCreative.set(id, 0);
-          openCountByCreative.set(id, 0);
-        }
-        for (const t of openTickets) {
-          if (!t.creativeId) continue;
-          if (!loadByCreative.has(t.creativeId)) continue;
-          const weight = priorityWeights[t.priority as TicketPriority];
-          const cost = (t.jobType?.tokenCost ?? 1) * (t.quantity ?? 1);
-          loadByCreative.set(t.creativeId, (loadByCreative.get(t.creativeId) ?? 0) + weight * cost);
-          openCountByCreative.set(t.creativeId, (openCountByCreative.get(t.creativeId) ?? 0) + 1);
-        }
-
-        // PR11 — drop creatives at-or-above their tasksPerWeekCap. Null
-        // cap means no limit (legacy behavior, preserves every existing
-        // creative). Done AFTER the load calc so we don't waste a rating
-        // fetch on excluded candidates, and AFTER the pause filter so
-        // the "capped" count reflects real candidates not zombie ones.
-        const cappedIds: string[] = [];
-        creatives = creatives.filter((d) => {
-          const cap = creativeMeta.get(d.id)?.tasksPerWeekCap;
-          if (cap == null) return true; // no cap → keep
-          const open = openCountByCreative.get(d.id) ?? 0;
-          if (open >= cap) {
-            cappedIds.push(d.id);
-            return false;
-          }
-          return true;
-        });
-        cappedCreativeCount = cappedIds.length;
-
-        if (creatives.length === 0) {
-          // Every skill-matching creative is at cap. Fall through to the
-          // unassigned FALLBACK path with a distinct mode so admin
-          // dashboards can spot it as a hiring-bandwidth signal.
-          assignmentReason = "FALLBACK";
-          fallbackMode = "all_skilled_at_cap";
+          creatives = skilled.map((s) => ({ id: s.creativeId }));
+          skilledCreativeCount = creatives.length;
+          skillFiltered = true;
+          if (creatives.length === 0) fallbackMode = "no_skilled_creatives";
         } else {
-          const remainingIds = creatives.map((d) => d.id);
-          const ratingByCreative = await getCreativeRatingSummaries(remainingIds);
-
-          assignedCreativeId = selectCreativeByLoadThenRating({
-            candidateIds: remainingIds,
-            loadByCreative,
-            ratingByCreative,
+          creatives = await tx.userAccount.findMany({
+            where: { role: UserRole.DESIGNER },
+            select: { id: true },
           });
-          assignmentReason = "AUTO_ASSIGN";
+        }
+
+        // Build a single per-creative metadata map covering pause + cap
+        // state. Pulled in one query rather than two so the auto-assign
+        // hot path adds at most one DB roundtrip per ticket-create even
+        // as we layer more candidate filters.
+        const creativeMeta = new Map<
+          string,
+          { isPaused: boolean; pauseExpiresAt: Date | null; tasksPerWeekCap: number | null }
+        >();
+
+        if (creatives.length > 0) {
+          const states = await tx.userAccount.findMany({
+            where: { id: { in: creatives.map((d) => d.id) } },
+            select: {
+              id: true,
+              isPaused: true,
+              pauseExpiresAt: true,
+              tasksPerWeekCap: true,
+            },
+          });
+          for (const s of states) {
+            creativeMeta.set(s.id, {
+              isPaused: s.isPaused,
+              pauseExpiresAt: s.pauseExpiresAt,
+              tasksPerWeekCap: s.tasksPerWeekCap,
+            });
+          }
+          const pausedIds = new Set(states.filter((d) => isCreativePaused(d)).map((d) => d.id));
+          pausedCreativeCount = pausedIds.size;
+          creatives = creatives.filter((d) => !pausedIds.has(d.id));
+        }
+
+        if (creatives.length > 0) {
+          const creativeIds = creatives.map((d) => d.id);
+
+          const openTickets = await tx.ticket.findMany({
+            where: {
+              creativeId: { in: creativeIds },
+              status: { in: [TicketStatus.TODO, TicketStatus.IN_PROGRESS, TicketStatus.IN_REVIEW] },
+            },
+            select: {
+              id: true,
+              creativeId: true,
+              priority: true,
+              quantity: true,
+              jobType: { select: { tokenCost: true } },
+            },
+          });
+
+          const priorityWeights: Record<TicketPriority, number> = {
+            LOW: 1,
+            MEDIUM: 2,
+            HIGH: 3,
+            URGENT: 4,
+          };
+
+          const loadByCreative = new Map<string, number>();
+          // PR11 — open ticket COUNT (not weighted load) per creative.
+          // Used by the tasksPerWeekCap filter below: cap is "max number
+          // of concurrently open tasks", not "max weighted load". The
+          // weighted load still drives the lowest-load tie-breaker.
+          const openCountByCreative = new Map<string, number>();
+          for (const id of creativeIds) {
+            loadByCreative.set(id, 0);
+            openCountByCreative.set(id, 0);
+          }
+          for (const t of openTickets) {
+            if (!t.creativeId) continue;
+            if (!loadByCreative.has(t.creativeId)) continue;
+            const weight = priorityWeights[t.priority as TicketPriority];
+            const cost = (t.jobType?.tokenCost ?? 1) * (t.quantity ?? 1);
+            loadByCreative.set(
+              t.creativeId,
+              (loadByCreative.get(t.creativeId) ?? 0) + weight * cost,
+            );
+            openCountByCreative.set(t.creativeId, (openCountByCreative.get(t.creativeId) ?? 0) + 1);
+          }
+
+          // PR11 — drop creatives at-or-above their tasksPerWeekCap. Null
+          // cap means no limit (legacy behavior, preserves every existing
+          // creative). Done AFTER the load calc so we don't waste a rating
+          // fetch on excluded candidates, and AFTER the pause filter so
+          // the "capped" count reflects real candidates not zombie ones.
+          const cappedIds: string[] = [];
+          creatives = creatives.filter((d) => {
+            const cap = creativeMeta.get(d.id)?.tasksPerWeekCap;
+            if (cap == null) return true; // no cap → keep
+            const open = openCountByCreative.get(d.id) ?? 0;
+            if (open >= cap) {
+              cappedIds.push(d.id);
+              return false;
+            }
+            return true;
+          });
+          cappedCreativeCount = cappedIds.length;
+
+          if (creatives.length === 0) {
+            // Every skill-matching creative is at cap. Fall through to the
+            // unassigned FALLBACK path with a distinct mode so admin
+            // dashboards can spot it as a hiring-bandwidth signal.
+            assignmentReason = "FALLBACK";
+            fallbackMode = "all_skilled_at_cap";
+          } else {
+            const remainingIds = creatives.map((d) => d.id);
+            const ratingByCreative = await getCreativeRatingSummaries(remainingIds);
+
+            assignedCreativeId = selectCreativeByLoadThenRating({
+              candidateIds: remainingIds,
+              loadByCreative,
+              ratingByCreative,
+            });
+            assignmentReason = "AUTO_ASSIGN";
+          }
+        } else {
+          assignmentReason = "FALLBACK";
+          if (!fallbackMode) fallbackMode = "no_creatives";
         }
       } else {
         assignmentReason = "FALLBACK";
-        if (!fallbackMode) fallbackMode = "no_creatives";
+        fallbackMode = "settings_disabled";
       }
-    } else {
-      assignmentReason = "FALLBACK";
-      fallbackMode = "settings_disabled";
-    }
 
-    // 3) Create ticket
-    const createdTicket = await tx.ticket.create({
-      data: {
-        title: data.title,
-        description: data.description || null,
-        status: isAiMode ? TicketStatus.IN_PROGRESS : TicketStatus.TODO,
-        priority: data.priority,
-        dueDate: data.dueDate ?? null,
-        companyId: company.id,
-        projectId: project?.id ?? null,
-        createdById: requesterMember.userId,
-        jobTypeId: jobType?.id ?? null,
-        quantity: data.quantity,
-        companyTicketNumber: nextCompanyTicketNumber,
-        creativeId: assignedCreativeId,
-        creativeMode: data.creativeMode,
-      },
-      include: {
-        project: { select: { id: true, name: true, code: true } },
-        jobType: { select: { id: true, name: true } },
-      },
-    });
-
-    // 4) Company token debit + ledger entry
-    if (jobType) {
-      const balanceBefore = company.tokenBalance;
-      const balanceAfter = balanceBefore - effectiveCost;
-
-      await tx.company.update({
-        where: { id: company.id },
-        data: { tokenBalance: balanceAfter },
-      });
-
-      await tx.tokenLedger.create({
+      // 3) Create ticket
+      const createdTicket = await tx.ticket.create({
         data: {
+          title: data.title,
+          description: data.description || null,
+          status: isAiMode ? TicketStatus.IN_PROGRESS : TicketStatus.TODO,
+          priority: data.priority,
+          dueDate: data.dueDate ?? null,
           companyId: company.id,
-          ticketId: createdTicket.id,
-          direction: LedgerDirection.DEBIT,
-          amount: effectiveCost,
-          reason: "JOB_REQUEST_CREATED",
-          notes: `New ticket created: ${createdTicket.title}`,
-          metadata: {
-            jobTypeId: jobType.id,
-            unitCost: jobType.tokenCost,
-            quantity: data.quantity,
-            companyTicketNumber: createdTicket.companyTicketNumber,
-            createdByUserId: requesterMember.userId,
-          },
-          balanceBefore,
-          balanceAfter,
+          projectId: project?.id ?? null,
+          createdById: requesterMember.userId,
+          jobTypeId: jobType?.id ?? null,
+          quantity: data.quantity,
+          companyTicketNumber: nextCompanyTicketNumber,
+          creativeId: assignedCreativeId,
+          creativeMode: data.creativeMode,
+        },
+        include: {
+          project: { select: { id: true, name: true, code: true } },
+          jobType: { select: { id: true, name: true } },
         },
       });
-    }
 
-    // 5) TicketAssignmentLog (AUTO_ASSIGN / FALLBACK)
-    if (assignmentReason === "AUTO_ASSIGN" && createdTicket.creativeId) {
-      await tx.ticketAssignmentLog.create({
-        data: {
-          ticketId: createdTicket.id,
-          creativeId: createdTicket.creativeId,
-          reason: "AUTO_ASSIGN",
-          metadata: {
-            algorithm: "v4-skill-weighted-cap-aware",
-            source: "customer-ticket-create",
-            autoAssignEffective: true,
-            companyAutoAssignDefault,
-            projectAutoAssignMode: projectAutoAssignMode ?? "INHERIT",
-            skillFiltered,
-            skilledCreativeCount,
-            pausedCreativeCount,
-            // PR11 — non-zero when the chosen creative was picked from a
-            // pool that excluded N at-cap candidates. Useful when a
-            // ticket gets routed to a slow / new creative because the
-            // experienced ones were full.
-            cappedCreativeCount,
-            jobTypeId: jobType?.id ?? null,
-          },
-        },
-      });
-    } else if (assignmentReason === "FALLBACK") {
-      await tx.ticketAssignmentLog.create({
-        data: {
-          ticketId: createdTicket.id,
-          creativeId: createdTicket.creativeId ?? null,
-          reason: "FALLBACK",
-          metadata: {
-            source: "customer-ticket-create",
-            autoAssignEffective,
-            companyAutoAssignDefault,
-            projectAutoAssignMode: projectAutoAssignMode ?? "INHERIT",
-            fallbackMode,
-            skillFiltered,
-            skilledCreativeCount,
-            pausedCreativeCount,
-            cappedCreativeCount,
-            jobTypeId: jobType?.id ?? null,
-            note:
-              fallbackMode === "settings_disabled"
-                ? "Auto-assign disabled by company/project settings."
-                : fallbackMode === "no_skilled_creatives"
-                  ? "No creatives with matching skill found; ticket left unassigned for admin."
-                  : fallbackMode === "all_skilled_at_cap"
-                    ? "Every skill-matching creative is at-or-above their tasksPerWeekCap; ticket left unassigned for admin (consider raising caps or hiring)."
-                    : "No active creatives available in pool at assignment time.",
-          },
-        },
-      });
-    }
+      // 4) Company token debit + ledger entry
+      if (jobType) {
+        // Guarded atomic decrement. The pre-transaction check at the top of this
+        // function can be raced by a concurrent create/booking, so re-assert the
+        // balance here: decrement only if it still covers the cost. count === 0
+        // means it no longer does — abort the whole ticket create rather than
+        // driving the balance negative.
+        const debited = await tx.company.updateMany({
+          where: { id: company.id, tokenBalance: { gte: effectiveCost } },
+          data: { tokenBalance: { decrement: effectiveCost } },
+        });
 
-    // 6) Tag assignments (company-scoped)
-    if (data.tagIds.length > 0) {
-      const validTags = await tx.ticketTag.findMany({
-        where: { id: { in: data.tagIds }, companyId: company.id },
-        select: { id: true },
-      });
-      if (validTags.length > 0) {
-        await tx.ticketTagAssignment.createMany({
-          data: validTags.map((t) => ({ ticketId: createdTicket.id, tagId: t.id })),
+        if (debited.count === 0) {
+          throw new InsufficientTokensAtCommitError(effectiveCost);
+        }
+
+        const refreshed = await tx.company.findUniqueOrThrow({
+          where: { id: company.id },
+          select: { tokenBalance: true },
+        });
+        const balanceAfter = refreshed.tokenBalance;
+        const balanceBefore = balanceAfter + effectiveCost;
+
+        await tx.tokenLedger.create({
+          data: {
+            companyId: company.id,
+            ticketId: createdTicket.id,
+            direction: LedgerDirection.DEBIT,
+            amount: effectiveCost,
+            reason: "JOB_REQUEST_CREATED",
+            notes: `New ticket created: ${createdTicket.title}`,
+            metadata: {
+              jobTypeId: jobType.id,
+              unitCost: jobType.tokenCost,
+              quantity: data.quantity,
+              companyTicketNumber: createdTicket.companyTicketNumber,
+              createdByUserId: requesterMember.userId,
+            },
+            balanceBefore,
+            balanceAfter,
+          },
         });
       }
-    }
 
-    // 7) Link moodboard (if provided)
-    if (data.moodboardId) {
-      await tx.moodboard.updateMany({
-        where: { id: data.moodboardId, companyId: company.id, ticketId: null },
-        data: { ticketId: createdTicket.id },
-      });
-    }
+      // 5) TicketAssignmentLog (AUTO_ASSIGN / FALLBACK)
+      if (assignmentReason === "AUTO_ASSIGN" && createdTicket.creativeId) {
+        await tx.ticketAssignmentLog.create({
+          data: {
+            ticketId: createdTicket.id,
+            creativeId: createdTicket.creativeId,
+            reason: "AUTO_ASSIGN",
+            metadata: {
+              algorithm: "v4-skill-weighted-cap-aware",
+              source: "customer-ticket-create",
+              autoAssignEffective: true,
+              companyAutoAssignDefault,
+              projectAutoAssignMode: projectAutoAssignMode ?? "INHERIT",
+              skillFiltered,
+              skilledCreativeCount,
+              pausedCreativeCount,
+              // PR11 — non-zero when the chosen creative was picked from a
+              // pool that excluded N at-cap candidates. Useful when a
+              // ticket gets routed to a slow / new creative because the
+              // experienced ones were full.
+              cappedCreativeCount,
+              jobTypeId: jobType?.id ?? null,
+            },
+          },
+        });
+      } else if (assignmentReason === "FALLBACK") {
+        await tx.ticketAssignmentLog.create({
+          data: {
+            ticketId: createdTicket.id,
+            creativeId: createdTicket.creativeId ?? null,
+            reason: "FALLBACK",
+            metadata: {
+              source: "customer-ticket-create",
+              autoAssignEffective,
+              companyAutoAssignDefault,
+              projectAutoAssignMode: projectAutoAssignMode ?? "INHERIT",
+              fallbackMode,
+              skillFiltered,
+              skilledCreativeCount,
+              pausedCreativeCount,
+              cappedCreativeCount,
+              jobTypeId: jobType?.id ?? null,
+              note:
+                fallbackMode === "settings_disabled"
+                  ? "Auto-assign disabled by company/project settings."
+                  : fallbackMode === "no_skilled_creatives"
+                    ? "No creatives with matching skill found; ticket left unassigned for admin."
+                    : fallbackMode === "all_skilled_at_cap"
+                      ? "Every skill-matching creative is at-or-above their tasksPerWeekCap; ticket left unassigned for admin (consider raising caps or hiring)."
+                      : "No active creatives available in pool at assignment time.",
+            },
+          },
+        });
+      }
 
-    // silence unused — kept named for future audit
-    void actorUserId;
+      // 6) Tag assignments (company-scoped)
+      if (data.tagIds.length > 0) {
+        const validTags = await tx.ticketTag.findMany({
+          where: { id: { in: data.tagIds }, companyId: company.id },
+          select: { id: true },
+        });
+        if (validTags.length > 0) {
+          await tx.ticketTagAssignment.createMany({
+            data: validTags.map((t) => ({ ticketId: createdTicket.id, tagId: t.id })),
+          });
+        }
+      }
 
-    return createdTicket;
-  });
+      // 7) Link moodboard (if provided)
+      if (data.moodboardId) {
+        await tx.moodboard.updateMany({
+          where: { id: data.moodboardId, companyId: company.id, ticketId: null },
+          data: { ticketId: createdTicket.id },
+        });
+      }
+
+      // silence unused — kept named for future audit
+      void actorUserId;
+
+      return createdTicket;
+    })
+    .catch((err: unknown) => {
+      // A concurrent debit won the race for the last tokens; the whole create
+      // rolled back. Signal with null so the caller returns INSUFFICIENT_TOKENS
+      // instead of a created-but-uncharged ticket.
+      if (err instanceof InsufficientTokensAtCommitError) return null;
+      throw err;
+    });
+
+  if (!created) {
+    const fresh = await prisma.company.findUnique({
+      where: { id: company.id },
+      select: { tokenBalance: true },
+    });
+    return {
+      success: false,
+      code: "INSUFFICIENT_TOKENS",
+      message: "Insufficient token balance.",
+      required: effectiveCost,
+      balance: fresh?.tokenBalance ?? company.tokenBalance,
+    };
+  }
 
   return {
     success: true,

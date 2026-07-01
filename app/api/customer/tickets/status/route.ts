@@ -15,6 +15,7 @@ import {
   canMarkTicketsDoneForCompany,
   normalizeCompanyRole,
 } from "@/lib/permissions/companyRoles";
+import { getEffectiveTokenValues } from "@/lib/token-engine";
 
 type PatchPayload = {
   ticketId?: string;
@@ -89,10 +90,14 @@ export async function PATCH(req: NextRequest) {
         status: true,
         companyId: true,
         creativeId: true,
+        quantity: true,
+        tokenCostOverride: true,
+        creativePayoutOverride: true,
         jobType: {
           select: {
             id: true,
             name: true,
+            tokenCost: true,
             creativePayoutTokens: true,
           },
         },
@@ -266,10 +271,15 @@ export async function PATCH(req: NextRequest) {
 
     const updated = await prisma.$transaction(async (tx) => {
       // 1) Creative payout (when moving to DONE)
-      if (isDoneTransition) {
-        const hasCreative = !!ticket.creativeId && !!ticket.jobType?.creativePayoutTokens;
+      if (isDoneTransition && ticket.creativeId) {
+        // Use the shared effective-value helper so this board path pays the
+        // same amount as lib/token-engine's completion flow: base payout ×
+        // quantity, or the admin creativePayoutOverride. Previously this used
+        // the raw per-unit creativePayoutTokens, underpaying multi-quantity
+        // and overridden tickets.
+        const { effectivePayout } = getEffectiveTokenValues(ticket);
 
-        if (hasCreative && ticket.jobType!.creativePayoutTokens > 0 && ticket.creativeId) {
+        if (effectivePayout > 0) {
           const existingPayout = await tx.tokenLedger.findFirst({
             where: {
               ticketId: ticket.id,
@@ -287,7 +297,7 @@ export async function PATCH(req: NextRequest) {
                 ticketId: ticket.id,
                 userId: ticket.creativeId,
                 direction: LedgerDirection.CREDIT,
-                amount: ticket.jobType!.creativePayoutTokens,
+                amount: effectivePayout,
                 reason: "DESIGNER_JOB_PAYOUT",
                 notes: `Automatic payout for completed ticket`,
               },

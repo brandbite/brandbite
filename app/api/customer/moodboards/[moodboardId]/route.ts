@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { canManageMoodboards, isCompanyAdminRole } from "@/lib/permissions/companyRoles";
-import { resolveAssetUrl } from "@/lib/r2";
+import { resolveAssetUrl, deleteR2Objects } from "@/lib/r2";
 import type { MoodboardItemType } from "@prisma/client";
 
 type RouteParams = { params: Promise<{ moodboardId: string }> };
@@ -257,9 +257,27 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams) {
       );
     }
 
+    // Collect R2 keys for IMAGE/FILE items before the cascade delete removes
+    // the rows, then best-effort delete the objects so they don't outlive the
+    // moodboard (and stay reachable via their public URLs).
+    const storedItems = await prisma.moodboardItem.findMany({
+      where: { moodboardId, type: { in: ["IMAGE", "FILE"] } },
+      select: { data: true },
+    });
+    const storageKeys = storedItems.map((it) => {
+      const data = it.data;
+      if (data && typeof data === "object" && "storageKey" in data) {
+        const key = (data as { storageKey?: unknown }).storageKey;
+        return typeof key === "string" ? key : null;
+      }
+      return null;
+    });
+
     await prisma.moodboard.delete({
       where: { id: moodboardId },
     });
+
+    await deleteR2Objects(storageKeys);
 
     return NextResponse.json({ success: true });
   } catch (err: any) {

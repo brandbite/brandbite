@@ -304,10 +304,24 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
         );
       }
 
+      const targetStatus = statusResult.data.status as TicketStatus;
+
+      // Completion must go through /api/customer/tickets/status, which enforces
+      // the board state machine (IN_REVIEW → DONE only), the OWNER/PM
+      // permission, and — critically — the creative payout. This raw update
+      // path writes no payout and no completedAt, so a DONE here would flip the
+      // ticket done while silently leaving the creative unpaid. Refuse it.
+      if (targetStatus === TicketStatus.DONE) {
+        return NextResponse.json(
+          { error: "Approve tickets from the board — this endpoint can't mark a ticket done." },
+          { status: 400 },
+        );
+      }
+
       const updated = await prisma.ticket.update({
         where: { id: ticketId },
         data: {
-          status: statusResult.data.status as TicketStatus,
+          status: targetStatus,
         },
         select: {
           id: true,

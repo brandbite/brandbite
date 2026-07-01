@@ -6,7 +6,7 @@
 // @lastUpdate: 2025-12-27
 // -----------------------------------------------------------------------------
 
-import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 function requireEnv(name: string): string {
@@ -56,6 +56,41 @@ export function createR2Client(): S3Client {
       secretAccessKey,
     },
   });
+}
+
+/**
+ * Best-effort deletion of R2 objects by storage key. Never throws — a failed
+ * delete only leaves an orphaned object (logged for later sweeping), which
+ * must not block the DB delete that already succeeded. Also clears any cached
+ * presigned URL so clients don't get a link to a gone object. Safe to call
+ * with an empty/whitespace list.
+ */
+export async function deleteR2Objects(
+  storageKeys: Array<string | null | undefined>,
+): Promise<void> {
+  const keys = storageKeys.filter((k): k is string => typeof k === "string" && k.length > 0);
+  if (keys.length === 0) return;
+
+  let r2: S3Client;
+  let bucket: string;
+  try {
+    r2 = createR2Client();
+    bucket = getR2BucketName();
+  } catch (err) {
+    console.warn("[r2] skipping object delete — R2 not configured", err);
+    return;
+  }
+
+  await Promise.all(
+    keys.map(async (key) => {
+      try {
+        await r2.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+        invalidatePresignedUrlCache(key);
+      } catch (err) {
+        console.warn(`[r2] failed to delete object ${key}`, err);
+      }
+    }),
+  );
 }
 
 /**

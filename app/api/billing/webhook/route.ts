@@ -182,16 +182,20 @@ export async function POST(req: NextRequest) {
           }
 
           await prisma.$transaction(async (tx) => {
-            const beforeBalance = company.tokenBalance;
-            const afterBalance = beforeBalance + amount;
-
-            await tx.company.update({
+            // Atomic increment (not an absolute set from the pre-transaction
+            // `company` read) so a concurrent debit — e.g. a ticket created
+            // between our read and this write — isn't silently overwritten.
+            const updated = await tx.company.update({
               where: { id: company.id },
               data: {
                 stripeCustomerId: stripeCustomerId ?? company.stripeCustomerId,
-                tokenBalance: afterBalance,
+                tokenBalance: { increment: amount },
               },
+              select: { tokenBalance: true },
             });
+
+            const afterBalance = updated.tokenBalance;
+            const beforeBalance = afterBalance - amount;
 
             await tx.tokenLedger.create({
               data: {
@@ -226,10 +230,7 @@ export async function POST(req: NextRequest) {
         const isFirstSubscription = !company.stripeSubscriptionId;
 
         await prisma.$transaction(async (tx) => {
-          const beforeBalance = company.tokenBalance;
           const shouldCredit = isFirstSubscription && plan.monthlyTokens > 0;
-
-          const afterBalance = shouldCredit ? beforeBalance + plan.monthlyTokens : beforeBalance;
 
           const updatedCompany = await tx.company.update({
             where: { id: company.id },
@@ -238,11 +239,15 @@ export async function POST(req: NextRequest) {
               stripeCustomerId: stripeCustomerId ?? company.stripeCustomerId,
               stripeSubscriptionId: stripeSubscriptionId ?? company.stripeSubscriptionId,
               billingStatus: "ACTIVE",
-              tokenBalance: afterBalance,
+              // Atomic increment so a concurrent debit isn't clobbered.
+              ...(shouldCredit ? { tokenBalance: { increment: plan.monthlyTokens } } : {}),
             },
+            select: { id: true, tokenBalance: true },
           });
 
           if (shouldCredit) {
+            const afterBalance = updatedCompany.tokenBalance;
+            const beforeBalance = afterBalance - plan.monthlyTokens;
             await tx.tokenLedger.create({
               data: {
                 companyId: updatedCompany.id,
@@ -318,11 +323,18 @@ export async function POST(req: NextRequest) {
           break;
         }
 
-        // The first invoice is typically subscription_create; we already
-        // credited initial tokens in checkout.session.completed, so skip here.
-        if (invoice.billing_reason === "subscription_create") {
+        // Only genuine cycle renewals grant a fresh month of tokens. Credit
+        // ONLY on `subscription_cycle`:
+        //  - `subscription_create`  → already credited in checkout.session.completed
+        //  - `subscription_update`  → proration invoice from a mid-cycle plan
+        //    change. Crediting these let a customer mint a full month of tokens
+        //    per plan flip (paying only the prorated difference, or $0 on a
+        //    downgrade). Do NOT credit.
+        //  - `manual` / others      → not a renewal.
+        if (invoice.billing_reason !== "subscription_cycle") {
           console.log(
-            "[billing.webhook] invoice.payment_succeeded (subscription_create) -> skipping extra credit to avoid double.",
+            "[billing.webhook] invoice.payment_succeeded is not a subscription_cycle renewal -> skipping token credit.",
+            { billingReason: invoice.billing_reason },
           );
           break;
         }
@@ -350,22 +362,18 @@ export async function POST(req: NextRequest) {
         }
 
         await prisma.$transaction(async (tx) => {
-          const current = await tx.company.findUnique({
-            where: { id: company.id },
-          });
-
-          if (!current) return;
-
-          const beforeBalance = current.tokenBalance;
-          const afterBalance = beforeBalance + plan.monthlyTokens;
-
+          // Atomic increment so concurrent balance writers don't lost-update.
           const updatedCompany = await tx.company.update({
             where: { id: company.id },
             data: {
-              tokenBalance: afterBalance,
+              tokenBalance: { increment: plan.monthlyTokens },
               billingStatus: "ACTIVE",
             },
+            select: { id: true, tokenBalance: true },
           });
+
+          const afterBalance = updatedCompany.tokenBalance;
+          const beforeBalance = afterBalance - plan.monthlyTokens;
 
           await tx.tokenLedger.create({
             data: {
@@ -479,11 +487,19 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        // On deletion, detach the subscription id. `isFirstSubscription`
+        // (checkout.session.completed) keys off its absence — leaving a stale
+        // id means a customer who cancels and later re-subscribes gets NO
+        // initial token credit (their first invoice is subscription_create,
+        // which we skip). Clearing it here restores the first-time credit.
+        const clearsSubscription = event.type === "customer.subscription.deleted";
+
         await prisma.company.update({
           where: { id: company.id },
           data: {
             billingStatus,
             ...(newPlanId ? { planId: newPlanId } : {}),
+            ...(clearsSubscription ? { stripeSubscriptionId: null } : {}),
           },
         });
 

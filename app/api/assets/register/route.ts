@@ -23,6 +23,20 @@ function buildPublicUrl(storageKey: string): string | null {
   return `${trimmed}/${storageKey}`;
 }
 
+/**
+ * The presign route (uploads/r2/presign) always mints keys under
+ * `tickets/<ticketId>/brief/` (BRIEF_INPUT) or `tickets/<ticketId>/outputs/`
+ * (OUTPUT_IMAGE). register must re-assert that shape: without it a caller who
+ * legitimately owns ticket A could register an Asset row pointing at any R2
+ * object key they can guess (another company's `tickets/<B>/outputs/...`,
+ * an `avatars/...` object, etc.), then read it back via the download route,
+ * which authorizes on the asset's own ticket. Pin the key to this ticket+kind.
+ */
+function isStorageKeyForTicket(storageKey: string, ticketId: string, kind: AssetKind): boolean {
+  const folder = kind === "BRIEF_INPUT" ? "brief" : "outputs";
+  return storageKey.startsWith(`tickets/${ticketId}/${folder}/`);
+}
+
 export async function POST(req: Request) {
   try {
     const user = await getCurrentUserOrThrow();
@@ -46,6 +60,12 @@ export async function POST(req: Request) {
 
     if (kind !== "BRIEF_INPUT" && kind !== "OUTPUT_IMAGE") {
       return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
+    }
+
+    // Reject keys that don't belong to this ticket+kind. Prevents pointing an
+    // Asset row (and thus the download presign) at an arbitrary R2 object.
+    if (!isStorageKeyForTicket(storageKey, ticketId, kind)) {
+      return NextResponse.json({ error: "INVALID_STORAGE_KEY" }, { status: 400 });
     }
 
     const ticket = await prisma.ticket.findUnique({
