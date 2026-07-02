@@ -15,6 +15,35 @@
 // -----------------------------------------------------------------------------
 
 import { LedgerDirection, Prisma, WithdrawalStatus } from "@prisma/client";
+import { prisma } from "./prisma";
+import { getUserTokenBalance } from "./token-engine";
+
+/**
+ * A creative's withdrawable position:
+ *  - balance:   ledger balance (credits − debits)
+ *  - reserved:  tokens committed to open (PENDING/APPROVED) withdrawals, which
+ *               haven't debited the ledger yet (the debit is at MARK_PAID)
+ *  - available: balance − reserved, i.e. how much a NEW request may ask for
+ *
+ * Checking a new request against `balance` alone would let a creative stack
+ * several open requests that together exceed their balance.
+ */
+export async function getCreativeWithdrawableBalance(
+  creativeId: string,
+): Promise<{ balance: number; reserved: number; available: number }> {
+  const [balance, openAgg] = await Promise.all([
+    getUserTokenBalance(creativeId),
+    prisma.withdrawal.aggregate({
+      where: {
+        creativeId,
+        status: { in: [WithdrawalStatus.PENDING, WithdrawalStatus.APPROVED] },
+      },
+      _sum: { amountTokens: true },
+    }),
+  ]);
+  const reserved = openAgg._sum.amountTokens ?? 0;
+  return { balance, reserved, available: balance - reserved };
+}
 
 /**
  * Atomically mark an APPROVED withdrawal PAID and debit the creative's ledger.
