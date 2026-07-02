@@ -31,6 +31,8 @@ type CreativeWithdrawal = {
 type CreativeWithdrawalsResponse = {
   stats: {
     availableBalance: number;
+    reservedTokens: number;
+    spendableBalance: number;
     totalRequested: number;
     pendingCount: number;
     withdrawalsCount: number;
@@ -221,7 +223,9 @@ export default function CreativeWithdrawalsPage() {
               </span>
             </p>
             <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-              This is your current token balance before new withdrawals.
+              {stats && stats.reservedTokens > 0
+                ? `${stats.spendableBalance} available to withdraw now — ${stats.reservedTokens} tokens are held by pending requests.`
+                : "This is your current token balance before new withdrawals."}
             </p>
           </div>
 

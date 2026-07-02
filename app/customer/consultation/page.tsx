@@ -20,6 +20,7 @@ import {
   type InsufficientTokensInfo,
 } from "@/components/tokens/insufficient-tokens-modal";
 import { isInsufficientTokensBody } from "@/lib/errors/insufficient-tokens";
+import { zonedWallTimeToUtc } from "@/lib/timezone";
 
 type ConsultationStatus = "PENDING" | "SCHEDULED" | "COMPLETED" | "CANCELED";
 
@@ -378,10 +379,12 @@ export default function CustomerConsultationPage() {
       setBusyGoogleConnected(false);
       return;
     }
-    const timeMin = new Date(`${date}T00:00`).toISOString();
-    const timeMaxLocal = new Date(`${date}T00:00`);
-    timeMaxLocal.setDate(timeMaxLocal.getDate() + 1);
-    const timeMax = timeMaxLocal.toISOString();
+    // Query the busy window for the selected zone's calendar day (its
+    // midnight-to-midnight), so it matches the zone-aware slot overlap check.
+    const [yy, mm, dd] = date.split("-").map(Number);
+    const nextDate = new Date(Date.UTC(yy, mm - 1, dd + 1)).toISOString().slice(0, 10);
+    const timeMin = zonedWallTimeToUtc(`${date}T00:00`, timezone).toISOString();
+    const timeMax = zonedWallTimeToUtc(`${nextDate}T00:00`, timezone).toISOString();
 
     let cancelled = false;
     setBusyLoading(true);
@@ -408,7 +411,7 @@ export default function CustomerConsultationPage() {
     return () => {
       cancelled = true;
     };
-  }, [date, settings]);
+  }, [date, settings, timezone]);
 
   // Which dropdown slots overlap a busy interval? Compared as (start, end+30min)
   // per slot against the busy list.
@@ -418,7 +421,10 @@ export default function CustomerConsultationPage() {
     for (const slot of ["00:00"]) void slot; // placate TS no-unused
     for (let h = 0; h < 24; h++) {
       for (const mm of [0, 30]) {
-        const slotStart = new Date(`${date}T${pad2(h)}:${pad2(mm)}`).getTime();
+        // Resolve the slot's wall-clock time in the SELECTED zone (not the
+        // browser's) so the overlap check lines up with the absolute busy
+        // intervals returned by Google.
+        const slotStart = zonedWallTimeToUtc(`${date}T${pad2(h)}:${pad2(mm)}`, timezone).getTime();
         const slotEnd = slotStart + 30 * 60_000;
         for (const b of busyIntervals) {
           const bs = new Date(b.start).getTime();
@@ -431,7 +437,7 @@ export default function CustomerConsultationPage() {
       }
     }
     return out;
-  }, [date, busyIntervals]);
+  }, [date, busyIntervals, timezone]);
 
   // If the currently-picked time just became busy, clear it so the user re-picks.
   useEffect(() => {
@@ -442,10 +448,13 @@ export default function CustomerConsultationPage() {
   // wire (API still accepts the legacy preferredTimes[] shape).
   const preferredIsoSlots = useMemo(() => {
     if (!date || !time) return [];
-    const local = new Date(`${date}T${time}`);
-    if (Number.isNaN(local.getTime())) return [];
-    return [local.toISOString()];
-  }, [date, time]);
+    // Resolve the picked wall-clock time in the SELECTED IANA zone (not the
+    // browser's), so the booked instant matches what the customer chose
+    // regardless of where they're browsing from.
+    const instant = zonedWallTimeToUtc(`${date}T${time}`, timezone);
+    if (Number.isNaN(instant.getTime())) return [];
+    return [instant.toISOString()];
+  }, [date, time, timezone]);
 
   const charCount = description.trim().length;
   const charOk = charCount >= DESCRIPTION_MIN && charCount <= DESCRIPTION_MAX;

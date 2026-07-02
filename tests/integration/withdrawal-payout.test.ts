@@ -10,7 +10,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/prisma";
 import { getUserTokenBalance } from "@/lib/token-engine";
-import { payApprovedWithdrawal } from "@/lib/withdrawals";
+import { getCreativeWithdrawableBalance, payApprovedWithdrawal } from "@/lib/withdrawals";
 import { resetDatabase } from "./helpers/db";
 import { createUser, createWithdrawal, creditCreative } from "./helpers/fixtures";
 
@@ -99,5 +99,46 @@ describe("payApprovedWithdrawal (integration)", () => {
     expect(after.status).toBe("APPROVED");
     expect(await getUserTokenBalance(creative.id)).toBe(30);
     expect(await prisma.tokenLedger.count({ where: { direction: "DEBIT" } })).toBe(0);
+  });
+});
+
+describe("getCreativeWithdrawableBalance", () => {
+  beforeEach(async () => {
+    await resetDatabase();
+  });
+
+  it("subtracts open (PENDING/APPROVED) withdrawals from the balance", async () => {
+    const creative = await createUser({ role: "DESIGNER" });
+    await creditCreative(creative.id, 100);
+    await createWithdrawal({ creativeId: creative.id, amountTokens: 30, status: "PENDING" });
+    await createWithdrawal({ creativeId: creative.id, amountTokens: 20, status: "APPROVED" });
+
+    const { balance, reserved, available } = await getCreativeWithdrawableBalance(creative.id);
+    expect(balance).toBe(100);
+    expect(reserved).toBe(50);
+    expect(available).toBe(50); // can't stack requests beyond this
+  });
+
+  it("does not reserve for PAID or REJECTED withdrawals", async () => {
+    const creative = await createUser({ role: "DESIGNER" });
+    await creditCreative(creative.id, 100);
+    // A PAID withdrawal already debited the ledger — model that with a debit.
+    await prisma.tokenLedger.create({
+      data: {
+        userId: creative.id,
+        direction: "DEBIT",
+        amount: 40,
+        reason: "WITHDRAWAL_PAID",
+        balanceBefore: 100,
+        balanceAfter: 60,
+      },
+    });
+    await createWithdrawal({ creativeId: creative.id, amountTokens: 40, status: "PAID" });
+    await createWithdrawal({ creativeId: creative.id, amountTokens: 25, status: "REJECTED" });
+
+    const { balance, reserved, available } = await getCreativeWithdrawableBalance(creative.id);
+    expect(balance).toBe(60); // 100 credited − 40 paid-out
+    expect(reserved).toBe(0); // PAID/REJECTED don't reserve
+    expect(available).toBe(60);
   });
 });

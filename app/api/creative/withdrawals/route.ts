@@ -11,6 +11,7 @@ import { prisma } from "@/lib/prisma";
 import { notifySiteOwnersOfEvent } from "@/lib/admin-event-email";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { getUserTokenBalance } from "@/lib/token-engine";
+import { getCreativeWithdrawableBalance } from "@/lib/withdrawals";
 import { getAppSettingInt } from "@/lib/app-settings";
 import { parseBody } from "@/lib/schemas/helpers";
 import { createWithdrawalSchema } from "@/lib/schemas/withdrawal.schemas";
@@ -44,6 +45,14 @@ export async function GET(_req: NextRequest) {
     const totalRequested = withdrawals.reduce((sum, w) => sum + w.amountTokens, 0);
     const pendingCount = withdrawals.filter((w) => w.status === "PENDING").length;
 
+    // Tokens committed to open (not-yet-paid) withdrawals. These haven't
+    // debited the ledger, so the spendable balance is the raw balance minus
+    // this reservation — that's the real cap for a new request.
+    const reservedTokens = withdrawals
+      .filter((w) => w.status === "PENDING" || w.status === "APPROVED")
+      .reduce((sum, w) => sum + w.amountTokens, 0);
+    const spendableBalance = balance - reservedTokens;
+
     const items = withdrawals.map((w) => ({
       id: w.id,
       amountTokens: w.amountTokens,
@@ -55,6 +64,8 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json({
       stats: {
         availableBalance: balance,
+        reservedTokens,
+        spendableBalance,
         totalRequested,
         pendingCount,
         withdrawalsCount: items.length,
@@ -102,12 +113,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const balance = await getUserTokenBalance(user.id);
+    // Available = balance minus tokens committed to open (PENDING/APPROVED)
+    // withdrawals — see getCreativeWithdrawableBalance. Checking the raw
+    // balance alone would let a creative stack requests that together exceed it.
+    const { reserved, available } = await getCreativeWithdrawableBalance(user.id);
 
-    if (amountTokens > balance) {
+    if (amountTokens > available) {
       return NextResponse.json(
         {
-          error: "Requested amount exceeds your current token balance.",
+          error:
+            reserved > 0
+              ? "Requested amount exceeds your available balance after pending withdrawals."
+              : "Requested amount exceeds your current token balance.",
+          availableBalance: available,
         },
         { status: 400 },
       );
