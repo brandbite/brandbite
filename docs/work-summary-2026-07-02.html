@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Brandbite — Work Summary / Çalışma Özeti · 2026-07-02</title>
+    <style>
+      :root {
+        --primary: #f15b2b;
+        --primary-light: #fff0ea;
+        --ink: #2b2a29;
+        --muted: #6f6d6a;
+        --line: #e6e3de;
+        --bg: #faf9f7;
+        --card: #ffffff;
+        --ok: #137a3a;
+        --ok-bg: #f0fff6;
+        --warn: #8a6b1f;
+        --warn-bg: #fff7e0;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font:
+          15px/1.6 -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          Roboto,
+          Helvetica,
+          Arial,
+          sans-serif;
+      }
+      .wrap {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 32px 20px 80px;
+      }
+      header.masthead {
+        border-bottom: 3px solid var(--primary);
+        padding-bottom: 18px;
+        margin-bottom: 8px;
+      }
+      h1 {
+        margin: 0 0 4px;
+        font-size: 26px;
+        letter-spacing: -0.01em;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 14px;
+      }
+      .toggle {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        background: var(--bg);
+        padding: 12px 0;
+        margin-bottom: 8px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        border-bottom: 1px solid var(--line);
+      }
+      .toggle button {
+        border: 1px solid var(--line);
+        background: var(--card);
+        color: var(--ink);
+        border-radius: 999px;
+        padding: 6px 16px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .toggle button.active {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #fff;
+      }
+      .toggle .hint {
+        color: var(--muted);
+        font-size: 12px;
+        margin-left: auto;
+      }
+      section.card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 18px 20px;
+        margin: 16px 0;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+      }
+      section.card h2 {
+        margin: 0 0 2px;
+        font-size: 17px;
+      }
+      .pr {
+        display: inline-block;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--primary);
+        background: var(--primary-light);
+        border: 1px solid #f5c4ad;
+        border-radius: 6px;
+        padding: 1px 7px;
+        margin-bottom: 8px;
+      }
+      .card h2 .tag {
+        font-size: 11px;
+        font-weight: 700;
+        color: #fff;
+        background: var(--ok);
+        border-radius: 6px;
+        padding: 1px 7px;
+        vertical-align: middle;
+        margin-left: 6px;
+      }
+      ul {
+        margin: 8px 0 0;
+        padding-left: 20px;
+      }
+      li {
+        margin: 4px 0;
+      }
+      code {
+        background: #f3f1ee;
+        border-radius: 4px;
+        padding: 1px 5px;
+        font-size: 12.5px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+      .note {
+        background: var(--warn-bg);
+        border: 1px solid #f7d0a9;
+        border-radius: 10px;
+        padding: 14px 16px;
+        margin: 16px 0;
+      }
+      .note h2 {
+        color: var(--warn);
+      }
+      .lead {
+        background: var(--primary-light);
+        border: 1px solid #f5c4ad;
+        border-radius: 12px;
+        padding: 16px 18px;
+        margin: 12px 0 4px;
+      }
+      .lang-tr {
+        display: none;
+      }
+      body.tr .lang-en {
+        display: none;
+      }
+      body.tr .lang-tr {
+        display: block;
+      }
+      .metrics {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 12px 0;
+      }
+      .metric {
+        flex: 1 1 130px;
+        background: var(--ok-bg);
+        border: 1px solid #b9e2cd;
+        border-radius: 10px;
+        padding: 10px 12px;
+      }
+      .metric b {
+        display: block;
+        font-size: 20px;
+        color: var(--ok);
+      }
+      .metric span {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      footer {
+        margin-top: 32px;
+        color: var(--muted);
+        font-size: 12px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="masthead">
+        <h1>Brandbite — Work Summary <span class="lang-tr">/ Çalışma Özeti</span></h1>
+        <div class="sub">
+          <span class="lang-en"
+            >Development log for 2 July 2026 · production: brandbite.studio</span
+          >
+          <span class="lang-tr">2 Temmuz 2026 geliştirme günlüğü · canlı: brandbite.studio</span>
+        </div>
+      </header>
+
+      <div class="toggle">
+        <button id="btn-en" class="active" onclick="setLang('en')">English</button>
+        <button id="btn-tr" onclick="setLang('tr')">Türkçe</button>
+        <span class="hint">
+          <span class="lang-en">8 pull requests shipped to production &amp; verified.</span>
+          <span class="lang-tr">8 pull request canlıya alındı ve doğrulandı.</span>
+        </span>
+      </div>
+
+      <div class="lead">
+        <div class="lang-en">
+          <strong>Overview.</strong> A full-day pass over the Brandbite codebase: a deep
+          multi-subsystem security &amp; correctness audit, followed by fixes surfaced by the
+          customer and creative smoke tests. Everything below is merged to <code>main</code>, live
+          on brandbite.studio, and covered by an automated test suite that grew from 27 to 48
+          integration tests. Each change was verified against a real Postgres before merge.
+        </div>
+        <div class="lang-tr">
+          <strong>Genel bakış.</strong> Brandbite kod tabanı üzerinde tam günlük bir çalışma:
+          derinlemesine, çok bileşenli bir güvenlik ve doğruluk denetimi ve ardından müşteri ile
+          kreatif duman testlerinin (smoke test) ortaya çıkardığı düzeltmeler. Aşağıdakilerin tümü
+          <code>main</code> dalına birleştirildi, brandbite.studio üzerinde canlıda ve 27'den 48'e
+          çıkan otomatik entegrasyon test paketi ile korunuyor. Her değişiklik birleştirilmeden önce
+          gerçek bir Postgres veritabanında doğrulandı.
+        </div>
+      </div>
+
+      <div class="metrics">
+        <div class="metric">
+          <b>8</b><span class="lang-en">PRs merged</span
+          ><span class="lang-tr">PR birleştirildi</span>
+        </div>
+        <div class="metric">
+          <b>13</b><span class="lang-en">audit bug fixes</span
+          ><span class="lang-tr">denetim düzeltmesi</span>
+        </div>
+        <div class="metric">
+          <b>48</b><span class="lang-en">integration tests</span
+          ><span class="lang-tr">entegrasyon testi</span>
+        </div>
+        <div class="metric">
+          <b>7</b><span class="lang-en">smoke-test fixes</span
+          ><span class="lang-tr">duman testi düzeltmesi</span>
+        </div>
+      </div>
+
+      <!-- PR 268 -->
+      <section class="card">
+        <span class="pr">PR #268</span>
+        <h2>Security &amp; access-control audit <span class="tag">LIVE</span></h2>
+        <div class="lang-en">
+          Deep audit across auth, billing/Stripe, tokens, tickets and moodboards. 13 verified fixes,
+          including:
+          <ul>
+            <li>
+              An <strong>unauthenticated ticket-completion endpoint</strong> that minted creative
+              payouts — now gated to admins / the assigned creative.
+            </li>
+            <li>
+              A <strong>cross-tenant asset access (IDOR)</strong> via a trusted client-supplied
+              storage key.
+            </li>
+            <li>
+              <strong>SSRF</strong> in the moodboard link-preview (could reach
+              internal/cloud-metadata addresses).
+            </li>
+            <li>
+              A <strong>privilege escalation</strong> letting a PM promote anyone (incl. themselves)
+              to OWNER.
+            </li>
+            <li>
+              A <strong>Stripe token-minting</strong> bug where plan-change proration invoices
+              granted a full month of tokens.
+            </li>
+            <li>
+              Several token-accounting race conditions (atomic increment/decrement, guarded
+              transactions).
+            </li>
+          </ul>
+        </div>
+        <div class="lang-tr">
+          Kimlik doğrulama, faturalama/Stripe, jetonlar, talepler (ticket) ve moodboard üzerinde
+          derin bir denetim. Doğrulanmış 13 düzeltme, aralarında:
+          <ul>
+            <li>
+              Kreatif ödemesi üreten,
+              <strong>kimlik doğrulaması olmayan bir talep tamamlama uç noktası</strong> — artık
+              yalnızca yöneticiler / atanan kreatif erişebilir.
+            </li>
+            <li>
+              İstemciden gelen depolama anahtarına güvenilmesinden kaynaklanan
+              <strong>şirketler arası dosya erişimi (IDOR)</strong>.
+            </li>
+            <li>
+              Moodboard bağlantı önizlemesinde <strong>SSRF</strong> (dahili / bulut-metadata
+              adreslerine erişebiliyordu).
+            </li>
+            <li>
+              Bir PM'in herkesi (kendisi dahil) OWNER'a yükseltmesine izin veren
+              <strong>yetki yükseltme</strong> açığı.
+            </li>
+            <li>
+              Plan değişikliği orantılama faturalarının tam aylık jeton verdiği
+              <strong>Stripe jeton üretme</strong> hatası.
+            </li>
+            <li>
+              Birkaç jeton muhasebesi yarış durumu (atomik artırma/azaltma, korumalı işlemler).
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- PR 269 -->
+      <section class="card">
+        <span class="pr">PR #269</span>
+        <h2>Regression test suite <span class="tag">LIVE</span></h2>
+        <div class="lang-en">
+          14 real-Postgres integration tests locking in the highest-risk audit fixes — the
+          completion endpoint's authorization, the PM→OWNER block, ticket-create token math, and the
+          creative-payout logic — so future deploys re-verify them automatically.
+        </div>
+        <div class="lang-tr">
+          En yüksek riskli denetim düzeltmelerini sabitleyen 14 gerçek-Postgres entegrasyon testi —
+          tamamlama uç noktasının yetkilendirmesi, PM→OWNER engeli, talep oluşturma jeton hesabı ve
+          kreatif ödeme mantığı — böylece gelecekteki dağıtımlar bunları otomatik olarak yeniden
+          doğrular.
+        </div>
+      </section>
+
+      <!-- PR 270 -->
+      <section class="card">
+        <span class="pr">PR #270</span>
+        <h2>Unified creative payout (gamification model) <span class="tag">LIVE</span></h2>
+        <div class="lang-en">
+          The two ticket-completion paths paid creatives <em>different amounts</em> for the same
+          ticket. Both now use one implementation — the gamification model (<code
+            >tokenCost × quantity × payoutPercent</code
+          >) — so pay is identical regardless of which endpoint completes the ticket. Also fixed the
+          completed-jobs report that showed paid jobs as unpaid.
+        </div>
+        <div class="lang-tr">
+          İki talep tamamlama yolu, aynı talep için kreatiflere <em>farklı tutarlar</em> ödüyordu.
+          Artık her ikisi de tek bir uygulamayı — oyunlaştırma modelini (<code
+            >jetonMaliyeti × adet × ödemeYüzdesi</code
+          >) — kullanıyor; böylece talebi hangi uç nokta tamamlarsa tamamlasın ödeme aynı. Ayrıca,
+          ödenmiş işleri ödenmemiş gösteren "tamamlanan işler" raporu düzeltildi.
+        </div>
+      </section>
+
+      <!-- PR 271 -->
+      <section class="card">
+        <span class="pr">PR #271</span>
+        <h2>Withdrawal debit consolidation <span class="tag">LIVE</span></h2>
+        <div class="lang-en">
+          The withdrawal flows debited creatives at <em>different stages</em>, so mixing them could
+          double-debit or zero-debit (paying out without ever removing the tokens). The debit now
+          happens exactly once, at mark-paid, through one shared helper that is race-safe,
+          idempotent, and never drives a balance negative.
+        </div>
+        <div class="lang-tr">
+          Para çekme akışları kreatiflerin bakiyesini <em>farklı aşamalarda</em> düşüyordu; bu
+          yüzden karıştırıldığında çift düşme veya sıfır düşme (jetonlar hiç düşülmeden ödeme
+          yapılması) oluşabiliyordu. Düşme işlemi artık tam olarak bir kez, "ödendi olarak işaretle"
+          aşamasında, yarış-güvenli, tekrara dayanıklı ve bakiyeyi asla eksiye düşürmeyen tek bir
+          ortak yardımcı üzerinden gerçekleşiyor.
+        </div>
+      </section>
+
+      <!-- PR 272 -->
+      <section class="card">
+        <span class="pr">PR #272</span>
+        <h2>Consultation timezone + withdrawal over-request <span class="tag">LIVE</span></h2>
+        <div class="lang-en">
+          <ul>
+            <li>
+              <strong>Consultation booking</strong> computed the meeting time in the browser's
+              timezone while ignoring the customer's selected zone, so Google Calendar events landed
+              hours off. A DST-correct helper now resolves the picked time in the chosen zone.
+            </li>
+            <li>
+              <strong>Withdrawal requests</strong> checked only the single amount against the raw
+              balance, letting a creative stack requests beyond their balance. New requests are now
+              gated on the <em>available</em> balance (balance minus open requests).
+            </li>
+          </ul>
+        </div>
+        <div class="lang-tr">
+          <ul>
+            <li>
+              <strong>Danışmanlık rezervasyonu</strong> toplantı saatini, müşterinin seçtiği saat
+              dilimini yok sayarak tarayıcının saat dilimine göre hesaplıyordu; bu yüzden Google
+              Takvim etkinlikleri saatlerce kayıyordu. Yaz saati uyumlu yeni bir yardımcı, seçilen
+              saati seçilen dilimde çözümlüyor.
+            </li>
+            <li>
+              <strong>Para çekme talepleri</strong> yalnızca tek tutarı ham bakiyeyle
+              karşılaştırıyordu; bu da bir kreatifin bakiyesini aşan talepler biriktirmesine izin
+              veriyordu. Yeni talepler artık <em>kullanılabilir</em> bakiyeye (bakiye eksi açık
+              talepler) göre sınırlandırılıyor.
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- PR 273 -->
+      <section class="card">
+        <span class="pr">PR #273</span>
+        <h2>Job type required + AI mode admin toggle <span class="tag">LIVE</span></h2>
+        <div class="lang-en">
+          <ul>
+            <li>
+              <strong>Job type is now required on every ticket.</strong> Previously optional, so a
+              ticket could be created with no cost — the company wasn't charged and the creative was
+              never paid. (Root cause of smoke-test "can't charge tokens" &amp; "creative credit
+              stayed at zero".)
+            </li>
+            <li>
+              <strong>"Work with AI" is behind an admin switch</strong>
+              (<code>AI_TICKETS_MODE</code>: off / test / on, default <strong>off</strong>) since
+              there is no working AI generation API yet. <em>Test</em> exposes it to site admins
+              only, so the AI provider can be validated before launch; <em>on</em> opens it to all
+              customers. Enforced on every AI endpoint.
+            </li>
+            <li>
+              <strong>Bonus:</strong> fixed a pre-existing bug where several admin toggles (ticket
+              tags, talent applications, owner emails) silently failed to save because the settings
+              validation had drifted out of sync.
+            </li>
+          </ul>
+        </div>
+        <div class="lang-tr">
+          <ul>
+            <li>
+              <strong>Artık her talepte iş türü (job type) zorunlu.</strong> Önceden isteğe
+              bağlıydı; bu yüzden maliyetsiz bir talep oluşturulabiliyordu — şirketten ücret
+              alınmıyor ve kreatife ödeme yapılmıyordu. (Duman testindeki "jeton alınamıyor" ve
+              "kreatif bakiyesi sıfır kaldı" sorunlarının kök nedeni.)
+            </li>
+            <li>
+              <strong>"Yapay Zeka ile Çalış" bir yönetici anahtarının arkasında</strong>
+              (<code>AI_TICKETS_MODE</code>: kapalı / test / açık, varsayılan
+              <strong>kapalı</strong>), çünkü henüz çalışan bir AI üretim API'si yok.
+              <em>Test</em> yalnızca site yöneticilerine açar; böylece AI sağlayıcı lansmandan önce
+              doğrulanabilir. <em>Açık</em> tüm müşterilere açar. Tüm AI uç noktalarında zorlanıyor.
+            </li>
+            <li>
+              <strong>Ek olarak:</strong> bazı yönetici anahtarlarının (talep etiketleri, yetenek
+              başvuruları, sahip e-postaları) ayar doğrulaması senkronizasyondan çıktığı için
+              sessizce kaydedilememesine yol açan mevcut bir hata düzeltildi.
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- PR 274 -->
+      <section class="card">
+        <span class="pr">PR #274</span>
+        <h2>Upload &amp; board UX fixes <span class="tag">LIVE</span></h2>
+        <div class="lang-en">
+          <ul>
+            <li>
+              <strong>PDF / document uploads work</strong> — the new-ticket form was silently
+              dropping every non-image even though PDFs are supported.
+            </li>
+            <li>
+              <strong>Oversized files rejected up front</strong> with a clear message, instead of
+              only after the ticket was already created.
+            </li>
+            <li>
+              <strong>Ticket detail panel scrolls</strong> on narrow screens — the "dates" section
+              was previously unreachable.
+            </li>
+            <li>
+              <strong>Board thumbnail updates immediately</strong> after adding an attachment,
+              instead of only after a manual refresh.
+            </li>
+          </ul>
+        </div>
+        <div class="lang-tr">
+          <ul>
+            <li>
+              <strong>PDF / belge yüklemeleri çalışıyor</strong> — yeni talep formu, PDF'ler
+              desteklendiği halde resim olmayan her dosyayı sessizce atıyordu.
+            </li>
+            <li>
+              <strong>Büyük dosyalar baştan reddediliyor</strong> ve net bir mesaj gösteriliyor;
+              önceden yalnızca talep oluşturulduktan sonra reddediliyordu.
+            </li>
+            <li>
+              <strong>Talep detay paneli kaydırılabiliyor</strong> — dar ekranlarda "tarihler"
+              bölümüne önceden ulaşılamıyordu.
+            </li>
+            <li>
+              <strong>Pano küçük görseli anında güncelleniyor</strong> — ek eklendikten sonra elle
+              yenileme gerekmiyor.
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- PR 275 -->
+      <section class="card">
+        <span class="pr">PR #275</span>
+        <h2>Hire-form persistence + creative approval notice <span class="tag">LIVE</span></h2>
+        <div class="lang-en">
+          <ul>
+            <li>
+              <strong>The talent hire form no longer loses entered values.</strong> Working hours
+              and the weekly cap now pre-fill from what was already saved, instead of being wiped on
+              a background reload.
+            </li>
+            <li>
+              <strong>Creatives are notified when their work is approved</strong> (in-app + email).
+              The board-approve path previously sent nothing.
+            </li>
+          </ul>
+        </div>
+        <div class="lang-tr">
+          <ul>
+            <li>
+              <strong>Yetenek işe alım formu artık girilen değerleri kaybetmiyor.</strong> Çalışma
+              saatleri ve haftalık üst sınır, arka planda yeniden yükleme sırasında silinmek yerine
+              kayıtlı değerlerden önceden dolduruluyor.
+            </li>
+            <li>
+              <strong>Kreatifler, işleri onaylandığında bildirim alıyor</strong> (uygulama içi +
+              e-posta). Pano onay yolu önceden hiçbir bildirim göndermiyordu.
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Outstanding -->
+      <div class="note">
+        <h2>
+          <span class="lang-en">Still needs your action (not code)</span>
+          <span class="lang-tr">Sizin aksiyonunuzu bekliyor (kod değil)</span>
+        </h2>
+        <div class="lang-en">
+          <ul>
+            <li>
+              <strong>Set <code>R2_PUBLIC_BASE_URL</code> in the production environment.</strong>
+              This is why avatar upload, "download final file", and PDF display fail on the live
+              site — it's a missing config value, not a code bug.
+            </li>
+            <li>
+              <strong>Confirm the email (Resend) configuration in production</strong> (API key +
+              verified sending domain). The notification wiring is now in place, but delivery still
+              depends on this.
+            </li>
+            <li>
+              <strong>Onboarding "Pick a plan / Payment" (smoke test 2.2 / 2.3):</strong> these
+              steps expected a plan screen inside the onboarding wizard, but plan selection actually
+              lives on <code>/customer/settings</code> after onboarding — the plans API returns
+              correctly. This is a checklist-vs-flow mismatch: either update the smoke-test
+              document, or decide (product) whether a plan step belongs in onboarding.
+            </li>
+            <li>
+              <strong>Branch protection:</strong> the required <code>quality</code> status check is
+              a stale name no workflow produces, so every merge needed an admin override. Worth
+              fixing in repo settings.
+            </li>
+          </ul>
+        </div>
+        <div class="lang-tr">
+          <ul>
+            <li>
+              <strong>Canlı ortamda <code>R2_PUBLIC_BASE_URL</code> değerini ayarlayın.</strong>
+              Avatar yükleme, "son dosyayı indir" ve PDF görüntülemenin canlı sitede başarısız
+              olmasının nedeni budur — bu bir kod hatası değil, eksik bir yapılandırma değeridir.
+            </li>
+            <li>
+              <strong>Canlı ortamda e-posta (Resend) yapılandırmasını doğrulayın</strong> (API
+              anahtarı + doğrulanmış gönderim alan adı). Bildirim bağlantısı artık hazır, ancak
+              teslimat buna bağlı.
+            </li>
+            <li>
+              <strong>Onboarding "Plan seç / Ödeme" (duman testi 2.2 / 2.3):</strong> bu adımlar,
+              onboarding sihirbazı içinde bir plan ekranı bekliyordu; ancak plan seçimi aslında
+              onboarding sonrasında <code>/customer/settings</code> sayfasında yer alıyor — planlar
+              API'si doğru şekilde yanıt veriyor. Bu, kontrol-listesi ile akış arasında bir
+              uyumsuzluk: ya duman testi belgesini güncelleyin ya da (ürün kararı) onboarding'e bir
+              plan adımının ait olup olmadığına karar verin.
+            </li>
+            <li>
+              <strong>Dal koruması (branch protection):</strong> zorunlu
+              <code>quality</code> kontrolü, hiçbir iş akışının üretmediği eski bir isim; bu yüzden
+              her birleştirme yönetici geçersiz kılması gerektirdi. Depo ayarlarında düzeltilmesi
+              faydalı olur.
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Backlog -->
+      <section class="card">
+        <h2>
+          <span class="lang-en">Backlog (enhancements, agreed for later)</span>
+          <span class="lang-tr">Bekleyen işler (geliştirmeler, sonraya bırakıldı)</span>
+        </h2>
+        <div class="lang-en">
+          <ul>
+            <li>
+              Interview flow: a "missed → reschedule" option instead of jumping straight to "held".
+            </li>
+            <li>A short onboarding guidance line on the creative profile.</li>
+            <li>
+              Auto-assign backfill for tickets left unassigned before company auto-assign was
+              enabled.
+            </li>
+          </ul>
+        </div>
+        <div class="lang-tr">
+          <ul>
+            <li>
+              Görüşme akışı: doğrudan "yapıldı"ya geçmek yerine "kaçırıldı → yeniden planla"
+              seçeneği.
+            </li>
+            <li>Kreatif profilinde kısa bir onboarding yönlendirme satırı.</li>
+            <li>
+              Şirket otomatik-atama açılmadan önce atanmadan kalan talepler için otomatik-atama geri
+              doldurması.
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <footer>
+        Brandbite · 2026-07-02 · <span class="lang-en">Generated as part of the day's work.</span>
+        <span class="lang-tr">Günün çalışmasının bir parçası olarak oluşturuldu.</span>
+      </footer>
+    </div>
+
+    <script>
+      function setLang(lang) {
+        document.body.classList.toggle("tr", lang === "tr");
+        document.getElementById("btn-en").classList.toggle("active", lang === "en");
+        document.getElementById("btn-tr").classList.toggle("active", lang === "tr");
+        document.documentElement.lang = lang;
+      }
+    </script>
+  </body>
+</html>
