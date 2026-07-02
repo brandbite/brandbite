@@ -10,6 +10,14 @@ import React, { useCallback, useEffect, useState } from "react";
 import { PinOverlay, type PinData } from "./pin-overlay";
 import { PinSidebar, PinBottomSheet } from "./pin-sidebar";
 import { downloadSingleAsset, downloadAssetsAsZip } from "@/lib/download-helpers";
+import { isImageAsset } from "@/lib/upload-helpers";
+
+/** Uppercase extension label for a non-image file chip (e.g. "PDF"). */
+function fileExtLabel(name: string | null, url: string | null): string {
+  const s = (name || url || "").toLowerCase().split("?")[0];
+  const m = s.match(/\.([a-z0-9]+)$/);
+  return m ? m[1].toUpperCase() : "FILE";
+}
 
 // ---------------------------------------------------------------------------
 // Download icon SVG (arrow-down to tray)
@@ -197,6 +205,11 @@ export function RevisionImage({
   onClick,
 }: RevisionImageProps) {
   const { src, loading, error } = useResolvedSrc(assetId, url);
+  // A PDF (or any non-image) can't render in an <img>. Detect it up front via
+  // MIME-less extension check, and keep an onError backstop for anything that
+  // slips through, so we show a file chip instead of a broken image.
+  const [imgFailed, setImgFailed] = useState(false);
+  const renderAsImage = isImageAsset({ name: alt, url }) && !imgFailed;
 
   if (loading) {
     return (
@@ -214,6 +227,30 @@ export function RevisionImage({
     );
   }
 
+  if (!renderAsImage) {
+    // Non-image (PDF, etc.) — a clickable file chip that opens the file in a
+    // new tab rather than the image lightbox.
+    return (
+      <button
+        type="button"
+        onClick={() => window.open(src, "_blank", "noopener,noreferrer")}
+        className={`flex h-16 w-full cursor-pointer flex-col items-center justify-center gap-1 bg-[var(--bb-bg-card)] text-[var(--bb-text-secondary)] transition-colors hover:text-[var(--bb-primary)]`}
+        title={alt}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path
+            d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinejoin="round"
+          />
+          <path d="M14 2v6h6" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+        </svg>
+        <span className="text-[9px] font-semibold tracking-wide">{fileExtLabel(alt, url)}</span>
+      </button>
+    );
+  }
+
   return (
     <img
       src={src}
@@ -221,6 +258,7 @@ export function RevisionImage({
       className={`${className} ${onClick ? "cursor-pointer" : ""}`}
       loading="lazy"
       onClick={onClick}
+      onError={() => setImgFailed(true)}
     />
   );
 }

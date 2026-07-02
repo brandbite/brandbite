@@ -24,7 +24,7 @@ import { RateCreativeModal } from "@/components/ratings/rate-creative-modal";
 import { TagBadge } from "@/components/ui/tag-badge";
 import { TagMultiSelect, type TagOption } from "@/components/ui/tag-multi-select";
 import type { TagColorKey } from "@/lib/tag-colors";
-import { BRIEF_ACCEPT_ATTR, BRIEF_ACCEPTED_LABEL } from "@/lib/upload-helpers";
+import { BRIEF_ACCEPT_ATTR, BRIEF_ACCEPTED_LABEL, isBriefMimeAllowed } from "@/lib/upload-helpers";
 import {
   RevisionImageLarge,
   RevisionImageGrid,
@@ -685,9 +685,9 @@ export default function CustomerTicketDetailPage() {
       if (!ticketId) return;
       if (!files || files.length === 0) return;
       const incoming = Array.from(files);
-      const accepted = incoming.filter((f) => f.type.startsWith("image/"));
+      const accepted = incoming.filter((f) => isBriefMimeAllowed(f.type));
       if (accepted.length === 0) {
-        setBriefAssetsError("Only image files are supported for now.");
+        setBriefAssetsError(`Unsupported file type. Allowed: ${BRIEF_ACCEPTED_LABEL}.`);
         return;
       }
       setUploadingBriefs(true);

@@ -46,7 +46,7 @@ import {
 } from "@/lib/board";
 import { Badge } from "@/components/ui/badge";
 import { TagBadge } from "@/components/ui/tag-badge";
-import { BRIEF_ACCEPT_ATTR } from "@/lib/upload-helpers";
+import { BRIEF_ACCEPT_ATTR, isBriefMimeAllowed } from "@/lib/upload-helpers";
 import { TagMultiSelect, type TagOption } from "@/components/ui/tag-multi-select";
 import type { TagColorKey } from "@/lib/tag-colors";
 import { Modal, ModalHeader, ModalFooter } from "@/components/ui/modal";
@@ -975,7 +975,7 @@ export default function CustomerBoardPage() {
     async (files: FileList | null) => {
       if (!detailTicketId) return;
       if (!files || files.length === 0) return;
-      const accepted = Array.from(files).filter((f) => f.type.startsWith("image/"));
+      const accepted = Array.from(files).filter((f) => isBriefMimeAllowed(f.type));
       if (accepted.length === 0) return;
 
       setUploadingBriefs(true);

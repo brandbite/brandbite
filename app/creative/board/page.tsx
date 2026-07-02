@@ -12,7 +12,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BoardViewToggle } from "@/components/board/board-view-toggle";
 import { buildTicketCode } from "@/lib/ticket-code";
-import { type PendingFile, getImageDimensions } from "@/lib/upload-helpers";
+import {
+  type PendingFile,
+  getImageDimensions,
+  isOutputMimeAllowed,
+  OUTPUT_ACCEPT_ATTR,
+} from "@/lib/upload-helpers";
 import { useToast } from "@/components/ui/toast-provider";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { PauseBanner } from "@/components/creative/pause-banner";
@@ -922,7 +927,7 @@ export default function CreativeBoardPage() {
 
   const handleAddReviewFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    const incoming = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    const incoming = Array.from(files).filter((f) => isOutputMimeAllowed(f.type));
     setReviewFiles((prev) => {
       const room = Math.max(0, MAX_REVIEW_FILES - prev.length);
       return [
@@ -2066,12 +2071,12 @@ export default function CreativeBoardPage() {
                 </button>
               </p>
               <p className="mt-1 text-[10px] text-[var(--bb-text-muted)]">
-                PNG, JPG, WebP — up to {MAX_REVIEW_FILES} files
+                PNG, JPG, WebP, PDF — up to {MAX_REVIEW_FILES} files
               </p>
               <input
                 ref={reviewFileInputRef}
                 type="file"
-                accept="image/*"
+                accept={OUTPUT_ACCEPT_ATTR}
                 multiple
                 className="hidden"
                 disabled={reviewUploading || reviewFiles.length >= MAX_REVIEW_FILES}
