@@ -70,45 +70,63 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       (existing.status === "PENDING" || existing.status === "SCHEDULED");
 
     const updated = await prisma.$transaction(async (tx) => {
-      const row = await tx.consultation.update({
-        where: { id },
-        data: {
-          status: parsed.data.status,
-          scheduledAt: parsed.data.scheduledAt ? new Date(parsed.data.scheduledAt) : undefined,
-          videoLink: parsed.data.videoLink,
-          adminNotes: parsed.data.adminNotes,
-        },
-      });
-
       if (shouldRefund) {
-        const company = await tx.company.findUniqueOrThrow({
-          where: { id: existing.companyId },
-          select: { tokenBalance: true },
-        });
-        const balanceBefore = company.tokenBalance;
-        const balanceAfter = balanceBefore + existing.tokenCost;
-
-        await tx.tokenLedger.create({
+        // Race-safe transition: only refund if THIS update is the one that
+        // actually flips the row out of a pre-refund state. A second
+        // concurrent cancel sees count=0 and skips the credit, so we can't
+        // double-refund. Guarding on the id + refundable statuses is the
+        // same pattern the ticket-cancel path uses.
+        const flipped = await tx.consultation.updateMany({
+          where: { id, status: { in: ["PENDING", "SCHEDULED"] } },
           data: {
-            companyId: existing.companyId,
-            userId: user.id,
-            direction: "CREDIT",
-            amount: existing.tokenCost,
-            reason: "CONSULTATION_REFUND",
-            notes: `Consultation ${id} cancelled — tokens refunded`,
-            metadata: { consultationId: id },
-            balanceBefore,
-            balanceAfter,
+            status: parsed.data.status,
+            scheduledAt: parsed.data.scheduledAt
+              ? new Date(parsed.data.scheduledAt)
+              : undefined,
+            videoLink: parsed.data.videoLink,
+            adminNotes: parsed.data.adminNotes,
           },
         });
 
-        await tx.company.update({
-          where: { id: existing.companyId },
-          data: { tokenBalance: balanceAfter },
+        if (flipped.count === 1) {
+          // Atomic increment (not read-then-absolute-set) so a concurrent
+          // debit/credit on the same company isn't clobbered. Derive
+          // before/after from the returned row for the ledger snapshot.
+          const company = await tx.company.update({
+            where: { id: existing.companyId },
+            data: { tokenBalance: { increment: existing.tokenCost } },
+            select: { tokenBalance: true },
+          });
+          const balanceAfter = company.tokenBalance;
+          const balanceBefore = balanceAfter - existing.tokenCost;
+
+          await tx.tokenLedger.create({
+            data: {
+              companyId: existing.companyId,
+              userId: user.id,
+              direction: "CREDIT",
+              amount: existing.tokenCost,
+              reason: "CONSULTATION_REFUND",
+              notes: `Consultation ${id} cancelled — tokens refunded`,
+              metadata: { consultationId: id },
+              balanceBefore,
+              balanceAfter,
+            },
+          });
+        }
+      } else {
+        await tx.consultation.update({
+          where: { id },
+          data: {
+            status: parsed.data.status,
+            scheduledAt: parsed.data.scheduledAt ? new Date(parsed.data.scheduledAt) : undefined,
+            videoLink: parsed.data.videoLink,
+            adminNotes: parsed.data.adminNotes,
+          },
         });
       }
 
-      return row;
+      return tx.consultation.findUniqueOrThrow({ where: { id } });
     });
 
     // If we cancelled a booking that had a Google event, cancel it on Google

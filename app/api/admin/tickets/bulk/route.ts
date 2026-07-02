@@ -12,10 +12,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { UserRole } from "@prisma/client";
 
+import { TicketStatus } from "@prisma/client";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { parseBody } from "@/lib/schemas/helpers";
 import { bulkTicketsSchema, type BulkTicketsInput } from "@/lib/schemas/bulk-tickets.schemas";
+import { completeTicketAndApplyTokens } from "@/lib/token-engine";
 
 type BulkResult = {
   succeeded: string[];
@@ -58,7 +60,7 @@ export async function POST(req: NextRequest) {
       try {
         const existing = await prisma.ticket.findUnique({
           where: { id },
-          select: { id: true },
+          select: { id: true, status: true, completedAt: true, jobTypeId: true },
         });
         if (!existing) {
           result.failed.push({ id, error: "Ticket not found" });
@@ -74,10 +76,35 @@ export async function POST(req: NextRequest) {
           // Admin override — no transition guards here by design. If the
           // state machine needs enforcement, callers should use the per-role
           // status endpoint (/api/customer/tickets/status).
-          await prisma.ticket.update({
-            where: { id },
-            data: { status: data.status },
-          });
+          //
+          // EXCEPT completion: a raw flip to DONE would mark the ticket done
+          // without paying the creative or stamping completedAt. Route DONE
+          // through the same completion engine the per-ticket path uses so
+          // the payout still happens. Idempotent: a ticket already DONE (or
+          // already paid) is a no-op inside the engine.
+          if (data.status === TicketStatus.DONE) {
+            if (existing.status !== TicketStatus.DONE) {
+              if (existing.jobTypeId) {
+                await completeTicketAndApplyTokens(id);
+              } else {
+                await prisma.ticket.update({
+                  where: { id },
+                  data: { status: TicketStatus.DONE },
+                });
+              }
+              if (!existing.completedAt) {
+                await prisma.ticket.update({
+                  where: { id },
+                  data: { completedAt: new Date(), completedById: user.id },
+                });
+              }
+            }
+          } else {
+            await prisma.ticket.update({
+              where: { id },
+              data: { status: data.status },
+            });
+          }
         } else if (data.op === "priority") {
           await prisma.ticket.update({
             where: { id },
