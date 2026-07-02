@@ -11,12 +11,11 @@ export const createTicketSchema = z.object({
     .nullable()
     .optional()
     .transform((v) => v || null),
-  jobTypeId: z
-    .string()
-    .min(1)
-    .nullable()
-    .optional()
-    .transform((v) => v || null),
+  // Required on every ticket (both Designer and AI modes): the job type sets
+  // the token cost and the creative payout, and we report on it system-wide.
+  // A ticket without one can't be charged — which previously let tickets slip
+  // through free and left creatives unpaid.
+  jobTypeId: z.string().trim().min(1, "Please select a job type."),
   quantity: z.coerce.number().int().min(1).max(10).optional().default(1).catch(1),
   priority: z
     .string()

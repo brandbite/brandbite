@@ -17,6 +17,8 @@ import {
 } from "@/lib/ai/cost-calculator";
 import { readIdempotencyKey } from "@/lib/ai/idempotency";
 import { insufficientTokensResponse } from "@/lib/errors/insufficient-tokens";
+import { getAiTicketsMode, isAiTicketsAllowed } from "@/lib/feature-flags";
+import { isSiteAdminRole } from "@/lib/roles";
 
 export async function POST(
   req: NextRequest,
@@ -35,6 +37,12 @@ export async function POST(
 
     if (!user.activeCompanyId) {
       return NextResponse.json({ error: "No active company" }, { status: 400 });
+    }
+
+    // AI regeneration is behind the AI_TICKETS_MODE flag (off by default).
+    const aiMode = await getAiTicketsMode();
+    if (!isAiTicketsAllowed(aiMode, isSiteAdminRole(user.role))) {
+      return NextResponse.json({ error: "AI generation isn't available yet." }, { status: 403 });
     }
 
     const idempotencyKey = readIdempotencyKey(req.headers);

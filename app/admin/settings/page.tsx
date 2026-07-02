@@ -30,10 +30,14 @@ type SectionKey = "finance" | "talent" | "notifications" | "features";
 type SettingMeta = {
   label: string;
   description: string;
-  type: "number" | "text" | "boolean";
+  type: "number" | "text" | "boolean" | "select";
   section: SectionKey;
   /** Optional input width override for short numeric controls. */
   inputClassName?: string;
+  /** Options for `type: "select"`. */
+  options?: { value: string; label: string }[];
+  /** Default value used when the AppSetting row is missing. */
+  defaultValue?: string;
 };
 
 /** Human-readable labels and descriptions for each setting key. */
@@ -79,6 +83,19 @@ const SETTING_META: Record<string, SettingMeta> = {
       "Per-company tagging system on tickets. When off, the TagMultiSelect is hidden on the new-ticket form, the tag-management section is hidden in /customer/settings, and tag chips don't render on any board card or detail page. Existing tag data is preserved — flipping back on restores everything instantly. Currently shipped off until the board filter UI lands.",
     type: "boolean",
     section: "features",
+  },
+  AI_TICKETS_MODE: {
+    label: "AI ticket mode (Work with AI)",
+    description:
+      "Controls the 'Work with AI' option on the new-ticket form and the AI generation endpoints. Off = hidden for everyone (default — there's no working AI generation API yet). Test = visible to site admins only, so you can validate the AI provider before launch. On = available to all customers.",
+    type: "select",
+    section: "features",
+    defaultValue: "off",
+    options: [
+      { value: "off", label: "Off — hidden for everyone" },
+      { value: "test", label: "Test — site admins only" },
+      { value: "on", label: "On — all customers" },
+    ],
   },
 };
 
@@ -224,6 +241,8 @@ export default function AdminSettingsPage() {
                 "ADMIN_EVENT_EMAILS_ENABLED",
               ]);
               initial[key] = ON_BY_DEFAULT.has(key) ? "true" : "false";
+            } else if (meta.type === "select" && map[key] == null) {
+              initial[key] = meta.defaultValue ?? meta.options?.[0]?.value ?? "";
             } else {
               initial[key] = map[key] ?? "";
             }
@@ -372,6 +391,21 @@ export default function AdminSettingsPage() {
                                 />
                                 <span>{draftValue === "true" ? "Enabled" : "Disabled"}</span>
                               </label>
+                            ) : meta.type === "select" ? (
+                              <select
+                                id={`setting-${key}`}
+                                value={draftValue}
+                                onChange={(e) =>
+                                  setDrafts((prev) => ({ ...prev, [key]: e.target.value }))
+                                }
+                                className="mt-3 max-w-xs rounded-md border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-2 py-1.5 text-xs text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
+                              >
+                                {meta.options?.map((opt) => (
+                                  <option key={opt.value} value={opt.value}>
+                                    {opt.label}
+                                  </option>
+                                ))}
+                              </select>
                             ) : (
                               <FormInput
                                 id={`setting-${key}`}

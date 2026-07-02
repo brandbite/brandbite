@@ -73,6 +73,9 @@ type Props = {
   onCreated?: (ticket: { id: string; code?: string | null }) => void;
   onCancel?: () => void;
   initialJobTypeId?: string;
+  /** Whether "Work with AI" mode is available (AI_TICKETS_MODE flag). When
+   *  false, the mode selector is hidden and tickets are always DESIGNER. */
+  aiEnabled?: boolean;
 };
 
 type TicketPriorityValue = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -163,6 +166,7 @@ export default function NewTicketForm({
   onCreated,
   onCancel,
   initialJobTypeId,
+  aiEnabled = false,
 }: Props) {
   const router = useRouter();
 
@@ -521,7 +525,9 @@ export default function NewTicketForm({
       title,
       description,
       projectId: projectId || null,
-      jobTypeId: jobTypeId || null,
+      // Pass the raw value (not `|| null`) so an empty selection surfaces the
+      // "Please select a job type." message rather than a generic type error.
+      jobTypeId,
       quantity,
       priority,
       dueDate: dueDate || null,
@@ -682,44 +688,48 @@ export default function NewTicketForm({
         </div>
       )}
 
-      {/* Creative Mode Selector */}
-      <div className="space-y-1">
-        <label className="text-xs font-medium text-[var(--bb-secondary)]">
-          How would you like this done?
-        </label>
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={() => setCreativeMode("DESIGNER")}
-            disabled={isBusy}
-            className={`rounded-xl border px-4 py-3 text-left transition-all ${
-              creativeMode === "DESIGNER"
-                ? "border-[var(--bb-primary)] bg-[var(--bb-primary-light)] shadow-sm"
-                : "border-[var(--bb-border)] bg-[var(--bb-bg-page)] hover:border-[var(--bb-primary)]"
-            }`}
-          >
-            <p className="text-sm font-semibold text-[var(--bb-secondary)]">Work with Designer</p>
-            <p className="mt-0.5 text-[11px] text-[var(--bb-text-muted)]">
-              A creative from our team handles the work. 2-3 day turnaround.
-            </p>
-          </button>
-          <button
-            type="button"
-            onClick={() => setCreativeMode("AI")}
-            disabled={isBusy}
-            className={`rounded-xl border px-4 py-3 text-left transition-all ${
-              creativeMode === "AI"
-                ? "border-[var(--bb-primary)] bg-[var(--bb-primary-light)] shadow-sm"
-                : "border-[var(--bb-border)] bg-[var(--bb-bg-page)] hover:border-[var(--bb-primary)]"
-            }`}
-          >
-            <p className="text-sm font-semibold text-[var(--bb-secondary)]">Work with AI</p>
-            <p className="mt-0.5 text-[11px] text-[var(--bb-text-muted)]">
-              AI generates your design instantly. Ready in seconds.
-            </p>
-          </button>
+      {/* Creative Mode Selector — only when "Work with AI" is enabled
+          (AI_TICKETS_MODE). Otherwise every ticket is a Designer ticket and
+          the choice is hidden. */}
+      {aiEnabled && (
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-[var(--bb-secondary)]">
+            How would you like this done?
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setCreativeMode("DESIGNER")}
+              disabled={isBusy}
+              className={`rounded-xl border px-4 py-3 text-left transition-all ${
+                creativeMode === "DESIGNER"
+                  ? "border-[var(--bb-primary)] bg-[var(--bb-primary-light)] shadow-sm"
+                  : "border-[var(--bb-border)] bg-[var(--bb-bg-page)] hover:border-[var(--bb-primary)]"
+              }`}
+            >
+              <p className="text-sm font-semibold text-[var(--bb-secondary)]">Work with Designer</p>
+              <p className="mt-0.5 text-[11px] text-[var(--bb-text-muted)]">
+                A creative from our team handles the work. 2-3 day turnaround.
+              </p>
+            </button>
+            <button
+              type="button"
+              onClick={() => setCreativeMode("AI")}
+              disabled={isBusy}
+              className={`rounded-xl border px-4 py-3 text-left transition-all ${
+                creativeMode === "AI"
+                  ? "border-[var(--bb-primary)] bg-[var(--bb-primary-light)] shadow-sm"
+                  : "border-[var(--bb-border)] bg-[var(--bb-bg-page)] hover:border-[var(--bb-primary)]"
+              }`}
+            >
+              <p className="text-sm font-semibold text-[var(--bb-secondary)]">Work with AI</p>
+              <p className="mt-0.5 text-[11px] text-[var(--bb-text-muted)]">
+                AI generates your design instantly. Ready in seconds.
+              </p>
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Title */}
       <div className="space-y-1">
@@ -977,7 +987,9 @@ export default function NewTicketForm({
 
       {/* Job type */}
       <div className="space-y-1">
-        <label className="text-xs font-medium text-[var(--bb-secondary)]">Job type</label>
+        <label className="text-xs font-medium text-[var(--bb-secondary)]">
+          Job type <span className="text-[var(--bb-primary)]">*</span>
+        </label>
         <JobTypePicker
           jobTypes={jobTypes}
           value={jobTypeId}

@@ -11,7 +11,8 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import NewTicketForm from "./NewTicketForm";
 import type { TagOption } from "@/components/ui/tag-multi-select";
-import { isTagsEnabled } from "@/lib/feature-flags";
+import { getAiTicketsMode, isAiTicketsAllowed, isTagsEnabled } from "@/lib/feature-flags";
+import { isSiteAdminRole } from "@/lib/roles";
 
 export default async function CustomerNewTicketPage({
   searchParams,
@@ -88,6 +89,8 @@ export default async function CustomerNewTicketPage({
   // Skip the tag query entirely when the global flag is off — the form
   // renders the TagMultiSelect only if it has at least one option OR
   // canCreateTags is true, so an empty array is the natural hide path.
+  const aiEnabled = isAiTicketsAllowed(await getAiTicketsMode(), isSiteAdminRole(user.role));
+
   const tagsEnabled = await isTagsEnabled();
   const tags = tagsEnabled
     ? await prisma.ticketTag.findMany({
@@ -125,6 +128,7 @@ export default async function CustomerNewTicketPage({
           tokenBalance={company.tokenBalance}
           tags={tags as unknown as TagOption[]}
           initialJobTypeId={initialJobTypeId}
+          aiEnabled={aiEnabled}
           // When the global flag is off, force-hide tag UI for everyone —
           // including OWNER/PM who would otherwise see the create-tag chip
           // via the canManageTagsCheck fallback inside the form. Passing

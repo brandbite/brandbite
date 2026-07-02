@@ -36,3 +36,27 @@ export async function isTagsEnabled(): Promise<boolean> {
     return false;
   }
 }
+
+/** "Work with AI" ticket mode availability.
+ *  - "off"  → hidden for everyone (default; there's no working AI API yet)
+ *  - "test" → available to site admins only, to validate the AI API pre-launch
+ *  - "on"   → available to all customers
+ *
+ *  Fails safe to "off" on any DB error or unrecognized value. */
+export type AiTicketsMode = "off" | "test" | "on";
+
+export async function getAiTicketsMode(): Promise<AiTicketsMode> {
+  try {
+    const v = await getAppSetting("AI_TICKETS_MODE");
+    return v === "on" || v === "test" ? v : "off";
+  } catch {
+    return "off";
+  }
+}
+
+/** Whether a given user may use "Work with AI" right now, given the mode. */
+export function isAiTicketsAllowed(mode: AiTicketsMode, isSiteAdmin: boolean): boolean {
+  if (mode === "on") return true;
+  if (mode === "test") return isSiteAdmin;
+  return false;
+}
