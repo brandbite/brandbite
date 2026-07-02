@@ -19,7 +19,7 @@ import { getCurrentUserOrThrow } from "@/lib/auth";
 import { createR2Client, getR2BucketName, getR2PublicBaseUrl } from "@/lib/r2";
 import { resolveAssetUrl } from "@/lib/r2";
 import { isCompanyAdminRole } from "@/lib/permissions/companyRoles";
-import { MAX_UPLOAD_BYTES, isBriefMimeAllowed } from "@/lib/upload-helpers";
+import { MAX_UPLOAD_BYTES, isBriefMimeAllowed, isOutputMimeAllowed } from "@/lib/upload-helpers";
 
 function sanitizeFilename(name: string): string {
   const base = name.trim().replace(/\s+/g, "_");
@@ -91,14 +91,14 @@ export async function POST(req: Request) {
         );
       }
     } else if (kind === "OUTPUT_IMAGE") {
-      // Creative outputs stay image-only for now — that's what the
-      // customer revision view + pin-on-asset annotations expect.
+      // Creative outputs accept images + PDF. Pin-on-asset annotations only
+      // apply to images; PDFs render as a downloadable file chip.
       const mime = file.type || "";
-      if (!mime.startsWith("image/")) {
+      if (!isOutputMimeAllowed(mime)) {
         return NextResponse.json(
           {
             error: "UNSUPPORTED_TYPE",
-            message: "Output deliverables must be images.",
+            message: "Output deliverables must be an image or PDF.",
           },
           { status: 415 },
         );

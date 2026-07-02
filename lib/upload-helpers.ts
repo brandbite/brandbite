@@ -50,6 +50,43 @@ export function isBriefMimeAllowed(mime: string): boolean {
   return (BRIEF_ACCEPTED_MIME_TYPES as readonly string[]).includes(mime);
 }
 
+/** MIME types accepted on creative OUTPUT deliverables (OUTPUT_IMAGE asset
+ *  kind). Images plus PDF — the common deliverable formats. Larger native
+ *  design sources (AI/PSD) are intentionally out of scope: they routinely
+ *  exceed the 4 MB server-proxy cap, so accepting them here would only fail
+ *  at upload time. Server allowlist in /api/uploads/r2/upload mirrors this. */
+export const OUTPUT_ACCEPTED_MIME_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+  "application/pdf",
+] as const;
+
+/** `accept` attribute for a creative output <input type="file">. */
+export const OUTPUT_ACCEPT_ATTR = "image/*,application/pdf";
+
+/** Human-readable list for output picker hint copy. */
+export const OUTPUT_ACCEPTED_LABEL = "images or PDF";
+
+export function isOutputMimeAllowed(mime: string): boolean {
+  if (mime.startsWith("image/")) return true;
+  return (OUTPUT_ACCEPTED_MIME_TYPES as readonly string[]).includes(mime);
+}
+
+/** True when an asset should render as an <img>. PDFs and other non-image
+ *  types get a file chip instead. Checks MIME first, then falls back to the
+ *  filename/URL extension (some rows only carry a name). */
+export function isImageAsset(opts: {
+  mimeType?: string | null;
+  name?: string | null;
+  url?: string | null;
+}): boolean {
+  if (opts.mimeType) return opts.mimeType.startsWith("image/");
+  const source = (opts.name || opts.url || "").toLowerCase().split("?")[0];
+  return /\.(png|jpe?g|gif|webp|avif|bmp|svg)$/.test(source);
+}
+
 /** Pending file awaiting upload */
 export type PendingFile = {
   id: string;
