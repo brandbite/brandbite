@@ -161,9 +161,11 @@ async function resolveCreative(jobTypeId: string): Promise<string | null> {
   let candidateIds = skilled.map((s) => s.creativeId);
   if (candidateIds.length === 0) return null;
 
-  // Pause filter.
+  // Pause + soft-delete filter. deletedAt: null drops anonymized accounts
+  // that may still hold CreativeSkill rows (ids absent from stateById are
+  // filtered out below, so a deleted candidate never gets assigned).
   const states = await prisma.userAccount.findMany({
-    where: { id: { in: candidateIds }, role: UserRole.DESIGNER },
+    where: { id: { in: candidateIds }, role: UserRole.DESIGNER, deletedAt: null },
     select: { id: true, isPaused: true, pauseExpiresAt: true, tasksPerWeekCap: true },
   });
   const stateById = new Map(states.map((s) => [s.id, s]));

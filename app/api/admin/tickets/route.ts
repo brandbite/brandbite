@@ -148,6 +148,8 @@ export async function GET(req: NextRequest) {
       prisma.userAccount.findMany({
         where: {
           role: UserRole.DESIGNER,
+          // Don't offer soft-deleted / anonymized accounts as assignees.
+          deletedAt: null,
         },
         select: {
           id: true,
@@ -253,6 +255,8 @@ export async function PATCH(req: NextRequest) {
         where: {
           id: creativeId,
           role: UserRole.DESIGNER,
+          // Can't assign a ticket to a soft-deleted / anonymized account.
+          deletedAt: null,
         },
         select: {
           id: true,

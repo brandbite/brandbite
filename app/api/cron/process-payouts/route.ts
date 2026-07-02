@@ -75,7 +75,10 @@ export async function GET(req: NextRequest) {
     }
 
     const creatives = await prisma.userAccount.findMany({
-      where: { role: UserRole.DESIGNER },
+      // Exclude soft-deleted / anonymized accounts — never auto-pay a deleted
+      // creative (payout details are anonymized; handle residual balance
+      // manually).
+      where: { role: UserRole.DESIGNER, deletedAt: null },
       select: { id: true },
     });
 

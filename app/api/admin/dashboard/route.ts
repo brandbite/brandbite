@@ -52,9 +52,9 @@ export async function GET() {
       // Total companies
       prisma.company.count(),
 
-      // Total creatives
+      // Total creatives (exclude soft-deleted / anonymized accounts)
       prisma.userAccount.count({
-        where: { role: "DESIGNER" },
+        where: { role: "DESIGNER", deletedAt: null },
       }),
 
       // Total tickets

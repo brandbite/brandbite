@@ -40,7 +40,8 @@ export async function POST(req: NextRequest) {
     // creativeId — a single lookup beats N lookups in the loop below.
     if (data.op === "reassign" && data.creativeId !== null) {
       const creative = await prisma.userAccount.findFirst({
-        where: { id: data.creativeId, role: UserRole.DESIGNER },
+        // deletedAt: null — can't bulk-reassign to a soft-deleted account.
+        where: { id: data.creativeId, role: UserRole.DESIGNER, deletedAt: null },
         select: { id: true },
       });
       if (!creative) {
