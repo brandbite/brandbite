@@ -269,19 +269,28 @@ export default function TalentApplicationsPage() {
     setProposedSlotsLocal(["", "", ""]);
     setCustomMessage("");
     setDeclineReason("");
-    setWorkingHoursLocal("");
     setHireNotesLocal("");
     setActionStatus("idle");
     setActionError(null);
 
     const sel = items.find((it) => it.id === selectedId);
+
+    // Pre-fill working hours from the saved application value so an admin
+    // returning to the row (or after a background list reload) sees what was
+    // already entered instead of a blank field they have to re-type.
+    setWorkingHoursLocal(sel?.workingHours ?? "");
+
     if (sel?.status === "INTERVIEW_HELD") {
       // Pre-fill HIRE form from the application data.
       const applied = Array.isArray(sel.categoryIds)
         ? (sel.categoryIds as unknown[]).filter((v): v is string => typeof v === "string")
         : [];
       setApprovedCategoryIdsLocal(applied);
-      setTasksPerWeekCapLocal(String(defaultTasksCapForBucket(sel.preferredTasksPerWeek)));
+      // Prefer a previously-saved cap over the bucket default so an admin's
+      // override survives a reload / re-open.
+      setTasksPerWeekCapLocal(
+        String(sel.approvedTasksPerWeekCap ?? defaultTasksCapForBucket(sel.preferredTasksPerWeek)),
+      );
     } else {
       setApprovedCategoryIdsLocal([]);
       setTasksPerWeekCapLocal("");

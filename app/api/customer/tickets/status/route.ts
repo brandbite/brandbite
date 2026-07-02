@@ -16,6 +16,7 @@ import {
   normalizeCompanyRole,
 } from "@/lib/permissions/companyRoles";
 import { completeTicketAndApplyTokens } from "@/lib/token-engine";
+import { createNotification } from "@/lib/notifications";
 
 type PatchPayload = {
   ticketId?: string;
@@ -87,8 +88,10 @@ export async function PATCH(req: NextRequest) {
       where,
       select: {
         id: true,
+        title: true,
         status: true,
         companyId: true,
+        creativeId: true,
         // jobType presence decides whether there's a payout to apply; the
         // completion engine loads its own copy for the actual math.
         jobType: { select: { id: true } },
@@ -280,6 +283,20 @@ export async function PATCH(req: NextRequest) {
         data: { completedAt: new Date(), completedById: user.id },
         select: { id: true, status: true, updatedAt: true },
       });
+
+      // Notify the assigned creative that their work was approved (in-app +
+      // email, honoring their preferences). Fire-and-forget so the response
+      // isn't blocked on the email pipeline. Previously the board-approve path
+      // sent nothing, so creatives never heard their ticket was accepted.
+      if (ticket.creativeId) {
+        void createNotification({
+          userId: ticket.creativeId,
+          type: "TICKET_COMPLETED",
+          title: "Ticket approved",
+          message: `"${ticket.title}" was approved and marked done.`,
+          ticketId: ticket.id,
+        });
+      }
 
       return NextResponse.json(done, { status: 200 });
     }
