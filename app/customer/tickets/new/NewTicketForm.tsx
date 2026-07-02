@@ -32,6 +32,7 @@ import { canManageTags as canManageTagsCheck } from "@/lib/permissions/companyRo
 import {
   BRIEF_ACCEPT_ATTR,
   BRIEF_ACCEPTED_LABEL,
+  isBriefMimeAllowed,
   MAX_UPLOAD_LABEL,
   readUploadError,
   validateFileSize,
@@ -337,16 +338,25 @@ export default function NewTicketForm({
     setSuccessMessage(null);
 
     const incoming = Array.from(files);
+    const rejections: string[] = [];
 
+    // Validate BOTH type and size at pick time (not just at submit), and
+    // accept every type the server allows — images, PDF, DOC, DOCX, TXT — so
+    // the picker, this filter, and the API agree. Previously this rejected all
+    // non-images (PDFs silently dropped) and never size-checked here, so an
+    // oversized file was only rejected after the ticket was already created.
     const accepted = incoming.filter((f) => {
-      // Allow images for now (fits annotation vision).
-      // If later you want PDFs, add "application/pdf" etc.
-      return f.type.startsWith("image/");
+      if (!isBriefMimeAllowed(f.type)) {
+        rejections.push(`${f.name}: unsupported type. Accepts ${BRIEF_ACCEPTED_LABEL}.`);
+        return false;
+      }
+      const sizeErr = validateFileSize(f);
+      if (sizeErr) {
+        rejections.push(sizeErr);
+        return false;
+      }
+      return true;
     });
-
-    if (accepted.length !== incoming.length) {
-      setError("Some files were skipped. Only image files are supported for now.");
-    }
 
     setBriefFiles((prev) => {
       const room = Math.max(0, maxBriefFiles - prev.length);
@@ -356,11 +366,14 @@ export default function NewTicketForm({
       }));
 
       if (accepted.length > room) {
-        setError(`You can attach up to ${maxBriefFiles} images.`);
+        rejections.push(`You can attach up to ${maxBriefFiles} files — some were not added.`);
       }
 
       return [...prev, ...next];
     });
+
+    // Persistent, per-file reasons (cleared on the next successful add or upload).
+    setUploadErrors(rejections);
   };
 
   const handleRemoveBriefFile = (id: string) => {
@@ -919,7 +932,7 @@ export default function NewTicketForm({
               role="alert"
               className="mt-3 space-y-1 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300"
             >
-              <p className="font-semibold">Some attachments couldn&apos;t upload:</p>
+              <p className="font-semibold">Some attachments couldn&apos;t be added:</p>
               <ul className="list-disc space-y-0.5 pl-4">
                 {uploadErrors.map((err, idx) => (
                   <li key={idx}>{err}</li>

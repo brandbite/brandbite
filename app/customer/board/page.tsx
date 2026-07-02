@@ -1008,6 +1008,9 @@ export default function CustomerBoardPage() {
       setUploadBriefsProgress(null);
       setUploadingBriefs(false);
       await loadDetailBriefAssets(detailTicketId);
+      // Also refresh the board so the card thumbnail reflects the newly added
+      // attachment immediately instead of only after a manual page refresh.
+      await load();
     },
     [detailTicketId, loadDetailBriefAssets],
   );
@@ -3051,7 +3054,11 @@ export default function CustomerBoardPage() {
               </div>
 
               {/* Right column — metadata sidebar (fixed while left scrolls) */}
-              <aside className="self-start overflow-y-auto rounded-xl bg-[var(--bb-bg-warm)] p-4">
+              {/* Right column — details. Must stretch to the grid row height
+                  (not self-start, which sizes to content) so overflow-y-auto
+                  can actually scroll on desktop; otherwise tall details (dates
+                  etc.) overflow the modal with no way to reach them. */}
+              <aside className="min-w-0 rounded-xl bg-[var(--bb-bg-warm)] p-4 md:overflow-y-auto">
                 {/* Details */}
                 <div className="mb-5">
                   <p className="mb-2 text-[11px] font-semibold tracking-[0.16em] text-[var(--bb-text-muted)] uppercase">
