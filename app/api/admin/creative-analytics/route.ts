@@ -38,7 +38,9 @@ export async function GET() {
         //    Workload PR: include workingHours + tasksPerWeekCap so the
         //    analytics row can render capacity at a glance.
         prisma.userAccount.findMany({
-          where: { role: "DESIGNER" },
+          // Exclude soft-deleted (anonymized) accounts — they're retained for
+          // audit/history but must not appear as active creatives.
+          where: { role: "DESIGNER", deletedAt: null },
           select: {
             id: true,
             name: true,

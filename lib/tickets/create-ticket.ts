@@ -216,7 +216,7 @@ export async function createCustomerTicket(input: CreateTicketInput): Promise<Cr
           if (creatives.length === 0) fallbackMode = "no_skilled_creatives";
         } else {
           creatives = await tx.userAccount.findMany({
-            where: { role: UserRole.DESIGNER },
+            where: { role: UserRole.DESIGNER, deletedAt: null },
             select: { id: true },
           });
         }
@@ -232,7 +232,10 @@ export async function createCustomerTicket(input: CreateTicketInput): Promise<Cr
 
         if (creatives.length > 0) {
           const states = await tx.userAccount.findMany({
-            where: { id: { in: creatives.map((d) => d.id) } },
+            // deletedAt: null — a skilled candidate may have been soft-deleted
+            // (anonymized) while keeping its CreativeSkill rows. Exclude it
+            // here so auto-assign never routes live work to a dead account.
+            where: { id: { in: creatives.map((d) => d.id) }, deletedAt: null },
             select: {
               id: true,
               isPaused: true,
@@ -247,9 +250,12 @@ export async function createCustomerTicket(input: CreateTicketInput): Promise<Cr
               tasksPerWeekCap: s.tasksPerWeekCap,
             });
           }
+          // `states` now contains only alive candidates; drop any deleted ones
+          // (absent from states) as well as paused ones.
+          const aliveIds = new Set(states.map((s) => s.id));
           const pausedIds = new Set(states.filter((d) => isCreativePaused(d)).map((d) => d.id));
           pausedCreativeCount = pausedIds.size;
-          creatives = creatives.filter((d) => !pausedIds.has(d.id));
+          creatives = creatives.filter((d) => aliveIds.has(d.id) && !pausedIds.has(d.id));
         }
 
         if (creatives.length > 0) {
