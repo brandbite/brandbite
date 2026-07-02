@@ -42,6 +42,13 @@ export async function GET(_req: NextRequest) {
     const ledger = await prisma.tokenLedger.findMany({
       where: {
         companyId: company.id,
+        // Company ledger only. Creative payout rows (JOB_PAYMENT) carry the
+        // ticket's companyId AND a userId — they belong to the creative's
+        // balance, not the company's. Without this filter they'd show up in
+        // the customer's ledger and inflate totalCredits, disagreeing with
+        // the stored company.tokenBalance. Matches recalculateCompanyToken-
+        // Balance and admin/token-analytics.
+        userId: null,
       },
       include: {
         ticket: {

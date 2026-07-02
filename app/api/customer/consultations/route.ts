@@ -138,11 +138,25 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      // Inline the ledger debit so we don't nest transactions. Mirrors
-      // applyCompanyLedgerEntry's flow — keep the two paths in sync if
-      // that helper's data shape evolves.
-      const balanceBefore = company.tokenBalance;
-      const balanceAfter = balanceBefore - tokenCost;
+      // Guarded atomic decrement inside the transaction — NOT a read-then-
+      // absolute-set from the pre-transaction snapshot. The snapshot check
+      // above is just an early friendly error; this is the authoritative
+      // one. If a concurrent debit landed since the snapshot, the balance
+      // may no longer cover tokenCost and count=0 rolls the booking back.
+      const debited = await tx.company.updateMany({
+        where: { id: company.id, tokenBalance: { gte: tokenCost } },
+        data: { tokenBalance: { decrement: tokenCost } },
+      });
+      if (debited.count === 0) {
+        throw new Error("INSUFFICIENT_TOKENS");
+      }
+
+      const companyRow = await tx.company.findUniqueOrThrow({
+        where: { id: company.id },
+        select: { tokenBalance: true },
+      });
+      const balanceAfter = companyRow.tokenBalance;
+      const balanceBefore = balanceAfter + tokenCost;
 
       await tx.tokenLedger.create({
         data: {
@@ -156,11 +170,6 @@ export async function POST(req: NextRequest) {
           balanceBefore,
           balanceAfter,
         },
-      });
-
-      await tx.company.update({
-        where: { id: company.id },
-        data: { tokenBalance: balanceAfter },
       });
 
       return row;
@@ -240,6 +249,14 @@ export async function POST(req: NextRequest) {
   } catch (error: unknown) {
     if ((error as { code?: string })?.code === "UNAUTHENTICATED") {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    }
+    if ((error as Error)?.message === "INSUFFICIENT_TOKENS") {
+      // Balance dropped below cost between the snapshot check and the
+      // guarded decrement (concurrent debit). Ask the client to refresh.
+      return NextResponse.json(
+        { error: "Your token balance changed. Please refresh and try again." },
+        { status: 409 },
+      );
     }
     console.error("[customer/consultations] POST error", error);
     return NextResponse.json({ error: "Failed to create consultation" }, { status: 500 });

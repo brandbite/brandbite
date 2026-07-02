@@ -128,18 +128,18 @@ export async function POST(_req: NextRequest, ctx: RouteContext) {
       // the spend when jobType is null.
       let refundedAmount = 0;
       if (effectiveCost > 0) {
-        const company = await tx.company.findUniqueOrThrow({
+        // Atomic increment (not read-then-absolute-set) so a concurrent
+        // debit/credit on the same company isn't clobbered. The status flip
+        // above already guards against a double refund; this guards the
+        // balance value itself against lost updates.
+        const company = await tx.company.update({
           where: { id: user.activeCompanyId! },
+          data: { tokenBalance: { increment: effectiveCost } },
           select: { tokenBalance: true },
         });
 
-        const balanceBefore = company.tokenBalance;
-        const balanceAfter = balanceBefore + effectiveCost;
-
-        await tx.company.update({
-          where: { id: user.activeCompanyId! },
-          data: { tokenBalance: balanceAfter },
-        });
+        const balanceAfter = company.tokenBalance;
+        const balanceBefore = balanceAfter - effectiveCost;
 
         await tx.tokenLedger.create({
           data: {

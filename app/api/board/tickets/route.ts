@@ -8,9 +8,20 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { buildTicketCode } from "@/lib/ticket-code";
+import { getCurrentUserOrThrow } from "@/lib/auth";
+import { isSiteAdminRole } from "@/lib/roles";
 
 export async function GET() {
   try {
+    // This board aggregates tickets across ALL companies (company names,
+    // creative names, per-job token costs). It is an internal admin view —
+    // gate it to site admins. Without this check the endpoint leaked every
+    // company's ticket data to any unauthenticated caller.
+    const user = await getCurrentUserOrThrow();
+    if (!isSiteAdminRole(user.role)) {
+      return NextResponse.json({ error: "Admin only" }, { status: 403 });
+    }
+
     const tickets = await prisma.ticket.findMany({
       // Hide soft-cancelled tickets from the global board view.
       where: { status: { not: "CANCELED" } },
@@ -72,6 +83,9 @@ export async function GET() {
 
     return NextResponse.json({ tickets: payload });
   } catch (error) {
+    if ((error as { code?: string })?.code === "UNAUTHENTICATED") {
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    }
     console.error("[board.tickets] GET error", error);
     return NextResponse.json({ error: "Failed to load board tickets" }, { status: 500 });
   }

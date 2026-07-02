@@ -8,9 +8,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { TicketStatus, CompanyRole } from "@prisma/client";
+import { TicketStatus, CompanyRole, LedgerDirection } from "@prisma/client";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { buildTicketCode } from "@/lib/ticket-code";
+import { insufficientTokensResponse } from "@/lib/errors/insufficient-tokens";
 import {
   updateTicketStatusSchema,
   updateTicketFieldsSchema,
@@ -273,6 +274,11 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
       select: {
         id: true,
         status: true,
+        companyId: true,
+        quantity: true,
+        tokenCostOverride: true,
+        jobTypeId: true,
+        jobType: { select: { tokenCost: true } },
       },
     });
 
@@ -395,19 +401,54 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
         }
       }
 
-      // jobTypeId — DB lookup stays inline
+      // jobTypeId — DB lookup stays inline. Changing the job type on a TODO
+      // ticket changes what the ticket costs, so we must reconcile the
+      // company ledger (see costDelta below) — otherwise the original charge
+      // and the eventual cancel/complete cost diverge.
+      let newJobTypeCost: number | null = null;
       if (fields.jobTypeId !== undefined) {
         if (fields.jobTypeId === null) {
-          updateData.jobTypeId = null;
-        } else {
-          const jt = await prisma.jobType.findUnique({
-            where: { id: fields.jobTypeId },
-            select: { id: true },
+          // Model 2: every ticket must carry a job type (that's how it's
+          // priced and how the creative is paid). Clearing it would strand
+          // the original charge with nothing to refund on cancel.
+          return NextResponse.json({ error: "A job type is required." }, { status: 400 });
+        }
+        const jt = await prisma.jobType.findUnique({
+          where: { id: fields.jobTypeId },
+          select: { id: true, tokenCost: true },
+        });
+        if (!jt) {
+          return NextResponse.json({ error: "Job type not found" }, { status: 400 });
+        }
+        updateData.jobTypeId = jt.id;
+        newJobTypeCost = jt.tokenCost;
+      }
+
+      // Compute the token-cost delta if the job type actually changed. An
+      // explicit tokenCostOverride pins the effective cost regardless of job
+      // type, so a change is a no-op in that case (delta = 0).
+      let costDelta = 0;
+      const jobTypeActuallyChanged =
+        newJobTypeCost !== null && fields.jobTypeId !== existing.jobTypeId;
+      if (jobTypeActuallyChanged && existing.tokenCostOverride == null) {
+        const oldEffective = (existing.jobType?.tokenCost ?? 0) * existing.quantity;
+        const newEffective = newJobTypeCost! * existing.quantity;
+        costDelta = newEffective - oldEffective;
+      }
+
+      // If the new job type costs more, make sure the company can afford the
+      // difference before we open the write transaction (friendly 402).
+      if (costDelta > 0) {
+        const company = await prisma.company.findUniqueOrThrow({
+          where: { id: existing.companyId! },
+          select: { tokenBalance: true },
+        });
+        if (company.tokenBalance < costDelta) {
+          return insufficientTokensResponse({
+            required: costDelta,
+            balance: company.tokenBalance,
+            action: "job type change",
           });
-          if (!jt) {
-            return NextResponse.json({ error: "Job type not found" }, { status: 400 });
-          }
-          updateData.jobTypeId = jt.id;
         }
       }
 
@@ -451,6 +492,54 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
             : await tx.ticket.findUniqueOrThrow({
                 where: { id: ticketId },
               });
+
+        // Reconcile the company ledger when the job type changed the cost.
+        // Mirrors create-ticket's guarded decrement so a concurrent debit
+        // can't drive the balance negative on the extra charge.
+        if (costDelta !== 0) {
+          if (costDelta > 0) {
+            const charged = await tx.company.updateMany({
+              where: { id: existing.companyId!, tokenBalance: { gte: costDelta } },
+              data: { tokenBalance: { decrement: costDelta } },
+            });
+            if (charged.count === 0) {
+              throw new Error("INSUFFICIENT_ADJUSTMENT");
+            }
+          } else {
+            await tx.company.update({
+              where: { id: existing.companyId! },
+              data: { tokenBalance: { increment: -costDelta } },
+            });
+          }
+
+          const companyRow = await tx.company.findUniqueOrThrow({
+            where: { id: existing.companyId! },
+            select: { tokenBalance: true },
+          });
+          const balanceAfter = companyRow.tokenBalance;
+          // A positive delta was a DEBIT (balance fell by delta); a negative
+          // delta was a CREDIT (balance rose by |delta|). Either way the
+          // pre-change balance is balanceAfter + costDelta.
+          const balanceBefore = balanceAfter + costDelta;
+
+          await tx.tokenLedger.create({
+            data: {
+              companyId: existing.companyId!,
+              ticketId,
+              direction: costDelta > 0 ? LedgerDirection.DEBIT : LedgerDirection.CREDIT,
+              amount: Math.abs(costDelta),
+              reason: costDelta > 0 ? "JOB_REQUEST_ADJUSTMENT" : "REFUND",
+              notes: `Job type changed on ticket ${ticketId}`,
+              metadata: {
+                changedByUserId: user.id,
+                previousJobTypeId: existing.jobTypeId,
+                newJobTypeId: fields.jobTypeId ?? null,
+              },
+              balanceBefore,
+              balanceAfter,
+            },
+          });
+        }
 
         // Replace tag assignments (if tagIds was provided)
         if (newTagIds !== null) {
@@ -533,6 +622,14 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    }
+
+    if ((error as Error)?.message === "INSUFFICIENT_ADJUSTMENT") {
+      // Lost the race on the extra charge for a costlier job type.
+      return NextResponse.json(
+        { error: "Not enough tokens to change to a higher-cost job type. Please refresh." },
+        { status: 402 },
+      );
     }
 
     console.error("[PATCH /api/customer/tickets/[ticketId]] error", error);
