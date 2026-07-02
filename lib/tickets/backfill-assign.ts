@@ -49,6 +49,23 @@ const PRIORITY_WEIGHTS: Record<TicketPriority, number> = {
 };
 
 /**
+ * Count the tickets a backfill would scan for a company (TODO, unassigned,
+ * non-AI). Used to show "assign N tickets?" before running the sweep. This is
+ * the pre-filter count; the actual run may assign fewer (project auto-assign
+ * off, no eligible creative) and reports those as skips.
+ */
+export async function countBackfillCandidates(companyId: string): Promise<number> {
+  return prisma.ticket.count({
+    where: {
+      status: TicketStatus.TODO,
+      creativeId: null,
+      creativeMode: { not: "AI" },
+      companyId,
+    },
+  });
+}
+
+/**
  * Re-run auto-assign for currently-unassigned TODO tickets.
  *
  * @param companyId  Optional — restrict the sweep to one company. Omit to run
