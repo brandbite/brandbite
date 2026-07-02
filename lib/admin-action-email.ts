@@ -48,6 +48,7 @@ const ACTION_SUBJECT_FRAGMENT: Record<AdminActionType, string> = {
   TALENT_APPLICATION_ACCEPTED: "accepted a talent application",
   TALENT_APPLICATION_DECLINED: "declined a talent application",
   TALENT_INTERVIEW_HELD: "marked a talent interview as held",
+  TALENT_INTERVIEW_MISSED: "marked a talent interview as missed (no-show)",
   TALENT_HIRED: "hired a talent applicant",
   TALENT_REJECTED_AFTER_INTERVIEW: "declined a talent applicant after the interview",
   TALENT_ONBOARDED: "onboarded a hired talent applicant as a creative",

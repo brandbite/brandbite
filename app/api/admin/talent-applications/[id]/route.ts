@@ -78,6 +78,7 @@ const ALLOWED_FROM: Record<
   | "ACCEPT_PROPOSED"
   | "DECLINE"
   | "MARK_INTERVIEW_HELD"
+  | "MARK_MISSED"
   | "HIRE"
   | "REJECT_POST_INTERVIEW"
   | "ONBOARD",
@@ -89,14 +90,30 @@ const ALLOWED_FROM: Record<
   // the old link expired / booking kept failing (AWAITING_CANDIDATE_CHOICE)
   // or counter-propose against a candidate's suggested time
   // (CANDIDATE_PROPOSED_TIME).
-  ACCEPT: ["SUBMITTED", "IN_REVIEW", "AWAITING_CANDIDATE_CHOICE", "CANDIDATE_PROPOSED_TIME"],
+  // MISSED is added to ACCEPT/DECLINE so a no-show can be rescheduled (ACCEPT
+  // re-offers fresh slots + booking link) or declined outright.
+  ACCEPT: [
+    "SUBMITTED",
+    "IN_REVIEW",
+    "AWAITING_CANDIDATE_CHOICE",
+    "CANDIDATE_PROPOSED_TIME",
+    "MISSED",
+  ],
   ACCEPT_PROPOSED: ["CANDIDATE_PROPOSED_TIME"],
-  DECLINE: ["SUBMITTED", "IN_REVIEW", "AWAITING_CANDIDATE_CHOICE", "CANDIDATE_PROPOSED_TIME"],
+  DECLINE: [
+    "SUBMITTED",
+    "IN_REVIEW",
+    "AWAITING_CANDIDATE_CHOICE",
+    "CANDIDATE_PROPOSED_TIME",
+    "MISSED",
+  ],
   // PR9 — post-interview lifecycle. MARK_INTERVIEW_HELD is the gate to
   // the hire-or-reject decision; HIRE captures onboarding fields and
   // moves to HIRED. REJECT_POST_INTERVIEW sends the soft-toned
   // decline-post-interview email and reaches a distinct terminal status.
+  // MARK_MISSED records a no-show from a booked (ACCEPTED) interview.
   MARK_INTERVIEW_HELD: ["ACCEPTED"],
+  MARK_MISSED: ["ACCEPTED"],
   HIRE: ["INTERVIEW_HELD"],
   REJECT_POST_INTERVIEW: ["INTERVIEW_HELD"],
   // PR10 — runs the onboarding orchestrator (lib/talent-onboarding.ts).
@@ -173,6 +190,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // PR9 — post-interview lifecycle dispatchers.
   if (action.action === "MARK_INTERVIEW_HELD") {
     return handleMarkInterviewHeld({ id, actor: user, auditContext });
+  }
+  if (action.action === "MARK_MISSED") {
+    return handleMarkMissed({ id, actor: user, auditContext });
   }
   if (action.action === "HIRE") {
     return handleHire({ id, row, action, actor: user, auditContext });
@@ -545,6 +565,45 @@ async function handleMarkInterviewHeld(args: {
   });
 
   return NextResponse.json({ ok: true, status: "INTERVIEW_HELD" }, { status: 200 });
+}
+
+// ---------------------------------------------------------------------------
+// MARK_MISSED — booked interview, candidate no-showed; status → MISSED
+// ---------------------------------------------------------------------------
+//
+// Mirror of handleMarkInterviewHeld: a race-safe flip pinned to ACCEPTED,
+// audit only, no candidate email. From MISSED the admin re-offers slots
+// (ACCEPT) to reschedule, or declines.
+async function handleMarkMissed(args: {
+  id: string;
+  actor: Awaited<ReturnType<typeof getCurrentUserOrThrow>>;
+  auditContext: ReturnType<typeof extractAuditContext>;
+}): Promise<NextResponse> {
+  const { id, actor, auditContext } = args;
+
+  const writeResult = await prisma.talentApplication.updateMany({
+    where: { id, status: "ACCEPTED" },
+    data: {
+      status: "MISSED",
+    },
+  });
+  if (writeResult.count === 0) {
+    return NextResponse.json(
+      { error: "Application status changed under us. Refresh and try again." },
+      { status: 409 },
+    );
+  }
+
+  await logAdminAction({
+    actor: { id: actor.id, email: actor.email, role: actor.role },
+    action: "TALENT_INTERVIEW_MISSED",
+    outcome: "SUCCESS",
+    targetType: "TalentApplication",
+    targetId: id,
+    context: auditContext,
+  });
+
+  return NextResponse.json({ ok: true, status: "MISSED" }, { status: 200 });
 }
 
 // ---------------------------------------------------------------------------

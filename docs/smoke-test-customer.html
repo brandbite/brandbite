@@ -513,15 +513,18 @@
         </div>
 
         <div class="step">
-          <h3><span class="num">2.2</span> Pick a plan</h3>
+          <h3><span class="num">2.2</span> Pick a plan (post-onboarding)</h3>
           <p class="action">
-            <strong>Action:</strong> Select a plan from the list. Plans show name, monthly tokens,
-            price.
+            <strong>Note (flow correction):</strong> Plan selection is <em>not</em> a step inside
+            the onboarding wizard. Onboarding creates the Company only; once it finishes, go to
+            <code>Settings &rarr; Billing</code> (<code>/customer/settings</code>) to pick a plan.
+            <strong>Action:</strong> Open Settings after onboarding and select a plan from the list
+            (each shows name, monthly tokens, price).
           </p>
           <p class="expected">
             <strong>Expected:</strong> Plan list renders with at least one option. Prices match
-            what&rsquo;s configured in Stripe (no $0.00 weirdness). Selecting one advances the
-            wizard or starts a Stripe checkout flow.
+            what&rsquo;s configured in Stripe (no $0.00 weirdness). Selecting one starts a Stripe
+            checkout flow.
           </p>
           <div class="results">
             <label><input type="radio" name="step-2.2" value="pass" /><span>Pass</span></label>
@@ -532,10 +535,10 @@
         </div>
 
         <div class="step">
-          <h3><span class="num">2.3</span> Complete payment (if required)</h3>
+          <h3><span class="num">2.3</span> Complete payment (from Settings &rarr; Billing)</h3>
           <p class="action">
-            <strong>Action:</strong> If the plan requires payment, complete Stripe checkout with a
-            real or test card. (Use Stripe test card <code>4242 4242 4242 4242</code>
+            <strong>Action:</strong> Selecting a plan in Settings starts Stripe checkout. Complete
+            it with a real or test card. (Use Stripe test card <code>4242 4242 4242 4242</code>
             with any future expiry and any 3-digit CVC if you&rsquo;re in Stripe test mode.)
           </p>
           <p class="expected">

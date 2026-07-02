@@ -126,6 +126,50 @@ export default function AdminBoardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Re-run auto-assign across currently-unassigned TODO tickets. Useful for
+  // tickets created before a company turned auto-assign on. Safe to re-run.
+  const [backfilling, setBackfilling] = useState<boolean>(false);
+  const runAutoAssignBackfill = async () => {
+    setBackfilling(true);
+    try {
+      const res = await fetch("/api/admin/tickets/auto-assign-backfill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | { assigned: number; scanned: number; skipped: number; hasMore: boolean }
+        | { error?: string }
+        | null;
+      if (!res.ok || !json || !("assigned" in json)) {
+        const message =
+          json && "error" in json && json.error ? json.error : `Failed (${res.status})`;
+        throw new Error(message);
+      }
+      showToast({
+        type: "success",
+        title: `Assigned ${json.assigned} of ${json.scanned} ticket(s)`,
+        description:
+          json.skipped > 0
+            ? `${json.skipped} skipped (auto-assign off, no eligible creative, or already claimed).${
+                json.hasMore ? " More remain — run again." : ""
+              }`
+            : json.hasMore
+              ? "More tickets remain — run again."
+              : "All eligible unassigned tickets processed.",
+      });
+      await load();
+    } catch (err) {
+      showToast({
+        type: "error",
+        title: "Auto-assign backfill failed",
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
+    } finally {
+      setBackfilling(false);
+    }
+  };
+
   // ---------------------------------------------------------------------------
   // Derived values
   // ---------------------------------------------------------------------------
@@ -254,6 +298,16 @@ export default function AdminBoardPage() {
             <p className="mt-1 text-[11px] text-[var(--bb-text-secondary)]">
               Monitor every request across all customer workspaces.
             </p>
+
+            <button
+              type="button"
+              onClick={runAutoAssignBackfill}
+              disabled={backfilling}
+              className="mt-3 w-full rounded-lg bg-[var(--bb-secondary)] px-2.5 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-[var(--bb-secondary)]/90 disabled:opacity-60"
+              title="Re-run auto-assign for unassigned tickets (e.g. created before auto-assign was enabled)"
+            >
+              {backfilling ? "Assigning…" : "Re-run auto-assign"}
+            </button>
           </div>
 
           {/* Companies list */}

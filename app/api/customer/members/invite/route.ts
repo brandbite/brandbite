@@ -15,6 +15,7 @@ import { randomUUID } from "crypto";
 import { parseBody } from "@/lib/schemas/helpers";
 import { createInviteSchema } from "@/lib/schemas/member.schemas";
 import { sendNotificationEmail } from "@/lib/email";
+import { companyInviteExpiresAt } from "@/lib/invite-expiry";
 
 export async function POST(req: NextRequest) {
   try {
@@ -89,6 +90,7 @@ export async function POST(req: NextRequest) {
           invitedByUserId: user.id,
           token,
           status: InviteStatus.PENDING,
+          expiresAt: companyInviteExpiresAt(),
         },
       }),
       prisma.company.findUnique({

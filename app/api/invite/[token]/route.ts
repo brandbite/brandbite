@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { InviteStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, getCurrentUserOrThrow } from "@/lib/auth";
+import { isCompanyInviteExpired } from "@/lib/invite-expiry";
 
 type RouteContext = {
   params: Promise<{
@@ -56,7 +57,9 @@ export async function GET(_req: NextRequest, context: RouteContext) {
       alreadyMember = !!member;
     }
 
-    const canAccept = !!viewer && invite.status === InviteStatus.PENDING && !alreadyMember;
+    const expired = isCompanyInviteExpired(invite.expiresAt);
+    const canAccept =
+      !!viewer && invite.status === InviteStatus.PENDING && !alreadyMember && !expired;
 
     return NextResponse.json(
       {
@@ -66,6 +69,8 @@ export async function GET(_req: NextRequest, context: RouteContext) {
           roleInCompany: invite.roleInCompany,
           status: invite.status,
           createdAt: invite.createdAt.toISOString(),
+          expiresAt: invite.expiresAt ? invite.expiresAt.toISOString() : null,
+          expired,
         },
         company: {
           id: invite.company.id,
@@ -121,6 +126,19 @@ export async function POST(_req: NextRequest, context: RouteContext) {
 
     if (invite.status !== InviteStatus.PENDING) {
       return NextResponse.json({ error: "Only pending invites can be accepted" }, { status: 400 });
+    }
+
+    // Reject (and mark) expired invites. Flip to EXPIRED so the row stops
+    // showing as pending everywhere and a fresh invite can be sent.
+    if (isCompanyInviteExpired(invite.expiresAt)) {
+      await prisma.companyInvite.update({
+        where: { id: invite.id },
+        data: { status: InviteStatus.EXPIRED },
+      });
+      return NextResponse.json(
+        { error: "This invite has expired. Please ask for a new one." },
+        { status: 410 },
+      );
     }
 
     // Verify the logged-in user's email matches the invite email

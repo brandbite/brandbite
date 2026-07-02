@@ -34,6 +34,7 @@ type TalentApplicationStatus =
   | "AWAITING_CANDIDATE_CHOICE"
   | "CANDIDATE_PROPOSED_TIME"
   | "ACCEPTED"
+  | "MISSED"
   // PR9 — post-interview lifecycle.
   | "INTERVIEW_HELD"
   | "HIRED"
@@ -101,6 +102,7 @@ const STATUS_LABELS: Record<TalentApplicationStatus, string> = {
   AWAITING_CANDIDATE_CHOICE: "Awaiting candidate",
   CANDIDATE_PROPOSED_TIME: "Candidate proposed",
   ACCEPTED: "Accepted",
+  MISSED: "Missed (no-show)",
   INTERVIEW_HELD: "Interview held",
   HIRED: "Hired",
   ONBOARDED: "Onboarded",
@@ -117,6 +119,7 @@ const STATUS_BADGE_VARIANT: Record<
   AWAITING_CANDIDATE_CHOICE: "primary",
   CANDIDATE_PROPOSED_TIME: "warning",
   ACCEPTED: "success",
+  MISSED: "warning",
   INTERVIEW_HELD: "warning",
   HIRED: "success",
   ONBOARDED: "success",
@@ -322,6 +325,8 @@ export default function TalentApplicationsPage() {
             return "Interview booked at the candidate's proposed time.";
           case "MARK_INTERVIEW_HELD":
             return "Interview marked as held. Hire or decline next.";
+          case "MARK_MISSED":
+            return "Marked as no-show. Re-offer slots to reschedule, or decline.";
           case "HIRE":
             return "Hired. Onboarding pending — UserAccount creation lands in the next PR.";
           case "REJECT_POST_INTERVIEW":
@@ -383,6 +388,10 @@ export default function TalentApplicationsPage() {
   // PR9 — post-interview handlers.
   function handleMarkInterviewHeld() {
     void submitAction({ action: "MARK_INTERVIEW_HELD" });
+  }
+
+  function handleMarkMissed() {
+    void submitAction({ action: "MARK_MISSED" });
   }
 
   function handleHire() {
@@ -453,6 +462,7 @@ export default function TalentApplicationsPage() {
     { key: "AWAITING_CANDIDATE_CHOICE", label: "Awaiting candidate", tone: "wait" },
     { key: "CANDIDATE_PROPOSED_TIME", label: "Candidate proposed", tone: "action" },
     { key: "ACCEPTED", label: "Accepted", tone: "wait" },
+    { key: "MISSED", label: "Missed", tone: "action" },
     { key: "INTERVIEW_HELD", label: "Interview held", tone: "action" },
     { key: "HIRED", label: "Hired", tone: "done" },
     { key: "ONBOARDED", label: "Onboarded", tone: "done" },
@@ -669,6 +679,7 @@ export default function TalentApplicationsPage() {
                           onAcceptProposed={handleAcceptProposed}
                           onDecline={handleDecline}
                           onMarkInterviewHeld={handleMarkInterviewHeld}
+                          onMarkMissed={handleMarkMissed}
                           onHire={handleHire}
                           onRejectPostInterview={handleRejectPostInterview}
                           onOnboard={handleOnboard}
@@ -713,6 +724,7 @@ function DetailPanel({
   onAcceptProposed,
   onDecline,
   onMarkInterviewHeld,
+  onMarkMissed,
   onHire,
   onRejectPostInterview,
   onOnboard,
@@ -739,6 +751,7 @@ function DetailPanel({
   onAcceptProposed: () => void;
   onDecline: () => void;
   onMarkInterviewHeld: () => void;
+  onMarkMissed: () => void;
   onHire: () => void;
   onRejectPostInterview: () => void;
   onOnboard: () => void;
@@ -755,16 +768,23 @@ function DetailPanel({
   //   - ACCEPTED (PR9): MARK_INTERVIEW_HELD or REJECT_POST_INTERVIEW (no-show path)
   //   - INTERVIEW_HELD (PR9): HIRE or REJECT_POST_INTERVIEW
   //   - HIRED / ONBOARDED / DECLINED / REJECTED_AFTER_INTERVIEW: terminal info
+  // MISSED behaves like a re-offer origin: from a no-show the admin can send
+  // fresh slots + a new booking link to reschedule the interview.
   const isReoffer =
-    item.status === "AWAITING_CANDIDATE_CHOICE" || item.status === "CANDIDATE_PROPOSED_TIME";
+    item.status === "AWAITING_CANDIDATE_CHOICE" ||
+    item.status === "CANDIDATE_PROPOSED_TIME" ||
+    item.status === "MISSED";
   const canOfferSlots = item.status === "SUBMITTED" || item.status === "IN_REVIEW" || isReoffer;
   const canConfirmProposed = item.status === "CANDIDATE_PROPOSED_TIME";
   const canDecline =
     item.status === "SUBMITTED" ||
     item.status === "IN_REVIEW" ||
     item.status === "AWAITING_CANDIDATE_CHOICE" ||
-    item.status === "CANDIDATE_PROPOSED_TIME";
-  // PR9 — post-interview action gates.
+    item.status === "CANDIDATE_PROPOSED_TIME" ||
+    item.status === "MISSED";
+  // PR9 — post-interview action gates. The "Did the interview happen?" panel
+  // (gated on canMarkInterviewHeld) offers all three ACCEPTED outcomes: held,
+  // no-show→reschedule (MARK_MISSED), and no-show→decline.
   const canMarkInterviewHeld = item.status === "ACCEPTED";
   const canHire = item.status === "INTERVIEW_HELD";
   const canRejectPostInterview = item.status === "ACCEPTED" || item.status === "INTERVIEW_HELD";
@@ -1039,10 +1059,10 @@ function DetailPanel({
           <div className="rounded-xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-card)] p-4">
             <SectionHeading>Did the interview happen?</SectionHeading>
             <p className="mt-1 mb-3 text-xs text-[var(--bb-text-muted)]">
-              Click &ldquo;Yes&rdquo; to unlock the Hire form. Click &ldquo;No-show&rdquo; to skip
-              straight to the soft-toned post-interview decline.
+              Click &ldquo;Yes&rdquo; to unlock the Hire form. If the candidate didn&rsquo;t show,
+              mark it a no-show — from there you can re-offer slots to reschedule, or decline.
             </p>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 onClick={onMarkInterviewHeld}
                 loading={actionStatus === "submitting"}
@@ -1050,6 +1070,15 @@ function DetailPanel({
                 disabled={actionStatus === "submitting"}
               >
                 Yes, mark held
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={onMarkMissed}
+                loading={actionStatus === "submitting"}
+                loadingText="Saving…"
+                disabled={actionStatus === "submitting"}
+              >
+                No-show — reschedule
               </Button>
               <Button
                 variant="danger"
