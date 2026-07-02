@@ -24,6 +24,8 @@ import { prisma } from "@/lib/prisma";
 import { isCreativePaused } from "@/lib/creative-availability";
 import { getCreativeRatingSummaries } from "@/lib/ratings/creative-ratings";
 import { isAutoAssignEnabled, selectCreativeByLoadThenRating } from "@/lib/tickets/auto-assign";
+import { createNotification } from "@/lib/notifications";
+import { buildTicketCode } from "@/lib/ticket-code";
 
 const MAX_TICKETS_PER_RUN = 500;
 
@@ -90,10 +92,12 @@ export async function backfillAutoAssign(companyId?: string): Promise<BackfillRe
     take: MAX_TICKETS_PER_RUN + 1,
     select: {
       id: true,
+      title: true,
+      companyTicketNumber: true,
       companyId: true,
       jobTypeId: true,
       company: { select: { autoAssignDefaultEnabled: true } },
-      project: { select: { autoAssignMode: true } },
+      project: { select: { autoAssignMode: true, code: true } },
     },
   });
 
@@ -132,13 +136,13 @@ export async function backfillAutoAssign(companyId?: string): Promise<BackfillRe
     }
 
     // Assign + log atomically. Status stays TODO (matches create-ticket).
-    await prisma.$transaction(async (tx) => {
+    const didAssign = await prisma.$transaction(async (tx) => {
       // Guard against a concurrent claim: only assign if still unassigned.
       const claimed = await tx.ticket.updateMany({
         where: { id: ticket.id, creativeId: null, status: TicketStatus.TODO },
         data: { creativeId },
       });
-      if (claimed.count === 0) return;
+      if (claimed.count === 0) return false;
 
       await tx.ticketAssignmentLog.create({
         data: {
@@ -152,9 +156,30 @@ export async function backfillAutoAssign(companyId?: string): Promise<BackfillRe
           },
         },
       });
+      return true;
     });
 
+    // Only count + notify when THIS run actually made the assignment (a
+    // concurrent claim returns count=0 → didAssign=false).
+    if (!didAssign) continue;
+
     assigned++;
+
+    // Fire-and-forget "new ticket assigned" notification, honoring the
+    // creative's preferences. Mirrors the create-ticket route so a backfilled
+    // assignment reaches the creative the same way a fresh one does.
+    const code = buildTicketCode({
+      projectCode: ticket.project?.code,
+      companyTicketNumber: ticket.companyTicketNumber,
+      ticketId: ticket.id,
+    });
+    void createNotification({
+      userId: creativeId,
+      type: "TICKET_ASSIGNED",
+      title: "New ticket assigned",
+      message: `${code} "${ticket.title}" was assigned to you`,
+      ticketId: ticket.id,
+    });
   }
 
   return {
