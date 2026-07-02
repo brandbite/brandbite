@@ -50,11 +50,19 @@ const securityHeaders = [
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://challenges.cloudflare.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: blob: https://*.r2.cloudflarestorage.com https://placehold.co https://img.youtube.com https://i.ytimg.com https://i3.ytimg.com https://i.vimeocdn.com",
+      // media.brandbite.studio: R2 public asset domain (R2_PUBLIC_BASE_URL).
+      // Must be listed here or the browser CSP-blocks avatars/assets served
+      // from it, even though images.remotePatterns already allows it.
+      "img-src 'self' data: blob: https://*.r2.cloudflarestorage.com https://media.brandbite.studio https://placehold.co https://img.youtube.com https://i.ytimg.com https://i3.ytimg.com https://i.vimeocdn.com",
       // - api.stripe.com: Stripe.js calls home from the browser during checkout
       // - sentry: error reporting
       // - challenges.cloudflare.com: Turnstile widget posts the token here for verification
-      "connect-src 'self' https://api.stripe.com https://*.ingest.sentry.io https://challenges.cloudflare.com",
+      // - r2.cloudflarestorage.com: client-side fetch() of presigned download
+      //   URLs (lib/download-helpers.ts) — without this the "Download final
+      //   file" button and zip bundling are CSP-blocked.
+      // - media.brandbite.studio: R2 public asset domain, in case assets are
+      //   fetched (not just <img>-rendered) client-side.
+      "connect-src 'self' https://api.stripe.com https://*.ingest.sentry.io https://challenges.cloudflare.com https://*.r2.cloudflarestorage.com https://media.brandbite.studio",
       // - js.stripe.com: Stripe checkout iframe
       // - challenges.cloudflare.com: Turnstile renders inside an iframe, must be allowed here
       // - youtube/vimeo/loom: embedded media
@@ -82,6 +90,8 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       { protocol: "https", hostname: "**.r2.cloudflarestorage.com" },
       { protocol: "https", hostname: "**.r2.dev" },
+      // Custom R2 public asset domain (R2_PUBLIC_BASE_URL).
+      { protocol: "https", hostname: "media.brandbite.studio" },
     ],
   },
   headers: async () => [
