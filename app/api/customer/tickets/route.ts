@@ -20,7 +20,8 @@ import { parseBody } from "@/lib/schemas/helpers";
 import { createTicketSchema } from "@/lib/schemas/ticket.schemas";
 import { buildTicketCode } from "@/lib/ticket-code";
 import { createCustomerTicket } from "@/lib/tickets/create-ticket";
-import { isTagsEnabled } from "@/lib/feature-flags";
+import { getAiTicketsMode, isAiTicketsAllowed, isTagsEnabled } from "@/lib/feature-flags";
+import { isSiteAdminRole } from "@/lib/roles";
 
 // -----------------------------------------------------------------------------
 // GET: list tickets for the current customer's active company
@@ -245,6 +246,19 @@ export async function POST(req: NextRequest) {
 
     const parsed = await parseBody(req, createTicketSchema);
     if (!parsed.success) return parsed.response;
+
+    // Guard "Work with AI" against the feature flag. Even if the form is
+    // bypassed, a customer can't force AI mode while it's off (or test-only,
+    // which is restricted to site admins).
+    if (parsed.data.creativeMode === "AI") {
+      const aiMode = await getAiTicketsMode();
+      if (!isAiTicketsAllowed(aiMode, isSiteAdminRole(user.role))) {
+        return NextResponse.json(
+          { error: "AI-generated tickets aren't available yet." },
+          { status: 403 },
+        );
+      }
+    }
 
     // When the tag system is globally disabled, drop any tagIds the client
     // sent — even a stale form shouldn't be able to attach tags while the

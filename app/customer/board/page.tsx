@@ -1586,7 +1586,10 @@ export default function CustomerBoardPage() {
           priority: editForm.priority,
           dueDate: editForm.dueDate || null,
           projectId: editForm.projectId || null,
-          jobTypeId: editForm.jobTypeId || null,
+          // Job type can't be cleared (model 2). Omit when empty so an edit to
+          // other fields leaves the existing job type unchanged rather than
+          // sending null, which the API now rejects.
+          jobTypeId: editForm.jobTypeId || undefined,
           tagIds: editForm.tagIds,
         }),
       });

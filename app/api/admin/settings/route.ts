@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { getAppSetting, setAppSetting } from "@/lib/app-settings";
 import { parseBody } from "@/lib/schemas/helpers";
-import { updateAdminSettingSchema } from "@/lib/schemas/admin-settings.schemas";
+import { ADMIN_SETTING_KEYS, updateAdminSettingSchema } from "@/lib/schemas/admin-settings.schemas";
 
 function requireAdmin(userRole: string) {
   if (userRole !== "SITE_OWNER" && userRole !== "SITE_ADMIN") {
@@ -22,32 +22,10 @@ function requireAdmin(userRole: string) {
   }
 }
 
-/** Allowed setting keys that admins may read/write via this endpoint. */
-const ALLOWED_KEYS = [
-  "MIN_WITHDRAWAL_TOKENS",
-  "AUTO_PAYOUT_ENABLED",
-  "AUTO_PAYOUT_THRESHOLD_TOKENS",
-  // Kill-switch for the public /talent submission form. When the
-  // stored value is the literal string "false" the API rejects new
-  // applications with 503 + a clear "applications closed" message
-  // and the public page swaps to a closed-state banner. Default
-  // (unset / "true") = open, matching today's behaviour.
-  "TALENT_APPLICATIONS_OPEN",
-  // Master kill-switch for the SITE_OWNER event notification emails
-  // (new feedback / new ticket / new company / new payment / new
-  // talent application / new withdrawal). Default unset = "true" =
-  // enabled. Set "false" to mute everything globally — useful during
-  // demos, data imports, or when the inbox simply gets too loud.
-  "ADMIN_EVENT_EMAILS_ENABLED",
-  // Feature flag for the per-company ticket tagging system. Default
-  // unset = "false" = OFF. Flipping to "true" re-enables the
-  // TagMultiSelect on the ticket form, the tag management section
-  // in /customer/settings, and the chip rendering across every
-  // board / detail page. Existing TicketTag + TicketTagAssignment
-  // rows are preserved while the flag is off — toggle is reversible
-  // without data loss.
-  "TAGS_ENABLED",
-] as const;
+// Allowed setting keys that admins may read/write. Canonical list lives in
+// admin-settings.schemas.ts (ADMIN_SETTING_KEYS) so GET filtering and PATCH
+// validation can never drift apart again.
+const ALLOWED_KEYS = ADMIN_SETTING_KEYS;
 
 function isAllowedKey(key: string): key is (typeof ALLOWED_KEYS)[number] {
   return (ALLOWED_KEYS as readonly string[]).includes(key);

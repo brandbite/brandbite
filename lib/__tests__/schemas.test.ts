@@ -5,6 +5,38 @@
 
 import { describe, it, expect } from "vitest";
 import { createInviteSchema } from "@/lib/schemas/member.schemas";
+import { createTicketSchema } from "@/lib/schemas/ticket.schemas";
+
+// ---------------------------------------------------------------------------
+// createTicketSchema — job type is required on every ticket (model 2)
+// ---------------------------------------------------------------------------
+
+describe("createTicketSchema jobTypeId", () => {
+  const base = { title: "Need a banner", creativeMode: "DESIGNER" as const };
+
+  it("rejects a ticket with no job type", () => {
+    const result = createTicketSchema.safeParse({ ...base, jobTypeId: "" });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toBe("Please select a job type.");
+    }
+  });
+
+  it("rejects a missing jobTypeId field entirely", () => {
+    const result = createTicketSchema.safeParse(base);
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an AI-mode ticket with no job type (required in both modes)", () => {
+    const result = createTicketSchema.safeParse({ ...base, creativeMode: "AI", jobTypeId: "" });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts a ticket with a job type", () => {
+    const result = createTicketSchema.safeParse({ ...base, jobTypeId: "job_123" });
+    expect(result.success).toBe(true);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // createInviteSchema
