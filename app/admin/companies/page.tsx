@@ -118,23 +118,66 @@ export default function AdminCompaniesPage() {
   // pill it belongs to. Errors land in the page-level banner — rare, and a
   // per-row error surface isn't worth the layout churn.
   const [autoAssignBusyId, setAutoAssignBusyId] = useState<string | null>(null);
+  // Confirm dialog when ENABLING for a company that has an unassigned backlog.
+  const [autoAssignConfirm, setAutoAssignConfirm] = useState<{
+    company: AdminCompany;
+    unassignedCount: number;
+  } | null>(null);
+  const [autoAssignNotice, setAutoAssignNotice] = useState<string | null>(null);
 
-  const toggleAutoAssign = async (c: AdminCompany) => {
+  const patchAutoAssign = async (c: AdminCompany, enabled: boolean, backfill: boolean) => {
     setAutoAssignBusyId(c.id);
     setError(null);
     try {
       const res = await fetch(`/api/admin/companies/${c.id}/auto-assign`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled: !c.autoAssignDefaultEnabled }),
+        body: JSON.stringify({ enabled, backfill }),
       });
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(json?.error || `Request failed with status ${res.status}`);
+      if (backfill && json?.backfill) {
+        const b = json.backfill;
+        setAutoAssignNotice(
+          `Auto-assign enabled for ${c.name} — assigned ${b.assigned} of ${b.scanned} unassigned ticket(s)` +
+            (b.skipped ? `, ${b.skipped} skipped (project off / no eligible creative)` : "") +
+            (b.hasMore ? ". More remain — run again from the board." : "."),
+        );
+      }
       await load();
     } catch (err: any) {
       console.error("Auto-assign toggle error:", err);
       setError(err?.message || "Failed to update auto-assign setting.");
     } finally {
+      setAutoAssignBusyId(null);
+      setAutoAssignConfirm(null);
+    }
+  };
+
+  const toggleAutoAssign = async (c: AdminCompany) => {
+    // Turning OFF is immediate — disabling never assigns anything.
+    if (c.autoAssignDefaultEnabled) {
+      await patchAutoAssign(c, false, false);
+      return;
+    }
+    // Turning ON — check for an existing unassigned backlog first, and only
+    // prompt to sweep it when there's something to sweep.
+    setAutoAssignBusyId(c.id);
+    setError(null);
+    setAutoAssignNotice(null);
+    try {
+      const res = await fetch(`/api/admin/companies/${c.id}/auto-assign`);
+      const json = await res.json().catch(() => null);
+      const count = typeof json?.unassignedCount === "number" ? json.unassignedCount : 0;
+      if (count > 0) {
+        setAutoAssignConfirm({ company: c, unassignedCount: count });
+        setAutoAssignBusyId(null);
+      } else {
+        await patchAutoAssign(c, true, false);
+      }
+    } catch (err: any) {
+      console.error("Auto-assign preview error:", err);
+      setError(err?.message || "Failed to check auto-assign.");
       setAutoAssignBusyId(null);
     }
   };
@@ -259,6 +302,12 @@ export default function AdminCompaniesPage() {
       {error && (
         <InlineAlert variant="error" title="Error" className="mb-4">
           {error}
+        </InlineAlert>
+      )}
+
+      {autoAssignNotice && (
+        <InlineAlert variant="success" title="Auto-assign" className="mb-4">
+          {autoAssignNotice}
         </InlineAlert>
       )}
 
@@ -535,6 +584,55 @@ export default function AdminCompaniesPage() {
             </Button>
           </ModalFooter>
         </form>
+      </Modal>
+
+      {/* Confirm sweeping the existing backlog when enabling auto-assign. */}
+      <Modal open={autoAssignConfirm !== null} onClose={() => setAutoAssignConfirm(null)} size="md">
+        <ModalHeader
+          eyebrow="Auto-assign"
+          title={
+            autoAssignConfirm
+              ? `Enable auto-assign — ${autoAssignConfirm.company.name}`
+              : "Enable auto-assign"
+          }
+          onClose={() => setAutoAssignConfirm(null)}
+        />
+        <div className="space-y-3">
+          <p className="text-sm text-[var(--bb-text-secondary)]">
+            New tickets will be auto-assigned to a matching creative. This company also has{" "}
+            <strong className="text-[var(--bb-secondary)]">
+              {autoAssignConfirm?.unassignedCount}
+            </strong>{" "}
+            unassigned to-do ticket{autoAssignConfirm?.unassignedCount === 1 ? "" : "s"} already in
+            the backlog. Assign those now too?
+          </p>
+          <p className="text-xs text-[var(--bb-text-tertiary)]">
+            Tickets in projects with auto-assign turned off, or with no eligible creative, are left
+            unassigned.
+          </p>
+          <ModalFooter>
+            <Button
+              variant="ghost"
+              type="button"
+              onClick={() =>
+                autoAssignConfirm && patchAutoAssign(autoAssignConfirm.company, true, false)
+              }
+              disabled={autoAssignBusyId !== null}
+            >
+              Just enable
+            </Button>
+            <Button
+              type="button"
+              loading={autoAssignBusyId !== null}
+              loadingText="Assigning..."
+              onClick={() =>
+                autoAssignConfirm && patchAutoAssign(autoAssignConfirm.company, true, true)
+              }
+            >
+              Enable &amp; assign {autoAssignConfirm?.unassignedCount ?? ""}
+            </Button>
+          </ModalFooter>
+        </div>
       </Modal>
 
       {/* L4 MFA. Opens when the grant POST returns 202; on verify success

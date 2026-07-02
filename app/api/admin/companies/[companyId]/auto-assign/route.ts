@@ -23,13 +23,39 @@ import { getCurrentUserOrThrow } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isSiteAdminRole } from "@/lib/roles";
 import { parseBody } from "@/lib/schemas/helpers";
+import { backfillAutoAssign, countBackfillCandidates } from "@/lib/tickets/backfill-assign";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const toggleSchema = z.object({
   enabled: z.boolean(),
+  // When enabling, also sweep this company's existing unassigned TODO tickets
+  // through auto-assign. Optional so a plain toggle stays a plain toggle.
+  backfill: z.boolean().optional(),
 });
+
+// GET — how many unassigned tickets a backfill would consider for this
+// company. Powers the "assign N existing tickets?" confirm before enabling.
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ companyId: string }> },
+) {
+  const { companyId } = await params;
+
+  let user;
+  try {
+    user = await getCurrentUserOrThrow();
+  } catch {
+    return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+  }
+  if (!isSiteAdminRole(user.role)) {
+    return NextResponse.json({ error: "Admin only" }, { status: 403 });
+  }
+
+  const unassignedCount = await countBackfillCandidates(companyId);
+  return NextResponse.json({ unassignedCount });
+}
 
 export async function PATCH(
   req: NextRequest,
@@ -83,5 +109,14 @@ export async function PATCH(
     });
   }
 
-  return NextResponse.json({ ok: true, autoAssignDefaultEnabled: enabled });
+  // Optional backlog sweep. Runs AFTER the flag is enabled so the per-ticket
+  // effective-auto-assign check (company default composed with project mode)
+  // sees the new value. Only when enabling — disabling never assigns. Safe to
+  // run even if the flag was already on (guarded updateMany, idempotent).
+  let backfill = null;
+  if (enabled && parsed.data.backfill) {
+    backfill = await backfillAutoAssign(company.id);
+  }
+
+  return NextResponse.json({ ok: true, autoAssignDefaultEnabled: enabled, backfill });
 }
