@@ -80,9 +80,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           where: { id, status: { in: ["PENDING", "SCHEDULED"] } },
           data: {
             status: parsed.data.status,
-            scheduledAt: parsed.data.scheduledAt
-              ? new Date(parsed.data.scheduledAt)
-              : undefined,
+            scheduledAt: parsed.data.scheduledAt ? new Date(parsed.data.scheduledAt) : undefined,
             videoLink: parsed.data.videoLink,
             adminNotes: parsed.data.adminNotes,
           },
