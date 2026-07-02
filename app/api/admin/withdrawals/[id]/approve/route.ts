@@ -7,8 +7,8 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { AdminActionType, Prisma, WithdrawalStatus } from "@prisma/client";
-import { applyUserLedgerEntry, getUserTokenBalance } from "@/lib/token-engine";
+import { AdminActionType, WithdrawalStatus } from "@prisma/client";
+import { getUserTokenBalance } from "@/lib/token-engine";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { canApproveWithdrawals } from "@/lib/roles";
 import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
@@ -199,59 +199,18 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       }
     }
 
-    // Ledger write + status update in a single transaction.
-    const result = await prisma.$transaction(async (tx) => {
-      // Re-assert PENDING inside the transaction and claim the row. If a
-      // concurrent approve (or the PATCH flow) already moved it, count is 0
-      // and we abort before writing a second DEBIT — closes the check-then-act
-      // race that could double-debit the creative.
-      const claimed = await tx.withdrawal.updateMany({
-        where: { id: withdrawal.id, status: WithdrawalStatus.PENDING },
-        data: { status: WithdrawalStatus.APPROVED, approvedAt: new Date() },
-      });
-      if (claimed.count === 0) {
-        throw new Response("Withdrawal is no longer pending", { status: 409 });
-      }
-
-      // Ledger DEBIT — pass `tx` so it commits atomically with the status
-      // flip above. Without the shared client applyUserLedgerEntry would open
-      // its own transaction and the debit could survive a rollback here.
-      const ledgerResult = await applyUserLedgerEntry(
-        {
-          userId: withdrawal.creativeId,
-          amount: withdrawal.amountTokens,
-          direction: "DEBIT",
-          reason: "WITHDRAW",
-          notes: `Withdrawal approved (id: ${withdrawal.id})`,
-          metadata: {
-            withdrawalId: withdrawal.id,
-          },
-        },
-        tx,
-      );
-
-      const updated = await tx.withdrawal.update({
-        where: { id: withdrawal.id },
-        data: {
-          status: WithdrawalStatus.APPROVED,
-          approvedAt: new Date(),
-          metadata: {
-            ...(typeof withdrawal.metadata === "object" &&
-            withdrawal.metadata !== null &&
-            !Array.isArray(withdrawal.metadata)
-              ? (withdrawal.metadata as Prisma.JsonObject)
-              : {}),
-            ledgerEntryId: ledgerResult.ledger.id,
-          },
-        },
-      });
-
-      return {
-        updated,
-        ledgerEntryId: ledgerResult.ledger.id,
-        creativeBalanceAfter: ledgerResult.balanceAfter,
-      };
+    // APPROVE is status-only. The token DEBIT happens once, at MARK_PAID, via
+    // the shared payApprovedWithdrawal helper — approving here as well would
+    // double-debit the creative when the withdrawal is later marked paid.
+    // Guarded flip (updateMany on status=PENDING) makes concurrent approves
+    // race-safe.
+    const claimed = await prisma.withdrawal.updateMany({
+      where: { id: withdrawal.id, status: WithdrawalStatus.PENDING },
+      data: { status: WithdrawalStatus.APPROVED, approvedAt: new Date() },
     });
+    if (claimed.count === 0) {
+      throw new Response("Withdrawal is no longer pending", { status: 409 });
+    }
 
     await logAdminAction({
       actor: user,
@@ -262,18 +221,14 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       metadata: {
         amountTokens: withdrawal.amountTokens,
         creativeId: withdrawal.creativeId,
-        ledgerEntryId: result.ledgerEntryId,
-        creativeBalanceAfter: result.creativeBalanceAfter,
       },
       context: auditCtx,
     });
 
     return NextResponse.json(
       {
-        message: "Withdrawal approved and token debit applied",
-        withdrawal: result.updated,
-        ledgerEntryId: result.ledgerEntryId,
-        creativeBalanceAfter: result.creativeBalanceAfter,
+        message: "Withdrawal approved. Tokens are debited when it is marked paid.",
+        withdrawal: { id: withdrawal.id, status: WithdrawalStatus.APPROVED },
       },
       { status: 200 },
     );

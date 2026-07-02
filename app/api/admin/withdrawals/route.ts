@@ -8,8 +8,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { AdminActionType, LedgerDirection } from "@prisma/client";
+import { AdminActionType } from "@prisma/client";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { payApprovedWithdrawal } from "@/lib/withdrawals";
 import { canApproveWithdrawals, canMarkWithdrawalsPaid, isSiteAdminRole } from "@/lib/roles";
 import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 import { CONFIRMATION_PHRASES, checkConfirmationPhrase } from "@/lib/admin-confirmation";
@@ -349,70 +350,9 @@ export async function PATCH(req: NextRequest) {
         return w;
       }
 
-      // MARK_PAID
-      if (withdrawal.status === "PAID") {
-        throw new Response("Withdrawal is already paid", {
-          status: 422,
-        });
-      }
-      if (withdrawal.status !== "APPROVED") {
-        throw new Response("Withdrawal must be approved before marking as paid", { status: 422 });
-      }
-
-      // Calculate creative balance before this debit
-      const [creditAgg, debitAgg] = await Promise.all([
-        tx.tokenLedger.aggregate({
-          where: {
-            userId: withdrawal.creativeId,
-            direction: LedgerDirection.CREDIT,
-          },
-          _sum: { amount: true },
-        }),
-        tx.tokenLedger.aggregate({
-          where: {
-            userId: withdrawal.creativeId,
-            direction: LedgerDirection.DEBIT,
-          },
-          _sum: { amount: true },
-        }),
-      ]);
-
-      const totalCredits = creditAgg._sum.amount ?? 0;
-      const totalDebits = debitAgg._sum.amount ?? 0;
-      const balanceBefore = totalCredits - totalDebits;
-      const balanceAfter = balanceBefore - withdrawal.amountTokens;
-
-      await tx.tokenLedger.create({
-        data: {
-          userId: withdrawal.creativeId,
-          direction: LedgerDirection.DEBIT,
-          amount: withdrawal.amountTokens,
-          reason: "WITHDRAWAL_PAID",
-          notes: `Withdrawal ${withdrawal.id} marked as paid by ${user.email}`,
-          balanceBefore,
-          balanceAfter,
-        },
-      });
-
-      const w = await tx.withdrawal.update({
-        where: { id: withdrawal.id },
-        data: {
-          status: "PAID",
-          approvedAt: withdrawal.approvedAt ?? new Date(),
-        },
-        include: {
-          creative: {
-            select: {
-              id: true,
-              email: true,
-              name: true,
-              role: true,
-            },
-          },
-        },
-      });
-
-      return w;
+      // MARK_PAID — the debit lives in the shared helper (single source of
+      // truth) so this flow and POST /[id]/mark-paid can't diverge.
+      return payApprovedWithdrawal(tx, withdrawal.id, user.email);
     });
 
     // Map the action to the corresponding audit enum + log the success.
