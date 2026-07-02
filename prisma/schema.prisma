@@ -194,6 +194,10 @@ enum TalentApplicationStatus {
   // own proposed time. Site owner needs to confirm (or counter-propose).
   CANDIDATE_PROPOSED_TIME
   ACCEPTED
+  // Interview was booked but the candidate did not show. Non-terminal: from
+  // here the admin can re-offer slots (ACCEPT) to reschedule, or DECLINE.
+  // Distinct from ACCEPTED so the dashboard can surface no-shows to follow up.
+  MISSED
   // PR9 — interview happened, no decision yet. The next admin action is
   // either HIRE (kicks off onboarding capture) or REJECT_POST_INTERVIEW.
   // Distinct from ACCEPTED so the dashboard can surface "interviews
@@ -447,6 +451,11 @@ model CompanyInvite {
 
   token  String       @unique
   status InviteStatus @default(PENDING)
+
+  /// When the invite stops being acceptable. Set to createdAt + 7 days on
+  /// create. Nullable so legacy rows (created before this column) are treated
+  /// as non-expiring rather than silently expired.
+  expiresAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2165,6 +2174,8 @@ enum AdminActionType {
   // PR's UserAccount auto-create handler; declared now so the enum
   // doesn't need a second migration.
   TALENT_INTERVIEW_HELD
+  // Interview was booked but the candidate no-showed (ACCEPTED → MISSED).
+  TALENT_INTERVIEW_MISSED
   TALENT_HIRED
   TALENT_REJECTED_AFTER_INTERVIEW
   TALENT_ONBOARDED

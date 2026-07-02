@@ -226,6 +226,13 @@ export const talentApplicationActionSchema = z.discriminatedUnion("action", [
      *  is the one that triggers candidate-facing email. */
   }),
   z.object({
+    /** Interview was booked but the candidate didn't show. Moves ACCEPTED →
+     *  MISSED (a distinct, non-terminal state) so the admin can then either
+     *  re-offer slots to reschedule (ACCEPT) or decline. No candidate email
+     *  here — the follow-up action sends any candidate-facing message. */
+    action: z.literal("MARK_MISSED"),
+  }),
+  z.object({
     action: z.literal("HIRE"),
     /** Free-text working hours from the post-interview onboarding form.
      *  Negotiated, not constrained — see model comment in schema.prisma. */

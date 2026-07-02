@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { canManageMembers, normalizeCompanyRole } from "@/lib/permissions/companyRoles";
+import { isCompanyInviteExpired } from "@/lib/invite-expiry";
 
 export async function GET(_req: NextRequest) {
   try {
@@ -114,6 +115,8 @@ export async function GET(_req: NextRequest) {
           roleInCompany: inv.roleInCompany,
           status: inv.status,
           createdAt: inv.createdAt.toISOString(),
+          expiresAt: inv.expiresAt ? inv.expiresAt.toISOString() : null,
+          expired: isCompanyInviteExpired(inv.expiresAt),
           invitedByName: inv.invitedByUser?.name ?? null,
           invitedByEmail: inv.invitedByUser?.email ?? null,
         })),

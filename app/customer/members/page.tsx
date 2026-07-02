@@ -38,6 +38,8 @@ type CompanyMembersResponse = {
     roleInCompany: CompanyRoleString;
     status: "PENDING" | "ACCEPTED" | "EXPIRED" | "CANCELLED";
     createdAt: string;
+    expiresAt: string | null;
+    expired: boolean;
     invitedByName: string | null;
     invitedByEmail: string | null;
   }[];
@@ -506,7 +508,14 @@ export default function CustomerMembersPage() {
                       className="flex items-center justify-between rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-3 text-sm shadow-sm"
                     >
                       <div>
-                        <p className="font-semibold text-[var(--bb-secondary)]">{invite.email}</p>
+                        <p className="flex items-center gap-2 font-semibold text-[var(--bb-secondary)]">
+                          {invite.email}
+                          {invite.expired && (
+                            <span className="rounded-full bg-[var(--bb-danger-bg)] px-2 py-0.5 text-[10px] font-semibold text-[var(--bb-danger-text)]">
+                              Expired
+                            </span>
+                          )}
+                        </p>
                         <p className="text-[11px] text-[var(--bb-text-secondary)]">
                           {formatCompanyRole(invite.roleInCompany)} • invited{" "}
                           {new Date(invite.createdAt).toLocaleDateString(undefined, {
@@ -514,6 +523,15 @@ export default function CustomerMembersPage() {
                             month: "short",
                             day: "numeric",
                           })}
+                          {invite.expiresAt && !invite.expired && (
+                            <>
+                              {" • expires "}
+                              {new Date(invite.expiresAt).toLocaleDateString(undefined, {
+                                month: "short",
+                                day: "numeric",
+                              })}
+                            </>
+                          )}
                         </p>
                         {invite.invitedByEmail && (
                           <p className="mt-1 text-[11px] text-[var(--bb-text-tertiary)]">
