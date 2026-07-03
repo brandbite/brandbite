@@ -228,13 +228,16 @@ export function RevisionImage({
   }
 
   if (!renderAsImage) {
-    // Non-image (PDF, etc.) — a clickable file chip that opens the file in a
-    // new tab rather than the image lightbox.
+    // Non-image (PDF, etc.) — a file chip. Clicking routes through the same
+    // onClick as image thumbnails so it opens the in-app lightbox preview
+    // (which renders the PDF inline). When no onClick is provided the click
+    // bubbles to the parent container, which owns the lightbox. We never
+    // open a new browser tab — the preview stays in-app.
     return (
       <button
         type="button"
-        onClick={() => window.open(src, "_blank", "noopener,noreferrer")}
-        className={`flex h-16 w-full cursor-pointer flex-col items-center justify-center gap-1 bg-[var(--bb-bg-card)] text-[var(--bb-text-secondary)] transition-colors hover:text-[var(--bb-primary)]`}
+        onClick={onClick}
+        className={`flex h-16 w-full ${onClick ? "cursor-pointer" : ""} flex-col items-center justify-center gap-1 bg-[var(--bb-bg-card)] text-[var(--bb-text-secondary)] transition-colors hover:text-[var(--bb-primary)]`}
         title={alt}
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -292,8 +295,24 @@ function LightboxImage({
   if (error || !src) {
     return (
       <div className="rounded-xl bg-[var(--bb-bg-page)]/10 px-6 py-10 text-sm text-white/60">
-        Failed to load image
+        Failed to load file
       </div>
+    );
+  }
+
+  // Non-image deliverables (PDF, etc.) render inline in an embedded viewer so
+  // the file previews inside the review screen — no new browser tab. Pin
+  // annotation isn't supported on non-images (the embed captures clicks), but
+  // the customer can still read the file in place.
+  if (!isImageAsset({ name: alt, url })) {
+    return (
+      <iframe
+        src={src}
+        title={alt}
+        className={`rounded-lg bg-white shadow-2xl ${
+          hasPins ? "h-[80vh] max-h-[80vh] w-full" : "h-[85vh] max-h-[85vh] w-[90vw] max-w-[900px]"
+        }`}
+      />
     );
   }
 

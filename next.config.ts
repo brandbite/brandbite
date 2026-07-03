@@ -66,7 +66,9 @@ const securityHeaders = [
       // - js.stripe.com: Stripe checkout iframe
       // - challenges.cloudflare.com: Turnstile renders inside an iframe, must be allowed here
       // - youtube/vimeo/loom: embedded media
-      "frame-src https://js.stripe.com https://challenges.cloudflare.com https://www.youtube.com https://player.vimeo.com https://www.loom.com",
+      // - media.brandbite.studio + r2 endpoint: inline PDF deliverable preview
+      //   in the revision lightbox (public URL or presigned GET fallback)
+      "frame-src https://js.stripe.com https://challenges.cloudflare.com https://www.youtube.com https://player.vimeo.com https://www.loom.com https://media.brandbite.studio https://*.r2.cloudflarestorage.com",
       "worker-src 'self' blob:",
       "object-src 'none'",
       "base-uri 'self'",
