@@ -2095,11 +2095,22 @@ export default function CreativeBoardPage() {
                     key={rf.id}
                     className="group relative overflow-hidden rounded-lg border border-[var(--bb-border)]"
                   >
-                    <img
-                      src={URL.createObjectURL(rf.file)}
-                      alt={rf.file.name}
-                      className="h-20 w-full object-cover"
-                    />
+                    {rf.file.type.startsWith("image/") ? (
+                      <img
+                        src={URL.createObjectURL(rf.file)}
+                        alt={rf.file.name}
+                        className="h-20 w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-20 w-full flex-col items-center justify-center gap-1 bg-[var(--bb-bg-warm)] text-[var(--bb-text-secondary)]">
+                        <span className="text-lg" aria-hidden>
+                          📄
+                        </span>
+                        <span className="text-[9px] font-semibold tracking-wide uppercase">
+                          {rf.file.name.split(".").pop() || "file"}
+                        </span>
+                      </div>
+                    )}
                     {!reviewUploading && (
                       <button
                         type="button"
