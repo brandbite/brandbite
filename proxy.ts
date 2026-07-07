@@ -75,6 +75,11 @@ const PUBLIC_PATHS = [
   "/talent",
   "/api/talent",
   "/api/health", // uptime monitors (BetterStack / Upptime / Vercel); route returns 200 or 503
+  // pdf.js web worker for the in-app PDF viewer/pin overlay. It's a vendored,
+  // non-sensitive static library file loaded via `new Worker(...)`. The matcher
+  // below only excludes image extensions, so without this entry the proxy 307s
+  // the worker fetch to /login and PDF rendering breaks. Public by design.
+  "/pdf.worker.min.mjs",
   // Vercel Cron invocations. Each cron route is defence-in-depth with a
   // CRON_SECRET Bearer check; the proxy only needs to let the request
   // reach the handler. Auth-gating here silently breaks every scheduled
