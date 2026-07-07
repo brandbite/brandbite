@@ -5,3 +5,6 @@ build
 coverage
 prisma/migrations
 package-lock.json
+
+# Vendored pdf.js worker (minified build artifact — never hand-format)
+public/pdf.worker.min.mjs

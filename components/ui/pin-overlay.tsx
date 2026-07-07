@@ -15,6 +15,9 @@ export type PinData = {
   id?: string;
   x: number; // 0..1 normalized
   y: number; // 0..1 normalized
+  /** 1-based page the pin sits on. Images are always page 1; PDFs pin per
+   *  rendered page. Optional for back-compat; treat undefined as 1. */
+  page?: number;
   order: number;
   label: string;
   status?: "OPEN" | "RESOLVED";

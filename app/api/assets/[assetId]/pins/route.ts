@@ -85,6 +85,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ assetId: strin
         id: true,
         x: true,
         y: true,
+        page: true,
         order: true,
         label: true,
         status: true,
@@ -100,6 +101,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ assetId: strin
         id: p.id,
         x: p.x,
         y: p.y,
+        page: p.page,
         order: p.order,
         label: p.label,
         status: p.status,
@@ -124,6 +126,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ assetId: strin
 type PinInput = {
   x: number;
   y: number;
+  page?: number;
   order: number;
   label: string;
 };
@@ -172,6 +175,17 @@ export async function POST(req: Request, ctx: { params: Promise<{ assetId: strin
       }
       if (typeof pin.order !== "number" || pin.order < 1) {
         return NextResponse.json({ error: "Pin order must be >= 1." }, { status: 400 });
+      }
+      // page is optional (defaults to 1 for single-page image assets); when
+      // present it must be a positive integer identifying the PDF page.
+      if (
+        pin.page !== undefined &&
+        (typeof pin.page !== "number" || !Number.isInteger(pin.page) || pin.page < 1)
+      ) {
+        return NextResponse.json(
+          { error: "Pin page must be a positive integer." },
+          { status: 400 },
+        );
       }
       if (!pin.label || typeof pin.label !== "string" || !pin.label.trim()) {
         return NextResponse.json(
@@ -240,6 +254,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ assetId: strin
           createdById: user.id,
           x: pin.x,
           y: pin.y,
+          page: pin.page ?? 1,
           order: pin.order,
           label: pin.label.trim(),
         })),

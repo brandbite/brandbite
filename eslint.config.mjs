@@ -25,6 +25,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Claude Code worktrees (contain nested .next builds)
     ".claude/**",
+    // Vendored minified assets served as-is (e.g. the pdf.js worker).
+    "public/**",
   ]),
 ]);
 

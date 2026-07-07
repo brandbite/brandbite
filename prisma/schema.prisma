@@ -1190,6 +1190,11 @@ model AssetPin {
   x Float
   y Float
 
+  /// 1-based page the pin belongs to. Images are single-page (always 1);
+  /// PDFs pin per rendered page. Defaults to 1 so all existing image pins
+  /// stay valid with no backfill.
+  page Int @default(1)
+
   /// UI order/number (1..N) per asset
   order  Int
   label  String?
