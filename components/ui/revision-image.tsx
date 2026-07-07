@@ -9,6 +9,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { PinOverlay, type PinData } from "./pin-overlay";
 import { PinSidebar, PinBottomSheet } from "./pin-sidebar";
+import { PdfCanvas } from "./pdf-canvas";
 import { downloadSingleAsset, downloadAssetsAsZip } from "@/lib/download-helpers";
 import { isImageAsset } from "@/lib/upload-helpers";
 
@@ -326,6 +327,52 @@ function LightboxImage({
 }
 
 // ---------------------------------------------------------------------------
+// PdfPager — page prev/next for multi-page PDF deliverables in the lightbox
+// ---------------------------------------------------------------------------
+
+function PdfPager({
+  page,
+  numPages,
+  onChange,
+}: {
+  page: number;
+  numPages: number;
+  onChange: (next: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-2 rounded-full bg-[var(--bb-bg-page)]/10 px-2 py-1 text-white/80">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onChange(Math.max(1, page - 1));
+        }}
+        disabled={page <= 1}
+        className="flex h-7 w-7 items-center justify-center rounded-full text-lg transition-colors hover:bg-[var(--bb-bg-page)]/20 hover:text-white disabled:opacity-40"
+        aria-label="Previous page"
+      >
+        &#8249;
+      </button>
+      <span className="min-w-[64px] text-center text-xs font-medium">
+        Page {page} / {numPages}
+      </span>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onChange(Math.min(numPages, page + 1));
+        }}
+        disabled={page >= numPages}
+        className="flex h-7 w-7 items-center justify-center rounded-full text-lg transition-colors hover:bg-[var(--bb-bg-page)]/20 hover:text-white disabled:opacity-40"
+        aria-label="Next page"
+      >
+        &#8250;
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // ImageLightbox — fullscreen overlay with pin support
 // ---------------------------------------------------------------------------
 
@@ -365,7 +412,18 @@ function ImageLightbox({
   const [resolvingPinId, setResolvingPinId] = useState<string | null>(null);
   const [lightboxDownloading, setLightboxDownloading] = useState(false);
 
-  const currentPins = pinsPerAsset[asset.id] ?? [];
+  // PDF paging. Images are single-page; PDFs render one page at a time and pins
+  // are scoped to the page they were placed on.
+  const isPdfAsset = !isImageAsset({ name: asset.originalName, url: asset.url });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [numPages, setNumPages] = useState(1);
+
+  const allPinsForAsset = pinsPerAsset[asset.id] ?? [];
+  // Only the current page's pins are shown on the canvas + sidebar (for images
+  // every pin is page 1, so this is a no-op there).
+  const currentPins = isPdfAsset
+    ? allPinsForAsset.filter((p) => (p.page ?? 1) === currentPage)
+    : allPinsForAsset;
   const isEditMode = pinMode === "review";
   const isResolveMode = pinMode === "resolve";
   const hasPinUI = isEditMode || pinMode === "view" || isResolveMode;
@@ -390,6 +448,7 @@ function ImageLightbox({
             id: p.id,
             x: p.x,
             y: p.y,
+            page: p.page ?? 1,
             order: p.order,
             label: p.label ?? "",
             status: p.status,
@@ -411,6 +470,12 @@ function ImageLightbox({
       cancelled = true;
     };
   }, [asset.id, hasPinUI, existingPinsLoaded]);
+
+  // Reset PDF paging whenever the shown asset changes.
+  useEffect(() => {
+    setCurrentPage(1);
+    setNumPages(1);
+  }, [asset.id]);
 
   // Navigation
   const goPrev = useCallback(() => {
@@ -468,8 +533,10 @@ function ImageLightbox({
     (x: number, y: number) => {
       if (!isEditMode) return;
       const existing = pinsPerAsset[asset.id] ?? [];
+      // Pin numbering stays global per asset (continues across PDF pages); the
+      // page field records which page the pin was placed on.
       const nextOrder = existing.length > 0 ? Math.max(...existing.map((p) => p.order)) + 1 : 1;
-      const newPin: PinData = { x, y, order: nextOrder, label: "" };
+      const newPin: PinData = { x, y, page: currentPage, order: nextOrder, label: "" };
 
       setPinsPerAsset((prev) => ({
         ...prev,
@@ -484,11 +551,17 @@ function ImageLightbox({
         return next;
       });
     },
-    [isEditMode, asset.id, pinsPerAsset],
+    [isEditMode, asset.id, pinsPerAsset, currentPage],
   );
 
   const handlePinClick = useCallback((pin: PinData) => {
     setActivePinOrder(pin.order);
+  }, []);
+
+  // Switch PDF page (clears any active pin, which may live on another page).
+  const handlePageChange = useCallback((nextPage: number) => {
+    setCurrentPage(nextPage);
+    setActivePinOrder(null);
   }, []);
 
   const handlePinLabelChange = useCallback(
@@ -587,6 +660,7 @@ function ImageLightbox({
             pins: newPins.map((p) => ({
               x: p.x,
               y: p.y,
+              page: p.page ?? 1,
               order: p.order,
               label: p.label.trim(),
             })),
@@ -756,22 +830,49 @@ function ImageLightbox({
           }}
         >
           {hasPinUI ? (
-            <PinOverlay
-              pins={currentPins}
-              mode={isEditMode ? "edit" : "readonly"}
-              activePinOrder={activePinOrder}
-              onPinClick={handlePinClick}
-              onImageClick={isEditMode ? handleImageClick : undefined}
-              resolveMode={isResolveMode}
-            >
-              <LightboxImage
+            <div className="flex max-h-full flex-col items-center justify-center gap-2">
+              <PinOverlay
+                pins={currentPins}
+                mode={isEditMode ? "edit" : "readonly"}
+                activePinOrder={activePinOrder}
+                onPinClick={handlePinClick}
+                onImageClick={isEditMode ? handleImageClick : undefined}
+                resolveMode={isResolveMode}
+              >
+                {isPdfAsset ? (
+                  <PdfCanvas
+                    key={asset.id}
+                    assetId={asset.id}
+                    page={currentPage}
+                    onNumPages={setNumPages}
+                    className="block h-auto max-h-[74vh] w-auto max-w-full rounded-lg bg-white shadow-2xl"
+                  />
+                ) : (
+                  <LightboxImage
+                    key={asset.id}
+                    assetId={asset.id}
+                    url={asset.url}
+                    alt={asset.originalName || "Output"}
+                    hasPins
+                  />
+                )}
+              </PinOverlay>
+              {isPdfAsset && numPages > 1 && (
+                <PdfPager page={currentPage} numPages={numPages} onChange={handlePageChange} />
+              )}
+            </div>
+          ) : isPdfAsset ? (
+            <div className="flex max-h-full flex-col items-center justify-center gap-2">
+              <PdfCanvas
                 key={asset.id}
                 assetId={asset.id}
-                url={asset.url}
-                alt={asset.originalName || "Output"}
-                hasPins
+                page={currentPage}
+                onNumPages={setNumPages}
               />
-            </PinOverlay>
+              {numPages > 1 && (
+                <PdfPager page={currentPage} numPages={numPages} onChange={handlePageChange} />
+              )}
+            </div>
           ) : (
             <LightboxImage
               key={asset.id}
