@@ -1544,6 +1544,68 @@ model ShowcaseWork {
   @@index([status, sortOrder])
 }
 
+// Curated palette for the public /colors/color-palette-ideas gallery.
+// CMS-managed (admin editors), mirrors ShowcaseWork's publishing shape.
+model PaletteIdea {
+  id String @id @default(cuid())
+
+  title String
+  slug  String @unique
+
+  summary String? // Short blurb shown on the gallery card
+
+  /// Ordered hex strings, e.g. ["#f15b2b","#424143"] (1–12 colors).
+  colors Json
+
+  /// Filter tags, e.g. ["Vintage","Corporate","Neon","Pastel"].
+  tags String[] @default([])
+
+  // Publishing
+  status      CmsStatus @default(DRAFT)
+  publishedAt DateTime?
+  sortOrder   Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, sortOrder])
+}
+
+// Encyclopedia entry for /colors/color-meanings/[slug]. CMS-managed; carries
+// BlogPost-style SEO fields plus ShowcaseWork-style manual ordering.
+model ColorMeaning {
+  id String @id @default(cuid())
+
+  name String // e.g. "Red"
+  slug String @unique // e.g. "red"
+
+  hex     String // Representative hex for the swatch, e.g. "#c0392b"
+  summary String? // Short blurb for the hub card
+
+  /// Long-form psychology/cultural meaning. Rich HTML (SafeHtml-rendered).
+  meaning String?
+
+  /// Keyword associations, e.g. ["passion","energy","urgency"].
+  associations String[] @default([])
+
+  /// Sample palettes featuring this color: [["#..","#.."], ...].
+  samplePalettes Json?
+
+  // SEO
+  metaTitle       String?
+  metaDescription String?
+
+  // Publishing
+  status      CmsStatus @default(DRAFT)
+  publishedAt DateTime?
+  sortOrder   Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, sortOrder])
+}
+
 model BlogPost {
   id String @id @default(cuid())
 

@@ -38,18 +38,20 @@ const TOOLS: Tool[] = [
     available: true,
   },
   {
-    href: "#",
+    href: "/colors/color-palette-ideas",
     title: "Palette Ideas",
-    description: "A curated, searchable gallery of ready-made palettes. Coming soon.",
+    description:
+      "A curated, searchable gallery of ready-made palettes — filter by vibe (vintage, corporate, neon, pastel) and copy any color in a click.",
     swatches: ["#e8d5c4", "#b5651d", "#f4a460", "#8b4513"],
-    available: false,
+    available: true,
   },
   {
-    href: "#",
+    href: "/colors/color-meanings",
     title: "Color Meanings",
-    description: "An encyclopedia of color psychology and cultural meaning. Coming soon.",
+    description:
+      "An encyclopedia of color psychology and cultural symbolism, with HEX/RGB/HSL values and sample palettes for every color.",
     swatches: ["#c0392b", "#2980b9", "#27ae60", "#f1c40f"],
-    available: false,
+    available: true,
   },
 ];
 
