@@ -133,6 +133,8 @@ export const ADMIN_NAV: NavConfig = {
         { href: "/admin/blog", label: "Blog", icon: IconContent },
         { href: "/admin/news", label: "News", icon: IconContent },
         { href: "/admin/docs", label: "Docs", icon: IconContent },
+        { href: "/admin/palette-ideas", label: "Palette Ideas", icon: IconContent },
+        { href: "/admin/color-meanings", label: "Color Meanings", icon: IconContent },
       ],
     },
     {
