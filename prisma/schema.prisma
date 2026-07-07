@@ -307,6 +307,9 @@ model UserAccount {
   createdMoodboards     Moodboard[]     @relation("MoodboardCreatedBy")
   createdMoodboardItems MoodboardItem[] @relation("MoodboardItemCreatedBy")
 
+  // Color tools
+  savedPalettes SavedPalette[] @relation("SavedPaletteCreatedBy")
+
   // Creative ratings (admin-only signal; creative does NOT see their own ratings)
   receivedRatings  CreativeRating[] @relation("CreativeRatingsReceived")
   submittedRatings CreativeRating[] @relation("CreativeRatingsGiven")
@@ -1951,6 +1954,29 @@ model Moodboard {
   @@index([companyId, createdAt])
   @@index([projectId])
   @@index([ticketId])
+}
+
+// User-owned palette saved from the public color tools (/colors/*). Not
+// company-scoped: any authenticated user (customer/designer/admin) can save,
+// so ownership is by createdById only.
+model SavedPalette {
+  id   String @id @default(cuid())
+  name String
+
+  /// Ordered list of hex strings, e.g. ["#f15b2b","#424143"]. JSON keeps the
+  /// store tool-agnostic (wheel/generator/extractor all emit hex arrays).
+  colors Json
+
+  /// Which tool produced it: "WHEEL" | "GENERATOR" | "EXTRACTOR".
+  source String?
+
+  createdById String
+  createdBy   UserAccount @relation("SavedPaletteCreatedBy", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdById, createdAt])
 }
 
 model MoodboardItem {

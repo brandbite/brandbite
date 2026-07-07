@@ -46,8 +46,10 @@ type SiteHeaderProps = {
  * trick Apple uses in iOS / macOS to make the blur feel lively
  * instead of muddy.
  */
+// The dark: variants only activate on theme-enabled routes (e.g. /colors),
+// so forced-light marketing pages keep the exact white glass bar unchanged.
 const GLASS_BAR =
-  "sticky top-0 z-50 border-b border-black/[0.06] bg-white/70 backdrop-blur-xl backdrop-saturate-150";
+  "sticky top-0 z-50 border-b border-black/[0.06] bg-white/70 backdrop-blur-xl backdrop-saturate-150 dark:border-white/[0.08] dark:bg-[color:var(--bb-bg-page)]/70";
 
 type GlobalBlocksApiPayload = { type?: string; data?: unknown };
 

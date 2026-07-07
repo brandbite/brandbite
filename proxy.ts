@@ -75,6 +75,10 @@ const PUBLIC_PATHS = [
   "/talent",
   "/api/talent",
   "/api/health", // uptime monitors (BetterStack / Upptime / Vercel); route returns 200 or 503
+  // Public color-tools marketing pages (wheel, palette generator). Only the
+  // pages are public; the authed /api/colors/palettes save/list endpoint is
+  // deliberately NOT listed, so the proxy gates it behind a session cookie.
+  "/colors",
   // pdf.js web worker for the in-app PDF viewer/pin overlay. It's a vendored,
   // non-sensitive static library file loaded via `new Worker(...)`. The matcher
   // below only excludes image extensions, so without this entry the proxy 307s

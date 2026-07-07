@@ -34,7 +34,7 @@ const STORAGE_KEY = "bb-theme";
  * Same prefix list lives in the inline FOUC-prevention script in
  * `app/layout.tsx`. Keep them in sync.
  */
-const APP_ROUTE_PREFIXES = ["/admin", "/customer", "/creative", "/debug"] as const;
+const APP_ROUTE_PREFIXES = ["/admin", "/customer", "/creative", "/debug", "/colors"] as const;
 
 function isAppRoute(pathname: string | null): boolean {
   if (!pathname) return false;
