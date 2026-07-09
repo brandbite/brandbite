@@ -36,31 +36,60 @@ export interface TailwindShade {
   isBase: boolean;
 }
 
+/** Lightness anchors for the two endpoints of the ramp (stop 50 and 950). */
+const LIGHT_END_L = 97;
+const DARK_END_L = 13;
+
+/** Pick the stop whose target lightness is closest to a given lightness. */
+export function nearestStop(lightness: number): number {
+  let stop = 500;
+  let best = Infinity;
+  for (const s of TAILWIND_STOPS) {
+    const d = Math.abs(STOP_LIGHTNESS[s] - lightness);
+    if (d < best) {
+      best = d;
+      stop = s;
+    }
+  }
+  return stop;
+}
+
 /**
- * Build the 11-stop scale. The input is placed at the stop whose target
- * lightness is nearest the input's own lightness (so a mid color lands ~500,
- * a pale one ~200, etc.), keeping the exact input hex at that stop.
+ * Build the 11-stop scale, keeping the exact input hex at the base stop.
+ *
+ * `baseStop` chooses which stop holds the input color. When omitted (or not a
+ * valid stop) it auto-selects the stop nearest the input's lightness. The other
+ * stops interpolate lightness from the input toward near-white (stop 50) on the
+ * light side and near-black (stop 950) on the dark side, so the ramp stays
+ * smooth and monotonic wherever the base is anchored.
  */
-export function tailwindScale(input: string): TailwindShade[] {
+export function tailwindScale(input: string, baseStop?: number): TailwindShade[] {
   const hex = normalizeHex(input) ?? "#000000";
   const base = hexToHsl(hex);
 
-  // Nearest stop by lightness distance.
-  let baseStop = 500;
-  let best = Infinity;
-  for (const stop of TAILWIND_STOPS) {
-    const d = Math.abs(STOP_LIGHTNESS[stop] - base.l);
-    if (d < best) {
-      best = d;
-      baseStop = stop;
-    }
-  }
+  const anchor =
+    baseStop && (TAILWIND_STOPS as readonly number[]).includes(baseStop)
+      ? baseStop
+      : nearestStop(base.l);
+  const baseIdx = TAILWIND_STOPS.indexOf(anchor as (typeof TAILWIND_STOPS)[number]);
+  const lastIdx = TAILWIND_STOPS.length - 1;
 
-  return TAILWIND_STOPS.map((stop) => {
-    if (stop === baseStop) {
+  return TAILWIND_STOPS.map((stop, i) => {
+    if (i === baseIdx) {
       return { stop, hex, hsl: base, isBase: true };
     }
-    const hsl: HSL = { h: base.h, s: clampPct(base.s), l: clampPct(STOP_LIGHTNESS[stop]) };
+    let l: number;
+    if (i < baseIdx) {
+      // Lighter side: 50 → base.
+      const t = baseIdx === 0 ? 0 : i / baseIdx;
+      l = LIGHT_END_L + (base.l - LIGHT_END_L) * t;
+    } else {
+      // Darker side: base → 950.
+      const span = lastIdx - baseIdx;
+      const t = span === 0 ? 1 : (i - baseIdx) / span;
+      l = base.l + (DARK_END_L - base.l) * t;
+    }
+    const hsl: HSL = { h: base.h, s: clampPct(base.s), l: clampPct(l) };
     return { stop, hex: hslToHex(hsl), hsl, isBase: false };
   });
 }

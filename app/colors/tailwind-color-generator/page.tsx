@@ -33,6 +33,8 @@ export default function TailwindColorGeneratorPage() {
   const [effective, setEffective] = useState(DEFAULT_HEX);
   const [name, setName] = useState("brand");
   const [exportKind, setExportKind] = useState<"config" | "css">("config");
+  // Which stop the input color anchors to. null = auto (nearest by lightness).
+  const [baseStop, setBaseStop] = useState<number | null>(null);
   const { copy, isCopied } = useClipboard();
 
   const normalized = useMemo(() => normalizeHex(input), [input]);
@@ -43,7 +45,10 @@ export default function TailwindColorGeneratorPage() {
     if (next) setEffective(next);
   };
 
-  const shades = useMemo(() => tailwindScale(effective), [effective]);
+  const shades = useMemo(
+    () => tailwindScale(effective, baseStop ?? undefined),
+    [effective, baseStop],
+  );
   const exportText = useMemo(
     () =>
       exportKind === "config"
@@ -122,20 +127,46 @@ export default function TailwindColorGeneratorPage() {
           </div>
         </div>
 
+        {/* Scale header: base is selectable per swatch; Auto resets to nearest */}
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold text-[var(--bb-text-secondary)]">
+            Shades{" "}
+            <span className="font-normal text-[var(--bb-text-tertiary)]">
+              — click a swatch to set it as the base
+            </span>
+          </h2>
+          <button
+            type="button"
+            onClick={() => setBaseStop(null)}
+            title="Auto-pick the base by lightness"
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              baseStop === null
+                ? "bg-[var(--bb-primary)] text-white"
+                : "border border-[var(--bb-border)] bg-[var(--bb-bg-warm)] text-[var(--bb-text-secondary)] hover:text-[var(--bb-primary)]"
+            }`}
+          >
+            Auto
+          </button>
+        </div>
+
         {/* Scale */}
         <div className="mb-10 grid grid-cols-2 gap-2 sm:grid-cols-6 lg:grid-cols-11">
           {shades.map((shade) => {
             const label = formatHex(shade.hex);
             return (
-              <button
+              <div
                 key={shade.stop}
-                type="button"
-                onClick={() => void copy(label, `s-${shade.stop}`)}
-                title={`Copy ${label}`}
-                className="group flex flex-col overflow-hidden rounded-xl border border-[var(--bb-border)] text-left"
+                className={`group overflow-hidden rounded-xl border ${
+                  shade.isBase
+                    ? "border-[var(--bb-primary)] ring-1 ring-[var(--bb-primary)]"
+                    : "border-[var(--bb-border)]"
+                }`}
               >
-                <span
-                  className="flex h-16 items-start justify-between p-1.5"
+                <button
+                  type="button"
+                  onClick={() => setBaseStop(shade.stop)}
+                  title={`Set ${shade.stop} as the base color`}
+                  className="flex h-16 w-full items-start justify-between p-1.5"
                   style={{ backgroundColor: shade.hex, color: readableTextOn(shade.hex) }}
                 >
                   <span className="text-[11px] font-semibold">{shade.stop}</span>
@@ -144,11 +175,16 @@ export default function TailwindColorGeneratorPage() {
                       Base
                     </span>
                   ) : null}
-                </span>
-                <span className="bg-[var(--bb-bg-card)] px-1.5 py-1 font-mono text-[10px] text-[var(--bb-text-tertiary)] group-hover:text-[var(--bb-primary)]">
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void copy(label, `s-${shade.stop}`)}
+                  title={`Copy ${label}`}
+                  className="block w-full bg-[var(--bb-bg-card)] px-1.5 py-1 text-left font-mono text-[10px] text-[var(--bb-text-tertiary)] group-hover:text-[var(--bb-primary)]"
+                >
                   {isCopied(`s-${shade.stop}`) ? "Copied!" : label}
-                </span>
-              </button>
+                </button>
+              </div>
             );
           })}
         </div>
