@@ -22,6 +22,14 @@ type Tool = {
 
 const TOOLS: Tool[] = [
   {
+    href: "/colors/tailwind-color-generator",
+    title: "Tailwind Color Generator",
+    description:
+      "Turn any color into a full Tailwind CSS shade scale from 50 to 950, then copy the config block or CSS variables straight into your project.",
+    swatches: ["#fff1e9", "#ffb488", "#ff6426", "#7c2d0f"],
+    available: true,
+  },
+  {
     href: "/colors/color-wheel",
     title: "Color Wheel",
     description:
