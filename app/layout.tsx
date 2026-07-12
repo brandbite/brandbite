@@ -9,7 +9,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
-import { Josefin_Sans, Inter } from "next/font/google";
+import { Josefin_Sans, Inter, Caveat } from "next/font/google";
 import DemoPersonaBanner from "../components/demo-persona-banner";
 import { ToastProvider } from "@/components/ui/toast-provider";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -26,9 +26,18 @@ const josefin = Josefin_Sans({
 
 const inter = Inter({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
+  // 800 (ExtraBold) drives the display headings on the marketing redesign.
+  weight: ["300", "400", "500", "600", "700", "800"],
   display: "swap",
   variable: "--font-inter",
+});
+
+// Handwritten accent font for the marketing pages (sticky notes, doodles).
+const caveat = Caveat({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  display: "swap",
+  variable: "--font-caveat",
 });
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
@@ -97,7 +106,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body
-        className={`${inter.variable} ${josefin.variable} min-h-screen bg-[var(--bb-bg-page)] text-[var(--bb-secondary)] antialiased`}
+        className={`${inter.variable} ${josefin.variable} ${caveat.variable} min-h-screen bg-[var(--bb-bg-page)] text-[var(--bb-secondary)] antialiased`}
       >
         <ThemeProvider>
           <ToastProvider>

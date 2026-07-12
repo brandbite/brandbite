@@ -30,6 +30,9 @@ const PUBLIC_PATHS = [
   "/onboarding",
   "/invite", // covers /invite/[token]
   "/how-it-works",
+  // Placeholder for pages still being redesigned — linked from the homepage
+  // nav (Pricing/Showcase/FAQs/Blog) so it must be reachable without auth.
+  "/coming-soon",
   "/pricing",
   "/showcase", // marketing pages
   "/blog", // marketing pages
