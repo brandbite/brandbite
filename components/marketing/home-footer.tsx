@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: components/marketing/home-footer.tsx
 // @purpose: Marketing footer for the redesigned homepage + coming-soon page.
-//           Legal links go to the real pages; socials point at /coming-soon
-//           until the profiles are live.
-// @version: v1.0.0
+//           Text links point at /coming-soon until those pages are
+//           redesigned; socials go to the real profiles.
+// @version: v1.1.0
 // @status: active
 // @lastUpdate: 2026-07-12
 // -----------------------------------------------------------------------------
@@ -12,9 +12,9 @@ import Image from "next/image";
 import Link from "next/link";
 
 const FOOTER_LINKS = [
-  { label: "Terms", href: "/terms" },
-  { label: "Privacy", href: "/privacy" },
-  { label: "Contact", href: "/contact" },
+  { label: "Terms", href: "/coming-soon" },
+  { label: "Privacy", href: "/coming-soon" },
+  { label: "Contact", href: "/coming-soon" },
 ];
 
 export function HomeFooter({ variant = "home" }: { variant?: "home" | "coming-soon" }) {
@@ -44,12 +44,22 @@ export function HomeFooter({ variant = "home" }: { variant?: "home" | "coming-so
             {link.label}
           </Link>
         ))}
-        <Link href="/coming-soon" className="flex transition-opacity hover:opacity-70">
+        <a
+          href="https://www.instagram.com/brandbitestudio/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex transition-opacity hover:opacity-70"
+        >
           <Image src="/home/instagram.svg" alt="Instagram" width={24} height={24} />
-        </Link>
-        <Link href="/coming-soon" className="flex transition-opacity hover:opacity-70">
+        </a>
+        <a
+          href="https://www.linkedin.com/company/brandbitestudio/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex transition-opacity hover:opacity-70"
+        >
           <Image src="/home/linkedin.svg" alt="LinkedIn" width={24} height={24} />
-        </Link>
+        </a>
       </div>
     </footer>
   );
