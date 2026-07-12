@@ -18,6 +18,7 @@ const PUBLIC_PATHS = [
   "/",
   "/login",
   "/reset-password",
+  "/coming-soon",
   "/onboarding",
   "/invite",
   "/api/auth",
@@ -71,6 +72,13 @@ describe("isPublicPath", () => {
 
   it("marks /reset-password as public", () => {
     expect(isPublicPath("/reset-password")).toBe(true);
+  });
+
+  // Homepage nav (Pricing/Showcase/FAQs/Blog) and CTAs point at the
+  // coming-soon placeholder — a login redirect here would strand every
+  // visitor who clicks a nav item.
+  it("marks /coming-soon as public", () => {
+    expect(isPublicPath("/coming-soon")).toBe(true);
   });
 
   it("marks /onboarding as public", () => {
