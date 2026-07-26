@@ -19,7 +19,7 @@ const NAV_LINKS = [
   { label: "How it works?", href: "/#how-it-works" },
   { label: "Pricing", href: "/coming-soon" },
   { label: "Showcase", href: "/coming-soon" },
-  { label: "FAQs", href: "/coming-soon" },
+  { label: "FAQs", href: "/faq" },
   { label: "Blog", href: "/coming-soon" },
 ];
 
