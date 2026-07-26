@@ -23,6 +23,12 @@ export const metadata: Metadata = {
   description: "Everything you need to know about Brandbite. No jargon, no tiny-print drama.",
 };
 
+// Render per-request: the FAQ list comes from the database, which isn't
+// reachable during CI's static prerender pass. Runtime SSR also means
+// /admin/faq edits show up immediately (bustFaqCaches keeps /api/faq in
+// sync for the portal surfaces).
+export const dynamic = "force-dynamic";
+
 const displayFont = "font-[family-name:var(--font-inter)]";
 
 export default async function FaqPage() {
