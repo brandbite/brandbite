@@ -15,7 +15,7 @@ const FOOTER_LINKS = [
   { label: "About Us", href: "/coming-soon" },
   { label: "Terms", href: "/coming-soon" },
   { label: "Privacy", href: "/coming-soon" },
-  { label: "Contact", href: "/coming-soon" },
+  { label: "Contact", href: "/contact" },
 ];
 
 export function HomeFooter({ variant = "home" }: { variant?: "home" | "coming-soon" }) {

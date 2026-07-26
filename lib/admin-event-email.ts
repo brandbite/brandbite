@@ -82,6 +82,15 @@ export type AdminEvent =
       amountTokens: number;
     }
   | {
+      kind: "NEW_CONTACT_MESSAGE";
+      contactMessageId: string;
+      name: string;
+      email: string;
+      company: string | null;
+      topic: string | null;
+      message: string;
+    }
+  | {
       kind: "GOOGLE_CALENDAR_DISCONNECTED";
       /** Google account that was connected, for "reconnect as X" guidance. */
       googleAccountEmail: string | null;
@@ -230,6 +239,25 @@ function render(event: AdminEvent): Rendered {
         ctaButton(`${ADMIN_BASE}/admin/withdrawals`, "Open withdrawals queue"),
       ].join("");
       return { subject, html: shell("Withdrawal request", body) };
+    }
+
+    case "NEW_CONTACT_MESSAGE": {
+      const subject = `[Brandbite] New contact message from ${event.name}`;
+      const metaLine = [event.email, event.company, event.topic]
+        .filter(Boolean)
+        .map((v) => escapeHtml(v as string))
+        .join(" · ");
+      const body = [
+        `<p style="font-size:13px;color:#424143;margin:0 0 6px;">Someone reached out via /contact.</p>`,
+        `<p style="font-size:14px;color:#1f2126;margin:8px 0 4px;font-weight:600;">${escapeHtml(event.name)}</p>`,
+        `<p style="font-size:12px;color:#7a7a7a;margin:6px 0;">${metaLine}</p>`,
+        `<p style="font-size:13px;color:#424143;white-space:pre-wrap;margin:6px 0;">${escapeHtml(event.message)}</p>`,
+        ctaButton(
+          `mailto:${encodeURIComponent(event.email)}?subject=${encodeURIComponent("Re: your message to Brandbite")}`,
+          "Reply by email",
+        ),
+      ].join("");
+      return { subject, html: shell("New contact message", body) };
     }
 
     case "GOOGLE_CALENDAR_DISCONNECTED": {
