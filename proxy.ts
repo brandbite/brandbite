@@ -80,6 +80,11 @@ const PUBLIC_PATHS = [
   // unreachable from the marketing surface that links to it.
   "/talent",
   "/api/talent",
+  // SEO surface — crawlers carry no session cookie, and the matcher below
+  // only excludes image extensions, so without these entries Google gets a
+  // 307 to /login instead of the sitemap/robots payloads.
+  "/sitemap.xml",
+  "/robots.txt",
   "/api/health", // uptime monitors (BetterStack / Upptime / Vercel); route returns 200 or 503
   // Public color-tools marketing pages (wheel, palette generator, ideas,
   // meanings). Only the pages are public; the authed /api/colors/palettes
