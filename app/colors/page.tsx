@@ -1,125 +1,106 @@
 // -----------------------------------------------------------------------------
 // @file: app/colors/page.tsx
-// @purpose: Public hub for the color tools. Links to the two Phase-1 tools and
-//           reserves slots for the Phase-2 gallery + encyclopedia.
+// @purpose: Color Tools hub — 2026 redesign ("Colors that hit different.",
+//           Figma nodes 46:198 desktop / 47:358 mobile). Static; the five
+//           tool cards come from the shared COLOR_TOOLS catalog.
+// @version: v2.0.0
+// @status: active
+// @lastUpdate: 2026-07-26
 // -----------------------------------------------------------------------------
 
-"use client";
+import type { Metadata } from "next";
+import Image from "next/image";
 
-import Link from "next/link";
-import { SiteHeader } from "@/components/marketing/site-header";
-import { SiteFooter } from "@/components/marketing/site-footer";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { Card, CardBody } from "@/components/ui/card";
+import { ColorToolCard } from "@/components/marketing/color-tool-card";
+import { COLOR_TOOLS } from "@/components/marketing/color-tools";
+import { HomeFooter } from "@/components/marketing/home-footer";
+import { HomeHeader } from "@/components/marketing/home-header";
+import { ReadyBand } from "@/components/marketing/ready-band";
 
-type Tool = {
-  href: string;
-  title: string;
-  description: string;
-  swatches: string[];
-  available: boolean;
+export const metadata: Metadata = {
+  title: "Color Tools",
+  description: "Tools and palettes that keep your brand bold, consistent, and unmistakably yours.",
 };
 
-const TOOLS: Tool[] = [
-  {
-    href: "/colors/tailwind-color-generator",
-    title: "Tailwind Color Generator",
-    description:
-      "Turn any color into a full Tailwind CSS shade scale from 50 to 950, then copy the config block or CSS variables straight into your project.",
-    swatches: ["#fff1e9", "#ffb488", "#ff6426", "#7c2d0f"],
-    available: true,
-  },
-  {
-    href: "/colors/color-wheel",
-    title: "Color Wheel",
-    description:
-      "Drag around an interactive wheel and see complementary, analogous, triadic, tetradic, and monochromatic harmonies update live. Copy HEX, RGB, or HSL.",
-    swatches: ["#f15b2b", "#2bb0f1", "#2bf177", "#a12bf1"],
-    available: true,
-  },
-  {
-    href: "/colors/color-palette-generator",
-    title: "Palette Generator",
-    description:
-      "Generate harmonious palettes at random, lock the colors you love and reroll the rest, or upload an image to extract its dominant colors — all in your browser.",
-    swatches: ["#424143", "#f15b2b", "#fff0ea", "#7a7a7a"],
-    available: true,
-  },
-  {
-    href: "/colors/color-palette-ideas",
-    title: "Palette Ideas",
-    description:
-      "A curated, searchable gallery of ready-made palettes — filter by vibe (vintage, corporate, neon, pastel) and copy any color in a click.",
-    swatches: ["#e8d5c4", "#b5651d", "#f4a460", "#8b4513"],
-    available: true,
-  },
-  {
-    href: "/colors/color-meanings",
-    title: "Color Meanings",
-    description:
-      "An encyclopedia of color psychology and cultural symbolism, with HEX/RGB/HSL values and sample palettes for every color.",
-    swatches: ["#c0392b", "#2980b9", "#27ae60", "#f1c40f"],
-    available: true,
-  },
-];
+const displayFont = "font-[family-name:var(--font-inter)]";
 
 export default function ColorsHubPage() {
   return (
-    <div className="min-h-screen bg-[var(--bb-bg-page)] text-[var(--bb-secondary)]">
-      <SiteHeader activePage="Color Tools" />
-      <main className="mx-auto max-w-6xl px-4 py-12 md:px-6">
-        <div className="mb-8 flex items-start justify-between gap-4">
-          <div>
-            <h1 className="font-brand text-3xl font-bold text-[var(--bb-secondary)] md:text-4xl">
-              Color Tools
+    <div className="min-h-screen w-full bg-[#F7F4F1]">
+      <main
+        id="main-content"
+        className="mx-auto w-full max-w-[1140px] overflow-hidden bg-[#F7F4F1]"
+      >
+        <HomeHeader />
+
+        {/* Hero */}
+        <section className="relative mx-auto h-[751px] w-[993px] origin-top max-[1179px]:h-[600px] max-[1179px]:scale-80 max-[929px]:h-[500px] max-[929px]:scale-[0.66] max-[767px]:flex max-[767px]:h-auto max-[767px]:w-full max-[767px]:scale-100 max-[767px]:flex-col max-[767px]:items-center max-[767px]:pt-5">
+          <div className="absolute top-[104px] left-[-8.5px] h-[100px] w-[186px] max-[767px]:static max-[767px]:order-1">
+            <Image
+              src="/home/colors-doodle.png"
+              alt=""
+              width={186}
+              height={100}
+              className="h-[100px] w-[186px]"
+            />
+          </div>
+          <div className="absolute top-[203px] left-[22px] flex w-[366px] flex-col gap-5 max-[767px]:static max-[767px]:order-2 max-[767px]:mt-5 max-[767px]:items-center">
+            <h1
+              className={`flex w-[298px] flex-col gap-1 ${displayFont} text-[64px] font-extrabold max-[767px]:items-center max-[767px]:text-center max-[767px]:text-[54px]`}
+            >
+              <span className="leading-[64px] whitespace-pre-line text-[#2B2D33] max-[767px]:leading-[56px]">
+                {"Colors\nthat hit"}
+              </span>
+              <span className="leading-[64px] text-[#FF6426] max-[767px]:leading-[56px]">
+                different.
+              </span>
             </h1>
-            <p className="mt-2 max-w-2xl text-[var(--bb-text-secondary)]">
-              A small suite of color utilities for building brand palettes. Free to use — save your
-              favorites when you’re signed in.
+            <p className="text-base leading-6 whitespace-pre-line text-[#2B2D33] max-[767px]:text-center">
+              {"Tools and palettes that keep your brand bold,\nconsistent, and unmistakably yours."}
             </p>
           </div>
-          <ThemeToggle />
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {TOOLS.map((tool) => {
-            const inner = (
-              <Card interactive={tool.available} className="h-full">
-                <div className="flex h-20 overflow-hidden rounded-t-2xl">
-                  {tool.swatches.map((hex) => (
-                    <div key={hex} className="flex-1" style={{ backgroundColor: hex }} />
-                  ))}
-                </div>
-                <CardBody>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-semibold text-[var(--bb-secondary)]">
-                      {tool.title}
-                    </h2>
-                    {!tool.available ? (
-                      <span className="rounded-full bg-[var(--bb-bg-warm)] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[var(--bb-text-muted)] uppercase">
-                        Soon
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="mt-1.5 text-sm text-[var(--bb-text-tertiary)]">
-                    {tool.description}
-                  </p>
-                </CardBody>
-              </Card>
-            );
-            return tool.available ? (
-              <Link key={tool.title} href={tool.href} className="block">
-                {inner}
-              </Link>
-            ) : (
-              <div key={tool.title} className="cursor-default opacity-70">
-                {inner}
+          {/* BB with color swatch fans, leaning on the orange bitemark "b" */}
+          <div className="absolute top-[24px] left-[488.5px] h-[640px] w-[504px] max-[767px]:static max-[767px]:order-3 max-[767px]:mt-8 max-[767px]:h-[447px] max-[767px]:w-full max-[767px]:max-w-[430px]">
+            <div className="relative h-full w-full">
+              <Image
+                src="/home/contact-b.svg"
+                alt=""
+                width={400}
+                height={634}
+                className="absolute top-[69px] left-[118px] h-[634px] w-[400px] max-[767px]:top-[52px] max-[767px]:left-[157px] max-[767px]:h-[373px] max-[767px]:w-[236px]"
+              />
+              <div className="absolute top-[60px] left-[-174px] h-[640px] w-[712px] overflow-hidden max-[767px]:top-[47px] max-[767px]:left-[-15px] max-[767px]:h-[376px] max-[767px]:w-[419px]">
+                <Image
+                  src="/home/colors-bb.webp"
+                  alt="BB the unicorn holding color swatch fans"
+                  width={712}
+                  height={712}
+                  priority
+                  className="absolute top-[-5.43%] left-0 h-[111.3%] w-full max-w-none object-cover"
+                />
               </div>
-            );
-          })}
-        </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Explore Color Tools */}
+        <section className="flex w-full flex-col items-center justify-center gap-10 bg-white py-[60px] max-[767px]:gap-5 max-[767px]:py-10">
+          <h2
+            className={`w-full px-[60px] ${displayFont} text-4xl leading-9 font-extrabold text-[#2B2D33] max-[767px]:px-[30px] max-[767px]:pt-5 max-[767px]:text-center`}
+          >
+            Explore Color Tools
+          </h2>
+          <div className="flex flex-row items-stretch justify-center gap-5 max-[1023px]:flex-wrap max-[767px]:flex-col max-[767px]:items-center">
+            {COLOR_TOOLS.map((tool) => (
+              <ColorToolCard key={tool.href} tool={tool} />
+            ))}
+          </div>
+        </section>
+
+        <ReadyBand />
+        <HomeFooter />
+        <div className="h-5" />
       </main>
-      <SiteFooter />
     </div>
   );
 }

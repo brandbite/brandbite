@@ -7,9 +7,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { SiteHeader } from "@/components/marketing/site-header";
-import { SiteFooter } from "@/components/marketing/site-footer";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { ColorToolShell } from "@/components/marketing/color-tool-shell";
 import { Button } from "@/components/ui/button";
 import { useClipboard } from "@/components/hooks/use-clipboard";
 import { formatHex, readableTextOn } from "@/lib/colors";
@@ -68,20 +66,13 @@ export default function PaletteIdeasPage() {
   }, [ideas, query, activeTag]);
 
   return (
-    <div className="min-h-screen bg-[var(--bb-bg-page)] text-[var(--bb-secondary)]">
-      <SiteHeader activePage="Color Tools" />
-      <main className="mx-auto max-w-6xl px-4 py-12 md:px-6">
-        <div className="mb-8 flex items-start justify-between gap-4">
-          <div>
-            <h1 className="font-brand text-3xl font-bold md:text-4xl">Color Palette Ideas</h1>
-            <p className="mt-2 max-w-2xl text-[var(--bb-text-secondary)]">
-              Curated palettes ready to drop into your next project. Click a color to copy it, or
-              copy the whole palette.
-            </p>
-          </div>
-          <ThemeToggle />
-        </div>
-
+    <ColorToolShell
+      currentHref="/colors/color-palette-ideas"
+      title={"Curated combos for"}
+      accent="every mood."
+      blurb="Curated palettes ready to drop into your next project. Click a color to copy it, or copy the whole palette."
+    >
+      <div>
         {/* Search + tag filters */}
         <div className="mb-8 space-y-4">
           <input
@@ -176,8 +167,7 @@ export default function PaletteIdeasPage() {
             ))}
           </div>
         )}
-      </main>
-      <SiteFooter />
-    </div>
+      </div>
+    </ColorToolShell>
   );
 }

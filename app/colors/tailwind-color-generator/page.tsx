@@ -8,9 +8,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { SiteHeader } from "@/components/marketing/site-header";
-import { SiteFooter } from "@/components/marketing/site-footer";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { ColorToolShell } from "@/components/marketing/color-tool-shell";
 import { Tabs, TabList, Tab } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { useClipboard } from "@/components/hooks/use-clipboard";
@@ -58,22 +56,13 @@ export default function TailwindColorGeneratorPage() {
   );
 
   return (
-    <div className="min-h-screen bg-[var(--bb-bg-page)] text-[var(--bb-secondary)]">
-      <SiteHeader activePage="Color Tools" />
-      <main className="mx-auto max-w-5xl px-4 py-12 md:px-6">
-        <div className="mb-8 flex items-start justify-between gap-4">
-          <div>
-            <h1 className="font-brand text-3xl font-bold md:text-4xl">
-              Tailwind CSS Color Generator
-            </h1>
-            <p className="mt-2 max-w-2xl text-[var(--bb-text-secondary)]">
-              Enter a color and get a full Tailwind shade scale from 50 to 950. Click any shade to
-              copy its hex, or export the whole scale as config or CSS variables.
-            </p>
-          </div>
-          <ThemeToggle />
-        </div>
-
+    <ColorToolShell
+      currentHref="/colors/tailwind-color-generator"
+      title={"Shades that scale,"}
+      accent="50 to 950."
+      blurb="Enter a color and get a full Tailwind shade scale. Click any shade to copy its hex, or export the whole scale as config or CSS variables."
+    >
+      <div>
         {/* Controls */}
         <div className="mb-8 flex flex-wrap items-end gap-4">
           <div>
@@ -206,8 +195,7 @@ export default function TailwindColorGeneratorPage() {
             {exportText}
           </pre>
         </div>
-      </main>
-      <SiteFooter />
-    </div>
+      </div>
+    </ColorToolShell>
   );
 }
