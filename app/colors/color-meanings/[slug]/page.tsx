@@ -10,9 +10,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { SiteHeader } from "@/components/marketing/site-header";
-import { SiteFooter } from "@/components/marketing/site-footer";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { ColorToolShell } from "@/components/marketing/color-tool-shell";
 import { CMS_ALLOWED_ATTR, CMS_ALLOWED_TAGS, SafeHtml } from "@/components/ui/safe-html";
 import { useClipboard } from "@/components/hooks/use-clipboard";
 import { formatHex, formatHsl, formatRgb, hexToHsl, hexToRgb, readableTextOn } from "@/lib/colors";
@@ -69,17 +67,20 @@ export default function ColorMeaningDetailPage() {
     : [];
 
   return (
-    <div className="min-h-screen bg-[var(--bb-bg-page)] text-[var(--bb-secondary)]">
-      <SiteHeader activePage="Color Tools" />
-      <main className="mx-auto max-w-4xl px-4 py-12 md:px-6">
-        <div className="mb-6 flex items-center justify-between">
+    <ColorToolShell
+      currentHref="/colors/color-meanings"
+      title={"The story behind"}
+      accent={meaning ? `${meaning.name.toLowerCase()}.` : "every shade."}
+      blurb="Psychology, symbolism, and sample palettes for this color."
+    >
+      <div className="mx-auto max-w-4xl">
+        <div className="mb-6">
           <Link
             href="/colors/color-meanings"
             className="text-sm font-medium text-[var(--bb-text-secondary)] hover:text-[var(--bb-primary)]"
           >
             ← All colors
           </Link>
-          <ThemeToggle />
         </div>
 
         {loading ? (
@@ -101,7 +102,7 @@ export default function ColorMeaningDetailPage() {
               className="flex flex-col justify-end rounded-3xl p-6 shadow-sm md:h-56"
               style={{ backgroundColor: hex, color: readableTextOn(hex) }}
             >
-              <h1 className="font-brand text-4xl font-bold">{meaning.name}</h1>
+              <h2 className="font-brand text-4xl font-bold">{meaning.name}</h2>
               {meaning.summary ? (
                 <p className="mt-1 max-w-xl opacity-90">{meaning.summary}</p>
               ) : null}
@@ -179,8 +180,7 @@ export default function ColorMeaningDetailPage() {
             ) : null}
           </article>
         )}
-      </main>
-      <SiteFooter />
-    </div>
+      </div>
+    </ColorToolShell>
   );
 }

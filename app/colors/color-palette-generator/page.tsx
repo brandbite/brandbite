@@ -7,9 +7,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { SiteHeader } from "@/components/marketing/site-header";
-import { SiteFooter } from "@/components/marketing/site-footer";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { ColorToolShell } from "@/components/marketing/color-tool-shell";
 import { Tabs, TabList, Tab, TabPanel } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { PaletteDisplay } from "@/components/colors/palette-display";
@@ -58,49 +56,39 @@ export default function PaletteGeneratorPage() {
   );
 
   return (
-    <div className="min-h-screen bg-[var(--bb-bg-page)] text-[var(--bb-secondary)]">
-      <SiteHeader activePage="Color Tools" />
-      <main className="mx-auto max-w-6xl px-4 py-12 md:px-6">
-        <div className="mb-8 flex items-start justify-between gap-4">
-          <div>
-            <h1 className="font-brand text-3xl font-bold md:text-4xl">Color Palette Generator</h1>
-            <p className="mt-2 max-w-2xl text-[var(--bb-text-secondary)]">
-              Roll harmonious palettes and lock the ones you like, or pull colors straight out of an
-              image. Everything runs in your browser.
-            </p>
+    <ColorToolShell
+      currentHref="/colors/color-palette-generator"
+      title={"Palettes that feel"}
+      accent="just right."
+      blurb="Roll harmonious palettes and lock the ones you like, or pull colors straight out of an image. Everything runs in your browser."
+    >
+      <Tabs value={mode} onValueChange={(v) => setMode(v as Mode)}>
+        <TabList label="Generator mode" className="mb-6">
+          <Tab value="random">Random harmonies</Tab>
+          <Tab value="image">From image</Tab>
+        </TabList>
+
+        <TabPanel value="random">
+          <div className="mb-4">
+            <Button variant="primary" onClick={reroll}>
+              Generate palette
+            </Button>
+            <span className="ml-3 text-sm text-[var(--bb-text-tertiary)]">
+              Lock 🔒 any color to keep it when you regenerate.
+            </span>
           </div>
-          <ThemeToggle />
-        </div>
+          <PaletteDisplay palette={palette} onToggleLock={toggleLock} savedSlot={saveSlot} />
+        </TabPanel>
 
-        <Tabs value={mode} onValueChange={(v) => setMode(v as Mode)}>
-          <TabList label="Generator mode" className="mb-6">
-            <Tab value="random">Random harmonies</Tab>
-            <Tab value="image">From image</Tab>
-          </TabList>
+        <TabPanel value="image">
+          <div className="mb-6">
+            <ImageColorExtractor colorCount={6} onExtracted={setPalette} />
+          </div>
+          <PaletteDisplay palette={palette} savedSlot={saveSlot} />
+        </TabPanel>
+      </Tabs>
 
-          <TabPanel value="random">
-            <div className="mb-4">
-              <Button variant="primary" onClick={reroll}>
-                Generate palette
-              </Button>
-              <span className="ml-3 text-sm text-[var(--bb-text-tertiary)]">
-                Lock 🔒 any color to keep it when you regenerate.
-              </span>
-            </div>
-            <PaletteDisplay palette={palette} onToggleLock={toggleLock} savedSlot={saveSlot} />
-          </TabPanel>
-
-          <TabPanel value="image">
-            <div className="mb-6">
-              <ImageColorExtractor colorCount={6} onExtracted={setPalette} />
-            </div>
-            <PaletteDisplay palette={palette} savedSlot={saveSlot} />
-          </TabPanel>
-        </Tabs>
-
-        <SavedPalettesList refreshKey={savedKey} />
-      </main>
-      <SiteFooter />
-    </div>
+      <SavedPalettesList refreshKey={savedKey} />
+    </ColorToolShell>
   );
 }

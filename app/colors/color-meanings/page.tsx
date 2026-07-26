@@ -8,9 +8,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { SiteHeader } from "@/components/marketing/site-header";
-import { SiteFooter } from "@/components/marketing/site-footer";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { ColorToolShell } from "@/components/marketing/color-tool-shell";
 import { readableTextOn, formatHex } from "@/lib/colors";
 
 type MeaningDTO = {
@@ -45,20 +43,13 @@ export default function ColorMeaningsHubPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[var(--bb-bg-page)] text-[var(--bb-secondary)]">
-      <SiteHeader activePage="Color Tools" />
-      <main className="mx-auto max-w-6xl px-4 py-12 md:px-6">
-        <div className="mb-8 flex items-start justify-between gap-4">
-          <div>
-            <h1 className="font-brand text-3xl font-bold md:text-4xl">Color Meanings</h1>
-            <p className="mt-2 max-w-2xl text-[var(--bb-text-secondary)]">
-              What colors communicate — psychology, cultural symbolism, and palettes that put each
-              color to work.
-            </p>
-          </div>
-          <ThemeToggle />
-        </div>
-
+    <ColorToolShell
+      currentHref="/colors/color-meanings"
+      title={"The story behind"}
+      accent="every shade."
+      blurb="What colors communicate — psychology, cultural symbolism, and palettes that put each color to work."
+    >
+      <div>
         {loading ? (
           <p className="py-16 text-center text-sm text-[var(--bb-text-tertiary)]">Loading…</p>
         ) : meanings.length === 0 ? (
@@ -93,8 +84,7 @@ export default function ColorMeaningsHubPage() {
             ))}
           </div>
         )}
-      </main>
-      <SiteFooter />
-    </div>
+      </div>
+    </ColorToolShell>
   );
 }

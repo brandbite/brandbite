@@ -79,11 +79,12 @@ export const metadata: Metadata = {
 // containers; applying .dark there flips the CSS variable colours but
 // leaves the literal backgrounds white, which produces unreadable
 // light-on-light text. Forcing light on those routes prevents that.
+// /colors joined the light-only marketing set with the 2026 redesign.
 const themeScript = `
 (function(){
   try {
     var p = window.location.pathname;
-    var isAppRoute = p.indexOf("/admin") === 0 || p.indexOf("/customer") === 0 || p.indexOf("/creative") === 0 || p.indexOf("/debug") === 0 || p.indexOf("/colors") === 0;
+    var isAppRoute = p.indexOf("/admin") === 0 || p.indexOf("/customer") === 0 || p.indexOf("/creative") === 0 || p.indexOf("/debug") === 0;
     if (!isAppRoute) return;
     var t = localStorage.getItem("bb-theme");
     var dark = t === "dark" || (t === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
