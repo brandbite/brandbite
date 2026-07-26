@@ -88,6 +88,14 @@ describe("isPublicPath", () => {
     expect(isPublicPath("/api/contact")).toBe(true);
   });
 
+  // SEO surface — crawlers have no session cookie. A 307-to-login here
+  // makes the site invisible to search engines.
+  for (const seoPath of ["/sitemap.xml", "/robots.txt"]) {
+    it(`marks ${seoPath} as public`, () => {
+      expect(isPublicPath(seoPath)).toBe(true);
+    });
+  }
+
   it("marks /onboarding as public", () => {
     expect(isPublicPath("/onboarding")).toBe(true);
   });
