@@ -148,6 +148,7 @@ export const ADMIN_NAV: NavConfig = {
           ownerOnly: true,
         },
         { href: "/admin/feedback", label: "Feedback", icon: IconFaq },
+        { href: "/admin/contact", label: "Contact Inbox", icon: IconFaq },
         {
           href: "/admin/settings/mfa",
           label: "Two-factor",

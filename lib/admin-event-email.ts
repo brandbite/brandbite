@@ -252,10 +252,8 @@ function render(event: AdminEvent): Rendered {
         `<p style="font-size:14px;color:#1f2126;margin:8px 0 4px;font-weight:600;">${escapeHtml(event.name)}</p>`,
         `<p style="font-size:12px;color:#7a7a7a;margin:6px 0;">${metaLine}</p>`,
         `<p style="font-size:13px;color:#424143;white-space:pre-wrap;margin:6px 0;">${escapeHtml(event.message)}</p>`,
-        ctaButton(
-          `mailto:${encodeURIComponent(event.email)}?subject=${encodeURIComponent("Re: your message to Brandbite")}`,
-          "Reply by email",
-        ),
+        ctaButton(`${ADMIN_BASE}/admin/contact`, "Open contact inbox"),
+        `<p style="font-size:12px;color:#7a7a7a;margin:6px 0;">Or reply directly: <a href="mailto:${escapeHtml(event.email)}">${escapeHtml(event.email)}</a></p>`,
       ].join("");
       return { subject, html: shell("New contact message", body) };
     }
