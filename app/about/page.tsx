@@ -50,8 +50,11 @@ export default function AboutPage() {
             <div className="h-[120px] w-[166px] bg-[url('/home/hero-badge.png')] bg-cover bg-center bg-no-repeat" />
           </div>
           <div className="absolute top-[203px] left-[22.5px] flex w-[436px] flex-col gap-5 max-[767px]:static max-[767px]:order-2 max-[767px]:mt-5 max-[767px]:w-full max-[767px]:items-center">
+            {/* No fixed width here — Figma's 298px title box lets "with a big"
+                overflow, but browsers wrap it, pushing the copy out of the
+                hero. Let the headline take the full 436px copy column. */}
             <h1
-              className={`flex w-[298px] flex-col gap-1 ${displayFont} text-[64px] font-extrabold max-[767px]:items-center max-[767px]:text-center max-[767px]:text-[54px]`}
+              className={`flex flex-col gap-1 ${displayFont} text-[64px] font-extrabold max-[767px]:items-center max-[767px]:text-center max-[767px]:text-[54px]`}
             >
               <span className="leading-[64px] whitespace-pre-line text-[#2B2D33] max-[767px]:leading-[56px]">
                 {"A team\nwith a big"}
