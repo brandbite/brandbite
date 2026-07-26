@@ -116,10 +116,10 @@ export default function TermsPage() {
           {RULES.map((rule) => (
             <div
               key={rule.title}
-              className="flex w-full flex-row items-center gap-px rounded-xl bg-[#F7F4F1] px-5 max-[767px]:flex-col max-[767px]:items-start max-[767px]:gap-3 max-[767px]:p-5"
+              className="flex w-full flex-row items-center gap-px rounded-xl bg-[#F7F4F1] px-5 max-[767px]:p-5"
             >
               <Image src={rule.icon} alt="" width={100} height={100} className="shrink-0" />
-              <div className="flex min-w-px flex-1 flex-col items-start justify-center gap-[5px] border-l border-[#D7D8DD] py-5 pl-5 max-[767px]:border-l-0 max-[767px]:py-0 max-[767px]:pl-0">
+              <div className="flex min-w-px flex-1 flex-col items-start justify-center gap-[5px] border-l border-[#D7D8DD] py-5 pl-5">
                 <h2 className={`${displayFont} text-base leading-5 font-bold text-[#2B2D33]`}>
                   {rule.title}
                 </h2>
