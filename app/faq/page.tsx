@@ -1,86 +1,141 @@
 // -----------------------------------------------------------------------------
 // @file: app/faq/page.tsx
-// @purpose: Public FAQ marketing page. Shares FAQ content + accordion with the
-//           logged-in dashboard FAQ pages via components/faq/faq-browser.tsx.
+// @purpose: Public FAQ page — 2026 redesign ("FAQs, but make them easy.").
+//           Server component: questions come from the central Faq table
+//           (edited at /admin/faq), rendered into the Figma design. The
+//           portal FAQ surfaces (/customer/faq, /creative/faq) still use
+//           FaqBrowser and are unaffected.
+// @version: v2.0.0
+// @status: active
+// @lastUpdate: 2026-07-13
 // -----------------------------------------------------------------------------
 
-"use client";
+import type { Metadata } from "next";
+import Image from "next/image";
 
-import Link from "next/link";
+import { FaqAccordion } from "@/components/marketing/faq-accordion";
+import { HomeFooter } from "@/components/marketing/home-footer";
+import { HomeHeader } from "@/components/marketing/home-header";
+import { prisma } from "@/lib/prisma";
 
-import { FaqBrowser } from "@/components/faq/faq-browser";
-import { SiteFooter } from "@/components/marketing/site-footer";
-import { SiteHeader } from "@/components/marketing/site-header";
+export const metadata: Metadata = {
+  title: "FAQ",
+  description: "Everything you need to know about Brandbite. No jargon, no tiny-print drama.",
+};
 
-export default function FaqPage() {
+// Render per-request: the FAQ list comes from the database, which isn't
+// reachable during CI's static prerender pass. Runtime SSR also means
+// /admin/faq edits show up immediately (bustFaqCaches keeps /api/faq in
+// sync for the portal surfaces).
+export const dynamic = "force-dynamic";
+
+const displayFont = "font-[family-name:var(--font-inter)]";
+
+export default async function FaqPage() {
+  // Same query as /api/faq: active rows, grouped by category then manual
+  // position — the order admins arrange at /admin/faq.
+  const faqs = await prisma.faq.findMany({
+    where: { isActive: true },
+    orderBy: [{ category: "asc" }, { position: "asc" }],
+    select: { id: true, question: true, answer: true },
+  });
+
   return (
-    <div className="flex min-h-screen flex-col bg-white text-[var(--bb-secondary)]">
-      <SiteHeader activePage="FAQs" />
+    <div className="min-h-screen w-full bg-[#F7F4F1]">
+      <main
+        id="main-content"
+        className="mx-auto w-full max-w-[1140px] overflow-hidden bg-[#F7F4F1]"
+      >
+        <HomeHeader />
 
-      {/* --------------------------------------------------------------- */}
-      {/* Hero                                                            */}
-      {/* --------------------------------------------------------------- */}
-      <section className="relative overflow-hidden bg-white px-6 pt-14 pb-16 sm:pt-20 sm:pb-20">
-        {/* Bitemark background */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/bitemark.svg"
-          alt=""
-          aria-hidden="true"
-          className="pointer-events-none absolute top-0 left-0 h-full w-auto max-w-none object-cover object-left-top select-none"
-        />
-
-        <div className="relative mx-auto max-w-6xl text-center">
-          <p className="text-sm font-bold tracking-widest text-[var(--bb-primary)] uppercase">
-            FAQs
-          </p>
-          <h1 className="font-brand mt-3 text-4xl font-bold tracking-tight text-[var(--bb-secondary)] sm:text-5xl">
-            Frequently Asked Questions
-          </h1>
-          <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-[var(--bb-text-secondary)]">
-            Everything you need to know about Brandbite. Can&apos;t find what you&apos;re looking
-            for? Reach out to our team.
-          </p>
-        </div>
-      </section>
-
-      {/* --------------------------------------------------------------- */}
-      {/* Category pills + accordion                                      */}
-      {/* --------------------------------------------------------------- */}
-      <section className="mx-auto w-full max-w-3xl px-6 pb-20 sm:pb-24">
-        <FaqBrowser />
-      </section>
-
-      {/* --------------------------------------------------------------- */}
-      {/* CTA                                                             */}
-      {/* --------------------------------------------------------------- */}
-      <section className="bg-[var(--bb-bg-warm)] px-6 py-16 sm:py-20">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="font-brand text-2xl font-bold tracking-tight text-[var(--bb-secondary)] sm:text-3xl">
-            Still have questions?
-          </h2>
-          <p className="mt-3 text-base text-[var(--bb-text-secondary)]">
-            We&apos;re here to help. Get in touch and we&apos;ll get back to you as soon as
-            possible.
-          </p>
-          <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-            <Link
-              href="/pricing"
-              className="rounded-full bg-[var(--bb-primary)] px-8 py-3.5 text-sm font-bold tracking-wide text-white uppercase shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl"
-            >
-              View Pricing
-            </Link>
-            <Link
-              href="/how-it-works"
-              className="rounded-full border border-[var(--bb-border)] bg-white px-8 py-3.5 text-sm font-bold tracking-wide text-[var(--bb-secondary)] uppercase transition-all hover:-translate-y-0.5 hover:shadow-md"
-            >
-              How It Works
-            </Link>
+        {/* Hero */}
+        <section className="relative mx-auto h-[751px] w-[993px] origin-top max-[1179px]:h-[600px] max-[1179px]:scale-80 max-[929px]:h-[500px] max-[929px]:scale-[0.66] max-[767px]:flex max-[767px]:h-auto max-[767px]:w-full max-[767px]:scale-100 max-[767px]:flex-col max-[767px]:items-center max-[767px]:pt-5">
+          <div className="absolute top-[91px] left-[-10.5px] h-[100px] w-[172px] max-[767px]:static max-[767px]:order-1">
+            <Image
+              src="/home/faq-doodle.png"
+              alt=""
+              width={172}
+              height={100}
+              className="h-[100px] w-[172px]"
+            />
           </div>
-        </div>
-      </section>
+          <div className="absolute top-[203px] left-[22px] flex w-[366px] flex-col gap-5 max-[767px]:static max-[767px]:order-2 max-[767px]:mt-5 max-[767px]:items-center">
+            <h1
+              className={`flex w-[298px] flex-col gap-1 ${displayFont} text-[64px] font-extrabold max-[767px]:items-center max-[767px]:text-center max-[767px]:text-[54px]`}
+            >
+              <span className="leading-[64px] whitespace-pre-line text-[#2B2D33] max-[767px]:leading-[56px]">
+                {"FAQs, but\nmake them"}
+              </span>
+              <span className="leading-[64px] text-[#FF6426] max-[767px]:leading-[56px]">
+                easy.
+              </span>
+            </h1>
+            <p className="text-base leading-6 whitespace-pre-line text-[#2B2D33] max-[767px]:text-center">
+              {"Everything you need to know\nabout Brandbite.\n\nNo jargon, no tiny-print drama."}
+            </p>
+          </div>
+          <div className="absolute top-[93px] left-[313.5px] h-[625px] w-[713px] max-[767px]:static max-[767px]:order-3 max-[767px]:mt-10 max-[767px]:h-auto max-[767px]:w-full max-[767px]:max-w-[402px]">
+            <Image
+              src="/home/faq-hero.webp"
+              alt="BB the unicorn answering FAQs at a laptop"
+              width={713}
+              height={625}
+              priority
+              className="h-full w-full object-cover max-[767px]:h-auto"
+            />
+          </div>
+        </section>
 
-      <SiteFooter />
+        {/* FAQ list */}
+        <section className="flex w-full flex-col items-center justify-center bg-white py-[60px]">
+          <FaqAccordion faqs={faqs} />
+        </section>
+
+        {/* Still have questions */}
+        <section className="relative flex h-[309px] w-full flex-row items-center justify-between bg-[#B696FF] px-[70px] max-[1023px]:px-8 max-[767px]:h-auto max-[767px]:flex-col max-[767px]:items-center max-[767px]:gap-10 max-[767px]:px-5 max-[767px]:pt-10">
+          <div className="flex w-[400px] flex-col items-start gap-6 max-[767px]:w-full max-[767px]:max-w-[400px]">
+            <h2
+              className={`flex w-full flex-col gap-[5px] ${displayFont} text-4xl leading-9 font-extrabold`}
+            >
+              <span className="text-[#2B2D33]">Still have</span>
+              <span className="text-white">questions?</span>
+            </h2>
+            <p className="w-full text-sm leading-5 text-[#2B2D33]">
+              We&rsquo;re here to help. If you need more clarity, our team is always just a message
+              away.
+            </p>
+            <a
+              href="mailto:hello@brandbite.studio"
+              className="flex flex-row items-center gap-[9px] transition-opacity hover:opacity-85"
+            >
+              <span className="text-xl leading-8 font-bold whitespace-nowrap text-white">
+                Chat with the team
+              </span>
+              <Image src="/home/arrow-chat.svg" alt="" width={24} height={24} />
+            </a>
+          </div>
+          <Image
+            src="/home/paper-plane.png"
+            alt=""
+            width={235}
+            height={80}
+            className="absolute top-[204px] left-[297px] h-20 w-[235px] object-cover max-[1023px]:hidden"
+          />
+          <div className="relative h-[309px] w-[350px] shrink-0 max-[767px]:order-3">
+            <div className="h-full w-full bg-[url('/home/unicorn-wave.webp')] [background-size:119.857%_135.761%] [background-position:50%_18.552%] bg-no-repeat" />
+          </div>
+          <Image
+            src="/home/faq-note.webp"
+            alt="Sticky note: We like clarity. You'll like the experience."
+            width={210}
+            height={140}
+            className="h-[140px] w-[210px] shrink-0 object-cover max-[1023px]:hidden max-[767px]:static max-[767px]:order-2 max-[767px]:block"
+          />
+        </section>
+
+        <HomeFooter />
+        <div className="h-5" />
+      </main>
     </div>
   );
 }
