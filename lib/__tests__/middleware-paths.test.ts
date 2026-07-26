@@ -34,6 +34,8 @@ const PUBLIC_PATHS = [
   "/api/faq",
   "/api/page-blocks",
   "/api/contact",
+  "/sitemap.xml",
+  "/robots.txt",
   "/api/health",
   "/api/cron",
   "/talent",
