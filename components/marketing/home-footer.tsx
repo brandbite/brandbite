@@ -13,7 +13,7 @@ import Link from "next/link";
 
 const FOOTER_LINKS = [
   { label: "About Us", href: "/about" },
-  { label: "Terms", href: "/coming-soon" },
+  { label: "Terms", href: "/terms" },
   { label: "Privacy", href: "/coming-soon" },
   { label: "Contact", href: "/contact" },
 ];
