@@ -33,6 +33,7 @@ const PUBLIC_PATHS = [
   "/api/plans",
   "/api/faq",
   "/api/page-blocks",
+  "/api/contact",
   "/api/health",
   "/api/cron",
   "/talent",
@@ -79,6 +80,12 @@ describe("isPublicPath", () => {
   // visitor who clicks a nav item.
   it("marks /coming-soon as public", () => {
     expect(isPublicPath("/coming-soon")).toBe(true);
+  });
+
+  // Anonymous contact-form submit — the route enforces its own Turnstile
+  // + rate-limit gates; the proxy only needs to let the POST through.
+  it("marks /api/contact as public", () => {
+    expect(isPublicPath("/api/contact")).toBe(true);
   });
 
   it("marks /onboarding as public", () => {

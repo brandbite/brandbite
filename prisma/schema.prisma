@@ -2400,3 +2400,38 @@ model ProcessedStripeEvent {
 
   @@index([processedAt])
 }
+
+/// Triage state for public contact-form messages. Mirrors the Feedback
+/// queue shape so an eventual /admin/contact inbox can reuse the pattern.
+enum ContactMessageStatus {
+  NEW
+  READ
+  ARCHIVED
+}
+
+/// Public /contact form submissions (2026 marketing redesign). Anonymous —
+/// no UserAccount link; the visitor isn't necessarily a user. SITE_OWNERs
+/// are notified via lib/admin-event-email.ts on every insert, so the table
+/// is the durable record and the email is the alert.
+model ContactMessage {
+  id String @id @default(cuid())
+
+  name    String
+  email   String
+  /// Optional company name ("Your company (Optional)" field).
+  company String?
+  /// Optional "What can we help you with?" one-liner.
+  topic   String?
+  message String  @db.Text
+
+  status ContactMessageStatus @default(NEW)
+
+  // Request context snapshot — same forensic posture as TalentApplication.
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+}

@@ -39,6 +39,9 @@ const PUBLIC_PATHS = [
   "/faq", // marketing pages
   "/about", // marketing pages
   "/contact", // marketing pages
+  // Public contact-form submit (anonymous POST; Turnstile + rate limits
+  // inside the route). Without this the proxy 307s the POST to /login.
+  "/api/contact",
   "/documentation", // marketing pages
   "/news", // marketing pages
   "/privacy", // legal — must be readable without auth (GDPR, Stripe)
