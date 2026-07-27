@@ -1,208 +1,182 @@
 // -----------------------------------------------------------------------------
 // @file: app/blog/[slug]/page.tsx
-// @purpose: Blog detail page — renders a single published blog post
+// @purpose: Blog post detail — 2026 redesign (Figma nodes 56:341 desktop /
+//           56:569 mobile). Server component with per-post generateMetadata
+//           (uses the CMS metaTitle/metaDescription fields, previously
+//           unused). Body is CMS rich HTML rendered through SafeHtml.
+// @version: v2.0.0
+// @status: active
+// @lastUpdate: 2026-07-26
 // -----------------------------------------------------------------------------
 
-"use client";
-
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { notFound } from "next/navigation";
 
-import { SiteFooter } from "@/components/marketing/site-footer";
-import { SiteHeader } from "@/components/marketing/site-header";
+import { HomeFooter } from "@/components/marketing/home-footer";
+import { HomeHeader } from "@/components/marketing/home-header";
+import { SubscribeBand } from "@/components/marketing/subscribe-band";
 import { CMS_ALLOWED_ATTR, CMS_ALLOWED_TAGS, SafeHtml } from "@/components/ui/safe-html";
+import { formatPostDate, readMinutes } from "@/lib/blog";
+import { prisma } from "@/lib/prisma";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+export const dynamic = "force-dynamic";
 
-type BlogPost = {
-  id: string;
-  title: string;
-  slug: string;
-  body: string;
-  excerpt: string | null;
-  authorName: string | null;
-  category: string | null;
-  tags: string[];
-  thumbnailUrl: string | null;
-  heroUrl: string | null;
-  publishedAt: string;
-};
+const displayFont = "font-[family-name:var(--font-inter)]";
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
+async function getPost(slug: string) {
+  return prisma.blogPost.findFirst({
+    where: { slug, status: "PUBLISHED" },
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      excerpt: true,
+      authorName: true,
+      category: true,
+      heroUrl: true,
+      body: true,
+      metaTitle: true,
+      metaDescription: true,
+      publishedAt: true,
+    },
   });
 }
 
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const post = await getPost(slug);
+  if (!post) return { title: "Post not found" };
+  return {
+    title: post.metaTitle || post.title,
+    description: post.metaDescription || post.excerpt || undefined,
+  };
+}
 
-export default function BlogPostPage() {
-  const { slug } = useParams<{ slug: string }>();
-  const [post, setPost] = useState<BlogPost | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
+/** Split the title so the last two words render orange, per the design. */
+function splitTitle(title: string): { dark: string; accent: string } {
+  const words = title.trim().split(/\s+/);
+  if (words.length <= 2) return { dark: "", accent: words.join(" ") };
+  return {
+    dark: words.slice(0, -2).join(" "),
+    accent: words.slice(-2).join(" "),
+  };
+}
 
-  useEffect(() => {
-    if (!slug) return;
+export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const post = await getPost(slug);
+  if (!post) notFound();
 
-    fetch(`/api/blog/${slug}`)
-      .then((res) => {
-        if (!res.ok) {
-          setNotFound(true);
-          return null;
-        }
-        return res.json();
-      })
-      .then((data) => {
-        if (data?.post) {
-          setPost(data.post);
-        } else {
-          setNotFound(true);
-        }
-      })
-      .catch(() => setNotFound(true))
-      .finally(() => setLoading(false));
-  }, [slug]);
+  const { dark, accent } = splitTitle(post.title);
+  const date = formatPostDate(post.publishedAt);
+  const minutes = readMinutes(post.body);
 
   return (
-    <div className="min-h-screen bg-white text-[var(--bb-secondary)]">
-      <SiteHeader activePage="Blog" />
+    <div className="min-h-screen w-full bg-[#F7F4F1]">
+      <main
+        id="main-content"
+        className="mx-auto w-full max-w-[1140px] overflow-hidden bg-[#F7F4F1]"
+      >
+        <HomeHeader active="Blog" />
 
-      {/* ----------------------------------------------------------------- */}
-      {/* Loading state                                                     */}
-      {/* ----------------------------------------------------------------- */}
-      {loading && (
-        <div className="flex items-center justify-center py-32">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--bb-border)] border-t-[var(--bb-primary)]" />
-        </div>
-      )}
+        {/* Hero */}
+        <section className="relative mx-auto min-h-[600px] w-[993px] pb-10 max-[1023px]:w-full max-[1023px]:px-6 max-[767px]:px-5">
+          <div className="absolute top-[54px] left-[-9.5px] h-[143px] w-[203px] max-[1023px]:static max-[1023px]:mt-5">
+            <Image
+              src="/home/blog-doodle-head.png"
+              alt=""
+              width={203}
+              height={143}
+              className="h-[143px] w-[203px]"
+            />
+          </div>
+          {/* BB reading BB Notes */}
+          <div className="absolute top-[67px] right-[-125px] h-[610px] w-[685px] max-[1023px]:hidden">
+            <Image
+              src="/home/blog-bb.webp"
+              alt=""
+              width={685}
+              height={640}
+              className="h-full w-full object-cover object-top"
+            />
+          </div>
+          <div className="relative flex w-[420px] flex-col gap-5 pt-[203px] max-[1023px]:w-full max-[1023px]:max-w-[640px] max-[1023px]:pt-8">
+            <p className="text-sm">
+              <Link
+                href="/blog"
+                className="font-medium text-[#5E616E] transition-colors hover:text-[#FF6426]"
+              >
+                ← All posts
+              </Link>
+            </p>
+            <h1
+              className={`${displayFont} text-[64px] leading-[64px] font-extrabold max-[767px]:text-[44px] max-[767px]:leading-[48px]`}
+            >
+              {dark && <span className="text-[#2B2D33]">{dark} </span>}
+              <span className="text-[#FF6426]">{accent}</span>
+            </h1>
+            {post.excerpt && <p className="text-base leading-6 text-[#2B2D33]">{post.excerpt}</p>}
+            <div className="flex w-full flex-row items-center gap-5">
+              <Image
+                src="/home/blog-author-default.webp"
+                alt=""
+                width={64}
+                height={64}
+                className="size-16 shrink-0 rounded-full object-cover"
+              />
+              <div className="flex min-w-px flex-1 flex-col gap-2.5">
+                {post.authorName && (
+                  <p className="text-sm leading-6 font-bold text-[#2B2D33]">{post.authorName}</p>
+                )}
+                <div className="flex flex-row items-center gap-5 text-sm leading-6 text-[#2B2D33]">
+                  {date && (
+                    <span className="flex flex-row items-center gap-2.5">
+                      <Image src="/home/ico-date-dark.svg" alt="" width={24} height={24} />
+                      {date}
+                    </span>
+                  )}
+                  <span className="flex flex-row items-center gap-2.5">
+                    <Image src="/home/ico-book-dark.svg" alt="" width={24} height={24} />
+                    {minutes} min read
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
 
-      {/* ----------------------------------------------------------------- */}
-      {/* Not found                                                         */}
-      {/* ----------------------------------------------------------------- */}
-      {!loading && notFound && (
-        <div className="mx-auto max-w-3xl px-6 py-32 text-center">
-          <h1 className="font-brand text-3xl font-bold text-[var(--bb-secondary)]">
-            Post not found
-          </h1>
-          <p className="mt-3 text-[var(--bb-text-secondary)]">
-            The blog post you&apos;re looking for doesn&apos;t exist or has been removed.
-          </p>
-          <Link
-            href="/blog"
-            className="mt-6 inline-block text-sm font-medium text-[var(--bb-primary)] transition-colors hover:underline"
-          >
-            &larr; Back to Blog
-          </Link>
-        </div>
-      )}
-
-      {/* ----------------------------------------------------------------- */}
-      {/* Post content                                                      */}
-      {/* ----------------------------------------------------------------- */}
-      {!loading && post && (
-        <>
-          {/* Hero image */}
+        {/* Body */}
+        <section className="flex w-full flex-col items-start justify-center bg-white px-[100px] py-10 max-[1023px]:px-8 max-[767px]:px-5">
           {post.heroUrl && (
-            <div className="relative mx-auto h-[500px] w-full overflow-hidden">
+            <div className="relative mb-10 h-[420px] w-full overflow-hidden rounded-xl max-[767px]:h-[220px]">
               <Image
                 src={post.heroUrl}
-                alt={post.title}
+                alt=""
                 fill
-                sizes="100vw"
-                priority
+                sizes="(max-width: 767px) 100vw, 940px"
                 className="object-cover"
               />
             </div>
           )}
+          <SafeHtml
+            as="article"
+            html={post.body ?? ""}
+            allowedTags={CMS_ALLOWED_TAGS}
+            allowedAttrs={CMS_ALLOWED_ATTR}
+            className="prose prose-lg prose-headings:font-[family-name:var(--font-inter)] prose-headings:font-extrabold prose-headings:text-[#2B2D33] prose-a:text-[#FF6426] max-w-none text-base leading-6 text-[#2B2D33]"
+          />
+        </section>
 
-          {/* Article wrapper */}
-          <div className="mx-auto max-w-3xl px-6 py-12">
-            {/* Back link */}
-            <Link
-              href="/blog"
-              className="inline-flex items-center gap-1 text-sm font-medium text-[var(--bb-primary)] transition-colors hover:underline"
-            >
-              &larr; Back to Blog
-            </Link>
-
-            {/* Title */}
-            <h1 className="font-brand mt-8 text-3xl font-bold text-[var(--bb-secondary)] sm:text-4xl lg:text-5xl">
-              {post.title}
-            </h1>
-
-            {/* Meta row: category + author + date */}
-            <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-[var(--bb-text-secondary)]">
-              {post.category && (
-                <span className="rounded-full bg-[var(--bb-primary-light)] px-2.5 py-0.5 text-xs font-medium text-[var(--bb-primary)]">
-                  {post.category}
-                </span>
-              )}
-              {post.authorName && (
-                <>
-                  <span className="font-medium">{post.authorName}</span>
-                  <span>&middot;</span>
-                </>
-              )}
-              <span>{formatDate(post.publishedAt)}</span>
-            </div>
-
-            {/* Separator */}
-            <div className="my-8 border-t border-[var(--bb-border-subtle)]" />
-
-            {/* Body */}
-            <SafeHtml
-              as="article"
-              html={post.body}
-              allowedTags={CMS_ALLOWED_TAGS}
-              allowedAttrs={CMS_ALLOWED_ATTR}
-              className="prose prose-lg prose-headings:font-brand prose-headings:text-[var(--bb-secondary)] prose-p:text-[var(--bb-text-secondary)] prose-p:leading-relaxed prose-a:text-[var(--bb-primary)] prose-a:no-underline hover:prose-a:underline prose-strong:text-[var(--bb-secondary)] prose-li:text-[var(--bb-text-secondary)] max-w-none"
-            />
-          </div>
-
-          {/* --------------------------------------------------------------- */}
-          {/* CTA section                                                      */}
-          {/* --------------------------------------------------------------- */}
-          <section className="bg-[var(--bb-bg-page)] py-20 sm:py-24">
-            <div className="mx-auto max-w-3xl px-6 text-center">
-              <h2 className="font-brand text-2xl font-bold text-[var(--bb-secondary)] sm:text-3xl">
-                Enjoyed this article?
-              </h2>
-              <p className="mt-3 text-[var(--bb-text-secondary)]">
-                Explore more insights from our blog or see our creative work in action.
-              </p>
-              <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
-                <Link
-                  href="/blog"
-                  className="rounded-full border border-[var(--bb-secondary)] px-6 py-2.5 text-sm font-semibold text-[var(--bb-secondary)] transition-colors hover:bg-[var(--bb-secondary)] hover:text-white"
-                >
-                  More articles
-                </Link>
-                <Link
-                  href="/showcase"
-                  className="rounded-full bg-[var(--bb-primary)] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--bb-primary-hover)]"
-                >
-                  View showcase
-                </Link>
-              </div>
-            </div>
-          </section>
-        </>
-      )}
-
-      <SiteFooter />
+        <SubscribeBand />
+        <HomeFooter />
+        <div className="h-5" />
+      </main>
     </div>
   );
 }

@@ -1,185 +1,123 @@
 // -----------------------------------------------------------------------------
 // @file: app/blog/page.tsx
-// @purpose: Blog listing page — displays all published blog posts
+// @purpose: Blog index — 2026 redesign ("Fresh thoughts. No stale takes.",
+//           Figma nodes 51:1950 desktop / 56:142 mobile). Server component:
+//           posts come from the BlogPost table (edited at /admin/blog);
+//           BlogList handles the client-side tag filter + reveal.
+// @version: v2.0.0
+// @status: active
+// @lastUpdate: 2026-07-26
 // -----------------------------------------------------------------------------
 
-"use client";
-
+import type { Metadata } from "next";
 import Image from "next/image";
-import Link from "next/link";
-import { useEffect, useState } from "react";
 
-import { SiteFooter } from "@/components/marketing/site-footer";
-import { SiteHeader } from "@/components/marketing/site-header";
+import { BlogList, type BlogCard } from "@/components/marketing/blog-list";
+import { HomeFooter } from "@/components/marketing/home-footer";
+import { HomeHeader } from "@/components/marketing/home-header";
+import { SubscribeBand } from "@/components/marketing/subscribe-band";
+import { formatPostDate, readMinutes } from "@/lib/blog";
+import { prisma } from "@/lib/prisma";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-type BlogPost = {
-  id: string;
-  title: string;
-  slug: string;
-  excerpt: string | null;
-  authorName: string | null;
-  category: string | null;
-  tags: string[];
-  thumbnailUrl: string | null;
-  publishedAt: string;
+export const metadata: Metadata = {
+  title: "Blog",
+  description:
+    "Ideas, inspiration, and practical tips on branding, design, and creative workflows. Straight from the Brandbite team.",
 };
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+// Render per-request: posts come from the database, which isn't reachable
+// during CI's static prerender pass — and admin publishes show up instantly.
+export const dynamic = "force-dynamic";
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
+const displayFont = "font-[family-name:var(--font-inter)]";
+
+export default async function BlogIndexPage() {
+  const rows = await prisma.blogPost.findMany({
+    where: { status: "PUBLISHED" },
+    orderBy: { publishedAt: "desc" },
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      excerpt: true,
+      authorName: true,
+      category: true,
+      thumbnailUrl: true,
+      publishedAt: true,
+      body: true,
+    },
   });
-}
 
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
-
-export default function BlogListingPage() {
-  const [posts, setPosts] = useState<BlogPost[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch("/api/blog")
-      .then((res) => res.json())
-      .then((data) => setPosts(data.posts ?? []))
-      .catch(() => setPosts([]))
-      .finally(() => setLoading(false));
-  }, []);
+  const posts: BlogCard[] = rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    slug: row.slug,
+    excerpt: row.excerpt,
+    authorName: row.authorName,
+    category: row.category,
+    thumbnailUrl: row.thumbnailUrl,
+    date: formatPostDate(row.publishedAt),
+    readMinutes: readMinutes(row.body),
+  }));
 
   return (
-    <div className="min-h-screen bg-white text-[var(--bb-secondary)]">
-      <SiteHeader activePage="Blog" />
+    <div className="min-h-screen w-full bg-[#F7F4F1]">
+      <main
+        id="main-content"
+        className="mx-auto w-full max-w-[1140px] overflow-hidden bg-[#F7F4F1]"
+      >
+        <HomeHeader active="Blog" />
 
-      {/* ----------------------------------------------------------------- */}
-      {/* Hero                                                              */}
-      {/* ----------------------------------------------------------------- */}
-      <section className="relative overflow-hidden bg-white px-6 pt-14 pb-16 sm:pt-20 sm:pb-20">
-        {/* Bitemark background */}
-        <img
-          src="/bitemark.svg"
-          alt=""
-          aria-hidden="true"
-          className="pointer-events-none absolute top-0 left-0 h-full w-auto max-w-none object-cover object-left-top select-none"
-        />
-
-        <div className="relative mx-auto max-w-6xl">
-          <p className="text-sm font-bold tracking-widest text-[var(--bb-primary)] uppercase">
-            Blog
-          </p>
-          <h1 className="font-brand mt-3 text-4xl font-bold tracking-tight text-[var(--bb-secondary)] sm:text-5xl">
-            Insights &amp; inspiration
-          </h1>
-          <p className="mt-4 max-w-xl text-base leading-relaxed text-[var(--bb-text-secondary)]">
-            Design tips, brand strategy, and creative trends from our team.
-          </p>
-        </div>
-      </section>
-
-      {/* ----------------------------------------------------------------- */}
-      {/* Post grid                                                         */}
-      {/* ----------------------------------------------------------------- */}
-      <section className="mx-auto max-w-6xl px-6 py-16">
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--bb-border)] border-t-[var(--bb-primary)]" />
+        {/* Hero */}
+        <section className="relative mx-auto h-[751px] w-[993px] origin-top max-[1179px]:h-[620px] max-[1179px]:scale-80 max-[929px]:h-[520px] max-[929px]:scale-[0.66] max-[767px]:flex max-[767px]:h-auto max-[767px]:w-full max-[767px]:scale-100 max-[767px]:flex-col max-[767px]:items-center max-[767px]:px-5 max-[767px]:pt-5">
+          <div className="absolute top-[54px] left-[-9.5px] h-[143px] w-[203px] max-[767px]:static max-[767px]:order-1">
+            <Image
+              src="/home/blog-doodle-head.png"
+              alt=""
+              width={203}
+              height={143}
+              className="h-[143px] w-[203px]"
+            />
           </div>
-        ) : posts.length === 0 ? (
-          <div className="py-20 text-center">
-            <p className="text-lg text-[var(--bb-text-secondary)]">
-              No blog posts yet. Check back soon!
+          <div className="absolute top-[203px] left-[22px] flex w-[366px] flex-col gap-5 max-[767px]:static max-[767px]:order-2 max-[767px]:mt-5 max-[767px]:w-full max-[767px]:items-center">
+            <h1
+              className={`flex flex-col gap-1 ${displayFont} text-[64px] leading-[64px] font-extrabold max-[767px]:items-center max-[767px]:text-center max-[767px]:text-[54px] max-[767px]:leading-[56px]`}
+            >
+              <span className="whitespace-nowrap text-[#2B2D33] max-[767px]:whitespace-normal">
+                Fresh thoughts.
+              </span>
+              <span className="whitespace-nowrap text-[#2B2D33] max-[767px]:whitespace-normal">
+                <span className="text-[#FF6426]">No stale</span> takes.
+              </span>
+            </h1>
+            <p className="text-base leading-6 whitespace-pre-line text-[#2B2D33] max-[767px]:text-center max-[767px]:whitespace-normal">
+              {
+                "Ideas, inspiration, and practical tips on branding, design,\nand creative workflows. Straight from the Brandbite team."
+              }
             </p>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            {posts.map((post) => (
-              <Link
-                key={post.id}
-                href={`/blog/${post.slug}`}
-                className="group overflow-hidden rounded-xl border border-[var(--bb-border-subtle)] bg-white transition-shadow hover:shadow-lg"
-              >
-                {/* Thumbnail */}
-                <div className="relative aspect-[16/9] bg-[#e8dff5]">
-                  {post.thumbnailUrl ? (
-                    <Image
-                      src={post.thumbnailUrl}
-                      alt={post.title}
-                      fill
-                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                      className="object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center">
-                      <div className="text-center">
-                        <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-white/40">
-                          <svg
-                            width="20"
-                            height="20"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="var(--bb-text-muted)"
-                            strokeWidth="1.5"
-                          >
-                            <rect x="3" y="3" width="18" height="18" rx="2" />
-                            <circle cx="8.5" cy="8.5" r="1.5" />
-                            <path d="M21 15l-5-5L5 21" />
-                          </svg>
-                        </div>
-                        <span className="text-xs font-medium text-[var(--bb-text-muted)]">
-                          Thumbnail
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Content */}
-                <div className="p-5">
-                  {post.category && (
-                    <span className="inline-block rounded-full bg-[var(--bb-primary-light)] px-2.5 py-0.5 text-xs font-medium text-[var(--bb-primary)]">
-                      {post.category}
-                    </span>
-                  )}
-                  <h2 className="mt-2 line-clamp-2 text-lg font-bold text-[var(--bb-secondary)] transition-colors group-hover:text-[var(--bb-primary)]">
-                    {post.title}
-                  </h2>
-                  {post.excerpt && (
-                    <p className="mt-2 line-clamp-3 text-sm text-[var(--bb-text-secondary)]">
-                      {post.excerpt}
-                    </p>
-                  )}
-
-                  {/* Footer: author + date */}
-                  <div className="mt-4 flex items-center gap-2 text-sm">
-                    {post.authorName && (
-                      <>
-                        <span className="font-medium text-[var(--bb-secondary)]">
-                          {post.authorName}
-                        </span>
-                        <span className="text-[var(--bb-text-muted)]">&middot;</span>
-                      </>
-                    )}
-                    <span className="text-[var(--bb-text-muted)]">
-                      {formatDate(post.publishedAt)}
-                    </span>
-                  </div>
-                </div>
-              </Link>
-            ))}
+          {/* BB reading BB Notes */}
+          <div className="absolute top-[67px] left-[371.5px] h-[610px] w-[685px] max-[767px]:static max-[767px]:order-3 max-[767px]:mt-8 max-[767px]:h-auto max-[767px]:w-full max-[767px]:max-w-[426px]">
+            <Image
+              src="/home/blog-bb.webp"
+              alt="BB the unicorn reading BB Notes with a coffee"
+              width={685}
+              height={640}
+              priority
+              className="h-full w-full object-cover object-top max-[767px]:h-auto"
+            />
           </div>
-        )}
-      </section>
+        </section>
 
-      <SiteFooter />
+        {/* Posts */}
+        <section className="flex w-full flex-col items-center bg-white p-10 max-[767px]:px-5">
+          <BlogList posts={posts} />
+        </section>
+
+        <SubscribeBand />
+        <HomeFooter />
+        <div className="h-5" />
+      </main>
     </div>
   );
 }
