@@ -47,7 +47,7 @@ export default async function FaqPage() {
         id="main-content"
         className="mx-auto w-full max-w-[1140px] overflow-hidden bg-[#F7F4F1]"
       >
-        <HomeHeader />
+        <HomeHeader active="FAQs" />
 
         {/* Hero */}
         <section className="relative mx-auto h-[751px] w-[993px] origin-top max-[1179px]:h-[600px] max-[1179px]:scale-80 max-[929px]:h-[500px] max-[929px]:scale-[0.66] max-[767px]:flex max-[767px]:h-auto max-[767px]:w-full max-[767px]:scale-100 max-[767px]:flex-col max-[767px]:items-center max-[767px]:pt-5">
