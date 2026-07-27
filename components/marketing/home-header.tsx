@@ -45,7 +45,7 @@ export function HomeHeader({ active }: { active?: string } = {}) {
             href={link.href}
             className={`font-brand text-xl leading-none whitespace-nowrap transition-colors ${
               active === link.label
-                ? "font-bold text-[#8D5BFF] underline decoration-dotted underline-offset-4"
+                ? "font-bold text-[#8D5BFF]"
                 : "text-[#1F2024] hover:text-[#FF6426]"
             }`}
           >
