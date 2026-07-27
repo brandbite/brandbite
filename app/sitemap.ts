@@ -22,12 +22,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.8,
     },
     // Public marketing pages (2026 redesign)
-    ...["/faq", "/contact", "/coming-soon"].map((path) => ({
-      url: `${baseUrl}${path}`,
-      lastModified: new Date(),
-      changeFrequency: "monthly" as const,
-      priority: 0.7,
-    })),
+    ...["/faq", "/contact", "/coming-soon", "/about", "/terms", "/privacy", "/blog"].map(
+      (path) => ({
+        url: `${baseUrl}${path}`,
+        lastModified: new Date(),
+        changeFrequency: "monthly" as const,
+        priority: 0.7,
+      }),
+    ),
     // Color tools — free public utilities, a meaningful organic-search surface.
     ...[
       "/colors",

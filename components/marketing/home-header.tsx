@@ -20,10 +20,10 @@ const NAV_LINKS = [
   { label: "Pricing", href: "/coming-soon" },
   { label: "Showcase", href: "/coming-soon" },
   { label: "FAQs", href: "/faq" },
-  { label: "Blog", href: "/coming-soon" },
+  { label: "Blog", href: "/blog" },
 ];
 
-export function HomeHeader() {
+export function HomeHeader({ active }: { active?: string } = {}) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -43,7 +43,11 @@ export function HomeHeader() {
           <Link
             key={link.label}
             href={link.href}
-            className="font-brand text-xl leading-none whitespace-nowrap text-[#1F2024] transition-colors hover:text-[#FF6426]"
+            className={`font-brand text-xl leading-none whitespace-nowrap transition-colors ${
+              active === link.label
+                ? "font-bold text-[#8D5BFF] underline decoration-dotted underline-offset-4"
+                : "text-[#1F2024] hover:text-[#FF6426]"
+            }`}
           >
             {link.label}
           </Link>
