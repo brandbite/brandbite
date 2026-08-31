@@ -105,6 +105,14 @@ const PUBLIC_PATHS = [
   // reach the handler. Auth-gating here silently breaks every scheduled
   // job because Vercel Cron does not send a BetterAuth session cookie.
   "/api/cron",
+  // Self-hosted WordPress plugin installs calling home to check a licence or
+  // fetch an update. They are not users of this app — no account, no session,
+  // no cookie — and authenticate with a licence key inside the request, which
+  // the route validates itself. Auth-gating here 307s every plugin on every
+  // customer's site to /login, and because the plugin reads a redirect as
+  // "could not be reached" it fails quietly into its fourteen-day grace period
+  // rather than reporting anything useful.
+  "/api/plugins",
 ];
 
 // Debug routes are only accessible in demo mode
