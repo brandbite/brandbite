@@ -2435,3 +2435,128 @@ model ContactMessage {
 
   @@index([status, createdAt])
 }
+
+// ---------------------------------------------------------------------------
+// WordPress plugin licences
+//
+// Brandbite sells self-hosted WordPress plugins (the first is Image
+// Optimizer). Those installs are not users of this app — there is no account,
+// no session and often no relation to a Company — so they authenticate to
+// /api/plugins/* with a licence key and nothing else. These three models are
+// the whole of that.
+//
+// The important asymmetry, which the API route depends on: a licence gates
+// *work* the plugin does, never the files it has already produced. A lapsed
+// key stops new images being converted and leaves every converted image on the
+// customer's site being served exactly as before, so a billing problem can
+// never blank a live shop.
+// ---------------------------------------------------------------------------
+
+model PluginLicence {
+  id String @id @default(cuid())
+
+  /// The key as typed into the plugin, e.g. "BB-1A2B-3C4D-5E6F-7G8H".
+  key String @unique
+
+  /// Which plugin it is for, matching the folder slug: "image-optimizer".
+  /// A key is deliberately per-product rather than per-account, so one can be
+  /// issued before the buyer has ever signed in here.
+  product String
+
+  /// Who bought it. A loose email rather than a relation to UserAccount,
+  /// because most keys are sold outside the app and issued before there is an
+  /// account to point at. Link it later if that changes.
+  email String?
+
+  /// Free text for us, never shown to the customer: "3-site agency plan,
+  /// invoice 2026-114".
+  note String?
+
+  /// How many sites may hold the key at once. A site that has been on the
+  /// licence before never costs a second seat — see the upsert in the route —
+  /// so moving between staging and live is free.
+  siteLimit Int @default(1)
+
+  /// null means perpetual. The plugin enforces this date itself as well, so a
+  /// key that has gone past it stops converting even on a site that never
+  /// reaches us again.
+  expiresAt DateTime?
+
+  /// Set to refund, charge back or ban. Answered as "invalid", which the
+  /// plugin treats as final and gives no grace period.
+  revokedAt DateTime?
+
+  sites PluginLicenceSite[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([product])
+  @@index([email])
+}
+
+model PluginLicenceSite {
+  id String @id @default(cuid())
+
+  licenceId String
+  licence   PluginLicence @relation(fields: [licenceId], references: [id], onDelete: Cascade)
+
+  /// Host plus path, no scheme, no "www.", no trailing slash — normalised by
+  /// normaliseSite() in lib/plugin-licence.ts before it ever gets here.
+  /// Storing it normalised is what stops a customer installing an SSL
+  /// certificate and silently consuming a second seat.
+  site String
+
+  /// Plugin version last seen on that site. Useful for support, and for
+  /// knowing how many installs are still on an old release before changing
+  /// anything in the API contract.
+  version String @default("")
+
+  /// Bumped on every activate and on the plugin's daily check, so a site that
+  /// has quietly gone away is visible.
+  lastSeenAt DateTime @default(now())
+
+  createdAt DateTime @default(now())
+
+  /// The route upserts on this pair. It has to stay a compound unique, and it
+  /// has to keep this field order — Prisma generates the `licenceId_site`
+  /// accessor from it.
+  @@unique([licenceId, site])
+  @@index([site])
+}
+
+model PluginRelease {
+  id String @id @default(cuid())
+
+  product String
+
+  /// Must match the "Version:" header inside the plugin file exactly, or
+  /// WordPress either offers an update that is already installed or never
+  /// offers one at all.
+  version String
+
+  /// R2 storage key for the zip, resolved through resolveAssetUrl() and then
+  /// streamed to the customer — never handed out directly, so the bucket can
+  /// stay private and the signed token remains the only way in.
+  packageKey String
+
+  requiresWp  String @default("5.8")
+  requiresPhp String @default("7.2")
+  testedWp    String @default("")
+
+  /// Both are rendered as HTML inside WordPress's own "View details" modal.
+  description String @db.Text
+  changelog   String @db.Text
+
+  /// Nothing is offered to any site until this is true, so a release can be
+  /// staged and its copy proofread before it goes out.
+  published Boolean @default(false)
+
+  releasedAt DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([product, version])
+  @@index([product, releasedAt])
+}

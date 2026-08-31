@@ -95,6 +95,15 @@ Get both at: Cloudflare dashboard → Turnstile → Add site → choose "Managed
 | ------------- | ---------------------------- | --------------------------- | --------------------------------------------------------------- |
 | `CRON_SECRET` | ✅ Required for auto-payouts | `/api/cron/process-payouts` | Monday cron returns 401, auto-payouts silently skipped forever. |
 
+## WordPress plugin licences
+
+| Var                      | Required in Prod            | Used by                 | What happens if missing                                                                                                                                                                        |
+| ------------------------ | --------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PLUGIN_DOWNLOAD_SECRET` | ✅ Required to ship updates | `lib/plugin-licence.ts` | Licence checks still answer, but `/version` returns an empty `package`, so no site can install an update. Logged as a warning on every version check. Generate with `openssl rand -base64 48`. |
+
+> Licence _checks_ degrade safely without it — the plugin keeps serving the
+> images it has already converted whatever we answer — but nobody can update.
+
 ## Observability (Sentry)
 
 | Var                            | Required in Prod | Used by                      | What happens if missing                                 |
