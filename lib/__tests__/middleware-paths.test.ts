@@ -14,6 +14,9 @@ import { describe, it, expect } from "vitest";
 //     without a session cookie.
 //   - /api/cron: Vercel Cron invocations have no session cookie; the
 //     route handlers enforce their own CRON_SECRET Bearer auth.
+//   - /api/plugins: self-hosted WordPress installs calling home. No
+//     account, no cookie — the licence key in the request is the auth,
+//     and the route validates it.
 const PUBLIC_PATHS = [
   "/",
   "/login",
@@ -38,6 +41,7 @@ const PUBLIC_PATHS = [
   "/robots.txt",
   "/api/health",
   "/api/cron",
+  "/api/plugins",
   "/talent",
   "/api/talent",
   "/privacy",
@@ -174,6 +178,22 @@ describe("isPublicPath", () => {
 
   it("marks any future /api/cron/* route as public", () => {
     expect(isPublicPath("/api/cron/hypothetical-future-job")).toBe(true);
+  });
+
+  // A WordPress plugin on a customer's server has no session cookie and
+  // never will. Gating these 307s every install to /login, and because the
+  // plugin reads a redirect as "could not be reached" it fails into its
+  // fourteen-day grace period instead of reporting anything useful — so the
+  // breakage is silent for a fortnight, then total.
+  it("marks the plugin licence endpoints as public", () => {
+    expect(isPublicPath("/api/plugins/image-optimizer/activate")).toBe(true);
+    expect(isPublicPath("/api/plugins/image-optimizer/check")).toBe(true);
+    expect(isPublicPath("/api/plugins/image-optimizer/version")).toBe(true);
+    expect(isPublicPath("/api/plugins/image-optimizer/download")).toBe(true);
+  });
+
+  it("marks any future /api/plugins/* product as public", () => {
+    expect(isPublicPath("/api/plugins/some-future-plugin/activate")).toBe(true);
   });
 
   // -------------------------------------------------------------------------
