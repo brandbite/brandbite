@@ -71,14 +71,17 @@ export const SECTION_GAP = "24px";
 /* ---------------------------------------------------------------------------
  * Brand identity — surfaces referenced by the layout header + footer.
  *
- * IMPORTANT for CAN-SPAM / EU compliance: the footer must include a real
- * postal address once the legal entity is set up. Until then we leave
- * `BRAND_ADDRESS` as null and the footer renders without it; this is
- * acceptable for transactional emails while we're pre-launch / pre-entity,
- * but any marketing drip must wait until the address is filled in.
+ * CAN-SPAM / EU compliance: the footer includes the registered postal
+ * address of Brandbite FZE (from lib/brand.ts). `BRAND_ADDRESS` is kept
+ * nullable so the footer can still render without it if the entity details
+ * ever need to be pulled temporarily.
  * ------------------------------------------------------------------------- */
 
+import { COMPANY_ADDRESS, COMPANY_LEGAL_NAME, CONTACT_EMAIL } from "../brand";
+
 export const BRAND_NAME = "Brandbite";
+/** Registered legal entity — shown next to the postal address in the footer. */
+export const BRAND_LEGAL_NAME = COMPANY_LEGAL_NAME;
 export const BRAND_TAGLINE = "All your designs, one subscription.";
 
 /**
@@ -95,8 +98,8 @@ export const BRAND_TAGLINE = "All your designs, one subscription.";
  * this stays correct across environments without per-env code changes.
  */
 export const BRAND_WEBSITE = process.env.NEXT_PUBLIC_APP_URL || "https://brandbite.studio";
-export const BRAND_SUPPORT_EMAIL = "support@brandbite.studio";
+export const BRAND_SUPPORT_EMAIL = CONTACT_EMAIL;
 
-/** Postal address line for the CAN-SPAM / EU-required footer. Set when
- *  the legal entity has a registered address. Null renders nothing. */
-export const BRAND_ADDRESS: string | null = null;
+/** Postal address line for the CAN-SPAM / EU-required footer. Sourced from
+ *  lib/brand.ts now that Brandbite FZE has a registered address. */
+export const BRAND_ADDRESS: string | null = COMPANY_ADDRESS;

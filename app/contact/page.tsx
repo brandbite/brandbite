@@ -15,6 +15,7 @@ import Image from "next/image";
 import { ContactForm } from "@/components/marketing/contact-form";
 import { HomeFooter } from "@/components/marketing/home-footer";
 import { HomeHeader } from "@/components/marketing/home-header";
+import { COMPANY_ADDRESS_LINES, COMPANY_LEGAL_NAME, CONTACT_EMAIL } from "@/lib/brand";
 
 export const metadata: Metadata = {
   title: "Contact",
@@ -82,8 +83,35 @@ export default function ContactPage() {
           </div>
         </section>
 
+        {/* Direct contact details */}
+        <section className="flex w-full flex-row items-stretch gap-5 bg-white px-[60px] pt-[60px] max-[767px]:flex-col max-[767px]:px-5 max-[767px]:pt-10">
+          <a
+            href={`mailto:${CONTACT_EMAIL}`}
+            className="group flex flex-1 flex-col gap-1.5 rounded-xl bg-[#F7F4F1] p-5 transition-colors hover:bg-[#FFF1EA]"
+          >
+            <span className="text-xs font-bold tracking-wider text-[#6B6E76] uppercase">Email</span>
+            <span
+              className={`${displayFont} text-lg leading-6 font-bold text-[#2B2D33] transition-colors group-hover:text-[#FF6426]`}
+            >
+              {CONTACT_EMAIL}
+            </span>
+          </a>
+          <address className="flex flex-1 flex-col gap-1.5 rounded-xl bg-[#F7F4F1] p-5 not-italic">
+            <span className="text-xs font-bold tracking-wider text-[#6B6E76] uppercase">
+              Office
+            </span>
+            <span className="text-base leading-6 text-[#2B2D33]">
+              <span className={`${displayFont} font-bold`}>{COMPANY_LEGAL_NAME}</span>
+              <br />
+              {COMPANY_ADDRESS_LINES[0]}
+              <br />
+              {COMPANY_ADDRESS_LINES[1]}
+            </span>
+          </address>
+        </section>
+
         {/* Form */}
-        <section className="flex w-full flex-col items-center gap-5 bg-white p-[60px] max-[767px]:gap-10 max-[767px]:px-5 max-[767px]:py-10">
+        <section className="flex w-full flex-col items-center gap-5 bg-white px-[60px] pt-10 pb-[60px] max-[767px]:gap-10 max-[767px]:px-5 max-[767px]:py-10">
           <ContactForm />
         </section>
 
