@@ -5,6 +5,9 @@
 //           node 15:92 ("Footer"): BB mascot + logo and the About/Contact/
 //           social row on top, then a hairline and the legal row — © notice
 //           (lib/brand.ts) on the left, policy links on the right.
+//           Horizontal padding is 56px (px-14) to line up with HomeHeader
+//           rather than the 100px inset drawn in Figma, so logo + hairline
+//           share the header's left/right edges.
 // @version: v2.0.0
 // @status: active
 // @lastUpdate: 2026-10-30
@@ -35,7 +38,7 @@ export function HomeFooter({ variant = "home" }: { variant?: "home" | "coming-so
     // Bottom padding is left to the page-level <div className="h-5" /> spacer
     // that follows every <HomeFooter /> call site.
     <footer
-      className={`flex w-full flex-col gap-2.5 px-[100px] pt-5 max-[1179px]:px-8 max-[767px]:px-5 ${
+      className={`flex w-full flex-col gap-2.5 px-14 pt-5 max-[1179px]:px-8 max-[767px]:px-5 ${
         isComingSoon ? "bg-white" : ""
       }`}
     >
