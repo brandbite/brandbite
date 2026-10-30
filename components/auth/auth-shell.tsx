@@ -1,13 +1,13 @@
 // -----------------------------------------------------------------------------
 // @file: components/auth/auth-shell.tsx
-// @purpose: Card chrome shared by the sign-up / log-in screens (2026 redesign).
+// @purpose: Page chrome shared by the sign-up / log-in screens (2026 redesign).
 //           Header (logo + "Back to home"), lavender BB panel on the left
 //           (desktop) or a banner above the form (mobile), the form slot on
 //           the right, and a © / Privacy footer row. Pure presentational —
 //           the auth logic lives in app/login/page.tsx.
-// @version: v1.0.0
+// @version: v1.1.0
 // @status: active
-// @lastUpdate: 2026-10-30
+// @lastUpdate: 2026-10-31
 // -----------------------------------------------------------------------------
 
 import Image from "next/image";
@@ -17,12 +17,38 @@ import { COMPANY_BRAND_NAME, copyrightYears } from "@/lib/brand";
 
 export const AUTH_DISPLAY_FONT = "font-[family-name:var(--font-inter)]";
 
+/**
+ * "fullbleed": the page itself is the layout — header and footer span the
+ * viewport, the lavender panel is flush with the left edge, no card border.
+ * "card": the same layout inside a centred, bordered, rounded card (the
+ * original mockup). Flip this one constant to switch; everything else is
+ * shared.
+ */
+const AUTH_SHELL_LAYOUT = "fullbleed" as "fullbleed" | "card";
+const isCard = AUTH_SHELL_LAYOUT === "card";
+
+const EDGE_PADDING = isCard ? "px-6" : "px-10 max-[1023px]:px-6";
+
 export function AuthShell({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-screen w-full flex-col items-center justify-center bg-[#F7F4F1] px-4 py-6 max-[767px]:px-3 max-[767px]:py-3">
-      <div className="flex w-full max-w-[1060px] flex-col overflow-hidden rounded-2xl border border-[#E6E2DD] bg-[#FBF9F7] shadow-[0_8px_30px_rgba(43,45,51,0.06)]">
+    <div
+      className={
+        isCard
+          ? "flex min-h-screen w-full flex-col items-center justify-center bg-[#F7F4F1] px-4 py-6 max-[767px]:px-3 max-[767px]:py-3"
+          : "flex min-h-screen w-full flex-col bg-[#F7F4F1]"
+      }
+    >
+      <div
+        className={
+          isCard
+            ? "flex w-full max-w-[1060px] flex-col overflow-hidden rounded-2xl border border-[#E6E2DD] bg-[#FBF9F7] shadow-[0_8px_30px_rgba(43,45,51,0.06)]"
+            : "flex w-full flex-1 flex-col"
+        }
+      >
         {/* Header */}
-        <header className="flex items-center justify-between px-6 py-4 max-[767px]:px-5">
+        <header
+          className={`flex items-center justify-between py-4 max-[767px]:px-5 ${EDGE_PADDING}`}
+        >
           <Link href="/" className="flex shrink-0" aria-label="Brandbite home">
             <Image src="/brandbite-logo.svg" alt="Brandbite" width={118} height={24} priority />
           </Link>
@@ -51,7 +77,9 @@ export function AuthShell({ children }: { children: ReactNode }) {
         </header>
 
         {/* Body */}
-        <div className="flex flex-row items-stretch max-[1023px]:flex-col">
+        <div
+          className={`flex flex-row items-stretch max-[1023px]:flex-col ${isCard ? "" : "flex-1"}`}
+        >
           {/* Desktop: lavender BB panel */}
           <aside className="relative w-[52%] shrink-0 overflow-hidden bg-[#E7DEFC] max-[1023px]:hidden">
             <Image
@@ -59,13 +87,15 @@ export function AuthShell({ children }: { children: ReactNode }) {
               alt="Good creative. Great to have you. BB the unicorn working on a laptop."
               fill
               priority
-              sizes="(min-width: 1024px) 560px, 0px"
+              sizes="(min-width: 1024px) 52vw, 0px"
               className="object-contain object-bottom"
             />
           </aside>
 
           {/* Mobile / tablet: banner above the form */}
-          <div className="hidden px-5 pt-1 max-[1023px]:block">
+          <div
+            className={`hidden pt-1 max-[1023px]:block ${isCard ? "px-5" : "px-6 max-[767px]:px-5"}`}
+          >
             <Image
               src="/home/auth-banner.webp"
               alt="More bite. Less briefing drama. BB the unicorn working on a laptop."
@@ -78,7 +108,11 @@ export function AuthShell({ children }: { children: ReactNode }) {
           </div>
 
           {/* Form slot */}
-          <section className="flex flex-1 flex-col justify-center px-14 py-10 max-[1179px]:px-8 max-[1023px]:px-5 max-[1023px]:py-6">
+          <section
+            className={`flex flex-1 flex-col justify-center px-14 max-[1179px]:px-8 max-[1023px]:justify-start max-[1023px]:px-5 max-[1023px]:py-6 ${
+              isCard ? "py-10" : "py-12"
+            }`}
+          >
             <div className="mx-auto w-full max-w-[360px] max-[1023px]:max-w-[460px]">
               {children}
             </div>
@@ -86,7 +120,9 @@ export function AuthShell({ children }: { children: ReactNode }) {
         </div>
 
         {/* Footer */}
-        <footer className="flex items-center justify-between px-6 py-3 text-xs text-[#5E616E] max-[767px]:px-5">
+        <footer
+          className={`flex items-center justify-between py-3 text-xs text-[#5E616E] max-[767px]:px-5 ${EDGE_PADDING}`}
+        >
           <span>
             &copy; {copyrightYears()} {COMPANY_BRAND_NAME}
           </span>
