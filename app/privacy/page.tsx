@@ -25,7 +25,7 @@ export const metadata: Metadata = {
 
 const displayFont = "font-[family-name:var(--font-inter)]";
 
-const RULES = [
+const RULES: { id?: string; icon: string; title: string; body: string }[] = [
   {
     icon: "/home/about-clarity.png",
     title: "We collect only what we need",
@@ -40,6 +40,15 @@ const RULES = [
     icon: "/home/about-momentum.png",
     title: "You stay in control",
     body: "You can request access, updates or deletion of your information anytime. Clear rights, simple process, zero tiny-print drama.",
+  },
+  {
+    // Cookie notice — linked from the footer as /privacy#cookies and from the
+    // legacy /cookies redirect. Keep this in sync with what the app actually
+    // sets: a session cookie and Cloudflare Turnstile on sign-up, nothing else.
+    id: "cookies",
+    icon: "/home/step-brief.png",
+    title: "Cookies, kept to a minimum",
+    body: "We set one cookie to keep you signed in, and the sign-up form uses Cloudflare Turnstile to block bots. Your theme preference stays in your browser's local storage. No analytics, advertising or tracking cookies, so there is nothing to opt out of.",
   },
 ];
 
@@ -105,7 +114,8 @@ export default function PrivacyPage() {
           {RULES.map((rule) => (
             <div
               key={rule.title}
-              className="flex w-full flex-row items-center gap-px rounded-xl bg-[#F7F4F1] px-5 max-[767px]:p-5"
+              id={rule.id}
+              className="flex w-full scroll-mt-5 flex-row items-center gap-px rounded-xl bg-[#F7F4F1] px-5 max-[767px]:p-5"
             >
               <Image src={rule.icon} alt="" width={100} height={100} className="shrink-0" />
               <div className="flex min-w-px flex-1 flex-col items-start justify-center gap-[5px] border-l border-[#D7D8DD] py-5 pl-5">

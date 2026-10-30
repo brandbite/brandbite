@@ -575,7 +575,7 @@ export default function OnboardingPage() {
             <Link href="/privacy" className="hover:text-white">
               Privacy Policy
             </Link>
-            <Link href="/cookies" className="hover:text-white">
+            <Link href="/privacy#cookies" className="hover:text-white">
               Cookies
             </Link>
             <Link href="/accessibility" className="hover:text-white">

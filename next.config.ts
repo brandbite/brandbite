@@ -102,6 +102,16 @@ const nextConfig: NextConfig = {
       headers: securityHeaders,
     },
   ],
+  redirects: async () => [
+    {
+      // The cookie notice is a section of the Privacy Policy now; the site
+      // sets no analytics/advertising cookies, so the standalone CMS page
+      // was retired. Keep old links + the retired CMS footer working.
+      source: "/cookies",
+      destination: "/privacy#cookies",
+      permanent: true,
+    },
+  ],
 };
 
 export default withSentryConfig(nextConfig, {

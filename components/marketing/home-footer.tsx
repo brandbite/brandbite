@@ -22,12 +22,12 @@ const MAIN_LINKS = [
   { label: "Contact", href: "/contact" },
 ];
 
-// "Cookie Preferences" points at the cookie policy for now — there is no
-// consent-preference centre in the app yet. Swap the href once one exists.
+// Cookie information lives as a section inside the Privacy Policy (the site
+// sets no analytics/advertising cookies, so there is no preference centre and
+// nothing to opt out of). /cookies permanently redirects there.
 const LEGAL_LINKS = [
   { label: "Privacy Policy", href: "/privacy" },
-  { label: "Cookie Notice", href: "/cookies" },
-  { label: "Cookie Preferences", href: "/cookies" },
+  { label: "Cookie Notice", href: "/privacy#cookies" },
   { label: "Terms of Use", href: "/terms" },
 ];
 
