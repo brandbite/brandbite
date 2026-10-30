@@ -54,7 +54,7 @@ export function HomeHeader({ active }: { active?: string } = {}) {
         ))}
       </nav>
       <Link
-        href="/coming-soon"
+        href="/login?mode=signup"
         className="font-brand flex h-10 w-[141px] shrink-0 flex-row items-center justify-center gap-2.5 rounded-[10px] bg-[#1F2024] px-5 py-2.5 text-xl leading-none font-bold text-white transition-colors hover:bg-[#FF6426] max-[767px]:ml-auto max-[767px]:h-9 max-[767px]:w-auto max-[767px]:px-3.5 max-[767px]:py-2 max-[767px]:text-base"
       >
         Start Now!

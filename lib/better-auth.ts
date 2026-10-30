@@ -273,6 +273,27 @@ export const auth = betterAuth({
     },
   },
 
+  // ----------------------------------------------------------------
+  // Google sign-in (optional)
+  //
+  // Only wired when both credentials are present so local/CI builds
+  // without a Google OAuth client keep working. The /login page shows
+  // the "Continue with Google" button when NEXT_PUBLIC_GOOGLE_AUTH_ENABLED
+  // is "true" — keep the two in sync per environment. Authorised
+  // redirect URI in Google Cloud Console:
+  //   <NEXT_PUBLIC_APP_URL>/api/auth/callback/google
+  // ----------------------------------------------------------------
+  ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+    ? {
+        socialProviders: {
+          google: {
+            clientId: process.env.GOOGLE_CLIENT_ID,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+          },
+        },
+      }
+    : {}),
+
   plugins: [
     // ----------------------------------------------------------------
     // Login two-factor authentication

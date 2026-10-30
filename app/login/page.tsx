@@ -1,16 +1,21 @@
 // -----------------------------------------------------------------------------
 // @file: app/login/page.tsx
-// @purpose: Combined sign-in / sign-up page with email+password and magic link.
-// @version: v1.0.0
+// @purpose: Combined sign-up / log-in page (2026 redesign). Email+password,
+//           optional Google sign-in, magic link, login 2FA, Turnstile on
+//           sign-up. Chrome (card, BB panel, footer) comes from
+//           components/auth/auth-shell.tsx; this file owns the auth logic.
+//           `?mode=signup` opens the sign-up tab (used by the homepage
+//           "Start Now!" CTA); `?redirect=/path` routes there after login.
+// @version: v2.0.0
 // @status: active
-// @lastUpdate: 2026-02-22
+// @lastUpdate: 2026-10-30
 // -----------------------------------------------------------------------------
 
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { BrandLogo } from "@/components/ui/brand-logo";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 import { authClient } from "@/lib/auth-client";
@@ -21,10 +26,23 @@ import {
 } from "@/lib/auth-error-messages";
 import { PASSWORD_POLICY_BULLETS, validatePasswordStrength } from "@/lib/password-policy";
 import { PasswordInput } from "@/components/ui/password-input";
+import {
+  AUTH_ERROR_CLASS,
+  AUTH_INPUT_CLASS,
+  AUTH_LABEL_CLASS,
+  AUTH_LINK_CLASS,
+  AUTH_PRIMARY_BUTTON_CLASS,
+  AUTH_SECONDARY_BUTTON_CLASS,
+  AuthHeading,
+  AuthShell,
+} from "@/components/auth/auth-shell";
 
 type Mode = "signin" | "signup";
 type Status = "idle" | "submitting" | "magic-link-sent" | "awaiting-2fa" | "error";
 type TwoFactorMode = "totp" | "backup";
+
+const CHECKBOX_CLASS =
+  "h-4 w-4 shrink-0 cursor-pointer rounded border-[#D7D8DD] accent-[#FF6426] focus:ring-1 focus:ring-[#FF6426]";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -36,10 +54,14 @@ export default function LoginPage() {
       ? rawRedirect
       : null;
 
-  const [mode, setMode] = useState<Mode>("signin");
+  const [mode, setMode] = useState<Mode>(
+    searchParams.get("mode") === "signup" ? "signup" : "signin",
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
@@ -56,6 +78,13 @@ export default function LoginPage() {
 
   const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
+  // Mirrors the server-side GOOGLE_CLIENT_ID/SECRET gate in lib/better-auth.ts.
+  const googleEnabled = process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED === "true";
+
+  function switchMode(next: Mode) {
+    setMode(next);
+    setError(null);
+  }
 
   // ---------------------------------------------------------------------------
   // Post-login redirect
@@ -111,6 +140,10 @@ export default function LoginPage() {
       const check = validatePasswordStrength(password);
       if (!check.ok) {
         setError(check.error);
+        return;
+      }
+      if (!agreedToTerms) {
+        setError("Please agree to the Terms of Service and Privacy Policy to continue.");
         return;
       }
     }
@@ -188,6 +221,9 @@ export default function LoginPage() {
       const { data: signInData, error: signInError } = await authClient.signIn.email({
         email: email.trim(),
         password,
+        // Unchecked "Remember me" → session cookie only (cleared when the
+        // browser closes) instead of BetterAuth's persistent default.
+        rememberMe,
       });
       if (signInError) {
         if (isUnverifiedEmailError(signInError as AuthClientError)) {
@@ -212,6 +248,31 @@ export default function LoginPage() {
       }
 
       await handlePostLogin();
+    } catch {
+      setError("Something went wrong. Please try again.");
+      setStatus("error");
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Google sign-in — BetterAuth social flow. Lands back on /login?callback=true
+  // (or the requested redirect) so the role-based routing below applies to
+  // Google users exactly as it does to password users.
+  // ---------------------------------------------------------------------------
+
+  async function handleGoogle() {
+    setError(null);
+    setStatus("submitting");
+    try {
+      const { error: socialError } = await authClient.signIn.social({
+        provider: "google",
+        callbackURL: redirectTo ?? "/login?callback=true",
+      });
+      if (socialError) {
+        setError(mapAuthError(socialError as AuthClientError, "Google sign-in failed."));
+        setStatus("error");
+      }
+      // On success the browser navigates to Google; nothing else to do.
     } catch {
       setError("Something went wrong. Please try again.");
       setStatus("error");
@@ -266,7 +327,7 @@ export default function LoginPage() {
     setError(null);
 
     if (!email.trim()) {
-      setError("Enter your email to receive a magic link.");
+      setError("Enter your email above and we'll send you a magic link.");
       return;
     }
 
@@ -292,16 +353,16 @@ export default function LoginPage() {
   }
 
   // ---------------------------------------------------------------------------
-  // Auto-redirect after magic link callback
+  // Auto-redirect after magic link / Google callback
   // ---------------------------------------------------------------------------
 
   const isCallback = searchParams.get("callback") === "true";
   if (isCallback) {
     handlePostLogin();
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--bb-bg-page)]">
-        <p className="text-sm text-[var(--bb-text-secondary)]">Signing you in...</p>
-      </div>
+      <AuthShell>
+        <AuthHeading title="Signing you in…" subtitle="One second while we open your board." />
+      </AuthShell>
     );
   }
 
@@ -311,45 +372,23 @@ export default function LoginPage() {
 
   if (status === "magic-link-sent") {
     return (
-      <div className="flex min-h-screen flex-col bg-[var(--bb-bg-page)]">
-        <header className="flex items-center border-b border-[var(--bb-border-subtle)] px-6 py-4">
-          <Link href="/" className="flex items-center" aria-label="Brandbite home">
-            <BrandLogo width={120} className="h-6 w-auto" />
-          </Link>
-        </header>
-        <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-6">
-          <div className="w-full rounded-2xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-card)] p-8 text-center shadow-sm">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--bb-primary)]/10">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                className="h-6 w-6 text-[var(--bb-primary)]"
-              >
-                <path d="M1.5 8.67v8.58a3 3 0 0 0 3 3h15a3 3 0 0 0 3-3V8.67l-8.928 5.493a3 3 0 0 1-3.144 0L1.5 8.67Z" />
-                <path d="M22.5 6.908V6.75a3 3 0 0 0-3-3h-15a3 3 0 0 0-3 3v.158l9.714 5.978a1.5 1.5 0 0 0 1.572 0L22.5 6.908Z" />
-              </svg>
-            </div>
-            <h2 className="text-xl font-bold text-[var(--bb-secondary)]">Check your email</h2>
-            <p className="mt-2 text-sm text-[var(--bb-text-secondary)]">
-              We sent a sign-in link to{" "}
-              <span className="font-medium text-[var(--bb-secondary)]">{email}</span>
-            </p>
-            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-              The link expires in 5 minutes.
-            </p>
-            <button
-              onClick={() => {
-                setStatus("idle");
-                setError(null);
-              }}
-              className="mt-6 text-sm font-medium text-[var(--bb-primary)] hover:underline"
-            >
-              Back to sign in
-            </button>
-          </div>
-        </div>
-      </div>
+      <AuthShell>
+        <AuthHeading title="Check your email" subtitle="Your sign-in link is on its way." />
+        <p className="text-sm leading-6 text-[#2B2D33]">
+          We sent a sign-in link to <span className="font-bold">{email}</span>. The link expires in
+          5 minutes.
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            setStatus("idle");
+            setError(null);
+          }}
+          className={`mt-6 text-sm ${AUTH_LINK_CLASS}`}
+        >
+          Back to log in
+        </button>
+      </AuthShell>
     );
   }
 
@@ -363,340 +402,347 @@ export default function LoginPage() {
   // the input + endpoint without leaving the page.
   // ---------------------------------------------------------------------------
 
-  if (status === "awaiting-2fa" || status === "submitting") {
-    if (status === "awaiting-2fa") {
-      return (
-        <div className="flex min-h-screen flex-col bg-[var(--bb-bg-page)]">
-          <header className="flex items-center border-b border-[var(--bb-border-subtle)] px-6 py-4">
-            <Link href="/" className="flex items-center" aria-label="Brandbite home">
-              <BrandLogo width={120} className="h-6 w-auto" />
-            </Link>
-          </header>
-          <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-6">
-            <div className="w-full rounded-2xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-card)] p-8 shadow-sm">
-              <h2 className="text-xl font-bold text-[var(--bb-secondary)]">
-                Two-factor authentication
-              </h2>
-              <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-                {twoFactorMode === "totp"
-                  ? "Open your authenticator app and enter the 6-digit code."
-                  : "Enter one of the backup codes you saved when you set up 2FA. Each code only works once."}
-              </p>
-              <form onSubmit={handleTwoFactorSubmit} className="mt-6 space-y-4">
-                <div>
-                  <label
-                    htmlFor="twoFactorCode"
-                    className="block text-xs font-medium text-[var(--bb-text-secondary)]"
-                  >
-                    {twoFactorMode === "totp" ? "Authenticator code" : "Backup code"}
-                  </label>
-                  <input
-                    id="twoFactorCode"
-                    type="text"
-                    inputMode={twoFactorMode === "totp" ? "numeric" : "text"}
-                    autoComplete="one-time-code"
-                    autoFocus
-                    value={twoFactorCode}
-                    onChange={(e) => setTwoFactorCode(e.target.value)}
-                    placeholder={twoFactorMode === "totp" ? "123 456" : "abcd-efgh-ijkl"}
-                    className="mt-1 w-full rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] px-3 py-2 text-base tracking-widest text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
-                  />
-                </div>
-                {error && (
-                  <div
-                    role="alert"
-                    className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"
-                  >
-                    {error}
-                  </div>
-                )}
-                <button
-                  type="submit"
-                  className="w-full rounded-xl bg-[var(--bb-primary)] px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-                >
-                  Verify and continue
-                </button>
-                <div className="flex items-center justify-between text-xs">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTwoFactorMode((m) => (m === "totp" ? "backup" : "totp"));
-                      setTwoFactorCode("");
-                      setError(null);
-                    }}
-                    className="font-medium text-[var(--bb-primary)] hover:underline"
-                  >
-                    {twoFactorMode === "totp"
-                      ? "Use a backup code instead"
-                      : "Use the authenticator app instead"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setStatus("idle");
-                      setTwoFactorCode("");
-                      setError(null);
-                    }}
-                    className="text-[var(--bb-text-muted)] hover:underline"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            </div>
+  if (status === "awaiting-2fa") {
+    return (
+      <AuthShell>
+        <AuthHeading
+          title="One more step."
+          subtitle={
+            twoFactorMode === "totp"
+              ? "Open your authenticator app and enter the 6-digit code."
+              : "Enter one of the backup codes you saved when you set up 2FA. Each code only works once."
+          }
+        />
+        <form onSubmit={handleTwoFactorSubmit} className="flex flex-col gap-4">
+          <div>
+            <label htmlFor="twoFactorCode" className={AUTH_LABEL_CLASS}>
+              {twoFactorMode === "totp" ? "Authenticator code" : "Backup code"}
+            </label>
+            <input
+              id="twoFactorCode"
+              type="text"
+              inputMode={twoFactorMode === "totp" ? "numeric" : "text"}
+              autoComplete="one-time-code"
+              autoFocus
+              value={twoFactorCode}
+              onChange={(e) => setTwoFactorCode(e.target.value)}
+              placeholder={twoFactorMode === "totp" ? "123 456" : "abcd-efgh-ijkl"}
+              className={`${AUTH_INPUT_CLASS} tracking-widest`}
+            />
           </div>
-        </div>
-      );
-    }
+          {error && (
+            <div role="alert" className={AUTH_ERROR_CLASS}>
+              {error}
+            </div>
+          )}
+          <button type="submit" className={AUTH_PRIMARY_BUTTON_CLASS}>
+            Verify and continue
+            <Image src="/home/arrow-white.svg" alt="" width={20} height={15.7} />
+          </button>
+          <div className="flex items-center justify-between text-xs">
+            <button
+              type="button"
+              onClick={() => {
+                setTwoFactorMode((m) => (m === "totp" ? "backup" : "totp"));
+                setTwoFactorCode("");
+                setError(null);
+              }}
+              className={AUTH_LINK_CLASS}
+            >
+              {twoFactorMode === "totp"
+                ? "Use a backup code instead"
+                : "Use the authenticator app instead"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setStatus("idle");
+                setTwoFactorCode("");
+                setError(null);
+              }}
+              className="text-[#5E616E] hover:underline"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </AuthShell>
+    );
   }
 
   // ---------------------------------------------------------------------------
-  // Main login form
+  // Main sign-up / log-in form
   // ---------------------------------------------------------------------------
 
+  const isSignup = mode === "signup";
+  const submitting = status === "submitting";
+
   return (
-    <div className="flex min-h-screen flex-col bg-[var(--bb-bg-page)]">
-      {/* Header */}
-      <header className="flex items-center border-b border-[var(--bb-border-subtle)] px-6 py-4">
-        <Link href="/" className="flex items-center" aria-label="Brandbite home">
-          <BrandLogo width={120} className="h-6 w-auto" />
-        </Link>
-      </header>
-
-      {/* Content */}
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-6">
-        <div className="w-full rounded-2xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-card)] p-8 shadow-sm">
-          {/* ?expired=1 — arrives here when the SessionTimeoutWarning's
-              countdown reached zero without the user clicking "Stay
-              signed in". Plain banner; `role="status"` so screen readers
-              announce it alongside the form title. */}
-          {searchParams.get("expired") === "1" && (
-            <div
-              role="status"
-              className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
-            >
-              Your session expired for security. Sign in again to continue.
-            </div>
-          )}
-          {/* Mode toggle */}
-          <div className="mb-6 flex rounded-xl bg-[var(--bb-bg-page)] p-1">
-            <button
-              onClick={() => {
-                setMode("signin");
-                setError(null);
-              }}
-              className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-colors ${
-                mode === "signin"
-                  ? "bg-[var(--bb-bg-card)] text-[var(--bb-secondary)] shadow-sm"
-                  : "text-[var(--bb-text-muted)] hover:text-[var(--bb-text-secondary)]"
-              }`}
-            >
-              Sign in
-            </button>
-            <button
-              onClick={() => {
-                setMode("signup");
-                setError(null);
-              }}
-              className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-colors ${
-                mode === "signup"
-                  ? "bg-[var(--bb-bg-card)] text-[var(--bb-secondary)] shadow-sm"
-                  : "text-[var(--bb-text-muted)] hover:text-[var(--bb-text-secondary)]"
-              }`}
-            >
-              Create account
-            </button>
-          </div>
-
-          {/* Form */}
-          <form onSubmit={handlePasswordSubmit} className="space-y-4">
-            {mode === "signup" && (
-              <div>
-                <label
-                  htmlFor="login-name"
-                  className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-                >
-                  Name
-                </label>
-                <input
-                  id="login-name"
-                  type="text"
-                  value={name}
-                  onChange={(e) => {
-                    if (error) setError(null);
-                    setName(e.target.value);
-                  }}
-                  placeholder="Your name"
-                  autoComplete="name"
-                  aria-describedby={error ? "login-error" : undefined}
-                  className="w-full rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] px-3.5 py-2.5 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
-                />
-              </div>
-            )}
-
-            <div>
-              <label
-                htmlFor="login-email"
-                className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-              >
-                Email <span className="text-[var(--bb-primary)]">*</span>
-              </label>
-              <input
-                id="login-email"
-                type="email"
-                value={email}
-                onChange={(e) => {
-                  if (error) setError(null);
-                  setEmail(e.target.value);
-                }}
-                placeholder="you@company.com"
-                autoComplete="email"
-                aria-describedby={error ? "login-error" : undefined}
-                className="w-full rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] px-3.5 py-2.5 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="login-password"
-                className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-              >
-                Password <span className="text-[var(--bb-primary)]">*</span>
-              </label>
-              <PasswordInput
-                id="login-password"
-                value={password}
-                onChange={(e) => {
-                  if (error) setError(null);
-                  setPassword(e.target.value);
-                }}
-                placeholder={mode === "signup" ? "At least 12 characters" : "Your password"}
-                autoComplete={mode === "signup" ? "new-password" : "current-password"}
-                aria-describedby={
-                  error ? "login-error" : mode === "signup" ? "login-password-rules" : undefined
-                }
-              />
-              {mode === "signup" && (
-                <PasswordRulesChecklist id="login-password-rules" password={password} />
-              )}
-              {mode === "signin" && (
-                <Link
-                  href="/reset-password"
-                  className="mt-1 block text-right text-xs font-medium text-[var(--bb-primary)] hover:underline"
-                >
-                  Forgot password?
-                </Link>
-              )}
-            </div>
-
-            {/* Cloudflare Turnstile — anti-bot challenge on signup only.
-                "Managed" mode means most humans see nothing (invisible);
-                bots and suspicious traffic get an interactive challenge.
-                We only render this when the site key is configured —
-                local dev/CI without Cloudflare keeps working. */}
-            {mode === "signup" && turnstileSiteKey && (
-              <div className="flex justify-center pt-1">
-                <Turnstile
-                  ref={turnstileRef}
-                  siteKey={turnstileSiteKey}
-                  onSuccess={(token) => setTurnstileToken(token)}
-                  onError={() => setTurnstileToken(null)}
-                  onExpire={() => setTurnstileToken(null)}
-                  options={{
-                    theme: "light",
-                    size: "flexible",
-                  }}
-                />
-              </div>
-            )}
-
-            {/* Error message — aria-describedby on each input above points
-                at this id so screen readers associate the error with the
-                failing field. role=alert announces it immediately. */}
-            {error && (
-              <p
-                id="login-error"
-                role="alert"
-                className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600 dark:bg-red-900/20 dark:text-red-400"
-              >
-                {error}
-              </p>
-            )}
-
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={status === "submitting"}
-              className="w-full rounded-xl bg-[var(--bb-primary)] px-6 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-            >
-              {status === "submitting"
-                ? "Please wait..."
-                : mode === "signin"
-                  ? "Sign in"
-                  : "Create account"}
-            </button>
-
-            {mode === "signup" && (
-              <p className="pt-1 text-center text-[11px] text-[var(--bb-text-muted)]">
-                By creating an account you agree to our{" "}
-                <Link
-                  href="/terms"
-                  className="font-medium text-[var(--bb-text-secondary)] hover:underline"
-                >
-                  Terms
-                </Link>{" "}
-                and{" "}
-                <Link
-                  href="/privacy"
-                  className="font-medium text-[var(--bb-text-secondary)] hover:underline"
-                >
-                  Privacy Policy
-                </Link>
-                .
-              </p>
-            )}
-          </form>
-
-          {/* Divider */}
-          <div className="my-5 flex items-center gap-3">
-            <div className="h-px flex-1 bg-[var(--bb-border)]" />
-            <span className="text-xs text-[var(--bb-text-muted)]">or</span>
-            <div className="h-px flex-1 bg-[var(--bb-border)]" />
-          </div>
-
-          {/* Magic link */}
-          <button
-            onClick={handleMagicLink}
-            disabled={status === "submitting"}
-            className="w-full rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] px-6 py-2.5 text-sm font-semibold text-[var(--bb-secondary)] transition-colors hover:bg-[var(--bb-bg-page)] disabled:opacity-50"
-          >
-            Send magic link
-          </button>
-          <p className="mt-2 text-center text-xs text-[var(--bb-text-tertiary)]">
-            No password needed — we&apos;ll email you a sign-in link.
-          </p>
-
-          {/* Demo mode link */}
-          {isDemoMode && (
-            <div className="mt-6 border-t border-[var(--bb-border-subtle)] pt-4 text-center">
-              <a
-                href="/debug/demo-user"
-                className="text-xs font-medium text-[var(--bb-primary)] hover:underline"
-              >
-                Use demo personas instead
-              </a>
-            </div>
-          )}
+    <AuthShell>
+      {/* ?expired=1 — arrives here when the SessionTimeoutWarning's
+          countdown reached zero without the user clicking "Stay
+          signed in". Plain banner; `role="status"` so screen readers
+          announce it alongside the form title. */}
+      {searchParams.get("expired") === "1" && (
+        <div
+          role="status"
+          className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+        >
+          Your session expired for security. Log in again to continue.
         </div>
+      )}
+
+      <AuthHeading
+        title={isSignup ? "Let’s make it happen." : "Back for another bite?"}
+        subtitle={
+          isSignup ? "Your next great creative starts here." : "Your creative flow is waiting."
+        }
+      />
+
+      {/* Mode toggle */}
+      <div
+        role="tablist"
+        aria-label="Sign up or log in"
+        className="mb-4 flex rounded-xl border border-[#D7D8DD] bg-white p-0.5"
+      >
+        {(
+          [
+            { key: "signup", label: "Sign up" },
+            { key: "signin", label: "Log in" },
+          ] as const
+        ).map((tab) => {
+          const active = mode === tab.key;
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => switchMode(tab.key)}
+              className={`h-9 flex-1 rounded-[10px] text-sm font-bold transition-colors ${
+                active ? "bg-[#FF6426] text-white" : "text-[#2B2D33] hover:text-[#FF6426]"
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
-    </div>
+
+      {/* Google */}
+      {googleEnabled && (
+        <>
+          <button
+            type="button"
+            onClick={handleGoogle}
+            disabled={submitting}
+            className={AUTH_SECONDARY_BUTTON_CLASS}
+          >
+            <Image src="/home/google-g.svg" alt="" width={20} height={20} />
+            Continue with Google
+          </button>
+          <div className="my-4 flex items-center gap-3 text-xs text-[#5E616E]">
+            <span className="h-px flex-1 bg-[#D7D8DD]" />
+            {isSignup ? "or sign up with email" : "or log in with email"}
+            <span className="h-px flex-1 bg-[#D7D8DD]" />
+          </div>
+        </>
+      )}
+
+      {/* Form */}
+      <form onSubmit={handlePasswordSubmit} className="flex flex-col gap-3.5" noValidate>
+        {isSignup && (
+          <div>
+            <label htmlFor="login-name" className={AUTH_LABEL_CLASS}>
+              Full name
+            </label>
+            <input
+              id="login-name"
+              type="text"
+              value={name}
+              onChange={(e) => {
+                if (error) setError(null);
+                setName(e.target.value);
+              }}
+              placeholder="Your name"
+              autoComplete="name"
+              aria-describedby={error ? "login-error" : undefined}
+              className={AUTH_INPUT_CLASS}
+            />
+          </div>
+        )}
+
+        <div>
+          <label htmlFor="login-email" className={AUTH_LABEL_CLASS}>
+            {isSignup ? "Work email" : "Email address"}
+          </label>
+          <input
+            id="login-email"
+            type="email"
+            value={email}
+            onChange={(e) => {
+              if (error) setError(null);
+              setEmail(e.target.value);
+            }}
+            placeholder="you@company.com"
+            autoComplete="email"
+            required
+            aria-describedby={error ? "login-error" : undefined}
+            className={AUTH_INPUT_CLASS}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="login-password" className={AUTH_LABEL_CLASS}>
+            Password
+          </label>
+          <PasswordInput
+            id="login-password"
+            value={password}
+            onChange={(e) => {
+              if (error) setError(null);
+              setPassword(e.target.value);
+            }}
+            placeholder={isSignup ? "Create a password" : "Your password"}
+            autoComplete={isSignup ? "new-password" : "current-password"}
+            required
+            aria-describedby={error ? "login-error" : isSignup ? "login-password-rules" : undefined}
+          />
+          {isSignup &&
+            (password ? (
+              <PasswordRulesChecklist id="login-password-rules" password={password} />
+            ) : (
+              <p id="login-password-rules" className="mt-1.5 text-xs text-[#5E616E]">
+                At least 12 characters, with a number and a symbol.
+              </p>
+            ))}
+        </div>
+
+        {isSignup ? (
+          <label className="flex cursor-pointer items-start gap-2.5 text-sm text-[#2B2D33]">
+            <input
+              type="checkbox"
+              checked={agreedToTerms}
+              onChange={(e) => {
+                if (error) setError(null);
+                setAgreedToTerms(e.target.checked);
+              }}
+              className={`${CHECKBOX_CLASS} mt-0.5`}
+            />
+            <span>
+              I agree to the{" "}
+              <Link
+                href="/terms"
+                className="font-semibold underline underline-offset-2 hover:text-[#FF6426]"
+              >
+                Terms of Service
+              </Link>{" "}
+              and{" "}
+              <Link
+                href="/privacy"
+                className="font-semibold underline underline-offset-2 hover:text-[#FF6426]"
+              >
+                Privacy Policy
+              </Link>
+            </span>
+          </label>
+        ) : (
+          <div className="flex items-center justify-between text-sm">
+            <label className="flex cursor-pointer items-center gap-2.5 text-[#2B2D33]">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className={CHECKBOX_CLASS}
+              />
+              Remember me
+            </label>
+            <Link href="/reset-password" className={AUTH_LINK_CLASS}>
+              Forgot password?
+            </Link>
+          </div>
+        )}
+
+        {/* Cloudflare Turnstile — anti-bot challenge on signup only.
+            "Managed" mode means most humans see nothing (invisible);
+            bots and suspicious traffic get an interactive challenge.
+            We only render this when the site key is configured —
+            local dev/CI without Cloudflare keeps working. */}
+        {isSignup && turnstileSiteKey && (
+          <div className="flex justify-center">
+            <Turnstile
+              ref={turnstileRef}
+              siteKey={turnstileSiteKey}
+              onSuccess={(token) => setTurnstileToken(token)}
+              onError={() => setTurnstileToken(null)}
+              onExpire={() => setTurnstileToken(null)}
+              options={{
+                theme: "light",
+                size: "flexible",
+              }}
+            />
+          </div>
+        )}
+
+        {/* Error message — aria-describedby on each input above points
+            at this id so screen readers associate the error with the
+            failing field. role=alert announces it immediately. */}
+        {error && (
+          <p id="login-error" role="alert" className={AUTH_ERROR_CLASS}>
+            {error}
+          </p>
+        )}
+
+        <button type="submit" disabled={submitting} className={AUTH_PRIMARY_BUTTON_CLASS}>
+          {submitting ? "Please wait…" : isSignup ? "Create account" : "Log in"}
+          {!submitting && <Image src="/home/arrow-white.svg" alt="" width={20} height={15.7} />}
+        </button>
+      </form>
+
+      {/* Switch mode */}
+      <p className="mt-4 text-center text-sm text-[#2B2D33]">
+        {isSignup ? "Already have an account? " : "New to Brandbite? "}
+        <button
+          type="button"
+          onClick={() => switchMode(isSignup ? "signin" : "signup")}
+          className={AUTH_LINK_CLASS}
+        >
+          {isSignup ? "Log in" : "Create an account"}
+        </button>
+      </p>
+
+      {/* Magic link — password-free alternative for existing accounts. */}
+      {!isSignup && (
+        <p className="mt-2 text-center text-xs text-[#5E616E]">
+          Prefer no password?{" "}
+          <button
+            type="button"
+            onClick={handleMagicLink}
+            disabled={submitting}
+            className="font-semibold text-[#2B2D33] underline underline-offset-2 hover:text-[#FF6426] disabled:opacity-60"
+          >
+            Email me a magic link
+          </button>
+        </p>
+      )}
+
+      {/* Demo mode link */}
+      {isDemoMode && (
+        <p className="mt-4 border-t border-[#E6E2DD] pt-3 text-center text-xs">
+          <a href="/debug/demo-user" className={AUTH_LINK_CLASS}>
+            Use demo personas instead
+          </a>
+        </p>
+      )}
+    </AuthShell>
   );
 }
 
 /**
- * Live password-policy checklist shown below the sign-up password field.
- * Each bullet turns green when its rule passes. Uses `useMemo` so the
- * test callbacks run once per keystroke rather than on every re-render.
+ * Live password-policy checklist shown below the sign-up password field
+ * once the user starts typing. Each bullet turns green when its rule
+ * passes. Uses `useMemo` so the test callbacks run once per keystroke
+ * rather than on every re-render.
  */
 function PasswordRulesChecklist({ id, password }: { id: string; password: string }) {
   const results = useMemo(
@@ -706,7 +752,7 @@ function PasswordRulesChecklist({ id, password }: { id: string; password: string
   return (
     <ul
       id={id}
-      className="mt-2 space-y-0.5 text-[11px] text-[var(--bb-text-secondary)]"
+      className="mt-2 space-y-0.5 text-xs text-[#5E616E]"
       aria-label="Password requirements"
     >
       {results.map((rule) => (
@@ -714,14 +760,12 @@ function PasswordRulesChecklist({ id, password }: { id: string; password: string
           <span
             aria-hidden="true"
             className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold ${
-              rule.passed
-                ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
-                : "bg-[var(--bb-bg-card-muted)] text-[var(--bb-text-tertiary)]"
+              rule.passed ? "bg-green-100 text-green-700" : "bg-[#EEEBE7] text-[#9A9CA5]"
             }`}
           >
-            {rule.passed ? "\u2713" : "\u2022"}
+            {rule.passed ? "✓" : "•"}
           </span>
-          <span className={rule.passed ? "text-[var(--bb-text-secondary)]" : ""}>{rule.label}</span>
+          <span className={rule.passed ? "text-[#2B2D33]" : ""}>{rule.label}</span>
         </li>
       ))}
     </ul>

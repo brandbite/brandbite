@@ -1,0 +1,127 @@
+// -----------------------------------------------------------------------------
+// @file: components/auth/auth-shell.tsx
+// @purpose: Card chrome shared by the sign-up / log-in screens (2026 redesign).
+//           Header (logo + "Back to home"), lavender BB panel on the left
+//           (desktop) or a banner above the form (mobile), the form slot on
+//           the right, and a © / Privacy footer row. Pure presentational —
+//           the auth logic lives in app/login/page.tsx.
+// @version: v1.0.0
+// @status: active
+// @lastUpdate: 2026-10-30
+// -----------------------------------------------------------------------------
+
+import Image from "next/image";
+import Link from "next/link";
+import type { ReactNode } from "react";
+import { COMPANY_BRAND_NAME, copyrightYears } from "@/lib/brand";
+
+export const AUTH_DISPLAY_FONT = "font-[family-name:var(--font-inter)]";
+
+export function AuthShell({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex min-h-screen w-full flex-col items-center justify-center bg-[#F7F4F1] px-4 py-6 max-[767px]:px-3 max-[767px]:py-3">
+      <div className="flex w-full max-w-[1060px] flex-col overflow-hidden rounded-2xl border border-[#E6E2DD] bg-[#FBF9F7] shadow-[0_8px_30px_rgba(43,45,51,0.06)]">
+        {/* Header */}
+        <header className="flex items-center justify-between px-6 py-4 max-[767px]:px-5">
+          <Link href="/" className="flex shrink-0" aria-label="Brandbite home">
+            <Image src="/brandbite-logo.svg" alt="Brandbite" width={118} height={24} priority />
+          </Link>
+          <Link
+            href="/"
+            className="flex items-center gap-2 text-sm font-medium text-[#2B2D33] transition-colors hover:text-[#FF6426]"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              aria-hidden="true"
+              className="shrink-0"
+            >
+              <path
+                d="M13 8H3M7 4 3 8l4 4"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Back to home
+          </Link>
+        </header>
+
+        {/* Body */}
+        <div className="flex flex-row items-stretch max-[1023px]:flex-col">
+          {/* Desktop: lavender BB panel */}
+          <aside className="relative w-[52%] shrink-0 overflow-hidden bg-[#E7DEFC] max-[1023px]:hidden">
+            <Image
+              src="/home/auth-panel.webp"
+              alt="Good creative. Great to have you. BB the unicorn working on a laptop."
+              fill
+              priority
+              sizes="(min-width: 1024px) 560px, 0px"
+              className="object-contain object-bottom"
+            />
+          </aside>
+
+          {/* Mobile / tablet: banner above the form */}
+          <div className="hidden px-5 pt-1 max-[1023px]:block">
+            <Image
+              src="/home/auth-banner.webp"
+              alt="More bite. Less briefing drama. BB the unicorn working on a laptop."
+              width={1400}
+              height={732}
+              priority
+              sizes="(max-width: 1023px) 100vw, 0px"
+              className="h-auto w-full rounded-xl"
+            />
+          </div>
+
+          {/* Form slot */}
+          <section className="flex flex-1 flex-col justify-center px-14 py-10 max-[1179px]:px-8 max-[1023px]:px-5 max-[1023px]:py-6">
+            <div className="mx-auto w-full max-w-[360px] max-[1023px]:max-w-[460px]">
+              {children}
+            </div>
+          </section>
+        </div>
+
+        {/* Footer */}
+        <footer className="flex items-center justify-between px-6 py-3 text-xs text-[#5E616E] max-[767px]:px-5">
+          <span>
+            &copy; {copyrightYears()} {COMPANY_BRAND_NAME}
+          </span>
+          <Link href="/privacy" className="transition-colors hover:text-[#2B2D33]">
+            Privacy Policy
+          </Link>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+/** Title + subtitle block used on every auth screen. */
+export function AuthHeading({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div className="mb-5">
+      <h1
+        className={`${AUTH_DISPLAY_FONT} text-[28px] leading-[1.15] font-extrabold tracking-tight text-[#2B2D33] max-[1023px]:text-[34px]`}
+      >
+        {title}
+      </h1>
+      <p className="mt-2 text-base leading-6 text-[#5E616E]">{subtitle}</p>
+    </div>
+  );
+}
+
+/** Shared styles for the auth form controls. */
+export const AUTH_INPUT_CLASS =
+  "h-11 w-full rounded-xl border border-[#D7D8DD] bg-white px-4 text-[15px] text-[#2B2D33] outline-none placeholder:text-[#9A9CA5] focus:border-[#FF6426] focus:ring-1 focus:ring-[#FF6426]";
+export const AUTH_LABEL_CLASS = "mb-1.5 block text-sm font-bold text-[#2B2D33]";
+export const AUTH_PRIMARY_BUTTON_CLASS =
+  "flex h-11 w-full items-center justify-center gap-2.5 rounded-xl bg-[#FF6426] text-base font-bold text-white transition-colors hover:bg-[#E8561C] disabled:cursor-not-allowed disabled:opacity-60";
+export const AUTH_SECONDARY_BUTTON_CLASS =
+  "flex h-11 w-full items-center justify-center gap-3 rounded-xl border border-[#D7D8DD] bg-white text-sm font-bold text-[#2B2D33] transition-colors hover:border-[#FF6426] disabled:cursor-not-allowed disabled:opacity-60";
+export const AUTH_LINK_CLASS =
+  "font-semibold text-[#FF6426] underline underline-offset-2 hover:text-[#E8561C]";
+export const AUTH_ERROR_CLASS =
+  "rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700";
