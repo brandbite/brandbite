@@ -27,6 +27,7 @@ import {
 
 import {
   BRAND_ADDRESS,
+  BRAND_LEGAL_NAME,
   BRAND_NAME,
   BRAND_SUPPORT_EMAIL,
   BRAND_TAGLINE,
@@ -147,7 +148,7 @@ export function BaseLayout({ previewText, hero, children }: BaseLayoutProps) {
             </Text>
             {BRAND_ADDRESS ? (
               <Text style={footerAddress}>
-                {BRAND_NAME} &middot; {BRAND_ADDRESS}
+                {BRAND_LEGAL_NAME} &middot; {BRAND_ADDRESS}
               </Text>
             ) : null}
             <Text style={footerLegal}>

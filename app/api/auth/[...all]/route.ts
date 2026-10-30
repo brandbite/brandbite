@@ -146,7 +146,7 @@ async function gate(req: NextRequest): Promise<NextResponse | null> {
     // direct fetch consumers that happen to look for it.
     const body = {
       message:
-        "Too many attempts from this IP. Wait a minute and try again; if this keeps happening, reach out at support@brandbite.studio.",
+        "Too many attempts from this IP. Wait a minute and try again; if this keeps happening, reach out at hello@brandbite.studio.",
     };
     return NextResponse.json(
       { ...body, error: body.message },

@@ -212,7 +212,7 @@ export function PricingHeaderBlockForm({ initial, pageKey }: PricingHeaderBlockF
               id="pr-contact-href"
               value={contactHref}
               onChange={(e) => setContactHref(e.target.value)}
-              placeholder="mailto:hello@brandbite.io"
+              placeholder="mailto:hello@brandbite.studio"
               maxLength={200}
             />
           </div>

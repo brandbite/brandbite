@@ -14,6 +14,7 @@ import Image from "next/image";
 
 import { HomeFooter } from "@/components/marketing/home-footer";
 import { HomeHeader } from "@/components/marketing/home-header";
+import { COMPANY_ADDRESS, COMPANY_LEGAL_NAME, CONTACT_EMAIL } from "@/lib/brand";
 import { QuestionsBand } from "@/components/marketing/questions-band";
 
 export const metadata: Metadata = {
@@ -115,6 +116,17 @@ export default function PrivacyPage() {
               </div>
             </div>
           ))}
+          <p className="px-5 pt-2 text-sm leading-6 text-[#6B6E76]">
+            Data controller: {COMPANY_LEGAL_NAME}, {COMPANY_ADDRESS}. For access, correction or
+            deletion requests write to{" "}
+            <a
+              href={`mailto:${CONTACT_EMAIL}`}
+              className="text-[#2B2D33] underline hover:text-[#FF6426]"
+            >
+              {CONTACT_EMAIL}
+            </a>
+            .
+          </p>
         </section>
 
         <QuestionsBand />

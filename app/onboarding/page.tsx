@@ -12,6 +12,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { BrandLogo } from "@/components/ui/brand-logo";
+import { copyrightLine } from "@/lib/brand";
 import { useRouter } from "next/navigation";
 import { generateAbbreviation } from "@/lib/abbreviation";
 
@@ -566,7 +567,7 @@ export default function OnboardingPage() {
       {/* Footer */}
       <footer className="bg-[var(--bb-primary)] px-6 py-3">
         <div className="mx-auto flex max-w-5xl items-center justify-between text-[11px] text-white/70">
-          <p>&copy; 2025 Brandbite Inc. All rights reserved.</p>
+          <p>{copyrightLine()}</p>
           <div className="flex flex-wrap gap-x-4 gap-y-1">
             <Link href="/terms" className="hover:text-white">
               Terms of Service

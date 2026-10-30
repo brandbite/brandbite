@@ -7,6 +7,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { COMPANY_ADDRESS_LINES, CONTACT_EMAIL, copyrightLine } from "@/lib/brand";
 import { useEffect, useState } from "react";
 
 // ---------------------------------------------------------------------------
@@ -665,6 +666,15 @@ function PricingFooter() {
             <p className="mt-3 text-sm leading-relaxed text-gray-400">
               All your creatives, <span className="text-[var(--bb-primary)]">one subscription</span>
             </p>
+            <address className="mt-4 text-sm leading-relaxed text-gray-400 not-italic">
+              <a href={`mailto:${CONTACT_EMAIL}`} className="transition-colors hover:text-white">
+                {CONTACT_EMAIL}
+              </a>
+              <br />
+              {COMPANY_ADDRESS_LINES[0]}
+              <br />
+              {COMPANY_ADDRESS_LINES[1]}
+            </address>
           </div>
 
           {FOOTER_COLS.map((col) => (
@@ -717,9 +727,7 @@ function PricingFooter() {
 
       <div className="bg-[var(--bb-primary)] px-6 py-3">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 sm:flex-row">
-          <p className="text-xs text-white/80">
-            &copy; {new Date().getFullYear()} Brandbite. All rights reserved.
-          </p>
+          <p className="text-xs text-white/80">{copyrightLine()}</p>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/80">
             <Link href="/terms" className="hover:text-white">
               Terms of Service
