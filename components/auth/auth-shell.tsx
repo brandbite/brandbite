@@ -13,7 +13,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { COMPANY_BRAND_NAME, copyrightYears } from "@/lib/brand";
+import { copyrightLine } from "@/lib/brand";
+import {
+  FOOTER_LEGAL_LINKS,
+  FOOTER_MAIN_LINKS,
+  FOOTER_SOCIAL_LINKS,
+} from "@/components/marketing/home-footer";
 
 export const AUTH_DISPLAY_FONT = "font-[family-name:var(--font-inter)]";
 
@@ -119,16 +124,39 @@ export function AuthShell({ children }: { children: ReactNode }) {
           </section>
         </div>
 
-        {/* Footer */}
+        {/* Footer — same information as the marketing HomeFooter legal row
+            (© line, main links, legal links, socials), minus logo + mascot. */}
         <footer
-          className={`flex items-center justify-between py-3 text-xs text-[#5E616E] max-[767px]:px-5 ${EDGE_PADDING}`}
+          className={`flex items-center justify-between gap-6 border-t border-[#E6E2DD] py-3 text-xs leading-5 font-medium text-[#5E616E] max-[1023px]:flex-col max-[1023px]:gap-2 max-[1023px]:text-center max-[767px]:px-5 ${EDGE_PADDING}`}
         >
-          <span>
-            &copy; {copyrightYears()} {COMPANY_BRAND_NAME}
-          </span>
-          <Link href="/privacy" className="transition-colors hover:text-[#2B2D33]">
-            Privacy Policy
-          </Link>
+          <p className="whitespace-nowrap max-[767px]:whitespace-normal">{copyrightLine()}</p>
+          <nav
+            aria-label="Footer"
+            className="flex flex-row items-center gap-5 max-[1023px]:flex-wrap max-[1023px]:justify-center max-[767px]:gap-x-4 max-[767px]:gap-y-1"
+          >
+            {[...FOOTER_MAIN_LINKS, ...FOOTER_LEGAL_LINKS].map((link) => (
+              <Link
+                key={link.label}
+                href={link.href}
+                className="whitespace-nowrap transition-colors hover:text-[#2B2D33]"
+              >
+                {link.label}
+              </Link>
+            ))}
+            <span className="flex flex-row items-center gap-4">
+              {FOOTER_SOCIAL_LINKS.map((social) => (
+                <a
+                  key={social.label}
+                  href={social.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex transition-opacity hover:opacity-70"
+                >
+                  <Image src={social.icon} alt={social.label} width={18} height={18} />
+                </a>
+              ))}
+            </span>
+          </nav>
         </footer>
       </div>
     </div>

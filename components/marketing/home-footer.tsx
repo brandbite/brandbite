@@ -17,15 +17,30 @@ import Image from "next/image";
 import Link from "next/link";
 import { copyrightLine } from "@/lib/brand";
 
-const MAIN_LINKS = [
+/** Main navigation links — shared with the auth-page footer (AuthShell). */
+export const FOOTER_MAIN_LINKS = [
   { label: "About Us", href: "/about" },
   { label: "Contact", href: "/contact" },
+];
+
+/** Social profiles — shared with the auth-page footer (AuthShell). */
+export const FOOTER_SOCIAL_LINKS = [
+  {
+    label: "Instagram",
+    href: "https://www.instagram.com/brandbitestudio/",
+    icon: "/home/instagram-dark.svg",
+  },
+  {
+    label: "LinkedIn",
+    href: "https://www.linkedin.com/company/brandbitestudio/",
+    icon: "/home/linkedin-dark.svg",
+  },
 ];
 
 // Cookie information lives as a section inside the Privacy Policy (the site
 // sets no analytics/advertising cookies, so there is no preference centre and
 // nothing to opt out of). /cookies permanently redirects there.
-const LEGAL_LINKS = [
+export const FOOTER_LEGAL_LINKS = [
   { label: "Privacy Policy", href: "/privacy" },
   { label: "Cookie Notice", href: "/privacy#cookies" },
   { label: "Terms of Use", href: "/terms" },
@@ -62,7 +77,7 @@ export function HomeFooter({ variant = "home" }: { variant?: "home" | "coming-so
           aria-label="Footer"
           className="flex shrink-0 flex-row items-center gap-[50px] max-[929px]:gap-8 max-[767px]:flex-wrap max-[767px]:justify-center max-[767px]:gap-6"
         >
-          {MAIN_LINKS.map((link) => (
+          {FOOTER_MAIN_LINKS.map((link) => (
             <Link
               key={link.label}
               href={link.href}
@@ -71,22 +86,17 @@ export function HomeFooter({ variant = "home" }: { variant?: "home" | "coming-so
               {link.label}
             </Link>
           ))}
-          <a
-            href="https://www.instagram.com/brandbitestudio/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex transition-opacity hover:opacity-70"
-          >
-            <Image src="/home/instagram-dark.svg" alt="Instagram" width={24} height={24} />
-          </a>
-          <a
-            href="https://www.linkedin.com/company/brandbitestudio/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex transition-opacity hover:opacity-70"
-          >
-            <Image src="/home/linkedin-dark.svg" alt="LinkedIn" width={24} height={24} />
-          </a>
+          {FOOTER_SOCIAL_LINKS.map((social) => (
+            <a
+              key={social.label}
+              href={social.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex transition-opacity hover:opacity-70"
+            >
+              <Image src={social.icon} alt={social.label} width={24} height={24} />
+            </a>
+          ))}
         </nav>
       </div>
 
@@ -94,7 +104,7 @@ export function HomeFooter({ variant = "home" }: { variant?: "home" | "coming-so
       <div className="flex w-full flex-row items-center justify-between gap-6 border-t border-[#D7D8DD] pt-[25px] text-xs leading-[19.5px] font-medium text-[#5E616E] max-[767px]:flex-col max-[767px]:gap-3 max-[767px]:text-center">
         <p className="whitespace-nowrap max-[767px]:whitespace-normal">{copyrightLine()}</p>
         <div className="flex flex-row items-center gap-6 max-[767px]:flex-wrap max-[767px]:justify-center max-[767px]:gap-x-4 max-[767px]:gap-y-1">
-          {LEGAL_LINKS.map((link) => (
+          {FOOTER_LEGAL_LINKS.map((link) => (
             <Link
               key={link.label}
               href={link.href}
