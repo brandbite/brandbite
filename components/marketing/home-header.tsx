@@ -29,7 +29,7 @@ export function HomeHeader({ active }: { active?: string } = {}) {
   return (
     <header className="flex flex-row items-center gap-[89px] px-14 pt-[37px] max-[1179px]:gap-8 max-[1179px]:px-8 max-[1179px]:pt-6 max-[767px]:flex-wrap max-[767px]:gap-4 max-[767px]:px-5 max-[767px]:pt-5">
       <Link href="/" className="flex shrink-0" aria-label="Brandbite home">
-        <Image src="/home/logo.svg" alt="Brandbite" width={145} height={36} priority />
+        <Image src="/brandbite-logo.svg" alt="Brandbite" width={145} height={30} priority />
       </Link>
       <nav
         className={`flex flex-1 flex-row items-center justify-center gap-[50px] max-[1179px]:gap-7 ${

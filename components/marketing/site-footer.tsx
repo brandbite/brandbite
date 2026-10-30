@@ -59,11 +59,11 @@ export function SiteFooter() {
           {/* Brand */}
           <div className="lg:col-span-2">
             <Image
-              src="/brandbite-logo.svg"
+              src="/brandbite-logo-negative.svg"
               alt="Brandbite"
               width={140}
-              height={35}
-              className="h-7 w-auto brightness-0 invert"
+              height={29}
+              className="h-7 w-auto"
             />
             {data.brandStatement ? (
               <p className="mt-3 text-sm leading-relaxed text-gray-400">

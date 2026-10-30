@@ -19,6 +19,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { BrandLogo } from "@/components/ui/brand-logo";
 import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 
 import { Button } from "@/components/ui/button";
@@ -913,12 +914,8 @@ export default function TalentApplicationPage() {
 function SlimHeader() {
   return (
     <header className="flex items-center border-b border-[var(--bb-border-subtle)] bg-[var(--bb-bg-card)] px-6 py-4">
-      <Link
-        href="/"
-        className="text-lg font-bold text-[var(--bb-secondary)]"
-        aria-label="Back to Brandbite home"
-      >
-        <span className="text-[var(--bb-primary)]">b</span>randbite
+      <Link href="/" className="flex items-center" aria-label="Back to Brandbite home">
+        <BrandLogo width={120} className="h-6 w-auto" />
       </Link>
     </header>
   );

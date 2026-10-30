@@ -19,8 +19,8 @@
 
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
+import { BrandLogo } from "@/components/ui/brand-logo";
 import { useEffect, useState } from "react";
 
 import { DEFAULT_SITE_HEADER_DATA } from "@/lib/blocks/defaults";
@@ -148,14 +148,7 @@ export function SiteHeader({ activePage }: SiteHeaderProps = {}) {
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 md:px-6">
         {/* Logo */}
         <Link href="/" className="flex-shrink-0">
-          <Image
-            src="/brandbite-logo.svg"
-            alt="Brandbite"
-            width={140}
-            height={35}
-            priority
-            className="h-7 w-auto"
-          />
+          <BrandLogo width={140} priority className="h-7 w-auto" />
         </Link>
 
         {/* Desktop nav */}

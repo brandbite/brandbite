@@ -1,15 +1,15 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Brandbite favicon. Source asset: G:/Works/brandbite/_logo/b-favicon.svg.
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Brandbite favicon ("b" bite mark). Source asset: G:/Works/brandbite/_logo/b-icon.svg.
      Lives at app/icon.svg so Next.js's file-convention favicon support
      auto-injects <link rel="icon" type="image/svg+xml"> on every page.
-     Replaces the Vercel-default favicon.ico that ships with create-next-app. -->
-<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
-	 viewBox="0 0 600 600" style="enable-background:new 0 0 600 600;" xml:space="preserve">
-<style type="text/css">
-	.st0{fill:#F15B2B;}
-</style>
-<path class="st0" d="M327.2,204.2c-33.2-36.5-76.5-54.8-129.8-54.8c-25.6,0-49.3,5.4-71.2,16.1c-21.9,10.8-40.7,26.4-56.4,46.8V0H0
-v287.5l0.4-0.6c10.2-2.3,20-3.3,28.5-2.8c23.1,1.1,51.8,17.3,62.1,39.8c29.6-5.9,60.4,1.7,78.8,29.2c13.2,19.7,15.5,43,7.1,62.3
-c26.7,6.3,50.2,20.1,57,50.6c7.6,34-11,56.4-36.6,70.7c7,6.6,12.8,14.1,16.2,22.8c3.2,7.9,4.2,16.9,2.1,27.1
-c-0.9,4.8-2.5,9.3-4.5,13.5c48.8-4.6,87.7-26.6,116.6-66c32.8-44.6,49.2-100.7,49.2-168.2C377,294.6,360.4,240.8,327.2,204.2"/>
+     Keep in sync with public/b-icon.svg (used by the app sidebar). -->
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 170.1 170.1">
+  <defs>
+    <style>
+      .st0 {
+        fill: #f2652e;
+      }
+    </style>
+  </defs>
+  <path class="st0" d="M136.9,73.6c-4.6-8.8-10.7-15.5-18.5-20.3-7.8-4.8-16.5-7.1-26.2-7.1s-15.7,1.7-22.1,5.1c-6.5,3.4-11.5,7.8-15.2,13.2V10.1h-28.5v70.9c2.1-.8,4.1-1.4,5.9-1.7,7-1.2,16.8,1.7,21.4,7.8,8.5-3.8,18.3-3.6,25.8,3.5,5.3,5.1,7.6,11.9,6.3,18.3,8.5.1,16.5,2.7,20.6,11.4,4.6,9.7.5,17.8-6.3,23.8,2.6,1.5,4.8,3.4,6.4,5.8,1.5,2.2,2.4,4.8,2.5,8,0,.6,0,1.3,0,1.9,3.3-1.2,6.4-2.7,9.4-4.5,7.8-4.9,14-11.8,18.5-20.7,4.5-8.9,6.8-19.1,6.8-30.7s-2.3-21.7-6.8-30.5Z"/>
 </svg>

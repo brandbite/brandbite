@@ -11,13 +11,13 @@
 
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { NotificationBell } from "@/components/ui/notification-bell";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { BrandLogo, BrandMark } from "@/components/ui/brand-logo";
 import { useSessionRole } from "@/lib/hooks/use-session-role";
 import { getNavConfig, type NavConfig, type NavLeaf, type NavRole } from "./nav-config";
 import { IconChevronsLeft, IconLogout, IconMenu, IconX } from "./nav-icons";
@@ -150,14 +150,7 @@ export function AppSidebar({ role }: { role: NavRole }) {
           className="flex items-center gap-1.5"
           aria-label={`${config.brand} home`}
         >
-          <Image
-            src="/brandbite-logo.svg"
-            alt="Brandbite"
-            width={120}
-            height={30}
-            priority
-            className="h-6 w-auto"
-          />
+          <BrandLogo width={120} priority className="h-6 w-auto" />
           {config.roleLabel && (
             <span className="font-brand text-sm font-light tracking-tight text-[var(--bb-text-muted)]">
               · {config.roleLabel}
@@ -218,34 +211,27 @@ export function AppSidebar({ role }: { role: NavRole }) {
           >
             {/*
               Collapsed rail is only 64px wide; the full brandbite-logo.svg
-              at h-7 is ~112px wide and would overflow. We swap to the
-              compact b-favicon mark in collapsed mode so the logo fills
-              the rail sensibly and no horizontal scroll can appear.
+              at h-7 is ~135px wide and would overflow. We swap to the
+              compact "b" mark in collapsed mode so the logo fills the rail
+              sensibly and no horizontal scroll can appear. Both variants
+              are theme-aware (negative artwork in dark mode).
             */}
             {collapsed ? (
-              <Image
-                src="/b-favicon.svg"
-                alt="Brandbite"
-                width={32}
-                height={32}
-                priority
-                className="hidden h-7 w-7 shrink-0 md:block"
-              />
+              <span className="hidden shrink-0 md:block">
+                <BrandMark size={32} priority className="h-7 w-7" />
+              </span>
             ) : null}
-            <Image
-              src="/brandbite-logo.svg"
-              alt="Brandbite"
-              width={120}
-              height={30}
-              priority
+            <span
               className={[
-                "h-7 w-auto shrink-0",
+                "flex shrink-0",
                 // On md+ screens, hide the full logo when collapsed (the
                 // compact mark above takes its place). On mobile drawer
                 // we always show the full logo.
                 collapsed ? "md:hidden" : "",
               ].join(" ")}
-            />
+            >
+              <BrandLogo width={120} priority className="h-7 w-auto" />
+            </span>
             {!collapsed && config.roleLabel && (
               <span className="font-brand truncate text-base font-light tracking-tight text-[var(--bb-text-muted)]">
                 · {config.roleLabel}
