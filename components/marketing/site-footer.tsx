@@ -18,7 +18,6 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { COMPANY_ADDRESS_LINES, CONTACT_EMAIL, copyrightLine } from "@/lib/brand";
 import { useEffect, useState } from "react";
 
 import { DEFAULT_SITE_FOOTER_DATA } from "@/lib/blocks/defaults";
@@ -75,15 +74,6 @@ export function SiteFooter() {
                 <BrandStatement text={data.brandStatement} />
               </p>
             ) : null}
-            <address className="mt-4 text-sm leading-relaxed text-gray-400 not-italic">
-              <a href={`mailto:${CONTACT_EMAIL}`} className="transition-colors hover:text-white">
-                {CONTACT_EMAIL}
-              </a>
-              <br />
-              {COMPANY_ADDRESS_LINES[0]}
-              <br />
-              {COMPANY_ADDRESS_LINES[1]}
-            </address>
           </div>
 
           {/* Link columns */}
@@ -112,7 +102,9 @@ export function SiteFooter() {
       {/* Bottom bar — copyright + repeat-of-legal links */}
       <div className="bg-[var(--bb-primary)] px-6 py-3">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 sm:flex-row">
-          <p className="text-xs text-white/80">{copyrightLine()}</p>
+          <p className="text-xs text-white/80">
+            &copy; {new Date().getFullYear()} Brandbite. All rights reserved.
+          </p>
           {data.legalLinks && data.legalLinks.length > 0 ? (
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/80">
               {data.legalLinks.map((link) => (
