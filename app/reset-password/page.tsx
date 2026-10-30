@@ -7,6 +7,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { BrandLogo } from "@/components/ui/brand-logo";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { PASSWORD_POLICY_BULLETS, validatePasswordStrength } from "@/lib/password-policy";
@@ -122,8 +123,8 @@ export default function ResetPasswordPage() {
     return (
       <div className="flex min-h-screen flex-col bg-[var(--bb-bg-page)]">
         <header className="flex items-center border-b border-[var(--bb-border-subtle)] px-6 py-4">
-          <Link href="/" className="text-lg font-bold text-[var(--bb-secondary)]">
-            <span className="text-[var(--bb-primary)]">b</span>randbite
+          <Link href="/" className="flex items-center" aria-label="Brandbite home">
+            <BrandLogo width={120} className="h-6 w-auto" />
           </Link>
         </header>
         <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-6">
@@ -166,8 +167,8 @@ export default function ResetPasswordPage() {
     return (
       <div className="flex min-h-screen flex-col bg-[var(--bb-bg-page)]">
         <header className="flex items-center border-b border-[var(--bb-border-subtle)] px-6 py-4">
-          <Link href="/" className="text-lg font-bold text-[var(--bb-secondary)]">
-            <span className="text-[var(--bb-primary)]">b</span>randbite
+          <Link href="/" className="flex items-center" aria-label="Brandbite home">
+            <BrandLogo width={120} className="h-6 w-auto" />
           </Link>
         </header>
         <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-6">
@@ -211,8 +212,8 @@ export default function ResetPasswordPage() {
   return (
     <div className="flex min-h-screen flex-col bg-[var(--bb-bg-page)]">
       <header className="flex items-center border-b border-[var(--bb-border-subtle)] px-6 py-4">
-        <Link href="/" className="text-lg font-bold text-[var(--bb-secondary)]">
-          <span className="text-[var(--bb-primary)]">b</span>randbite
+        <Link href="/" className="flex items-center" aria-label="Brandbite home">
+          <BrandLogo width={120} className="h-6 w-auto" />
         </Link>
       </header>
 

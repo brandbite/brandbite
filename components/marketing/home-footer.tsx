@@ -29,10 +29,10 @@ export function HomeFooter({ variant = "home" }: { variant?: "home" | "coming-so
     >
       <Link href="/" className="flex shrink-0" aria-label="Brandbite home">
         <Image
-          src="/home/logo.svg"
+          src="/brandbite-logo.svg"
           alt="Brandbite"
           width={isComingSoon ? 118 : 145}
-          height={isComingSoon ? 29 : 36}
+          height={isComingSoon ? 24 : 30}
         />
       </Link>
       <div className="flex shrink-0 flex-row items-center justify-center gap-[50px] max-[767px]:flex-wrap max-[767px]:justify-center max-[767px]:gap-6">

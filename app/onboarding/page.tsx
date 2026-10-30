@@ -11,6 +11,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { BrandLogo } from "@/components/ui/brand-logo";
 import { useRouter } from "next/navigation";
 import { generateAbbreviation } from "@/lib/abbreviation";
 
@@ -159,9 +160,9 @@ export default function OnboardingPage() {
     <div className="flex min-h-screen flex-col bg-[var(--bb-bg-page)]">
       {/* Header */}
       <header className="flex items-center justify-between border-b border-[var(--bb-border-subtle)] px-6 py-4">
-        <p className="text-lg font-bold text-[var(--bb-secondary)]">
-          <span className="text-[var(--bb-primary)]">b</span>randbite
-        </p>
+        <div className="flex items-center">
+          <BrandLogo width={120} className="h-6 w-auto" />
+        </div>
         <p className="text-xs text-[var(--bb-text-tertiary)]">Setting up your workspace</p>
       </header>
 
