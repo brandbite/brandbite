@@ -1,21 +1,52 @@
 // -----------------------------------------------------------------------------
 // @file: app/admin/time-tracking/page.tsx
-// @purpose: Admin time-tracking analytics — logged hours per ticket joined
-//           with the job type's estimatedHours so ops can see overruns and
-//           tune token pricing.
-// @version: v1.0.0
+// @purpose: Admin time-tracking analytics (admin design language v1) —
+//           logged hours per ticket joined with the job type's estimated
+//           hours so ops can see overruns and tune token pricing. The empty
+//           state explains why there is nothing to compare and links to the
+//           tickets and job-type estimates.
+// @version: v2.0.0
 // @status: active
-// @lastUpdate: 2026-04-20
+// @lastUpdate: 2026-11-01
 // -----------------------------------------------------------------------------
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Badge, type BadgeVariant } from "@/components/ui/badge";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import { LoadingState } from "@/components/ui/loading-state";
-import { FormInput } from "@/components/ui/form-field";
+import {
+  Badge,
+  Button,
+  ButtonLink,
+  Callout,
+  Card,
+  CardTitle,
+  DASH,
+  EmptyState,
+  FilterBar,
+  IconTile,
+  KpiCard,
+  PageHeader,
+  SearchInput,
+  SegmentedControl,
+  Skeleton,
+  TICKET_STATUS,
+  Table,
+  TableFooter,
+  Td,
+  Th,
+  Tr,
+  fmt,
+  plural,
+  type Tone,
+} from "@/components/admin/v2/ui";
+import {
+  IconAlertCircle,
+  IconArrowUpRight,
+  IconClock,
+  IconDocument,
+  IconTicket,
+} from "@/components/admin/v2/icons";
 
 type Row = {
   ticketId: string;
@@ -60,29 +91,99 @@ function formatHours(hours: number): string {
   return m === 0 ? `${h}h` : `${h}h ${m}m`;
 }
 
-function ratioBadge(ratio: number | null): {
-  label: string;
-  variant: BadgeVariant;
-} {
-  if (ratio == null) return { label: "—", variant: "neutral" };
-  const pct = Math.round(ratio * 100);
-  if (pct <= 80) return { label: `${pct}% under`, variant: "success" };
-  if (pct <= 110) return { label: `${pct}% on target`, variant: "info" };
-  if (pct <= 150) return { label: `${pct}% over`, variant: "warning" };
-  return { label: `${pct}% over`, variant: "danger" };
+/**
+ * Logged minus estimated, as signed text ("+1h 30m over", "−45m under").
+ * Returns null when there is no estimate — never compare against a missing
+ * estimate.
+ */
+function variance(row: Row): { text: string; pct: string; tone: Tone } | null {
+  if (row.estimatedHours == null || row.estimateRatio == null) return null;
+  const diff = row.loggedHours - row.estimatedHours;
+  const pct = `${Math.round(row.estimateRatio * 100)}% of estimate`;
+  // Under a minute either way reads as "on estimate".
+  if (Math.abs(diff) < 1 / 60) return { text: "On estimate", pct, tone: "neutral" };
+  if (diff > 0) {
+    return {
+      text: `+${formatHours(diff)} over`,
+      pct,
+      tone: row.estimateRatio > 1.5 ? "red" : "amber",
+    };
+  }
+  return { text: `−${formatHours(-diff)} under`, pct, tone: "green" };
 }
 
-function statusBadge(status: string): BadgeVariant {
-  switch (status) {
-    case "DONE":
-      return "success";
-    case "IN_REVIEW":
-      return "info";
-    case "IN_PROGRESS":
-      return "warning";
-    default:
-      return "neutral";
-  }
+function Glyph({ children }: { children: ReactNode }) {
+  return (
+    <svg
+      width={20}
+      height={20}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      {children}
+    </svg>
+  );
+}
+
+const IconBars = () => (
+  <Glyph>
+    <path d="M6 20v-6M12 20V8M18 20V4" />
+  </Glyph>
+);
+
+const STEPS: { n: number; tone: Tone; title: string; body: string }[] = [
+  {
+    n: 1,
+    tone: "lavender",
+    title: "Logged hours",
+    body: "Time creatives record on each ticket with the ticket timer.",
+  },
+  {
+    n: 2,
+    tone: "peach",
+    title: "Estimated hours",
+    body: "The job type's estimate per unit, multiplied by the ticket quantity.",
+  },
+  {
+    n: 3,
+    tone: "green",
+    title: "Variance",
+    body: "Logged minus estimated. A ticket is overrunning when logged time exceeds the estimate.",
+  },
+];
+
+function HowItWorks() {
+  return (
+    <Card>
+      <CardTitle>How comparisons work</CardTitle>
+      <ol className="mt-4">
+        {STEPS.map((s) => (
+          <li
+            key={s.n}
+            className="flex gap-4 border-b border-[var(--av2-border)] py-4 first:pt-0 last:border-b-0"
+          >
+            <IconTile tone={s.tone} size={36} round>
+              <span className="text-sm font-semibold">{s.n}</span>
+            </IconTile>
+            <div className="min-w-0">
+              <p className="text-base font-semibold">{s.title}</p>
+              <p className="mt-0.5 text-sm text-[var(--av2-text-2)]">{s.body}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+      <p className="mt-2 flex items-start gap-2 border-t border-[var(--av2-border)] pt-4 text-sm text-[var(--av2-text-2)]">
+        <IconAlertCircle width={18} height={18} className="mt-px shrink-0" />
+        Tickets whose job type has no estimate show “—” and are left out of the variance and the
+        overrun count.
+      </p>
+    </Card>
+  );
 }
 
 export default function AdminTimeTrackingPage() {
@@ -160,169 +261,262 @@ export default function AdminTimeTrackingPage() {
     return copy;
   }, [data, search, sort]);
 
-  if (loading) return <LoadingState />;
-  if (error) return <InlineAlert variant="error">{error}</InlineAlert>;
-  if (!data) return null;
-
-  const { stats } = data;
+  const stats = data?.stats;
+  const rows = data?.rows ?? [];
+  const hasRows = rows.length > 0;
+  const estimatedCount = rows.filter((r) => r.estimatedHours != null).length;
+  const pending = loading && !data;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <header>
-        <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--bb-text-tertiary)] uppercase">
-          Admin · Time tracking
-        </p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--bb-secondary)]">
-          Hours vs estimate
-        </h1>
-        <p className="mt-1 text-sm text-[var(--bb-text-muted)]">
-          Logged creative time per ticket, joined with the job type&apos;s estimated hours so you
-          can spot overruns and retune token pricing.
-        </p>
-      </header>
+    <>
+      <PageHeader
+        title="Time tracking"
+        description="Compare logged hours with job-type estimates to spot overruns and retune token pricing."
+        meta="Only tickets with recorded time are listed."
+      />
 
-      {data.migrationPending && (
-        <InlineAlert variant="warning">
-          <p className="text-sm font-semibold">
-            Time-tracking migration is pending on this environment.
-          </p>
-          <p className="mt-1 text-xs">
-            The <code className="rounded bg-[var(--bb-bg-warm)] px-1">TicketTimeEntry</code> table
-            doesn&apos;t exist in the current database yet. Run{" "}
-            <code className="rounded bg-[var(--bb-bg-warm)] px-1">npx prisma migrate deploy</code>{" "}
+      {error && (
+        <div className="mb-6">
+          <Callout tone="error" title="Something went wrong">
+            {error}
+          </Callout>
+        </div>
+      )}
+
+      {data?.migrationPending && (
+        <div className="mb-6">
+          <Callout tone="warning" title="Time-tracking migration is pending on this environment">
+            The <code className="font-mono">TicketTimeEntry</code> table doesn&apos;t exist in the
+            current database yet. Run <code className="font-mono">npx prisma migrate deploy</code>{" "}
             against this environment, then reload. Until then creatives can&apos;t log time and this
             page will stay empty.
-          </p>
-        </InlineAlert>
+          </Callout>
+        </div>
       )}
 
-      {/* Stats cards */}
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Tickets" value={String(stats.ticketCount)} />
-        <StatCard label="Hours logged" value={formatHours(stats.totalLoggedHours)} />
-        <StatCard label="Hours estimated" value={formatHours(stats.totalEstimatedHours)} />
-        <StatCard
-          label="Overrunning"
-          value={String(stats.overrunCount)}
-          muted={stats.overrunCount === 0}
-        />
-      </section>
-
-      {/* Controls */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="w-full max-w-xs">
-          <FormInput
-            placeholder="Search title, creative, company…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            size="sm"
+      {!error && (
+        <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <KpiCard
+            icon={<IconTicket />}
+            tone="lavender"
+            label="Tickets with logged time"
+            value={pending ? DASH : fmt(stats?.ticketCount)}
+            hint={stats && stats.ticketCount >= 200 ? "Capped at the top 200 by hours" : undefined}
+          />
+          <KpiCard
+            icon={<IconClock />}
+            tone="peach"
+            label="Hours logged"
+            value={pending || !stats ? DASH : formatHours(stats.totalLoggedHours)}
+          />
+          <KpiCard
+            icon={<IconDocument />}
+            tone="green"
+            label="Estimated hours"
+            value={pending || estimatedCount === 0 ? DASH : formatHours(stats!.totalEstimatedHours)}
+            hint={
+              !hasRows
+                ? "Available after time is logged"
+                : estimatedCount === rows.length
+                  ? "For the logged tickets"
+                  : `${fmt(estimatedCount)} of ${fmt(rows.length)} logged tickets have an estimate`
+            }
+          />
+          <KpiCard
+            icon={<IconBars />}
+            tone="neutral"
+            label="Overrunning"
+            value={pending || estimatedCount === 0 ? DASH : fmt(stats?.overrunCount)}
+            hint={
+              !hasRows
+                ? "Available after time is logged"
+                : estimatedCount === 0
+                  ? "No logged ticket has an estimate"
+                  : "Logged time above the estimate"
+            }
           />
         </div>
-        <div className="flex items-center gap-1 rounded-full border border-[var(--bb-border)] bg-[var(--bb-bg-page)] p-1">
-          {(
-            [
-              { key: "logged", label: "Most logged" },
-              { key: "variance", label: "Overruns first" },
-              { key: "recent", label: "Recently done" },
-            ] as { key: SortKey; label: string }[]
-          ).map((opt) => (
-            <button
-              key={opt.key}
-              type="button"
-              onClick={() => setSort(opt.key)}
-              className={`rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide transition-colors ${
-                sort === opt.key
-                  ? "bg-[var(--bb-primary)] text-white"
-                  : "text-[var(--bb-text-secondary)] hover:bg-[var(--bb-bg-warm)]"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      )}
 
-      {/* Table */}
-      {filtered.length === 0 ? (
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-6 py-10 text-center">
-          <p className="text-sm text-[var(--bb-text-muted)]">
-            {data.rows.length === 0
-              ? "No time has been logged on any ticket yet."
-              : "No tickets match this filter."}
-          </p>
+      {pending ? (
+        <Card padding="none">
+          <div className="space-y-3 px-6 py-5" role="status">
+            <span className="sr-only">Loading time tracking…</span>
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} className="h-12 w-full" />
+            ))}
+          </div>
+        </Card>
+      ) : !data ? null : !hasRows ? (
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,400px)]">
+          <Card>
+            <EmptyState
+              icon={<IconClock width={28} height={28} />}
+              title="No time has been logged yet"
+              description={
+                data.migrationPending
+                  ? "Time logging is unavailable until the migration above has run."
+                  : "Creatives log time from the timer on a ticket. Once they do, this view compares their hours with the job-type estimates."
+              }
+              action={
+                <div className="flex flex-wrap justify-center gap-3">
+                  <ButtonLink href="/admin/tickets" variant="primary">
+                    View tickets
+                    <IconArrowUpRight />
+                  </ButtonLink>
+                  <ButtonLink href="/admin/job-types">
+                    Review job estimates
+                    <IconArrowUpRight />
+                  </ButtonLink>
+                </div>
+              }
+            />
+          </Card>
+          <HowItWorks />
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] shadow-sm">
-          <table className="w-full text-sm">
-            <thead className="bg-[var(--bb-bg-warm)] text-left text-[10px] font-semibold tracking-[0.15em] text-[var(--bb-text-tertiary)] uppercase">
-              <tr>
-                <th className="px-4 py-2">Ticket</th>
-                <th className="px-4 py-2">Creative</th>
-                <th className="px-4 py-2">Logged</th>
-                <th className="px-4 py-2">Est.</th>
-                <th className="px-4 py-2">Variance</th>
-                <th className="px-4 py-2">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--bb-border)]">
-              {filtered.map((row) => {
-                const badge = ratioBadge(row.estimateRatio);
-                return (
-                  <tr key={row.ticketId} className="hover:bg-[var(--bb-bg-warm)]/40">
-                    <td className="px-4 py-2.5">
-                      <Link
-                        href={`/admin/tickets?ticketId=${row.ticketId}`}
-                        className="block font-semibold text-[var(--bb-secondary)] hover:text-[var(--bb-primary)]"
-                      >
-                        {row.title}
-                      </Link>
-                      <p className="text-[10px] text-[var(--bb-text-muted)]">
-                        {row.code} · {row.jobType?.name ?? "—"}
-                        {row.company && ` · ${row.company.name}`}
-                        {row.hasRunningEntry && (
-                          <span className="ml-1 inline-block rounded-full bg-[var(--bb-primary)] px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-white uppercase">
-                            Running
-                          </span>
-                        )}
-                      </p>
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-[var(--bb-text-secondary)]">
-                      {row.creative?.name || row.creative?.email || "—"}
-                    </td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-[var(--bb-secondary)]">
-                      {formatHours(row.loggedHours)}
-                    </td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-[var(--bb-text-muted)]">
-                      {row.estimatedHours != null ? formatHours(row.estimatedHours) : "—"}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <Badge variant={badge.variant}>{badge.label}</Badge>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <Badge variant={statusBadge(row.status)}>{row.status}</Badge>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
+        <>
+          <Card padding="none">
+            <div className="px-6 pt-5">
+              <div className="mb-4">
+                <CardTitle description="Estimated hours scale with ticket quantity.">
+                  Hours vs estimate
+                </CardTitle>
+              </div>
+              <FilterBar>
+                <SearchInput
+                  className="min-w-[220px] flex-1"
+                  value={search}
+                  onChange={setSearch}
+                  placeholder="Search title, creative, company…"
+                  label="Search tickets by title, code, creative, company or job type"
+                />
+                <SegmentedControl
+                  label="Sort tickets"
+                  value={sort}
+                  onChange={setSort}
+                  options={[
+                    { value: "logged", label: "Most logged" },
+                    { value: "variance", label: "Overruns first" },
+                    { value: "recent", label: "Recently done" },
+                  ]}
+                />
+              </FilterBar>
+            </div>
 
-function StatCard({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
-  return (
-    <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-3 shadow-sm">
-      <p className="text-[10px] font-semibold tracking-[0.18em] text-[var(--bb-text-tertiary)] uppercase">
-        {label}
-      </p>
-      <p
-        className={`mt-1 text-xl font-semibold tracking-tight ${muted ? "text-[var(--bb-text-muted)]" : "text-[var(--bb-secondary)]"}`}
-      >
-        {value}
-      </p>
-    </div>
+            {filtered.length === 0 ? (
+              <div className="border-t border-[var(--av2-border)]">
+                <EmptyState
+                  title="No tickets match this search"
+                  description="Try a different title, creative, company or job type."
+                  action={<Button onClick={() => setSearch("")}>Clear search</Button>}
+                />
+              </div>
+            ) : (
+              <Table label="Logged hours versus estimate per ticket">
+                <thead>
+                  <tr>
+                    <Th>Ticket</Th>
+                    <Th className="hidden xl:table-cell">Job type</Th>
+                    <Th className="hidden xl:table-cell">Creative</Th>
+                    <Th align="right">Estimated</Th>
+                    <Th align="right">Logged</Th>
+                    <Th align="right">Variance</Th>
+                    <Th>Status</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((row) => {
+                    const v = variance(row);
+                    const status = TICKET_STATUS[row.status] ?? {
+                      label: row.status,
+                      tone: "neutral" as Tone,
+                    };
+                    return (
+                      <Tr key={row.ticketId}>
+                        <Td>
+                          <Link
+                            href={`/admin/tickets?ticketId=${row.ticketId}`}
+                            className="font-semibold hover:text-[var(--av2-link)] hover:underline"
+                          >
+                            {row.title}
+                          </Link>
+                          <div className="text-xs text-[var(--av2-text-2)]">
+                            {row.code}
+                            {row.company && ` · ${row.company.name}`}
+                          </div>
+                          <div className="text-xs text-[var(--av2-text-2)] xl:hidden">
+                            {row.jobType?.name ?? "No job type"} ·{" "}
+                            {row.creative?.name || row.creative?.email || "Unassigned"}
+                          </div>
+                        </Td>
+                        <Td className="hidden text-[var(--av2-text-2)] xl:table-cell">
+                          {row.jobType?.name ?? DASH}
+                        </Td>
+                        <Td className="hidden text-[var(--av2-text-2)] xl:table-cell">
+                          {row.creative?.name || row.creative?.email || DASH}
+                        </Td>
+                        <Td align="right">
+                          {row.estimatedHours != null ? (
+                            formatHours(row.estimatedHours)
+                          ) : (
+                            <span className="text-[var(--av2-text-2)]" title="No estimate">
+                              {DASH}
+                            </span>
+                          )}
+                        </Td>
+                        <Td align="right">
+                          <div className="font-semibold">{formatHours(row.loggedHours)}</div>
+                          <div className="text-xs whitespace-nowrap text-[var(--av2-text-2)]">
+                            {fmt(row.entryCount)} {plural(row.entryCount, "entry", "entries")}
+                          </div>
+                        </Td>
+                        <Td align="right">
+                          {v ? (
+                            <>
+                              <Badge tone={v.tone}>{v.text}</Badge>
+                              <div className="mt-1 text-xs whitespace-nowrap text-[var(--av2-text-2)]">
+                                {v.pct}
+                              </div>
+                            </>
+                          ) : (
+                            <span className="text-sm text-[var(--av2-text-2)]">No estimate</span>
+                          )}
+                        </Td>
+                        <Td>
+                          <div className="flex flex-col items-start gap-1">
+                            <Badge tone={status.tone}>{status.label}</Badge>
+                            {row.hasRunningEntry && (
+                              <Badge tone="peach" dot>
+                                Timer running
+                              </Badge>
+                            )}
+                          </div>
+                        </Td>
+                      </Tr>
+                    );
+                  })}
+                </tbody>
+              </Table>
+            )}
+
+            <TableFooter>
+              <span className="tabular-nums">
+                Showing {fmt(filtered.length)} of {fmt(rows.length)}{" "}
+                {plural(rows.length, "ticket", "tickets")}
+              </span>
+              {search && (
+                <Button size="sm" variant="ghost" onClick={() => setSearch("")}>
+                  Clear search
+                </Button>
+              )}
+            </TableFooter>
+          </Card>
+          <div className="mt-6 max-w-2xl">
+            <HowItWorks />
+          </div>
+        </>
+      )}
+    </>
   );
 }

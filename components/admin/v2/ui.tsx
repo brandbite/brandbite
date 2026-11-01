@@ -414,8 +414,9 @@ const BUTTON_VARIANT: Record<ButtonVariant, string> = {
   primary:
     "bg-[var(--av2-accent-strong)] text-white hover:brightness-110 disabled:bg-[var(--av2-track)] disabled:text-[var(--av2-text-2)] disabled:hover:brightness-100",
   secondary:
-    "border border-[var(--av2-border)] bg-[var(--av2-surface)] text-[var(--av2-text)] hover:bg-[var(--av2-bg)] disabled:text-[var(--av2-text-2)]",
-  ghost: "text-[var(--av2-text)] hover:bg-[var(--av2-bg)] disabled:text-[var(--av2-text-2)]",
+    "border border-[var(--av2-border)] bg-[var(--av2-surface)] text-[var(--av2-text)] hover:bg-[var(--av2-bg)] disabled:bg-[var(--av2-bg)] disabled:text-[var(--av2-text-2)] disabled:opacity-60 disabled:hover:bg-[var(--av2-bg)]",
+  ghost:
+    "text-[var(--av2-text)] hover:bg-[var(--av2-bg)] disabled:text-[var(--av2-text-2)] disabled:opacity-60",
   danger:
     "border border-[var(--av2-error)]/40 bg-[var(--av2-surface)] text-[var(--av2-error-text)] hover:bg-[#fde3e1] dark:hover:bg-[#3a1715] disabled:opacity-50",
 };

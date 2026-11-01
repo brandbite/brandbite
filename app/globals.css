@@ -315,6 +315,28 @@ h6 {
   --av2-track: #27272a;
 }
 
+/* Legacy-token bridge: shared components rendered inside the admin
+   (Modal, ConfirmDialog, CMS uploads, rich-text editor, ProfileForm,
+   notification bell, typed-phrase / MFA modals) still read --bb-* tokens.
+   Re-point those tokens at the v2 palette inside the admin scope only, so
+   those components match without forking them; customer and creative
+   portals keep the original values. Status tokens (danger / warning /
+   success / info) are intentionally left alone. */
+.bb-admin-v2 {
+  --bb-primary: var(--av2-accent-strong);
+  --bb-primary-light: var(--av2-selected);
+  --bb-secondary: var(--av2-text);
+  --bb-text-secondary: var(--av2-text-2);
+  --bb-text-tertiary: var(--av2-text-2);
+  --bb-text-muted: var(--av2-text-2);
+  --bb-border: var(--av2-border);
+  --bb-border-subtle: var(--av2-border);
+  --bb-border-input: var(--av2-border);
+  --bb-bg-page: var(--av2-surface);
+  --bb-bg-card: var(--av2-surface);
+  --bb-bg-warm: var(--av2-bg);
+}
+
 .bb-admin-v2 :is(h1, h2, h3, h4, h5, h6) {
   font-family: inherit;
 }
@@ -460,4 +482,44 @@ h6 {
   color: var(--bb-text-muted);
   pointer-events: none;
   height: 0;
+}
+
+/* Admin v2: the shared editor had no heading styles (Tailwind preflight
+   flattens h2/h3), and its chrome used legacy tokens. Scoped to the admin
+   area so customer-side editors are unchanged. */
+.bb-admin-v2 .bb-rich-text {
+  border-color: var(--av2-border);
+  background: var(--av2-surface);
+  border-radius: 8px;
+}
+.bb-admin-v2 .bb-rich-text:focus-within {
+  border-color: var(--av2-accent);
+  --tw-ring-color: color-mix(in srgb, var(--av2-accent) 25%, transparent);
+}
+.bb-admin-v2 .bb-rich-text > div:first-child {
+  border-color: var(--av2-border);
+}
+.bb-admin-v2 .bb-rich-text .ProseMirror {
+  color: var(--av2-text);
+  font-size: 15px;
+  line-height: 1.6;
+}
+.bb-admin-v2 .bb-rich-text h2 {
+  margin: 1.1em 0 0.4em;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 600;
+}
+.bb-admin-v2 .bb-rich-text h3 {
+  margin: 1em 0 0.35em;
+  font-size: 17px;
+  line-height: 24px;
+  font-weight: 600;
+}
+.bb-admin-v2 .bb-rich-text h2:first-child,
+.bb-admin-v2 .bb-rich-text h3:first-child {
+  margin-top: 0;
+}
+.bb-admin-v2 .bb-rich-text a {
+  color: var(--av2-link);
 }

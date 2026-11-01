@@ -1,17 +1,59 @@
+// -----------------------------------------------------------------------------
 // @file: app/admin/news/page.tsx
-// @purpose: Admin CMS page for managing news articles
+// @purpose: Admin CMS page for managing news articles. Searchable article
+//           list on the left, tabbed editor (Basics / Content / Media /
+//           Publish) on the right. Below xl the two swap: the list, or the
+//           editor with a "Back to articles" control, so the rich-text editor
+//           keeps its width. Mirrors the Blog page (app/admin/blog/page.tsx).
+// @version: v2.0.0
+// @status: active
+// @lastUpdate: 2026-11-01
+// -----------------------------------------------------------------------------
 
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { FormInput, FormTextarea, FormSelect } from "@/components/ui/form-field";
-import { Badge } from "@/components/ui/badge";
-import { LoadingState } from "@/components/ui/loading-state";
-import { EmptyState } from "@/components/ui/empty-state";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { useToast } from "@/components/ui/toast-provider";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { CmsImageUpload } from "@/components/ui/cms-image-upload";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  Badge,
+  Button,
+  Callout,
+  Card,
+  DASH,
+  EmptyState,
+  Field,
+  KeyValueList,
+  PageHeader,
+  Pager,
+  PanelSection,
+  SaveBar,
+  SearchInput,
+  Select,
+  Skeleton,
+  Switch,
+  TabPanel,
+  TableFooter,
+  Tabs,
+  TextArea,
+  TextInput,
+  TextLink,
+  fmt,
+  plural,
+} from "@/components/admin/v2/ui";
+import { IconDocument } from "@/components/admin/v2/icons";
+import { IconX } from "@/components/navigation/nav-icons";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                      */
@@ -40,12 +82,52 @@ type NewsArticle = {
 
 type ImageValue = { storageKey: string; url: string } | null;
 
+type StatusFilter = "ALL" | "PUBLISHED" | "DRAFT";
+type EditorTab = "basics" | "content" | "media" | "publish";
+
+type FormState = {
+  title: string;
+  slug: string;
+  excerpt: string;
+  authorName: string;
+  category: string;
+  tags: string;
+  body: string;
+  metaTitle: string;
+  metaDescription: string;
+  published: boolean;
+  heroImage: ImageValue;
+  thumbnail: ImageValue;
+};
+
+const EMPTY_FORM: FormState = {
+  title: "",
+  slug: "",
+  excerpt: "",
+  authorName: "",
+  category: "",
+  tags: "",
+  body: "",
+  metaTitle: "",
+  metaDescription: "",
+  published: false,
+  heroImage: null,
+  thumbnail: null,
+};
+
+const PAGE_SIZE = 10;
+const TAB_IDS = "news-editor";
+const LIST_TAB_IDS = "news-status";
+
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                    */
 /* -------------------------------------------------------------------------- */
 
+const cx = (...c: unknown[]) =>
+  c.filter((x): x is string => typeof x === "string" && x.length > 0).join(" ");
+
 function formatDate(dateStr: string | null): string {
-  if (!dateStr) return "\u2014";
+  if (!dateStr) return DASH;
   try {
     return new Date(dateStr).toLocaleDateString("en-US", {
       year: "numeric",
@@ -53,8 +135,100 @@ function formatDate(dateStr: string | null): string {
       day: "numeric",
     });
   } catch {
-    return "\u2014";
+    return DASH;
   }
+}
+
+function formFromArticle(article: NewsArticle): FormState {
+  return {
+    title: article.title,
+    slug: article.slug,
+    excerpt: article.excerpt ?? "",
+    authorName: article.authorName ?? "",
+    category: article.category ?? "",
+    tags: Array.isArray(article.tags) ? article.tags.join(", ") : "",
+    body: article.body ?? "",
+    metaTitle: article.metaTitle ?? "",
+    metaDescription: article.metaDescription ?? "",
+    published: article.status === "PUBLISHED",
+    heroImage:
+      article.heroStorageKey && article.heroUrl
+        ? { storageKey: article.heroStorageKey, url: article.heroUrl }
+        : null,
+    thumbnail:
+      article.thumbnailStorageKey && article.thumbnailUrl
+        ? { storageKey: article.thumbnailStorageKey, url: article.thumbnailUrl }
+        : null,
+  };
+}
+
+const sameForm = (a: FormState, b: FormState) => JSON.stringify(a) === JSON.stringify(b);
+
+function StatusBadge({ status }: { status: NewsArticle["status"] }) {
+  return status === "PUBLISHED" ? (
+    <Badge tone="green">Published</Badge>
+  ) : (
+    <Badge tone="amber">Draft</Badge>
+  );
+}
+
+function IconPlus() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      aria-hidden
+    >
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+function IconArrowLeft() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M19 12H5M12 19l-7-7 7-7" />
+    </svg>
+  );
+}
+
+/** Editor card: header (title + actions), tabs, scrolling body, sticky save bar. */
+function EditorPanel({
+  header,
+  tabs,
+  footer,
+  children,
+}: {
+  header: ReactNode;
+  tabs: ReactNode;
+  footer: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="flex flex-col rounded-2xl border border-[var(--av2-border)] bg-[var(--av2-surface)] xl:sticky xl:top-24 xl:max-h-[calc(100vh-7rem)]">
+      <div className="px-6 pt-5">
+        {header}
+        <div className="mt-4">{tabs}</div>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">{children}</div>
+      <div className="border-t border-[var(--av2-border)] px-6 py-4">{footer}</div>
+    </section>
+  );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -64,67 +238,116 @@ function formatDate(dateStr: string | null): string {
 export default function AdminNewsPage() {
   const { showToast } = useToast();
 
+  // ---- Data state ----
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [modalOpen, setModalOpen] = useState(false);
+  // ---- Editor state ----
+  const [editorOpen, setEditorOpen] = useState(false);
   const [editingArticle, setEditingArticle] = useState<NewsArticle | null>(null);
+  const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [tab, setTab] = useState<EditorTab>("basics");
+  const [titleError, setTitleError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
 
-  const [formTitle, setFormTitle] = useState("");
-  const [formSlug, setFormSlug] = useState("");
-  const [formExcerpt, setFormExcerpt] = useState("");
-  const [formAuthorName, setFormAuthorName] = useState("");
-  const [formCategory, setFormCategory] = useState("");
-  const [formTags, setFormTags] = useState("");
-  const [formBody, setFormBody] = useState("");
-  const [formMetaTitle, setFormMetaTitle] = useState("");
-  const [formMetaDescription, setFormMetaDescription] = useState("");
-  const [formStatus, setFormStatus] = useState(false);
-  const [formHeroImage, setFormHeroImage] = useState<ImageValue>(null);
-  const [formThumbnail, setFormThumbnail] = useState<ImageValue>(null);
-
+  // ---- Action states ----
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<NewsArticle | null>(null);
 
+  // The rich-text editor re-emits the loaded body as normalised HTML right
+  // after it mounts. Until the user interacts with it, that output is treated
+  // as the saved value so merely opening an article doesn't count as an edit.
+  const [bodyBaseline, setBodyBaseline] = useState<string | null>(null);
+  const bodyTouchedRef = useRef(false);
+
+  // ---- Filters ----
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | "PUBLISHED" | "DRAFT">("ALL");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+  const [categoryFilter, setCategoryFilter] = useState("ALL");
+  const [page, setPage] = useState(1);
+
+  // ---- Derived data ----
+  const categories = useMemo(
+    () =>
+      Array.from(
+        new Set(articles.map((p) => p.category?.trim()).filter((c): c is string => !!c)),
+      ).sort((a, b) => a.localeCompare(b)),
+    [articles],
+  );
 
   const filteredArticles = useMemo(() => {
-    return articles.filter((a) => {
-      if (statusFilter !== "ALL" && a.status !== statusFilter) return false;
+    return articles.filter((article) => {
+      // Status filter
+      if (statusFilter !== "ALL" && article.status !== statusFilter) return false;
+
+      // Category filter
+      if (categoryFilter !== "ALL" && (article.category?.trim() ?? "") !== categoryFilter) {
+        return false;
+      }
+
+      // Search filter
       if (searchQuery.trim()) {
         const q = searchQuery.trim().toLowerCase();
-        const titleMatch = a.title.toLowerCase().includes(q);
-        const authorMatch = a.authorName?.toLowerCase().includes(q) ?? false;
-        const categoryMatch = a.category?.toLowerCase().includes(q) ?? false;
+        const titleMatch = article.title.toLowerCase().includes(q);
+        const authorMatch = article.authorName?.toLowerCase().includes(q) ?? false;
+        const categoryMatch = article.category?.toLowerCase().includes(q) ?? false;
         if (!titleMatch && !authorMatch && !categoryMatch) return false;
       }
+
       return true;
     });
-  }, [articles, statusFilter, searchQuery]);
+  }, [articles, statusFilter, categoryFilter, searchQuery]);
 
-  const publishedCount = articles.filter((a) => a.status === "PUBLISHED").length;
+  const publishedCount = articles.filter((p) => p.status === "PUBLISHED").length;
   const draftCount = articles.length - publishedCount;
 
+  const pageCount = Math.max(1, Math.ceil(filteredArticles.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const pageStart = (currentPage - 1) * PAGE_SIZE;
+  const pageRows = filteredArticles.slice(pageStart, pageStart + PAGE_SIZE);
+
+  const filtersActive =
+    searchQuery.trim() !== "" || statusFilter !== "ALL" || categoryFilter !== "ALL";
+  const resetFilters = () => {
+    setSearchQuery("");
+    setStatusFilter("ALL");
+    setCategoryFilter("ALL");
+    setPage(1);
+  };
+
+  const savedForm = editingArticle ? formFromArticle(editingArticle) : EMPTY_FORM;
+  const baseline = bodyBaseline === null ? savedForm : { ...savedForm, body: bodyBaseline };
+  const dirty = editorOpen && !sameForm(form, baseline);
+  const confirmDiscard = useUnsavedChanges(dirty, "News article");
+
   // --------------------------------------------------------------------------
-  //  Fetch
+  //  API: Fetch articles
   // --------------------------------------------------------------------------
 
-  const fetchArticles = useCallback(async () => {
+  const fetchArticles = useCallback(async (): Promise<NewsArticle[] | null> => {
     setLoading(true);
     setError(null);
+
     try {
       const res = await fetch("/api/admin/news", { cache: "no-store" });
       const json = await res.json().catch(() => null);
+
       if (!res.ok) {
         if (res.status === 401) throw new Error("You must be signed in as an admin.");
         if (res.status === 403) throw new Error("You do not have permission to manage news.");
         throw new Error(json?.error || `Request failed with status ${res.status}`);
       }
-      setArticles(json.articles ?? []);
+
+      const fresh: NewsArticle[] = json?.articles ?? [];
+      setArticles(fresh);
+      setLoaded(true);
+      return fresh;
     } catch (err: any) {
       setError(err?.message || "Failed to load news articles.");
+      return null;
     } finally {
       setLoading(false);
     }
@@ -135,87 +358,111 @@ export default function AdminNewsPage() {
   }, [fetchArticles]);
 
   // --------------------------------------------------------------------------
-  //  Form helpers
+  //  Editor helpers
   // --------------------------------------------------------------------------
 
-  const clearForm = () => {
-    setFormTitle("");
-    setFormSlug("");
-    setFormExcerpt("");
-    setFormAuthorName("");
-    setFormCategory("");
-    setFormTags("");
-    setFormBody("");
-    setFormMetaTitle("");
-    setFormMetaDescription("");
-    setFormStatus(false);
-    setFormHeroImage(null);
-    setFormThumbnail(null);
+  const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
+    setForm((f) => ({ ...f, [key]: value }));
+    if (key === "title") setTitleError(null);
+    setSaveSuccess(null);
   };
 
-  const openCreateModal = () => {
-    clearForm();
+  /** Below xl the list hides while editing; bring the editor into view. */
+  const scrollToEditorOnSmallScreens = () => {
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
+      window.scrollTo({ top: 0 });
+    }
+  };
+
+  const resetBodyTracking = () => {
+    setBodyBaseline(null);
+    bodyTouchedRef.current = false;
+  };
+
+  const handleBodyChange = (html: string) => {
+    if (bodyTouchedRef.current) {
+      set("body", html);
+    } else {
+      setBodyBaseline(html);
+      setForm((f) => ({ ...f, body: html }));
+    }
+  };
+
+  const markBodyTouched = () => {
+    bodyTouchedRef.current = true;
+  };
+
+  const openCreate = () => {
+    resetBodyTracking();
     setEditingArticle(null);
-    setModalOpen(true);
+    setForm(EMPTY_FORM);
+    setTab("basics");
+    setTitleError(null);
+    setSaveSuccess(null);
+    setEditorOpen(true);
+    scrollToEditorOnSmallScreens();
   };
 
-  const openEditModal = (article: NewsArticle) => {
+  const openEdit = (article: NewsArticle, keepTab = false) => {
+    resetBodyTracking();
     setEditingArticle(article);
-    setFormTitle(article.title);
-    setFormSlug(article.slug);
-    setFormExcerpt(article.excerpt ?? "");
-    setFormAuthorName(article.authorName ?? "");
-    setFormCategory(article.category ?? "");
-    setFormTags(Array.isArray(article.tags) ? article.tags.join(", ") : "");
-    setFormBody(article.body ?? "");
-    setFormMetaTitle(article.metaTitle ?? "");
-    setFormMetaDescription(article.metaDescription ?? "");
-    setFormStatus(article.status === "PUBLISHED");
-    setFormHeroImage(
-      article.heroStorageKey && article.heroUrl
-        ? { storageKey: article.heroStorageKey, url: article.heroUrl }
-        : null,
-    );
-    setFormThumbnail(
-      article.thumbnailStorageKey && article.thumbnailUrl
-        ? { storageKey: article.thumbnailStorageKey, url: article.thumbnailUrl }
-        : null,
-    );
-    setModalOpen(true);
+    setForm(formFromArticle(article));
+    if (!keepTab) setTab("basics");
+    setTitleError(null);
+    if (!keepTab) setSaveSuccess(null);
+    setEditorOpen(true);
+    if (!keepTab) scrollToEditorOnSmallScreens();
   };
 
-  const closeModal = () => setModalOpen(false);
+  const closeEditor = () => {
+    resetBodyTracking();
+    setEditorOpen(false);
+    setEditingArticle(null);
+    setForm(EMPTY_FORM);
+    setTitleError(null);
+    setSaveSuccess(null);
+  };
+
+  /** Run `fn` now, or after the user agrees to drop unsaved edits. */
+  const guard = async (fn: () => void) => {
+    if (await confirmDiscard()) fn();
+  };
 
   // --------------------------------------------------------------------------
-  //  Save
+  //  API: Save (create / update)
   // --------------------------------------------------------------------------
 
-  const handleSave = async () => {
-    if (!formTitle.trim()) {
+  const handleSave = async (e?: FormEvent) => {
+    e?.preventDefault();
+
+    if (!form.title.trim()) {
+      setTitleError("Title is required.");
+      setTab("basics");
       showToast({ type: "error", title: "Title is required." });
       return;
     }
 
     setSaving(true);
+
     try {
       const payload: Record<string, unknown> = {
-        title: formTitle.trim(),
-        slug: formSlug.trim() || undefined,
-        excerpt: formExcerpt.trim() || null,
-        authorName: formAuthorName.trim() || null,
-        category: formCategory.trim() || null,
-        tags: formTags
+        title: form.title.trim(),
+        slug: form.slug.trim() || undefined,
+        excerpt: form.excerpt.trim() || null,
+        authorName: form.authorName.trim() || null,
+        category: form.category.trim() || null,
+        tags: form.tags
           .split(",")
           .map((t) => t.trim())
           .filter(Boolean),
-        body: formBody || null,
-        metaTitle: formMetaTitle.trim() || null,
-        metaDescription: formMetaDescription.trim() || null,
-        status: formStatus ? "PUBLISHED" : "DRAFT",
-        heroStorageKey: formHeroImage?.storageKey ?? null,
-        heroUrl: formHeroImage?.url ?? null,
-        thumbnailStorageKey: formThumbnail?.storageKey ?? null,
-        thumbnailUrl: formThumbnail?.url ?? null,
+        body: form.body || null,
+        metaTitle: form.metaTitle.trim() || null,
+        metaDescription: form.metaDescription.trim() || null,
+        status: form.published ? "PUBLISHED" : "DRAFT",
+        heroStorageKey: form.heroImage?.storageKey ?? null,
+        heroUrl: form.heroImage?.url ?? null,
+        thumbnailStorageKey: form.thumbnail?.storageKey ?? null,
+        thumbnailUrl: form.thumbnail?.url ?? null,
       };
 
       const isEditing = !!editingArticle;
@@ -229,14 +476,25 @@ export default function AdminNewsPage() {
       });
 
       const json = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(json?.error || `Request failed with status ${res.status}`);
 
-      showToast({
-        type: "success",
-        title: isEditing ? "News article updated." : "News article created.",
-      });
-      await fetchArticles();
-      closeModal();
+      if (!res.ok) {
+        throw new Error(json?.error || `Request failed with status ${res.status}`);
+      }
+
+      const msg = isEditing ? "News article updated." : "News article created.";
+      showToast({ type: "success", title: msg });
+
+      const fresh = await fetchArticles();
+      // Re-sync the editor with the saved record so the dirty state clears
+      // (a new article opens for further editing with its generated slug).
+      const savedId: string | undefined = isEditing ? editingArticle!.id : json?.article?.id;
+      const saved = savedId ? fresh?.find((p) => p.id === savedId) : undefined;
+      if (saved) {
+        openEdit(saved, true);
+        setSaveSuccess(msg);
+      } else {
+        closeEditor();
+      }
     } catch (err: any) {
       showToast({ type: "error", title: err?.message || "Failed to save." });
     } finally {
@@ -245,24 +503,26 @@ export default function AdminNewsPage() {
   };
 
   // --------------------------------------------------------------------------
-  //  Delete
+  //  API: Delete
   // --------------------------------------------------------------------------
 
   const handleDelete = async (articleId: string) => {
-    if (!window.confirm("Are you sure you want to delete this article? This cannot be undone.")) {
-      return;
-    }
-
     setDeleting(true);
+
     try {
-      const res = await fetch(`/api/admin/news/${articleId}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/news/${articleId}`, {
+        method: "DELETE",
+      });
+
       if (!res.ok) {
         const json = await res.json().catch(() => null);
         throw new Error(json?.error || `Delete failed with status ${res.status}`);
       }
+
       showToast({ type: "success", title: "Article deleted." });
+      setDeleteTarget(null);
       await fetchArticles();
-      if (modalOpen) closeModal();
+      if (editingArticle?.id === articleId) closeEditor();
     } catch (err: any) {
       showToast({ type: "error", title: err?.message || "Failed to delete." });
     } finally {
@@ -271,379 +531,548 @@ export default function AdminNewsPage() {
   };
 
   // --------------------------------------------------------------------------
+  //  Render: list
+  // --------------------------------------------------------------------------
+
+  const list = (
+    <Card padding="none">
+      <div className="px-6 pt-4">
+        <Tabs
+          idPrefix={LIST_TAB_IDS}
+          label="Filter articles by status"
+          value={statusFilter}
+          onChange={(v) => {
+            setStatusFilter(v);
+            setPage(1);
+          }}
+          tabs={[
+            { value: "ALL", label: `All (${loaded ? fmt(articles.length) : DASH})` },
+            { value: "PUBLISHED", label: `Published (${loaded ? fmt(publishedCount) : DASH})` },
+            { value: "DRAFT", label: `Drafts (${loaded ? fmt(draftCount) : DASH})` },
+          ]}
+        />
+        <div className="flex flex-wrap items-center gap-3 py-4">
+          <SearchInput
+            className="min-w-[200px] flex-1"
+            value={searchQuery}
+            onChange={(v) => {
+              setSearchQuery(v);
+              setPage(1);
+            }}
+            placeholder="Search articles"
+            label="Search articles by title, author or category"
+          />
+          {categories.length > 0 && (
+            <div className="w-full sm:w-44">
+              <Select
+                aria-label="Filter by category"
+                value={categoryFilter}
+                onChange={(e) => {
+                  setCategoryFilter(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="ALL">All categories</option>
+                {categories.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <TabPanel idPrefix={LIST_TAB_IDS} value={statusFilter}>
+        {loading && !loaded ? (
+          <div className="space-y-3 border-t border-[var(--av2-border)] px-6 py-5" role="status">
+            <span className="sr-only">Loading news articles…</span>
+            {[0, 1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-16 w-full" />
+            ))}
+          </div>
+        ) : articles.length === 0 ? (
+          <div className="border-t border-[var(--av2-border)]">
+            <EmptyState
+              icon={<IconDocument width={28} height={28} />}
+              title="No news articles yet"
+              description="Create your first article with the New article button."
+            />
+          </div>
+        ) : filteredArticles.length === 0 ? (
+          <div className="border-t border-[var(--av2-border)]">
+            <EmptyState
+              title="No articles match these filters"
+              description="Try a different search, status or category."
+              action={<Button onClick={resetFilters}>Clear filters</Button>}
+            />
+          </div>
+        ) : (
+          <ul className="border-t border-[var(--av2-border)]" aria-label="News articles">
+            {pageRows.map((article) => {
+              const active = editorOpen && editingArticle?.id === article.id;
+              const meta = [article.authorName, article.category].filter(Boolean).join(" · ");
+              return (
+                <li
+                  key={article.id}
+                  className="border-b border-[var(--av2-border)] last:border-b-0"
+                >
+                  <button
+                    type="button"
+                    aria-current={active ? "true" : undefined}
+                    onClick={() => {
+                      if (active) return;
+                      void guard(() => openEdit(article));
+                    }}
+                    className={cx(
+                      "flex w-full items-start gap-4 px-6 py-4 text-left transition-colors",
+                      "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--av2-accent)]",
+                      active
+                        ? "bg-[var(--av2-selected)] shadow-[inset_3px_0_0_var(--av2-accent)]"
+                        : "hover:bg-[var(--av2-bg)]",
+                    )}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="line-clamp-2 text-base leading-6 font-semibold">
+                        {article.title}
+                      </p>
+                      <p className="mt-1 truncate text-sm text-[var(--av2-text-2)]">
+                        {meta || "No author or category"}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1.5">
+                      <StatusBadge status={article.status} />
+                      <span className="text-sm whitespace-nowrap text-[var(--av2-text-2)] tabular-nums">
+                        {article.status === "PUBLISHED"
+                          ? formatDate(article.publishedAt)
+                          : `Updated ${formatDate(article.updatedAt)}`}
+                      </span>
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </TabPanel>
+
+      {loaded && articles.length > 0 && (
+        <TableFooter>
+          <span className="tabular-nums">
+            {filteredArticles.length === 0
+              ? `Showing 0 of ${fmt(articles.length)} ${plural(articles.length, "article", "articles")}`
+              : `Showing ${fmt(pageStart + 1)}–${fmt(
+                  Math.min(pageStart + PAGE_SIZE, filteredArticles.length),
+                )} of ${fmt(filteredArticles.length)} ${plural(
+                  filteredArticles.length,
+                  "article",
+                  "articles",
+                )}`}
+          </span>
+          {pageCount > 1 ? (
+            <Pager page={currentPage} pageCount={pageCount} onPage={setPage} />
+          ) : filtersActive ? (
+            <Button size="sm" variant="ghost" onClick={resetFilters}>
+              Clear filters
+            </Button>
+          ) : null}
+        </TableFooter>
+      )}
+    </Card>
+  );
+
+  // --------------------------------------------------------------------------
+  //  Render: editor
+  // --------------------------------------------------------------------------
+
+  const publicHref =
+    editingArticle && editingArticle.status === "PUBLISHED" ? `/news/${editingArticle.slug}` : null;
+  const previewMeta = [form.authorName.trim(), form.category.trim()].filter(Boolean);
+
+  const editorHeader = (
+    <div className="flex items-start justify-between gap-4">
+      <div className="min-w-0">
+        <button
+          type="button"
+          onClick={() => void guard(closeEditor)}
+          className="mb-3 inline-flex items-center gap-1.5 rounded text-sm font-semibold text-[var(--av2-text-2)] hover:text-[var(--av2-text)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none xl:hidden"
+        >
+          <IconArrowLeft />
+          Back to articles
+        </button>
+        <h2 className="flex flex-wrap items-center gap-3 text-xl leading-7 font-semibold">
+          {editingArticle ? "Edit article" : "New article"}
+          {editingArticle ? (
+            <StatusBadge status={editingArticle.status} />
+          ) : (
+            <Badge>Not saved yet</Badge>
+          )}
+        </h2>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        {publicHref && (
+          <span className="hidden sm:inline-flex">
+            <TextLink href={publicHref} external>
+              View on site
+            </TextLink>
+          </span>
+        )}
+        {editingArticle && (
+          <Button
+            size="sm"
+            variant="danger"
+            onClick={() => setDeleteTarget(editingArticle)}
+            disabled={saving || deleting}
+          >
+            Delete
+          </Button>
+        )}
+        <button
+          type="button"
+          onClick={() => void guard(closeEditor)}
+          aria-label="Close editor"
+          className="hidden h-9 w-9 items-center justify-center rounded-lg text-[var(--av2-text-2)] hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none xl:flex"
+        >
+          <IconX width={18} height={18} />
+        </button>
+      </div>
+    </div>
+  );
+
+  const editorTabs = (
+    <Tabs
+      idPrefix={TAB_IDS}
+      label="Article editor sections"
+      value={tab}
+      onChange={setTab}
+      tabs={[
+        {
+          value: "basics",
+          label: titleError ? (
+            <span className="inline-flex items-center gap-1.5">
+              Basics
+              <span
+                aria-label="has an error"
+                className="h-2 w-2 rounded-full bg-[var(--av2-error)]"
+              />
+            </span>
+          ) : (
+            "Basics"
+          ),
+        },
+        { value: "content", label: "Content" },
+        { value: "media", label: "Media" },
+        { value: "publish", label: "Publish & SEO" },
+      ]}
+    />
+  );
+
+  const editorFooter = (
+    <SaveBar
+      dirty={dirty}
+      status={
+        saving
+          ? "Saving…"
+          : dirty
+            ? "Unsaved changes"
+            : saveSuccess
+              ? saveSuccess
+              : editingArticle
+                ? "No unsaved changes"
+                : "Add a title to create the article"
+      }
+    >
+      {dirty && (
+        <Button
+          variant="ghost"
+          disabled={saving || deleting}
+          onClick={() => {
+            setForm(baseline);
+            setTitleError(null);
+            bodyTouchedRef.current = false;
+          }}
+        >
+          Discard
+        </Button>
+      )}
+      <Button type="submit" variant="primary" disabled={!dirty || saving || deleting}>
+        {saving ? "Saving…" : editingArticle ? "Save changes" : "Create article"}
+      </Button>
+    </SaveBar>
+  );
+
+  // Panels stay mounted (hidden) so the rich-text editor keeps its state and
+  // every field remains part of the form while another tab is showing.
+  const editor = (
+    <form onSubmit={handleSave} noValidate>
+      <EditorPanel header={editorHeader} tabs={editorTabs} footer={editorFooter}>
+        <div hidden={tab !== "basics"}>
+          <TabPanel idPrefix={TAB_IDS} value="basics">
+            <div className="space-y-5">
+              <Field label="Title" htmlFor="news-title" error={titleError ?? undefined}>
+                <TextInput
+                  id="news-title"
+                  type="text"
+                  value={form.title}
+                  onChange={(e) => set("title", e.target.value)}
+                  placeholder="Article title"
+                  required
+                  aria-required
+                  aria-invalid={!!titleError}
+                />
+              </Field>
+
+              <Field label="Slug" htmlFor="news-slug" hint="Leave blank to auto-generate.">
+                <TextInput
+                  id="news-slug"
+                  type="text"
+                  value={form.slug}
+                  onChange={(e) => set("slug", e.target.value)}
+                  placeholder="auto-generated-from-title"
+                />
+              </Field>
+
+              <Field label="Excerpt" htmlFor="news-excerpt">
+                <TextArea
+                  id="news-excerpt"
+                  value={form.excerpt}
+                  onChange={(e) => set("excerpt", e.target.value)}
+                  rows={3}
+                  placeholder="Short summary for listing cards..."
+                />
+              </Field>
+
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Field label="Author name" htmlFor="news-author">
+                  <TextInput
+                    id="news-author"
+                    type="text"
+                    value={form.authorName}
+                    onChange={(e) => set("authorName", e.target.value)}
+                    placeholder="Author name"
+                  />
+                </Field>
+                <Field label="Category" htmlFor="news-category">
+                  <TextInput
+                    id="news-category"
+                    type="text"
+                    value={form.category}
+                    onChange={(e) => set("category", e.target.value)}
+                    placeholder="e.g. Company, Product"
+                  />
+                </Field>
+              </div>
+
+              <Field label="Tags" htmlFor="news-tags" hint="Comma-separated list.">
+                <TextInput
+                  id="news-tags"
+                  type="text"
+                  value={form.tags}
+                  onChange={(e) => set("tags", e.target.value)}
+                  placeholder="news, update, launch"
+                />
+              </Field>
+
+              <div className="overflow-hidden rounded-xl border border-[var(--av2-border)]">
+                <p className="border-b border-[var(--av2-border)] bg-[var(--av2-bg)] px-4 py-3 text-sm font-semibold">
+                  Listing preview
+                </p>
+                <div className="flex gap-4 px-4 py-4">
+                  {form.thumbnail?.url && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={form.thumbnail.url}
+                      alt=""
+                      className="h-16 w-20 shrink-0 rounded-lg object-cover"
+                    />
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-lg leading-7 font-semibold break-words">
+                      {form.title.trim() || (
+                        <span className="text-[var(--av2-text-2)]">Untitled article</span>
+                      )}
+                    </p>
+                    {form.excerpt.trim() && (
+                      <p className="mt-1 line-clamp-2 text-sm text-[var(--av2-text-2)]">
+                        {form.excerpt.trim()}
+                      </p>
+                    )}
+                    <p className="mt-1 text-sm text-[var(--av2-text-2)]">
+                      {[...previewMeta, formatDate(editingArticle?.publishedAt ?? null)].join(
+                        " · ",
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </TabPanel>
+        </div>
+
+        <div hidden={tab !== "content"}>
+          <TabPanel idPrefix={TAB_IDS} value="content">
+            <p className="mb-1.5 text-sm font-medium">Body</p>
+            <div
+              onKeyDownCapture={markBodyTouched}
+              onMouseDownCapture={markBodyTouched}
+              onPasteCapture={markBodyTouched}
+              onDropCapture={markBodyTouched}
+              onCompositionStartCapture={markBodyTouched}
+            >
+              <RichTextEditor
+                value={form.body}
+                onChange={handleBodyChange}
+                placeholder="Write your article..."
+                minHeight="400px"
+                enableHeadings
+                className="rounded-lg! border-[var(--av2-border)]! bg-[var(--av2-surface)]!"
+              />
+            </div>
+          </TabPanel>
+        </div>
+
+        <div hidden={tab !== "media"}>
+          <TabPanel idPrefix={TAB_IDS} value="media">
+            <p className="mb-5 text-sm text-[var(--av2-text-2)]">
+              The hero image leads the article page; the thumbnail is used on listing cards.
+            </p>
+            <div className="grid gap-6 sm:grid-cols-2">
+              <CmsImageUpload
+                type="blog"
+                value={form.heroImage}
+                onChange={(v) => set("heroImage", v)}
+                label="Hero Image"
+                aspectRatio="16/9"
+              />
+              <CmsImageUpload
+                type="blog"
+                value={form.thumbnail}
+                onChange={(v) => set("thumbnail", v)}
+                label="Thumbnail"
+                aspectRatio="4/3"
+              />
+            </div>
+          </TabPanel>
+        </div>
+
+        <div hidden={tab !== "publish"}>
+          <TabPanel idPrefix={TAB_IDS} value="publish">
+            <PanelSection title="Visibility">
+              <Switch
+                checked={form.published}
+                onChange={(v) => set("published", v)}
+                label="Published"
+              />
+              <p className="mt-2 text-sm text-[var(--av2-text-2)]">
+                {form.published
+                  ? "Live on the website once saved."
+                  : "Draft. Only visible here until you publish it."}
+              </p>
+              <div className="mt-5">
+                <KeyValueList
+                  rows={[
+                    {
+                      label: "Published on",
+                      value: editingArticle?.publishedAt
+                        ? formatDate(editingArticle.publishedAt)
+                        : form.published
+                          ? "Set when you save"
+                          : DASH,
+                    },
+                    { label: "Created", value: formatDate(editingArticle?.createdAt ?? null) },
+                    { label: "Last updated", value: formatDate(editingArticle?.updatedAt ?? null) },
+                  ]}
+                />
+              </div>
+            </PanelSection>
+
+            <PanelSection title="SEO">
+              <div className="space-y-5">
+                <Field label="Meta title" htmlFor="news-meta-title">
+                  <TextInput
+                    id="news-meta-title"
+                    type="text"
+                    value={form.metaTitle}
+                    onChange={(e) => set("metaTitle", e.target.value)}
+                    placeholder="SEO title"
+                  />
+                </Field>
+                <Field label="Meta description" htmlFor="news-meta-description">
+                  <TextArea
+                    id="news-meta-description"
+                    value={form.metaDescription}
+                    onChange={(e) => set("metaDescription", e.target.value)}
+                    rows={2}
+                    placeholder="SEO description..."
+                  />
+                </Field>
+              </div>
+            </PanelSection>
+          </TabPanel>
+        </div>
+      </EditorPanel>
+    </form>
+  );
+
+  const editorPlaceholder = (
+    <Card>
+      <EmptyState
+        icon={<IconDocument width={28} height={28} />}
+        title="Select an article to edit"
+        description="Pick an article from the list, or start a new one."
+        action={<Button onClick={() => openCreate()}>New article</Button>}
+      />
+    </Card>
+  );
+
+  // --------------------------------------------------------------------------
   //  Render
   // --------------------------------------------------------------------------
 
   return (
     <>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight">News</h1>
-          <Badge variant="neutral">{articles.length}</Badge>
-        </div>
-        <Button onClick={openCreateModal}>New Article</Button>
-      </div>
+      <PageHeader
+        title="News"
+        description="Manage news articles shown on the website."
+        actions={
+          <Button variant="primary" onClick={() => void guard(openCreate)}>
+            <IconPlus />
+            New article
+          </Button>
+        }
+      />
 
       {error && (
-        <div className="mb-4 rounded-xl border border-[var(--bb-danger-border)] bg-[var(--bb-danger-bg)] px-4 py-3 text-sm text-[var(--bb-danger-text)]">
-          {error}
+        <div className="mb-6">
+          <Callout tone="error" title="Couldn't load news articles">
+            {error}
+          </Callout>
         </div>
       )}
 
-      <section className="mb-6 grid gap-4 md:grid-cols-3">
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-          <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
-            Total
-          </p>
-          <p className="mt-2 text-3xl font-semibold text-[var(--bb-secondary)]">
-            {loading ? "\u2014" : articles.length}
-          </p>
-          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">All news articles.</p>
+      {/* List and editor side by side on xl; one at a time below that. */}
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+        <div className={cx("min-w-0", editorOpen && "hidden xl:block")}>{list}</div>
+        <div className={cx("min-w-0", !editorOpen && "hidden xl:block")}>
+          {editorOpen ? editor : editorPlaceholder}
         </div>
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-          <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
-            Published
-          </p>
-          <p className="mt-2 text-3xl font-semibold text-[var(--bb-secondary)]">
-            {loading ? "\u2014" : publishedCount}
-          </p>
-          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">Live on the website.</p>
-        </div>
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-          <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
-            Draft
-          </p>
-          <p className="mt-2 text-3xl font-semibold text-[var(--bb-secondary)]">
-            {loading ? "\u2014" : draftCount}
-          </p>
-          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">Unpublished drafts.</p>
-        </div>
-      </section>
+      </div>
 
-      <section className="mb-4 flex flex-wrap items-center gap-3">
-        <div className="relative max-w-sm min-w-[200px] flex-1">
-          <svg
-            className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[var(--bb-text-tertiary)]"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={2}
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-            />
-          </svg>
-          <input
-            type="text"
-            placeholder="Search articles..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] py-2 pr-3 pl-10 text-sm text-[var(--bb-secondary)] transition-colors outline-none placeholder:text-[var(--bb-text-tertiary)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery("")}
-              className="absolute top-1/2 right-3 -translate-y-1/2 text-[var(--bb-text-tertiary)] hover:text-[var(--bb-secondary)]"
-            >
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={2}
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          )}
-        </div>
-        <FormSelect
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as any)}
-          size="sm"
-          className="w-auto"
-        >
-          <option value="ALL">All Status</option>
-          <option value="PUBLISHED">Published</option>
-          <option value="DRAFT">Draft</option>
-        </FormSelect>
-        <p className="text-xs text-[var(--bb-text-tertiary)]">
-          Showing {filteredArticles.length} of {articles.length}
-        </p>
-      </section>
-
-      <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
-        {loading ? (
-          <LoadingState message="Loading news articles..." />
-        ) : filteredArticles.length === 0 ? (
-          <EmptyState
-            title={
-              searchQuery || statusFilter !== "ALL"
-                ? "No articles match your filters."
-                : "No news articles yet."
-            }
-            description={
-              !searchQuery && statusFilter === "ALL"
-                ? "Create your first article to get started."
-                : undefined
-            }
-          />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-[var(--bb-border)] text-xs tracking-[0.08em] text-[var(--bb-text-tertiary)] uppercase">
-                  <th className="px-3 py-2">Title</th>
-                  <th className="px-3 py-2">Author</th>
-                  <th className="px-3 py-2">Category</th>
-                  <th className="px-3 py-2 text-center">Status</th>
-                  <th className="px-3 py-2">Published</th>
-                  <th className="px-3 py-2 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredArticles.map((article) => (
-                  <tr
-                    key={article.id}
-                    className="border-b border-[var(--bb-border-subtle)] last:border-b-0"
-                  >
-                    <td className="px-3 py-2.5">
-                      <span className="font-semibold text-[var(--bb-secondary)]">
-                        {article.title}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 text-xs text-[var(--bb-text-secondary)]">
-                      {article.authorName || "\u2014"}
-                    </td>
-                    <td className="px-3 py-2.5 text-xs text-[var(--bb-text-secondary)]">
-                      {article.category || "\u2014"}
-                    </td>
-                    <td className="px-3 py-2.5 text-center">
-                      <Badge variant={article.status === "PUBLISHED" ? "success" : "warning"}>
-                        {article.status === "PUBLISHED" ? "Published" : "Draft"}
-                      </Badge>
-                    </td>
-                    <td className="px-3 py-2.5 text-xs text-[var(--bb-text-secondary)]">
-                      {formatDate(article.publishedAt)}
-                    </td>
-                    <td className="px-3 py-2.5 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => openEditModal(article)}>
-                          Edit
-                        </Button>
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          onClick={() => handleDelete(article.id)}
-                          disabled={deleting}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      {/* Modal */}
-      {modalOpen && (
-        <div
-          className="fixed inset-0 z-50 bg-black/50"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeModal();
-          }}
-        >
-          <div className="mx-auto my-8 max-h-[calc(100vh-4rem)] max-w-5xl overflow-y-auto rounded-xl bg-white shadow-2xl">
-            <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-xl border-b border-[var(--bb-border)] bg-white px-6 py-4">
-              <h2 className="text-lg font-semibold text-[var(--bb-secondary)]">
-                {editingArticle ? "Edit Article" : "New Article"}
-              </h2>
-              <button
-                type="button"
-                onClick={closeModal}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--bb-text-muted)] transition-colors hover:bg-[var(--bb-bg-warm)] hover:text-[var(--bb-secondary)]"
-                aria-label="Close"
-              >
-                <svg
-                  className="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={2}
-                  stroke="currentColor"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 gap-6 p-6 xl:grid-cols-[3fr_2fr]">
-              <div className="space-y-4">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-[var(--bb-secondary)]">
-                    Title <span className="text-[var(--bb-danger-text)]">*</span>
-                  </label>
-                  <FormInput
-                    type="text"
-                    value={formTitle}
-                    onChange={(e) => setFormTitle(e.target.value)}
-                    placeholder="Article title"
-                    required
-                    className="text-lg font-semibold"
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-[var(--bb-secondary)]">Body</label>
-                  <RichTextEditor
-                    value={formBody}
-                    onChange={setFormBody}
-                    placeholder="Write your article..."
-                    minHeight="400px"
-                    enableHeadings
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-[var(--bb-secondary)]">Slug</label>
-                  <FormInput
-                    type="text"
-                    value={formSlug}
-                    onChange={(e) => setFormSlug(e.target.value)}
-                    placeholder="auto-generated-from-title"
-                  />
-                  <p className="text-[10px] text-[var(--bb-text-muted)]">
-                    Leave blank to auto-generate.
-                  </p>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-[var(--bb-secondary)]">Excerpt</label>
-                  <FormTextarea
-                    value={formExcerpt}
-                    onChange={(e) => setFormExcerpt(e.target.value)}
-                    rows={3}
-                    placeholder="Short summary for listing cards..."
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-[var(--bb-secondary)]">
-                    Author Name
-                  </label>
-                  <FormInput
-                    type="text"
-                    value={formAuthorName}
-                    onChange={(e) => setFormAuthorName(e.target.value)}
-                    placeholder="Author name"
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-[var(--bb-secondary)]">Category</label>
-                  <FormInput
-                    type="text"
-                    value={formCategory}
-                    onChange={(e) => setFormCategory(e.target.value)}
-                    placeholder="e.g. Company, Product"
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-[var(--bb-secondary)]">Tags</label>
-                  <FormInput
-                    type="text"
-                    value={formTags}
-                    onChange={(e) => setFormTags(e.target.value)}
-                    placeholder="news, update, launch"
-                  />
-                  <p className="text-[10px] text-[var(--bb-text-muted)]">Comma-separated list.</p>
-                </div>
-                <CmsImageUpload
-                  type="blog"
-                  value={formHeroImage}
-                  onChange={setFormHeroImage}
-                  label="Hero Image"
-                  aspectRatio="16/9"
-                />
-                <CmsImageUpload
-                  type="blog"
-                  value={formThumbnail}
-                  onChange={setFormThumbnail}
-                  label="Thumbnail"
-                  aspectRatio="4/3"
-                />
-                <div className="space-y-3 rounded-xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-warm)] px-4 py-3">
-                  <p className="text-xs font-semibold tracking-[0.08em] text-[var(--bb-text-tertiary)] uppercase">
-                    SEO
-                  </p>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-medium text-[var(--bb-secondary)]">
-                      Meta Title
-                    </label>
-                    <FormInput
-                      type="text"
-                      value={formMetaTitle}
-                      onChange={(e) => setFormMetaTitle(e.target.value)}
-                      placeholder="SEO title"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-medium text-[var(--bb-secondary)]">
-                      Meta Description
-                    </label>
-                    <FormTextarea
-                      value={formMetaDescription}
-                      onChange={(e) => setFormMetaDescription(e.target.value)}
-                      rows={2}
-                      placeholder="SEO description..."
-                    />
-                  </div>
-                </div>
-                <label className="flex items-center gap-2 text-xs font-medium text-[var(--bb-secondary)]">
-                  <input
-                    type="checkbox"
-                    checked={formStatus}
-                    onChange={(e) => setFormStatus(e.target.checked)}
-                    className="h-3.5 w-3.5 rounded border-[var(--bb-border-input)] text-[var(--bb-primary)] focus:ring-[var(--bb-primary)]"
-                  />
-                  Published
-                </label>
-              </div>
-            </div>
-
-            <div className="sticky bottom-0 flex items-center justify-between rounded-b-xl border-t border-[var(--bb-border)] bg-white px-6 py-4">
-              <div className="flex items-center gap-2">
-                <Button
-                  onClick={handleSave}
-                  loading={saving}
-                  loadingText="Saving..."
-                  disabled={saving || deleting}
-                >
-                  Save
-                </Button>
-                {editingArticle && (
-                  <Button
-                    variant="danger"
-                    onClick={() => handleDelete(editingArticle.id)}
-                    disabled={saving || deleting}
-                    loading={deleting}
-                    loadingText="Deleting..."
-                  >
-                    Delete
-                  </Button>
-                )}
-              </div>
-              <Button variant="ghost" onClick={closeModal} disabled={saving || deleting}>
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onClose={() => !deleting && setDeleteTarget(null)}
+        onConfirm={() => deleteTarget && handleDelete(deleteTarget.id)}
+        loading={deleting}
+        variant="danger"
+        title="Delete this article?"
+        description={
+          deleteTarget
+            ? `"${deleteTarget.title}" will be removed permanently. This action cannot be undone.`
+            : undefined
+        }
+        confirmLabel="Delete article"
+      />
     </>
   );
 }

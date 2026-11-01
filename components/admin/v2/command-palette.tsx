@@ -10,6 +10,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { PageEntry } from "./admin-nav";
+import { useConfirmDiscard } from "./unsaved-changes";
 
 export function CommandPalette({
   open,
@@ -21,6 +22,7 @@ export function CommandPalette({
   pages: PageEntry[];
 }) {
   const router = useRouter();
+  const confirmDiscard = useConfirmDiscard();
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -46,9 +48,10 @@ export function CommandPalette({
 
   if (!open) return null;
 
-  const go = (p: PageEntry | undefined) => {
+  const go = async (p: PageEntry | undefined) => {
     if (!p) return;
     onClose();
+    if (!(await confirmDiscard())) return;
     router.push(p.href);
   };
 
