@@ -40,6 +40,7 @@ import {
   plural,
 } from "@/components/admin/v2/ui";
 import { IconAlertCircle, IconBuilding, IconDocument } from "@/components/admin/v2/icons";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 
 type CompanyPlan = {
   id: string;
@@ -235,6 +236,9 @@ export default function AdminPlanAssignmentPage() {
     return d === (c.plan?.id ?? "") ? undefined : d;
   };
   const pendingCompanies = companies.filter((c) => pendingFor(c) !== undefined);
+  // Drafts are kept per company, so switching rows never drops them — only
+  // leaving the page does.
+  useUnsavedChanges(pendingCompanies.length > 0, "Plan assignments");
 
   const filteredCompanies = useMemo(() => {
     const q = query.trim().toLowerCase();

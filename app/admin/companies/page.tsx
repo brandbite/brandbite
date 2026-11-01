@@ -11,8 +11,9 @@
 
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Modal, ModalFooter, ModalHeader } from "@/components/ui/modal";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 import { MfaChallengeModal, type MfaChallengeInfo } from "@/components/admin/mfa-challenge-modal";
 import {
   Badge,
@@ -282,6 +283,26 @@ export default function AdminCompaniesPage() {
   const closeAdjust = () => {
     setAdjustTarget(null);
     setAdjustError(null);
+  };
+
+  // An unsubmitted amount or reason is a draft: dismissing the modal (Cancel,
+  // ×, Escape, backdrop) asks first. A successful submit calls closeAdjust.
+  const adjustDirty =
+    adjustTarget !== null && (adjustAmount.trim() !== "" || adjustNotes.trim() !== "");
+  const confirmDiscard = useUnsavedChanges(
+    adjustDirty,
+    adjustTarget ? `Token adjustment: ${adjustTarget.name}` : "Token adjustment",
+  );
+  // Escape reaches both this modal and the confirm dialog — ignore re-entry.
+  const closingAdjust = useRef(false);
+  const requestCloseAdjust = async () => {
+    if (closingAdjust.current) return;
+    closingAdjust.current = true;
+    try {
+      if (await confirmDiscard()) closeAdjust();
+    } finally {
+      closingAdjust.current = false;
+    }
   };
 
   const submitAdjust = async (e: React.FormEvent) => {
@@ -775,7 +796,7 @@ export default function AdminCompaniesPage() {
       {/* Token-adjustment modal */}
       <Modal
         open={adjustTarget !== null}
-        onClose={closeAdjust}
+        onClose={requestCloseAdjust}
         size="md"
         className="border border-[var(--av2-border)] bg-[var(--av2-surface)]! p-6! shadow-none!"
       >
@@ -787,7 +808,7 @@ export default function AdminCompaniesPage() {
               ? `Current balance: ${adjustTarget.tokenBalance} tokens. This writes a ledger entry with reason ADMIN_ADJUSTMENT.`
               : undefined
           }
-          onClose={closeAdjust}
+          onClose={requestCloseAdjust}
           className="border-[var(--av2-border)]!"
         />
 
@@ -890,7 +911,12 @@ export default function AdminCompaniesPage() {
           {adjustError && <Callout tone="error">{adjustError}</Callout>}
 
           <ModalFooter>
-            <Button variant="ghost" type="button" onClick={closeAdjust} disabled={adjustSaving}>
+            <Button
+              variant="ghost"
+              type="button"
+              onClick={requestCloseAdjust}
+              disabled={adjustSaving}
+            >
               Cancel
             </Button>
             <Button

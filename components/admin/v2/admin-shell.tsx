@@ -21,6 +21,7 @@ import { AdminSidebar } from "./admin-sidebar";
 import { CommandPalette } from "./command-palette";
 import { IconSearch } from "./icons";
 import { useAdminSession } from "./use-admin-session";
+import { UnsavedChangesProvider } from "./unsaved-changes";
 import { Avatar, UserMenu } from "./user-menu";
 
 const LS_COLLAPSED_KEY = "bb.sidebar.collapsed";
@@ -118,7 +119,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 
   return (
-    <>
+    <UnsavedChangesProvider>
       {mobileOpen && (
         <button
           type="button"
@@ -216,6 +217,6 @@ export function AdminShell({ children }: { children: ReactNode }) {
         onClose={() => setPaletteOpen(false)}
         pages={getAdminPageIndex(isSiteOwner)}
       />
-    </>
+    </UnsavedChangesProvider>
   );
 }

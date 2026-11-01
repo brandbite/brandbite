@@ -22,11 +22,20 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { OwnerOnlyBanner } from "@/components/admin/owner-only-banner";
-import { Button } from "@/components/ui/button";
-import { FormInput } from "@/components/ui/form-field";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import { LoadingState } from "@/components/ui/loading-state";
+import { IconCoins } from "@/components/admin/v2/icons";
+import {
+  Badge,
+  Button,
+  Callout,
+  Card,
+  Field,
+  IconTile,
+  PageHeader,
+  Skeleton,
+  TextInput,
+} from "@/components/admin/v2/ui";
 import { useToast } from "@/components/ui/toast-provider";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 type EnrolmentSession = {
   secret: string;
@@ -153,8 +162,9 @@ export default function AdminMfaSettingsPage() {
     }
   };
 
+  const [confirmDisable, setConfirmDisable] = useState(false);
+
   const handleDisable = async () => {
-    if (!window.confirm("Disable TOTP? Future money actions will email codes instead.")) return;
     setSubmitting(true);
     setErrorMessage(null);
     try {
@@ -176,147 +186,310 @@ export default function AdminMfaSettingsPage() {
       setSubmitting(false);
     }
   };
+  // Header status: null while the status probe is in flight.
+  const statusBadge =
+    enrolled === null ? null : enrolled ? (
+      <Badge tone="green" dot>
+        Enabled
+      </Badge>
+    ) : (
+      <Badge tone="neutral" dot>
+        Not enrolled
+      </Badge>
+    );
 
   return (
     <>
-      <div className="mb-4">
-        <h1 className="text-2xl font-semibold tracking-tight">Two-factor authentication</h1>
-        <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-          Add a one-tap authenticator code to money-moving admin actions. Replaces the slower
-          &ldquo;wait for email&rdquo; flow with an instant 6-digit code from Authy, Google
-          Authenticator, or 1Password.
-        </p>
-      </div>
+      <PageHeader
+        title={
+          <span className="inline-flex flex-wrap items-center gap-3">
+            Two-factor authentication
+            <Badge tone="peach" className="font-medium tracking-normal">
+              Site owner only
+            </Badge>
+          </span>
+        }
+        description="Confirm money-moving admin actions with an instant 6-digit code from Authy, Google Authenticator or 1Password, instead of waiting for an email."
+        meta={
+          statusBadge && (
+            <span className="inline-flex items-center gap-2">Status {statusBadge}</span>
+          )
+        }
+      />
 
       <OwnerOnlyBanner action="manage their own authenticator app" />
 
-      {loading ? (
-        <LoadingState message="Loading…" />
-      ) : enrolled ? (
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] p-6 shadow-sm">
-          <div className="mb-4 flex items-start gap-3">
-            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--bb-success-bg)] text-[var(--bb-success-text)]">
-              ✓
-            </div>
-            <div>
-              <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">
-                Authenticator app enabled
-              </h2>
-              <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
-                {userEmail ? (
-                  <>
-                    Money actions on <strong>{userEmail}</strong> will prompt for a 6-digit code
-                    from your authenticator app instead of an email.
-                  </>
-                ) : (
-                  "Money actions will prompt for a code from your authenticator app."
-                )}
-              </p>
-            </div>
-          </div>
-
-          {errorMessage && (
-            <InlineAlert variant="error" size="sm" className="mb-3">
-              {errorMessage}
-            </InlineAlert>
-          )}
-
-          <Button
-            variant="ghost"
-            onClick={handleDisable}
-            loading={submitting}
-            loadingText="Disabling…"
-            className="!border !border-red-300 !text-red-700 hover:!bg-red-50"
-          >
-            Disable authenticator app
-          </Button>
-        </div>
-      ) : session ? (
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] p-6 shadow-sm">
-          <div className="grid gap-6 md:grid-cols-[200px_1fr]">
-            <div>
-              {/* QR — next/image won't fetch a data: URL; use a plain img */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={session.qrDataUrl}
-                alt="TOTP enrolment QR code"
-                width={200}
-                height={200}
-                className="rounded-lg border border-[var(--bb-border)] bg-white p-2"
-              />
-              <p className="mt-2 text-[10px] text-[var(--bb-text-tertiary)]">
-                Scan with Authy, 1Password, Google Authenticator, etc.
-              </p>
-            </div>
-            <div>
-              <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">
-                Step 1 · Scan the QR code
-              </h2>
-              <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
-                Or enter this secret manually in your authenticator:
-              </p>
-              <p className="mt-1 rounded-md border border-[var(--bb-border-input)] bg-[var(--bb-bg-warm)] px-2 py-1 font-mono text-[11px] tracking-wider text-[var(--bb-secondary)] select-all">
-                {session.secret}
-              </p>
-
-              <div className="mt-5">
-                <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">
-                  Step 2 · Confirm a code
-                </h2>
-                <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
-                  Type the 6-digit code your app is showing right now. We verify it matches before
-                  turning TOTP on.
-                </p>
-                <div className="mt-2 max-w-[200px]">
-                  <FormInput
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    value={code}
-                    onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    placeholder="123456"
-                    disabled={submitting}
-                    className="!text-center !font-mono !text-lg !tracking-[0.5em]"
-                  />
-                </div>
-                {errorMessage && (
-                  <InlineAlert variant="error" size="sm" className="mt-2">
-                    {errorMessage}
-                  </InlineAlert>
-                )}
-
-                <div className="mt-3 flex gap-2">
-                  <Button
-                    variant="primary"
-                    onClick={handleConfirm}
-                    loading={submitting}
-                    loadingText="Verifying…"
-                    disabled={submitting || code.length !== 6}
-                  >
-                    Turn on
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      setSession(null);
-                      setCode("");
-                      setErrorMessage(null);
-                      void startEnrolment();
-                    }}
-                    disabled={submitting}
-                  >
-                    Generate new code
-                  </Button>
-                </div>
+      <div className="space-y-6">
+        {loading ? (
+          <Card>
+            <div aria-busy="true" aria-label="Loading two-factor status" className="space-y-4">
+              <Skeleton className="h-6 w-64" />
+              <Skeleton className="h-4 w-96 max-w-full" />
+              <div className="grid gap-8 pt-2 md:grid-cols-2">
+                <Skeleton className="h-52 w-52" />
+                <Skeleton className="h-40" />
               </div>
             </div>
+          </Card>
+        ) : enrolled ? (
+          <Card>
+            <div className="flex flex-wrap items-start gap-4">
+              <IconTile tone="green">
+                <IconCheck />
+              </IconTile>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-xl leading-7 font-semibold">Authenticator app enabled</h2>
+                <p className="mt-1 text-sm text-[var(--av2-text-2)]">
+                  {userEmail ? (
+                    <>
+                      Money actions on{" "}
+                      <strong className="font-semibold text-[var(--av2-text)]">{userEmail}</strong>{" "}
+                      will prompt for a 6-digit code from your authenticator app instead of an
+                      email.
+                    </>
+                  ) : (
+                    "Money actions will prompt for a code from your authenticator app."
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 border-t border-[var(--av2-border)] pt-5">
+              <h3 className="text-base font-semibold">Disable authenticator app</h3>
+              <p className="mt-1 text-sm text-[var(--av2-text-2)]">
+                Money actions fall back to emailed codes. You can enrol again at any time.
+              </p>
+              {errorMessage && (
+                <div className="mt-3">
+                  <Callout tone="error" title="Couldn't disable two-factor">
+                    {errorMessage}
+                  </Callout>
+                </div>
+              )}
+              <Button
+                variant="danger"
+                className="mt-4"
+                onClick={() => setConfirmDisable(true)}
+                disabled={submitting}
+                aria-busy={submitting || undefined}
+              >
+                {submitting ? "Disabling…" : "Disable authenticator app"}
+              </Button>
+            </div>
+          </Card>
+        ) : session ? (
+          <Card padding="none">
+            <div className="grid md:grid-cols-2">
+              {/* Step 1 — scan */}
+              <section
+                aria-labelledby="mfa-step-1"
+                className="border-b border-[var(--av2-border)] p-6 md:border-r md:border-b-0"
+              >
+                <StepHeading
+                  n={1}
+                  tone="lavender"
+                  id="mfa-step-1"
+                  title="Connect your authenticator"
+                  description="Scan the QR code with Authy, 1Password, Google Authenticator or similar."
+                />
+                <div className="mt-5 sm:pl-14">
+                  {/* QR — next/image won't fetch a data: URL; use a plain img */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={session.qrDataUrl}
+                    alt="TOTP enrolment QR code"
+                    width={200}
+                    height={200}
+                    className="rounded-xl border border-[var(--av2-border)] bg-white p-2"
+                  />
+                  <details className="group mt-5 rounded-xl border border-[var(--av2-border)] bg-[var(--av2-bg)]">
+                    <summary className="flex cursor-pointer list-none items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none [&::-webkit-details-marker]:hidden">
+                      <svg
+                        aria-hidden="true"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="shrink-0 transition-transform group-open:rotate-90"
+                      >
+                        <path d="m9 18 6-6-6-6" />
+                      </svg>
+                      Can&rsquo;t scan the code?
+                    </summary>
+                    <div className="px-4 pb-4">
+                      <p className="text-sm text-[var(--av2-text-2)]">
+                        Enter this secret manually in your authenticator:
+                      </p>
+                      <p className="mt-2 rounded-lg border border-[var(--av2-border)] bg-[var(--av2-surface)] px-3 py-2 font-mono text-sm tracking-wider break-all text-[var(--av2-text)] select-all">
+                        {session.secret}
+                      </p>
+                    </div>
+                  </details>
+                </div>
+              </section>
+
+              {/* Step 2 — verify */}
+              <section aria-labelledby="mfa-step-2" className="p-6">
+                <StepHeading
+                  n={2}
+                  tone="peach"
+                  id="mfa-step-2"
+                  title="Verify the connection"
+                  description="Type the 6-digit code your app is showing right now. We check it matches before turning two-factor on."
+                />
+                <div className="mt-5 sm:pl-14">
+                  <Field label="6-digit code" htmlFor="mfa-code" className="max-w-[240px]">
+                    <TextInput
+                      id="mfa-code"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      value={code}
+                      onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      placeholder="123456"
+                      disabled={submitting}
+                      aria-invalid={errorMessage ? true : undefined}
+                      className="h-12 text-center font-mono text-lg tracking-[0.5em]"
+                    />
+                  </Field>
+                  {errorMessage && (
+                    <div className="mt-3">
+                      <Callout tone="error" title="Couldn't turn on two-factor">
+                        {errorMessage}
+                      </Callout>
+                    </div>
+                  )}
+                  <div className="mt-5 flex flex-wrap items-center gap-2">
+                    <Button
+                      variant="primary"
+                      onClick={handleConfirm}
+                      disabled={submitting || code.length !== 6}
+                      aria-busy={submitting || undefined}
+                    >
+                      {submitting ? "Verifying…" : "Turn on two-factor"}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setSession(null);
+                        setCode("");
+                        setErrorMessage(null);
+                        void startEnrolment();
+                      }}
+                      disabled={submitting}
+                    >
+                      Generate new code
+                    </Button>
+                  </div>
+                  <p className="mt-4 text-sm text-[var(--av2-text-2)]">
+                    Two-factor turns on only after your code is verified. Generating a new code
+                    replaces the QR code.
+                  </p>
+                </div>
+              </section>
+            </div>
+          </Card>
+        ) : errorMessage ? (
+          <Callout
+            tone="error"
+            title="Couldn't start enrolment"
+            action={
+              <Button size="sm" onClick={() => void startEnrolment()}>
+                Try again
+              </Button>
+            }
+          >
+            {errorMessage}
+          </Callout>
+        ) : (
+          <Card>
+            <div aria-busy="true" className="space-y-3">
+              <p className="text-sm text-[var(--av2-text-2)]">Loading enrolment…</p>
+              <Skeleton className="h-40" />
+            </div>
+          </Card>
+        )}
+
+        <Card>
+          <div className="flex items-start gap-4">
+            <IconTile tone="green">
+              <IconCoins />
+            </IconTile>
+            <div className="min-w-0">
+              <h2 className="text-base font-semibold">Used for financial admin actions</h2>
+              <p className="mt-1 text-sm text-[var(--av2-text-2)]">
+                Money-moving admin actions, such as approving withdrawals, ask for this code.
+                Without an authenticator app, those actions email you a code instead.
+              </p>
+            </div>
           </div>
-        </div>
-      ) : (
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] p-6 text-center shadow-sm">
-          <p className="text-sm text-[var(--bb-text-secondary)]">Loading enrolment…</p>
-        </div>
-      )}
+        </Card>
+      </div>
+      <ConfirmDialog
+        open={confirmDisable}
+        onClose={() => !submitting && setConfirmDisable(false)}
+        onConfirm={async () => {
+          await handleDisable();
+          setConfirmDisable(false);
+        }}
+        loading={submitting}
+        variant="danger"
+        title="Disable two-factor?"
+        description="Future money actions will email codes instead of asking for your authenticator app."
+        confirmLabel="Disable"
+        cancelLabel="Keep it on"
+      />
     </>
+  );
+}
+
+function StepHeading({
+  n,
+  tone,
+  id,
+  title,
+  description,
+}: {
+  n: number;
+  tone: "lavender" | "peach";
+  id: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex items-start gap-4">
+      <IconTile tone={tone} size={40} round>
+        <span className="text-base font-bold">{n}</span>
+      </IconTile>
+      <div className="min-w-0">
+        <h2 id={id} className="text-xl leading-7 font-semibold">
+          <span className="sr-only">Step {n}: </span>
+          {title}
+        </h2>
+        <p className="mt-1 text-sm text-[var(--av2-text-2)]">{description}</p>
+      </div>
+    </div>
+  );
+}
+
+function IconCheck() {
+  return (
+    <svg
+      aria-hidden="true"
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
   );
 }

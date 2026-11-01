@@ -17,10 +17,10 @@
 import Link from "next/link";
 import { useState } from "react";
 
-import { Button } from "@/components/ui/button";
-import { FormInput } from "@/components/ui/form-field";
-import { InlineAlert } from "@/components/ui/inline-alert";
+import { Callout, Field, TextInput } from "@/components/admin/v2/ui";
 import { useToast } from "@/components/ui/toast-provider";
+
+import { BlockSaveFooter, FormSection, useDirtyBaseline } from "./block-form-ui";
 
 import type { ShowcaseData } from "@/lib/blocks/types";
 
@@ -41,6 +41,11 @@ export function ShowcaseHeaderBlockForm({ initial, pageKey }: ShowcaseHeaderBloc
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Presentation only: drives the SaveBar status + disables Save when clean.
+  const { dirty, markSaved } = useDirtyBaseline(
+    JSON.stringify([title, subtitle, ctaLabel, ctaHref]),
+  );
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,6 +85,7 @@ export function ShowcaseHeaderBlockForm({ initial, pageKey }: ShowcaseHeaderBloc
         throw new Error(json?.reason || json?.error || "Save failed.");
       }
 
+      markSaved();
       showToast({
         type: "success",
         title: "Showcase header saved",
@@ -94,100 +100,74 @@ export function ShowcaseHeaderBlockForm({ initial, pageKey }: ShowcaseHeaderBloc
 
   return (
     <form onSubmit={handleSave} className="space-y-6">
-      <InlineAlert variant="info" size="sm">
-        This form only edits the <strong>section header</strong> above the gallery grid. Gallery
-        items themselves are managed in{" "}
-        <Link href="/admin/showcase" className="underline">
+      <Callout title="Header copy only">
+        Gallery items themselves are managed in{" "}
+        <Link
+          href="/admin/showcase"
+          className="font-semibold text-[var(--av2-link)] underline-offset-2 hover:underline"
+        >
           Content → Showcase
         </Link>
         .
-      </InlineAlert>
+      </Callout>
 
       {/* Title + subtitle (left side) -------------------------------- */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <label
-            htmlFor="sh-title"
-            className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-          >
-            Title (optional)
-          </label>
-          <FormInput
-            id="sh-title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Showcase"
-            maxLength={120}
-          />
+      <FormSection title="Header copy" description="Both optional.">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <Field label="Title (optional)" htmlFor="sh-title">
+            <TextInput
+              id="sh-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Showcase"
+              maxLength={120}
+            />
+          </Field>
+          <Field label="Subtitle (optional)" htmlFor="sh-subtitle">
+            <TextInput
+              id="sh-subtitle"
+              value={subtitle}
+              onChange={(e) => setSubtitle(e.target.value)}
+              placeholder="Creatives that speak louder than words."
+              maxLength={300}
+            />
+          </Field>
         </div>
-        <div>
-          <label
-            htmlFor="sh-subtitle"
-            className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-          >
-            Subtitle (optional)
-          </label>
-          <FormInput
-            id="sh-subtitle"
-            value={subtitle}
-            onChange={(e) => setSubtitle(e.target.value)}
-            placeholder="Creatives that speak louder than words."
-            maxLength={300}
-          />
-        </div>
-      </div>
+      </FormSection>
 
       {/* CTA pair (right side) --------------------------------------- */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <label
-            htmlFor="sh-cta-label"
-            className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-          >
-            CTA label (optional)
-          </label>
-          <FormInput
-            id="sh-cta-label"
-            value={ctaLabel}
-            onChange={(e) => setCtaLabel(e.target.value)}
-            placeholder="View the full gallery"
-            maxLength={50}
-          />
-          <p className="mt-1 text-xs text-[var(--bb-text-muted)]">
-            Clear both label and destination to hide the button.
-          </p>
+      <FormSection
+        title="Gallery button"
+        description="Clear both label and destination to hide the button."
+      >
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <Field label="CTA label (optional)" htmlFor="sh-cta-label">
+            <TextInput
+              id="sh-cta-label"
+              value={ctaLabel}
+              onChange={(e) => setCtaLabel(e.target.value)}
+              placeholder="View the full gallery"
+              maxLength={50}
+            />
+          </Field>
+          <Field label="CTA destination (optional)" htmlFor="sh-cta-href">
+            <TextInput
+              id="sh-cta-href"
+              value={ctaHref}
+              onChange={(e) => setCtaHref(e.target.value)}
+              placeholder="/showcase"
+              maxLength={200}
+            />
+          </Field>
         </div>
-        <div>
-          <label
-            htmlFor="sh-cta-href"
-            className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-          >
-            CTA destination (optional)
-          </label>
-          <FormInput
-            id="sh-cta-href"
-            value={ctaHref}
-            onChange={(e) => setCtaHref(e.target.value)}
-            placeholder="/showcase"
-            maxLength={200}
-          />
-        </div>
-      </div>
+      </FormSection>
 
-      {/* Error + submit ---------------------------------------------- */}
-      {error ? <InlineAlert variant="error">{error}</InlineAlert> : null}
-
-      <div className="flex justify-end gap-3 pt-2">
-        <Button
-          type="submit"
-          variant="primary"
-          loading={submitting}
-          loadingText="Saving…"
-          disabled={submitting}
-        >
-          Save showcase header
-        </Button>
-      </div>
+      <BlockSaveFooter
+        error={error}
+        dirty={dirty}
+        submitting={submitting}
+        label="Save showcase header"
+      />
     </form>
   );
 }

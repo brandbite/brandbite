@@ -21,6 +21,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 
 import {
   Avatar,
@@ -225,6 +226,26 @@ function defaultTasksCapForBucket(bucket: string | null): number {
       return 3;
   }
 }
+
+/** HIRE form pre-fill for a row: what the admin sees before typing anything.
+ *  Shared by the reset effect and the dirty check so they can't drift. */
+function hirePrefill(sel: Application | null | undefined) {
+  if (sel?.status !== "INTERVIEW_HELD") {
+    return { workingHours: sel?.workingHours ?? "", categoryIds: [] as string[], cap: "" };
+  }
+  return {
+    workingHours: sel.workingHours ?? "",
+    categoryIds: Array.isArray(sel.categoryIds)
+      ? (sel.categoryIds as unknown[]).filter((v): v is string => typeof v === "string")
+      : [],
+    // Prefer a previously-saved cap over the bucket default so an admin's
+    // override survives a reload / re-open.
+    cap: String(sel.approvedTasksPerWeekCap ?? defaultTasksCapForBucket(sel.preferredTasksPerWeek)),
+  };
+}
+
+const sameIds = (a: string[], b: string[]) =>
+  a.length === b.length && [...a].sort().join("\n") === [...b].sort().join("\n");
 
 function formatDateTime(iso: string | null, timezone?: string): string {
   if (!iso) return DASH;
@@ -682,29 +703,77 @@ export default function TalentApplicationsPage() {
     setActionError(null);
     setMode(null);
 
-    const sel = items.find((it) => it.id === selectedId);
-
     // Pre-fill working hours from the saved application value so an admin
     // returning to the row (or after a background list reload) sees what was
-    // already entered instead of a blank field they have to re-type.
-    setWorkingHoursLocal(sel?.workingHours ?? "");
-
-    if (sel?.status === "INTERVIEW_HELD") {
-      // Pre-fill HIRE form from the application data.
-      const applied = Array.isArray(sel.categoryIds)
-        ? (sel.categoryIds as unknown[]).filter((v): v is string => typeof v === "string")
-        : [];
-      setApprovedCategoryIdsLocal(applied);
-      // Prefer a previously-saved cap over the bucket default so an admin's
-      // override survives a reload / re-open.
-      setTasksPerWeekCapLocal(
-        String(sel.approvedTasksPerWeekCap ?? defaultTasksCapForBucket(sel.preferredTasksPerWeek)),
-      );
-    } else {
-      setApprovedCategoryIdsLocal([]);
-      setTasksPerWeekCapLocal("");
-    }
+    // already entered instead of a blank field they have to re-type. At
+    // INTERVIEW_HELD the HIRE form is pre-filled from the application data.
+    const prefill = hirePrefill(items.find((it) => it.id === selectedId));
+    setWorkingHoursLocal(prefill.workingHours);
+    setApprovedCategoryIdsLocal(prefill.categoryIds);
+    setTasksPerWeekCapLocal(prefill.cap);
   }, [selectedId, items]);
+
+  // An open action form with input is a draft. Selecting another row,
+  // changing the stage/status filter, Refresh and closing the panel all
+  // reset it, so they ask first.
+  const formDirty = (() => {
+    if (!selected || !mode) return false;
+    if (mode === "offer") return proposedSlotsLocal.some((v) => v) || customMessage.trim() !== "";
+    if (mode === "decline" || mode === "rejectPost") return declineReason.trim() !== "";
+    const prefill = hirePrefill(selected);
+    return (
+      workingHoursLocal !== prefill.workingHours ||
+      !sameIds(approvedCategoryIdsLocal, prefill.categoryIds) ||
+      tasksPerWeekCapLocal !== prefill.cap ||
+      hireNotesLocal.trim() !== ""
+    );
+  })();
+  const formLabel =
+    mode === "offer"
+      ? "Offer slots"
+      : mode === "hire"
+        ? "Hire form"
+        : mode === "decline" || mode === "rejectPost"
+          ? "Decline reason"
+          : undefined;
+  const confirmDiscard = useUnsavedChanges(formDirty, formLabel);
+
+  // Cancel on an action form: ask if it has input, then clear that form so
+  // re-opening it starts fresh (and the page is clean again).
+  const cancelForm = async () => {
+    if (!(await confirmDiscard())) return;
+    if (mode === "offer") {
+      setProposedSlotsLocal(["", "", ""]);
+      setCustomMessage("");
+    } else if (mode === "decline" || mode === "rejectPost") {
+      setDeclineReason("");
+    } else if (mode === "hire") {
+      const prefill = hirePrefill(selected);
+      setWorkingHoursLocal(prefill.workingHours);
+      setApprovedCategoryIdsLocal(prefill.categoryIds);
+      setTasksPerWeekCapLocal(prefill.cap);
+      setHireNotesLocal("");
+    }
+    setActionError(null);
+    setMode(null);
+  };
+
+  const selectRow = async (id: string) => {
+    if (id === selectedId) return;
+    if (!(await confirmDiscard())) return;
+    setTab("overview");
+    setSelectedId(id);
+  };
+
+  const closePanel = async () => {
+    if (!(await confirmDiscard())) return;
+    setSelectedId(null);
+  };
+
+  const refreshList = async () => {
+    if (!(await confirmDiscard())) return;
+    await refresh();
+  };
 
   // Below xl the panel stacks under the list; bring it into view on select.
   useEffect(() => {
@@ -871,13 +940,15 @@ export default function TalentApplicationsPage() {
     );
   };
 
-  const selectStage = (next: StageFilter) => {
+  const selectStage = async (next: StageFilter) => {
+    if (!(await confirmDiscard())) return;
     setStage(next);
     setStatusFilter(null);
     setSelectedId(null);
   };
 
-  const selectStatus = (value: string) => {
+  const selectStatus = async (value: string) => {
+    if (!(await confirmDiscard())) return;
     if (value === "") {
       setStatusFilter(null);
     } else {
@@ -973,7 +1044,7 @@ export default function TalentApplicationsPage() {
     if (mode === "offer") {
       footer = (
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button variant="ghost" onClick={() => setMode(null)} disabled={submitting}>
+          <Button variant="ghost" onClick={() => void cancelForm()} disabled={submitting}>
             Cancel
           </Button>
           <Button
@@ -992,7 +1063,7 @@ export default function TalentApplicationsPage() {
     } else if (mode === "decline" || mode === "rejectPost") {
       footer = (
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button variant="ghost" onClick={() => setMode(null)} disabled={submitting}>
+          <Button variant="ghost" onClick={() => void cancelForm()} disabled={submitting}>
             Cancel
           </Button>
           <Button
@@ -1008,7 +1079,7 @@ export default function TalentApplicationsPage() {
     } else if (mode === "hire") {
       footer = (
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button variant="ghost" onClick={() => setMode(null)} disabled={submitting}>
+          <Button variant="ghost" onClick={() => void cancelForm()} disabled={submitting}>
             Cancel
           </Button>
           <Button
@@ -1489,7 +1560,7 @@ export default function TalentApplicationsPage() {
     return (
       <DetailPanel
         title="Application details"
-        onClose={() => setSelectedId(null)}
+        onClose={() => void closePanel()}
         closeLabel="Close application details"
         footer={footer}
       >
@@ -1713,7 +1784,7 @@ export default function TalentApplicationsPage() {
         description="Review submissions from the public /talent form and move candidates through hiring."
         actions={
           <Button
-            onClick={() => void refresh()}
+            onClick={() => void refreshList()}
             disabled={loading}
             aria-label="Refresh applications"
           >
@@ -1729,7 +1800,7 @@ export default function TalentApplicationsPage() {
         <FilterChips
           label="Filter applications by stage"
           value={stage}
-          onChange={selectStage}
+          onChange={(v) => void selectStage(v)}
           options={[
             { value: "ALL" as StageFilter, label: "All applications", count: stageCount("ALL") },
             ...STAGES.map((s) => ({
@@ -1771,7 +1842,7 @@ export default function TalentApplicationsPage() {
                   <Select
                     aria-label="Filter by individual status"
                     value={statusFilter ?? ""}
-                    onChange={(e) => selectStatus(e.target.value)}
+                    onChange={(e) => void selectStatus(e.target.value)}
                   >
                     <option value="">
                       {stage === "ALL" ? "All statuses" : `All statuses in ${viewLabel}`}
@@ -1809,7 +1880,7 @@ export default function TalentApplicationsPage() {
                   description="Nothing is at this stage right now."
                   action={
                     countsLoaded && totalCount > 0 ? (
-                      <Button onClick={() => selectStage("ALL")}>Show all applications</Button>
+                      <Button onClick={() => void selectStage("ALL")}>Show all applications</Button>
                     ) : undefined
                   }
                 />
@@ -1845,10 +1916,7 @@ export default function TalentApplicationsPage() {
                     <Tr
                       key={it.id}
                       selected={it.id === selectedId}
-                      onSelect={() => {
-                        if (it.id !== selectedId) setTab("overview");
-                        setSelectedId(it.id);
-                      }}
+                      onSelect={() => void selectRow(it.id)}
                       label={`${it.fullName}, ${meta.label}, submitted ${formatDateTime(it.createdAt)}`}
                     >
                       <Td>
