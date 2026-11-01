@@ -1,23 +1,50 @@
 // -----------------------------------------------------------------------------
 // @file: app/admin/job-types/page.tsx
-// @purpose: Admin-facing management of job types (estimated hours -> auto pricing)
-// @version: v3.0.0
+// @purpose: Admin-facing management of job types (estimated hours -> auto pricing).
+//           Paginated, filterable catalogue on the left; editor with a live
+//           price preview on the right (admin design language v1).
+// @version: v4.0.0
 // @status: active
-// @lastUpdate: 2026-02-20
+// @lastUpdate: 2026-11-01
 // -----------------------------------------------------------------------------
 
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { EmptyState } from "@/components/ui/empty-state";
-import { InlineAlert } from "@/components/ui/inline-alert";
 import { useToast } from "@/components/ui/toast-provider";
-import { Button } from "@/components/ui/button";
-import { FormInput } from "@/components/ui/form-field";
-import { FormTextarea } from "@/components/ui/form-field";
-import { FormSelect } from "@/components/ui/form-field";
-import { LoadingState } from "@/components/ui/loading-state";
-import { Badge } from "@/components/ui/badge";
+import {
+  Badge,
+  Button,
+  Callout,
+  Card,
+  DASH,
+  DetailPanel,
+  EmptyState,
+  Field,
+  FilterBar,
+  PageHeader,
+  Pager,
+  PanelSection,
+  SaveBar,
+  SearchInput,
+  Select,
+  Skeleton,
+  SplitView,
+  Switch,
+  Table,
+  TableFooter,
+  Td,
+  TextArea,
+  TextInput,
+  TextLink,
+  Th,
+  Tr,
+  fmt,
+  plural,
+} from "@/components/admin/v2/ui";
+import { IconAlertCircle, IconDocument } from "@/components/admin/v2/icons";
+import { IconServices } from "@/components/navigation/nav-icons";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 
 type CategoryRef = {
   id: string;
@@ -59,6 +86,51 @@ type JobTypesResponse = {
   jobTypes: JobType[];
 };
 
+type ActiveFilter = "ALL" | "ACTIVE" | "INACTIVE";
+
+const PAGE_SIZE = 10;
+
+/** Base creative payout share used by the page preview (mirrors
+ *  BASE_PAYOUT_PERCENT = 60 applied by /api/admin/job-types on save). */
+const PAYOUT_RATE = 0.6;
+
+type FormSnapshot = {
+  name: string;
+  categoryId: string;
+  description: string;
+  estimatedHours: string;
+  hasQuantity: boolean;
+  quantityLabel: string;
+  defaultQuantity: string;
+  aiPromptTemplate: string;
+  isActive: boolean;
+};
+
+const EMPTY_FORM: FormSnapshot = {
+  name: "",
+  categoryId: "",
+  description: "",
+  estimatedHours: "",
+  hasQuantity: false,
+  quantityLabel: "",
+  defaultQuantity: "1",
+  aiPromptTemplate: "",
+  isActive: true,
+};
+
+const snapshotOf = (jt: JobType): FormSnapshot => ({
+  name: jt.name,
+  categoryId: jt.categoryId ?? "",
+  description: jt.description ?? "",
+  // Fallback to tokenCost for legacy rows where estimatedHours was not set
+  estimatedHours: String(jt.estimatedHours ?? jt.tokenCost),
+  hasQuantity: jt.hasQuantity,
+  quantityLabel: jt.quantityLabel ?? "",
+  defaultQuantity: String(jt.defaultQuantity),
+  aiPromptTemplate: jt.aiPromptTemplate ?? "",
+  isActive: jt.isActive,
+});
+
 export default function AdminJobTypesPage() {
   const { showToast } = useToast();
   const [data, setData] = useState<JobTypesResponse | null>(null);
@@ -68,9 +140,10 @@ export default function AdminJobTypesPage() {
   // Categories from DB
   const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([]);
 
-  const [filterActive, setFilterActive] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
+  const [filterActive, setFilterActive] = useState<ActiveFilter>("ALL");
   const [filterCategory, setFilterCategory] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
 
   const [selected, setSelected] = useState<JobType | null>(null);
   const [formName, setFormName] = useState("");
@@ -90,7 +163,7 @@ export default function AdminJobTypesPage() {
   // Duplicate detection
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
 
-  const jobTypes = data?.jobTypes ?? [];
+  const jobTypes = useMemo(() => data?.jobTypes ?? [], [data]);
 
   // Filter and search
   const filteredJobTypes = useMemo(() => {
@@ -124,12 +197,54 @@ export default function AdminJobTypesPage() {
     });
   }, [jobTypes, filterActive, filterCategory, searchQuery]);
 
+  // Client-side pagination over the filtered list
+  const pageCount = Math.max(1, Math.ceil(filteredJobTypes.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const pageStart = (currentPage - 1) * PAGE_SIZE;
+  const pageRows = filteredJobTypes.slice(pageStart, pageStart + PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filterActive, filterCategory, searchQuery]);
+
+  const filtersActive = filterActive !== "ALL" || filterCategory !== "ALL" || !!searchQuery.trim();
+  const resetFilters = () => {
+    setFilterActive("ALL");
+    setFilterCategory("ALL");
+    setSearchQuery("");
+  };
+
   const activeCount = jobTypes.filter((jt) => jt.isActive).length;
   const inactiveCount = jobTypes.length - activeCount;
 
-  // Derived token values (auto-calculated from estimated hours)
+  // Derived token values (auto-calculated from estimated hours) — same
+  // formula as before: 1 hour = 1 token, creative payout = 60% rounded.
   const derivedTokenCost = formEstimatedHours ? parseInt(formEstimatedHours, 10) || 0 : 0;
-  const derivedCreativePayout = Math.round(derivedTokenCost * 0.6);
+  const derivedCreativePayout = Math.round(derivedTokenCost * PAYOUT_RATE);
+  const hasPreview = derivedTokenCost > 0;
+  const previewQuantity = Math.max(1, parseInt(formDefaultQuantity, 10) || 1);
+
+  const hoursError =
+    formEstimatedHours.trim() !== "" && !(parseInt(formEstimatedHours, 10) >= 1)
+      ? "Enter a whole number of hours, 1 or more."
+      : null;
+
+  // Dirty state — compare the form to the selected row (or the empty form).
+  const baseline = selected ? snapshotOf(selected) : EMPTY_FORM;
+  const dirty =
+    formName !== baseline.name ||
+    formCategoryId !== baseline.categoryId ||
+    formDescription !== baseline.description ||
+    formEstimatedHours !== baseline.estimatedHours ||
+    formHasQuantity !== baseline.hasQuantity ||
+    formQuantityLabel !== baseline.quantityLabel ||
+    formDefaultQuantity !== baseline.defaultQuantity ||
+    formAiPromptTemplate !== baseline.aiPromptTemplate ||
+    formIsActive !== baseline.isActive;
+  const confirmDiscard = useUnsavedChanges(
+    dirty,
+    selected ? `Job type: ${selected.name}` : "New job type",
+  );
 
   // Duplicate detection — check when name changes
   useEffect(() => {
@@ -154,17 +269,21 @@ export default function AdminJobTypesPage() {
     }
   }, [formName, jobTypes, selected]);
 
+  const applySnapshot = (s: FormSnapshot) => {
+    setFormName(s.name);
+    setFormCategoryId(s.categoryId);
+    setFormDescription(s.description);
+    setFormEstimatedHours(s.estimatedHours);
+    setFormHasQuantity(s.hasQuantity);
+    setFormQuantityLabel(s.quantityLabel);
+    setFormDefaultQuantity(s.defaultQuantity);
+    setFormAiPromptTemplate(s.aiPromptTemplate);
+    setFormIsActive(s.isActive);
+  };
+
   const resetForm = () => {
     setSelected(null);
-    setFormName("");
-    setFormCategoryId("");
-    setFormDescription("");
-    setFormEstimatedHours("");
-    setFormHasQuantity(false);
-    setFormQuantityLabel("");
-    setFormDefaultQuantity("1");
-    setFormAiPromptTemplate("");
-    setFormIsActive(true);
+    applySnapshot(EMPTY_FORM);
     setSaveError(null);
     setSaveSuccess(null);
     setDuplicateWarning(null);
@@ -172,18 +291,14 @@ export default function AdminJobTypesPage() {
 
   const fillFormFromSelection = (jt: JobType) => {
     setSelected(jt);
-    setFormName(jt.name);
-    setFormCategoryId(jt.categoryId ?? "");
-    setFormDescription(jt.description ?? "");
-    // Fallback to tokenCost for legacy rows where estimatedHours was not set
-    setFormEstimatedHours(String(jt.estimatedHours ?? jt.tokenCost));
-    setFormHasQuantity(jt.hasQuantity);
-    setFormQuantityLabel(jt.quantityLabel ?? "");
-    setFormDefaultQuantity(String(jt.defaultQuantity));
-    setFormAiPromptTemplate(jt.aiPromptTemplate ?? "");
-    setFormIsActive(jt.isActive);
+    applySnapshot(snapshotOf(jt));
     setSaveError(null);
     setSaveSuccess(null);
+  };
+
+  const discardChanges = () => {
+    applySnapshot(baseline);
+    setSaveError(null);
   };
 
   const load = async () => {
@@ -232,14 +347,29 @@ export default function AdminJobTypesPage() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleEditClick = (jt: JobType) => {
+  // Keep the selected row object in sync after a reload (same id).
+  useEffect(() => {
+    if (!selected) return;
+    const fresh = jobTypes.find((jt) => jt.id === selected.id);
+    if (fresh && fresh !== selected) setSelected(fresh);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobTypes]);
+
+  const handleEditClick = async (jt: JobType) => {
+    if (jt.id === selected?.id) return;
+    if (!(await confirmDiscard())) return;
     fillFormFromSelection(jt);
   };
 
-  const handleNewClick = () => {
+  const handleNewClick = async () => {
+    if (!(await confirmDiscard())) return;
+    resetForm();
+  };
+
+  const handleClosePanel = async () => {
+    if (!(await confirmDiscard())) return;
     resetForm();
   };
 
@@ -252,13 +382,23 @@ export default function AdminJobTypesPage() {
     try {
       const estimatedHours = parseInt(formEstimatedHours, 10);
 
+      // Only send category fields when the admin actually changed the
+      // category (or is creating). Sending them unconditionally used to
+      // overwrite a legacy text-only label with null on every save.
+      const categoryChanged = !selected || formCategoryId !== baseline.categoryId;
+      const categoryFields = categoryChanged
+        ? {
+            categoryId: formCategoryId || null,
+            // Keep the legacy text field in sync with the linked category name.
+            category: formCategoryId
+              ? (categoryOptions.find((c) => c.id === formCategoryId)?.name ?? null)
+              : null,
+          }
+        : {};
+
       const payload = {
         name: formName.trim(),
-        categoryId: formCategoryId || null,
-        // Also set legacy text field from category name for backward compat
-        category: formCategoryId
-          ? (categoryOptions.find((c) => c.id === formCategoryId)?.name ?? null)
-          : null,
+        ...categoryFields,
         description: formDescription.trim() || null,
         estimatedHours,
         hasQuantity: formHasQuantity,
@@ -316,248 +456,93 @@ export default function AdminJobTypesPage() {
     return jt.categoryRef?.name ?? jt.category ?? "";
   };
 
-  return (
-    <>
-      {/* Page header */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Job types</h1>
-          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-            Set estimated hours for each job type. Token cost and creative payout are calculated
-            automatically.
-          </p>
-        </div>
-        <Button onClick={handleNewClick}>New job type</Button>
-      </div>
+  const activeCategoryOptions = categoryOptions.filter((c) => c.isActive);
 
-      {/* Error */}
-      {error && (
-        <InlineAlert variant="error" title="Error" className="mb-4">
-          {error}
-        </InlineAlert>
+  // Existing category whose name matches a legacy text-only label, so the
+  // admin can link it in one click (case / whitespace-insensitive).
+  const legacyMatch = (() => {
+    const label = selected && !selected.categoryId ? selected.category : null;
+    if (!label) return null;
+    const key = label.trim().replace(/\s+/g, " ").toLowerCase();
+    return (
+      activeCategoryOptions.find((c) => c.name.trim().replace(/\s+/g, " ").toLowerCase() === key) ??
+      null
+    );
+  })();
+  const selectedCategoryName = selected ? getCategoryDisplay(selected) : "";
+
+  // ---------------------------------------------------------------------------
+  // Editor panel
+  // ---------------------------------------------------------------------------
+
+  const panelFooter = (
+    <SaveBar
+      dirty={dirty}
+      status={saving ? "Saving…" : !dirty && saveSuccess ? saveSuccess : undefined}
+    >
+      {dirty && (
+        <Button variant="ghost" onClick={discardChanges} disabled={saving}>
+          Discard
+        </Button>
+      )}
+      <Button
+        type="submit"
+        form="job-type-form"
+        variant="primary"
+        disabled={!dirty || saving}
+        aria-busy={saving}
+      >
+        {saving ? "Saving…" : selected ? "Save job type" : "Create job type"}
+      </Button>
+    </SaveBar>
+  );
+
+  const panel = (
+    <DetailPanel
+      title={
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="break-words">{selected ? selected.name : "New job type"}</span>
+          {selected && (
+            <Badge tone={selected.isActive ? "green" : "neutral"}>
+              {selected.isActive ? "Active" : "Inactive"}
+            </Badge>
+          )}
+        </span>
+      }
+      onClose={selected ? handleClosePanel : undefined}
+      closeLabel="Clear selection"
+      footer={panelFooter}
+    >
+      <p className="-mt-1 mb-5 text-sm text-[var(--av2-text-2)]">
+        {selected
+          ? selectedCategoryName || "No category"
+          : "Enter estimated hours — token cost and creative payout are calculated automatically."}
+      </p>
+
+      {saveError && (
+        <div className="mb-5">
+          <Callout tone="error" title="Couldn’t save">
+            {saveError}
+          </Callout>
+        </div>
       )}
 
-      {/* Summary cards */}
-      <section className="mb-6 grid gap-4 md:grid-cols-3">
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-          <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
-            Total job types
-          </p>
-          <p className="mt-2 text-3xl font-semibold text-[var(--bb-secondary)]">
-            {loading ? "&mdash;" : jobTypes.length}
-          </p>
-          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">All configured job types.</p>
-        </div>
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-          <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
-            Active
-          </p>
-          <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
-            {loading ? "&mdash;" : activeCount}
-          </p>
-          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-            Job types available to customers.
-          </p>
-        </div>
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-          <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
-            Inactive
-          </p>
-          <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
-            {loading ? "&mdash;" : inactiveCount}
-          </p>
-          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-            Hidden job types kept for history.
-          </p>
-        </div>
-      </section>
-
-      {/* Filter + table + form layout — stacks below lg so the form column
-          doesn't get squeezed next to the fixed sidebar. */}
-      <section className="grid gap-4 xl:grid-cols-[3fr_2fr]">
-        {/* Left: table */}
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
-          {/* Search bar */}
-          <div className="mb-3">
-            <div className="relative">
-              <svg
-                className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[var(--bb-text-tertiary)]"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={2}
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-                />
-              </svg>
-              <input
-                type="text"
-                placeholder="Search job types..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] py-2 pr-3 pl-10 text-sm text-[var(--bb-secondary)] transition-colors outline-none placeholder:text-[var(--bb-text-tertiary)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="absolute top-1/2 right-3 -translate-y-1/2 text-[var(--bb-text-tertiary)] hover:text-[var(--bb-secondary)]"
-                >
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    strokeWidth={2}
-                    stroke="currentColor"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Filters row */}
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold tracking-tight">Job type list</h2>
-              <FormSelect
-                value={filterActive}
-                onChange={(e) => setFilterActive(e.target.value as "ALL" | "ACTIVE" | "INACTIVE")}
-                size="sm"
-                className="w-auto"
-              >
-                <option value="ALL">All status</option>
-                <option value="ACTIVE">Active</option>
-                <option value="INACTIVE">Inactive</option>
-              </FormSelect>
-              <FormSelect
-                value={filterCategory}
-                onChange={(e) => setFilterCategory(e.target.value)}
-                size="sm"
-                className="w-auto"
-              >
-                <option value="ALL">All categories</option>
-                <option value="UNCATEGORIZED">Uncategorized</option>
-                {categoryOptions
-                  .filter((c) => c.isActive)
-                  .map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.icon ? `${cat.icon} ` : ""}
-                      {cat.name}
-                    </option>
-                  ))}
-              </FormSelect>
-            </div>
-            <p className="text-xs text-[var(--bb-text-tertiary)]">
-              Showing {filteredJobTypes.length} of {jobTypes.length}
-            </p>
-          </div>
-
-          {loading ? (
-            <LoadingState message="Loading job types..." />
-          ) : filteredJobTypes.length === 0 ? (
-            <EmptyState
-              title={
-                searchQuery ? "No job types match your search." : "No job types match your filter."
+      <form id="job-type-form" onSubmit={handleSubmit}>
+        <PanelSection title="Details">
+          <div className="space-y-4">
+            <Field
+              label="Name"
+              htmlFor="job-name"
+              hint={
+                duplicateWarning ? (
+                  <span className="flex items-start gap-1.5 text-[var(--av2-link)]">
+                    <IconAlertCircle width={14} height={14} className="mt-px shrink-0" />
+                    {duplicateWarning}
+                  </span>
+                ) : undefined
               }
-            />
-          ) : (
-            <div className="max-h-[420px] overflow-x-auto overflow-y-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-[var(--bb-border)] text-xs tracking-[0.08em] text-[var(--bb-text-tertiary)] uppercase">
-                    <th className="px-2 py-2">Name</th>
-                    <th className="px-2 py-2">Category</th>
-                    <th className="px-2 py-2 text-right">Est. Hours</th>
-                    <th className="px-2 py-2 text-center">Qty</th>
-                    <th className="px-2 py-2 text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredJobTypes.map((jt) => (
-                    <tr
-                      key={jt.id}
-                      className={`border-b border-[var(--bb-border-subtle)] text-xs last:border-b-0 ${
-                        selected?.id === jt.id
-                          ? "bg-[var(--bb-primary-light)]"
-                          : "bg-[var(--bb-bg-page)]"
-                      } cursor-pointer`}
-                      onClick={() => handleEditClick(jt)}
-                    >
-                      <td className="px-2 py-2 align-top text-[11px] text-[var(--bb-secondary)]">
-                        <div className="font-semibold">{jt.name}</div>
-                        {jt.description && (
-                          <div className="mt-0.5 line-clamp-1 text-[10px] text-[var(--bb-text-secondary)]">
-                            {jt.description}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-2 py-2 align-top text-[11px] text-[var(--bb-text-tertiary)]">
-                        {getCategoryDisplay(jt) ? (
-                          <span className="inline-flex items-center gap-1">
-                            {jt.categoryRef?.icon && <span>{jt.categoryRef.icon}</span>}
-                            {getCategoryDisplay(jt)}
-                          </span>
-                        ) : (
-                          <span className="text-[var(--bb-border-input)]">&mdash;</span>
-                        )}
-                      </td>
-                      <td className="px-2 py-2 text-right align-top text-[11px] text-[var(--bb-secondary)]">
-                        {jt.estimatedHours ?? jt.tokenCost}{" "}
-                        <span className="text-[10px] text-[var(--bb-text-tertiary)]">hrs</span>
-                      </td>
-                      <td className="px-2 py-2 text-center align-top text-[11px]">
-                        {jt.hasQuantity ? (
-                          <Badge variant="info">Yes</Badge>
-                        ) : (
-                          <span className="text-[var(--bb-text-tertiary)]">&mdash;</span>
-                        )}
-                      </td>
-                      <td className="px-2 py-2 text-center align-top text-[11px]">
-                        <Badge variant={jt.isActive ? "success" : "neutral"}>
-                          {jt.isActive ? "Active" : "Inactive"}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Right: form */}
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-          <h2 className="text-sm font-semibold tracking-tight">
-            {selected ? "Edit job type" : "Create new job type"}
-          </h2>
-          <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
-            Enter estimated hours. Token cost and creative payout are calculated automatically (1
-            token = 1 hour, 60% base payout).
-          </p>
-
-          {saveError && (
-            <InlineAlert variant="error" size="sm" className="mt-3">
-              {saveError}
-            </InlineAlert>
-          )}
-
-          {saveSuccess && (
-            <InlineAlert variant="success" size="sm" className="mt-3">
-              {saveSuccess}
-            </InlineAlert>
-          )}
-
-          <form className="mt-4 space-y-3" onSubmit={handleSubmit}>
-            <div className="flex flex-col gap-1">
-              <label htmlFor="job-name" className="text-xs font-medium text-[var(--bb-secondary)]">
-                Name
-              </label>
-              <FormInput
+            >
+              <TextInput
                 id="job-name"
                 type="text"
                 value={formName}
@@ -565,68 +550,94 @@ export default function AdminJobTypesPage() {
                 required
                 placeholder="e.g. Logo design"
               />
-              {duplicateWarning && <p className="text-[10px] text-amber-600">{duplicateWarning}</p>}
-            </div>
+            </Field>
 
-            <div className="flex flex-col gap-1">
-              <label
-                htmlFor="job-category"
-                className="text-xs font-medium text-[var(--bb-secondary)]"
-              >
-                Category
-              </label>
-              <FormSelect
+            <Field
+              label="Category"
+              htmlFor="job-category"
+              hint={
+                categoryOptions.length === 0 && !loading ? (
+                  <span className="inline-flex flex-wrap items-center gap-1">
+                    No categories yet.
+                    <TextLink href="/admin/job-type-categories">Create categories</TextLink>
+                  </span>
+                ) : selected && !selected.categoryId && selected.category ? (
+                  <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span>
+                      Labelled “{selected.category}” as text only, not linked to a category. Saving
+                      keeps that label unless you pick a category.
+                    </span>
+                    {legacyMatch && formCategoryId !== legacyMatch.id && (
+                      <button
+                        type="button"
+                        onClick={() => setFormCategoryId(legacyMatch.id)}
+                        className="rounded font-semibold text-[var(--av2-link)] hover:underline focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
+                      >
+                        Link to {legacyMatch.name}
+                      </button>
+                    )}
+                  </span>
+                ) : undefined
+              }
+            >
+              <Select
                 id="job-category"
                 value={formCategoryId}
                 onChange={(e) => setFormCategoryId(e.target.value)}
               >
                 <option value="">No category</option>
-                {categoryOptions
-                  .filter((c) => c.isActive)
-                  .map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.icon ? `${cat.icon} ` : ""}
-                      {cat.name}
-                    </option>
-                  ))}
-              </FormSelect>
-              {categoryOptions.length === 0 && !loading && (
-                <p className="text-[10px] text-[var(--bb-text-tertiary)]">
-                  No categories yet.{" "}
-                  <a
-                    href="/admin/job-type-categories"
-                    className="text-[var(--bb-primary)] underline"
-                  >
-                    Create categories
-                  </a>
-                </p>
-              )}
-            </div>
+                {activeCategoryOptions.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.icon ? `${cat.icon} ` : ""}
+                    {cat.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
 
-            <div className="flex flex-col gap-1">
-              <label
-                htmlFor="job-description"
-                className="text-xs font-medium text-[var(--bb-secondary)]"
-              >
-                Description
-              </label>
-              <FormTextarea
+            <Field
+              label="Description"
+              htmlFor="job-description"
+              hint="Short description visible to team and admins."
+            >
+              <TextArea
                 id="job-description"
                 value={formDescription}
                 onChange={(e) => setFormDescription(e.target.value)}
                 rows={2}
-                placeholder="Short description visible to team and admins."
+                className="min-h-20"
+                placeholder="What does this job include?"
+              />
+            </Field>
+
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p id="job-active-label" className="text-sm font-medium">
+                  Active
+                </p>
+                <p id="job-active-hint" className="mt-0.5 text-xs text-[var(--av2-text-2)]">
+                  Active job types are available to customers.
+                </p>
+              </div>
+              <Switch
+                checked={formIsActive}
+                onChange={setFormIsActive}
+                labelledBy="job-active-label"
+                describedBy="job-active-hint"
               />
             </div>
+          </div>
+        </PanelSection>
 
-            <div className="flex flex-col gap-1">
-              <label
-                htmlFor="job-estimated-hours"
-                className="text-xs font-medium text-[var(--bb-secondary)]"
-              >
-                Estimated hours
-              </label>
-              <FormInput
+        <PanelSection title="Pricing">
+          <div className="space-y-4">
+            <Field
+              label="Estimated hours"
+              htmlFor="job-estimated-hours"
+              hint="1 estimated hour = 1 token."
+              error={hoursError}
+            >
+              <TextInput
                 id="job-estimated-hours"
                 type="number"
                 min={1}
@@ -634,122 +645,341 @@ export default function AdminJobTypesPage() {
                 onChange={(e) => setFormEstimatedHours(e.target.value)}
                 required
                 placeholder="e.g. 8"
+                suffix="hours"
+                aria-invalid={hoursError ? true : undefined}
+                className="tabular-nums"
+              />
+            </Field>
+
+            <div
+              className="rounded-2xl border border-[var(--av2-attention-border)] bg-[var(--av2-selected)] p-5"
+              aria-live="polite"
+            >
+              <p className="text-base font-semibold">Calculated pricing</p>
+              <dl className="mt-3 grid grid-cols-2 divide-x divide-[var(--av2-border)]">
+                <div className="pr-4">
+                  <dt className="text-sm text-[var(--av2-text-2)]">Customer cost</dt>
+                  <dd className="mt-1 flex items-baseline gap-2">
+                    <span className="text-[32px] leading-10 font-bold tracking-tight tabular-nums">
+                      {hasPreview ? fmt(derivedTokenCost) : DASH}
+                    </span>
+                    <span className="text-sm text-[var(--av2-text-2)]">tokens</span>
+                  </dd>
+                </div>
+                <div className="pl-4">
+                  <dt className="text-sm text-[var(--av2-text-2)]">Creative base payout</dt>
+                  <dd className="mt-1 flex items-baseline gap-2">
+                    <span className="text-[32px] leading-10 font-bold tracking-tight tabular-nums">
+                      {hasPreview ? fmt(derivedCreativePayout) : DASH}
+                    </span>
+                    <span className="text-sm text-[var(--av2-text-2)]">tokens</span>
+                  </dd>
+                </div>
+              </dl>
+              <p className="mt-3 text-xs text-[var(--av2-text-2)]">
+                Token cost = estimated hours. Base payout = 60% of the token cost, rounded.
+                {formHasQuantity && hasPreview && (
+                  <>
+                    {" "}
+                    Prices are per unit — at the default quantity of {fmt(previewQuantity)}, a
+                    ticket costs {fmt(derivedTokenCost * previewQuantity)} tokens.
+                  </>
+                )}
+              </p>
+              {!hasPreview && (
+                <p className="mt-2 text-xs text-[var(--av2-text-2)]">
+                  Enter estimated hours to see the calculated price.
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p id="job-qty-label" className="text-sm font-medium">
+                  Per-unit pricing
+                </p>
+                <p id="job-qty-hint" className="mt-0.5 text-xs text-[var(--av2-text-2)]">
+                  Enable when requests can include multiple units (has quantity).
+                </p>
+              </div>
+              <Switch
+                checked={formHasQuantity}
+                onChange={setFormHasQuantity}
+                labelledBy="job-qty-label"
+                describedBy="job-qty-hint"
               />
             </div>
 
-            {/* Derived values preview */}
-            {derivedTokenCost > 0 && (
-              <div className="rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-2 text-xs text-[var(--bb-text-secondary)]">
-                <p>
-                  <span className="font-medium text-[var(--bb-secondary)]">Token cost:</span>{" "}
-                  {derivedTokenCost} tokens <span className="text-[10px]">(1 token = 1 hour)</span>
-                </p>
-                <p className="mt-0.5">
-                  <span className="font-medium text-[var(--bb-secondary)]">Creative payout:</span>{" "}
-                  {derivedCreativePayout} tokens{" "}
-                  <span className="text-[10px]">(60% base rate)</span>
-                </p>
-              </div>
-            )}
-
-            {/* Has Quantity */}
-            <label className="flex items-center gap-2 text-xs font-medium text-[var(--bb-secondary)]">
-              <input
-                type="checkbox"
-                checked={formHasQuantity}
-                onChange={(e) => setFormHasQuantity(e.target.checked)}
-                className="h-3 w-3 rounded border-[var(--bb-border-input)] text-[var(--bb-primary)] focus:ring-[var(--bb-primary)]"
-              />
-              Has quantity (per-unit pricing)
-            </label>
-
-            {/* Quantity fields — visible when hasQuantity is checked */}
+            {/* Quantity fields — visible when hasQuantity is on */}
             {formHasQuantity && (
-              <div className="grid gap-3 border-l-2 border-[var(--bb-primary)]/20 pl-4 md:grid-cols-2">
-                <div className="flex flex-col gap-1">
-                  <label
-                    htmlFor="job-quantity-label"
-                    className="text-xs font-medium text-[var(--bb-secondary)]"
-                  >
-                    Quantity label
-                  </label>
-                  <FormInput
+              <div className="grid gap-4 border-l-2 border-[var(--av2-accent)]/30 pl-4 sm:grid-cols-2">
+                <Field label="Quantity label" htmlFor="job-quantity-label">
+                  <TextInput
                     id="job-quantity-label"
                     type="text"
                     value={formQuantityLabel}
                     onChange={(e) => setFormQuantityLabel(e.target.value)}
                     placeholder="e.g. Number of sizes"
                   />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label
-                    htmlFor="job-default-quantity"
-                    className="text-xs font-medium text-[var(--bb-secondary)]"
-                  >
-                    Default quantity
-                  </label>
-                  <FormInput
+                </Field>
+                <Field label="Default quantity" htmlFor="job-default-quantity">
+                  <TextInput
                     id="job-default-quantity"
                     type="number"
                     min={1}
                     value={formDefaultQuantity}
                     onChange={(e) => setFormDefaultQuantity(e.target.value)}
                     placeholder="1"
+                    className="tabular-nums"
                   />
-                </div>
+                </Field>
               </div>
             )}
+          </div>
+        </PanelSection>
 
-            {/* AI prompt template — tuned guidance appended to every
-                image generation for tickets of this job type. */}
-            <div className="space-y-1">
-              <label
-                htmlFor="job-ai-prompt"
-                className="text-xs font-medium text-[var(--bb-secondary)]"
-              >
-                AI prompt template <span className="text-[var(--bb-text-muted)]">(optional)</span>
-              </label>
-              <textarea
-                id="job-ai-prompt"
-                value={formAiPromptTemplate}
-                onChange={(e) => setFormAiPromptTemplate(e.target.value)}
-                rows={3}
-                maxLength={2000}
-                placeholder={
-                  'e.g. "For logos: emphasize simplicity and scalability; should remain recognizable down to 24px square."'
-                }
-                className="w-full rounded-md border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-2 text-sm text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
-              />
-              <p className="text-[11px] text-[var(--bb-text-muted)]">
-                Appended to every AI image generation for tickets of this job type. Composes with
-                the project-level brand guide when set.
-              </p>
-            </div>
+        {/* AI prompt template — tuned guidance appended to every
+            image generation for tickets of this job type. */}
+        <PanelSection title="AI prompt">
+          <Field
+            label={
+              <>
+                AI prompt template{" "}
+                <span className="font-normal text-[var(--av2-text-2)]">(optional)</span>
+              </>
+            }
+            htmlFor="job-ai-prompt"
+            hint="Appended to every AI image generation for tickets of this job type. Composes with the project-level brand guide when set."
+          >
+            <TextArea
+              id="job-ai-prompt"
+              value={formAiPromptTemplate}
+              onChange={(e) => setFormAiPromptTemplate(e.target.value)}
+              rows={3}
+              maxLength={2000}
+              placeholder={
+                'e.g. "For logos: emphasize simplicity and scalability; should remain recognizable down to 24px square."'
+              }
+            />
+          </Field>
+        </PanelSection>
+      </form>
+    </DetailPanel>
+  );
 
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 text-xs font-medium text-[var(--bb-secondary)]">
-                <input
-                  type="checkbox"
-                  checked={formIsActive}
-                  onChange={(e) => setFormIsActive(e.target.checked)}
-                  className="h-3 w-3 rounded border-[var(--bb-border-input)] text-[var(--bb-primary)] focus:ring-[var(--bb-primary)]"
-                />
-                Active
-              </label>
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
 
-              {selected && (
-                <Button variant="ghost" size="sm" onClick={resetForm}>
-                  Clear selection
-                </Button>
-              )}
-            </div>
+  return (
+    <div>
+      <PageHeader
+        title="Job types"
+        description="Define the work, estimate effort and review token pricing."
+        meta={
+          data ? (
+            <span className="tabular-nums">
+              {fmt(jobTypes.length)} {plural(jobTypes.length, "job type", "job types")} ·{" "}
+              {fmt(activeCount)} active · {fmt(inactiveCount)} inactive
+            </span>
+          ) : null
+        }
+        actions={
+          <Button variant="primary" onClick={handleNewClick}>
+            <span aria-hidden className="text-lg leading-none">
+              +
+            </span>
+            New job type
+          </Button>
+        }
+      />
 
-            <Button type="submit" loading={saving} loadingText="Saving..." className="mt-2">
-              {selected ? "Save changes" : "Create job type"}
-            </Button>
-          </form>
+      {/* Error */}
+      {error && (
+        <div className="mb-6">
+          <Callout tone="error" title="Something went wrong">
+            {error}
+          </Callout>
         </div>
-      </section>
-    </>
+      )}
+
+      <SplitView panel={panel}>
+        <Card padding="none">
+          <div className="px-6 pt-5">
+            <div className="mb-4">
+              <h2 className="text-xl leading-7 font-semibold">Job catalogue</h2>
+            </div>
+            <FilterBar>
+              <SearchInput
+                className="w-full min-w-[200px] flex-1"
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="Search job types…"
+                label="Search job types by name, description or category"
+              />
+              <div className="w-full sm:w-52">
+                <Select
+                  aria-label="Filter by category"
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value)}
+                >
+                  <option value="ALL">All categories</option>
+                  <option value="UNCATEGORIZED">Uncategorized</option>
+                  {activeCategoryOptions.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.icon ? `${cat.icon} ` : ""}
+                      {cat.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="w-full sm:w-40">
+                <Select
+                  aria-label="Filter by status"
+                  value={filterActive}
+                  onChange={(e) => setFilterActive(e.target.value as ActiveFilter)}
+                >
+                  <option value="ALL">All statuses</option>
+                  <option value="ACTIVE">Active</option>
+                  <option value="INACTIVE">Inactive</option>
+                </Select>
+              </div>
+            </FilterBar>
+          </div>
+
+          {loading && !data ? (
+            <div className="space-y-3 border-t border-[var(--av2-border)] px-6 py-5" role="status">
+              <span className="sr-only">Loading job types…</span>
+              {[0, 1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
+          ) : jobTypes.length === 0 ? (
+            <div className="border-t border-[var(--av2-border)]">
+              <EmptyState
+                icon={<IconServices width={28} height={28} />}
+                title="No job types yet"
+                description="Create the first job type with the editor on the right."
+              />
+            </div>
+          ) : filteredJobTypes.length === 0 ? (
+            <div className="border-t border-[var(--av2-border)]">
+              <EmptyState
+                title={
+                  searchQuery.trim()
+                    ? "No job types match your search"
+                    : "No job types match these filters"
+                }
+                description="Try a different search, category or status."
+                action={<Button onClick={resetFilters}>Clear filters</Button>}
+              />
+            </div>
+          ) : (
+            <Table label="Job types">
+              <thead>
+                <tr>
+                  <Th>Name</Th>
+                  <Th>Category</Th>
+                  <Th align="right">Est. hours</Th>
+                  <Th align="right">Tokens</Th>
+                  <Th>Status</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {pageRows.map((jt) => {
+                  const catName = getCategoryDisplay(jt);
+                  const legacyOnly = !jt.categoryRef && !!jt.category;
+                  return (
+                    <Tr
+                      key={jt.id}
+                      selected={selected?.id === jt.id}
+                      onSelect={() => handleEditClick(jt)}
+                      label={`${jt.name}, ${jt.isActive ? "active" : "inactive"}`}
+                    >
+                      <Td className="min-w-[220px]">
+                        <div className="font-semibold break-words">{jt.name}</div>
+                        {jt.description && (
+                          <div className="mt-0.5 line-clamp-2 text-xs text-[var(--av2-text-2)]">
+                            {jt.description}
+                          </div>
+                        )}
+                        {jt.hasQuantity && (
+                          <div className="mt-1.5">
+                            <Badge tone="lavender">
+                              Per unit{jt.quantityLabel ? ` · ${jt.quantityLabel}` : ""}
+                            </Badge>
+                          </div>
+                        )}
+                      </Td>
+                      <Td className="min-w-[160px] text-[var(--av2-text-2)]">
+                        {catName ? (
+                          <>
+                            <span className="inline-flex items-start gap-1.5">
+                              {jt.categoryRef?.icon && (
+                                <span aria-hidden>{jt.categoryRef.icon}</span>
+                              )}
+                              <span>{catName}</span>
+                            </span>
+                            {legacyOnly && (
+                              <div className="mt-0.5 text-xs">Text label · not linked</div>
+                            )}
+                          </>
+                        ) : (
+                          <span>{DASH}</span>
+                        )}
+                      </Td>
+                      <Td align="right" className="whitespace-nowrap">
+                        {jt.estimatedHours != null ? (
+                          <>
+                            {fmt(jt.estimatedHours)}{" "}
+                            <span className="text-xs text-[var(--av2-text-2)]">h</span>
+                          </>
+                        ) : (
+                          <span className="text-[var(--av2-text-2)]">{DASH}</span>
+                        )}
+                      </Td>
+                      <Td align="right" className="whitespace-nowrap">
+                        {fmt(jt.tokenCost)}{" "}
+                        <span className="text-xs text-[var(--av2-text-2)]">tokens</span>
+                      </Td>
+                      <Td>
+                        <Badge tone={jt.isActive ? "green" : "neutral"}>
+                          {jt.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                      </Td>
+                    </Tr>
+                  );
+                })}
+              </tbody>
+            </Table>
+          )}
+
+          {data && filteredJobTypes.length > 0 && (
+            <TableFooter>
+              <span className="tabular-nums">
+                Showing {fmt(pageStart + 1)}–{fmt(pageStart + pageRows.length)} of{" "}
+                {fmt(filteredJobTypes.length)}
+                {filtersActive && ` (filtered from ${fmt(jobTypes.length)})`}
+              </span>
+              <div className="flex flex-wrap items-center gap-3">
+                {filtersActive && (
+                  <Button size="sm" variant="ghost" onClick={resetFilters}>
+                    Clear filters
+                  </Button>
+                )}
+                <Pager page={currentPage} pageCount={pageCount} onPage={setPage} />
+              </div>
+            </TableFooter>
+          )}
+        </Card>
+
+        {!selected && data && jobTypes.length > 0 && (
+          <p className="mt-6 flex items-center gap-2 text-sm text-[var(--av2-text-2)]">
+            <IconDocument width={18} height={18} className="shrink-0" />
+            Select a job type to edit its settings, or use the editor to create a new one.
+          </p>
+        )}
+      </SplitView>
+    </div>
   );
 }

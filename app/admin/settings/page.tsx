@@ -1,26 +1,46 @@
 // -----------------------------------------------------------------------------
 // @file: app/admin/settings/page.tsx
 // @purpose: Admin-facing page for managing app-level platform settings.
-//           Sectioned by domain (Finance, Talent funnel) so the page reads
-//           as a small index of switches rather than a flat list. Quick
-//           links at the top jump to the deeper admin tools that have
-//           their own pages (Plans, Audit Log, Two-factor, etc.).
+//           Admin design language v1: one topic tab per domain (Finance,
+//           Talent funnel, Notifications, Features) so only one group of
+//           switches is visible at a time, with a "Related tools" card on the
+//           right that links to the deeper admin tools that have their own
+//           pages (Plans, Audit Log, Two-factor, etc.).
+//
+//           Save semantics are unchanged: every setting still has its own
+//           Save button and sends one PATCH { key, value } to
+//           /api/admin/settings. Drafts survive switching tabs.
 //
 //           Demo-only debug links (auto-assign, assignment-log, demo-user
 //           switcher) only render under DEMO_MODE — those routes redirect
 //           to "/" in real prod by design (proxy.ts), so showing them in
 //           the prod settings page produced a confusing redirect.
+// @version: v2.0.0
+// @status: active
+// @lastUpdate: 2026-11-01
 // -----------------------------------------------------------------------------
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type SVGProps } from "react";
 import Link from "next/link";
 
-import { Button } from "@/components/ui/button";
-import { FormInput } from "@/components/ui/form-field";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import { LoadingState } from "@/components/ui/loading-state";
+import {
+  Badge,
+  Button,
+  Callout,
+  Card,
+  CardTitle,
+  PageHeader,
+  Select,
+  Skeleton,
+  Switch,
+  TabPanel,
+  Tabs,
+  TextInput,
+} from "@/components/admin/v2/ui";
+import { IconArrowUpRight } from "@/components/admin/v2/icons";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 import { useToast } from "@/components/ui/toast-provider";
 
 type SettingsMap = Record<string, string | null>;
@@ -38,6 +58,8 @@ type SettingMeta = {
   options?: { value: string; label: string }[];
   /** Default value used when the AppSetting row is missing. */
   defaultValue?: string;
+  /** Unit shown inside numeric inputs. */
+  suffix?: string;
 };
 
 /** Human-readable labels and descriptions for each setting key. */
@@ -48,6 +70,7 @@ const SETTING_META: Record<string, SettingMeta> = {
       "The minimum number of tokens a creative must request when creating a withdrawal. Creatives cannot submit a withdrawal below this amount.",
     type: "number",
     section: "finance",
+    suffix: "tokens",
   },
   AUTO_PAYOUT_ENABLED: {
     label: "Auto-create weekly payout requests",
@@ -62,6 +85,7 @@ const SETTING_META: Record<string, SettingMeta> = {
       "Creatives at or above this balance get a PENDING withdrawal request auto-created during the weekly run.",
     type: "number",
     section: "finance",
+    suffix: "tokens",
   },
   TALENT_APPLICATIONS_OPEN: {
     label: "Talent applications open",
@@ -121,9 +145,9 @@ const SECTION_TITLES: Record<SectionKey, { title: string; description: string }>
   },
 };
 
-/** Cards in the "Admin tools" quick-links block. Every link points at a
- *  page that already exists; this is a single index for the deeper
- *  workflows so admins don't have to hunt the sidebar. */
+/** Cards in the "Related tools" block. Every link points at a page that
+ *  already exists; this is a single index for the deeper workflows so
+ *  admins don't have to hunt the sidebar. */
 const QUICK_LINKS: { href: string; title: string; description: string; ownerOnly?: boolean }[] = [
   {
     href: "/admin/users",
@@ -189,15 +213,91 @@ const DEMO_DEBUG_LINKS: { href: string; title: string; description: string }[] =
   },
 ];
 
+const SECTION_ORDER = Object.keys(SECTION_TITLES) as SectionKey[];
+
+// ---------------------------------------------------------------------------
+// Local building blocks
+// ---------------------------------------------------------------------------
+
+function IconCheck(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      width={16}
+      height={16}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      {...p}
+    >
+      <path d="m5 12.5 4.5 4.5L19 7.5" />
+    </svg>
+  );
+}
+
+/** Compact link list used by the Related tools / Demo tools cards. */
+function LinkList({
+  links,
+}: {
+  links: { href: string; title: string; description: string; ownerOnly?: boolean }[];
+}) {
+  return (
+    <ul className="mt-4 divide-y divide-[var(--av2-border)] rounded-xl border border-[var(--av2-border)]">
+      {links.map((link) => (
+        <li key={link.href}>
+          <Link
+            href={link.href}
+            className="group flex items-start gap-3 px-4 py-3 transition-colors first:rounded-t-xl last:rounded-b-xl hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none focus-visible:ring-inset"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="flex flex-wrap items-center gap-2 text-sm font-semibold group-hover:text-[var(--av2-link)]">
+                {link.title}
+                {link.ownerOnly && <Badge tone="amber">Owner only</Badge>}
+              </span>
+              <span className="mt-0.5 block text-xs text-[var(--av2-text-2)]">
+                {link.description}
+              </span>
+            </span>
+            <IconArrowUpRight className="mt-0.5 shrink-0 text-[var(--av2-link)]" />
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function LoadingSkeleton() {
+  return (
+    <div aria-busy="true" className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <Skeleton className="h-[420px] rounded-2xl" />
+      <Skeleton className="h-[420px] rounded-2xl" />
+      <p className="sr-only" role="status">
+        Loading settings…
+      </p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
+
 export default function AdminSettingsPage() {
   const { showToast } = useToast();
 
   const [settings, setSettings] = useState<SettingsMap>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<SectionKey>("finance");
 
   // Local draft values for each setting (what the user types)
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  // Drafts as first loaded — only used to tell "edited by you" apart from
+  // "row missing, showing the documented default" for the dirty markers.
+  const [initialDrafts, setInitialDrafts] = useState<Record<string, string>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
 
   // Demo-debug section visibility — driven by the public env flag the
@@ -248,6 +348,7 @@ export default function AdminSettingsPage() {
             }
           }
           setDrafts(initial);
+          setInitialDrafts(initial);
         }
       } catch (err: unknown) {
         if (!cancelled) {
@@ -295,6 +396,7 @@ export default function AdminSettingsPage() {
       }
 
       setSettings((prev) => ({ ...prev, [key]: value }));
+      setInitialDrafts((prev) => ({ ...prev, [key]: value }));
       showToast({
         type: "success",
         title: "Setting updated",
@@ -308,7 +410,7 @@ export default function AdminSettingsPage() {
     }
   };
 
-  // Group settings by section for the sectioned render.
+  // Group settings by section for the tabbed render.
   const sectionedKeys = (Object.keys(SETTING_META) as Array<keyof typeof SETTING_META>).reduce(
     (acc, key) => {
       const sec = SETTING_META[key].section;
@@ -319,195 +421,230 @@ export default function AdminSettingsPage() {
     {} as Record<SectionKey, string[]>,
   );
 
+  // Trimmed, like the value handleSave sends, so a saved value with stray
+  // whitespace in the input doesn't stay "edited".
+  const isEdited = (key: string) =>
+    (drafts[key] ?? "").trim() !== (initialDrafts[key] ?? "").trim();
+  const editedIn = (section: SectionKey) => (sectionedKeys[section] ?? []).filter(isEdited);
+
+  // Drafts are per setting and survive tab switches, so only leaving the page
+  // can lose them.
+  useUnsavedChanges(Object.keys(SETTING_META).some(isEdited), "Settings");
+
+  const tabLabel = (section: SectionKey) => {
+    const n = editedIn(section).length;
+    return (
+      <span className="inline-flex items-center gap-2">
+        {SECTION_TITLES[section].title}
+        {n > 0 && (
+          <span
+            className="h-2 w-2 rounded-full bg-[var(--av2-accent)]"
+            aria-label="has unsaved changes"
+          />
+        )}
+      </span>
+    );
+  };
+
+  const tabPrefix = "admin-settings";
+  const visibleSections = SECTION_ORDER.filter((s) => (sectionedKeys[s] ?? []).length > 0);
+  const keys = sectionedKeys[tab] ?? [];
+  const otherEdited = visibleSections
+    .filter((s) => s !== tab && editedIn(s).length > 0)
+    .map((s) => SECTION_TITLES[s].title);
+
   return (
-    <>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-        <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-          Global configuration for the Brandbite platform. Changes take effect immediately.
-        </p>
-      </div>
+    <div>
+      <PageHeader
+        title="Settings"
+        description="Global configuration for the Brandbite platform. Each setting saves on its own and takes effect immediately."
+      />
 
       {error && (
-        <InlineAlert variant="error" title="Something went wrong" className="mb-4">
-          {error}
-        </InlineAlert>
+        <div className="mb-6">
+          <Callout tone="error" title="Something went wrong">
+            {error}
+          </Callout>
+        </div>
       )}
 
       {loading ? (
-        <LoadingState message="Loading settings…" />
+        <LoadingSkeleton />
       ) : (
-        <div className="space-y-8">
-          {(Object.keys(SECTION_TITLES) as SectionKey[]).map((section) => {
-            const keys = sectionedKeys[section] ?? [];
-            if (keys.length === 0) return null;
-            return (
-              <section key={section}>
-                <header className="mb-3">
-                  <h2 className="text-base font-semibold text-[var(--bb-secondary)]">
-                    {SECTION_TITLES[section].title}
-                  </h2>
-                  <p className="mt-0.5 text-xs text-[var(--bb-text-muted)]">
-                    {SECTION_TITLES[section].description}
-                  </p>
-                </header>
-                <div className="space-y-3">
+        <>
+          <div className="mb-6">
+            <Tabs<SectionKey>
+              label="Settings topics"
+              idPrefix={tabPrefix}
+              value={tab}
+              onChange={setTab}
+              tabs={visibleSections.map((s) => ({ value: s, label: tabLabel(s) }))}
+            />
+          </div>
+
+          <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+            <Card className="min-w-0">
+              <TabPanel idPrefix={tabPrefix} value={tab}>
+                <CardTitle description={SECTION_TITLES[tab].description}>
+                  {SECTION_TITLES[tab].title}
+                </CardTitle>
+
+                <div className="mt-6 divide-y divide-[var(--av2-border)] border-t border-[var(--av2-border)]">
                   {keys.map((key) => {
                     const meta = SETTING_META[key];
                     const isSaving = savingKey === key;
                     const currentValue = settings[key] ?? "";
                     const draftValue = drafts[key] ?? "";
                     const hasChanged = draftValue.trim() !== currentValue;
+                    const edited = isEdited(key);
+                    const labelId = `setting-${key}-label`;
+                    const hintId = `setting-${key}-hint`;
+
+                    const status = isSaving ? (
+                      "Saving…"
+                    ) : edited ? (
+                      <span className="font-semibold text-[var(--av2-link)]">Unsaved change</span>
+                    ) : settings[key] == null ? (
+                      "Not saved yet — showing the default"
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5">
+                        <IconCheck />
+                        Saved
+                      </span>
+                    );
 
                     return (
-                      <div
-                        key={key}
-                        className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] px-5 py-5 shadow-sm"
-                      >
-                        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                          <div className="flex-1">
+                      <div key={key} className="py-6 last:pb-0">
+                        <div className="flex flex-wrap items-start justify-between gap-4">
+                          <div className="min-w-0 flex-1 basis-80">
                             <label
-                              htmlFor={`setting-${key}`}
-                              className="text-sm font-semibold text-[var(--bb-secondary)]"
+                              id={labelId}
+                              htmlFor={meta.type === "boolean" ? undefined : `setting-${key}`}
+                              className="text-base font-semibold"
                             >
                               {meta.label}
                             </label>
-                            <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
+                            <p id={hintId} className="mt-1 text-sm text-[var(--av2-text-2)]">
                               {meta.description}
                             </p>
-                            {meta.type === "boolean" ? (
-                              <label className="mt-3 flex items-center gap-2 text-xs text-[var(--bb-secondary)]">
-                                <input
-                                  type="checkbox"
-                                  id={`setting-${key}`}
-                                  checked={draftValue === "true"}
-                                  onChange={(e) =>
-                                    setDrafts((prev) => ({
-                                      ...prev,
-                                      [key]: e.target.checked ? "true" : "false",
-                                    }))
-                                  }
-                                  className="h-3.5 w-3.5 rounded border-[var(--bb-border-input)] text-[var(--bb-primary)] focus:ring-[var(--bb-primary)]"
-                                />
-                                <span>{draftValue === "true" ? "Enabled" : "Disabled"}</span>
-                              </label>
-                            ) : meta.type === "select" ? (
-                              <select
-                                id={`setting-${key}`}
-                                value={draftValue}
-                                onChange={(e) =>
-                                  setDrafts((prev) => ({ ...prev, [key]: e.target.value }))
-                                }
-                                className="mt-3 max-w-xs rounded-md border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-2 py-1.5 text-xs text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
-                              >
-                                {meta.options?.map((opt) => (
-                                  <option key={opt.value} value={opt.value}>
-                                    {opt.label}
-                                  </option>
-                                ))}
-                              </select>
-                            ) : (
-                              <FormInput
-                                id={`setting-${key}`}
-                                type={meta.type}
-                                min={meta.type === "number" ? 1 : undefined}
-                                value={draftValue}
-                                onChange={(e) =>
+                          </div>
+                          {meta.type === "boolean" && (
+                            <span className="inline-flex items-center gap-3">
+                              <Switch
+                                checked={draftValue === "true"}
+                                onChange={(v) =>
                                   setDrafts((prev) => ({
                                     ...prev,
-                                    [key]: e.target.value,
+                                    [key]: v ? "true" : "false",
                                   }))
                                 }
-                                className={`mt-3 ${meta.inputClassName ?? "max-w-xs"}`}
+                                labelledBy={labelId}
+                                describedBy={hintId}
                               />
-                            )}
-                            {currentValue && (
-                              <p className="mt-1.5 text-[11px] text-[var(--bb-text-tertiary)]">
-                                Current value: <span className="font-semibold">{currentValue}</span>
-                              </p>
-                            )}
-                          </div>
+                              <span className="w-16 text-sm font-medium">
+                                {draftValue === "true" ? "Enabled" : "Disabled"}
+                              </span>
+                            </span>
+                          )}
+                        </div>
 
+                        {meta.type === "select" && (
+                          <div className="mt-4 max-w-sm">
+                            <Select
+                              id={`setting-${key}`}
+                              aria-describedby={hintId}
+                              value={draftValue}
+                              onChange={(e) =>
+                                setDrafts((prev) => ({ ...prev, [key]: e.target.value }))
+                              }
+                            >
+                              {meta.options?.map((opt) => (
+                                <option key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </option>
+                              ))}
+                            </Select>
+                          </div>
+                        )}
+                        {(meta.type === "number" || meta.type === "text") && (
+                          <div className={`mt-4 ${meta.inputClassName ?? "max-w-xs"}`}>
+                            <TextInput
+                              id={`setting-${key}`}
+                              type={meta.type}
+                              min={meta.type === "number" ? 1 : undefined}
+                              suffix={meta.suffix}
+                              aria-describedby={hintId}
+                              value={draftValue}
+                              onChange={(e) =>
+                                setDrafts((prev) => ({
+                                  ...prev,
+                                  [key]: e.target.value,
+                                }))
+                              }
+                            />
+                          </div>
+                        )}
+
+                        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--av2-bg)] px-4 py-3">
+                          <p role="status" className="text-sm text-[var(--av2-text-2)]">
+                            {status}
+                            {currentValue && (
+                              <>
+                                {" · "}Current value:{" "}
+                                <span className="font-semibold text-[var(--av2-text)]">
+                                  {currentValue}
+                                </span>
+                              </>
+                            )}
+                          </p>
                           <Button
+                            variant={edited ? "primary" : "secondary"}
+                            size="sm"
                             disabled={isSaving || !hasChanged || !draftValue.trim()}
                             onClick={() => handleSave(key)}
-                            loading={isSaving}
-                            loadingText="Saving…"
+                            aria-label={`Save ${meta.label}`}
                           >
-                            Save
+                            {isSaving ? "Saving…" : "Save"}
                           </Button>
                         </div>
                       </div>
                     );
                   })}
                 </div>
-              </section>
-            );
-          })}
-        </div>
-      )}
 
-      {/* Admin tools — quick links to the deeper config pages that have
-          their own routes already. Mirrors the sidebar but keeps related
-          tools grouped on one screen so admins don't go hunting. */}
-      <section className="mt-10">
-        <h2 className="text-base font-semibold tracking-tight text-[var(--bb-secondary)]">
-          Admin tools
-        </h2>
-        <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-          Direct links to the deeper config pages.
-        </p>
-
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {QUICK_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="group rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] px-5 py-5 shadow-sm transition-colors hover:border-[var(--bb-primary)]/40 hover:bg-[var(--bb-primary-light)]"
-            >
-              <h3 className="text-sm font-semibold text-[var(--bb-secondary)] group-hover:text-[var(--bb-primary)]">
-                {link.title}
-                {link.ownerOnly && (
-                  <span className="ml-1.5 align-middle text-[9px] font-medium text-[var(--bb-text-muted)]">
-                    OWNER
-                  </span>
+                {otherEdited.length > 0 && (
+                  <p className="mt-6 text-sm text-[var(--av2-text-2)]">
+                    Unsaved changes in other tabs: {otherEdited.join(", ")}.
+                  </p>
                 )}
-              </h3>
-              <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">{link.description}</p>
-            </Link>
-          ))}
-        </div>
-      </section>
+              </TabPanel>
+            </Card>
 
-      {/* Demo-only tools. The /debug/* routes are demo-only by design
-          (proxy.ts redirects them to "/" in real prod), so we hide the
-          whole section unless we're on the demo build. The card on prod
-          used to redirect to the landing page, which was confusing. */}
-      {isDemoMode && (
-        <section className="mt-10">
-          <h2 className="text-base font-semibold tracking-tight text-[var(--bb-secondary)]">
-            Demo tools
-          </h2>
-          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-            Available only on the demo deployment.
-          </p>
+            <div className="space-y-6">
+              {/* Related tools — quick links to the deeper config pages that
+                  have their own routes already. */}
+              <Card>
+                <CardTitle description="Direct links to the deeper config pages.">
+                  Related tools
+                </CardTitle>
+                <LinkList links={QUICK_LINKS} />
+              </Card>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {DEMO_DEBUG_LINKS.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="group rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] px-5 py-5 shadow-sm transition-colors hover:border-[var(--bb-primary)]/40 hover:bg-[var(--bb-primary-light)]"
-              >
-                <h3 className="text-sm font-semibold text-[var(--bb-secondary)] group-hover:text-[var(--bb-primary)]">
-                  {link.title}
-                </h3>
-                <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">{link.description}</p>
-              </Link>
-            ))}
+              {/* Demo-only tools. The /debug/* routes are demo-only by design
+                  (proxy.ts redirects them to "/" in real prod), so we hide the
+                  whole card unless we're on the demo build. */}
+              {isDemoMode && (
+                <Card>
+                  <CardTitle description="Available only on the demo deployment.">
+                    Demo tools
+                  </CardTitle>
+                  <LinkList links={DEMO_DEBUG_LINKS} />
+                </Card>
+              )}
+            </div>
           </div>
-        </section>
+        </>
       )}
-    </>
+    </div>
   );
 }

@@ -8,6 +8,10 @@
 //           same /api/admin/page-blocks pipeline as page-specific blocks
 //           but live in their own namespace separate from "home" (the
 //           landing-page blocks).
+//
+//           Tabs: Header navigation / Footer & legal bar. The legal bar
+//           lives in the SITE_FOOTER payload and saves with the footer, so
+//           it stays inside the footer tab as its own section.
 // -----------------------------------------------------------------------------
 // @version: v1.0.0
 // @status: active
@@ -15,6 +19,8 @@
 // -----------------------------------------------------------------------------
 
 import { OwnerOnlyBanner } from "@/components/admin/owner-only-banner";
+import { Callout, PageHeader } from "@/components/admin/v2/ui";
+import { TabbedPanels } from "@/components/blocks/admin/block-form-ui";
 import { SiteFooterBlockForm } from "@/components/blocks/admin/SiteFooterBlockForm";
 import { SiteHeaderBlockForm } from "@/components/blocks/admin/SiteHeaderBlockForm";
 
@@ -41,42 +47,41 @@ export default async function AdminSiteChromePage() {
 
   return (
     <>
-      {/* Page header */}
-      <div className="mb-4">
-        <h1 className="text-2xl font-semibold tracking-tight">Site header &amp; footer</h1>
-        <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-          Chrome that wraps every marketing page — landing, pricing, showcase, blog, FAQ, legal.
-          Edits land within ~60 seconds via ISR; logo and copyright year stay in code.
-        </p>
-      </div>
+      <PageHeader
+        title="Site chrome"
+        description="Header navigation, footer links and the legal bar shown on the older marketing pages."
+      />
 
       <OwnerOnlyBanner action="edit site header and footer" />
 
-      {/* Header section ---------------------------------------------- */}
-      <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-6 py-5 shadow-sm">
-        <header className="mb-5 border-b border-[var(--bb-border-subtle)] pb-3">
-          <h2 className="text-lg font-semibold tracking-tight">Header navigation</h2>
-          <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
-            The links between the brand logo and the Sign in button on every marketing page. Add up
-            to 10 entries, reorder them, customise label and destination per link.
-          </p>
-        </header>
+      <div className="mb-6">
+        <Callout title="Where this shows up">
+          Documentation, News, Showcase and Accessibility pages use this header and footer. The
+          homepage and the redesigned pages (About, Blog, FAQ, Contact, Privacy, Terms…) use their
+          own static header and footer and ignore these settings. Logo and copyright year stay in
+          code.
+        </Callout>
+      </div>
 
-        <SiteHeaderBlockForm initial={initialHeader} />
-      </section>
-
-      {/* Footer section ---------------------------------------------- */}
-      <section className="mt-6 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-6 py-5 shadow-sm">
-        <header className="mb-5 border-b border-[var(--bb-border-subtle)] pb-3">
-          <h2 className="text-lg font-semibold tracking-tight">Footer</h2>
-          <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
-            Brand statement, multi-column link grid, and the orange legal-link strip at the very
-            bottom of every marketing page.
-          </p>
-        </header>
-
-        <SiteFooterBlockForm initial={initialFooter} />
-      </section>
+      <TabbedPanels
+        label="Site chrome sections"
+        sections={[
+          {
+            id: "header",
+            label: "Header navigation",
+            description:
+              "Links between the brand logo and the Sign in button. Up to 10 entries, in order.",
+            content: <SiteHeaderBlockForm initial={initialHeader} />,
+          },
+          {
+            id: "footer",
+            label: "Footer & legal bar",
+            description:
+              "Brand statement, the multi-column link grid and the orange legal-link strip at the very bottom. All three save together.",
+            content: <SiteFooterBlockForm initial={initialFooter} />,
+          },
+        ]}
+      />
     </>
   );
 }

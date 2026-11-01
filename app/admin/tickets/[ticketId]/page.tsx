@@ -6,28 +6,54 @@
 //           revision, only the ticket owner can approve, etc.) stays the
 //           single source of truth. This page is investigative context.
 //
-//           Renders:
-//             - Header card (title, status, priority, code, customer +
-//               creative, deep-links into both user-detail pages)
-//             - Brief description + brief attachments
-//             - Revision timeline with assets and feedback
-//             - Comments timeline
-//             - Token cost + payout summary
-//             - Assignment history (auto-assign + manual decisions)
-//             - Admin actions performed on this ticket
+//           Renders (admin design language v1):
+//             - Header card (code, status, priority, title, dates, a
+//               "Read-only view" marker + link to the ticket list)
+//             - Tabs: Brief (description + attachments) / Revisions (n) /
+//               Comments (n)
+//             - Activity card: assignment history + admin actions
+//             - "Ticket details" side card: customer, creative, token cost
+//               + payout overrides, job type — with deep links
+// @version: v2.0.0
+// @status: active
+// @lastUpdate: 2026-11-01
 // -----------------------------------------------------------------------------
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode, type SVGProps } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import { LoadingState } from "@/components/ui/loading-state";
+import {
+  Avatar,
+  Badge,
+  ButtonLink,
+  Callout,
+  Card,
+  CardTitle,
+  DASH,
+  EmptyState,
+  Eyebrow,
+  IconTile,
+  PRIORITY,
+  PanelSection,
+  Skeleton,
+  TICKET_STATUS,
+  TabPanel,
+  Tabs,
+  TextLink,
+  fmt,
+  plural,
+  type Tone,
+} from "@/components/admin/v2/ui";
+import {
+  IconAlertCircle,
+  IconArrowUpRight,
+  IconBuilding,
+  IconCoins,
+  IconDocument,
+} from "@/components/admin/v2/icons";
 
 // ---------------------------------------------------------------------------
 // Types — narrow mirrors of the API shape, kept colocated so the page
@@ -126,30 +152,29 @@ type DetailResponse = {
   auditLogs: AuditLogRow[];
 };
 
+type TabKey = "brief" | "revisions" | "comments";
+
 // ---------------------------------------------------------------------------
 // Display helpers
 // ---------------------------------------------------------------------------
 
-const STATUS_VARIANT: Record<TicketStatus, "info" | "warning" | "primary" | "success"> = {
-  TODO: "info",
-  IN_PROGRESS: "warning",
-  IN_REVIEW: "primary",
-  DONE: "success",
-  // Cancelled tickets land on this page only via direct deep-link (the
-  // admin board hides them). Render as muted info so the operator can
-  // still tell at a glance that this row is terminal.
-  CANCELED: "info",
+// Cancelled tickets land on this page only via direct deep-link (the admin
+// board hides them). Render as a muted badge so the operator can still tell
+// at a glance that this row is terminal.
+const STATUS_META: Record<TicketStatus, { label: string; tone: Tone }> = {
+  ...(TICKET_STATUS as Record<Exclude<TicketStatus, "CANCELED">, { label: string; tone: Tone }>),
+  CANCELED: { label: "Canceled", tone: "neutral" },
 };
 
-const PRIORITY_VARIANT: Record<TicketPriority, "neutral" | "info" | "warning" | "primary"> = {
-  LOW: "neutral",
-  MEDIUM: "info",
-  HIGH: "warning",
-  URGENT: "primary",
+const ROLE_LABEL: Record<Role, string> = {
+  SITE_OWNER: "Site owner",
+  SITE_ADMIN: "Site admin",
+  DESIGNER: "Creative",
+  CUSTOMER: "Customer",
 };
 
 function formatDateTime(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return DASH;
   try {
     return new Intl.DateTimeFormat("en-GB", {
       day: "numeric",
@@ -158,14 +183,16 @@ function formatDateTime(iso: string | null): string {
       hour: "2-digit",
       minute: "2-digit",
       hour12: false,
-    }).format(new Date(iso));
+    })
+      .format(new Date(iso))
+      .replace(",", " ·");
   } catch {
     return iso;
   }
 }
 
 function relativeTime(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return DASH;
   const diff = Math.max(0, Date.now() - new Date(iso).getTime());
   const sec = Math.round(diff / 1000);
   if (sec < 60) return "just now";
@@ -186,6 +213,158 @@ function formatBytes(b: number): string {
   return `${(b / 1024 / 1024).toFixed(1)} MB`;
 }
 
+/** Rich-text editors store an empty brief as "<p></p>" — treat that as none. */
+function hasText(html: string | null): boolean {
+  if (!html) return false;
+  return (
+    html
+      .replace(/<[^>]*>/g, "")
+      .replace(/&nbsp;/g, " ")
+      .trim().length > 0
+  );
+}
+
+const fileLabel = (a: AssetRow) => a.mimeType.split("/")[1]?.toUpperCase() ?? "FILE";
+
+// Page-local glyphs the shared icon set doesn't have yet.
+const svgBase = {
+  width: 20,
+  height: 20,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.8,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+};
+
+function IconLock(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...svgBase} {...p}>
+      <rect x="5" y="11" width="14" height="9" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </svg>
+  );
+}
+
+function IconLayers(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...svgBase} {...p}>
+      <path d="m12 3 9 5-9 5-9-5z" />
+      <path d="m3 13 9 5 9-5" />
+    </svg>
+  );
+}
+
+function IconChat(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...svgBase} {...p}>
+      <path d="M20 15a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
+function IconBriefcase(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...svgBase} {...p}>
+      <rect x="3" y="7" width="18" height="13" rx="2" />
+      <path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18" />
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Small local building blocks
+// ---------------------------------------------------------------------------
+
+function AssetTile({ asset, size }: { asset: AssetRow; size: "sm" | "md" }) {
+  const box = size === "md" ? "h-32 w-32" : "h-24 w-24";
+  const isImage = asset.mimeType.startsWith("image/") && asset.url;
+  return (
+    <li className="w-min rounded-xl border border-[var(--av2-border)] bg-[var(--av2-bg)] p-2">
+      {isImage ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={asset.url!}
+          alt={asset.originalName ?? ""}
+          className={`${box} rounded-lg object-cover`}
+        />
+      ) : (
+        <div
+          className={`${box} flex items-center justify-center rounded-lg bg-[var(--av2-surface)] text-xs font-semibold text-[var(--av2-text-2)]`}
+        >
+          {fileLabel(asset)}
+        </div>
+      )}
+      <p
+        className={`mt-2 truncate text-xs font-medium ${size === "md" ? "max-w-32" : "max-w-24"}`}
+        title={asset.originalName ?? undefined}
+      >
+        {asset.originalName || "(unnamed)"}
+      </p>
+      <div className="mt-0.5 flex items-center justify-between gap-2 text-xs text-[var(--av2-text-2)]">
+        <span>{formatBytes(asset.bytes)}</span>
+        {asset.url && (
+          <a
+            href={asset.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-[var(--av2-link)] hover:underline"
+          >
+            Open
+          </a>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function DetailBlock({
+  label,
+  icon,
+  children,
+}: {
+  label: string;
+  icon: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className="border-t border-[var(--av2-border)] py-5 first:border-t-0 first:pt-0">
+      <Eyebrow>{label}</Eyebrow>
+      <div className="mt-3 flex items-start gap-4">
+        {icon}
+        <div className="min-w-0 flex-1 text-sm">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function LoadingSkeleton() {
+  return (
+    <div aria-busy="true" aria-label="Loading ticket">
+      <Skeleton className="mb-4 h-5 w-32" />
+      <Skeleton className="mb-6 h-36 w-full rounded-2xl" />
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_400px] xl:grid-rows-[auto_1fr]">
+        <Skeleton className="h-80 rounded-2xl" />
+        <Skeleton className="h-96 rounded-2xl" />
+      </div>
+      <p className="sr-only" role="status">
+        Loading ticket…
+      </p>
+    </div>
+  );
+}
+
+const BackLink = () => (
+  <Link
+    href="/admin/tickets"
+    className="mb-4 inline-flex items-center gap-1.5 rounded text-sm font-medium text-[var(--av2-text-2)] hover:text-[var(--av2-text)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
+  >
+    <span aria-hidden>←</span> Back to tickets
+  </Link>
+);
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -195,6 +374,7 @@ export default function AdminTicketDetailPage() {
   const [data, setData] = useState<DetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<TabKey>("brief");
 
   useEffect(() => {
     if (!ticketId) return;
@@ -223,370 +403,464 @@ export default function AdminTicketDetailPage() {
     };
   }, [ticketId]);
 
-  if (loading) return <LoadingState message="Loading ticket…" />;
+  if (loading) return <LoadingSkeleton />;
   if (error)
     return (
-      <InlineAlert variant="error" title="Couldn't load ticket">
-        {error}
-      </InlineAlert>
+      <div>
+        <BackLink />
+        <Callout tone="error" title="Couldn't load ticket">
+          {error}
+        </Callout>
+      </div>
     );
   if (!data)
-    return <EmptyState title="Ticket not found" description="No record matched that id." />;
+    return (
+      <div>
+        <BackLink />
+        <Card>
+          <EmptyState
+            icon={<IconDocument width={28} height={28} />}
+            title="Ticket not found"
+            description="No record matched that id."
+          />
+        </Card>
+      </div>
+    );
 
   const { ticket, briefAssets, revisions, comments, assignmentLogs, auditLogs } = data;
+  const status = STATUS_META[ticket.status] ?? { label: ticket.status, tone: "neutral" as Tone };
+  const priority = PRIORITY[ticket.priority] ?? { label: ticket.priority, tone: "neutral" as Tone };
+  const briefHasText = hasText(ticket.description);
+  const tabPrefix = "ticket-detail";
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-xs text-[var(--bb-text-muted)]">
-        <Link href="/admin/tickets" className="hover:text-[var(--bb-secondary)]">
-          ← Tickets
-        </Link>
-        <span>·</span>
-        <span>{ticket.code}</span>
-      </div>
+    <div>
+      <BackLink />
 
-      {/* Header card */}
-      <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      {/* ---------------- Header card ---------------- */}
+      <Card className="mb-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <code className="rounded bg-[var(--bb-bg-page)] px-2 py-0.5 text-[11px] font-semibold text-[var(--bb-text-secondary)]">
-                {ticket.code}
-              </code>
-              <Badge variant={STATUS_VARIANT[ticket.status]}>{ticket.status}</Badge>
-              <Badge variant={PRIORITY_VARIANT[ticket.priority]}>{ticket.priority}</Badge>
-              {ticket.creativeMode === "AI" && <Badge variant="info">AI</Badge>}
+              <span className="mr-1 text-sm font-semibold tabular-nums">{ticket.code}</span>
+              <Badge tone={status.tone} dot>
+                {status.label}
+              </Badge>
+              <Badge tone={priority.tone}>{priority.label} priority</Badge>
+              {ticket.creativeMode === "AI" && <Badge tone="blue">AI</Badge>}
               {ticket.tags.map((t) => (
-                <span
-                  key={t.id}
-                  className="inline-block rounded-full border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-2 py-0.5 text-[11px] text-[var(--bb-text-secondary)]"
-                >
+                <Badge key={t.id} tone="neutral">
                   {t.name}
-                </span>
+                </Badge>
               ))}
             </div>
-            <h1 className="mt-2 text-xl font-bold text-[var(--bb-secondary)]">{ticket.title}</h1>
-            <p className="mt-1 text-xs text-[var(--bb-text-muted)]">
-              {ticket.jobType ? <>{ticket.jobType.name} · </> : null}
+            <h1 className="mt-2 text-[32px] leading-10 font-bold tracking-tight break-words">
+              {ticket.title}
+            </h1>
+            <p className="mt-1 text-sm text-[var(--av2-text-2)]">
               Created {formatDateTime(ticket.createdAt)}
               {ticket.dueDate ? <> · Due {formatDateTime(ticket.dueDate)}</> : null}
+              {ticket.project ? (
+                <>
+                  {" "}
+                  · Project {ticket.project.name}
+                  {ticket.project.code ? ` (${ticket.project.code})` : ""}
+                </>
+              ) : null}
             </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex h-10 items-center gap-2 rounded-lg bg-[var(--av2-bg)] px-3 text-sm font-medium text-[var(--av2-text-2)]">
+              <IconLock width={16} height={16} />
+              Read-only view
+            </span>
+            <ButtonLink href="/admin/tickets" variant="secondary">
+              Manage in ticket list
+              <IconArrowUpRight />
+            </ButtonLink>
           </div>
         </div>
-      </section>
+      </Card>
 
-      {/* Customer + creative grid */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-5">
-          <h2 className="text-xs font-semibold tracking-wide text-[var(--bb-text-muted)] uppercase">
-            Customer
-          </h2>
-          <p className="mt-2 text-sm font-medium text-[var(--bb-secondary)]">
-            <Link
-              href={`/admin/companies/${ticket.company.id}`}
-              className="hover:text-[var(--bb-primary)] hover:underline"
-            >
-              {ticket.company.name}
-            </Link>
-          </p>
-          <p className="mt-1 text-xs text-[var(--bb-text-muted)]">
-            Created by{" "}
-            <Link
-              href={`/admin/users/${ticket.createdBy.id}`}
-              className="hover:text-[var(--bb-primary)] hover:underline"
-            >
-              {ticket.createdBy.email}
-            </Link>
-          </p>
-          {ticket.project && (
-            <p className="mt-2 text-xs text-[var(--bb-text-muted)]">
-              Project: {ticket.project.name}
-              {ticket.project.code ? ` (${ticket.project.code})` : ""}
-            </p>
-          )}
-        </section>
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_400px] xl:grid-rows-[auto_1fr]">
+        {/* ---------------- Left column ---------------- */}
+        <div className="min-w-0 xl:col-start-1 xl:row-start-1">
+          <Card>
+            <Tabs<TabKey>
+              label="Ticket content"
+              idPrefix={tabPrefix}
+              value={tab}
+              onChange={setTab}
+              tabs={[
+                { value: "brief", label: "Brief" },
+                { value: "revisions", label: `Revisions (${revisions.length})` },
+                { value: "comments", label: `Comments (${comments.length})` },
+              ]}
+            />
 
-        <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-5">
-          <h2 className="text-xs font-semibold tracking-wide text-[var(--bb-text-muted)] uppercase">
-            Creative
-          </h2>
-          {ticket.creative ? (
-            <>
-              <p className="mt-2 text-sm font-medium text-[var(--bb-secondary)]">
-                <Link
-                  href={`/admin/users/${ticket.creative.id}`}
-                  className="hover:text-[var(--bb-primary)] hover:underline"
-                >
-                  {ticket.creative.name || ticket.creative.email}
-                </Link>
-              </p>
-              <p className="mt-1 text-xs text-[var(--bb-text-muted)]">{ticket.creative.email}</p>
-            </>
-          ) : (
-            <p className="mt-2 text-sm text-[var(--bb-text-muted)]">Unassigned</p>
-          )}
-          {ticket.completedBy && (
-            <p className="mt-2 text-xs text-[var(--bb-text-muted)]">
-              Approved by {ticket.completedBy.email} · {formatDateTime(ticket.completedAt)}
-            </p>
-          )}
-        </section>
-
-        <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-5">
-          <h2 className="text-xs font-semibold tracking-wide text-[var(--bb-text-muted)] uppercase">
-            Tokens
-          </h2>
-          <p className="mt-2 text-sm font-medium text-[var(--bb-secondary)]">
-            {ticket.tokenCostEffective.toLocaleString()} tokens
-          </p>
-          <p className="mt-1 text-xs text-[var(--bb-text-muted)]">
-            Base: {ticket.tokenCostBase.toLocaleString()}
-            {ticket.quantity > 1 ? ` (×${ticket.quantity})` : ""}
-          </p>
-          {ticket.tokenCostOverride != null && (
-            <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-              Cost overridden by admin
-            </p>
-          )}
-          {ticket.creativePayoutOverride != null && (
-            <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-              Payout override: {ticket.creativePayoutOverride.toLocaleString()}
-            </p>
-          )}
-        </section>
-      </div>
-
-      {/* Brief */}
-      <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-6">
-        <h2 className="text-base font-semibold text-[var(--bb-secondary)]">Brief</h2>
-        {ticket.description ? (
-          <div
-            className="prose prose-sm mt-3 max-w-none text-[var(--bb-text-secondary)]"
-            // The description is server-side sanitized at write time
-            // (see lib/sanitize.ts in the customer ticket flow); admins
-            // are read-only here so re-sanitizing would be overkill.
-            dangerouslySetInnerHTML={{ __html: ticket.description }}
-          />
-        ) : (
-          <p className="mt-2 text-xs text-[var(--bb-text-muted)]">No description.</p>
-        )}
-
-        {briefAssets.length > 0 && (
-          <div className="mt-4">
-            <h3 className="text-xs font-medium text-[var(--bb-text-secondary)]">
-              Attachments ({briefAssets.length})
-            </h3>
-            <ul className="mt-2 flex flex-wrap gap-2">
-              {briefAssets.map((a) => (
-                <li
-                  key={a.id}
-                  className="rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] p-2"
-                >
-                  {a.mimeType.startsWith("image/") && a.url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={a.url}
-                      alt={a.originalName ?? ""}
-                      className="h-24 w-24 rounded object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-24 w-24 items-center justify-center rounded bg-[var(--bb-bg-card)] text-[10px] text-[var(--bb-text-muted)]">
-                      {a.mimeType.split("/")[1]?.toUpperCase() ?? "FILE"}
-                    </div>
-                  )}
-                  <p className="mt-1 max-w-[96px] truncate text-[10px] text-[var(--bb-text-muted)]">
-                    {a.originalName || "(unnamed)"}
-                  </p>
-                  <p className="text-[10px] text-[var(--bb-text-tertiary)]">
-                    {formatBytes(a.bytes)}
-                  </p>
-                  {a.url && (
-                    <a
-                      href={a.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[10px] text-[var(--bb-primary)] hover:underline"
-                    >
-                      Open
-                    </a>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </section>
-
-      {/* Revisions */}
-      <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-6">
-        <h2 className="mb-3 text-base font-semibold text-[var(--bb-secondary)]">
-          Revisions ({revisions.length})
-        </h2>
-        {revisions.length === 0 ? (
-          <p className="text-xs text-[var(--bb-text-muted)]">No revisions submitted yet.</p>
-        ) : (
-          <ol className="space-y-4">
-            {revisions.map((r) => (
-              <li
-                key={r.id}
-                className="rounded-xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-page)] p-4"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-[var(--bb-secondary)]">
-                    v{r.version}
-                    {r.submittedByCreative && (
-                      <span className="ml-2 text-xs font-normal text-[var(--bb-text-muted)]">
-                        by {r.submittedByCreative.email}
-                      </span>
+            {/* Brief */}
+            {tab === "brief" && (
+              <TabPanel idPrefix={tabPrefix} value="brief">
+                {!briefHasText && briefAssets.length === 0 ? (
+                  <EmptyState
+                    icon={<IconDocument width={28} height={28} />}
+                    title="No brief provided"
+                    description="There is no brief text or attachment on this ticket."
+                  />
+                ) : (
+                  <div className="pt-6">
+                    {briefHasText ? (
+                      <div
+                        className="text-base leading-7 break-words [&_a]:font-semibold [&_a]:text-[var(--av2-link)] [&_a]:underline [&_h1]:mb-2 [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:mb-2 [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:mb-2 [&_h3]:font-semibold [&_li]:mb-1 [&_ol]:mb-3 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:mb-3 [&_p:last-child]:mb-0 [&_ul]:mb-3 [&_ul]:list-disc [&_ul]:pl-6"
+                        // The description is server-side sanitized at write time
+                        // (see lib/sanitize.ts in the customer ticket flow); admins
+                        // are read-only here so re-sanitizing would be overkill.
+                        dangerouslySetInnerHTML={{ __html: ticket.description ?? "" }}
+                      />
+                    ) : (
+                      <p className="text-sm text-[var(--av2-text-2)]">
+                        No brief text — only attachments were provided.
+                      </p>
                     )}
-                  </p>
-                  <span className="text-[11px] text-[var(--bb-text-muted)]">
-                    Submitted {formatDateTime(r.submittedAt)}
-                  </span>
-                </div>
-                {r.creativeMessage && (
-                  <p className="mt-2 text-xs whitespace-pre-wrap text-[var(--bb-text-secondary)]">
-                    {r.creativeMessage}
-                  </p>
+
+                    {briefAssets.length > 0 && (
+                      <div className="mt-6 border-t border-[var(--av2-border)] pt-5">
+                        <h3 className="text-base font-semibold">
+                          Attachments{" "}
+                          <span className="font-normal text-[var(--av2-text-2)]">
+                            ({briefAssets.length})
+                          </span>
+                        </h3>
+                        <ul className="mt-3 flex flex-wrap gap-3">
+                          {briefAssets.map((a) => (
+                            <AssetTile key={a.id} asset={a} size="sm" />
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
                 )}
-                {r.assets.length > 0 && (
-                  <ul className="mt-3 flex flex-wrap gap-2">
-                    {r.assets.map((a) => (
+              </TabPanel>
+            )}
+
+            {/* Revisions */}
+            {tab === "revisions" && (
+              <TabPanel idPrefix={tabPrefix} value="revisions">
+                {revisions.length === 0 ? (
+                  <EmptyState
+                    icon={<IconLayers width={28} height={28} />}
+                    title="No revisions yet"
+                    description="The creative hasn't submitted any work on this ticket."
+                  />
+                ) : (
+                  <ol className="space-y-4 pt-6">
+                    {revisions.map((r) => (
                       <li
-                        key={a.id}
-                        className="rounded border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-2"
+                        key={r.id}
+                        className="rounded-xl border border-[var(--av2-border)] bg-[var(--av2-bg)] p-4"
                       >
-                        {a.mimeType.startsWith("image/") && a.url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={a.url} alt="" className="h-32 w-32 rounded object-cover" />
-                        ) : (
-                          <div className="flex h-32 w-32 items-center justify-center rounded bg-[var(--bb-bg-page)] text-[10px] text-[var(--bb-text-muted)]">
-                            {a.mimeType.split("/")[1]?.toUpperCase() ?? "FILE"}
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge tone="lavender">v{r.version}</Badge>
+                            {r.submittedByCreative && (
+                              <span className="text-sm text-[var(--av2-text-2)]">
+                                by{" "}
+                                <Link
+                                  href={`/admin/users/${r.submittedByCreative.id}`}
+                                  className="font-medium text-[var(--av2-text)] hover:text-[var(--av2-link)] hover:underline"
+                                >
+                                  {r.submittedByCreative.email}
+                                </Link>
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs text-[var(--av2-text-2)]">
+                            Submitted {formatDateTime(r.submittedAt)}
+                          </span>
+                        </div>
+                        {r.creativeMessage && (
+                          <p className="mt-3 text-sm whitespace-pre-wrap">{r.creativeMessage}</p>
+                        )}
+                        {r.assets.length > 0 && (
+                          <ul className="mt-3 flex flex-wrap gap-3">
+                            {r.assets.map((a) => (
+                              <AssetTile key={a.id} asset={a} size="md" />
+                            ))}
+                          </ul>
+                        )}
+                        {r.feedbackAt && (
+                          <div className="mt-3 rounded-lg border-l-2 border-[var(--av2-accent)] bg-[var(--av2-surface)] px-3 py-2">
+                            <p className="text-xs text-[var(--av2-text-2)]">
+                              Feedback by {r.feedbackByCustomer?.email ?? "(unknown)"} ·{" "}
+                              {formatDateTime(r.feedbackAt)}
+                            </p>
+                            {r.feedbackMessage && (
+                              <p className="mt-1 text-sm whitespace-pre-wrap">
+                                {r.feedbackMessage}
+                              </p>
+                            )}
                           </div>
                         )}
                       </li>
                     ))}
+                  </ol>
+                )}
+              </TabPanel>
+            )}
+
+            {/* Comments */}
+            {tab === "comments" && (
+              <TabPanel idPrefix={tabPrefix} value="comments">
+                {comments.length === 0 ? (
+                  <EmptyState
+                    icon={<IconChat width={28} height={28} />}
+                    title="No comments yet"
+                    description="Nobody has commented on this ticket."
+                  />
+                ) : (
+                  <ul className="divide-y divide-[var(--av2-border)] pt-2">
+                    {comments.map((c) => (
+                      <li key={c.id} className="flex gap-3 py-4">
+                        <Avatar
+                          name={c.author.name || c.author.email}
+                          tone={c.author.role === "DESIGNER" ? "green" : "lavender"}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm">
+                            <Link
+                              href={`/admin/users/${c.author.id}`}
+                              className="font-semibold hover:text-[var(--av2-link)] hover:underline"
+                            >
+                              {c.author.email}
+                            </Link>{" "}
+                            <span className="text-[var(--av2-text-2)]">
+                              {c.author.role ? `· ${ROLE_LABEL[c.author.role]} ` : ""}·{" "}
+                              <time dateTime={c.createdAt} title={formatDateTime(c.createdAt)}>
+                                {relativeTime(c.createdAt)}
+                              </time>
+                            </span>
+                          </p>
+                          <p className="mt-1 text-sm whitespace-pre-wrap">{c.body}</p>
+                        </div>
+                      </li>
+                    ))}
                   </ul>
                 )}
-                {r.feedbackAt && (
-                  <div className="mt-3 rounded border-l-2 border-[var(--bb-primary)] bg-[var(--bb-bg-card)] px-3 py-2">
-                    <p className="text-[11px] text-[var(--bb-text-muted)]">
-                      Feedback by {r.feedbackByCustomer?.email ?? "(unknown)"} ·{" "}
-                      {formatDateTime(r.feedbackAt)}
-                    </p>
-                    {r.feedbackMessage && (
-                      <p className="mt-1 text-xs whitespace-pre-wrap text-[var(--bb-text-secondary)]">
-                        {r.feedbackMessage}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
+              </TabPanel>
+            )}
+          </Card>
+        </div>
 
-      {/* Comments */}
-      <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-6">
-        <h2 className="mb-3 text-base font-semibold text-[var(--bb-secondary)]">
-          Comments ({comments.length})
-        </h2>
-        {comments.length === 0 ? (
-          <p className="text-xs text-[var(--bb-text-muted)]">No comments yet.</p>
-        ) : (
-          <ul className="space-y-3">
-            {comments.map((c) => (
-              <li key={c.id} className="border-l-2 border-[var(--bb-border)] pl-3">
-                <p className="text-xs font-medium text-[var(--bb-secondary)]">
-                  <Link
-                    href={`/admin/users/${c.author.id}`}
-                    className="hover:text-[var(--bb-primary)] hover:underline"
-                  >
-                    {c.author.email}
-                  </Link>{" "}
-                  <span className="font-normal text-[var(--bb-text-muted)]">
-                    · {c.author.role ?? ""} · {relativeTime(c.createdAt)}
-                  </span>
-                </p>
-                <p className="mt-1 text-sm whitespace-pre-wrap text-[var(--bb-text-secondary)]">
-                  {c.body}
-                </p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+        {/* ---------------- Ticket details ---------------- */}
+        <Card as="div" className="xl:sticky xl:top-24 xl:col-start-2 xl:row-span-2 xl:row-start-1">
+          <h2 className="mb-5 text-xl leading-7 font-semibold">Ticket details</h2>
 
-      {/* Assignment history */}
-      {assignmentLogs.length > 0 && (
-        <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-6">
-          <h2 className="mb-3 text-base font-semibold text-[var(--bb-secondary)]">
-            Assignment history
-          </h2>
-          <ul className="space-y-2 text-xs">
-            {assignmentLogs.map((log) => (
-              <li
-                key={log.id}
-                className="flex flex-wrap items-center gap-2 border-b border-[var(--bb-border-subtle)] pb-2 last:border-b-0 last:pb-0"
-              >
-                <code className="rounded bg-[var(--bb-bg-page)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--bb-text-secondary)]">
-                  {log.reason}
-                </code>
-                {log.creative ? (
-                  <span>→ {log.creative.email}</span>
-                ) : (
-                  <span className="text-[var(--bb-text-muted)]">unassigned</span>
-                )}
-                <span className="text-[var(--bb-text-muted)]">· {relativeTime(log.createdAt)}</span>
-                {log.notes && <span className="text-[var(--bb-text-muted)]">— {log.notes}</span>}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {/* Audit log */}
-      {auditLogs.length > 0 && (
-        <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-6">
-          <h2 className="mb-3 text-base font-semibold text-[var(--bb-secondary)]">
-            Admin actions on this ticket
-          </h2>
-          <ul className="space-y-2 text-xs">
-            {auditLogs.map((log) => (
-              <li
-                key={log.id}
-                className="flex flex-wrap items-center gap-2 border-b border-[var(--bb-border-subtle)] pb-2 last:border-b-0 last:pb-0"
-              >
-                <Badge variant={log.outcome === "SUCCESS" ? "success" : "neutral"}>
-                  {log.outcome}
-                </Badge>
-                <code className="text-[11px] text-[var(--bb-secondary)]">{log.action}</code>
-                <span className="text-[var(--bb-text-muted)]">
-                  by {log.actorEmail} ({log.actorRole}) · {relativeTime(log.createdAt)}
-                </span>
-                {log.errorMessage && (
-                  <span className="text-[var(--bb-text-muted)]">— {log.errorMessage}</span>
-                )}
-              </li>
-            ))}
-          </ul>
-          <p className="mt-3 text-[11px] text-[var(--bb-text-muted)]">
-            <Link
-              href={`/admin/audit-log?targetId=${ticket.id}`}
-              className="text-[var(--bb-primary)] hover:underline"
+          <div>
+            <DetailBlock
+              label="Customer"
+              icon={
+                <IconTile tone="lavender" round>
+                  <IconBuilding />
+                </IconTile>
+              }
             >
-              View full audit log for this ticket ↗
-            </Link>
-          </p>
-        </section>
-      )}
+              <p className="text-base font-semibold">{ticket.company.name}</p>
+              <p className="mt-0.5 break-words text-[var(--av2-text-2)]">
+                Created by{" "}
+                <Link
+                  href={`/admin/users/${ticket.createdBy.id}`}
+                  className="hover:text-[var(--av2-link)] hover:underline"
+                >
+                  {ticket.createdBy.email}
+                </Link>
+              </p>
+              <div className="mt-1.5">
+                <TextLink href="/admin/companies">View companies</TextLink>
+              </div>
+            </DetailBlock>
 
-      <div className="pt-2 text-center">
-        <Button variant="secondary" onClick={() => window.history.back()}>
-          ← Back
-        </Button>
+            <DetailBlock
+              label="Creative"
+              icon={
+                ticket.creative ? (
+                  <Avatar
+                    name={ticket.creative.name || ticket.creative.email}
+                    size={48}
+                    tone="green"
+                  />
+                ) : (
+                  <IconTile tone="neutral" round>
+                    <span className="text-sm font-semibold">{DASH}</span>
+                  </IconTile>
+                )
+              }
+            >
+              {ticket.creative ? (
+                <>
+                  <p className="text-base font-semibold">
+                    {ticket.creative.name || ticket.creative.email}
+                  </p>
+                  <p className="mt-0.5 break-words text-[var(--av2-text-2)]">
+                    {ticket.creative.email}
+                  </p>
+                  <div className="mt-1.5">
+                    <TextLink href={`/admin/users/${ticket.creative.id}`}>View creative</TextLink>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-base font-semibold">Unassigned</p>
+                  <p className="mt-0.5 text-[var(--av2-text-2)]">No creative on this ticket yet.</p>
+                </>
+              )}
+              {ticket.completedBy && (
+                <p className="mt-2 text-[var(--av2-text-2)]">
+                  Approved by {ticket.completedBy.email} · {formatDateTime(ticket.completedAt)}
+                </p>
+              )}
+            </DetailBlock>
+
+            <DetailBlock
+              label="Token cost"
+              icon={
+                <IconTile tone="green" round>
+                  <IconCoins />
+                </IconTile>
+              }
+            >
+              <p className="text-xl leading-7 font-semibold tabular-nums">
+                {fmt(ticket.tokenCostEffective)}{" "}
+                {plural(ticket.tokenCostEffective, "token", "tokens")}
+              </p>
+              <p className="mt-0.5 text-[var(--av2-text-2)]">
+                Base cost: {fmt(ticket.tokenCostBase)}{" "}
+                {plural(ticket.tokenCostBase, "token", "tokens")}
+                {ticket.quantity > 1 ? ` (×${ticket.quantity})` : ""}
+              </p>
+              {(ticket.tokenCostOverride != null || ticket.creativePayoutOverride != null) && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {ticket.tokenCostOverride != null && (
+                    <Badge tone="amber">Cost overridden by admin</Badge>
+                  )}
+                  {ticket.creativePayoutOverride != null && (
+                    <Badge tone="amber">
+                      Payout override: {fmt(ticket.creativePayoutOverride)}
+                    </Badge>
+                  )}
+                </div>
+              )}
+            </DetailBlock>
+
+            <DetailBlock
+              label="Job type"
+              icon={
+                <IconTile tone="peach" round>
+                  <IconBriefcase />
+                </IconTile>
+              }
+            >
+              {ticket.jobType ? (
+                <>
+                  <p className="text-base font-semibold">{ticket.jobType.name}</p>
+                  <p className="mt-0.5 text-[var(--av2-text-2)]">
+                    List price {fmt(ticket.jobType.tokenCost)}{" "}
+                    {plural(ticket.jobType.tokenCost, "token", "tokens")}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-base font-semibold">Not specified</p>
+                  <p className="mt-0.5 text-[var(--av2-text-2)]">{DASH}</p>
+                </>
+              )}
+            </DetailBlock>
+          </div>
+
+          <div className="mt-1 flex items-start gap-3 rounded-xl bg-[var(--av2-bg)] p-4 text-sm text-[var(--av2-text-2)]">
+            <IconAlertCircle width={18} height={18} className="mt-0.5 shrink-0" />
+            <p>
+              This page is read-only. Manage assignment and pricing from the{" "}
+              <Link
+                href="/admin/tickets"
+                className="font-semibold text-[var(--av2-link)] hover:underline"
+              >
+                ticket list
+              </Link>
+              .
+            </p>
+          </div>
+        </Card>
+
+        {/* ---------------- Activity ---------------- */}
+        <Card className="min-w-0 xl:col-start-1 xl:row-start-2">
+          <CardTitle description="Assignment decisions and admin actions recorded on this ticket.">
+            Activity
+          </CardTitle>
+          <div className="mt-5">
+            <PanelSection title="Assignment history">
+              {assignmentLogs.length === 0 ? (
+                <p className="text-sm text-[var(--av2-text-2)]">
+                  No assignment changes have been logged.
+                </p>
+              ) : (
+                <ul className="space-y-2 text-sm">
+                  {assignmentLogs.map((log) => (
+                    <li
+                      key={log.id}
+                      className="flex flex-wrap items-center gap-2 border-b border-[var(--av2-border)] pb-2 last:border-b-0 last:pb-0"
+                    >
+                      <Badge tone="neutral">{log.reason}</Badge>
+                      {log.creative ? (
+                        <span>→ {log.creative.email}</span>
+                      ) : (
+                        <span className="text-[var(--av2-text-2)]">unassigned</span>
+                      )}
+                      <span className="text-[var(--av2-text-2)]">
+                        · {relativeTime(log.createdAt)}
+                      </span>
+                      {log.notes && <span className="text-[var(--av2-text-2)]">— {log.notes}</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </PanelSection>
+            <PanelSection
+              title="Admin actions"
+              action={
+                <TextLink href={`/admin/audit-log?targetId=${ticket.id}`}>
+                  View full audit log
+                </TextLink>
+              }
+            >
+              {auditLogs.length === 0 ? (
+                <p className="text-sm text-[var(--av2-text-2)]">
+                  No admin actions have been recorded on this ticket.
+                </p>
+              ) : (
+                <ul className="space-y-2 text-sm">
+                  {auditLogs.map((log) => (
+                    <li
+                      key={log.id}
+                      className="flex flex-wrap items-center gap-2 border-b border-[var(--av2-border)] pb-2 last:border-b-0 last:pb-0"
+                    >
+                      <Badge tone={log.outcome === "SUCCESS" ? "green" : "neutral"}>
+                        {log.outcome}
+                      </Badge>
+                      <code className="text-xs font-semibold">{log.action}</code>
+                      <span className="text-[var(--av2-text-2)]">
+                        by {log.actorEmail} ({ROLE_LABEL[log.actorRole] ?? log.actorRole}) ·{" "}
+                        {relativeTime(log.createdAt)}
+                      </span>
+                      {log.errorMessage && (
+                        <span className="text-[var(--av2-text-2)]">— {log.errorMessage}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </PanelSection>
+          </div>
+        </Card>
       </div>
     </div>
   );

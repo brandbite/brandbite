@@ -15,10 +15,18 @@
 
 import { useState } from "react";
 
-import { Button } from "@/components/ui/button";
-import { FormInput } from "@/components/ui/form-field";
-import { InlineAlert } from "@/components/ui/inline-alert";
+import { TextInput } from "@/components/admin/v2/ui";
 import { useToast } from "@/components/ui/toast-provider";
+
+import {
+  AddButton,
+  BlockSaveFooter,
+  FormSection,
+  LinkList,
+  LinkRow,
+  ReorderActions,
+  useDirtyBaseline,
+} from "./block-form-ui";
 
 import type { SiteHeaderData } from "@/lib/blocks/types";
 
@@ -40,6 +48,9 @@ export function SiteHeaderBlockForm({ initial }: SiteHeaderBlockFormProps) {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Presentation only: drives the SaveBar status + disables Save when clean.
+  const { dirty, markSaved } = useDirtyBaseline(JSON.stringify(navLinks));
 
   const updateLink = (idx: number, patch: Partial<LinkDraft>) => {
     setNavLinks((prev) => prev.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
@@ -106,6 +117,7 @@ export function SiteHeaderBlockForm({ initial }: SiteHeaderBlockFormProps) {
         throw new Error(json?.reason || json?.error || "Save failed.");
       }
 
+      markSaved();
       showToast({
         type: "success",
         title: "Header saved",
@@ -120,114 +132,53 @@ export function SiteHeaderBlockForm({ initial }: SiteHeaderBlockFormProps) {
 
   return (
     <form onSubmit={handleSave} className="space-y-6">
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-[var(--bb-secondary)]">
-            Navigation links ({navLinks.length}/{MAX_LINKS})
-          </h3>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={addLink}
-            disabled={navLinks.length >= MAX_LINKS}
-          >
+      <FormSection
+        title="Navigation links"
+        count={`${navLinks.length} / ${MAX_LINKS}`}
+        description="Label and destination are required for every link."
+        action={
+          <AddButton onClick={addLink} disabled={navLinks.length >= MAX_LINKS}>
             Add link
-          </Button>
-        </div>
-
-        {navLinks.map((link, idx) => (
-          <div
-            key={idx}
-            className="rounded-xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-warm)] px-4 py-4"
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-xs font-semibold tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
-                Link {idx + 1}
-              </span>
-              <div className="flex items-center gap-1">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => moveLink(idx, -1)}
-                  disabled={idx === 0}
-                  aria-label={`Move link ${idx + 1} up`}
-                >
-                  ↑
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => moveLink(idx, 1)}
-                  disabled={idx === navLinks.length - 1}
-                  aria-label={`Move link ${idx + 1} down`}
-                >
-                  ↓
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeLink(idx)}
-                  disabled={navLinks.length <= MIN_LINKS}
-                  aria-label={`Remove link ${idx + 1}`}
-                >
-                  Remove
-                </Button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                <label
-                  htmlFor={`hdr-label-${idx}`}
-                  className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-                >
-                  Label <span className="text-[var(--bb-primary)]">*</span>
-                </label>
-                <FormInput
-                  id={`hdr-label-${idx}`}
-                  value={link.label}
-                  onChange={(e) => updateLink(idx, { label: e.target.value })}
-                  placeholder="How it works?"
-                  maxLength={40}
+          </AddButton>
+        }
+      >
+        <LinkList>
+          {navLinks.map((link, idx) => (
+            <LinkRow
+              key={idx}
+              actions={
+                <ReorderActions
+                  noun={`link ${idx + 1}`}
+                  index={idx}
+                  count={navLinks.length}
+                  onMove={(d) => moveLink(idx, d)}
+                  onRemove={() => removeLink(idx)}
+                  removeDisabled={navLinks.length <= MIN_LINKS}
                 />
-              </div>
-              <div>
-                <label
-                  htmlFor={`hdr-href-${idx}`}
-                  className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-                >
-                  Destination <span className="text-[var(--bb-primary)]">*</span>
-                </label>
-                <FormInput
-                  id={`hdr-href-${idx}`}
-                  value={link.href}
-                  onChange={(e) => updateLink(idx, { href: e.target.value })}
-                  placeholder="/how-it-works"
-                  maxLength={200}
-                />
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+              }
+            >
+              <TextInput
+                id={`hdr-label-${idx}`}
+                aria-label={`Link ${idx + 1} label`}
+                value={link.label}
+                onChange={(e) => updateLink(idx, { label: e.target.value })}
+                placeholder="How it works?"
+                maxLength={40}
+              />
+              <TextInput
+                id={`hdr-href-${idx}`}
+                aria-label={`Link ${idx + 1} destination`}
+                value={link.href}
+                onChange={(e) => updateLink(idx, { href: e.target.value })}
+                placeholder="/how-it-works"
+                maxLength={200}
+              />
+            </LinkRow>
+          ))}
+        </LinkList>
+      </FormSection>
 
-      {error ? <InlineAlert variant="error">{error}</InlineAlert> : null}
-
-      <div className="flex justify-end gap-3 pt-2">
-        <Button
-          type="submit"
-          variant="primary"
-          loading={submitting}
-          loadingText="Saving…"
-          disabled={submitting}
-        >
-          Save header
-        </Button>
-      </div>
+      <BlockSaveFooter error={error} dirty={dirty} submitting={submitting} label="Save header" />
     </form>
   );
 }
