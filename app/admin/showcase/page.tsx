@@ -48,6 +48,7 @@ import {
   plural,
 } from "@/components/admin/v2/ui";
 import { IconPortfolio } from "@/components/navigation/nav-icons";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                      */
@@ -272,6 +273,12 @@ export default function AdminShowcasePage() {
 
   const baseline = selected ? formFromWork(selected) : EMPTY_FORM;
   const dirty = !sameForm(form, baseline);
+  const confirmDiscard = useUnsavedChanges(dirty, "Showcase work");
+
+  /** Run `fn` now, or after the user agrees to drop unsaved edits. */
+  const guarded = async (fn: () => void) => {
+    if (await confirmDiscard()) fn();
+  };
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((f) => ({ ...f, [key]: value }));
@@ -463,7 +470,7 @@ export default function AdminShowcasePage() {
     <form onSubmit={handleSubmit} noValidate className="contents">
       <DetailPanel
         title={panelTitle}
-        onClose={selected ? resetForm : undefined}
+        onClose={selected ? () => void guarded(resetForm) : undefined}
         closeLabel="Clear selection"
         footer={
           <SaveBar
@@ -738,7 +745,7 @@ export default function AdminShowcasePage() {
           ) : undefined
         }
         actions={
-          <Button variant="primary" onClick={resetForm}>
+          <Button variant="primary" onClick={() => void guarded(resetForm)}>
             <IconPlus />
             New work
           </Button>
@@ -820,7 +827,10 @@ export default function AdminShowcasePage() {
                   <Tr
                     key={work.id}
                     selected={selected?.id === work.id}
-                    onSelect={() => fillFormFromWork(work)}
+                    onSelect={() => {
+                      if (selected?.id === work.id) return;
+                      void guarded(() => fillFormFromWork(work));
+                    }}
                     label={`${work.title}, ${work.status === "PUBLISHED" ? "published" : "draft"}`}
                   >
                     <Td>

@@ -40,6 +40,7 @@ import {
   plural,
 } from "@/components/admin/v2/ui";
 import { IconAlertCircle } from "@/components/admin/v2/icons";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 
 type PaletteIdea = {
   id: string;
@@ -285,6 +286,12 @@ export default function AdminPaletteIdeasPage() {
   const baselineForm = selected ? formFromIdea(selected) : emptyForm;
   const baselineColors = selected ? selected.colors : [];
   const dirty = !sameForm(form, baselineForm) || !sameColors(colors, baselineColors);
+  const confirmDiscard = useUnsavedChanges(dirty, "Palette idea");
+
+  /** Run `fn` now, or after the user agrees to drop unsaved edits. */
+  const guarded = async (fn: () => void) => {
+    if (await confirmDiscard()) fn();
+  };
 
   const clearErrors = () => {
     setTitleError(null);
@@ -434,7 +441,7 @@ export default function AdminPaletteIdeasPage() {
     >
       <DetailPanel
         title={panelTitle}
-        onClose={selected ? resetForm : undefined}
+        onClose={selected ? () => void guarded(resetForm) : undefined}
         closeLabel="Clear selection"
         footer={
           <SaveBar
@@ -765,7 +772,7 @@ export default function AdminPaletteIdeasPage() {
           ) : undefined
         }
         actions={
-          <Button variant="primary" onClick={resetForm}>
+          <Button variant="primary" onClick={() => void guarded(resetForm)}>
             <IconPlus />
             New palette
           </Button>
@@ -843,7 +850,10 @@ export default function AdminPaletteIdeasPage() {
                     <li key={idea.id}>
                       <button
                         type="button"
-                        onClick={() => editIdea(idea)}
+                        onClick={() => {
+                          if (active) return;
+                          void guarded(() => editIdea(idea));
+                        }}
                         aria-pressed={active}
                         className={`flex w-full items-center gap-4 rounded-xl border p-3 text-left transition-colors focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none ${
                           active

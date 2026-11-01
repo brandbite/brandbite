@@ -53,6 +53,7 @@ import {
 } from "@/components/admin/v2/ui";
 import { IconDocument } from "@/components/admin/v2/icons";
 import { IconX } from "@/components/navigation/nav-icons";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                      */
@@ -255,7 +256,6 @@ export default function AdminNewsPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<NewsArticle | null>(null);
-  const [pendingNav, setPendingNav] = useState<(() => void) | null>(null);
 
   // The rich-text editor re-emits the loaded body as normalised HTML right
   // after it mounts. Until the user interacts with it, that output is treated
@@ -321,6 +321,7 @@ export default function AdminNewsPage() {
   const savedForm = editingArticle ? formFromArticle(editingArticle) : EMPTY_FORM;
   const baseline = bodyBaseline === null ? savedForm : { ...savedForm, body: bodyBaseline };
   const dirty = editorOpen && !sameForm(form, baseline);
+  const confirmDiscard = useUnsavedChanges(dirty, "News article");
 
   // --------------------------------------------------------------------------
   //  API: Fetch articles
@@ -423,9 +424,8 @@ export default function AdminNewsPage() {
   };
 
   /** Run `fn` now, or after the user agrees to drop unsaved edits. */
-  const guard = (fn: () => void) => {
-    if (dirty) setPendingNav(() => fn);
-    else fn();
+  const guard = async (fn: () => void) => {
+    if (await confirmDiscard()) fn();
   };
 
   // --------------------------------------------------------------------------
@@ -623,7 +623,7 @@ export default function AdminNewsPage() {
                     aria-current={active ? "true" : undefined}
                     onClick={() => {
                       if (active) return;
-                      guard(() => openEdit(article));
+                      void guard(() => openEdit(article));
                     }}
                     className={cx(
                       "flex w-full items-start gap-4 px-6 py-4 text-left transition-colors",
@@ -695,7 +695,7 @@ export default function AdminNewsPage() {
       <div className="min-w-0">
         <button
           type="button"
-          onClick={() => guard(closeEditor)}
+          onClick={() => void guard(closeEditor)}
           className="mb-3 inline-flex items-center gap-1.5 rounded text-sm font-semibold text-[var(--av2-text-2)] hover:text-[var(--av2-text)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none xl:hidden"
         >
           <IconArrowLeft />
@@ -730,7 +730,7 @@ export default function AdminNewsPage() {
         )}
         <button
           type="button"
-          onClick={() => guard(closeEditor)}
+          onClick={() => void guard(closeEditor)}
           aria-label="Close editor"
           className="hidden h-9 w-9 items-center justify-center rounded-lg text-[var(--av2-text-2)] hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none xl:flex"
         >
@@ -1036,7 +1036,7 @@ export default function AdminNewsPage() {
         title="News"
         description="Manage news articles shown on the website."
         actions={
-          <Button variant="primary" onClick={() => guard(openCreate)}>
+          <Button variant="primary" onClick={() => void guard(openCreate)}>
             <IconPlus />
             New article
           </Button>
@@ -1072,21 +1072,6 @@ export default function AdminNewsPage() {
             : undefined
         }
         confirmLabel="Delete article"
-      />
-
-      <ConfirmDialog
-        open={pendingNav !== null}
-        onClose={() => setPendingNav(null)}
-        onConfirm={() => {
-          const next = pendingNav;
-          setPendingNav(null);
-          next?.();
-        }}
-        variant="warning"
-        title="Discard unsaved changes?"
-        description="Your edits to this article haven't been saved and will be lost."
-        confirmLabel="Discard changes"
-        cancelLabel="Keep editing"
       />
     </>
   );

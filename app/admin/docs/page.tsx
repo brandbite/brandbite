@@ -49,6 +49,7 @@ import {
   plural,
   type Tone,
 } from "@/components/admin/v2/ui";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 import { IconDocument } from "@/components/admin/v2/icons";
 
 /* -------------------------------------------------------------------------- */
@@ -496,6 +497,20 @@ export default function AdminDocsPage() {
     { ...artBaseline, body: normBody(artBaseline.body) },
   );
 
+  // Both forms register with the admin-wide unsaved-changes guard. The article
+  // draft only counts while its editor is open (closing it drops the draft).
+  // Switching Categories / Articles tabs keeps both drafts in page state, so
+  // it doesn't confirm.
+  const artOpenDirty = editorOpen && artDirty;
+  const confirmDiscard = useUnsavedChanges(catDirty, "Category form");
+  useUnsavedChanges(artOpenDirty, "Article editor");
+
+  /** Run `fn` now, or — when `wouldDrop` holds a draft — after the user agrees to discard it. */
+  const guarded = async (wouldDrop: boolean, fn: () => void) => {
+    if (wouldDrop && !(await confirmDiscard())) return;
+    fn();
+  };
+
   const handleSaveArticle = async () => {
     const errs: { title?: string; categoryId?: string } = {};
     if (!artForm.title.trim()) errs.title = "Title is required.";
@@ -620,7 +635,7 @@ export default function AdminDocsPage() {
             </span>
           </span>
         }
-        onClose={editingCat ? clearCatForm : undefined}
+        onClose={editingCat ? () => void guarded(catDirty, clearCatForm) : undefined}
         closeLabel="Clear selection"
         footer={
           <SaveBar
@@ -830,7 +845,13 @@ export default function AdminDocsPage() {
                       <li key={a.id}>
                         <button
                           type="button"
-                          onClick={() => openEditEditor(a)}
+                          onClick={() => {
+                            if (editorOpen && editingArt?.id === a.id) {
+                              setTab("articles");
+                              return;
+                            }
+                            void guarded(artOpenDirty, () => openEditEditor(a));
+                          }}
                           className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none focus-visible:ring-inset"
                         >
                           <span className="w-6 shrink-0 text-sm text-[var(--av2-text-2)] tabular-nums">
@@ -848,7 +869,12 @@ export default function AdminDocsPage() {
                   </ul>
                 )}
                 <div className="mt-4">
-                  <Button size="sm" onClick={() => openCreateEditor(editingCat.id)}>
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      void guarded(artOpenDirty, () => openCreateEditor(editingCat.id))
+                    }
+                  >
                     <span aria-hidden>+</span> New article in this category
                   </Button>
                 </div>
@@ -952,7 +978,10 @@ export default function AdminDocsPage() {
                 <Tr
                   key={cat.id}
                   selected={editingCat?.id === cat.id}
-                  onSelect={() => selectCategory(cat)}
+                  onSelect={() => {
+                    if (editingCat?.id === cat.id) return;
+                    void guarded(catDirty, () => selectCategory(cat));
+                  }}
                   label={`${cat.title}, ${audienceLabel(cat.audience)}, ${cat._count.articles} articles`}
                 >
                   <Td className="text-[var(--av2-text-2)] tabular-nums">{fmt(cat.sortOrder)}</Td>
@@ -1163,7 +1192,12 @@ export default function AdminDocsPage() {
   const articleEditor = (
     <Card padding="none">
       <div className="px-6 pt-5">
-        <Button size="sm" variant="ghost" onClick={closeEditor} className="-ml-3">
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => void guarded(artOpenDirty, closeEditor)}
+          className="-ml-3"
+        >
           <span aria-hidden>←</span> All articles
         </Button>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -1401,7 +1435,11 @@ export default function AdminDocsPage() {
           dirty={artDirty}
           status={artSaving ? "Saving…" : artDirty ? "Unsaved changes" : "No unsaved changes"}
         >
-          <Button variant="ghost" onClick={closeEditor} disabled={artSaving || deleting}>
+          <Button
+            variant="ghost"
+            onClick={() => void guarded(artOpenDirty, closeEditor)}
+            disabled={artSaving || deleting}
+          >
             Cancel
           </Button>
           <Button
@@ -1428,7 +1466,7 @@ export default function AdminDocsPage() {
         description="Organise help centre articles by topic and audience."
         actions={
           tab === "categories" ? (
-            <Button variant="primary" onClick={clearCatForm}>
+            <Button variant="primary" onClick={() => void guarded(catDirty, clearCatForm)}>
               <span aria-hidden className="text-lg leading-none">
                 +
               </span>

@@ -9,14 +9,25 @@
 //
 //           Everything here is presentation only — no data fetching, no
 //           payload shaping. Panels stay mounted (`hidden`) so unsaved edits
-//           survive switching sections.
+//           survive switching sections. Each form's dirty state is reported
+//           to the admin unsaved-changes guard by `BlockSaveFooter`, labelled
+//           with the section name, so leaving the page asks first.
 // -----------------------------------------------------------------------------
 
 "use client";
 
-import { useEffect, useId, useState, type ReactNode, type SVGProps } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useId,
+  useState,
+  type ReactNode,
+  type SVGProps,
+} from "react";
 
 import { Button, Callout, SaveBar, Tabs, TabPanel } from "@/components/admin/v2/ui";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 
 const cx = (...c: unknown[]) =>
   c.filter((x): x is string => typeof x === "string" && x.length > 0).join(" ");
@@ -320,7 +331,13 @@ export function LinkRow({ children, actions }: { children: ReactNode; actions: R
 // Save footer
 // ---------------------------------------------------------------------------
 
-/** Error callout + dirty-state SaveBar with the form's submit button. */
+/** Name of the switcher section a block form renders in (guard dialog label). */
+const SectionLabelContext = createContext<string | null>(null);
+
+/**
+ * Error callout + dirty-state SaveBar with the form's submit button. Also
+ * registers the form's dirty state with the admin unsaved-changes guard.
+ */
 export function BlockSaveFooter({
   error,
   dirty,
@@ -332,6 +349,8 @@ export function BlockSaveFooter({
   submitting: boolean;
   label: string;
 }) {
+  const section = useContext(SectionLabelContext);
+  useUnsavedChanges(dirty, section ?? label.replace(/^Save\s+/i, ""));
   return (
     <div className="mt-8 space-y-4 border-t border-[var(--av2-border)] pt-5">
       {error ? (
@@ -365,7 +384,7 @@ function useHashSelection(ids: string[], fallback: string) {
   const [value, setValue] = useState(fallback);
   useEffect(() => {
     const fromHash = window.location.hash.replace(/^#/, "");
-     
+
     if (ids.includes(fromHash)) setValue(fromHash);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -479,7 +498,7 @@ export function SectionSwitcher({
                 <p className="mt-1 max-w-3xl text-sm text-[var(--av2-text-2)]">{s.description}</p>
               )}
             </header>
-            {s.content}
+            <SectionLabelContext.Provider value={s.label}>{s.content}</SectionLabelContext.Provider>
           </section>
         ))}
       </div>
@@ -515,7 +534,9 @@ export function TabbedPanels({ sections, label }: { sections: SwitcherSection[];
                   <p className="mt-1 max-w-3xl text-sm text-[var(--av2-text-2)]">{s.description}</p>
                 )}
               </header>
-              {s.content}
+              <SectionLabelContext.Provider value={s.label}>
+                {s.content}
+              </SectionLabelContext.Provider>
             </section>
           </TabPanel>
         </div>
