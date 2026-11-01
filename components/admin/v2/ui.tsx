@@ -777,6 +777,62 @@ export function SearchInput({
   );
 }
 
+/**
+ * On/off toggle (role="switch"). Name it with `label` (visible text next to
+ * it) or `labelledBy` (id of an existing label element).
+ */
+export function Switch({
+  checked,
+  onChange,
+  label,
+  labelledBy,
+  describedBy,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label?: ReactNode;
+  labelledBy?: string;
+  describedBy?: string;
+  disabled?: boolean;
+}) {
+  const autoId = useId();
+  const labelId = labelledBy ?? (label ? `${autoId}-label` : undefined);
+  const button = (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-labelledby={labelId}
+      aria-describedby={describedBy}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={cx(
+        "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+        checked ? "bg-[var(--av2-accent-strong)]" : "bg-[var(--av2-fill-neutral)]",
+        FOCUS,
+      )}
+    >
+      <span
+        aria-hidden
+        className={cx(
+          "inline-block h-5 w-5 rounded-full bg-white transition-transform",
+          checked ? "translate-x-[22px]" : "translate-x-0.5",
+        )}
+      />
+    </button>
+  );
+  if (!label) return button;
+  return (
+    <span className="inline-flex items-center gap-3">
+      {button}
+      <span id={labelId} className="text-sm font-medium">
+        {label}
+      </span>
+    </span>
+  );
+}
+
 /** Row of filters above a list: search + selects + trailing count. */
 export function FilterBar({ children, trailing }: { children: ReactNode; trailing?: ReactNode }) {
   return (
