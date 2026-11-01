@@ -13,6 +13,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ui/toast-provider";
 import { Modal, ModalFooter, ModalHeader } from "@/components/ui/modal";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Badge,
   Button,
@@ -65,6 +66,16 @@ type StatusFilter = "ALL" | "ACTIVE" | "INACTIVE";
 const LINKED_COUNT_NOTE =
   "Job types whose category is set to this category (active and inactive). Job types that only carry a legacy text label aren’t counted.";
 
+type LegacyPreview = {
+  unlinkedJobTypes: number;
+  groups: {
+    label: string;
+    jobTypes: number;
+    action: "link" | "create";
+    category: { id: string; name: string } | null;
+  }[];
+};
+
 export default function AdminJobTypeCategoriesPage() {
   const { showToast } = useToast();
   const [categories, setCategories] = useState<Category[]>([]);
@@ -86,7 +97,9 @@ export default function AdminJobTypeCategoriesPage() {
 
   // Migration
   const [migrating, setMigrating] = useState(false);
-  const [hasLegacyCategories, setHasLegacyCategories] = useState(false);
+  // Job types that still carry only the legacy text category (no categoryId).
+  const [legacyPreview, setLegacyPreview] = useState<LegacyPreview | null>(null);
+  const [confirmLink, setConfirmLink] = useState(false);
 
   // Delete confirmation
   const [deleteConfirm, setDeleteConfirm] = useState<Category | null>(null);
@@ -108,18 +121,11 @@ export default function AdminJobTypeCategoriesPage() {
       const cats = (json?.categories ?? []) as Category[];
       setCategories(cats);
 
-      // Check if we need migration (no categories but job types exist with text categories)
-      if (cats.length === 0) {
-        const jtRes = await fetch("/api/admin/job-types", {
-          cache: "no-store",
-        });
-        const jtJson = await jtRes.json().catch(() => null);
-        const jobTypes = jtJson?.jobTypes ?? [];
-        const hasText = jobTypes.some((jt: any) => jt.category && !jt.categoryId);
-        setHasLegacyCategories(hasText);
-      } else {
-        setHasLegacyCategories(false);
-      }
+      // Any job type still linked only by its legacy text label? (Preview is
+      // read-only; it groups them by label and resolves existing matches.)
+      const pvRes = await fetch("/api/admin/job-type-categories/migrate", { cache: "no-store" });
+      const pv = (await pvRes.json().catch(() => null)) as LegacyPreview | null;
+      setLegacyPreview(pvRes.ok && pv && pv.unlinkedJobTypes > 0 ? pv : null);
     } catch (err: any) {
       setError(err?.message || "Failed to load categories.");
     } finally {
@@ -215,19 +221,19 @@ export default function AdminJobTypeCategoriesPage() {
       const json = await res.json().catch(() => null);
 
       if (!res.ok) {
-        throw new Error(json?.error || "Migration failed.");
+        throw new Error(json?.error || "Linking failed.");
       }
 
       showToast({
         type: "success",
-        title: json?.message || "Migration completed.",
+        title: json?.message || "Job types linked.",
       });
 
       await load();
     } catch (err: any) {
       showToast({
         type: "error",
-        title: err?.message || "Migration failed.",
+        title: err?.message || "Linking failed.",
       });
     } finally {
       setMigrating(false);
@@ -506,23 +512,53 @@ export default function AdminJobTypeCategoriesPage() {
         </div>
       )}
 
-      {/* Migration banner */}
-      {hasLegacyCategories && categories.length === 0 && (
+      {/* Legacy text-category banner: shown whenever job types still carry
+          only a text label. Linking is idempotent (see the migrate route). */}
+      {legacyPreview && (
         <div className="mb-6">
           <Callout
             tone="warning"
-            title="Legacy categories detected"
+            title={`${legacyPreview.unlinkedJobTypes} job ${plural(legacyPreview.unlinkedJobTypes, "type isn't", "types aren't")} linked to a category`}
             action={
-              <Button onClick={handleMigrate} disabled={migrating} aria-busy={migrating}>
-                {migrating ? "Migrating…" : "Migrate from text categories"}
+              <Button
+                onClick={() => setConfirmLink(true)}
+                disabled={migrating}
+                aria-busy={migrating}
+              >
+                {migrating ? "Linking…" : "Review & link"}
               </Button>
             }
           >
-            Your job types have text-based categories that haven&apos;t been migrated yet. Migrate
-            to automatically create structured categories and link your existing job types.
+            They show a category name from an old text field, but the catalogue counts, the job-type
+            editor and talent onboarding only use linked categories.
           </Callout>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmLink}
+        onClose={() => !migrating && setConfirmLink(false)}
+        onConfirm={async () => {
+          await handleMigrate();
+          setConfirmLink(false);
+        }}
+        loading={migrating}
+        variant="warning"
+        title="Link job types to categories?"
+        description={
+          legacyPreview
+            ? legacyPreview.groups
+                .map((g) =>
+                  g.action === "link"
+                    ? `${g.jobTypes} → ${g.category?.name}`
+                    : `${g.jobTypes} → new category “${g.label}”`,
+                )
+                .join(" · ") + ". Already linked job types and existing categories are not changed."
+            : undefined
+        }
+        confirmLabel="Link job types"
+        cancelLabel="Not now"
+      />
 
       <SplitView panel={panel}>
         <Card padding="none">

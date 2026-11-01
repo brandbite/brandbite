@@ -382,13 +382,23 @@ export default function AdminJobTypesPage() {
     try {
       const estimatedHours = parseInt(formEstimatedHours, 10);
 
+      // Only send category fields when the admin actually changed the
+      // category (or is creating). Sending them unconditionally used to
+      // overwrite a legacy text-only label with null on every save.
+      const categoryChanged = !selected || formCategoryId !== baseline.categoryId;
+      const categoryFields = categoryChanged
+        ? {
+            categoryId: formCategoryId || null,
+            // Keep the legacy text field in sync with the linked category name.
+            category: formCategoryId
+              ? (categoryOptions.find((c) => c.id === formCategoryId)?.name ?? null)
+              : null,
+          }
+        : {};
+
       const payload = {
         name: formName.trim(),
-        categoryId: formCategoryId || null,
-        // Also set legacy text field from category name for backward compat
-        category: formCategoryId
-          ? (categoryOptions.find((c) => c.id === formCategoryId)?.name ?? null)
-          : null,
+        ...categoryFields,
         description: formDescription.trim() || null,
         estimatedHours,
         hasQuantity: formHasQuantity,
@@ -447,6 +457,18 @@ export default function AdminJobTypesPage() {
   };
 
   const activeCategoryOptions = categoryOptions.filter((c) => c.isActive);
+
+  // Existing category whose name matches a legacy text-only label, so the
+  // admin can link it in one click (case / whitespace-insensitive).
+  const legacyMatch = (() => {
+    const label = selected && !selected.categoryId ? selected.category : null;
+    if (!label) return null;
+    const key = label.trim().replace(/\s+/g, " ").toLowerCase();
+    return (
+      activeCategoryOptions.find((c) => c.name.trim().replace(/\s+/g, " ").toLowerCase() === key) ??
+      null
+    );
+  })();
   const selectedCategoryName = selected ? getCategoryDisplay(selected) : "";
 
   // ---------------------------------------------------------------------------
@@ -540,10 +562,21 @@ export default function AdminJobTypesPage() {
                     <TextLink href="/admin/job-type-categories">Create categories</TextLink>
                   </span>
                 ) : selected && !selected.categoryId && selected.category ? (
-                  <>
-                    Currently labelled “{selected.category}” as text only, not linked to a category.
-                    Saving with “No category” clears that label.
-                  </>
+                  <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span>
+                      Labelled “{selected.category}” as text only, not linked to a category. Saving
+                      keeps that label unless you pick a category.
+                    </span>
+                    {legacyMatch && formCategoryId !== legacyMatch.id && (
+                      <button
+                        type="button"
+                        onClick={() => setFormCategoryId(legacyMatch.id)}
+                        className="rounded font-semibold text-[var(--av2-link)] hover:underline focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
+                      >
+                        Link to {legacyMatch.name}
+                      </button>
+                    )}
+                  </span>
                 ) : undefined
               }
             >

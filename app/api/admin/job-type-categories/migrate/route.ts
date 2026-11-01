@@ -1,9 +1,27 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/admin/job-type-categories/migrate/route.ts
-// @purpose: One-time migration — convert free-text categories to structured records
-// @version: v1.0.0
+// @purpose: Link job types that only carry the legacy free-text `category`
+//           to structured JobTypeCategory rows.
+//
+//           v1 only ran when NO categories existed (409 otherwise), so any
+//           deploy where categories were created first — demo, and prod
+//           after the demo→prod copy — could never link its job types. Those
+//           job types then (a) render a category name the Categories page
+//           doesn't count, (b) lose their label when saved from the admin
+//           editor, and (c) are invisible to talent onboarding, which picks
+//           CreativeSkills by `categoryId`.
+//
+//           v2 is idempotent and safe to re-run:
+//             GET  → preview: unlinked job types grouped by their text label,
+//                    each mapped to the existing category it will join (same
+//                    name, case/whitespace-insensitive) or marked "create".
+//             POST → in one transaction, create only the missing categories
+//                    and set `categoryId` only on job types where it is null.
+//                    Already-linked job types and existing categories are
+//                    never modified. The legacy text is left as-is.
+// @version: v2.0.0
 // @status: active
-// @lastUpdate: 2026-02-20
+// @lastUpdate: 2026-11-01
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
@@ -13,117 +31,184 @@ import { isSiteAdminRole } from "@/lib/roles";
 
 /** Known categories with their default icons and sort order */
 const KNOWN_CATEGORIES: Record<string, { icon: string; sortOrder: number }> = {
-  "Brand Strategy & Creative Direction": { icon: "\u2728", sortOrder: 0 },
-  "Copywriting & Creative Writing": { icon: "\u270D\uFE0F", sortOrder: 1 },
-  "Visual Design & Brand Identity": { icon: "\uD83C\uDFA8", sortOrder: 2 },
-  "Digital Content & Marketing": { icon: "\uD83D\uDCF1", sortOrder: 3 },
-  "Video & Motion Production": { icon: "\uD83C\uDFAC", sortOrder: 4 },
+  "Brand Strategy & Creative Direction": { icon: "✨", sortOrder: 0 },
+  "Copywriting & Creative Writing": { icon: "✍️", sortOrder: 1 },
+  "Visual Design & Brand Identity": { icon: "🎨", sortOrder: 2 },
+  "Digital Content & Marketing": { icon: "📱", sortOrder: 3 },
+  "Video & Motion Production": { icon: "🎬", sortOrder: 4 },
 };
 
+const norm = (s: string) => s.trim().replace(/\s+/g, " ").toLowerCase();
+
+const slugify = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 50) || "category";
+
+type PlanGroup = {
+  /** Legacy label as written on the job types (first spelling seen). */
+  label: string;
+  jobTypeIds: string[];
+  match: { id: string; name: string } | null;
+};
+
+/** Read-only: group unlinked job types by label and resolve existing matches. */
+async function buildPlan(db: Pick<typeof prisma, "jobType" | "jobTypeCategory">) {
+  const [unlinked, categories] = await Promise.all([
+    db.jobType.findMany({
+      where: { categoryId: null, category: { not: null } },
+      select: { id: true, category: true },
+    }),
+    db.jobTypeCategory.findMany({ select: { id: true, name: true } }),
+  ]);
+
+  const byName = new Map(categories.map((c) => [norm(c.name), c]));
+  const groups = new Map<string, PlanGroup>();
+
+  for (const jt of unlinked) {
+    const raw = jt.category?.trim();
+    if (!raw) continue;
+    const key = norm(raw);
+    let g = groups.get(key);
+    if (!g) {
+      const m = byName.get(key);
+      g = { label: raw, jobTypeIds: [], match: m ? { id: m.id, name: m.name } : null };
+      groups.set(key, g);
+    }
+    g.jobTypeIds.push(jt.id);
+  }
+
+  return [...groups.values()].sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function summarize(plan: PlanGroup[]) {
+  return {
+    unlinkedJobTypes: plan.reduce((n, g) => n + g.jobTypeIds.length, 0),
+    groups: plan.map((g) => ({
+      label: g.label,
+      jobTypes: g.jobTypeIds.length,
+      action: g.match ? ("link" as const) : ("create" as const),
+      category: g.match,
+    })),
+  };
+}
+
+async function requireSiteAdmin() {
+  const user = await getCurrentUserOrThrow();
+  if (!isSiteAdminRole(user.role)) {
+    return {
+      user,
+      denied: NextResponse.json(
+        { error: "Only site admins can link job type categories" },
+        { status: 403 },
+      ),
+    };
+  }
+  return { user, denied: null };
+}
+
 // ---------------------------------------------------------------------------
-// POST: Migrate text-based categories to structured JobTypeCategory records
+// GET: preview what POST would do (no writes)
+// ---------------------------------------------------------------------------
+
+export async function GET() {
+  try {
+    const { denied } = await requireSiteAdmin();
+    if (denied) return denied;
+    return NextResponse.json(summarize(await buildPlan(prisma)));
+  } catch (error: any) {
+    if (error?.code === "UNAUTHENTICATED") {
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    }
+    console.error("[admin.job-type-categories.migrate] GET error", error);
+    return NextResponse.json({ error: "Failed to load preview" }, { status: 500 });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// POST: create missing categories + link unlinked job types (idempotent)
 // ---------------------------------------------------------------------------
 
 export async function POST(_req: NextRequest) {
   try {
-    const user = await getCurrentUserOrThrow();
+    const { user, denied } = await requireSiteAdmin();
+    if (denied) return denied;
 
-    if (!isSiteAdminRole(user.role)) {
-      return NextResponse.json({ error: "Only site admins can run migrations" }, { status: 403 });
-    }
+    const result = await prisma.$transaction(async (tx) => {
+      // Re-plan inside the transaction so a concurrent edit can't make us
+      // link against a stale view.
+      const plan = await buildPlan(tx);
+      if (plan.length === 0) return { created: 0, linked: 0 };
 
-    // Check if categories already exist
-    const existingCount = await prisma.jobTypeCategory.count();
-    if (existingCount > 0) {
-      return NextResponse.json(
-        { error: "Categories already exist. Migration skipped." },
-        { status: 409 },
+      const usedSlugs = new Set(
+        (await tx.jobTypeCategory.findMany({ select: { slug: true } })).map((c) => c.slug),
       );
-    }
+      const maxSort =
+        (await tx.jobTypeCategory.aggregate({ _max: { sortOrder: true } }))._max.sortOrder ?? -1;
+      let nextSort = maxSort + 1;
 
-    // Get all unique text categories from job types
-    const jobTypes = await prisma.jobType.findMany({
-      where: { category: { not: null } },
-      select: { id: true, category: true },
+      let created = 0;
+      let linked = 0;
+
+      for (const g of plan) {
+        let categoryId = g.match?.id;
+
+        if (!categoryId) {
+          const base = slugify(g.label);
+          let slug = base;
+          for (let i = 2; usedSlugs.has(slug); i++) slug = `${base}-${i}`;
+          usedSlugs.add(slug);
+
+          const known = KNOWN_CATEGORIES[g.label];
+          const cat = await tx.jobTypeCategory.create({
+            data: {
+              name: g.label,
+              slug,
+              icon: known?.icon ?? null,
+              sortOrder: known?.sortOrder ?? nextSort++,
+            },
+            select: { id: true },
+          });
+          categoryId = cat.id;
+          created++;
+        }
+
+        // `categoryId: null` in the where clause keeps this idempotent even
+        // if a row was linked by someone else mid-transaction.
+        const res = await tx.jobType.updateMany({
+          where: { id: { in: g.jobTypeIds }, categoryId: null },
+          data: { categoryId },
+        });
+        linked += res.count;
+      }
+
+      return { created, linked };
     });
 
-    const uniqueCategories = [
-      ...new Set(jobTypes.map((jt) => jt.category?.trim()).filter((c): c is string => !!c)),
-    ];
-
-    if (uniqueCategories.length === 0) {
-      return NextResponse.json({
-        success: true,
-        message: "No text categories found to migrate.",
-        created: 0,
-        linked: 0,
-      });
-    }
-
-    // Sort: known categories first (in KNOWN_CATEGORIES order), then unknown alphabetically
-    uniqueCategories.sort((a, b) => {
-      const aKnown = KNOWN_CATEGORIES[a];
-      const bKnown = KNOWN_CATEGORIES[b];
-      if (aKnown && bKnown) return aKnown.sortOrder - bKnown.sortOrder;
-      if (aKnown) return -1;
-      if (bKnown) return 1;
-      return a.localeCompare(b);
-    });
-
-    // Create category records
-    let nextSortOrder = 0;
-    const categoryMap = new Map<string, string>(); // name -> id
-
-    for (const catName of uniqueCategories) {
-      const known = KNOWN_CATEGORIES[catName];
-      const slug = catName
-        .toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, "")
-        .replace(/\s+/g, "-")
-        .replace(/-+/g, "-")
-        .slice(0, 50);
-
-      const cat = await prisma.jobTypeCategory.create({
-        data: {
-          name: catName,
-          slug,
-          icon: known?.icon ?? null,
-          sortOrder: known?.sortOrder ?? nextSortOrder,
-        },
-      });
-
-      categoryMap.set(catName, cat.id);
-      nextSortOrder = Math.max(nextSortOrder, (known?.sortOrder ?? nextSortOrder) + 1);
-    }
-
-    // Link job types to their new categories
-    let linked = 0;
-    for (const jt of jobTypes) {
-      const catName = jt.category?.trim();
-      if (!catName) continue;
-
-      const categoryId = categoryMap.get(catName);
-      if (!categoryId) continue;
-
-      await prisma.jobType.update({
-        where: { id: jt.id },
-        data: { categoryId },
-      });
-      linked++;
-    }
+    console.info(
+      `[admin.job-type-categories.migrate] ${user.email} linked ${result.linked} job types, created ${result.created} categories`,
+    );
 
     return NextResponse.json({
       success: true,
-      message: `Migrated ${categoryMap.size} categories, linked ${linked} job types.`,
-      created: categoryMap.size,
-      linked,
+      ...result,
+      message:
+        result.linked === 0 && result.created === 0
+          ? "Every job type is already linked to a category."
+          : `Linked ${result.linked} job type${result.linked === 1 ? "" : "s"}` +
+            (result.created
+              ? ` and created ${result.created} categor${result.created === 1 ? "y" : "ies"}.`
+              : "."),
     });
   } catch (error: any) {
     if (error?.code === "UNAUTHENTICATED") {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
-
     console.error("[admin.job-type-categories.migrate] POST error", error);
-    return NextResponse.json({ error: "Migration failed" }, { status: 500 });
+    return NextResponse.json({ error: "Linking failed" }, { status: 500 });
   }
 }
