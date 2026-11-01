@@ -42,7 +42,18 @@
 
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from "react";
 
 import { authClient } from "@/lib/auth-client";
 import { Badge } from "@/components/ui/badge";
@@ -51,6 +62,218 @@ import { FormInput, FormSelect } from "@/components/ui/form-field";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Modal, ModalFooter, ModalHeader } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast-provider";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
+import {
+  Badge as V2Badge,
+  Button as V2Button,
+  Callout as V2Callout,
+  Select as V2Select,
+  Skeleton as V2Skeleton,
+  Switch as V2Switch,
+  Tabs as V2Tabs,
+  TextInput as V2TextInput,
+} from "@/components/admin/v2/ui";
+
+// ---------------------------------------------------------------------------
+// Layout modes.
+//   "stacked" (default) — the original single-column page used by the
+//     customer + creative portals. Every adapter below renders the exact
+//     same legacy component with the exact same props, so the markup is
+//     unchanged.
+//   "tabs" (admin only) — Personal / Notifications / Security tabs on the
+//     admin design language v1 (`.bb-admin-v2` primitives). Same state,
+//     handlers and API calls; only presentation differs.
+// ---------------------------------------------------------------------------
+
+export type ProfileFormLayout = "stacked" | "tabs";
+
+const V2Context = createContext(false);
+
+type ProfileTab = "personal" | "notifications" | "security";
+
+/** Class names that differ between the two layouts. Stacked values are the
+ *  original strings, verbatim. */
+const T_STACKED = {
+  card: "rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-6",
+  h2: "text-base font-semibold text-[var(--bb-secondary)]",
+  desc: "mt-0.5 text-xs text-[var(--bb-text-muted)]",
+  label: "block text-xs font-medium text-[var(--bb-text-secondary)]",
+  hint: "mt-1 text-[11px] text-[var(--bb-text-muted)]",
+  hint2: "mt-2 text-[11px] text-[var(--bb-text-muted)]",
+  body: "text-sm text-[var(--bb-text-secondary)]",
+  muted: "text-sm text-[var(--bb-text-muted)]",
+  rowTitle: "text-sm font-medium text-[var(--bb-secondary)]",
+  divide: "divide-y divide-[var(--bb-border-subtle)]",
+  emailError: "mt-1 text-[11px] text-red-600 dark:text-red-400",
+  secretHint: "text-xs text-[var(--bb-text-muted)]",
+  code: "block rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-2 text-xs break-all text-[var(--bb-secondary)]",
+  backupCode:
+    "rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-2 text-center text-xs tracking-widest",
+  qr: "h-44 w-44 rounded-xl border border-[var(--bb-border)] bg-white p-2",
+  avatar:
+    "flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-[var(--bb-bg-page)] text-lg font-semibold text-[var(--bb-text-secondary)] ring-1 ring-[var(--bb-border)]",
+  inputLabelGap: "mt-1",
+  avatarHint: "basis-full text-[11px] text-[var(--bb-text-muted)]",
+};
+
+const T_TABS: typeof T_STACKED = {
+  card: "rounded-2xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-6",
+  h2: "text-xl leading-7 font-semibold text-[var(--av2-text)]",
+  desc: "mt-0.5 text-sm text-[var(--av2-text-2)]",
+  label: "block text-sm font-medium text-[var(--av2-text)]",
+  hint: "mt-1.5 text-xs text-[var(--av2-text-2)]",
+  hint2: "mt-2 text-xs text-[var(--av2-text-2)]",
+  body: "text-sm text-[var(--av2-text-2)]",
+  muted: "text-sm text-[var(--av2-text-2)]",
+  rowTitle: "text-sm font-semibold text-[var(--av2-text)]",
+  divide: "divide-y divide-[var(--av2-border)]",
+  emailError: "mt-1.5 text-xs text-[var(--av2-error-text)]",
+  secretHint: "text-sm text-[var(--av2-text-2)]",
+  code: "block rounded-lg border border-[var(--av2-border)] bg-[var(--av2-bg)] px-3 py-2 font-mono text-sm break-all text-[var(--av2-text)] select-all",
+  backupCode:
+    "rounded-lg border border-[var(--av2-border)] bg-[var(--av2-bg)] px-3 py-2 text-center font-mono text-sm tracking-widest",
+  qr: "h-44 w-44 rounded-xl border border-[var(--av2-border)] bg-white p-2",
+  avatar:
+    "flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-[var(--av2-selected)] text-xl font-semibold text-[var(--av2-link)]",
+  inputLabelGap: "mt-1.5",
+  avatarHint: "basis-full text-xs text-[var(--av2-text-2)]",
+};
+
+// Adapters: stacked → the legacy component with the props untouched;
+// tabs → the v2 primitive.
+
+function PButton(props: ComponentProps<typeof Button>) {
+  const v2 = useContext(V2Context);
+  if (!v2) return <Button {...props} />;
+  const { variant, size, loading, loadingText, children, disabled, ...rest } = props;
+  return (
+    <V2Button
+      {...rest}
+      variant={variant ?? "primary"}
+      size={size === "sm" ? "sm" : "md"}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
+    >
+      {loading ? (loadingText ?? "Saving…") : children}
+    </V2Button>
+  );
+}
+
+function PInput(props: ComponentProps<typeof FormInput>) {
+  const v2 = useContext(V2Context);
+  if (!v2) return <FormInput {...props} />;
+  const { error, size: _size, className, ...rest } = props;
+  void _size;
+  return <V2TextInput {...rest} className={className} aria-invalid={error || undefined} />;
+}
+
+function PSelect(props: ComponentProps<typeof FormSelect>) {
+  const v2 = useContext(V2Context);
+  if (!v2) return <FormSelect {...props} />;
+  const { error, size: _size, className, children, ...rest } = props;
+  void _size;
+  // v2 Select wraps the control in a positioned div; drop the legacy
+  // margin from the <select> itself (the label spacing comes from T).
+  return (
+    <V2Select
+      {...rest}
+      className={(className ?? "").replace(/\bmt-1\b/, "").trim()}
+      aria-invalid={error || undefined}
+    >
+      {children}
+    </V2Select>
+  );
+}
+
+const BADGE_TONE = {
+  neutral: "neutral",
+  primary: "peach",
+  info: "blue",
+  success: "green",
+  warning: "amber",
+  danger: "red",
+} as const;
+
+function PBadge(props: ComponentProps<typeof Badge>) {
+  const v2 = useContext(V2Context);
+  if (!v2) return <Badge {...props} />;
+  return <V2Badge tone={BADGE_TONE[props.variant ?? "neutral"]}>{props.children}</V2Badge>;
+}
+
+function PAlert(props: ComponentProps<typeof InlineAlert>) {
+  const v2 = useContext(V2Context);
+  if (!v2) return <InlineAlert {...props} />;
+  return (
+    <V2Callout tone={props.variant} title={props.title}>
+      {props.children}
+    </V2Callout>
+  );
+}
+
+/** Root wrapper. Stacked: the original `max-w-2xl` column + page header.
+ *  Tabs: tab bar + panels on the left, account summary on the right. */
+function ProfileShell({
+  layout,
+  header,
+  tabBar,
+  aside,
+  children,
+}: {
+  layout: ProfileFormLayout;
+  header: ReactNode;
+  tabBar: ReactNode;
+  aside: ReactNode;
+  children: ReactNode;
+}) {
+  if (layout !== "tabs") {
+    return (
+      <div className="mx-auto max-w-2xl space-y-8">
+        {header}
+        {children}
+      </div>
+    );
+  }
+  return (
+    <div>
+      {tabBar}
+      <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,380px)]">
+        <div className="min-w-0">{children}</div>
+        {aside}
+      </div>
+    </div>
+  );
+}
+
+/** Tab panel. Stacked: renders its children with no wrapper element.
+ *  Tabs: a role="tabpanel" that stays mounted and is `hidden` when
+ *  inactive, so in-progress drafts and enrolment state survive tab
+ *  switches. */
+function ProfilePanel({
+  layout,
+  value,
+  active,
+  idPrefix,
+  children,
+}: {
+  layout: ProfileFormLayout;
+  value: ProfileTab;
+  active: ProfileTab;
+  idPrefix: string;
+  children: ReactNode;
+}) {
+  if (layout !== "tabs") return <>{children}</>;
+  return (
+    <div
+      role="tabpanel"
+      id={`${idPrefix}-panel-${value}`}
+      aria-labelledby={`${idPrefix}-tab-${value}`}
+      hidden={value !== active}
+      className="space-y-6"
+    >
+      {children}
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Types — kept narrow so the component compiles in any role's layout
@@ -257,8 +480,21 @@ function relativeTime(iso: string): string {
 // Component
 // ---------------------------------------------------------------------------
 
-export function ProfileForm() {
+export function ProfileForm({ layout = "stacked" }: { layout?: ProfileFormLayout } = {}) {
+  // The provider renders no DOM, so the stacked markup is unchanged.
+  return (
+    <V2Context.Provider value={layout === "tabs"}>
+      <ProfileFormBody layout={layout} />
+    </V2Context.Provider>
+  );
+}
+
+function ProfileFormBody({ layout }: { layout: ProfileFormLayout }) {
   const { showToast } = useToast();
+  const v2 = layout === "tabs";
+  const T = v2 ? T_TABS : T_STACKED;
+  const [tab, setTab] = useState<ProfileTab>("personal");
+  const tabIdPrefix = useId();
 
   // ---- core profile load ----
   const [user, setUser] = useState<ProfileUser | null>(null);
@@ -1060,778 +1296,817 @@ export function ProfileForm() {
 
   const timezones = useMemo(() => listTimezones(), []);
 
+  // Per-field drafts (each has its own Save). Registered with the admin
+  // unsaved-changes guard; a no-op on the customer / creative profiles,
+  // which render outside the admin provider. Renders no DOM either way.
+  const emailTarget = emailDraft.trim().toLowerCase();
+  const profileDirty =
+    user != null &&
+    (nameDraft.trim() !== (user.name ?? "") ||
+      (emailTarget !== user.email.toLowerCase() && emailTarget !== pendingEmail) ||
+      timezoneDraft !== (user.timezone ?? "") ||
+      (user.role === "DESIGNER" &&
+        (workingHoursDraft.trim() !== (user.workingHours ?? "") ||
+          tasksCapDraft.trim() !==
+            (user.tasksPerWeekCap == null ? "" : String(user.tasksPerWeekCap)))));
+  useUnsavedChanges(profileDirty, "Profile");
+
   if (loading) {
+    if (v2) {
+      return (
+        <div aria-busy="true" aria-label="Loading your profile" className="space-y-6">
+          <V2Skeleton className="h-9 w-80" />
+          <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,380px)]">
+            <V2Skeleton className="h-96 rounded-2xl" />
+            <V2Skeleton className="h-72 rounded-2xl" />
+          </div>
+        </div>
+      );
+    }
     return <div className="text-sm text-[var(--bb-text-muted)]">Loading your profile…</div>;
   }
   if (loadError || !user) {
     return (
-      <InlineAlert variant="error" title="Couldn't load profile">
+      <PAlert variant="error" title="Couldn't load profile">
         {loadError ?? "Unknown error."}
-      </InlineAlert>
+      </PAlert>
     );
   }
 
   const browserTz = detectBrowserTimezone();
   const browserTzMatchesSaved = !!user.timezone && browserTz === user.timezone;
 
+  const panel = { layout, active: tab, idPrefix: tabIdPrefix };
+
   return (
-    <div className="mx-auto max-w-2xl space-y-8">
-      <header>
-        <h1 className="text-xl font-bold text-[var(--bb-secondary)]">Your profile</h1>
-        <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-          Personal details, timezone, and what we can email you about. Company-level settings (plan,
-          members, billing) stay in your dashboard.
-        </p>
-      </header>
-
-      {/* ---- Identity ---- */}
-      <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-6">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-base font-semibold text-[var(--bb-secondary)]">Identity</h2>
-            <p className="mt-0.5 text-xs text-[var(--bb-text-muted)]">
-              Your name appears on tickets, comments, and emails creatives receive.
-            </p>
+    <ProfileShell
+      layout={layout}
+      header={
+        <header>
+          <h1 className="text-xl font-bold text-[var(--bb-secondary)]">Your profile</h1>
+          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
+            Personal details, timezone, and what we can email you about. Company-level settings
+            (plan, members, billing) stay in your dashboard.
+          </p>
+        </header>
+      }
+      tabBar={
+        v2 ? (
+          <V2Tabs<ProfileTab>
+            label="Profile sections"
+            idPrefix={tabIdPrefix}
+            value={tab}
+            onChange={setTab}
+            tabs={[
+              { value: "personal", label: "Personal details" },
+              { value: "notifications", label: "Notifications" },
+              { value: "security", label: "Security & sessions" },
+            ]}
+          />
+        ) : null
+      }
+      aside={
+        v2 ? (
+          <AccountSummary
+            name={user.name}
+            email={user.email}
+            image={user.image}
+            roleLabel={ROLE_LABELS[user.role]}
+            twoFactorEnabled={user.twoFactorEnabled}
+            sessionCount={sessionsList?.length ?? null}
+            onOpen={(next) => {
+              setTab(next);
+              requestAnimationFrame(() =>
+                document.getElementById(`${tabIdPrefix}-tab-${next}`)?.focus(),
+              );
+            }}
+          />
+        ) : null
+      }
+    >
+      <ProfilePanel value="personal" {...panel}>
+        {/* ---- Identity ---- */}
+        <section className={T.card}>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h2 className={T.h2}>Identity</h2>
+              <p className={T.desc}>
+                Your name appears on tickets, comments, and emails creatives receive.
+              </p>
+            </div>
+            <PBadge variant="neutral">{ROLE_LABELS[user.role]}</PBadge>
           </div>
-          <Badge variant="neutral">{ROLE_LABELS[user.role]}</Badge>
-        </div>
 
-        {/* Avatar — circle, with initials fallback. Click anywhere on the
+          {/* Avatar — circle, with initials fallback. Click anywhere on the
             row to swap, or use the explicit Change/Remove buttons. The
             file input is hidden and triggered programmatically so the
             UI can stay restrained. */}
-        <div className="mb-5 flex flex-wrap items-center gap-4">
-          <div
-            className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-[var(--bb-bg-page)] text-lg font-semibold text-[var(--bb-text-secondary)] ring-1 ring-[var(--bb-border)]"
-            aria-label={user.image ? "Your avatar" : "Avatar placeholder with your initials"}
-          >
-            {user.image ? (
-              // Rendered via <img> rather than next/image because the
-              // source is a public R2 URL the optimizer can't help with
-              // and we don't need a layout-shift placeholder.
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={user.image} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <span aria-hidden="true">{(user.name || user.email)[0]?.toUpperCase() ?? "?"}</span>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void handleUploadAvatar(f);
-                // Reset so the same file can be re-selected (e.g. after
-                // a failed upload).
-                e.target.value = "";
-              }}
-            />
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingAvatar || removingAvatar}
-              loading={uploadingAvatar}
-              loadingText="Uploading…"
+          <div className="mb-5 flex flex-wrap items-center gap-4">
+            <div
+              className={T.avatar}
+              aria-label={user.image ? "Your avatar" : "Avatar placeholder with your initials"}
             >
-              {user.image ? "Change avatar" : "Upload avatar"}
-            </Button>
-            {user.image && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => void handleRemoveAvatar()}
-                disabled={uploadingAvatar || removingAvatar}
-                loading={removingAvatar}
-                loadingText="Removing…"
-              >
-                Remove
-              </Button>
-            )}
-          </div>
-          <p className="basis-full text-[11px] text-[var(--bb-text-muted)]">
-            PNG, JPEG, WebP, or GIF. 2&nbsp;MB max. Square images crop best.
-          </p>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-[var(--bb-text-secondary)]">
-              Full name
-            </label>
-            <div className="mt-1 flex flex-wrap items-center gap-2">
-              <FormInput
-                value={nameDraft}
-                onChange={(e) => setNameDraft(e.target.value)}
-                placeholder="Your full name"
-                autoComplete="name"
-                maxLength={80}
-                className="min-w-[200px] flex-1"
-              />
-              <Button
-                onClick={() => void handleSaveIdentity()}
-                disabled={savingIdentity || nameDraft.trim() === (user.name ?? "")}
-                loading={savingIdentity}
-                loadingText="Saving…"
-              >
-                Save name
-              </Button>
+              {user.image ? (
+                // Rendered via <img> rather than next/image because the
+                // source is a public R2 URL the optimizer can't help with
+                // and we don't need a layout-shift placeholder.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={user.image} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <span aria-hidden="true">{(user.name || user.email)[0]?.toUpperCase() ?? "?"}</span>
+              )}
             </div>
-          </div>
-
-          <div>
-            <label
-              className="block text-xs font-medium text-[var(--bb-text-secondary)]"
-              htmlFor="profile-email"
-            >
-              Email
-            </label>
-            <div className="mt-1 flex flex-wrap items-center gap-2">
-              <FormInput
-                id="profile-email"
-                type="email"
-                value={emailDraft}
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="hidden"
                 onChange={(e) => {
-                  setEmailDraft(e.target.value);
-                  if (emailError) setEmailError(null);
+                  const f = e.target.files?.[0];
+                  if (f) void handleUploadAvatar(f);
+                  // Reset so the same file can be re-selected (e.g. after
+                  // a failed upload).
+                  e.target.value = "";
                 }}
-                autoComplete="email"
-                placeholder="you@example.com"
-                error={!!emailError}
-                disabled={savingEmail}
-                className="min-w-[200px] flex-1"
               />
-              <Button
-                onClick={() => void handleRequestEmailChange()}
-                disabled={
-                  savingEmail || emailDraft.trim().toLowerCase() === user.email.toLowerCase()
-                }
-                loading={savingEmail}
-                loadingText="Sending…"
+              <PButton
+                variant="secondary"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingAvatar || removingAvatar}
+                loading={uploadingAvatar}
+                loadingText="Uploading…"
               >
-                Change email
-              </Button>
+                {user.image ? "Change avatar" : "Upload avatar"}
+              </PButton>
+              {user.image && (
+                <PButton
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void handleRemoveAvatar()}
+                  disabled={uploadingAvatar || removingAvatar}
+                  loading={removingAvatar}
+                  loadingText="Removing…"
+                >
+                  Remove
+                </PButton>
+              )}
             </div>
-            {emailError && (
-              <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{emailError}</p>
-            )}
-            {pendingEmail && !emailError && (
-              <p className="mt-1 text-[11px] text-[var(--bb-text-muted)]">
-                Pending — we sent a confirmation link to <strong>{pendingEmail}</strong>. Open it
-                from that inbox to complete the swap. Until then, you stay signed in as{" "}
-                <strong>{user.email}</strong>.
-              </p>
-            )}
-            {!pendingEmail && !emailError && (
-              <p className="mt-1 text-[11px] text-[var(--bb-text-muted)]">
-                We&apos;ll email a confirmation link to the new address. Your current email stays in
-                effect until you open the link.
-              </p>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* ---- Timezone ---- */}
-      <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-6">
-        <div className="mb-4">
-          <h2 className="text-base font-semibold text-[var(--bb-secondary)]">Timezone</h2>
-          <p className="mt-0.5 text-xs text-[var(--bb-text-muted)]">
-            Used to render due dates and notification timestamps in your local time. Falls back to
-            UTC when not set.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="min-w-[220px] flex-1">
-            <label className="block text-xs font-medium text-[var(--bb-text-secondary)]">
-              IANA timezone
-            </label>
-            <FormSelect
-              value={timezoneDraft}
-              onChange={(e) => setTimezoneDraft(e.target.value)}
-              className="mt-1 w-full"
-              aria-label="IANA timezone"
-            >
-              <option value="">— Not set (UTC) —</option>
-              {timezones.map((tz) => (
-                <option key={tz} value={tz}>
-                  {tz}
-                </option>
-              ))}
-            </FormSelect>
-          </div>
-          <Button
-            onClick={() => void handleSaveTimezone(timezoneDraft)}
-            disabled={savingTimezone || timezoneDraft === (user.timezone ?? "")}
-            loading={savingTimezone}
-            loadingText="Saving…"
-          >
-            Save
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={handleAutoDetectTimezone}
-            disabled={savingTimezone || browserTzMatchesSaved}
-            title={
-              browserTzMatchesSaved
-                ? "Already matches your browser's timezone"
-                : "Use your browser's detected timezone"
-            }
-          >
-            Auto-detect
-          </Button>
-        </div>
-        {browserTz && !browserTzMatchesSaved && (
-          <p className="mt-2 text-[11px] text-[var(--bb-text-muted)]">
-            Your browser thinks you&apos;re in <strong>{browserTz}</strong>.
-          </p>
-        )}
-      </section>
-
-      {/* ---- Workload (creative-only) ---- */}
-      {user.role === "DESIGNER" && (
-        <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-6">
-          <div className="mb-4">
-            <h2 className="text-base font-semibold text-[var(--bb-secondary)]">Workload</h2>
-            <p className="mt-0.5 text-xs text-[var(--bb-text-muted)]">
-              When you&apos;re available and how many tickets you&apos;re willing to hold at once.
-              Auto-assign uses the cap to skip you when you&apos;re already at capacity; admins use
-              the working-hours hint when scheduling rush work.
+            <p className={T.avatarHint}>
+              PNG, JPEG, WebP, or GIF. 2&nbsp;MB max. Square images crop best.
             </p>
           </div>
 
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-[var(--bb-text-secondary)]">
-                Working hours
-              </label>
-              <div className="mt-1 flex flex-wrap items-center gap-2">
-                <FormInput
-                  value={workingHoursDraft}
-                  onChange={(e) => setWorkingHoursDraft(e.target.value)}
-                  placeholder="e.g. 9–18 weekdays, Europe/Istanbul"
-                  maxLength={200}
-                  className="min-w-[220px] flex-1"
+              <label className={T.label}>Full name</label>
+              <div className={`${T.inputLabelGap} flex flex-wrap items-center gap-2`}>
+                <PInput
+                  value={nameDraft}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                  placeholder="Your full name"
+                  autoComplete="name"
+                  maxLength={80}
+                  className="min-w-[200px] flex-1"
                 />
-                <Button
-                  onClick={() => void handleSaveWorkingHours()}
-                  disabled={
-                    savingWorkingHours || workingHoursDraft.trim() === (user.workingHours ?? "")
-                  }
-                  loading={savingWorkingHours}
+                <PButton
+                  onClick={() => void handleSaveIdentity()}
+                  disabled={savingIdentity || nameDraft.trim() === (user.name ?? "")}
+                  loading={savingIdentity}
                   loadingText="Saving…"
                 >
-                  Save
-                </Button>
+                  Save name
+                </PButton>
               </div>
-              <p className="mt-1 text-[11px] text-[var(--bb-text-muted)]">
-                Free-form text — describe the days and hours you&apos;re typically online. Anything
-                an admin can read at a glance works.
-              </p>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[var(--bb-text-secondary)]">
-                Concurrent task cap
+              <label className={T.label} htmlFor="profile-email">
+                Email
               </label>
-              <div className="mt-1 flex flex-wrap items-center gap-2">
-                <FormInput
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  max={40}
-                  value={tasksCapDraft}
-                  onChange={(e) => setTasksCapDraft(e.target.value)}
-                  placeholder="No cap"
-                  aria-label="Concurrent task cap"
-                  className="w-32"
+              <div className={`${T.inputLabelGap} flex flex-wrap items-center gap-2`}>
+                <PInput
+                  id="profile-email"
+                  type="email"
+                  value={emailDraft}
+                  onChange={(e) => {
+                    setEmailDraft(e.target.value);
+                    if (emailError) setEmailError(null);
+                  }}
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  error={!!emailError}
+                  disabled={savingEmail}
+                  className="min-w-[200px] flex-1"
                 />
-                <Button
-                  onClick={() => void handleSaveTasksCap()}
+                <PButton
+                  onClick={() => void handleRequestEmailChange()}
                   disabled={
-                    savingTasksCap ||
-                    tasksCapDraft.trim() ===
-                      (user.tasksPerWeekCap == null ? "" : String(user.tasksPerWeekCap))
+                    savingEmail || emailDraft.trim().toLowerCase() === user.email.toLowerCase()
                   }
-                  loading={savingTasksCap}
-                  loadingText="Saving…"
+                  loading={savingEmail}
+                  loadingText="Sending…"
                 >
-                  Save
-                </Button>
-                {user.tasksPerWeekCap != null && (
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      setTasksCapDraft("");
-                      void handleSaveTasksCap();
-                    }}
-                    disabled={savingTasksCap}
-                  >
-                    Clear
-                  </Button>
-                )}
+                  Change email
+                </PButton>
               </div>
-              <p className="mt-1 text-[11px] text-[var(--bb-text-muted)]">
-                Auto-assign skips you when your open ticket count reaches this number. Empty means
-                no cap (the legacy behavior). Admin can also adjust this.
-              </p>
+              {emailError && <p className={T.emailError}>{emailError}</p>}
+              {pendingEmail && !emailError && (
+                <p className={T.hint}>
+                  Pending — we sent a confirmation link to <strong>{pendingEmail}</strong>. Open it
+                  from that inbox to complete the swap. Until then, you stay signed in as{" "}
+                  <strong>{user.email}</strong>.
+                </p>
+              )}
+              {!pendingEmail && !emailError && (
+                <p className={T.hint}>
+                  We&apos;ll email a confirmation link to the new address. Your current email stays
+                  in effect until you open the link.
+                </p>
+              )}
             </div>
           </div>
         </section>
-      )}
 
-      {/* ---- Notifications ---- */}
-      <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-6">
-        <div className="mb-4">
-          <h2 className="text-base font-semibold text-[var(--bb-secondary)]">Notifications</h2>
-          <p className="mt-0.5 text-xs text-[var(--bb-text-muted)]">
-            Pick which events show up in your inbox and which also email you. Auth and security
-            messages always send.
-          </p>
-        </div>
-
-        {prefsLoading || !prefs ? (
-          <div className="text-sm text-[var(--bb-text-muted)]">Loading preferences…</div>
-        ) : (
-          <ul className="divide-y divide-[var(--bb-border-subtle)]">
-            {NOTIFICATION_ORDER.map((type) => {
-              const pref = prefs[type];
-              const meta = NOTIFICATION_LABELS[type];
-              const inAppKey = `${type}:enabled`;
-              const emailKey = `${type}:emailEnabled`;
-              return (
-                <li key={type} className="flex flex-wrap items-start gap-3 py-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-[var(--bb-secondary)]">{meta.title}</p>
-                    <p className="mt-0.5 text-xs text-[var(--bb-text-muted)]">{meta.description}</p>
-                  </div>
-                  <div className="flex items-center gap-3 text-xs text-[var(--bb-text-secondary)]">
-                    <ToggleSwitch
-                      label="In-app"
-                      checked={pref.enabled}
-                      disabled={prefsSaving.has(inAppKey)}
-                      onChange={(next) => void handleTogglePref(type, "enabled", next)}
-                    />
-                    <ToggleSwitch
-                      label="Email"
-                      checked={pref.emailEnabled}
-                      disabled={prefsSaving.has(emailKey)}
-                      onChange={(next) => void handleTogglePref(type, "emailEnabled", next)}
-                    />
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
-
-      {/* ---- Two-factor authentication ---- */}
-      <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-6">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-base font-semibold text-[var(--bb-secondary)]">
-              Two-factor authentication
-            </h2>
-            <p className="mt-0.5 text-xs text-[var(--bb-text-muted)]">
-              Require a one-time code from your authenticator app each time you sign in. Backup
-              codes recover access if you lose your phone.
+        {/* ---- Timezone ---- */}
+        <section className={T.card}>
+          <div className="mb-4">
+            <h2 className={T.h2}>Timezone</h2>
+            <p className={T.desc}>
+              Used to render due dates and notification timestamps in your local time. Falls back to
+              UTC when not set.
             </p>
           </div>
-          <Badge variant={user.twoFactorEnabled ? "success" : "neutral"}>
-            {user.twoFactorEnabled ? "Enabled" : "Disabled"}
-          </Badge>
-        </div>
 
-        {/* Disabled — show enable CTA. The password field below is bound
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="min-w-[220px] flex-1">
+              <label className={T.label}>IANA timezone</label>
+              <PSelect
+                value={timezoneDraft}
+                onChange={(e) => setTimezoneDraft(e.target.value)}
+                className="mt-1 w-full"
+                aria-label="IANA timezone"
+              >
+                <option value="">— Not set (UTC) —</option>
+                {timezones.map((tz) => (
+                  <option key={tz} value={tz}>
+                    {tz}
+                  </option>
+                ))}
+              </PSelect>
+            </div>
+            <PButton
+              onClick={() => void handleSaveTimezone(timezoneDraft)}
+              disabled={savingTimezone || timezoneDraft === (user.timezone ?? "")}
+              loading={savingTimezone}
+              loadingText="Saving…"
+            >
+              Save
+            </PButton>
+            <PButton
+              variant="secondary"
+              onClick={handleAutoDetectTimezone}
+              disabled={savingTimezone || browserTzMatchesSaved}
+              title={
+                browserTzMatchesSaved
+                  ? "Already matches your browser's timezone"
+                  : "Use your browser's detected timezone"
+              }
+            >
+              Auto-detect
+            </PButton>
+          </div>
+          {browserTz && !browserTzMatchesSaved && (
+            <p className={T.hint2}>
+              Your browser thinks you&apos;re in <strong>{browserTz}</strong>.
+            </p>
+          )}
+        </section>
+
+        {/* ---- Workload (creative-only) ---- */}
+        {user.role === "DESIGNER" && (
+          <section className={T.card}>
+            <div className="mb-4">
+              <h2 className={T.h2}>Workload</h2>
+              <p className={T.desc}>
+                When you&apos;re available and how many tickets you&apos;re willing to hold at once.
+                Auto-assign uses the cap to skip you when you&apos;re already at capacity; admins
+                use the working-hours hint when scheduling rush work.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className={T.label}>Working hours</label>
+                <div className={`${T.inputLabelGap} flex flex-wrap items-center gap-2`}>
+                  <PInput
+                    value={workingHoursDraft}
+                    onChange={(e) => setWorkingHoursDraft(e.target.value)}
+                    placeholder="e.g. 9–18 weekdays, Europe/Istanbul"
+                    maxLength={200}
+                    className="min-w-[220px] flex-1"
+                  />
+                  <PButton
+                    onClick={() => void handleSaveWorkingHours()}
+                    disabled={
+                      savingWorkingHours || workingHoursDraft.trim() === (user.workingHours ?? "")
+                    }
+                    loading={savingWorkingHours}
+                    loadingText="Saving…"
+                  >
+                    Save
+                  </PButton>
+                </div>
+                <p className={T.hint}>
+                  Free-form text — describe the days and hours you&apos;re typically online.
+                  Anything an admin can read at a glance works.
+                </p>
+              </div>
+
+              <div>
+                <label className={T.label}>Concurrent task cap</label>
+                <div className={`${T.inputLabelGap} flex flex-wrap items-center gap-2`}>
+                  <PInput
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={40}
+                    value={tasksCapDraft}
+                    onChange={(e) => setTasksCapDraft(e.target.value)}
+                    placeholder="No cap"
+                    aria-label="Concurrent task cap"
+                    className="w-32"
+                  />
+                  <PButton
+                    onClick={() => void handleSaveTasksCap()}
+                    disabled={
+                      savingTasksCap ||
+                      tasksCapDraft.trim() ===
+                        (user.tasksPerWeekCap == null ? "" : String(user.tasksPerWeekCap))
+                    }
+                    loading={savingTasksCap}
+                    loadingText="Saving…"
+                  >
+                    Save
+                  </PButton>
+                  {user.tasksPerWeekCap != null && (
+                    <PButton
+                      variant="ghost"
+                      onClick={() => {
+                        setTasksCapDraft("");
+                        void handleSaveTasksCap();
+                      }}
+                      disabled={savingTasksCap}
+                    >
+                      Clear
+                    </PButton>
+                  )}
+                </div>
+                <p className={T.hint}>
+                  Auto-assign skips you when your open ticket count reaches this number. Empty means
+                  no cap (the legacy behavior). Admin can also adjust this.
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
+      </ProfilePanel>
+
+      <ProfilePanel value="notifications" {...panel}>
+        {/* ---- Notifications ---- */}
+        <section className={T.card}>
+          <div className="mb-4">
+            <h2 className={T.h2}>Notifications</h2>
+            <p className={T.desc}>
+              Pick which events show up in your inbox and which also email you. Auth and security
+              messages always send.
+            </p>
+          </div>
+
+          {prefsLoading || !prefs ? (
+            <div className={T.muted}>Loading preferences…</div>
+          ) : (
+            <ul className={T.divide}>
+              {NOTIFICATION_ORDER.map((type) => {
+                const pref = prefs[type];
+                const meta = NOTIFICATION_LABELS[type];
+                const inAppKey = `${type}:enabled`;
+                const emailKey = `${type}:emailEnabled`;
+                return (
+                  <li key={type} className="flex flex-wrap items-start gap-3 py-3">
+                    <div className="min-w-0 flex-1">
+                      <p className={T.rowTitle}>{meta.title}</p>
+                      <p className={T.desc}>{meta.description}</p>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-[var(--bb-text-secondary)]">
+                      <ToggleSwitch
+                        label="In-app"
+                        checked={pref.enabled}
+                        disabled={prefsSaving.has(inAppKey)}
+                        onChange={(next) => void handleTogglePref(type, "enabled", next)}
+                      />
+                      <ToggleSwitch
+                        label="Email"
+                        checked={pref.emailEnabled}
+                        disabled={prefsSaving.has(emailKey)}
+                        onChange={(next) => void handleTogglePref(type, "emailEnabled", next)}
+                      />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+      </ProfilePanel>
+
+      <ProfilePanel value="security" {...panel}>
+        {/* ---- Two-factor authentication ---- */}
+        <section className={T.card}>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h2 className={T.h2}>Two-factor authentication</h2>
+              <p className={T.desc}>
+                Require a one-time code from your authenticator app each time you sign in. Backup
+                codes recover access if you lose your phone.
+              </p>
+            </div>
+            <PBadge variant={user.twoFactorEnabled ? "success" : "neutral"}>
+              {user.twoFactorEnabled ? "Enabled" : "Disabled"}
+            </PBadge>
+          </div>
+
+          {/* Disabled — show enable CTA. The password field below is bound
             to twoFaPassword so the user types once and we forward it to
             BetterAuth's enable + (later) generate-backup-codes calls. */}
-        {!user.twoFactorEnabled && twoFaEnrollment.stage === "idle" && (
-          <div className="space-y-3">
-            <p className="text-sm text-[var(--bb-text-secondary)]">
-              We&apos;ll show you a QR code to scan with Google Authenticator, 1Password, Authy, or
-              your password manager of choice.
-            </p>
-            <div className="flex flex-wrap items-end gap-2">
-              <div className="min-w-[220px] flex-1">
-                <label className="block text-xs font-medium text-[var(--bb-text-secondary)]">
-                  Current password
-                </label>
-                <FormInput
-                  type="password"
-                  value={twoFaPassword}
-                  onChange={(e) => setTwoFaPassword(e.target.value)}
-                  autoComplete="current-password"
-                  className="mt-1 w-full"
-                />
+          {!user.twoFactorEnabled && twoFaEnrollment.stage === "idle" && (
+            <div className="space-y-3">
+              <p className={T.body}>
+                We&apos;ll show you a QR code to scan with Google Authenticator, 1Password, Authy,
+                or your password manager of choice.
+              </p>
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="min-w-[220px] flex-1">
+                  <label className={T.label}>Current password</label>
+                  <PInput
+                    type="password"
+                    value={twoFaPassword}
+                    onChange={(e) => setTwoFaPassword(e.target.value)}
+                    autoComplete="current-password"
+                    className="mt-1 w-full"
+                  />
+                </div>
+                <PButton onClick={() => void handleStart2FAEnable()} disabled={!twoFaPassword}>
+                  Set up
+                </PButton>
               </div>
-              <Button onClick={() => void handleStart2FAEnable()} disabled={!twoFaPassword}>
-                Set up
-              </Button>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Enrolling — QR + secret + verify code input. */}
-        {twoFaEnrollment.stage === "qr" && (
-          <div className="space-y-4">
-            {twoFaEnrollment.uri ? (
-              <>
-                <p className="text-sm text-[var(--bb-text-secondary)]">
-                  Scan this QR code in your authenticator app, then enter the 6-digit code below to
-                  confirm.
-                </p>
-                <div className="flex flex-wrap items-start gap-4">
-                  {/* QR rendered by our own /api/profile/two-factor/qr —
+          {/* Enrolling — QR + secret + verify code input. */}
+          {twoFaEnrollment.stage === "qr" && (
+            <div className="space-y-4">
+              {twoFaEnrollment.uri ? (
+                <>
+                  <p className={T.body}>
+                    Scan this QR code in your authenticator app, then enter the 6-digit code below
+                    to confirm.
+                  </p>
+                  <div className="flex flex-wrap items-start gap-4">
+                    {/* QR rendered by our own /api/profile/two-factor/qr —
                       keeps the TOTP secret on our infrastructure. Using
                       <img> rather than next/image because the source is
                       a per-request server-rendered PNG, not a static
                       asset Next can optimize. */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    alt="Two-factor QR code"
-                    className="h-44 w-44 rounded-xl border border-[var(--bb-border)] bg-white p-2"
-                    src={`/api/profile/two-factor/qr?uri=${encodeURIComponent(twoFaEnrollment.uri)}`}
-                  />
-                  <div className="min-w-[220px] flex-1 space-y-2">
-                    <p className="text-xs text-[var(--bb-text-muted)]">
-                      Or paste this secret manually:
-                    </p>
-                    <code className="block rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-2 text-xs break-all text-[var(--bb-secondary)]">
-                      {twoFaEnrollment.secret}
-                    </code>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-[var(--bb-text-secondary)]">
-                    Code from your app
-                  </label>
-                  <div className="mt-1 flex flex-wrap gap-2">
-                    <FormInput
-                      inputMode="numeric"
-                      autoComplete="one-time-code"
-                      placeholder="123 456"
-                      value={twoFaEnrollment.codeDraft}
-                      onChange={(e) =>
-                        setTwoFaEnrollment({
-                          ...twoFaEnrollment,
-                          codeDraft: e.target.value,
-                          error: null,
-                        })
-                      }
-                      className="min-w-[160px] flex-1 tracking-widest"
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      alt="Two-factor QR code"
+                      className={T.qr}
+                      src={`/api/profile/two-factor/qr?uri=${encodeURIComponent(twoFaEnrollment.uri)}`}
                     />
-                    <Button
-                      onClick={() => void handleConfirm2FAEnable()}
-                      disabled={twoFaEnrollment.saving}
-                      loading={twoFaEnrollment.saving}
-                      loadingText="Verifying…"
-                    >
-                      Confirm and enable
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      onClick={() => {
-                        setTwoFaEnrollment({ stage: "idle" });
-                        setTwoFaPassword("");
-                      }}
-                    >
-                      Cancel
-                    </Button>
+                    <div className="min-w-[220px] flex-1 space-y-2">
+                      <p className={T.secretHint}>Or paste this secret manually:</p>
+                      <code className={T.code}>{twoFaEnrollment.secret}</code>
+                    </div>
                   </div>
-                </div>
-              </>
-            ) : (
-              twoFaEnrollment.error && (
-                <InlineAlert variant="error">{twoFaEnrollment.error}</InlineAlert>
-              )
-            )}
-            {twoFaEnrollment.uri && twoFaEnrollment.error && (
-              <InlineAlert variant="error">{twoFaEnrollment.error}</InlineAlert>
-            )}
-          </div>
-        )}
-
-        {/* Backup codes — shown ONCE on enable success. The user is
-            told to copy / print these somewhere safe. */}
-        {twoFaEnrollment.stage === "codes" && (
-          <div className="space-y-3">
-            <InlineAlert variant="success" title="Two-factor is now on">
-              Save these backup codes somewhere safe. Each one works exactly once and lets you sign
-              in if you lose access to your authenticator app.
-            </InlineAlert>
-            {twoFaEnrollment.backupCodes.length > 0 ? (
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {twoFaEnrollment.backupCodes.map((code) => (
-                  <code
-                    key={code}
-                    className="rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-2 text-center text-xs tracking-widest"
-                  >
-                    {code}
-                  </code>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-[var(--bb-text-muted)]">
-                Backup codes weren&apos;t included in the response. Use the &quot;Regenerate backup
-                codes&quot; option below to create a fresh set, then copy them to a safe place.
-              </p>
-            )}
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  if (twoFaEnrollment.backupCodes.length === 0) return;
-                  void navigator.clipboard
-                    .writeText(twoFaEnrollment.backupCodes.join("\n"))
-                    .then(() => showToast({ type: "success", title: "Backup codes copied." }))
-                    .catch(() =>
-                      showToast({ type: "error", title: "Couldn't copy — copy manually." }),
-                    );
-                }}
-                disabled={twoFaEnrollment.backupCodes.length === 0}
-              >
-                Copy codes
-              </Button>
-              <Button onClick={() => setTwoFaEnrollment({ stage: "idle" })}>
-                I&apos;ve saved them
-              </Button>
+                  <div>
+                    <label className={T.label}>Code from your app</label>
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      <PInput
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        placeholder="123 456"
+                        value={twoFaEnrollment.codeDraft}
+                        onChange={(e) =>
+                          setTwoFaEnrollment({
+                            ...twoFaEnrollment,
+                            codeDraft: e.target.value,
+                            error: null,
+                          })
+                        }
+                        className="min-w-[160px] flex-1 tracking-widest"
+                      />
+                      <PButton
+                        onClick={() => void handleConfirm2FAEnable()}
+                        disabled={twoFaEnrollment.saving}
+                        loading={twoFaEnrollment.saving}
+                        loadingText="Verifying…"
+                      >
+                        Confirm and enable
+                      </PButton>
+                      <PButton
+                        variant="ghost"
+                        onClick={() => {
+                          setTwoFaEnrollment({ stage: "idle" });
+                          setTwoFaPassword("");
+                        }}
+                      >
+                        Cancel
+                      </PButton>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                twoFaEnrollment.error && <PAlert variant="error">{twoFaEnrollment.error}</PAlert>
+              )}
+              {twoFaEnrollment.uri && twoFaEnrollment.error && (
+                <PAlert variant="error">{twoFaEnrollment.error}</PAlert>
+              )}
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Enabled (and not mid-enrollment) — show status + disable CTA. */}
-        {user.twoFactorEnabled && twoFaEnrollment.stage === "idle" && (
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm text-[var(--bb-text-secondary)]">
-              You&apos;re asked for an authenticator code every time you sign in.
-            </p>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setTwoFaPassword("");
-                setTwoFaDisableError(null);
-                setTwoFaDisableOpen(true);
-              }}
-              className="text-red-600 hover:text-red-700 dark:text-red-400"
-            >
-              Disable
-            </Button>
-          </div>
-        )}
-      </section>
+          {/* Backup codes — shown ONCE on enable success. The user is
+            told to copy / print these somewhere safe. */}
+          {twoFaEnrollment.stage === "codes" && (
+            <div className="space-y-3">
+              <PAlert variant="success" title="Two-factor is now on">
+                Save these backup codes somewhere safe. Each one works exactly once and lets you
+                sign in if you lose access to your authenticator app.
+              </PAlert>
+              {twoFaEnrollment.backupCodes.length > 0 ? (
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {twoFaEnrollment.backupCodes.map((code) => (
+                    <code key={code} className={T.backupCode}>
+                      {code}
+                    </code>
+                  ))}
+                </div>
+              ) : (
+                <p className={T.secretHint}>
+                  Backup codes weren&apos;t included in the response. Use the &quot;Regenerate
+                  backup codes&quot; option below to create a fresh set, then copy them to a safe
+                  place.
+                </p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <PButton
+                  variant="secondary"
+                  onClick={() => {
+                    if (twoFaEnrollment.backupCodes.length === 0) return;
+                    void navigator.clipboard
+                      .writeText(twoFaEnrollment.backupCodes.join("\n"))
+                      .then(() => showToast({ type: "success", title: "Backup codes copied." }))
+                      .catch(() =>
+                        showToast({ type: "error", title: "Couldn't copy — copy manually." }),
+                      );
+                  }}
+                  disabled={twoFaEnrollment.backupCodes.length === 0}
+                >
+                  Copy codes
+                </PButton>
+                <PButton onClick={() => setTwoFaEnrollment({ stage: "idle" })}>
+                  I&apos;ve saved them
+                </PButton>
+              </div>
+            </div>
+          )}
 
-      {/* ---- 2FA disable confirm modal ---- */}
-      <Modal
-        open={twoFaDisableOpen}
-        onClose={() => {
-          if (twoFaDisabling) return;
-          setTwoFaDisableOpen(false);
-          setTwoFaPassword("");
-          setTwoFaDisableError(null);
-        }}
-        size="md"
-      >
-        <ModalHeader
-          title="Turn off two-factor authentication?"
+          {/* Enabled (and not mid-enrollment) — show status + disable CTA. */}
+          {user.twoFactorEnabled && twoFaEnrollment.stage === "idle" && (
+            <div className="flex flex-wrap items-center gap-2">
+              <p className={T.body}>
+                You&apos;re asked for an authenticator code every time you sign in.
+              </p>
+              <PButton
+                variant={v2 ? "danger" : "ghost"}
+                onClick={() => {
+                  setTwoFaPassword("");
+                  setTwoFaDisableError(null);
+                  setTwoFaDisableOpen(true);
+                }}
+                className={v2 ? undefined : "text-red-600 hover:text-red-700 dark:text-red-400"}
+              >
+                Disable
+              </PButton>
+            </div>
+          )}
+        </section>
+
+        {/* ---- 2FA disable confirm modal ---- */}
+        <Modal
+          open={twoFaDisableOpen}
           onClose={() => {
             if (twoFaDisabling) return;
             setTwoFaDisableOpen(false);
             setTwoFaPassword("");
             setTwoFaDisableError(null);
           }}
-        />
-        <div className="space-y-3 px-6 pb-4 text-sm text-[var(--bb-text-secondary)]">
-          <p>
-            Confirm your current password to disable 2FA. Your existing backup codes will be
-            invalidated.
-          </p>
-          <FormInput
-            type="password"
-            value={twoFaPassword}
-            onChange={(e) => setTwoFaPassword(e.target.value)}
-            placeholder="Current password"
-            autoComplete="current-password"
-            aria-label="Current password"
-          />
-          {twoFaDisableError && <InlineAlert variant="error">{twoFaDisableError}</InlineAlert>}
-        </div>
-        <ModalFooter>
-          <Button
-            variant="ghost"
-            disabled={twoFaDisabling}
-            onClick={() => {
+          size="md"
+        >
+          <ModalHeader
+            title="Turn off two-factor authentication?"
+            onClose={() => {
+              if (twoFaDisabling) return;
               setTwoFaDisableOpen(false);
               setTwoFaPassword("");
               setTwoFaDisableError(null);
             }}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="danger"
-            onClick={() => void handleConfirm2FADisable()}
-            loading={twoFaDisabling}
-            loadingText="Disabling…"
-            disabled={twoFaDisabling || !twoFaPassword}
-          >
-            Disable 2FA
-          </Button>
-        </ModalFooter>
-      </Modal>
-
-      {/* ---- Active sessions ---- */}
-      <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-6">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-base font-semibold text-[var(--bb-secondary)]">Active sessions</h2>
-            <p className="mt-0.5 text-xs text-[var(--bb-text-muted)]">
-              Every browser you&apos;re signed in with. Sign out individual devices, or everything
-              except this one in a single click.
+          />
+          <div className="space-y-3 px-6 pb-4 text-sm text-[var(--bb-text-secondary)]">
+            <p>
+              Confirm your current password to disable 2FA. Your existing backup codes will be
+              invalidated.
             </p>
+            <PInput
+              type="password"
+              value={twoFaPassword}
+              onChange={(e) => setTwoFaPassword(e.target.value)}
+              placeholder="Current password"
+              autoComplete="current-password"
+              aria-label="Current password"
+            />
+            {twoFaDisableError && <PAlert variant="error">{twoFaDisableError}</PAlert>}
           </div>
-          {sessionsList && sessionsList.length > 1 && (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => void handleRevokeOtherSessions()}
-              loading={revokingOthers}
-              loadingText="Signing out…"
-              disabled={revokingOthers}
+          <ModalFooter>
+            <PButton
+              variant="ghost"
+              disabled={twoFaDisabling}
+              onClick={() => {
+                setTwoFaDisableOpen(false);
+                setTwoFaPassword("");
+                setTwoFaDisableError(null);
+              }}
             >
-              Sign out everywhere else
-            </Button>
-          )}
-        </div>
+              Cancel
+            </PButton>
+            <PButton
+              variant="danger"
+              onClick={() => void handleConfirm2FADisable()}
+              loading={twoFaDisabling}
+              loadingText="Disabling…"
+              disabled={twoFaDisabling || !twoFaPassword}
+            >
+              Disable 2FA
+            </PButton>
+          </ModalFooter>
+        </Modal>
 
-        {sessionsLoading && (
-          <p className="text-sm text-[var(--bb-text-muted)]">Loading sessions…</p>
-        )}
-        {!sessionsLoading && sessionsError && (
-          <InlineAlert variant="error">{sessionsError}</InlineAlert>
-        )}
-        {!sessionsLoading && !sessionsError && sessionsList && (
-          <ul className="divide-y divide-[var(--bb-border-subtle)]">
-            {sessionsList
-              // Newest first by last activity (updatedAt). Matches Gmail / GitHub UX.
-              .slice()
-              .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-              .map((s) => {
-                const isCurrent = currentSessionId !== null && s.id === currentSessionId;
-                const isRevoking = revokingTokens.has(s.token);
-                return (
-                  <li key={s.id} className="flex flex-wrap items-start gap-3 py-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-medium text-[var(--bb-secondary)]">
-                          {describeUserAgent(s.userAgent)}
-                        </p>
-                        {isCurrent && <Badge variant="success">This device</Badge>}
-                      </div>
-                      <p className="mt-0.5 text-xs text-[var(--bb-text-muted)]">
-                        Last active {relativeTime(s.updatedAt)} &middot; First seen{" "}
-                        {relativeTime(s.createdAt)} &middot; IP {maskIp(s.ipAddress)}
-                      </p>
-                    </div>
-                    {!isCurrent && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => void handleRevokeSession(s.token)}
-                        loading={isRevoking}
-                        loadingText="Signing out…"
-                        disabled={isRevoking}
-                      >
-                        Sign out
-                      </Button>
-                    )}
-                  </li>
-                );
-              })}
-          </ul>
-        )}
-      </section>
-
-      {/* ---- Delete account ---- */}
-      {canSelfDelete && (
-        <section className="rounded-2xl border border-red-200 bg-red-50/50 p-6 dark:border-red-900/40 dark:bg-red-950/20">
-          <h2 className="text-base font-semibold text-red-700 dark:text-red-300">Delete account</h2>
-          <p className="mt-0.5 text-xs text-red-700/80 dark:text-red-300/80">
-            Permanently anonymize your account. Tickets and ledger entries you&apos;re attached to
-            stay for our financial records, but your name, email, and login credentials are removed.
-            This cannot be undone.
-          </p>
-          <div className="mt-3">
-            <Button variant="danger" onClick={() => setDeleteOpen(true)}>
-              Delete my account…
-            </Button>
+        {/* ---- Active sessions ---- */}
+        <section className={T.card}>
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <h2 className={T.h2}>Active sessions</h2>
+              <p className={T.desc}>
+                Every browser you&apos;re signed in with. Sign out individual devices, or everything
+                except this one in a single click.
+              </p>
+            </div>
+            {sessionsList && sessionsList.length > 1 && (
+              <PButton
+                variant="secondary"
+                size="sm"
+                onClick={() => void handleRevokeOtherSessions()}
+                loading={revokingOthers}
+                loadingText="Signing out…"
+                disabled={revokingOthers}
+              >
+                Sign out everywhere else
+              </PButton>
+            )}
           </div>
-        </section>
-      )}
 
-      {/* ---- Delete modal ---- */}
-      <Modal
-        open={deleteOpen}
-        onClose={() => {
-          if (deleting) return;
-          setDeleteOpen(false);
-          setDeleteEmail("");
-          setDeleteError(null);
-        }}
-        size="md"
-      >
-        <ModalHeader
-          title="Delete your account?"
+          {sessionsLoading && <p className={T.muted}>Loading sessions…</p>}
+          {!sessionsLoading && sessionsError && <PAlert variant="error">{sessionsError}</PAlert>}
+          {!sessionsLoading && !sessionsError && sessionsList && (
+            <ul className={T.divide}>
+              {sessionsList
+                // Newest first by last activity (updatedAt). Matches Gmail / GitHub UX.
+                .slice()
+                .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+                .map((s) => {
+                  const isCurrent = currentSessionId !== null && s.id === currentSessionId;
+                  const isRevoking = revokingTokens.has(s.token);
+                  return (
+                    <li key={s.id} className="flex flex-wrap items-start gap-3 py-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className={T.rowTitle}>{describeUserAgent(s.userAgent)}</p>
+                          {isCurrent && <PBadge variant="success">This device</PBadge>}
+                        </div>
+                        <p className={T.desc}>
+                          Last active {relativeTime(s.updatedAt)} &middot; First seen{" "}
+                          {relativeTime(s.createdAt)} &middot; IP {maskIp(s.ipAddress)}
+                        </p>
+                      </div>
+                      {!isCurrent && (
+                        <PButton
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => void handleRevokeSession(s.token)}
+                          loading={isRevoking}
+                          loadingText="Signing out…"
+                          disabled={isRevoking}
+                        >
+                          Sign out
+                        </PButton>
+                      )}
+                    </li>
+                  );
+                })}
+            </ul>
+          )}
+        </section>
+
+        {/* ---- Delete account ---- */}
+        {canSelfDelete && (
+          <section className="rounded-2xl border border-red-200 bg-red-50/50 p-6 dark:border-red-900/40 dark:bg-red-950/20">
+            <h2 className="text-base font-semibold text-red-700 dark:text-red-300">
+              Delete account
+            </h2>
+            <p className="mt-0.5 text-xs text-red-700/80 dark:text-red-300/80">
+              Permanently anonymize your account. Tickets and ledger entries you&apos;re attached to
+              stay for our financial records, but your name, email, and login credentials are
+              removed. This cannot be undone.
+            </p>
+            <div className="mt-3">
+              <PButton variant="danger" onClick={() => setDeleteOpen(true)}>
+                Delete my account…
+              </PButton>
+            </div>
+          </section>
+        )}
+
+        {/* ---- Delete modal ---- */}
+        <Modal
+          open={deleteOpen}
           onClose={() => {
             if (deleting) return;
             setDeleteOpen(false);
             setDeleteEmail("");
             setDeleteError(null);
           }}
-        />
-        <div className="space-y-3 px-6 pb-4 text-sm text-[var(--bb-text-secondary)]">
-          <p>
-            Type your email <strong>{user.email}</strong> to confirm. Your auth credentials will be
-            revoked and your identity will be anonymized immediately.
-          </p>
-          <FormInput
-            type="email"
-            value={deleteEmail}
-            onChange={(e) => setDeleteEmail(e.target.value)}
-            placeholder={user.email}
-            autoComplete="off"
-            aria-label="Type your email to confirm deletion"
-          />
-          {deleteError && <InlineAlert variant="error">{deleteError}</InlineAlert>}
-        </div>
-        <ModalFooter>
-          <Button
-            variant="ghost"
-            disabled={deleting}
-            onClick={() => {
+          size="md"
+        >
+          <ModalHeader
+            title="Delete your account?"
+            onClose={() => {
+              if (deleting) return;
               setDeleteOpen(false);
               setDeleteEmail("");
               setDeleteError(null);
             }}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="danger"
-            onClick={() => void handleDelete()}
-            loading={deleting}
-            loadingText="Deleting…"
-            disabled={deleting || deleteEmail.trim().toLowerCase() !== user.email.toLowerCase()}
-          >
-            Delete account
-          </Button>
-        </ModalFooter>
-      </Modal>
-    </div>
+          />
+          <div className="space-y-3 px-6 pb-4 text-sm text-[var(--bb-text-secondary)]">
+            <p>
+              Type your email <strong>{user.email}</strong> to confirm. Your auth credentials will
+              be revoked and your identity will be anonymized immediately.
+            </p>
+            <PInput
+              type="email"
+              value={deleteEmail}
+              onChange={(e) => setDeleteEmail(e.target.value)}
+              placeholder={user.email}
+              autoComplete="off"
+              aria-label="Type your email to confirm deletion"
+            />
+            {deleteError && <PAlert variant="error">{deleteError}</PAlert>}
+          </div>
+          <ModalFooter>
+            <PButton
+              variant="ghost"
+              disabled={deleting}
+              onClick={() => {
+                setDeleteOpen(false);
+                setDeleteEmail("");
+                setDeleteError(null);
+              }}
+            >
+              Cancel
+            </PButton>
+            <PButton
+              variant="danger"
+              onClick={() => void handleDelete()}
+              loading={deleting}
+              loadingText="Deleting…"
+              disabled={deleting || deleteEmail.trim().toLowerCase() !== user.email.toLowerCase()}
+            >
+              Delete account
+            </PButton>
+          </ModalFooter>
+        </Modal>
+      </ProfilePanel>
+    </ProfileShell>
   );
 }
 
@@ -1853,6 +2128,10 @@ function ToggleSwitch({
   disabled?: boolean;
   onChange: (next: boolean) => void;
 }) {
+  const v2 = useContext(V2Context);
+  if (v2) {
+    return <V2Switch label={label} checked={checked} disabled={disabled} onChange={onChange} />;
+  }
   return (
     <button
       type="button"
@@ -1878,5 +2157,111 @@ function ToggleSwitch({
       </span>
       <span className="text-[11px] font-medium">{label}</span>
     </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// AccountSummary — tabs layout only. Read-only digest of data the form has
+// already loaded, plus shortcuts into the other tabs.
+// ---------------------------------------------------------------------------
+
+function AccountSummary({
+  name,
+  email,
+  image,
+  roleLabel,
+  twoFactorEnabled,
+  sessionCount,
+  onOpen,
+}: {
+  name: string | null;
+  email: string;
+  image: string | null;
+  roleLabel: string;
+  twoFactorEnabled: boolean;
+  sessionCount: number | null;
+  onOpen: (tab: ProfileTab) => void;
+}) {
+  const rows: { tab: ProfileTab; title: string; description: string; badge?: ReactNode }[] = [
+    {
+      tab: "notifications",
+      title: "Notification preferences",
+      description: "Choose in-app and email updates",
+    },
+    {
+      tab: "security",
+      title: "Two-factor sign-in",
+      description: "Authenticator code when you sign in",
+      badge: (
+        <V2Badge tone={twoFactorEnabled ? "green" : "neutral"}>
+          {twoFactorEnabled ? "Enabled" : "Disabled"}
+        </V2Badge>
+      ),
+    },
+    {
+      tab: "security",
+      title: "Active sessions",
+      description:
+        sessionCount == null
+          ? "Browsers you're signed in with"
+          : `${sessionCount} ${sessionCount === 1 ? "browser" : "browsers"} signed in`,
+    },
+  ];
+  return (
+    <aside className="rounded-2xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-6">
+      <h2 className="text-xl leading-7 font-semibold">Account</h2>
+      <div className="mt-4 flex items-center gap-4 border-b border-[var(--av2-border)] pb-5">
+        <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--av2-selected)] text-lg font-semibold text-[var(--av2-link)]">
+          {image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={image} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <span aria-hidden="true">{(name || email)[0]?.toUpperCase() ?? "?"}</span>
+          )}
+        </span>
+        <div className="min-w-0">
+          <p className="truncate text-base font-semibold">{name || email}</p>
+          <p className="truncate text-sm text-[var(--av2-text-2)]">{email}</p>
+          <div className="mt-1.5">
+            <V2Badge>{roleLabel}</V2Badge>
+          </div>
+        </div>
+      </div>
+      <ul className="divide-y divide-[var(--av2-border)]">
+        {rows.map((r) => (
+          <li key={r.title}>
+            <button
+              type="button"
+              onClick={() => onOpen(r.tab)}
+              className="-mx-3 flex w-[calc(100%+1.5rem)] items-center gap-3 rounded-lg px-3 py-4 text-left hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+                  {r.title}
+                  {r.badge}
+                </span>
+                <span className="mt-0.5 block text-sm text-[var(--av2-text-2)]">
+                  {r.description}
+                </span>
+              </span>
+              <svg
+                aria-hidden="true"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="shrink-0 text-[var(--av2-text-2)]"
+              >
+                <path d="m9 18 6-6-6-6" />
+              </svg>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </aside>
   );
 }

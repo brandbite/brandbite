@@ -50,6 +50,7 @@ import {
 } from "@/components/admin/v2/ui";
 import { IconChevronDown } from "@/components/admin/v2/icons";
 import { IconFaq } from "@/components/navigation/nav-icons";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 
 type Faq = {
   id: string;
@@ -209,6 +210,12 @@ export default function AdminFaqPage() {
     answer !== baseline.answer ||
     category !== baseline.category ||
     isActive !== baseline.isActive;
+  const confirmDiscard = useUnsavedChanges(dirty, "FAQ editor");
+
+  /** Run `fn` now, or after the user agrees to drop unsaved edits. */
+  const guarded = async (fn: () => void) => {
+    if (await confirmDiscard()) fn();
+  };
 
   // ---- Save ---------------------------------------------------------
 
@@ -397,7 +404,7 @@ export default function AdminFaqPage() {
             )}
           </span>
         }
-        onClose={selectedRow ? resetForm : undefined}
+        onClose={selectedRow ? () => void guarded(resetForm) : undefined}
         closeLabel="Clear selection"
         footer={
           <SaveBar
@@ -613,7 +620,7 @@ export default function AdminFaqPage() {
           </div>
         }
         actions={
-          <Button variant="primary" onClick={resetForm}>
+          <Button variant="primary" onClick={() => void guarded(resetForm)}>
             <span aria-hidden className="text-lg leading-none">
               +
             </span>
@@ -720,7 +727,10 @@ export default function AdminFaqPage() {
                   <Tr
                     key={row.id}
                     selected={selectedId === row.id}
-                    onSelect={() => fillFormFromRow(row)}
+                    onSelect={() => {
+                      if (row.id === selectedId) return;
+                      void guarded(() => fillFormFromRow(row));
+                    }}
                     label={`${row.question}, ${row.category}, ${row.isActive ? "active" : "hidden"}`}
                   >
                     <Td>

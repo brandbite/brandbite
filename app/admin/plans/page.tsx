@@ -14,6 +14,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ui/toast-provider";
 import { useSessionRole } from "@/lib/hooks/use-session-role";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 import {
   Badge,
   Button,
@@ -289,6 +290,7 @@ export default function AdminPlansPage() {
 
   const baseline = selected ? formFromPlan(selected) : EMPTY_FORM;
   const dirty = !sameForm(form, baseline);
+  const confirmDiscard = useUnsavedChanges(dirty, selected ? `Plan: ${selected.name}` : "New plan");
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((f) => ({ ...f, [key]: value }));
@@ -358,11 +360,19 @@ export default function AdminPlansPage() {
     };
   }, []);
 
-  const handleClickPlan = (plan: Plan) => {
+  const handleClickPlan = async (plan: Plan) => {
+    if (plan.id === selected?.id) return;
+    if (!(await confirmDiscard())) return;
     fillFormFromPlan(plan);
   };
 
-  const handleNewPlan = () => {
+  const handleNewPlan = async () => {
+    if (!(await confirmDiscard())) return;
+    resetForm();
+  };
+
+  const handleClosePanel = async () => {
+    if (!(await confirmDiscard())) return;
     resetForm();
   };
 
@@ -507,7 +517,7 @@ export default function AdminPlansPage() {
     <form onSubmit={handleSubmit} noValidate className="contents">
       <DetailPanel
         title={panelTitle}
-        onClose={selected ? resetForm : undefined}
+        onClose={selected ? handleClosePanel : undefined}
         closeLabel="Clear selection"
         footer={
           <SaveBar

@@ -39,6 +39,7 @@ import {
   fmt,
   plural,
 } from "@/components/admin/v2/ui";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 
 type ColorMeaning = {
   id: string;
@@ -226,6 +227,12 @@ export default function AdminColorMeaningsPage() {
   const baselineForm = selected ? formFromItem(selected) : emptyForm;
   const baselineMeaning = selected ? (selected.meaning ?? "") : "";
   const dirty = !sameForm(form, baselineForm) || meaningHtml !== baselineMeaning;
+  const confirmDiscard = useUnsavedChanges(dirty, "Color meaning");
+
+  /** Run `fn` now, or after the user agrees to drop unsaved edits. */
+  const guarded = async (fn: () => void) => {
+    if (await confirmDiscard()) fn();
+  };
 
   const clearErrors = () => {
     setNameError(null);
@@ -354,7 +361,7 @@ export default function AdminColorMeaningsPage() {
     >
       <DetailPanel
         title={panelTitle}
-        onClose={selected ? resetForm : undefined}
+        onClose={selected ? () => void guarded(resetForm) : undefined}
         closeLabel="Clear selection"
         footer={
           <SaveBar
@@ -686,7 +693,7 @@ export default function AdminColorMeaningsPage() {
           ) : undefined
         }
         actions={
-          <Button variant="primary" onClick={resetForm}>
+          <Button variant="primary" onClick={() => void guarded(resetForm)}>
             <IconPlus />
             New color
           </Button>
@@ -764,7 +771,10 @@ export default function AdminColorMeaningsPage() {
                     <li key={m.id}>
                       <button
                         type="button"
-                        onClick={() => editItem(m)}
+                        onClick={() => {
+                          if (active) return;
+                          void guarded(() => editItem(m));
+                        }}
                         aria-pressed={active}
                         className={`flex w-full items-center gap-4 rounded-xl border p-3 text-left transition-colors focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none ${
                           active
