@@ -19,10 +19,25 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
-import { Button } from "@/components/ui/button";
-import { FormInput } from "@/components/ui/form-field";
-import { InlineAlert } from "@/components/ui/inline-alert";
+import {
+  Badge,
+  Button,
+  Callout,
+  Field,
+  FilterChips,
+  SearchInput,
+  Skeleton,
+  TextInput,
+} from "@/components/admin/v2/ui";
 import { useToast } from "@/components/ui/toast-provider";
+
+import {
+  BlockSaveFooter,
+  Code,
+  FormSection,
+  ReorderActions,
+  useDirtyBaseline,
+} from "./block-form-ui";
 
 import { DEFAULT_FAQ_FALLBACK_LIMIT } from "@/lib/blocks/defaults";
 import type { FaqData } from "@/lib/blocks/types";
@@ -63,6 +78,11 @@ export function FaqBlockForm({ initial, pageKey }: FaqBlockFormProps) {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Presentation only: drives the SaveBar status + disables Save when clean.
+  const { dirty, markSaved } = useDirtyBaseline(
+    JSON.stringify([title, subtitle, pickedIds, ctaLabel, ctaHref]),
+  );
 
   // Fetch the central FAQ list from the admin endpoint so the picker
   // can show inactive items (with a "Hidden" hint) — the public list
@@ -198,6 +218,7 @@ export function FaqBlockForm({ initial, pageKey }: FaqBlockFormProps) {
         throw new Error(json?.reason || json?.error || "Save failed.");
       }
 
+      markSaved();
       showToast({
         type: "success",
         title: "FAQ section saved",
@@ -216,293 +237,245 @@ export function FaqBlockForm({ initial, pageKey }: FaqBlockFormProps) {
   return (
     <form onSubmit={handleSave} className="space-y-6">
       {/* Title + subtitle (both optional) ----------------------------- */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <label
-            htmlFor="faq-block-title"
-            className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-          >
-            Section title (optional)
-          </label>
-          <FormInput
-            id="faq-block-title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="FAQ"
-            maxLength={120}
-          />
-          <p className="mt-1 text-xs text-[var(--bb-text-muted)]">
-            Defaults to <code>FAQ</code> when blank.
-          </p>
-        </div>
-        <div>
-          <label
-            htmlFor="faq-block-subtitle"
-            className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-          >
-            Subtitle (optional)
-          </label>
-          <FormInput
-            id="faq-block-subtitle"
-            value={subtitle}
-            onChange={(e) => setSubtitle(e.target.value)}
-            placeholder="Frequently asked questions."
-            maxLength={300}
-          />
-        </div>
-      </div>
-
-      {/* "See all" CTA pair (optional, paired) ------------------------ */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <label
-            htmlFor="faq-block-cta-label"
-            className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-          >
-            CTA label (optional)
-          </label>
-          <FormInput
-            id="faq-block-cta-label"
-            value={ctaLabel}
-            onChange={(e) => setCtaLabel(e.target.value)}
-            placeholder="See all questions"
-            maxLength={50}
-          />
-          <p className="mt-1 text-xs text-[var(--bb-text-muted)]">
-            Shown below the accordion. Clear both label and destination to hide the button.
-          </p>
-        </div>
-        <div>
-          <label
-            htmlFor="faq-block-cta-href"
-            className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-          >
-            CTA destination (optional)
-          </label>
-          <FormInput
-            id="faq-block-cta-href"
-            value={ctaHref}
-            onChange={(e) => setCtaHref(e.target.value)}
-            placeholder="/faq"
-            maxLength={200}
-          />
-          <p className="mt-1 text-xs text-[var(--bb-text-muted)]">
-            Internal path like <code>/faq</code> or full URL.
-          </p>
-        </div>
-      </div>
-
-      {/* Where the FAQs live notice ----------------------------------- */}
-      <InlineAlert variant="info" size="sm">
-        Question text and answers are managed in{" "}
-        <Link href="/admin/faq" className="underline">
-          Content → FAQ
-        </Link>
-        . This form only chooses which questions to surface on the landing page.
-      </InlineAlert>
-
-      {loadError && (
-        <InlineAlert variant="error" size="sm">
-          {loadError}
-        </InlineAlert>
-      )}
-
-      {/* Selection summary -------------------------------------------- */}
-      <div className="rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-warm)] px-4 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <p className="text-sm font-semibold text-[var(--bb-secondary)]">
-              {pickedIds.length === 0
-                ? "Nothing picked yet"
-                : `${pickedIds.length} ${pickedIds.length === 1 ? "FAQ" : "FAQs"} selected`}
-            </p>
-            <p className="mt-0.5 text-xs text-[var(--bb-text-muted)]">
-              {pickedIds.length === 0
-                ? `Empty selection falls back to the first ${DEFAULT_FAQ_FALLBACK_LIMIT} active FAQs in category order.`
-                : "Drag-equivalent reorder via ↑ / ↓ on each row."}
-            </p>
-          </div>
-          {pickedIds.length > 0 && (
-            <Button type="button" variant="ghost" size="sm" onClick={clearAllPicked}>
-              Clear selection
-            </Button>
-          )}
-        </div>
-
-        {pickedIds.length > 0 && (
-          <ol className="mt-3 space-y-1.5">
-            {pickedIds.map((id, idx) => {
-              const faq = faqsById.get(id);
-              if (!faq) {
-                return (
-                  <li
-                    key={id}
-                    className="flex items-center justify-between rounded-md border border-dashed border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-2 text-xs text-[var(--bb-text-tertiary)]"
-                  >
-                    <span>Removed from store ({id})</span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removePicked(id)}
-                    >
-                      Drop
-                    </Button>
-                  </li>
-                );
+      <FormSection title="Section heading" description="Both optional.">
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <Field
+              label="Section title (optional)"
+              htmlFor="faq-block-title"
+              hint={
+                <>
+                  Defaults to <Code>FAQ</Code> when blank.
+                </>
               }
-              return (
-                <li
-                  key={id}
-                  className="flex items-center justify-between gap-2 rounded-md bg-[var(--bb-bg-page)] px-3 py-2"
-                >
-                  <span className="min-w-0 flex-1 text-xs">
-                    <span className="font-mono text-[10px] text-[var(--bb-text-muted)]">
-                      {idx + 1}.
-                    </span>{" "}
-                    <span className="font-semibold text-[var(--bb-secondary)]">{faq.question}</span>{" "}
-                    <span className="text-[var(--bb-text-muted)]">— {faq.category}</span>
-                  </span>
-                  <span className="flex shrink-0 items-center gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => movePicked(idx, -1)}
-                      disabled={idx === 0}
-                      aria-label="Move up"
-                    >
-                      ↑
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => movePicked(idx, 1)}
-                      disabled={idx === pickedIds.length - 1}
-                      aria-label="Move down"
-                    >
-                      ↓
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removePicked(id)}
-                    >
-                      Remove
-                    </Button>
-                  </span>
-                </li>
-              );
-            })}
-          </ol>
-        )}
-      </div>
+            >
+              <TextInput
+                id="faq-block-title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="FAQ"
+                maxLength={120}
+              />
+            </Field>
+            <Field label="Subtitle (optional)" htmlFor="faq-block-subtitle">
+              <TextInput
+                id="faq-block-subtitle"
+                value={subtitle}
+                onChange={(e) => setSubtitle(e.target.value)}
+                placeholder="Frequently asked questions."
+                maxLength={300}
+              />
+            </Field>
+          </div>
 
-      {/* Available pool ----------------------------------------------- */}
-      <div>
-        <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-[var(--bb-secondary)]">Available FAQs</h3>
-          <span className="text-xs text-[var(--bb-text-muted)]">
-            {filteredFaqs.length} {filteredFaqs.length === 1 ? "match" : "matches"}
-          </span>
-        </div>
-
-        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="flex-1">
-            <FormInput
-              id="faq-block-search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search question or answer text…"
-            />
+          {/* "See all" CTA pair (optional, paired) ------------------------ */}
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <Field
+              label="CTA label (optional)"
+              htmlFor="faq-block-cta-label"
+              hint="Shown below the accordion. Clear both label and destination to hide the button."
+            >
+              <TextInput
+                id="faq-block-cta-label"
+                value={ctaLabel}
+                onChange={(e) => setCtaLabel(e.target.value)}
+                placeholder="See all questions"
+                maxLength={50}
+              />
+            </Field>
+            <Field
+              label="CTA destination (optional)"
+              htmlFor="faq-block-cta-href"
+              hint={
+                <>
+                  Internal path like <Code>/faq</Code> or full URL.
+                </>
+              }
+            >
+              <TextInput
+                id="faq-block-cta-href"
+                value={ctaHref}
+                onChange={(e) => setCtaHref(e.target.value)}
+                placeholder="/faq"
+                maxLength={200}
+              />
+            </Field>
           </div>
         </div>
+      </FormSection>
 
-        <div className="mb-3 flex flex-wrap gap-2">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              type="button"
-              onClick={() => setFilterCategory(cat)}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                filterCategory === cat
-                  ? "bg-[var(--bb-primary)] text-white"
-                  : "bg-[var(--bb-bg-warm)] text-[var(--bb-text-secondary)] hover:bg-[#eae6f1]"
-              }`}
+      <FormSection
+        title="Questions"
+        count={`${pickedIds.length} / ${MAX_PICKED}`}
+        description={
+          <>
+            Question text and answers are managed in{" "}
+            <Link
+              href="/admin/faq"
+              className="font-semibold text-[var(--av2-link)] underline-offset-2 hover:underline"
             >
-              {cat}
-            </button>
-          ))}
-        </div>
-
-        {allFaqs === null ? (
-          <p className="rounded-xl border border-dashed border-[var(--bb-border)] bg-[var(--bb-bg-warm)] px-4 py-6 text-center text-xs text-[var(--bb-text-muted)]">
-            Loading FAQs…
-          </p>
-        ) : filteredFaqs.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-[var(--bb-border)] bg-[var(--bb-bg-warm)] px-4 py-6 text-center text-xs text-[var(--bb-text-muted)]">
-            No FAQs match this filter. Add new ones in{" "}
-            <Link href="/admin/faq" className="underline">
               Content → FAQ
             </Link>
-            .
-          </p>
-        ) : (
-          <ul className="max-h-[420px] space-y-1.5 overflow-auto rounded-xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-page)] p-2">
-            {filteredFaqs.map((faq) => {
-              const checked = isPicked(faq.id);
-              const inactiveHint = faq.isActive === false ? " (Hidden — won't render)" : "";
-              return (
-                <li key={faq.id}>
-                  <label
-                    className={`flex cursor-pointer items-start gap-3 rounded-md px-3 py-2 transition-colors ${
-                      checked ? "bg-[var(--bb-primary-light)]" : "hover:bg-[var(--bb-bg-warm)]"
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => togglePicked(faq.id)}
-                      disabled={!checked && pickedIds.length >= MAX_PICKED}
-                      className="mt-1 h-4 w-4 rounded border-[var(--bb-border-input)] text-[var(--bb-primary)] focus:ring-[var(--bb-primary)]"
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-semibold text-[var(--bb-secondary)]">
-                        {faq.question}
-                        {inactiveHint && (
-                          <span className="ml-1 text-xs font-normal text-[var(--bb-warning-text)]">
-                            {inactiveHint}
+            . This form only chooses which questions to surface on the landing page.
+          </>
+        }
+      >
+        <div className="space-y-5">
+          {loadError && <Callout tone="error" title={loadError} />}
+
+          {/* Selection summary -------------------------------------------- */}
+          <div className="rounded-xl border border-[var(--av2-border)] bg-[var(--av2-bg)] p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold">
+                  {pickedIds.length === 0
+                    ? "Nothing picked yet"
+                    : `${pickedIds.length} ${pickedIds.length === 1 ? "FAQ" : "FAQs"} selected`}
+                </p>
+                <p className="mt-0.5 text-sm text-[var(--av2-text-2)]">
+                  {pickedIds.length === 0
+                    ? `Empty selection falls back to the first ${DEFAULT_FAQ_FALLBACK_LIMIT} active FAQs in category order.`
+                    : "Reorder with the arrows on each row."}
+                </p>
+              </div>
+              {pickedIds.length > 0 && (
+                <Button size="sm" variant="ghost" onClick={clearAllPicked}>
+                  Clear selection
+                </Button>
+              )}
+            </div>
+
+            {pickedIds.length > 0 && (
+              <ol className="mt-3 space-y-1.5">
+                {pickedIds.map((id, idx) => {
+                  const faq = faqsById.get(id);
+                  if (!faq) {
+                    return (
+                      <li
+                        key={id}
+                        className="flex items-center justify-between gap-2 rounded-lg border border-dashed border-[var(--av2-border)] bg-[var(--av2-surface)] py-1 pr-1 pl-3 text-sm text-[var(--av2-text-2)]"
+                      >
+                        <span className="min-w-0 truncate">Removed from store ({id})</span>
+                        <Button size="sm" variant="ghost" onClick={() => removePicked(id)}>
+                          Drop
+                        </Button>
+                      </li>
+                    );
+                  }
+                  return (
+                    <li
+                      key={id}
+                      className="flex items-center justify-between gap-2 rounded-lg border border-[var(--av2-border)] bg-[var(--av2-surface)] py-1 pr-1 pl-3"
+                    >
+                      <span className="min-w-0 flex-1 text-sm">
+                        <span className="mr-1.5 text-[var(--av2-text-2)] tabular-nums">
+                          {idx + 1}.
+                        </span>
+                        <span className="font-medium">{faq.question}</span>{" "}
+                        <span className="text-[var(--av2-text-2)]">— {faq.category}</span>
+                      </span>
+                      <ReorderActions
+                        noun={`question ${idx + 1}`}
+                        index={idx}
+                        count={pickedIds.length}
+                        onMove={(d) => movePicked(idx, d)}
+                        onRemove={() => removePicked(id)}
+                      />
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
+          </div>
+
+          {/* Available pool ----------------------------------------------- */}
+          <div>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h4 className="text-sm font-semibold">Available FAQs</h4>
+              <span className="text-sm text-[var(--av2-text-2)] tabular-nums">
+                {filteredFaqs.length} {filteredFaqs.length === 1 ? "match" : "matches"}
+              </span>
+            </div>
+
+            <div className="mb-3">
+              <SearchInput
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="Search question or answer text…"
+                label="Search FAQs"
+              />
+            </div>
+
+            <div className="mb-3">
+              <FilterChips
+                label="Filter FAQs by category"
+                value={filterCategory}
+                onChange={setFilterCategory}
+                options={categories.map((cat) => ({ value: cat, label: cat }))}
+              />
+            </div>
+
+            {allFaqs === null ? (
+              <div className="space-y-2" aria-label="Loading FAQs">
+                <Skeleton className="h-12" />
+                <Skeleton className="h-12" />
+                <Skeleton className="h-12" />
+              </div>
+            ) : filteredFaqs.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-[var(--av2-border)] px-4 py-8 text-center text-sm text-[var(--av2-text-2)]">
+                No FAQs match this filter. Add new ones in{" "}
+                <Link
+                  href="/admin/faq"
+                  className="font-semibold text-[var(--av2-link)] underline-offset-2 hover:underline"
+                >
+                  Content → FAQ
+                </Link>
+                .
+              </div>
+            ) : (
+              <ul className="max-h-[420px] space-y-1 overflow-auto rounded-xl border border-[var(--av2-border)] p-2">
+                {filteredFaqs.map((faq) => {
+                  const checked = isPicked(faq.id);
+                  const inactiveHint = faq.isActive === false;
+                  return (
+                    <li key={faq.id}>
+                      <label
+                        className={`flex cursor-pointer items-start gap-3 rounded-lg px-3 py-2.5 transition-colors ${
+                          checked ? "bg-[var(--av2-selected)]" : "hover:bg-[var(--av2-bg)]"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => togglePicked(faq.id)}
+                          disabled={!checked && pickedIds.length >= MAX_PICKED}
+                          className="mt-0.5 h-4 w-4 shrink-0 rounded accent-[var(--av2-accent-strong)]"
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                            {faq.question}
+                            {inactiveHint && <Badge tone="amber">Hidden — won&apos;t render</Badge>}
                           </span>
-                        )}
-                      </span>
-                      <span className="mt-0.5 block text-xs text-[var(--bb-text-muted)]">
-                        {faq.category}
-                      </span>
-                    </span>
-                  </label>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
+                          <span className="mt-0.5 block text-xs text-[var(--av2-text-2)]">
+                            {faq.category}
+                          </span>
+                        </span>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </div>
+      </FormSection>
 
-      {/* Error + submit ---------------------------------------------- */}
-      {error ? <InlineAlert variant="error">{error}</InlineAlert> : null}
-
-      <div className="flex justify-end gap-3 pt-2">
-        <Button
-          type="submit"
-          variant="primary"
-          loading={submitting}
-          loadingText="Saving…"
-          disabled={submitting}
-        >
-          Save FAQ section
-        </Button>
-      </div>
+      <BlockSaveFooter
+        error={error}
+        dirty={dirty}
+        submitting={submitting}
+        label="Save FAQ section"
+      />
     </form>
   );
 }

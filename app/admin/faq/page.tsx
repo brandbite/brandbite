@@ -1,17 +1,14 @@
 // -----------------------------------------------------------------------------
 // @file: app/admin/faq/page.tsx
-// @purpose: Admin CRUD for the central Faq table. Two-column layout:
-//           filterable list on the left, edit/create form on the right.
-//           Mirrors the /admin/plans pattern so admins who already know
-//           that page have zero learning curve here.
-//
-//           Rows are grouped by category in the list. Each row carries
-//           up/down reorder buttons (within its category), an Active
-//           toggle, and an inline Delete (with browser confirm).
+// @purpose: Admin CRUD for the central Faq table (admin design language v1).
+//           Short, paginated question list on the left (question + category
+//           and visibility badges); the selected record opens in the editor
+//           panel on the right with the answer, visibility, a read-only
+//           visitor preview, ordering within its category and delete.
 // -----------------------------------------------------------------------------
-// @version: v1.0.0
+// @version: v2.0.0
 // @status: active
-// @lastUpdate: 2026-04-28
+// @lastUpdate: 2026-11-01
 // -----------------------------------------------------------------------------
 
 "use client";
@@ -19,13 +16,40 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { OwnerOnlyBanner } from "@/components/admin/owner-only-banner";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
-import { FormInput } from "@/components/ui/form-field";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import { LoadingState } from "@/components/ui/loading-state";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast-provider";
+import {
+  Badge,
+  Button,
+  Callout,
+  Card,
+  DASH,
+  DetailPanel,
+  EmptyState,
+  Field,
+  FilterBar,
+  PageHeader,
+  Pager,
+  PanelSection,
+  SaveBar,
+  SearchInput,
+  Select,
+  Skeleton,
+  SplitView,
+  StatusDot,
+  Switch,
+  Table,
+  TableFooter,
+  Td,
+  TextArea,
+  TextInput,
+  Th,
+  Tr,
+  fmt,
+  plural,
+} from "@/components/admin/v2/ui";
+import { IconChevronDown } from "@/components/admin/v2/icons";
+import { IconFaq } from "@/components/navigation/nav-icons";
 
 type Faq = {
   id: string;
@@ -40,7 +64,19 @@ type Faq = {
 
 type FaqApiResponse = { faqs: Faq[]; categories: string[] };
 
-const ALL_LABEL = "All";
+type StatusFilter = "ALL" | "ACTIVE" | "HIDDEN";
+
+const ALL = "__all__";
+const PAGE_SIZE = 10;
+
+type FormSnapshot = {
+  question: string;
+  answer: string;
+  category: string;
+  isActive: boolean;
+};
+
+type FieldErrors = Partial<Record<"question" | "answer" | "category", string>>;
 
 export default function AdminFaqPage() {
   const { showToast } = useToast();
@@ -49,9 +85,11 @@ export default function AdminFaqPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Filter pill state. Mirrors the public /faq filter, but here it's a
-  // pure list filter — admin sees inactive items too.
-  const [filterCategory, setFilterCategory] = useState<string>(ALL_LABEL);
+  // List filters — admin sees inactive items too.
+  const [filterCategory, setFilterCategory] = useState<string>(ALL);
+  const [filterStatus, setFilterStatus] = useState<StatusFilter>("ALL");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
   // Form state. `selectedId === null` means "creating new"; otherwise
   // the form is editing the row with that id.
@@ -60,9 +98,21 @@ export default function AdminFaqPage() {
   const [answer, setAnswer] = useState("");
   const [category, setCategory] = useState("");
   const [isActive, setIsActive] = useState(true);
+  // Baseline for the "new FAQ" form (seeded category), used for dirty state.
+  const [newBaseline, setNewBaseline] = useState<FormSnapshot>({
+    question: "",
+    answer: "",
+    category: "",
+    isActive: true,
+  });
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [reordering, setReordering] = useState(false);
+
+  const [pendingDelete, setPendingDelete] = useState<Faq | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // ---- Load ---------------------------------------------------------
 
@@ -82,8 +132,10 @@ export default function AdminFaqPage() {
         throw new Error(errMsg || `Request failed (${res.status}).`);
       }
       setData(json as FaqApiResponse);
+      return json as FaqApiResponse;
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : "Failed to load FAQs.");
+      return null;
     } finally {
       setLoading(false);
     }
@@ -95,38 +147,68 @@ export default function AdminFaqPage() {
 
   // ---- Form helpers -------------------------------------------------
 
+  const applySnapshot = (s: FormSnapshot) => {
+    setQuestion(s.question);
+    setAnswer(s.answer);
+    setCategory(s.category);
+    setIsActive(s.isActive);
+  };
+
   const resetForm = () => {
     setSelectedId(null);
-    setQuestion("");
-    setAnswer("");
     // Default new rows into the currently-filtered category if one is
     // active; otherwise default to the first category we know about so
-    // the dropdown isn't blank. Falls back to "General" for an empty DB.
+    // the field isn't blank. Falls back to "General" for an empty DB.
     const seedCategory =
-      filterCategory !== ALL_LABEL ? filterCategory : (data?.categories[0] ?? "General");
-    setCategory(seedCategory);
-    setIsActive(true);
+      filterCategory !== ALL ? filterCategory : (data?.categories[0] ?? "General");
+    const seed = { question: "", answer: "", category: seedCategory, isActive: true };
+    setNewBaseline(seed);
+    applySnapshot(seed);
     setSubmitError(null);
+    setFieldErrors({});
   };
 
   const fillFormFromRow = (row: Faq) => {
     setSelectedId(row.id);
-    setQuestion(row.question);
-    setAnswer(row.answer);
-    setCategory(row.category);
-    setIsActive(row.isActive);
+    applySnapshot({
+      question: row.question,
+      answer: row.answer,
+      category: row.category,
+      isActive: row.isActive,
+    });
     setSubmitError(null);
+    setFieldErrors({});
   };
 
   // Initial form seed once data first lands.
   useEffect(() => {
     if (data && !selectedId && question === "") {
-      // Triggered once on first load — fills the dropdown so an admin can
-      // hit "Save" without first clicking "New".
+      // Triggered once on first load — fills the category so an admin can
+      // hit "Create" without first clicking "New".
       resetForm();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
+
+  const selectedRow = useMemo(
+    () => (selectedId ? (data?.faqs.find((f) => f.id === selectedId) ?? null) : null),
+    [data, selectedId],
+  );
+
+  const baseline: FormSnapshot = selectedRow
+    ? {
+        question: selectedRow.question,
+        answer: selectedRow.answer,
+        category: selectedRow.category,
+        isActive: selectedRow.isActive,
+      }
+    : newBaseline;
+
+  const dirty =
+    question !== baseline.question ||
+    answer !== baseline.answer ||
+    category !== baseline.category ||
+    isActive !== baseline.isActive;
 
   // ---- Save ---------------------------------------------------------
 
@@ -135,9 +217,16 @@ export default function AdminFaqPage() {
     if (submitting) return;
     setSubmitError(null);
 
-    if (!question.trim()) return setSubmitError("Question is required.");
-    if (!answer.trim()) return setSubmitError("Answer is required.");
-    if (!category.trim()) return setSubmitError("Category is required.");
+    const errs: FieldErrors = {};
+    if (!category.trim()) errs.category = "Category is required.";
+    if (!question.trim()) errs.question = "Question is required.";
+    if (!answer.trim()) errs.answer = "Answer is required.";
+    setFieldErrors(errs);
+    const firstInvalid = (["category", "question", "answer"] as const).find((k) => errs[k]);
+    if (firstInvalid) {
+      document.getElementById(`faq-${firstInvalid}`)?.focus();
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -166,8 +255,14 @@ export default function AdminFaqPage() {
         title: isEdit ? "FAQ updated" : "FAQ created",
       });
 
-      await load();
-      if (!isEdit) resetForm();
+      const fresh = await load();
+      if (!isEdit) {
+        resetForm();
+      } else {
+        // Re-sync with the saved (trimmed) row so the editor reads clean.
+        const saved = fresh?.faqs.find((f) => f.id === selectedId);
+        if (saved) fillFormFromRow(saved);
+      }
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Save failed.");
     } finally {
@@ -175,24 +270,7 @@ export default function AdminFaqPage() {
     }
   };
 
-  // ---- Inline row actions -------------------------------------------
-
-  const toggleActive = async (row: Faq) => {
-    try {
-      const res = await fetch(`/api/admin/faq/${row.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isActive: !row.isActive }),
-      });
-      if (!res.ok) throw new Error("Toggle failed.");
-      await load();
-    } catch (err) {
-      showToast({
-        type: "error",
-        title: err instanceof Error ? err.message : "Toggle failed.",
-      });
-    }
-  };
+  // ---- Row actions --------------------------------------------------
 
   const moveRow = async (row: Faq, direction: -1 | 1) => {
     if (!data) return;
@@ -204,6 +282,7 @@ export default function AdminFaqPage() {
     const neighbour = sameCategory[idx + direction];
     if (!neighbour) return;
 
+    setReordering(true);
     try {
       // Swap positions in two PATCHes. We do them sequentially so a
       // mid-flight failure leaves at most one row mid-swap (which is
@@ -226,233 +305,151 @@ export default function AdminFaqPage() {
         type: "error",
         title: err instanceof Error ? err.message : "Reorder failed.",
       });
+    } finally {
+      setReordering(false);
     }
   };
 
-  const deleteRow = async (row: Faq) => {
-    if (!confirm(`Delete this FAQ permanently?\n\n"${row.question}"`)) return;
+  const confirmDelete = async () => {
+    const row = pendingDelete;
+    if (!row) return;
+    setDeleting(true);
     try {
       const res = await fetch(`/api/admin/faq/${row.id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Delete failed.");
       showToast({ type: "success", title: "FAQ deleted" });
       if (selectedId === row.id) resetForm();
+      setPendingDelete(null);
       await load();
     } catch (err) {
       showToast({
         type: "error",
         title: err instanceof Error ? err.message : "Delete failed.",
       });
+    } finally {
+      setDeleting(false);
     }
   };
 
   // ---- Derived ------------------------------------------------------
 
-  const allCategories = useMemo<string[]>(() => {
-    return [ALL_LABEL, ...(data?.categories ?? [])];
-  }, [data?.categories]);
+  const faqs = useMemo(() => data?.faqs ?? [], [data]);
 
-  const visibleFaqs = useMemo<Faq[]>(() => {
-    if (!data) return [];
-    if (filterCategory === ALL_LABEL) return data.faqs;
-    return data.faqs.filter((f) => f.category === filterCategory);
-  }, [data, filterCategory]);
+  const filteredFaqs = useMemo<Faq[]>(() => {
+    const q = search.trim().toLowerCase();
+    return faqs.filter((f) => {
+      if (filterCategory !== ALL && f.category !== filterCategory) return false;
+      if (filterStatus === "ACTIVE" && !f.isActive) return false;
+      if (filterStatus === "HIDDEN" && f.isActive) return false;
+      if (q && !f.question.toLowerCase().includes(q) && !f.answer.toLowerCase().includes(q))
+        return false;
+      return true;
+    });
+  }, [faqs, filterCategory, filterStatus, search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filterCategory, filterStatus, search]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredFaqs.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const pageStart = (currentPage - 1) * PAGE_SIZE;
+  const pageRows = filteredFaqs.slice(pageStart, pageStart + PAGE_SIZE);
+
+  const filtersActive = filterCategory !== ALL || filterStatus !== "ALL" || !!search.trim();
+  const resetFilters = () => {
+    setFilterCategory(ALL);
+    setFilterStatus("ALL");
+    setSearch("");
+  };
 
   const counts = useMemo(() => {
-    const total = data?.faqs.length ?? 0;
-    const active = data?.faqs.filter((f) => f.isActive).length ?? 0;
-    const inactive = total - active;
-    return { total, active, inactive };
-  }, [data]);
+    const total = faqs.length;
+    const active = faqs.filter((f) => f.isActive).length;
+    return { total, active, inactive: total - active };
+  }, [faqs]);
 
-  // ---- Render -------------------------------------------------------
+  // Position of the selected FAQ within its (saved) category.
+  const orderInfo = useMemo(() => {
+    if (!selectedRow) return null;
+    const same = faqs
+      .filter((f) => f.category === selectedRow.category)
+      .sort((a, b) => a.position - b.position);
+    const idx = same.findIndex((f) => f.id === selectedRow.id);
+    return { index: idx, total: same.length };
+  }, [faqs, selectedRow]);
 
-  return (
-    <>
-      {/* Header */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">FAQ</h1>
-          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-            Central question/answer store. Powers <code>/faq</code>, the dashboard FAQ pages, and
-            the landing-page FAQ block.
-          </p>
-        </div>
-        <Button onClick={resetForm}>New FAQ</Button>
-      </div>
+  // ---- Editor panel -------------------------------------------------
 
-      <OwnerOnlyBanner action="manage FAQs" />
+  const previewQuestion = question.trim();
+  const previewAnswer = answer.trim();
 
-      {loadError && (
-        <InlineAlert variant="error" title="Error" className="mb-4">
-          {loadError}
-        </InlineAlert>
-      )}
-
-      {/* Summary cards */}
-      <section className="mb-6 grid gap-4 md:grid-cols-3">
-        <SummaryCard
-          label="Total"
-          value={loading ? "—" : counts.total}
-          hint="All FAQs in the store."
-        />
-        <SummaryCard
-          label="Active"
-          value={loading ? "—" : counts.active}
-          hint="Visible to visitors."
-        />
-        <SummaryCard
-          label="Hidden"
-          value={loading ? "—" : counts.inactive}
-          hint="Inactive — kept for restore but hidden from public."
-        />
-      </section>
-
-      {/* List + Form */}
-      <section className="grid gap-4 xl:grid-cols-[3fr_2fr]">
-        {/* List */}
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold tracking-tight">FAQ list</h2>
-            <p className="text-xs text-[var(--bb-text-tertiary)]">Click a row to edit.</p>
-          </div>
-
-          {/* Category filter pills */}
-          <div className="mb-3 flex flex-wrap gap-2">
-            {allCategories.map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => setFilterCategory(cat)}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                  filterCategory === cat
-                    ? "bg-[var(--bb-primary)] text-white"
-                    : "bg-[var(--bb-bg-warm)] text-[var(--bb-text-secondary)] hover:bg-[#eae6f1]"
-                }`}
+  const panel = (
+    <form onSubmit={handleSubmit} noValidate className="contents">
+      <DetailPanel
+        title={
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            {selectedRow ? "Edit FAQ" : "New FAQ"}
+            {selectedRow && (
+              <Badge tone={selectedRow.isActive ? "green" : "neutral"}>
+                {selectedRow.isActive ? "Active" : "Hidden"}
+              </Badge>
+            )}
+          </span>
+        }
+        onClose={selectedRow ? resetForm : undefined}
+        closeLabel="Clear selection"
+        footer={
+          <SaveBar
+            dirty={dirty}
+            status={submitting ? "Saving…" : dirty ? "Unsaved changes" : "No unsaved changes"}
+          >
+            {dirty && (
+              <Button
+                variant="ghost"
+                disabled={submitting}
+                onClick={() => {
+                  applySnapshot(baseline);
+                  setFieldErrors({});
+                  setSubmitError(null);
+                }}
               >
-                {cat}
-              </button>
-            ))}
-          </div>
+                Discard
+              </Button>
+            )}
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={!dirty || submitting}
+              aria-busy={submitting}
+            >
+              {submitting ? "Saving…" : selectedRow ? "Save FAQ" : "Create FAQ"}
+            </Button>
+          </SaveBar>
+        }
+      >
+        <p className="-mt-1 mb-5 text-sm text-[var(--av2-text-2)]">
+          Active FAQs render on every public surface. Hidden FAQs stay in the store but don&apos;t
+          show up on the public site.
+        </p>
 
-          {loading ? (
-            <LoadingState message="Loading FAQs…" />
-          ) : visibleFaqs.length === 0 ? (
-            <EmptyState title="No FAQs in this category." />
-          ) : (
-            <ul className="space-y-2">
-              {visibleFaqs.map((row) => {
-                const sameCategoryCount =
-                  data?.faqs.filter((f) => f.category === row.category).length ?? 0;
-                const sameCategorySorted = (data?.faqs ?? [])
-                  .filter((f) => f.category === row.category)
-                  .sort((a, b) => a.position - b.position);
-                const idxInCategory = sameCategorySorted.findIndex((f) => f.id === row.id);
-                const isFirst = idxInCategory === 0;
-                const isLast = idxInCategory === sameCategoryCount - 1;
-                const isSelected = selectedId === row.id;
-
-                return (
-                  <li
-                    key={row.id}
-                    className={`rounded-xl border px-3 py-2.5 transition-colors ${
-                      isSelected
-                        ? "border-[var(--bb-primary)] bg-[var(--bb-primary-light)]"
-                        : "border-[var(--bb-border-subtle)] bg-[var(--bb-bg-page)] hover:bg-[var(--bb-bg-warm)]"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <button
-                        type="button"
-                        onClick={() => fillFormFromRow(row)}
-                        className="min-w-0 flex-1 text-left"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Badge variant="neutral">{row.category}</Badge>
-                          {!row.isActive && <Badge variant="warning">Hidden</Badge>}
-                        </div>
-                        <p className="mt-1.5 text-sm font-semibold text-[var(--bb-secondary)]">
-                          {row.question}
-                        </p>
-                        <p className="mt-1 line-clamp-2 text-xs text-[var(--bb-text-secondary)]">
-                          {row.answer}
-                        </p>
-                      </button>
-
-                      <div className="flex shrink-0 flex-col items-end gap-1">
-                        <div className="flex items-center gap-1">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => moveRow(row, -1)}
-                            disabled={isFirst}
-                            aria-label="Move up"
-                          >
-                            ↑
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => moveRow(row, 1)}
-                            disabled={isLast}
-                            aria-label="Move down"
-                          >
-                            ↓
-                          </Button>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => toggleActive(row)}
-                          >
-                            {row.isActive ? "Hide" : "Show"}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => deleteRow(row)}
-                          >
-                            Delete
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-
-        {/* Form */}
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-          <h2 className="text-sm font-semibold tracking-tight">
-            {selectedId ? "Edit FAQ" : "Create FAQ"}
-          </h2>
-          <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
-            Active FAQs render on every public surface. Hidden FAQs stay in the store but don&apos;t
-            show up on the public site.
-          </p>
-
-          {submitError && (
-            <InlineAlert variant="error" size="sm" className="mt-3">
+        {submitError && (
+          <div className="mb-5">
+            <Callout tone="error" title="Couldn’t save the FAQ">
               {submitError}
-            </InlineAlert>
-          )}
+            </Callout>
+          </div>
+        )}
 
-          <form className="mt-4 space-y-3" onSubmit={handleSubmit}>
-            <div className="flex flex-col gap-1">
-              <label
-                htmlFor="faq-category"
-                className="text-xs font-medium text-[var(--bb-secondary)]"
-              >
-                Category <span className="text-[var(--bb-primary)]">*</span>
-              </label>
-              <input
+        <PanelSection>
+          <div className="space-y-4">
+            <Field
+              label="Category"
+              htmlFor="faq-category"
+              hint="Pick an existing category or type a new one."
+              error={fieldErrors.category}
+            >
+              <TextInput
                 id="faq-category"
                 list="faq-category-options"
                 type="text"
@@ -461,113 +458,324 @@ export default function AdminFaqPage() {
                 placeholder="e.g. General, Pricing & Billing"
                 maxLength={80}
                 required
-                className="w-full rounded-md border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-2 text-sm text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
+                aria-invalid={fieldErrors.category ? true : undefined}
               />
               <datalist id="faq-category-options">
                 {data?.categories.map((c) => (
                   <option key={c} value={c} />
                 ))}
               </datalist>
-              <p className="text-xs text-[var(--bb-text-muted)]">
-                Pick an existing bucket or type a new one.
-              </p>
-            </div>
+            </Field>
 
-            <div className="flex flex-col gap-1">
-              <label
-                htmlFor="faq-question"
-                className="text-xs font-medium text-[var(--bb-secondary)]"
-              >
-                Question <span className="text-[var(--bb-primary)]">*</span>
-              </label>
-              <FormInput
+            <Field label="Question" htmlFor="faq-question" error={fieldErrors.question}>
+              <TextInput
                 id="faq-question"
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
                 placeholder="How fast will I get my creatives?"
                 maxLength={300}
                 required
+                aria-invalid={fieldErrors.question ? true : undefined}
               />
-            </div>
+            </Field>
 
-            <div className="flex flex-col gap-1">
-              <label
-                htmlFor="faq-answer"
-                className="text-xs font-medium text-[var(--bb-secondary)]"
-              >
-                Answer <span className="text-[var(--bb-primary)]">*</span>
-              </label>
-              <textarea
+            <Field
+              label="Answer"
+              htmlFor="faq-answer"
+              hint="Line breaks are preserved on the public page."
+              error={fieldErrors.answer}
+            >
+              <TextArea
                 id="faq-answer"
                 value={answer}
                 onChange={(e) => setAnswer(e.target.value)}
                 placeholder="Most requests are completed within 1 to 2 days…"
-                rows={6}
+                rows={5}
                 maxLength={5000}
                 required
-                className="w-full rounded-md border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-2 text-sm text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
+                aria-invalid={fieldErrors.answer ? true : undefined}
               />
-              <p className="text-xs text-[var(--bb-text-muted)]">
-                Line breaks are preserved on the public page.
+            </Field>
+
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p id="faq-visible-label" className="text-sm font-medium">
+                  Visible to visitors
+                </p>
+                <p id="faq-visible-hint" className="mt-0.5 text-xs text-[var(--av2-text-2)]">
+                  Hidden questions stay saved and can be restored.
+                </p>
+              </div>
+              <Switch
+                checked={isActive}
+                onChange={setIsActive}
+                labelledBy="faq-visible-label"
+                describedBy="faq-visible-hint"
+              />
+            </div>
+          </div>
+        </PanelSection>
+
+        <PanelSection>
+          <details open className="group">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded text-base font-semibold focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none [&::-webkit-details-marker]:hidden">
+              Visitor preview
+              <IconChevronDown className="text-[var(--av2-text-2)] transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="mt-3 rounded-xl border border-[var(--av2-border)] bg-[var(--av2-bg)] p-4">
+              {!isActive && (
+                <div className="mb-2">
+                  <Badge tone="neutral">Hidden — not shown to visitors</Badge>
+                </div>
+              )}
+              <p className="text-base font-semibold break-words">
+                {previewQuestion || (
+                  <span className="text-[var(--av2-text-2)]">Your question appears here</span>
+                )}
+              </p>
+              <p className="mt-1 text-sm break-words whitespace-pre-line text-[var(--av2-text-2)]">
+                {previewAnswer || "The answer appears here."}
               </p>
             </div>
+          </details>
+        </PanelSection>
 
-            <label className="flex items-center gap-2 text-xs font-medium text-[var(--bb-secondary)]">
-              <input
-                type="checkbox"
-                checked={isActive}
-                onChange={(e) => setIsActive(e.target.checked)}
-                className="h-3 w-3 rounded border-[var(--bb-border-input)] text-[var(--bb-primary)] focus:ring-[var(--bb-primary)]"
-              />
-              Active (visible on public surfaces)
-            </label>
-
-            <div className="flex items-center justify-between pt-2">
-              {selectedId ? (
-                <Button type="button" variant="ghost" size="sm" onClick={resetForm}>
-                  Cancel edit
-                </Button>
-              ) : (
-                <span />
-              )}
+        {selectedRow && orderInfo && (
+          <PanelSection title="Order in category">
+            <p className="text-sm text-[var(--av2-text-2)]">
+              Position{" "}
+              <span className="font-semibold text-[var(--av2-text)] tabular-nums">
+                {orderInfo.index >= 0 ? fmt(orderInfo.index + 1) : DASH}
+              </span>{" "}
+              of {fmt(orderInfo.total)} in “{selectedRow.category}”.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
               <Button
-                type="submit"
-                loading={submitting}
-                loadingText="Saving…"
-                disabled={submitting}
+                size="sm"
+                onClick={() => void moveRow(selectedRow, -1)}
+                disabled={reordering || orderInfo.index <= 0}
               >
-                {selectedId ? "Save changes" : "Create FAQ"}
+                <span aria-hidden>↑</span> Move up
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => void moveRow(selectedRow, 1)}
+                disabled={reordering || orderInfo.index >= orderInfo.total - 1}
+              >
+                <span aria-hidden>↓</span> Move down
               </Button>
             </div>
-          </form>
-        </div>
-      </section>
-    </>
+          </PanelSection>
+        )}
+
+        {selectedRow && (
+          <PanelSection title="Danger zone">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="min-w-0 flex-1 text-sm text-[var(--av2-text-2)]">
+                Deleting removes this FAQ permanently. To keep it, hide it instead.
+              </p>
+              <Button variant="danger" size="sm" onClick={() => setPendingDelete(selectedRow)}>
+                Delete FAQ
+              </Button>
+            </div>
+          </PanelSection>
+        )}
+      </DetailPanel>
+    </form>
   );
-}
 
-// -----------------------------------------------------------------------------
-// Inline summary card. Same shape as the cards on /admin/plans for a
-// consistent admin look without pulling in a shared SummaryCard component
-// (would be over-abstraction for two pages).
-// -----------------------------------------------------------------------------
+  // ---- Render -------------------------------------------------------
 
-function SummaryCard({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: number | string;
-  hint: string;
-}) {
+  const stat = (label: string, value: number) => (
+    <span className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--av2-border)] bg-[var(--av2-surface)] px-3 text-sm">
+      <span className="font-semibold text-[var(--av2-text)] tabular-nums">
+        {data ? fmt(value) : DASH}
+      </span>
+      {label}
+    </span>
+  );
+
   return (
-    <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-      <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
-        {label}
-      </p>
-      <p className="mt-2 text-3xl font-semibold text-[var(--bb-secondary)]">{value}</p>
-      <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">{hint}</p>
+    <div>
+      <PageHeader
+        title="FAQ"
+        description={
+          <>
+            Central question and answer store. Powers <code>/faq</code>, the dashboard FAQ pages and
+            the landing-page FAQ block.
+          </>
+        }
+        meta={
+          <div className="flex flex-wrap gap-2">
+            {stat("total", counts.total)}
+            {stat("active", counts.active)}
+            {stat("hidden", counts.inactive)}
+          </div>
+        }
+        actions={
+          <Button variant="primary" onClick={resetForm}>
+            <span aria-hidden className="text-lg leading-none">
+              +
+            </span>
+            New FAQ
+          </Button>
+        }
+      />
+
+      <OwnerOnlyBanner action="manage FAQs" />
+
+      {loadError && (
+        <div className="mb-6">
+          <Callout
+            tone="error"
+            title="Couldn’t load FAQs"
+            action={
+              <Button size="sm" onClick={() => void load()}>
+                Try again
+              </Button>
+            }
+          >
+            {loadError}
+          </Callout>
+        </div>
+      )}
+
+      <SplitView panel={panel}>
+        <Card padding="none">
+          <div className="px-6 pt-5">
+            <h2 className="mb-4 text-xl leading-7 font-semibold">All questions</h2>
+            <FilterBar>
+              <SearchInput
+                className="w-full min-w-[200px] flex-1"
+                value={search}
+                onChange={setSearch}
+                placeholder="Search questions…"
+                label="Search questions and answers"
+              />
+              <div className="w-full sm:w-52">
+                <Select
+                  aria-label="Filter by category"
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value)}
+                >
+                  <option value={ALL}>All categories</option>
+                  {data?.categories.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="w-full sm:w-40">
+                <Select
+                  aria-label="Filter by visibility"
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value as StatusFilter)}
+                >
+                  <option value="ALL">All statuses</option>
+                  <option value="ACTIVE">Active</option>
+                  <option value="HIDDEN">Hidden</option>
+                </Select>
+              </div>
+            </FilterBar>
+          </div>
+
+          {loading && !data ? (
+            <div className="space-y-3 border-t border-[var(--av2-border)] px-6 py-5" role="status">
+              <span className="sr-only">Loading FAQs…</span>
+              {[0, 1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
+          ) : !data ? null : faqs.length === 0 ? (
+            <div className="border-t border-[var(--av2-border)]">
+              <EmptyState
+                icon={<IconFaq width={28} height={28} />}
+                title="No FAQs yet"
+                description="Write the first question with the editor on the right."
+              />
+            </div>
+          ) : filteredFaqs.length === 0 ? (
+            <div className="border-t border-[var(--av2-border)]">
+              <EmptyState
+                title={
+                  search.trim()
+                    ? "No questions match your search"
+                    : "No questions match these filters"
+                }
+                description="Try a different search, category or status."
+                action={<Button onClick={resetFilters}>Clear filters</Button>}
+              />
+            </div>
+          ) : (
+            <Table label="FAQs">
+              <thead>
+                <tr>
+                  <Th>Question</Th>
+                  <Th className="w-28">Visibility</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {pageRows.map((row) => (
+                  <Tr
+                    key={row.id}
+                    selected={selectedId === row.id}
+                    onSelect={() => fillFormFromRow(row)}
+                    label={`${row.question}, ${row.category}, ${row.isActive ? "active" : "hidden"}`}
+                  >
+                    <Td>
+                      <div className="font-semibold break-words">{row.question}</div>
+                      <div className="mt-1.5">
+                        <Badge tone="neutral">{row.category}</Badge>
+                      </div>
+                    </Td>
+                    <Td className="whitespace-nowrap">
+                      <StatusDot
+                        tone={row.isActive ? "green" : "neutral"}
+                        label={row.isActive ? "Active" : "Hidden"}
+                      />
+                    </Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
+
+          {data && filteredFaqs.length > 0 && (
+            <TableFooter>
+              <span className="tabular-nums">
+                Showing {fmt(pageStart + 1)}–{fmt(pageStart + pageRows.length)} of{" "}
+                {fmt(filteredFaqs.length)} {plural(filteredFaqs.length, "question", "questions")}
+                {filtersActive && ` (filtered from ${fmt(faqs.length)})`}
+              </span>
+              <div className="flex flex-wrap items-center gap-3">
+                {filtersActive && (
+                  <Button size="sm" variant="ghost" onClick={resetFilters}>
+                    Clear filters
+                  </Button>
+                )}
+                <Pager page={currentPage} pageCount={pageCount} onPage={setPage} />
+              </div>
+            </TableFooter>
+          )}
+        </Card>
+
+        {data && faqs.length > 0 && (
+          <p className="mt-4 text-sm text-[var(--av2-text-2)]">
+            Select a question to edit it. Order is managed within each category from the editor.
+          </p>
+        )}
+      </SplitView>
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={() => void confirmDelete()}
+        loading={deleting}
+        title="Delete this FAQ permanently?"
+        description={pendingDelete ? `“${pendingDelete.question}”` : undefined}
+        confirmLabel="Delete"
+      />
     </div>
   );
 }
