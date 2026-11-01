@@ -17,6 +17,7 @@ import { useToast } from "@/components/ui/toast-provider";
 import { ConfirmTypedPhraseModal } from "@/components/admin/confirm-typed-phrase-modal";
 import { MfaChallengeModal, type MfaChallengeInfo } from "@/components/admin/mfa-challenge-modal";
 import { useSessionRole } from "@/lib/hooks/use-session-role";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 import {
   Avatar,
   Badge,
@@ -252,8 +253,28 @@ export default function AdminUsersPage() {
     setPreselectId(null);
   }, [preselectId, loaded, users, pageSize]);
 
+  const selected = users.find((u) => u.id === selectedId) ?? null;
+
+  // Drafts belong to the selected user only; switching user resets them.
+  const roleDirty = selected != null && pendingRole !== "" && pendingRole !== selected.role;
+  const capDirty =
+    selected != null &&
+    pendingCap.trim() !==
+      (selected.tasksPerWeekCap == null ? "" : String(selected.tasksPerWeekCap));
+  const hoursDirty = selected != null && pendingHours.trim() !== (selected.workingHours ?? "");
+  const confirmDiscard = useUnsavedChanges(roleDirty || capDirty || hoursDirty, "Manage user");
+
+  const resetDrafts = (u: UserRow | null) => {
+    if (!u) return;
+    setPendingRole(u.role);
+    setPendingCap(u.tasksPerWeekCap == null ? "" : String(u.tasksPerWeekCap));
+    setPendingHours(u.workingHours ?? "");
+  };
+
   // Below xl the panel stacks under the list — bring it into view.
-  const selectUser = (id: string) => {
+  const selectUser = async (id: string) => {
+    if (id === selectedId) return;
+    if (!(await confirmDiscard())) return;
     setSelectedId(id);
     if (window.matchMedia("(max-width: 1279px)").matches) {
       requestAnimationFrame(() =>
@@ -264,14 +285,22 @@ export default function AdminUsersPage() {
     }
   };
 
-  const selected = users.find((u) => u.id === selectedId) ?? null;
+  const closePanel = async () => {
+    if (!(await confirmDiscard())) return;
+    setSelectedId(null);
+  };
+
+  // Filters reload the list and can drop the selected user (and the panel),
+  // so ask first and clear the drafts once the user agrees.
+  const confirmFilterChange = async () => {
+    if (!(await confirmDiscard())) return false;
+    resetDrafts(selected);
+    return true;
+  };
 
   // Reset the drafts whenever a different user is selected.
   useEffect(() => {
-    if (!selected) return;
-    setPendingRole(selected.role);
-    setPendingCap(selected.tasksPerWeekCap == null ? "" : String(selected.tasksPerWeekCap));
-    setPendingHours(selected.workingHours ?? "");
+    resetDrafts(selected);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset on selection change only
   }, [selected?.id]);
 
@@ -520,7 +549,8 @@ export default function AdminUsersPage() {
   // ---------------------------------------------------------------------------
 
   const filtersActive = roleFilter !== "" || debouncedSearch.trim() !== "" || showDeleted;
-  const resetFilters = () => {
+  const resetFilters = async () => {
+    if (!(await confirmFilterChange())) return;
     setRoleFilter("");
     setSearch("");
     setDebouncedSearch("");
@@ -540,18 +570,11 @@ export default function AdminUsersPage() {
   // Manage user panel
   // ---------------------------------------------------------------------------
 
-  const roleDirty = selected != null && pendingRole !== "" && pendingRole !== selected.role;
-  const capDirty =
-    selected != null &&
-    pendingCap.trim() !==
-      (selected.tasksPerWeekCap == null ? "" : String(selected.tasksPerWeekCap));
-  const hoursDirty = selected != null && pendingHours.trim() !== (selected.workingHours ?? "");
-
   const panel = selected ? (
     <div id="manage-user-panel" className="min-w-0 scroll-mt-24">
       <DetailPanel
         title="Manage user"
-        onClose={() => setSelectedId(null)}
+        onClose={() => void closePanel()}
         closeLabel="Close user panel"
         footer={
           selected.deletedAt ? undefined : (
@@ -822,7 +845,10 @@ export default function AdminUsersPage() {
                 <Select
                   aria-label="Filter by role"
                   value={roleFilter}
-                  onChange={(e) => setRoleFilter(e.target.value)}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    void confirmFilterChange().then((ok) => ok && setRoleFilter(next));
+                  }}
                 >
                   <option value="">All roles</option>
                   {ROLE_OPTIONS.map((r) => (
@@ -832,7 +858,11 @@ export default function AdminUsersPage() {
                   ))}
                 </Select>
               </div>
-              <Switch checked={showDeleted} onChange={setShowDeleted} label="Show deleted" />
+              <Switch
+                checked={showDeleted}
+                onChange={(v) => void confirmFilterChange().then((ok) => ok && setShowDeleted(v))}
+                label="Show deleted"
+              />
             </FilterBar>
           </div>
 
@@ -855,7 +885,7 @@ export default function AdminUsersPage() {
                 <EmptyState
                   title="No users match these filters"
                   description="Try a different name, email or role."
-                  action={<Button onClick={resetFilters}>Clear filters</Button>}
+                  action={<Button onClick={() => void resetFilters()}>Clear filters</Button>}
                 />
               ) : (
                 <EmptyState
@@ -891,7 +921,7 @@ export default function AdminUsersPage() {
                     <Tr
                       key={u.id}
                       selected={u.id === selectedId}
-                      onSelect={() => selectUser(u.id)}
+                      onSelect={() => void selectUser(u.id)}
                       label={`${displayName(u)}, ${ROLE_LABELS[u.role] || u.role}`}
                     >
                       <Td>
@@ -950,7 +980,7 @@ export default function AdminUsersPage() {
               <Pager page={currentPage} pageCount={pageCount} onPage={setPage} />
               <div className="flex items-center gap-3">
                 {filtersActive && (
-                  <Button size="sm" variant="ghost" onClick={resetFilters}>
+                  <Button size="sm" variant="ghost" onClick={() => void resetFilters()}>
                     Clear filters
                   </Button>
                 )}

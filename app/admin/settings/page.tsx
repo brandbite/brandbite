@@ -40,6 +40,7 @@ import {
   TextInput,
 } from "@/components/admin/v2/ui";
 import { IconArrowUpRight } from "@/components/admin/v2/icons";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 import { useToast } from "@/components/ui/toast-provider";
 
 type SettingsMap = Record<string, string | null>;
@@ -420,8 +421,15 @@ export default function AdminSettingsPage() {
     {} as Record<SectionKey, string[]>,
   );
 
-  const isEdited = (key: string) => (drafts[key] ?? "") !== (initialDrafts[key] ?? "");
+  // Trimmed, like the value handleSave sends, so a saved value with stray
+  // whitespace in the input doesn't stay "edited".
+  const isEdited = (key: string) =>
+    (drafts[key] ?? "").trim() !== (initialDrafts[key] ?? "").trim();
   const editedIn = (section: SectionKey) => (sectionedKeys[section] ?? []).filter(isEdited);
+
+  // Drafts are per setting and survive tab switches, so only leaving the page
+  // can lose them.
+  useUnsavedChanges(Object.keys(SETTING_META).some(isEdited), "Settings");
 
   const tabLabel = (section: SectionKey) => {
     const n = editedIn(section).length;
