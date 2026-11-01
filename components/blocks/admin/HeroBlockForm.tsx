@@ -15,11 +15,11 @@
 
 import { useState } from "react";
 
-import { Button } from "@/components/ui/button";
+import { Field, Select, TextArea, TextInput } from "@/components/admin/v2/ui";
 import { CmsImageUpload } from "@/components/ui/cms-image-upload";
-import { FormInput } from "@/components/ui/form-field";
-import { InlineAlert } from "@/components/ui/inline-alert";
 import { useToast } from "@/components/ui/toast-provider";
+
+import { BlockSaveFooter, Code, FormSection, Req, useDirtyBaseline } from "./block-form-ui";
 
 import { HERO_VARIANTS, type HeroData } from "@/lib/blocks/types";
 
@@ -66,6 +66,20 @@ export function HeroBlockForm({ initial, pageKey }: HeroBlockFormProps) {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Presentation only: drives the SaveBar status + disables Save when clean.
+  const { dirty, markSaved } = useDirtyBaseline(
+    JSON.stringify([
+      variant,
+      headline,
+      subhead,
+      ctaLabel,
+      ctaHref,
+      secondaryCtaLabel,
+      secondaryCtaHref,
+      image,
+    ]),
+  );
 
   const variantNeedsImage =
     variant === "image-left" || variant === "image-right" || variant === "full-bleed";
@@ -123,6 +137,7 @@ export function HeroBlockForm({ initial, pageKey }: HeroBlockFormProps) {
         throw new Error(json?.reason || json?.error || "Save failed.");
       }
 
+      markSaved();
       showToast({
         type: "success",
         title: "Hero saved",
@@ -137,139 +152,119 @@ export function HeroBlockForm({ initial, pageKey }: HeroBlockFormProps) {
 
   return (
     <form onSubmit={handleSave} className="space-y-6">
-      {/* Variant ------------------------------------------------------- */}
-      <div>
-        <label
-          htmlFor="hero-variant"
-          className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-        >
-          Layout variant
-        </label>
-        <select
-          id="hero-variant"
-          value={variant}
-          onChange={(e) => setVariant(e.target.value as HeroData["variant"])}
-          className="w-full rounded-md border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-2 text-sm text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
-        >
-          {HERO_VARIANTS.map((v) => (
-            <option key={v} value={v}>
-              {VARIANT_LABELS[v]}
-            </option>
-          ))}
-        </select>
-        <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">{VARIANT_HELPS[variant]}</p>
-      </div>
-
-      {/* Headline ----------------------------------------------------- */}
-      <div>
-        <label
-          htmlFor="hero-headline"
-          className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-        >
-          Headline <span className="text-[var(--bb-primary)]">*</span>
-        </label>
-        <FormInput
-          id="hero-headline"
-          value={headline}
-          onChange={(e) => setHeadline(e.target.value)}
-          placeholder="All your creatives, one subscription."
-          maxLength={200}
-        />
-      </div>
-
-      {/* Subhead ------------------------------------------------------- */}
-      <div>
-        <label
-          htmlFor="hero-subhead"
-          className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-        >
-          Subhead
-        </label>
-        <textarea
-          id="hero-subhead"
-          value={subhead}
-          onChange={(e) => setSubhead(e.target.value)}
-          placeholder="Optional supporting paragraph below the headline."
-          rows={2}
-          maxLength={500}
-          className="w-full rounded-md border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-2 text-sm text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
-        />
-      </div>
-
-      {/* CTA pair ------------------------------------------------------ */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <label
-            htmlFor="hero-cta-label"
-            className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
+      <FormSection>
+        <Field label="Layout variant" htmlFor="hero-variant" hint={VARIANT_HELPS[variant]}>
+          <Select
+            id="hero-variant"
+            value={variant}
+            onChange={(e) => setVariant(e.target.value as HeroData["variant"])}
           >
-            Primary CTA label
-          </label>
-          <FormInput
-            id="hero-cta-label"
-            value={ctaLabel}
-            onChange={(e) => setCtaLabel(e.target.value)}
-            placeholder="Get Started"
-            maxLength={50}
-          />
-        </div>
-        <div>
-          <label
-            htmlFor="hero-cta-href"
-            className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-          >
-            Primary CTA destination
-          </label>
-          <FormInput
-            id="hero-cta-href"
-            value={ctaHref}
-            onChange={(e) => setCtaHref(e.target.value)}
-            placeholder="/login"
-            maxLength={200}
-          />
-          <p className="mt-1 text-xs text-[var(--bb-text-muted)]">
-            Internal path like <code>/login</code> or full URL starting with <code>https://</code>.
-          </p>
-        </div>
-      </div>
+            {HERO_VARIANTS.map((v) => (
+              <option key={v} value={v}>
+                {VARIANT_LABELS[v]}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      </FormSection>
 
-      {/* Secondary CTA (optional) -------------------------------------- */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <label
-            htmlFor="hero-secondary-label"
-            className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
+      <FormSection title="Content">
+        <div className="space-y-5">
+          <Field
+            label={
+              <>
+                Headline
+                <Req />
+              </>
+            }
+            htmlFor="hero-headline"
           >
-            Secondary CTA label (optional)
-          </label>
-          <FormInput
-            id="hero-secondary-label"
-            value={secondaryCtaLabel}
-            onChange={(e) => setSecondaryCtaLabel(e.target.value)}
-            placeholder="See the showcase"
-            maxLength={50}
-          />
+            <TextInput
+              id="hero-headline"
+              value={headline}
+              onChange={(e) => setHeadline(e.target.value)}
+              placeholder="All your creatives, one subscription."
+              maxLength={200}
+            />
+          </Field>
+
+          <Field label="Subhead" htmlFor="hero-subhead">
+            <TextArea
+              id="hero-subhead"
+              value={subhead}
+              onChange={(e) => setSubhead(e.target.value)}
+              placeholder="Optional supporting paragraph below the headline."
+              rows={2}
+              maxLength={500}
+            />
+          </Field>
         </div>
-        <div>
-          <label
-            htmlFor="hero-secondary-href"
-            className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-          >
-            Secondary CTA destination
-          </label>
-          <FormInput
-            id="hero-secondary-href"
-            value={secondaryCtaHref}
-            onChange={(e) => setSecondaryCtaHref(e.target.value)}
-            placeholder="/showcase"
-            maxLength={200}
-          />
+      </FormSection>
+
+      <FormSection
+        title="Buttons"
+        description="A label without a destination can't be saved. Leave both blank to hide a button."
+      >
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <Field label="Primary CTA label" htmlFor="hero-cta-label">
+              <TextInput
+                id="hero-cta-label"
+                value={ctaLabel}
+                onChange={(e) => setCtaLabel(e.target.value)}
+                placeholder="Get Started"
+                maxLength={50}
+              />
+            </Field>
+            <Field
+              label="Primary CTA destination"
+              htmlFor="hero-cta-href"
+              hint={
+                <>
+                  Internal path like <Code>/login</Code> or full URL starting with{" "}
+                  <Code>https://</Code>.
+                </>
+              }
+            >
+              <TextInput
+                id="hero-cta-href"
+                value={ctaHref}
+                onChange={(e) => setCtaHref(e.target.value)}
+                placeholder="/login"
+                maxLength={200}
+              />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <Field label="Secondary CTA label (optional)" htmlFor="hero-secondary-label">
+              <TextInput
+                id="hero-secondary-label"
+                value={secondaryCtaLabel}
+                onChange={(e) => setSecondaryCtaLabel(e.target.value)}
+                placeholder="See the showcase"
+                maxLength={50}
+              />
+            </Field>
+            <Field label="Secondary CTA destination" htmlFor="hero-secondary-href">
+              <TextInput
+                id="hero-secondary-href"
+                value={secondaryCtaHref}
+                onChange={(e) => setSecondaryCtaHref(e.target.value)}
+                placeholder="/showcase"
+                maxLength={200}
+              />
+            </Field>
+          </div>
         </div>
-      </div>
+      </FormSection>
 
       {/* Hero image (only shown for variants that use one) ------------ */}
       {variantNeedsImage ? (
-        <div>
+        <FormSection
+          title="Media"
+          description="For full-bleed, use a high-resolution image (≥1600px wide). The renderer adds a dark gradient overlay so light photos stay legible."
+        >
           <CmsImageUpload
             type="page-block"
             value={image}
@@ -277,27 +272,10 @@ export function HeroBlockForm({ initial, pageKey }: HeroBlockFormProps) {
             label="Hero image"
             aspectRatio={variant === "full-bleed" ? "21/9" : "4/3"}
           />
-          <p className="mt-1 text-xs text-[var(--bb-text-muted)]">
-            For full-bleed, use a high-resolution image (≥1600px wide). The renderer adds a dark
-            gradient overlay so light photos stay legible.
-          </p>
-        </div>
+        </FormSection>
       ) : null}
 
-      {/* Error + submit ---------------------------------------------- */}
-      {error ? <InlineAlert variant="error">{error}</InlineAlert> : null}
-
-      <div className="flex justify-end gap-3 pt-2">
-        <Button
-          type="submit"
-          variant="primary"
-          loading={submitting}
-          loadingText="Saving…"
-          disabled={submitting}
-        >
-          Save hero
-        </Button>
-      </div>
+      <BlockSaveFooter error={error} dirty={dirty} submitting={submitting} label="Save hero" />
     </form>
   );
 }

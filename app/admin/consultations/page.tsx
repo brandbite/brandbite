@@ -44,6 +44,7 @@ import {
 } from "@/components/admin/v2/ui";
 import { IconClock } from "@/components/admin/v2/icons";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 import { IconConsultations, IconSettings } from "@/components/navigation/nav-icons";
 
 type ConsultationStatus = "PENDING" | "SCHEDULED" | "COMPLETED" | "CANCELED";
@@ -248,6 +249,24 @@ export default function AdminConsultationsPage() {
   }, [rows, query]);
 
   const selected = rows.find((r) => r.id === selectedId) ?? null;
+
+  // Schedule drafts are kept per consultation, so switching rows or filters
+  // never drops them — only leaving the page does. A draft that still matches
+  // the consultation's saved values is not a change.
+  const scheduleDirty = useMemo(
+    () =>
+      Object.entries(drafts).some(([id, d]) => {
+        const c = rows.find((r) => r.id === id);
+        if (!c) return true;
+        return (
+          d.scheduledAt !== (c.scheduledAt ? isoToDatetimeLocal(c.scheduledAt) : "") ||
+          d.videoLink !== (c.videoLink ?? "") ||
+          d.adminNotes !== (c.adminNotes ?? "")
+        );
+      }),
+    [drafts, rows],
+  );
+  useUnsavedChanges(scheduleDirty, "Consultation schedule");
 
   const selectRow = (id: string) => {
     if (id !== selectedId) setTab(drafts[id] ? "schedule" : "request");

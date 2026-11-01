@@ -44,6 +44,7 @@ import {
 import { IconArrowUpRight, IconClock, IconCoins } from "@/components/admin/v2/icons";
 import { IconConsultations } from "@/components/navigation/nav-icons";
 import { useSessionRole } from "@/lib/hooks/use-session-role";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 
 type Settings = {
   id: string;
@@ -379,6 +380,7 @@ export default function AdminConsultationSettingsPage() {
   const errors = useMemo(() => (draftPayload ? validate(draftPayload) : {}), [draftPayload]);
   const errorKeys = Object.keys(errors) as FieldKey[];
   const dirty = changed.length > 0;
+  const confirmDiscard = useUnsavedChanges(dirty, "Consultation settings");
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -411,6 +413,8 @@ export default function AdminConsultationSettingsPage() {
   };
 
   const handleDisconnect = async () => {
+    // Disconnecting reloads the settings, which replaces the form draft.
+    if (!(await confirmDiscard())) return;
     if (
       !window.confirm(
         "Disconnect Google Calendar? New bookings will fall back to the manual PENDING flow.",

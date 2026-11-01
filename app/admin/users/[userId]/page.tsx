@@ -7,21 +7,51 @@
 //
 //           Edit actions still go through the existing PATCH on
 //           /api/admin/users (role change, cap, working hours, revision
-//           notes, hard-delete). This page is read-only context; we link
-//           back to the list view for the inline editors.
+//           notes, hard-delete). This page is read-only context; "Manage
+//           user" links back to the list view with this user's panel open.
+//
+//           Layout (admin design language v1): header card (avatar, name,
+//           email, role + status badges) → tabs: Overview / Authentication /
+//           role-specific (Workload + Profile for creatives, Companies for
+//           customers) / Admin history.
+// @version: v2.0.0
+// @status: active
+// @lastUpdate: 2026-11-01
 // -----------------------------------------------------------------------------
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode, type SVGProps } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import { LoadingState } from "@/components/ui/loading-state";
+import {
+  Avatar,
+  Badge,
+  Button,
+  ButtonLink,
+  Callout,
+  Card,
+  CardTitle,
+  DASH,
+  EmptyState,
+  IconTile,
+  KeyValueList,
+  Skeleton,
+  TabPanel,
+  Tabs,
+  TextLink,
+  fmt,
+  plural,
+  type Tone,
+} from "@/components/admin/v2/ui";
+import {
+  IconArrowUpRight,
+  IconBuilding,
+  IconCoins,
+  IconTicket,
+  IconUsers,
+} from "@/components/admin/v2/icons";
 
 // ---------------------------------------------------------------------------
 // Types — kept narrow so the page compiles without leaking server-only types
@@ -142,6 +172,8 @@ type DetailResponse = {
   } | null;
 };
 
+type TabKey = "overview" | "auth" | "workload" | "profile" | "companies" | "history";
+
 const ROLE_LABELS: Record<Role, string> = {
   SITE_OWNER: "Site Owner",
   SITE_ADMIN: "Site Admin",
@@ -149,17 +181,16 @@ const ROLE_LABELS: Record<Role, string> = {
   CUSTOMER: "Customer",
 };
 
-// Mirror the colors the list page uses so badges read consistently across
-// the two views.
-const ROLE_BADGE_VARIANTS: Record<Role, "warning" | "primary" | "info" | "neutral"> = {
-  SITE_OWNER: "warning",
-  SITE_ADMIN: "primary",
-  DESIGNER: "info",
-  CUSTOMER: "neutral",
+// Same tones the list page uses so badges read consistently across views.
+const ROLE_TONES: Record<Role, Tone> = {
+  SITE_OWNER: "amber",
+  SITE_ADMIN: "blue",
+  DESIGNER: "green",
+  CUSTOMER: "lavender",
 };
 
 function formatDateTime(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return DASH;
   try {
     return new Intl.DateTimeFormat("en-GB", {
       day: "numeric",
@@ -175,7 +206,7 @@ function formatDateTime(iso: string | null): string {
 }
 
 function relativeTime(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return DASH;
   const then = new Date(iso).getTime();
   const diff = Math.max(0, Date.now() - then);
   const sec = Math.round(diff / 1000);
@@ -238,6 +269,158 @@ function describeUserAgent(ua: string | null): string {
   return `${browser} on ${os}`;
 }
 
+const rating = (n: number | null) => (n == null ? DASH : `${n.toFixed(1)} / 5`);
+
+// ---------------------------------------------------------------------------
+// Page-local glyphs + building blocks
+// ---------------------------------------------------------------------------
+
+const svgBase = {
+  width: 18,
+  height: 18,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.8,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+};
+
+function IconCopy(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...svgBase} {...p}>
+      <rect x="8" y="8" width="12" height="12" rx="2" />
+      <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />
+    </svg>
+  );
+}
+
+function IconShield(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...svgBase} {...p}>
+      <path d="M12 3 5 6v5c0 4.5 3 8.3 7 10 4-1.7 7-5.5 7-10V6l-7-3Z" />
+    </svg>
+  );
+}
+
+function IconHistory(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...svgBase} {...p}>
+      <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+      <path d="M3 3v5h5M12 7v5l3 2" />
+    </svg>
+  );
+}
+
+function IconLock(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...svgBase} {...p}>
+      <rect x="5" y="11" width="14" height="9" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </svg>
+  );
+}
+
+const BackLink = () => (
+  <Link
+    href="/admin/users"
+    className="mb-4 inline-flex items-center gap-1.5 rounded text-sm font-medium text-[var(--av2-text-2)] hover:text-[var(--av2-text)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
+  >
+    <span aria-hidden>←</span> Back to users
+  </Link>
+);
+
+function ExternalLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1 font-semibold break-all text-[var(--av2-link)] hover:underline"
+    >
+      {children}
+      <IconArrowUpRight className="shrink-0" />
+    </a>
+  );
+}
+
+/** Big-number stat with an icon tile (Account activity / Workload). */
+function Stat({
+  icon,
+  tone,
+  label,
+  value,
+  hint,
+  link,
+}: {
+  icon: ReactNode;
+  tone: Tone;
+  label: string;
+  value: ReactNode;
+  hint?: ReactNode;
+  link?: ReactNode;
+}) {
+  return (
+    <div className="flex min-w-0 items-start gap-4">
+      <IconTile tone={tone}>{icon}</IconTile>
+      <div className="min-w-0">
+        <p className="text-sm text-[var(--av2-text-2)]">{label}</p>
+        <p className="mt-0.5 text-[32px] leading-10 font-bold tracking-tight tabular-nums">
+          {value}
+        </p>
+        {hint && <p className="text-xs text-[var(--av2-text-2)]">{hint}</p>}
+        {link && <div className="mt-1.5">{link}</div>}
+      </div>
+    </div>
+  );
+}
+
+function OutcomeBadge({ outcome }: { outcome: string }) {
+  const tone: Tone = outcome === "SUCCESS" ? "green" : outcome === "FAILURE" ? "red" : "neutral";
+  const label = outcome.charAt(0) + outcome.slice(1).toLowerCase().replace(/_/g, " ");
+  return <Badge tone={tone}>{label}</Badge>;
+}
+
+function TargetAuditList({ rows }: { rows: AuditTargetEntry[] }) {
+  return (
+    <ul className="divide-y divide-[var(--av2-border)]">
+      {rows.map((row) => (
+        <li key={row.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-3 text-sm">
+          <OutcomeBadge outcome={row.outcome} />
+          <code className="font-mono text-[13px] font-medium">{row.action}</code>
+          <span className="text-[var(--av2-text-2)]">
+            by {row.actorEmail} ({ROLE_LABELS[row.actorRole] ?? row.actorRole}) ·{" "}
+            <time dateTime={row.createdAt} title={formatDateTime(row.createdAt)}>
+              {relativeTime(row.createdAt)}
+            </time>
+          </span>
+          {row.errorMessage && (
+            <span className="w-full text-xs text-[var(--av2-error-text)]">{row.errorMessage}</span>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function LoadingSkeleton() {
+  return (
+    <div aria-busy="true" aria-label="Loading user">
+      <Skeleton className="mb-4 h-5 w-32" />
+      <Skeleton className="mb-6 h-36 w-full rounded-2xl" />
+      <Skeleton className="mb-6 h-10 w-96 max-w-full" />
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <Skeleton className="h-80 rounded-2xl" />
+        <Skeleton className="h-80 rounded-2xl" />
+      </div>
+      <p className="sr-only" role="status">
+        Loading user…
+      </p>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -247,6 +430,8 @@ export default function AdminUserDetailPage() {
   const [data, setData] = useState<DetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<TabKey>("overview");
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -275,524 +460,836 @@ export default function AdminUserDetailPage() {
     };
   }, [userId]);
 
-  if (loading) return <LoadingState message="Loading user…" />;
+  if (loading) return <LoadingSkeleton />;
   if (error)
     return (
-      <InlineAlert variant="error" title="Couldn't load user">
-        {error}
-      </InlineAlert>
+      <div>
+        <BackLink />
+        <Callout tone="error" title="Couldn't load user">
+          {error}
+        </Callout>
+      </div>
     );
-  if (!data) return <EmptyState title="User not found" description="No record matched that id." />;
+  if (!data)
+    return (
+      <div>
+        <BackLink />
+        <Card>
+          <EmptyState
+            icon={<IconUsers width={28} height={28} />}
+            title="User not found"
+            description="No record matched that id."
+          />
+        </Card>
+      </div>
+    );
 
   const { user, sessions, audit, designer, customer } = data;
+  const isAdminRole = user.role === "SITE_OWNER" || user.role === "SITE_ADMIN";
+  const tabPrefix = "user-detail";
 
-  return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      {/* Top breadcrumb / back link */}
-      <div className="flex items-center gap-2 text-xs text-[var(--bb-text-muted)]">
-        <Link href="/admin/users" className="hover:text-[var(--bb-secondary)]">
-          ← All users
-        </Link>
-        <span>·</span>
-        <span>User profile</span>
+  const copyId = async () => {
+    try {
+      await navigator.clipboard.writeText(user.id);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard blocked — the id is still visible in the Identity card.
+    }
+  };
+
+  const tabs: { value: TabKey; label: ReactNode }[] = [
+    { value: "overview", label: "Overview" },
+    { value: "auth", label: "Sessions & auth" },
+  ];
+  if (designer) {
+    tabs.push({ value: "workload", label: "Workload" });
+    if (designer.hiredFrom) tabs.push({ value: "profile", label: "Profile" });
+  }
+  if (customer) {
+    tabs.push({ value: "companies", label: `Companies (${customer.memberships.length})` });
+  }
+  tabs.push({ value: "history", label: "Admin history" });
+
+  // ---------------------------------------------------------------- cards
+
+  const identityCard = (
+    <Card>
+      <CardTitle
+        action={
+          <Button size="sm" variant="ghost" onClick={copyId} aria-live="polite">
+            <IconCopy width={16} height={16} />
+            {copied ? "Copied" : "Copy user ID"}
+          </Button>
+        }
+      >
+        Identity
+      </CardTitle>
+      <div className="mt-5">
+        <KeyValueList
+          rows={[
+            { label: "Name", value: user.name || DASH },
+            { label: "Email", value: <span className="break-all">{user.email}</span> },
+            {
+              label: "Platform role",
+              value: <Badge tone={ROLE_TONES[user.role]}>{ROLE_LABELS[user.role]}</Badge>,
+            },
+            {
+              label: "User ID",
+              value: (
+                <code className="font-mono text-xs break-all text-[var(--av2-text-2)]">
+                  {user.id}
+                </code>
+              ),
+            },
+            { label: "Timezone", value: user.timezone ?? "Not set" },
+            ...(user.role === "DESIGNER"
+              ? [
+                  { label: "Working hours", value: user.workingHours ?? "Not set" },
+                  {
+                    label: "Open task cap",
+                    value: user.tasksPerWeekCap == null ? "No cap" : fmt(user.tasksPerWeekCap),
+                  },
+                  {
+                    label: "Revision notes",
+                    value: user.creativeRevisionNotesEnabled ? "Allowed" : "Disabled",
+                  },
+                  ...(user.isPaused
+                    ? [
+                        {
+                          label: "Paused",
+                          value:
+                            user.pauseType === "MANUAL"
+                              ? "Manual (no expiry)"
+                              : user.pauseExpiresAt
+                                ? `Until ${formatDateTime(user.pauseExpiresAt)}`
+                                : "Yes",
+                        },
+                      ]
+                    : []),
+                ]
+              : []),
+            { label: "Created", value: formatDateTime(user.createdAt) },
+            { label: "Updated", value: formatDateTime(user.updatedAt) },
+          ]}
+        />
       </div>
+    </Card>
+  );
 
-      {/* Header — identity card */}
-      <section className="flex flex-wrap items-start gap-5 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-6">
-        <div
-          className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--bb-bg-page)] text-2xl font-semibold text-[var(--bb-text-secondary)] ring-1 ring-[var(--bb-border)]"
-          aria-hidden="true"
+  const authRows = [
+    { label: "Active sessions", value: fmt(sessions.activeCount) },
+    {
+      label: "Email verification",
+      value: user.emailVerified ? (
+        <Badge tone="green">Verified</Badge>
+      ) : (
+        <Badge tone="amber">Unverified</Badge>
+      ),
+    },
+    {
+      label: "Login two-factor",
+      value: user.twoFactorEnabled ? <Badge tone="green">Enabled</Badge> : <Badge>Disabled</Badge>,
+    },
+    {
+      label: "Money-action MFA",
+      value: user.totpEnrolledAt
+        ? `Enrolled ${formatDateTime(user.totpEnrolledAt)}`
+        : "Not enrolled",
+    },
+  ];
+
+  const authSummaryCard = (
+    <Card>
+      <CardTitle>Authentication</CardTitle>
+      <div className="mt-5">
+        <KeyValueList rows={authRows} />
+      </div>
+      <div className="mt-5 border-t border-[var(--av2-border)] pt-4">
+        <button
+          type="button"
+          onClick={() => setTab("auth")}
+          className="inline-flex items-center gap-1 rounded text-sm font-semibold text-[var(--av2-link)] hover:underline focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
         >
-          {user.image ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={user.image} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <span>{(user.name || user.email)[0]?.toUpperCase() ?? "?"}</span>
-          )}
-        </div>
-
-        <div className="min-w-0 flex-1 space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl font-bold text-[var(--bb-secondary)]">
-              {user.name || "(no name)"}
-            </h1>
-            <Badge variant={ROLE_BADGE_VARIANTS[user.role]}>{ROLE_LABELS[user.role]}</Badge>
-            {user.deletedAt && <Badge variant="neutral">Deleted</Badge>}
-            {user.role === "DESIGNER" && user.isPaused && <Badge variant="warning">Paused</Badge>}
-            {!user.emailVerified && <Badge variant="warning">Email unverified</Badge>}
-            {user.twoFactorEnabled && <Badge variant="success">Login 2FA</Badge>}
-            {user.totpEnrolledAt && (
-              <span title="MFA TOTP enrolled for money actions">
-                <Badge variant="success">MFA TOTP</Badge>
-              </span>
-            )}
-          </div>
-          <p className="text-sm break-all text-[var(--bb-text-secondary)]">{user.email}</p>
-          <p className="text-xs text-[var(--bb-text-muted)]">
-            Joined {formatDateTime(user.createdAt)} · Last activity{" "}
-            {relativeTime(user.lastAuthActivityAt)}
-            {user.timezone ? ` · ${user.timezone}` : ""}
-          </p>
-        </div>
-
-        <div className="shrink-0">
-          <Link href="/admin/users">
-            <Button variant="secondary" size="sm">
-              Edit on /admin/users
-            </Button>
-          </Link>
-        </div>
-      </section>
-
-      {/* Soft-deleted banner */}
-      {user.deletedAt && (
-        <InlineAlert variant="warning" title="This account is deleted">
-          The user&apos;s identity was anonymized on {formatDateTime(user.deletedAt)}. Tickets,
-          ledger entries, and audit rows they&apos;re attached to are preserved. They cannot sign
-          in.
-        </InlineAlert>
-      )}
-
-      {/* Two-column grid for the main sections */}
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Auth + sessions */}
-        <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-5">
-          <h2 className="mb-3 text-sm font-semibold text-[var(--bb-secondary)]">Auth & sessions</h2>
-          <dl className="space-y-1.5 text-xs">
-            <Row label="Active sessions">
-              <span className="font-medium text-[var(--bb-secondary)]">{sessions.activeCount}</span>
-            </Row>
-            <Row label="Email verified">{user.emailVerified ? "Yes" : "No"}</Row>
-            <Row label="Login 2FA">{user.twoFactorEnabled ? "Enabled" : "Disabled"}</Row>
-            <Row label="Money-action MFA">
-              {user.totpEnrolledAt
-                ? `Enrolled ${formatDateTime(user.totpEnrolledAt)}`
-                : "Not enrolled"}
-            </Row>
-            {sessions.lastSession && (
-              <>
-                <Row label="Last device">{describeUserAgent(sessions.lastSession.userAgent)}</Row>
-                <Row label="Last seen">{relativeTime(sessions.lastSession.updatedAt)}</Row>
-              </>
-            )}
-          </dl>
-        </section>
-
-        {/* Identity quick-reference */}
-        <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-5">
-          <h2 className="mb-3 text-sm font-semibold text-[var(--bb-secondary)]">Identity</h2>
-          <dl className="space-y-1.5 text-xs">
-            <Row label="User id">
-              <code className="text-[10px] break-all text-[var(--bb-text-muted)]">{user.id}</code>
-            </Row>
-            <Row label="Timezone">{user.timezone ?? "—"}</Row>
-            {user.role === "DESIGNER" && (
-              <>
-                <Row label="Working hours">{user.workingHours ?? "—"}</Row>
-                <Row label="Concurrent task cap">
-                  {user.tasksPerWeekCap == null ? "No cap" : user.tasksPerWeekCap}
-                </Row>
-                <Row label="Revision notes">
-                  {user.creativeRevisionNotesEnabled ? "Allowed" : "Disabled"}
-                </Row>
-                {user.isPaused && (
-                  <Row label="Paused">
-                    {user.pauseType === "MANUAL"
-                      ? "Manual (no expiry)"
-                      : user.pauseExpiresAt
-                        ? `Until ${formatDateTime(user.pauseExpiresAt)}`
-                        : "Yes"}
-                  </Row>
-                )}
-              </>
-            )}
-            <Row label="Created">{formatDateTime(user.createdAt)}</Row>
-            <Row label="Updated">{formatDateTime(user.updatedAt)}</Row>
-          </dl>
-        </section>
+          View sessions &amp; auth
+          <IconArrowUpRight />
+        </button>
       </div>
+    </Card>
+  );
 
-      {/* Designer-only sections */}
-      {designer && (
-        <>
-          <div className="grid gap-6 md:grid-cols-2">
-            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-5">
-              <h2 className="mb-3 text-sm font-semibold text-[var(--bb-secondary)]">
-                Workload &amp; tickets
-              </h2>
-              <dl className="space-y-1.5 text-xs">
-                <Row label="Active">
-                  <span className="font-medium text-[var(--bb-secondary)]">
-                    {designer.tickets.active}
-                  </span>{" "}
-                  <span className="text-[var(--bb-text-muted)]">
-                    ({designer.tickets.TODO} TODO / {designer.tickets.IN_PROGRESS} IP /{" "}
-                    {designer.tickets.IN_REVIEW} IR)
-                  </span>
-                </Row>
-                <Row label="Done lifetime">{designer.tickets.DONE}</Row>
-                <Row label="Done this week">{designer.tickets.completedThisWeek}</Row>
-                <Row label="Cap">
-                  {user.tasksPerWeekCap == null ? "No cap" : user.tasksPerWeekCap}
-                </Row>
-              </dl>
-            </section>
-
-            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-5">
-              <h2 className="mb-3 text-sm font-semibold text-[var(--bb-secondary)]">Earnings</h2>
-              <dl className="space-y-1.5 text-xs">
-                <Row label="Total earned">
-                  {designer.earnings.totalEarned.toLocaleString()} tokens
-                </Row>
-                <Row label="Total withdrawn">
-                  {designer.earnings.totalWithdrawn.toLocaleString()} tokens
-                </Row>
-                <Row label="Withdrawals">{designer.earnings.withdrawalCount}</Row>
-                <Row label="Current balance">
-                  <span className="font-medium text-[var(--bb-secondary)]">
-                    {(
-                      designer.earnings.totalEarned - designer.earnings.totalWithdrawn
-                    ).toLocaleString()}{" "}
-                    tokens
-                  </span>
-                </Row>
-              </dl>
-            </section>
-          </div>
-
-          <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-5">
-            <h2 className="mb-3 text-sm font-semibold text-[var(--bb-secondary)]">
-              Skills · {designer.skills.length} job type
-              {designer.skills.length === 1 ? "" : "s"}
-            </h2>
-            {designer.skills.length === 0 ? (
-              <p className="text-xs text-[var(--bb-text-muted)]">
-                No skills assigned yet. Auto-assign won&apos;t route any tickets to this creative
-                until at least one CreativeSkill is added.
-              </p>
-            ) : (
-              <ul className="flex flex-wrap gap-1.5">
-                {designer.skills.map((s) => (
-                  <li key={s.jobTypeId}>
-                    <span className="inline-block rounded-full border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-2.5 py-0.5 text-[11px] text-[var(--bb-text-secondary)]">
-                      {s.jobTypeName}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          {designer.ratings.count > 0 && (
-            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-5">
-              <h2 className="mb-3 text-sm font-semibold text-[var(--bb-secondary)]">
-                Customer ratings · {designer.ratings.count} response
-                {designer.ratings.count === 1 ? "" : "s"}
-              </h2>
-              <dl className="grid gap-2 text-xs sm:grid-cols-3">
-                <Row label="Quality">{designer.ratings.quality?.toFixed(1) ?? "—"} / 5</Row>
-                <Row label="Communication">
-                  {designer.ratings.communication?.toFixed(1) ?? "—"} / 5
-                </Row>
-                <Row label="Speed">{designer.ratings.speed?.toFixed(1) ?? "—"} / 5</Row>
-              </dl>
-            </section>
-          )}
-
-          {designer.hiredFrom && (
-            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-5">
-              <h2 className="mb-3 text-sm font-semibold text-[var(--bb-secondary)]">Contact</h2>
-              <dl className="space-y-1.5 text-xs">
-                <Row label="WhatsApp">
-                  {designer.hiredFrom.whatsappNumber ? (
-                    <a
-                      href={`https://wa.me/${designer.hiredFrom.whatsappNumber.replace(/[^0-9]/g, "")}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[var(--bb-primary)] hover:underline"
-                    >
-                      {designer.hiredFrom.whatsappNumber} ↗
-                    </a>
-                  ) : (
-                    "—"
-                  )}
-                </Row>
-                <Row label="Country">{designer.hiredFrom.country || "—"}</Row>
-                <Row label="Timezone (at apply)">
-                  {designer.hiredFrom.applicationTimezone || "—"}
-                  {user.timezone && user.timezone !== designer.hiredFrom.applicationTimezone && (
-                    <span className="ml-1.5 text-[var(--bb-text-muted)]">
-                      (now: {user.timezone})
-                    </span>
-                  )}
-                </Row>
-                <Row label="Portfolio">
-                  {designer.hiredFrom.portfolioUrl ? (
-                    <a
-                      href={designer.hiredFrom.portfolioUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="break-all text-[var(--bb-primary)] hover:underline"
-                    >
-                      {designer.hiredFrom.portfolioUrl} ↗
-                    </a>
-                  ) : (
-                    "—"
-                  )}
-                </Row>
-                <Row label="LinkedIn">
-                  {designer.hiredFrom.linkedinUrl ? (
-                    <a
-                      href={designer.hiredFrom.linkedinUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="break-all text-[var(--bb-primary)] hover:underline"
-                    >
-                      {designer.hiredFrom.linkedinUrl} ↗
-                    </a>
-                  ) : (
-                    "—"
-                  )}
-                </Row>
-                {(() => {
-                  const socials = readSocialLinks(designer.hiredFrom.socialLinks);
-                  if (socials.length === 0) return null;
-                  return (
-                    <Row label="Other links">
-                      <ul className="flex flex-wrap gap-1.5">
-                        {socials.map((s) => (
-                          <li key={s.url}>
-                            <a
-                              href={s.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-block rounded-full border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-2 py-0.5 text-[11px] text-[var(--bb-primary)] hover:underline"
-                            >
-                              {s.label} ↗
-                            </a>
-                          </li>
-                        ))}
-                      </ul>
-                    </Row>
-                  );
-                })()}
-              </dl>
-            </section>
-          )}
-
-          {designer.hiredFrom && (
-            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-5">
-              <h2 className="mb-3 text-sm font-semibold text-[var(--bb-secondary)]">Background</h2>
-              <dl className="space-y-1.5 text-xs">
-                <Row label="Years experience">{designer.hiredFrom.totalYears}</Row>
-                <Row label="Remote experience">
-                  {designer.hiredFrom.hasRemoteExp
-                    ? designer.hiredFrom.yearsRemote
-                      ? `Yes · ${designer.hiredFrom.yearsRemote}`
-                      : "Yes"
-                    : "No"}
-                </Row>
-                {(() => {
-                  const worked = readStringArray(designer.hiredFrom.workedWith);
-                  if (worked.length === 0) return null;
-                  return (
-                    <Row label="Worked with">
-                      <span className="text-[var(--bb-text-secondary)]">{worked.join(" · ")}</span>
-                    </Row>
-                  );
-                })()}
-                {(() => {
-                  const tools = readStringArray(designer.hiredFrom.tools);
-                  if (tools.length === 0 && !designer.hiredFrom.toolsOther) return null;
-                  return (
-                    <Row label="Tools">
-                      <span className="text-[var(--bb-text-secondary)]">
-                        {tools.join(" · ")}
-                        {designer.hiredFrom.toolsOther
-                          ? `${tools.length > 0 ? " · " : ""}Other: ${designer.hiredFrom.toolsOther}`
-                          : ""}
-                      </span>
-                    </Row>
-                  );
-                })()}
-              </dl>
-            </section>
-          )}
-
-          {designer.hiredFrom && (
-            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-5">
-              <h2 className="mb-3 text-sm font-semibold text-[var(--bb-secondary)]">
-                Hired through talent application
-              </h2>
-              <dl className="space-y-1.5 text-xs">
-                <Row label="Application name">{designer.hiredFrom.fullName}</Row>
-                <Row label="Hired at">{formatDateTime(designer.hiredFrom.hiredAt)}</Row>
-                <Row label="Hired by">{designer.hiredFrom.hiredByUserEmail ?? "—"}</Row>
-                <Row label="Applied workload">
-                  {designer.hiredFrom.workload}
-                  {designer.hiredFrom.preferredTasksPerWeek
-                    ? ` · ${designer.hiredFrom.preferredTasksPerWeek} tasks/wk`
-                    : ""}
-                </Row>
-                {designer.hiredFrom.hireNotes && (
-                  <Row label="Hire notes">
-                    <span className="whitespace-pre-wrap">{designer.hiredFrom.hireNotes}</span>
-                  </Row>
-                )}
-                <Row label="Application id">
-                  <Link
-                    href={`/admin/talent-applications`}
-                    className="text-[var(--bb-primary)] hover:underline"
-                  >
-                    {designer.hiredFrom.applicationId} ↗
-                  </Link>
-                </Row>
-              </dl>
-            </section>
-          )}
-        </>
-      )}
-
-      {/* Customer-only sections */}
-      {customer && (
-        <>
-          <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-5">
-            <h2 className="mb-3 text-sm font-semibold text-[var(--bb-secondary)]">
-              Tickets created
-            </h2>
-            <p className="text-xs text-[var(--bb-text-secondary)]">
-              <span className="font-medium text-[var(--bb-secondary)]">
-                {customer.ticketsCreated}
-              </span>{" "}
-              total
-            </p>
-          </section>
-
-          <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-5">
-            <h2 className="mb-3 text-sm font-semibold text-[var(--bb-secondary)]">
-              Companies · {customer.memberships.length}
-            </h2>
-            {customer.memberships.length === 0 ? (
-              <p className="text-xs text-[var(--bb-text-muted)]">No company memberships.</p>
-            ) : (
-              <ul className="space-y-2">
-                {customer.memberships.map((m) => (
-                  <li
-                    key={m.company.id}
-                    className="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-page)] p-3"
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-[var(--bb-secondary)]">
-                        <Link href={`/admin/companies/${m.company.id}`} className="hover:underline">
-                          {m.company.name}
-                        </Link>
-                      </p>
-                      <p className="text-[11px] text-[var(--bb-text-muted)]">
-                        Role: {m.roleInCompany} · Joined {formatDateTime(m.joinedAt)}
-                      </p>
-                      {m.company.plan && (
-                        <p className="text-[11px] text-[var(--bb-text-muted)]">
-                          Plan: {m.company.plan.name} (
-                          {m.company.plan.monthlyTokens.toLocaleString()} tokens/mo)
-                        </p>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs font-medium text-[var(--bb-secondary)]">
-                        {m.company.tokenBalance.toLocaleString()} tokens
-                      </p>
-                      {m.company.billingStatus && (
-                        <p className="text-[11px] text-[var(--bb-text-muted)]">
-                          {m.company.billingStatus}
-                        </p>
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        </>
-      )}
-
-      {/* Audit — actions performed ON this user */}
-      <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-5">
-        <h2 className="mb-3 text-sm font-semibold text-[var(--bb-secondary)]">
-          Recent admin actions on this user
-        </h2>
+  const historyPreviewCard = (
+    <Card>
+      <CardTitle>Admin history</CardTitle>
+      <div className="mt-3">
         {audit.asTarget.length === 0 ? (
-          <p className="text-xs text-[var(--bb-text-muted)]">
+          <p className="py-2 text-sm text-[var(--av2-text-2)]">
             No admin actions recorded on this account.
           </p>
         ) : (
-          <ul className="divide-y divide-[var(--bb-border-subtle)]">
-            {audit.asTarget.map((row) => (
-              <li key={row.id} className="flex flex-wrap items-center gap-2 py-2 text-xs">
-                <Badge variant={row.outcome === "SUCCESS" ? "success" : "neutral"}>
-                  {row.outcome}
-                </Badge>
-                <code className="text-[11px] text-[var(--bb-secondary)]">{row.action}</code>
-                <span className="text-[var(--bb-text-muted)]">
-                  by {row.actorEmail} ({row.actorRole}) · {relativeTime(row.createdAt)}
-                </span>
-                {row.errorMessage && (
-                  <span className="text-[var(--bb-text-muted)]">— {row.errorMessage}</span>
-                )}
-              </li>
-            ))}
-          </ul>
+          <TargetAuditList rows={audit.asTarget.slice(0, 3)} />
         )}
-        <p className="mt-3 text-[11px] text-[var(--bb-text-muted)]">
-          <Link
-            href={`/admin/audit-log?targetId=${user.id}`}
-            className="text-[var(--bb-primary)] hover:underline"
+      </div>
+      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
+        {audit.asTarget.length > 3 && (
+          <button
+            type="button"
+            onClick={() => setTab("history")}
+            className="inline-flex items-center gap-1 rounded text-sm font-semibold text-[var(--av2-link)] hover:underline focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
           >
-            View full audit log for this user ↗
-          </Link>
-        </p>
-      </section>
-
-      {/* Audit — actions THIS user performed (admin/owner only) */}
-      {(user.role === "SITE_OWNER" || user.role === "SITE_ADMIN") && (
-        <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] p-5">
-          <h2 className="mb-3 text-sm font-semibold text-[var(--bb-secondary)]">
-            Recent actions this user performed
-          </h2>
-          {audit.asActor.length === 0 ? (
-            <p className="text-xs text-[var(--bb-text-muted)]">No admin actions on record yet.</p>
-          ) : (
-            <ul className="divide-y divide-[var(--bb-border-subtle)]">
-              {audit.asActor.map((row) => (
-                <li key={row.id} className="flex flex-wrap items-center gap-2 py-2 text-xs">
-                  <Badge variant={row.outcome === "SUCCESS" ? "success" : "neutral"}>
-                    {row.outcome}
-                  </Badge>
-                  <code className="text-[11px] text-[var(--bb-secondary)]">{row.action}</code>
-                  {row.targetType && (
-                    <span className="text-[var(--bb-text-muted)]">on {row.targetType}</span>
-                  )}
-                  <span className="text-[var(--bb-text-muted)]">
-                    · {relativeTime(row.createdAt)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      )}
-    </div>
+            Show all {audit.asTarget.length}
+          </button>
+        )}
+        <TextLink href={`/admin/audit-log?targetId=${user.id}`}>View audit log</TextLink>
+      </div>
+    </Card>
   );
-}
 
-// ---------------------------------------------------------------------------
-// Tiny helper component for the dl/dt/dd label pattern used throughout
-// ---------------------------------------------------------------------------
+  // Role-specific "Account activity" summary on the overview.
+  let activityCard: ReactNode = null;
+  if (designer) {
+    const balance = designer.earnings.totalEarned - designer.earnings.totalWithdrawn;
+    activityCard = (
+      <Card>
+        <CardTitle>Account activity</CardTitle>
+        <div className="mt-5 grid gap-6 sm:grid-cols-2">
+          <Stat
+            icon={<IconTicket />}
+            tone="peach"
+            label="Active tickets"
+            value={fmt(designer.tickets.active)}
+            hint={`${fmt(designer.tickets.completedThisWeek)} done this week`}
+          />
+          <Stat
+            icon={<IconCoins />}
+            tone="green"
+            label="Token balance"
+            value={fmt(balance)}
+            hint={`${fmt(designer.earnings.totalEarned)} earned lifetime`}
+          />
+        </div>
+      </Card>
+    );
+  } else if (customer) {
+    activityCard = (
+      <Card>
+        <CardTitle>Account activity</CardTitle>
+        <div className="mt-5 grid gap-6 sm:grid-cols-2 sm:divide-x sm:divide-[var(--av2-border)]">
+          <Stat
+            icon={<IconBuilding />}
+            tone="peach"
+            label="Companies"
+            value={fmt(customer.memberships.length)}
+            link={
+              customer.memberships.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setTab("companies")}
+                  className="inline-flex items-center gap-1 rounded text-sm font-semibold text-[var(--av2-link)] hover:underline focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
+                >
+                  View memberships
+                  <IconArrowUpRight />
+                </button>
+              ) : undefined
+            }
+          />
+          <div className="sm:pl-6">
+            <Stat
+              icon={<IconTicket />}
+              tone="lavender"
+              label="Tickets created"
+              value={fmt(customer.ticketsCreated)}
+            />
+          </div>
+        </div>
+      </Card>
+    );
+  }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-wrap items-baseline gap-2">
-      <dt className="min-w-[120px] text-[var(--bb-text-muted)]">{label}</dt>
-      <dd className="flex-1 break-words text-[var(--bb-text-secondary)]">{children}</dd>
+    <div>
+      <BackLink />
+
+      {/* ---------------- Header card ---------------- */}
+      <Card className="mb-6">
+        <div className="flex flex-wrap items-start gap-5">
+          {user.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={user.image}
+              alt=""
+              className="h-20 w-20 shrink-0 rounded-full border border-[var(--av2-border)] object-cover"
+            />
+          ) : (
+            <Avatar name={user.name || user.email} size={80} tone="neutral" />
+          )}
+
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="mr-1 text-[32px] leading-10 font-bold tracking-tight break-words">
+                {user.name || "(no name)"}
+              </h1>
+              <Badge tone={ROLE_TONES[user.role]}>{ROLE_LABELS[user.role]}</Badge>
+              {user.deletedAt && <Badge tone="red">Deleted</Badge>}
+              {user.role === "DESIGNER" && user.isPaused && <Badge tone="amber">Paused</Badge>}
+              {!user.emailVerified && <Badge tone="amber">Email unverified</Badge>}
+              {user.twoFactorEnabled && <Badge tone="green">Login 2FA</Badge>}
+              {user.totpEnrolledAt && (
+                <span title="MFA TOTP enrolled for money actions">
+                  <Badge tone="green">MFA TOTP</Badge>
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-base break-all">{user.email}</p>
+            <p className="mt-1 text-sm text-[var(--av2-text-2)]">
+              Joined {formatDateTime(user.createdAt)} · Last activity{" "}
+              {relativeTime(user.lastAuthActivityAt)}
+              {user.timezone ? ` · ${user.timezone}` : ""}
+            </p>
+          </div>
+
+          {!user.deletedAt && (
+            <ButtonLink href={`/admin/users?user=${user.id}`} variant="secondary">
+              Manage user
+              <IconArrowUpRight />
+            </ButtonLink>
+          )}
+        </div>
+      </Card>
+
+      {/* Soft-deleted banner */}
+      {user.deletedAt && (
+        <div className="mb-6">
+          <Callout tone="warning" title="This account is deleted">
+            The user&apos;s identity was anonymized on {formatDateTime(user.deletedAt)}. Tickets,
+            ledger entries, and audit rows they&apos;re attached to are preserved. They cannot sign
+            in.
+          </Callout>
+        </div>
+      )}
+
+      <div className="mb-6">
+        <Tabs<TabKey>
+          label="User sections"
+          idPrefix={tabPrefix}
+          value={tab}
+          onChange={setTab}
+          tabs={tabs}
+        />
+      </div>
+
+      {/* ---------------- Overview ---------------- */}
+      {tab === "overview" && (
+        <TabPanel idPrefix={tabPrefix} value="overview">
+          <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+            <div className="min-w-0 space-y-6">
+              {identityCard}
+              {activityCard}
+            </div>
+            <div className="min-w-0 space-y-6">
+              {authSummaryCard}
+              {historyPreviewCard}
+            </div>
+          </div>
+        </TabPanel>
+      )}
+
+      {/* ---------------- Sessions & auth ---------------- */}
+      {tab === "auth" && (
+        <TabPanel idPrefix={tabPrefix} value="auth">
+          <div className="grid items-start gap-6 lg:grid-cols-2">
+            <Card>
+              <CardTitle description="Sign-in factors for this account.">Authentication</CardTitle>
+              <div className="mt-5">
+                <KeyValueList rows={authRows.slice(1)} />
+              </div>
+            </Card>
+            <Card>
+              <CardTitle description="Signed-in devices that haven't expired.">Sessions</CardTitle>
+              <div className="mt-5 flex items-center gap-4">
+                <IconTile tone="lavender">
+                  <IconShield width={22} height={22} />
+                </IconTile>
+                <div>
+                  <p className="text-sm text-[var(--av2-text-2)]">Active sessions</p>
+                  <p className="text-[32px] leading-10 font-bold tracking-tight tabular-nums">
+                    {fmt(sessions.activeCount)}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-5 border-t border-[var(--av2-border)] pt-5">
+                <h3 className="mb-3 text-base font-semibold">Most recent session</h3>
+                {sessions.lastSession ? (
+                  <KeyValueList
+                    rows={[
+                      {
+                        label: "Device",
+                        value: describeUserAgent(sessions.lastSession.userAgent),
+                      },
+                      {
+                        label: "Last seen",
+                        value: (
+                          <span title={formatDateTime(sessions.lastSession.updatedAt)}>
+                            {relativeTime(sessions.lastSession.updatedAt)}
+                          </span>
+                        ),
+                      },
+                      {
+                        label: "Signed in",
+                        value: formatDateTime(sessions.lastSession.createdAt),
+                      },
+                      {
+                        label: "IP address",
+                        value: sessions.lastSession.ipAddress ? (
+                          <code className="font-mono text-xs">
+                            {sessions.lastSession.ipAddress}
+                          </code>
+                        ) : (
+                          DASH
+                        ),
+                      },
+                    ]}
+                  />
+                ) : (
+                  <p className="text-sm text-[var(--av2-text-2)]">
+                    No sessions on record for this account.
+                  </p>
+                )}
+              </div>
+              <p className="mt-5 flex items-start gap-2 rounded-xl bg-[var(--av2-bg)] p-4 text-sm text-[var(--av2-text-2)]">
+                <IconLock width={16} height={16} className="mt-0.5 shrink-0" />
+                {user.lastAuthActivityAt
+                  ? `Last auth activity ${relativeTime(user.lastAuthActivityAt)}.`
+                  : "No auth activity recorded."}
+              </p>
+            </Card>
+          </div>
+        </TabPanel>
+      )}
+
+      {/* ---------------- Workload (creatives) ---------------- */}
+      {tab === "workload" && designer && (
+        <TabPanel idPrefix={tabPrefix} value="workload">
+          <div className="grid items-start gap-6 lg:grid-cols-2">
+            <Card>
+              <CardTitle>Workload &amp; tickets</CardTitle>
+              <div className="mt-5">
+                <Stat
+                  icon={<IconTicket />}
+                  tone="peach"
+                  label="Active tickets"
+                  value={fmt(designer.tickets.active)}
+                />
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Badge>{fmt(designer.tickets.TODO)} backlog</Badge>
+                  <Badge tone="lavender">{fmt(designer.tickets.IN_PROGRESS)} in progress</Badge>
+                  <Badge tone="peach">{fmt(designer.tickets.IN_REVIEW)} in review</Badge>
+                </div>
+              </div>
+              <div className="mt-5 border-t border-[var(--av2-border)] pt-5">
+                <KeyValueList
+                  rows={[
+                    { label: "Done lifetime", value: fmt(designer.tickets.DONE) },
+                    { label: "Done this week", value: fmt(designer.tickets.completedThisWeek) },
+                    {
+                      label: "Open task cap",
+                      value: user.tasksPerWeekCap == null ? "No cap" : fmt(user.tasksPerWeekCap),
+                    },
+                  ]}
+                />
+              </div>
+            </Card>
+
+            <Card>
+              <CardTitle>Earnings</CardTitle>
+              <div className="mt-5">
+                <Stat
+                  icon={<IconCoins />}
+                  tone="green"
+                  label="Current balance"
+                  value={fmt(designer.earnings.totalEarned - designer.earnings.totalWithdrawn)}
+                  hint="tokens"
+                />
+              </div>
+              <div className="mt-5 border-t border-[var(--av2-border)] pt-5">
+                <KeyValueList
+                  rows={[
+                    {
+                      label: "Total earned",
+                      value: `${fmt(designer.earnings.totalEarned)} tokens`,
+                    },
+                    {
+                      label: "Total withdrawn",
+                      value: `${fmt(designer.earnings.totalWithdrawn)} tokens`,
+                    },
+                    { label: "Withdrawals", value: fmt(designer.earnings.withdrawalCount) },
+                  ]}
+                />
+              </div>
+            </Card>
+
+            <Card>
+              <CardTitle
+                description={`${fmt(designer.skills.length)} ${plural(designer.skills.length, "job type", "job types")}`}
+              >
+                Skills
+              </CardTitle>
+              <div className="mt-4">
+                {designer.skills.length === 0 ? (
+                  <p className="text-sm text-[var(--av2-text-2)]">
+                    No skills assigned yet. Auto-assign won&apos;t route any tickets to this
+                    creative until at least one CreativeSkill is added.
+                  </p>
+                ) : (
+                  <ul className="flex flex-wrap gap-2">
+                    {designer.skills.map((s) => (
+                      <li key={s.jobTypeId}>
+                        <Badge>{s.jobTypeName}</Badge>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </Card>
+
+            <Card>
+              <CardTitle
+                description={
+                  designer.ratings.count > 0
+                    ? `${fmt(designer.ratings.count)} ${plural(designer.ratings.count, "response", "responses")}`
+                    : undefined
+                }
+              >
+                Customer ratings
+              </CardTitle>
+              <div className="mt-4">
+                {designer.ratings.count === 0 ? (
+                  <p className="text-sm text-[var(--av2-text-2)]">No ratings yet.</p>
+                ) : (
+                  <dl className="grid grid-cols-3 divide-x divide-[var(--av2-border)]">
+                    {[
+                      { label: "Quality", value: designer.ratings.quality },
+                      { label: "Communication", value: designer.ratings.communication },
+                      { label: "Speed", value: designer.ratings.speed },
+                    ].map((r) => (
+                      <div key={r.label} className="px-4 first:pl-0">
+                        <dt className="text-sm text-[var(--av2-text-2)]">{r.label}</dt>
+                        <dd className="mt-1 text-2xl leading-8 font-bold tabular-nums">
+                          {rating(r.value)}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+              </div>
+            </Card>
+          </div>
+        </TabPanel>
+      )}
+
+      {/* ---------------- Profile (hired creatives) ---------------- */}
+      {tab === "profile" && designer?.hiredFrom && (
+        <TabPanel idPrefix={tabPrefix} value="profile">
+          {(() => {
+            const h = designer.hiredFrom;
+            const socials = readSocialLinks(h.socialLinks);
+            const worked = readStringArray(h.workedWith);
+            const tools = readStringArray(h.tools);
+            return (
+              <div className="grid items-start gap-6 lg:grid-cols-2">
+                <Card>
+                  <CardTitle>Contact</CardTitle>
+                  <div className="mt-5">
+                    <KeyValueList
+                      rows={[
+                        {
+                          label: "WhatsApp",
+                          value: h.whatsappNumber ? (
+                            <ExternalLink
+                              href={`https://wa.me/${h.whatsappNumber.replace(/[^0-9]/g, "")}`}
+                            >
+                              {h.whatsappNumber}
+                            </ExternalLink>
+                          ) : (
+                            DASH
+                          ),
+                        },
+                        { label: "Country", value: h.country || DASH },
+                        {
+                          label: "Timezone (at apply)",
+                          value: (
+                            <>
+                              {h.applicationTimezone || DASH}
+                              {user.timezone && user.timezone !== h.applicationTimezone && (
+                                <span className="ml-1.5 font-normal text-[var(--av2-text-2)]">
+                                  (now: {user.timezone})
+                                </span>
+                              )}
+                            </>
+                          ),
+                        },
+                        {
+                          label: "Portfolio",
+                          value: h.portfolioUrl ? (
+                            <ExternalLink href={h.portfolioUrl}>{h.portfolioUrl}</ExternalLink>
+                          ) : (
+                            DASH
+                          ),
+                        },
+                        {
+                          label: "LinkedIn",
+                          value: h.linkedinUrl ? (
+                            <ExternalLink href={h.linkedinUrl}>{h.linkedinUrl}</ExternalLink>
+                          ) : (
+                            DASH
+                          ),
+                        },
+                        ...(socials.length > 0
+                          ? [
+                              {
+                                label: "Other links",
+                                value: (
+                                  <ul className="flex flex-col gap-1">
+                                    {socials.map((s) => (
+                                      <li key={s.url}>
+                                        <ExternalLink href={s.url}>{s.label}</ExternalLink>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                ),
+                              },
+                            ]
+                          : []),
+                      ]}
+                    />
+                  </div>
+                </Card>
+
+                <Card>
+                  <CardTitle>Background</CardTitle>
+                  <div className="mt-5">
+                    <KeyValueList
+                      rows={[
+                        { label: "Years experience", value: h.totalYears || DASH },
+                        {
+                          label: "Remote experience",
+                          value: h.hasRemoteExp
+                            ? h.yearsRemote
+                              ? `Yes · ${h.yearsRemote}`
+                              : "Yes"
+                            : "No",
+                        },
+                        ...(worked.length > 0
+                          ? [{ label: "Worked with", value: worked.join(" · ") }]
+                          : []),
+                        ...(tools.length > 0 || h.toolsOther
+                          ? [
+                              {
+                                label: "Tools",
+                                value: `${tools.join(" · ")}${
+                                  h.toolsOther
+                                    ? `${tools.length > 0 ? " · " : ""}Other: ${h.toolsOther}`
+                                    : ""
+                                }`,
+                              },
+                            ]
+                          : []),
+                      ]}
+                    />
+                  </div>
+                </Card>
+
+                <Card className="lg:col-span-2">
+                  <CardTitle
+                    action={<TextLink href="/admin/talent-applications">Applications</TextLink>}
+                  >
+                    Hired through talent application
+                  </CardTitle>
+                  <div className="mt-5 max-w-3xl">
+                    <KeyValueList
+                      rows={[
+                        { label: "Application name", value: h.fullName },
+                        { label: "Hired at", value: formatDateTime(h.hiredAt) },
+                        { label: "Hired by", value: h.hiredByUserEmail ?? DASH },
+                        {
+                          label: "Applied workload",
+                          value: `${h.workload}${
+                            h.preferredTasksPerWeek ? ` · ${h.preferredTasksPerWeek} tasks/wk` : ""
+                          }`,
+                        },
+                        ...(h.hireNotes
+                          ? [
+                              {
+                                label: "Hire notes",
+                                value: (
+                                  <span className="font-normal whitespace-pre-wrap">
+                                    {h.hireNotes}
+                                  </span>
+                                ),
+                              },
+                            ]
+                          : []),
+                        {
+                          label: "Application id",
+                          value: (
+                            <code className="font-mono text-xs break-all text-[var(--av2-text-2)]">
+                              {h.applicationId}
+                            </code>
+                          ),
+                        },
+                      ]}
+                    />
+                  </div>
+                </Card>
+              </div>
+            );
+          })()}
+        </TabPanel>
+      )}
+
+      {/* ---------------- Companies (customers) ---------------- */}
+      {tab === "companies" && customer && (
+        <TabPanel idPrefix={tabPrefix} value="companies">
+          <Card>
+            <CardTitle
+              description={`${fmt(customer.ticketsCreated)} ${plural(customer.ticketsCreated, "ticket", "tickets")} created across all companies`}
+            >
+              Company memberships
+            </CardTitle>
+            {customer.memberships.length === 0 ? (
+              <EmptyState
+                icon={<IconBuilding width={28} height={28} />}
+                title="No company memberships"
+                description="This customer isn't a member of any company workspace."
+              />
+            ) : (
+              <ul className="mt-5 divide-y divide-[var(--av2-border)] border-t border-[var(--av2-border)]">
+                {customer.memberships.map((m) => (
+                  <li key={m.company.id} className="flex flex-wrap items-start gap-4 py-4">
+                    <IconTile tone="lavender" size={44}>
+                      <span className="text-lg font-bold" aria-hidden>
+                        {m.company.name.trim().charAt(0).toUpperCase() || "?"}
+                      </span>
+                    </IconTile>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-base font-semibold">
+                        <Link
+                          href={`/admin/companies/${m.company.id}`}
+                          className="hover:text-[var(--av2-link)] hover:underline"
+                        >
+                          {m.company.name}
+                        </Link>
+                      </p>
+                      <p className="mt-0.5 text-sm text-[var(--av2-text-2)]">
+                        {m.roleInCompany} · Joined {formatDateTime(m.joinedAt)}
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {m.company.plan ? (
+                          <Badge tone="lavender">
+                            {m.company.plan.name} · {fmt(m.company.plan.monthlyTokens)} tokens/mo
+                          </Badge>
+                        ) : (
+                          <Badge>No plan</Badge>
+                        )}
+                        {m.company.billingStatus && <Badge>{m.company.billingStatus}</Badge>}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xl leading-7 font-bold tabular-nums">
+                        {fmt(m.company.tokenBalance)}
+                      </p>
+                      <p className="text-xs text-[var(--av2-text-2)]">tokens</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </TabPanel>
+      )}
+
+      {/* ---------------- Admin history ---------------- */}
+      {tab === "history" && (
+        <TabPanel idPrefix={tabPrefix} value="history">
+          <div className="space-y-6">
+            <Card>
+              <CardTitle
+                description="The most recent admin actions where this account was the target."
+                action={
+                  <TextLink href={`/admin/audit-log?targetId=${user.id}`}>Full audit log</TextLink>
+                }
+              >
+                Actions on this user
+              </CardTitle>
+              <div className="mt-4">
+                {audit.asTarget.length === 0 ? (
+                  <EmptyState
+                    icon={<IconHistory width={28} height={28} />}
+                    title="No admin actions yet"
+                    description="No admin actions have been recorded on this account."
+                  />
+                ) : (
+                  <TargetAuditList rows={audit.asTarget} />
+                )}
+              </div>
+            </Card>
+
+            {/* Actions THIS user performed (admin/owner only) */}
+            {isAdminRole && (
+              <Card>
+                <CardTitle description="The most recent admin actions this account performed.">
+                  Actions by this user
+                </CardTitle>
+                <div className="mt-4">
+                  {audit.asActor.length === 0 ? (
+                    <p className="py-2 text-sm text-[var(--av2-text-2)]">
+                      No admin actions on record yet.
+                    </p>
+                  ) : (
+                    <ul className="divide-y divide-[var(--av2-border)]">
+                      {audit.asActor.map((row) => (
+                        <li
+                          key={row.id}
+                          className="flex flex-wrap items-center gap-x-3 gap-y-1 py-3 text-sm"
+                        >
+                          <OutcomeBadge outcome={row.outcome} />
+                          <code className="font-mono text-[13px] font-medium">{row.action}</code>
+                          {row.targetType && (
+                            <span className="text-[var(--av2-text-2)]">on {row.targetType}</span>
+                          )}
+                          <span className="text-[var(--av2-text-2)]">
+                            ·{" "}
+                            <time dateTime={row.createdAt} title={formatDateTime(row.createdAt)}>
+                              {relativeTime(row.createdAt)}
+                            </time>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </Card>
+            )}
+          </div>
+        </TabPanel>
+      )}
+
+      {/* Read-only note */}
+      {!user.deletedAt && (
+        <p className="mt-6 flex items-center gap-2 text-sm text-[var(--av2-text-2)]">
+          <IconLock width={16} height={16} className="shrink-0" />
+          <span>
+            This profile is read-only. Change roles and creative settings from{" "}
+            <Link
+              href={`/admin/users?user=${user.id}`}
+              className="font-semibold text-[var(--av2-link)] hover:underline"
+            >
+              Manage user
+            </Link>
+            .
+          </span>
+        </p>
+      )}
     </div>
   );
 }

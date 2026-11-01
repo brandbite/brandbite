@@ -1,12 +1,16 @@
 // -----------------------------------------------------------------------------
 // @file: app/admin/error.tsx
-// @purpose: Error boundary for admin pages (nav provided by layout)
+// @purpose: Error boundary for admin pages (nav provided by layout). Admin
+//           design language v1: error Callout inside a card, with "Try
+//           again" (reset) as the primary action and a way back to the board.
 // -----------------------------------------------------------------------------
 
 "use client";
 
 import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
+
+import { Button, Callout, Card } from "@/components/admin/v2/ui";
 
 export default function AdminError({
   error,
@@ -21,25 +25,29 @@ export default function AdminError({
   }, [error]);
 
   return (
-    <div className="mx-auto max-w-md rounded-2xl border border-red-200 bg-[var(--bb-bg-page)] px-6 py-8 text-center shadow-sm">
-      <h2 className="text-lg font-semibold text-[var(--bb-secondary)]">Something went wrong</h2>
-      <p className="mt-2 text-sm text-[var(--bb-text-secondary)]">
-        An error occurred while loading this admin page.
-      </p>
-      <div className="mt-4 flex items-center justify-center gap-3">
-        <button
-          onClick={reset}
-          className="inline-flex items-center justify-center rounded-full bg-[var(--bb-primary)] px-5 py-2 text-sm font-semibold text-white shadow-sm"
-        >
-          Try again
-        </button>
-        <button
-          onClick={() => (window.location.href = "/admin/board")}
-          className="inline-flex items-center justify-center rounded-full border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-2 text-sm font-medium text-[var(--bb-secondary)]"
-        >
-          Go to Board
-        </button>
-      </div>
+    <div className="mx-auto max-w-xl pt-8">
+      <Card>
+        <h2 className="text-xl leading-7 font-semibold">Something went wrong</h2>
+        <p className="mt-1 text-sm text-[var(--av2-text-2)]">
+          An error occurred while loading this admin page.
+        </p>
+        <div className="mt-5">
+          <Callout tone="error" title="This page couldn't be loaded">
+            Try again, or head back to the board. The error has been reported.
+            {error.digest && (
+              <span className="mt-1 block font-mono text-xs">Reference: {error.digest}</span>
+            )}
+          </Callout>
+        </div>
+        <div className="mt-6 flex flex-wrap items-center gap-2">
+          <Button variant="primary" onClick={reset}>
+            Try again
+          </Button>
+          <Button variant="secondary" onClick={() => (window.location.href = "/admin/board")}>
+            Go to Board
+          </Button>
+        </div>
+      </Card>
     </div>
   );
 }
