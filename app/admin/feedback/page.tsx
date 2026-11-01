@@ -4,8 +4,9 @@
 //           entry filed via the floating widget, filterable by status + type
 //           (server) and a local search. Selecting an entry opens a panel
 //           with the report itself, its review status and the internal admin
-//           notes; status + notes are drafted in the panel and saved together
-//           (each through its own PATCH, same payloads as before).
+//           notes. The status saves instantly when the select changes
+//           (PATCH { status } + reload, as before the redesign); the notes are
+//           a per-entry draft saved from the panel's SaveBar.
 //
 //           Intentionally read-mostly. The submission side is the user
 //           widget; admins only triage here, not invent new entries.
@@ -22,6 +23,7 @@ import Link from "next/link";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast-provider";
 import { useSessionRole } from "@/lib/hooks/use-session-role";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 import {
   Badge,
   Button,
@@ -185,10 +187,10 @@ export default function AdminFeedbackPage() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [panelTab, setPanelTab] = useState<PanelTab>("report");
-  // Per-entry drafts so switching rows never loses unsaved triage.
+  // Per-entry notes drafts so switching rows never loses unsaved triage.
   const [notesDraft, setNotesDraft] = useState<Record<string, string>>({});
-  const [statusDraft, setStatusDraft] = useState<Record<string, FeedbackStatus>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [statusSavingId, setStatusSavingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -219,7 +221,8 @@ export default function AdminFeedbackPage() {
   }, [load]);
 
   const handleStatusChange = useCallback(
-    async (id: string, next: FeedbackStatus): Promise<boolean> => {
+    async (id: string, next: FeedbackStatus) => {
+      setStatusSavingId(id);
       try {
         const res = await fetch(`/api/admin/feedback/${id}`, {
           method: "PATCH",
@@ -229,18 +232,18 @@ export default function AdminFeedbackPage() {
         const body = (await res.json().catch(() => null)) as { error?: string } | null;
         if (!res.ok) {
           showToast({ type: "error", title: body?.error ?? "Couldn't update status." });
-          return false;
+          return;
         }
         showToast({ type: "success", title: `Status set to ${STATUS_LABEL[next]}` });
         // Refresh — the row may move out of the current filter view.
         void load();
-        return true;
       } catch (err) {
         showToast({
           type: "error",
           title: err instanceof Error ? err.message : "Couldn't update status.",
         });
-        return false;
+      } finally {
+        setStatusSavingId(null);
       }
     },
     [load, showToast],
@@ -289,6 +292,11 @@ export default function AdminFeedbackPage() {
         }
         showToast({ type: "success", title: "Feedback deleted." });
         setItems((prev) => prev.filter((row) => row.id !== id));
+        setNotesDraft((prev) => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
         setSelectedId((cur) => (cur === id ? null : cur));
       } catch (err) {
         showToast({
@@ -317,21 +325,26 @@ export default function AdminFeedbackPage() {
 
   const selected = items.find((row) => row.id === selectedId) ?? null;
 
-  // Draft state for the selected entry
+  // Notes draft for the selected entry (status saves instantly, never drafted)
   const notesValue = selected ? (notesDraft[selected.id] ?? selected.adminNotes ?? "") : "";
-  const statusValue = selected ? (statusDraft[selected.id] ?? selected.status) : "NEW";
-  const notesDirty = selected ? (selected.adminNotes ?? "") !== notesValue.trim() : false;
-  const statusDirty = selected ? statusValue !== selected.status : false;
-  const dirty = notesDirty || statusDirty;
+  const dirty = selected ? (selected.adminNotes ?? "") !== notesValue.trim() : false;
   const saving = selected ? savingId === selected.id : false;
+  const statusSaving = selected ? statusSavingId === selected.id : false;
+
+  // Any entry with unsaved notes, including entries filtered out of the list
+  // (their draft survives until the page is left).
+  const anyNotesDirty = useMemo(
+    () =>
+      Object.entries(notesDraft).some(([id, draft]) => {
+        const row = items.find((r) => r.id === id);
+        return row ? (row.adminNotes ?? "") !== draft.trim() : true;
+      }),
+    [notesDraft, items],
+  );
+  useUnsavedChanges(anyNotesDirty, "Feedback notes");
 
   const resetDraft = (id: string) => {
     setNotesDraft((prev) => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
-    setStatusDraft((prev) => {
       const next = { ...prev };
       delete next[id];
       return next;
@@ -343,17 +356,8 @@ export default function AdminFeedbackPage() {
     const id = selected.id;
     setSavingId(id);
     try {
-      if (notesDirty) await handleSaveNotes(id);
-      if (statusDirty) {
-        const ok = await handleStatusChange(id, statusValue);
-        if (ok) {
-          setStatusDraft((prev) => {
-            const next = { ...prev };
-            delete next[id];
-            return next;
-          });
-        }
-      }
+      // Saved notes become the baseline, so the draft is no longer needed.
+      if (await handleSaveNotes(id)) resetDraft(id);
     } finally {
       setSavingId(null);
     }
@@ -381,13 +385,7 @@ export default function AdminFeedbackPage() {
       footer={
         <SaveBar
           dirty={dirty}
-          status={
-            saving
-              ? "Saving…"
-              : dirty
-                ? `Unsaved changes: ${[statusDirty && "status", notesDirty && "notes"].filter(Boolean).join(" and ")}`
-                : undefined
-          }
+          status={saving ? "Saving…" : dirty ? "Unsaved changes: notes" : undefined}
         >
           <Button
             variant="ghost"
@@ -423,7 +421,7 @@ export default function AdminFeedbackPage() {
                 Internal notes
                 {selected.adminNotes ? (
                   <Badge tone="neutral">Added</Badge>
-                ) : notesDirty ? (
+                ) : dirty ? (
                   <Badge tone="amber">Draft</Badge>
                 ) : null}
               </span>
@@ -491,14 +489,11 @@ export default function AdminFeedbackPage() {
             >
               <Select
                 id="fb-status"
-                value={statusValue}
+                value={selected.status}
                 onChange={(e) =>
-                  setStatusDraft((prev) => ({
-                    ...prev,
-                    [selected.id]: e.target.value as FeedbackStatus,
-                  }))
+                  void handleStatusChange(selected.id, e.target.value as FeedbackStatus)
                 }
-                disabled={saving}
+                disabled={statusSaving}
               >
                 {ALL_STATUSES.map((s) => (
                   <option key={s} value={s}>

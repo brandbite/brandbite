@@ -62,6 +62,7 @@ import { FormInput, FormSelect } from "@/components/ui/form-field";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Modal, ModalFooter, ModalHeader } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast-provider";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 import {
   Badge as V2Badge,
   Button as V2Button,
@@ -1294,6 +1295,21 @@ function ProfileFormBody({ layout }: { layout: ProfileFormLayout }) {
   // -----------------------------------------------------------------
 
   const timezones = useMemo(() => listTimezones(), []);
+
+  // Per-field drafts (each has its own Save). Registered with the admin
+  // unsaved-changes guard; a no-op on the customer / creative profiles,
+  // which render outside the admin provider. Renders no DOM either way.
+  const emailTarget = emailDraft.trim().toLowerCase();
+  const profileDirty =
+    user != null &&
+    (nameDraft.trim() !== (user.name ?? "") ||
+      (emailTarget !== user.email.toLowerCase() && emailTarget !== pendingEmail) ||
+      timezoneDraft !== (user.timezone ?? "") ||
+      (user.role === "DESIGNER" &&
+        (workingHoursDraft.trim() !== (user.workingHours ?? "") ||
+          tasksCapDraft.trim() !==
+            (user.tasksPerWeekCap == null ? "" : String(user.tasksPerWeekCap)))));
+  useUnsavedChanges(profileDirty, "Profile");
 
   if (loading) {
     if (v2) {

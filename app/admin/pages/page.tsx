@@ -36,6 +36,7 @@ import {
   buttonClass,
 } from "@/components/admin/v2/ui";
 import { IconArrowUpRight, IconDocument } from "@/components/admin/v2/icons";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                      */
@@ -236,7 +237,9 @@ export default function AdminPagesPage() {
     void fetchPages();
   }, [fetchPages]);
 
-  function selectPage(key: string) {
+  async function selectPage(key: string) {
+    if (key === selectedKeyRef.current) return;
+    if (!(await confirmDiscard())) return;
     selectedKeyRef.current = key;
     setSelectedKey(key);
     const page = pages.find((p) => p.pageKey === key);
@@ -270,6 +273,11 @@ export default function AdminPagesPage() {
     formMetaTitle,
     formMetaDescription,
   ]);
+
+  const confirmDiscard = useUnsavedChanges(
+    dirty,
+    selectedKey ? `${labelOf(selectedKey)} page` : "Page editor",
+  );
 
   const notCreated = selectedPage ? isPlaceholder(selectedPage) : false;
 
@@ -399,7 +407,7 @@ export default function AdminPagesPage() {
                     <li key={p.pageKey}>
                       <button
                         type="button"
-                        onClick={() => selectPage(p.pageKey)}
+                        onClick={() => void selectPage(p.pageKey)}
                         aria-current={active ? "page" : undefined}
                         className={`flex h-10 w-full items-center gap-3 rounded-lg px-2.5 text-left text-sm transition-colors focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none ${
                           active

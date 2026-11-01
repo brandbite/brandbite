@@ -4,11 +4,12 @@
 //           rate limit per tool, plus usage KPIs.
 //
 //           Admin design language v1: usage KPIs on top, then the six tools in
-//           one editable comparison table with a single SaveBar. The API still
-//           saves one tool per PATCH, so "Save changes" walks the changed rows
-//           in order and sends the same payloads as the old per-card buttons:
-//             - availability: { toolType, enabled }            (admins + owner)
-//             - pricing:      { toolType, tokenCost, rateLimit } (owner only)
+//           one editable comparison table.
+//             - availability saves instantly on toggle, as it always has:
+//               PATCH { toolType, enabled }               (admins + owner)
+//             - token cost / rate limit are a draft behind one SaveBar; "Save
+//               changes" walks the changed rows in order, one PATCH each:
+//               PATCH { toolType, tokenCost, rateLimit }  (owner only)
 //           Keeping the two PATCHes separate matters: the route 403s the whole
 //           request when a SITE_ADMIN sends pricing fields, so bundling them
 //           would block an admin's on/off change too.
@@ -42,6 +43,7 @@ import {
 } from "@/components/admin/v2/ui";
 import { IconClock, IconCoins } from "@/components/admin/v2/icons";
 import { OwnerOnlyBanner } from "@/components/admin/owner-only-banner";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 
 type ToolConfig = {
   toolType: string;
@@ -63,12 +65,11 @@ type UsageStats = {
 };
 
 /** Editable row state. Numbers stay strings so a cleared input isn't "0". */
-type Draft = { enabled: boolean; tokenCost: string; rateLimit: string };
+type Draft = { tokenCost: string; rateLimit: string };
 
 type RowErrors = { tokenCost?: string; rateLimit?: string };
 
 const toDraft = (t: ToolConfig): Draft => ({
-  enabled: t.enabled,
   tokenCost: String(t.tokenCost),
   rateLimit: String(t.rateLimit),
 });
@@ -83,12 +84,10 @@ function validateRow(d: Draft): RowErrors {
   return e;
 }
 
-function rowChanges(t: ToolConfig, d: Draft | undefined) {
-  if (!d) return { enabled: false, pricing: false };
-  return {
-    enabled: d.enabled !== t.enabled,
-    pricing: Number(d.tokenCost) !== t.tokenCost || Number(d.rateLimit) !== t.rateLimit,
-  };
+/** True when the row's token cost or rate limit differs from the saved values. */
+function pricingChanged(t: ToolConfig, d: Draft | undefined) {
+  if (!d) return false;
+  return Number(d.tokenCost) !== t.tokenCost || Number(d.rateLimit) !== t.rateLimit;
 }
 
 // ---------------------------------------------------------------------------
@@ -220,6 +219,8 @@ export default function AdminAiSettingsPage() {
   const [usage, setUsage] = useState<UsageStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
+  /** Rows whose availability toggle is being saved right now. */
+  const [toggling, setToggling] = useState<ReadonlySet<string>>(() => new Set());
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -270,13 +271,28 @@ export default function AdminAiSettingsPage() {
   const patchDraft = (toolType: string, patch: Partial<Draft>) =>
     setDrafts((prev) => ({ ...prev, [toolType]: { ...prev[toolType], ...patch } }));
 
-  // --- dirty state ----------------------------------------------------------
+  /** Availability saves instantly: PATCH { toolType, enabled }, as before the redesign. */
+  const toggleEnabled = async (toolType: string, enabled: boolean) => {
+    setToggling((prev) => new Set(prev).add(toolType));
+    setError("");
+    setSuccess("");
+    try {
+      const tool = await updateTool(toolType, { enabled });
+      setSuccess(`${tool.label} updated.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Update failed");
+    } finally {
+      setToggling((prev) => {
+        const next = new Set(prev);
+        next.delete(toolType);
+        return next;
+      });
+    }
+  };
+
+  // --- dirty state (pricing only; availability is never a draft) -----------
   const changedTools = useMemo(
-    () =>
-      tools.filter((t) => {
-        const c = rowChanges(t, drafts[t.toolType]);
-        return c.enabled || c.pricing;
-      }),
+    () => tools.filter((t) => pricingChanged(t, drafts[t.toolType])),
     [tools, drafts],
   );
   const errors = useMemo(() => {
@@ -291,6 +307,7 @@ export default function AdminAiSettingsPage() {
   }, [tools, drafts]);
   const errorCount = Object.keys(errors).length;
   const dirty = changedTools.length > 0;
+  useUnsavedChanges(dirty, "AI settings");
 
   const handleSave = async () => {
     if (!dirty || errorCount > 0) return;
@@ -302,26 +319,16 @@ export default function AdminAiSettingsPage() {
       // entry); stop at the first failure so a 403 isn't repeated per row.
       for (const t of changedTools) {
         const d = drafts[t.toolType];
-        const c = rowChanges(t, d);
         setSaving(t.toolType);
-        let latest: ToolConfig | null = null;
-        if (c.enabled) latest = await updateTool(t.toolType, { enabled: d.enabled });
-        if (c.pricing) {
-          latest = await updateTool(t.toolType, {
-            tokenCost: Number(d.tokenCost),
-            rateLimit: Number(d.rateLimit),
-          });
-        }
-        if (latest) {
-          const next = latest;
-          patchDraft(t.toolType, {
-            ...(c.enabled ? { enabled: next.enabled } : {}),
-            ...(c.pricing
-              ? { tokenCost: String(next.tokenCost), rateLimit: String(next.rateLimit) }
-              : {}),
-          });
-          saved.push(next.label);
-        }
+        const next = await updateTool(t.toolType, {
+          tokenCost: Number(d.tokenCost),
+          rateLimit: Number(d.rateLimit),
+        });
+        patchDraft(t.toolType, {
+          tokenCost: String(next.tokenCost),
+          rateLimit: String(next.rateLimit),
+        });
+        saved.push(next.label);
       }
       setSuccess(
         saved.length === 1
@@ -493,15 +500,16 @@ export default function AdminAiSettingsPage() {
             <tbody>
               {tools.map((tool) => {
                 const d = drafts[tool.toolType] ?? toDraft(tool);
-                const c = rowChanges(tool, d);
+                const changed = pricingChanged(tool, d);
                 const e = errors[tool.toolType] ?? {};
                 const rowSaving = saving === tool.toolType;
+                const rowToggling = toggling.has(tool.toolType);
                 const labelId = `ai-tool-${tool.toolType}`;
                 return (
                   <tr
                     key={tool.toolType}
                     className={`border-b border-[var(--av2-border)] last:border-b-0 ${
-                      c.enabled || c.pricing
+                      changed
                         ? "bg-[var(--av2-selected)] shadow-[inset_3px_0_0_var(--av2-accent)]"
                         : ""
                     }`}
@@ -513,7 +521,7 @@ export default function AdminAiSettingsPage() {
                           <p id={labelId} className="font-semibold whitespace-nowrap">
                             {tool.label}
                           </p>
-                          {(c.enabled || c.pricing) && (
+                          {changed && (
                             <p className="text-xs text-[var(--av2-link)]">
                               {rowSaving ? "Saving…" : "Unsaved"}
                             </p>
@@ -524,14 +532,14 @@ export default function AdminAiSettingsPage() {
                     <Td>
                       <div className="flex items-center gap-3">
                         <Switch
-                          checked={d.enabled}
-                          onChange={(v) => patchDraft(tool.toolType, { enabled: v })}
+                          checked={tool.enabled}
+                          onChange={(v) => void toggleEnabled(tool.toolType, v)}
                           labelledBy={labelId}
                           describedBy={`${labelId}-state`}
-                          disabled={isSaving}
+                          disabled={rowToggling}
                         />
                         <span id={`${labelId}-state`} className="text-sm whitespace-nowrap">
-                          {d.enabled ? "Enabled" : "Disabled"}
+                          {rowToggling ? "Saving…" : tool.enabled ? "Enabled" : "Disabled"}
                         </span>
                       </div>
                     </Td>
