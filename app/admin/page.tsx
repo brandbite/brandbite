@@ -3,7 +3,7 @@
 // @purpose: Admin analytics dashboard — platform-wide metrics, ticket workflow,
 //           "needs attention" health signals, token economy and withdrawal
 //           queue. First screen migrated to the admin design language v1
-//           (Plus Jakarta Sans, `.bb-admin-v2` tokens in globals.css).
+//           (Plus Jakarta Sans + `.bb-admin-v2` tokens, applied by app/admin/layout.tsx).
 // @version: v2.0.0
 // @status: active
 // @lastUpdate: 2026-11-01
@@ -14,7 +14,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { InlineAlert } from "@/components/ui/inline-alert";
-import { adminFont } from "@/lib/fonts/admin";
 import {
   IconAlertCircle,
   IconArrowUpRight,
@@ -277,7 +276,7 @@ export default function AdminDashboardPage() {
   const net = tokens?.globalNet ?? null;
 
   return (
-    <div className={`${adminFont.variable} bb-admin-v2`}>
+    <div>
       {/* Header */}
       <header className="mb-6">
         <h1 className="text-[32px] leading-10 font-bold tracking-tight">Dashboard</h1>

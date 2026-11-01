@@ -103,3 +103,20 @@ export function IconArrowUpRight(p: Props) {
     </svg>
   );
 }
+
+export function IconChevronDown(p: Props) {
+  return (
+    <svg {...base} width={16} height={16} {...p}>
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
+
+export function IconSearch(p: Props) {
+  return (
+    <svg {...base} {...p}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </svg>
+  );
+}

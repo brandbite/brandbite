@@ -1,14 +1,17 @@
 // -----------------------------------------------------------------------------
 // @file: app/admin/layout.tsx
-// @purpose: Admin shell — fixed-left sidebar + content area. The sidebar
-//           collapses to an icon rail via a user toggle and becomes a
-//           slide-in drawer on mobile.
+// @purpose: Admin shell (design language v1) — AdminShell renders the 224px
+//           sidebar (icon rail when collapsed, drawer on mobile) and the
+//           64px top bar around every admin page. The `.bb-admin-v2` scope
+//           and Plus Jakarta Sans apply to the whole admin area so pages
+//           that haven't been redesigned yet still share the new type.
 // -----------------------------------------------------------------------------
 
-import { AppSidebar } from "@/components/navigation/app-sidebar";
 import { SessionTimeoutWarning } from "@/components/auth/session-timeout-warning";
 import { FeedbackWidget } from "@/components/feedback/feedback-widget";
 import { GoogleConnectionBanner } from "@/components/admin/google-connection-banner";
+import { AdminShell } from "@/components/admin/v2/admin-shell";
+import { adminFont } from "@/lib/fonts/admin";
 
 // All admin routes are auth-gated. Skip SSG so the build does not prerender
 // pages that depend on the live DB or client-only libraries.
@@ -16,31 +19,17 @@ export const dynamic = "force-dynamic";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-[var(--bb-bg-card)] text-[var(--bb-secondary)]">
+    <div className={`${adminFont.variable} bb-admin-v2 min-h-screen bg-[var(--av2-bg)]`}>
       {/* WCAG 2.2.1 — warn before the BetterAuth session expires. No-op
           in demo mode (the /api/session response's expiresAt is null). */}
       <SessionTimeoutWarning />
-      <AppSidebar role="admin" />
-      {/*
-        Content is offset by the live sidebar width on md+. The sidebar
-        writes --bb-sidebar-w to <html> whenever the user toggles collapse,
-        so this stays in sync without prop drilling. Fallback = 240px for
-        the very first paint before the client hydrates.
-      */}
-      <div className="md:pl-[var(--bb-sidebar-w,240px)] md:transition-[padding] md:duration-200">
-        {/* Horizontal padding intentionally matches the pre-sidebar layout
-            (md:px-6 lg:px-8). The sidebar already claims 240px of the
-            viewport; bumping content padding further squeezes pages
-            designed for the old full-width top-nav layout (e.g. /admin/plans
-            2-col grid). */}
-        <main id="main-content" className="px-4 py-6 md:px-6 md:py-8 lg:px-8 lg:py-10">
-          {/* Sitewide alarm while the Google Calendar connection is dead —
-              bookings silently fail until someone reconnects, so this must
-              not hide on the one settings page admins rarely visit. */}
-          <GoogleConnectionBanner />
-          {children}
-        </main>
-      </div>
+      <AdminShell>
+        {/* Sitewide alarm while the Google Calendar connection is dead —
+            bookings silently fail until someone reconnects, so this must
+            not hide on the one settings page admins rarely visit. */}
+        <GoogleConnectionBanner />
+        {children}
+      </AdminShell>
       {/* Floating feedback pill — see component header. Useful for admins
           too: dogfooding catches paper cuts before they hit customers. */}
       <FeedbackWidget />
