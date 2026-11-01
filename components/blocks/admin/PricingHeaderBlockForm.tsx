@@ -18,10 +18,10 @@
 import Link from "next/link";
 import { useState } from "react";
 
-import { Button } from "@/components/ui/button";
-import { FormInput } from "@/components/ui/form-field";
-import { InlineAlert } from "@/components/ui/inline-alert";
+import { Callout, Field, TextInput } from "@/components/admin/v2/ui";
 import { useToast } from "@/components/ui/toast-provider";
+
+import { BlockSaveFooter, FormSection, useDirtyBaseline } from "./block-form-ui";
 
 import type { PricingData } from "@/lib/blocks/types";
 
@@ -44,6 +44,11 @@ export function PricingHeaderBlockForm({ initial, pageKey }: PricingHeaderBlockF
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Presentation only: drives the SaveBar status + disables Save when clean.
+  const { dirty, markSaved } = useDirtyBaseline(
+    JSON.stringify([eyebrow, title, subtitle, contactNote, contactLabel, contactHref]),
+  );
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,6 +91,7 @@ export function PricingHeaderBlockForm({ initial, pageKey }: PricingHeaderBlockF
         throw new Error(json?.reason || json?.error || "Save failed.");
       }
 
+      markSaved();
       showToast({
         type: "success",
         title: "Pricing header saved",
@@ -100,139 +106,100 @@ export function PricingHeaderBlockForm({ initial, pageKey }: PricingHeaderBlockF
 
   return (
     <form onSubmit={handleSave} className="space-y-6">
-      <InlineAlert variant="info" size="sm">
-        This form only edits the <strong>section header</strong> above the plan-card grid. Per-plan
-        prices come from Stripe; per-plan name and tokens are managed in{" "}
-        <Link href="/admin/plans" className="underline">
+      <Callout title="Header copy only">
+        Per-plan prices come from Stripe; per-plan name and tokens are managed in{" "}
+        <Link
+          href="/admin/plans"
+          className="font-semibold text-[var(--av2-link)] underline-offset-2 hover:underline"
+        >
           Catalog → Plans
         </Link>
         . Per-plan tagline / feature copy will become editable in a follow-up.
-      </InlineAlert>
+      </Callout>
 
       {/* Left side — header copy ------------------------------------- */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <label
-            htmlFor="pr-eyebrow"
-            className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-          >
-            Eyebrow (optional)
-          </label>
-          <FormInput
-            id="pr-eyebrow"
-            value={eyebrow}
-            onChange={(e) => setEyebrow(e.target.value)}
-            placeholder="Start now your"
-            maxLength={50}
-          />
+      <FormSection title="Header copy" description="All optional.">
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <Field label="Eyebrow (optional)" htmlFor="pr-eyebrow">
+              <TextInput
+                id="pr-eyebrow"
+                value={eyebrow}
+                onChange={(e) => setEyebrow(e.target.value)}
+                placeholder="Start now your"
+                maxLength={50}
+              />
+            </Field>
+            <Field label="Title (optional)" htmlFor="pr-title">
+              <TextInput
+                id="pr-title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="creative plan"
+                maxLength={120}
+              />
+            </Field>
+          </div>
+          <Field label="Subtitle (optional)" htmlFor="pr-subtitle">
+            <TextInput
+              id="pr-subtitle"
+              value={subtitle}
+              onChange={(e) => setSubtitle(e.target.value)}
+              placeholder="Optional descriptive paragraph below the title."
+              maxLength={300}
+            />
+          </Field>
         </div>
-        <div>
-          <label
-            htmlFor="pr-title"
-            className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-          >
-            Title (optional)
-          </label>
-          <FormInput
-            id="pr-title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="creative plan"
-            maxLength={120}
-          />
-        </div>
-      </div>
-
-      <div>
-        <label
-          htmlFor="pr-subtitle"
-          className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-        >
-          Subtitle (optional)
-        </label>
-        <FormInput
-          id="pr-subtitle"
-          value={subtitle}
-          onChange={(e) => setSubtitle(e.target.value)}
-          placeholder="Optional descriptive paragraph below the title."
-          maxLength={300}
-        />
-      </div>
+      </FormSection>
 
       {/* Right side — contact triad ---------------------------------- */}
-      <fieldset className="rounded-xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-warm)] px-4 py-4">
-        <legend className="px-2 text-xs font-semibold tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
-          Right-side contact prompt (optional)
-        </legend>
-        <p className="mt-1 text-xs text-[var(--bb-text-muted)]">
-          Renders on the right of the header band as
-          <em> &ldquo;Need a custom plan? Let&apos;s talk&rdquo;</em>. Set all three fields to show,
-          or leave all three blank to hide.
-        </p>
-
-        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div>
-            <label
-              htmlFor="pr-contact-note"
-              className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-            >
-              Note text
-            </label>
-            <FormInput
+      <FormSection
+        title="Right-side contact prompt (optional)"
+        description={
+          <>
+            Renders on the right of the header band as{" "}
+            <em>&ldquo;Need a custom plan? Let&apos;s talk&rdquo;</em>. Set all three fields to
+            show, or leave all three blank to hide.
+          </>
+        }
+      >
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+          <Field label="Note text" htmlFor="pr-contact-note">
+            <TextInput
               id="pr-contact-note"
               value={contactNote}
               onChange={(e) => setContactNote(e.target.value)}
               placeholder="Need a custom plan?"
               maxLength={120}
             />
-          </div>
-          <div>
-            <label
-              htmlFor="pr-contact-label"
-              className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-            >
-              Link label
-            </label>
-            <FormInput
+          </Field>
+          <Field label="Link label" htmlFor="pr-contact-label">
+            <TextInput
               id="pr-contact-label"
               value={contactLabel}
               onChange={(e) => setContactLabel(e.target.value)}
               placeholder="Let's talk"
               maxLength={50}
             />
-          </div>
-          <div>
-            <label
-              htmlFor="pr-contact-href"
-              className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-            >
-              Link destination
-            </label>
-            <FormInput
+          </Field>
+          <Field label="Link destination" htmlFor="pr-contact-href">
+            <TextInput
               id="pr-contact-href"
               value={contactHref}
               onChange={(e) => setContactHref(e.target.value)}
               placeholder="mailto:hello@brandbite.studio"
               maxLength={200}
             />
-          </div>
+          </Field>
         </div>
-      </fieldset>
+      </FormSection>
 
-      {/* Error + submit ---------------------------------------------- */}
-      {error ? <InlineAlert variant="error">{error}</InlineAlert> : null}
-
-      <div className="flex justify-end gap-3 pt-2">
-        <Button
-          type="submit"
-          variant="primary"
-          loading={submitting}
-          loadingText="Saving…"
-          disabled={submitting}
-        >
-          Save pricing header
-        </Button>
-      </div>
+      <BlockSaveFooter
+        error={error}
+        dirty={dirty}
+        submitting={submitting}
+        label="Save pricing header"
+      />
     </form>
   );
 }

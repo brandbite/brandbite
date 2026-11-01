@@ -15,11 +15,9 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
-import { Button } from "@/components/ui/button";
-import { FormInput } from "@/components/ui/form-field";
-import { InlineAlert } from "@/components/ui/inline-alert";
+import { Button, Callout, Field, TextInput } from "@/components/admin/v2/ui";
 import { Modal, ModalFooter, ModalHeader } from "@/components/ui/modal";
 
 export type MfaChallengeInfo = {
@@ -49,6 +47,7 @@ export function MfaChallengeModal({
   const [code, setCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const inputId = useId();
 
   useEffect(() => {
     if (open) {
@@ -95,9 +94,14 @@ export function MfaChallengeModal({
   };
 
   return (
-    <Modal open={open} onClose={submitting ? () => {} : onClose} size="sm">
+    <Modal
+      open={open}
+      onClose={submitting ? () => {} : onClose}
+      size="sm"
+      className="border border-[var(--av2-border)]"
+    >
       <ModalHeader title="Security check" onClose={submitting ? () => {} : onClose} />
-      <div className="space-y-3 px-6 pb-4 text-sm text-[var(--bb-text-secondary)]">
+      <div className="space-y-4 text-sm text-[var(--av2-text-2)]">
         {method === "totp" ? (
           <p>
             Open your authenticator app (Authy, Google Authenticator, 1Password, etc.) and enter the
@@ -106,44 +110,51 @@ export function MfaChallengeModal({
         ) : (
           <p>
             We emailed a 6-digit code to{" "}
-            <strong>{challenge?.maskedEmail ?? "your account email"}</strong>. Enter it below to
-            confirm this money-moving action.
+            <strong className="font-semibold text-[var(--av2-text)]">
+              {challenge?.maskedEmail ?? "your account email"}
+            </strong>
+            . Enter it below to confirm this money-moving action.
           </p>
         )}
-        <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-          {method === "totp"
-            ? "Codes rotate every 30 seconds. After this check, further money actions in the next 30 minutes won\u2019t ask again."
-            : "Codes expire in 10 minutes. After this check, further money actions in the next 30 minutes won\u2019t ask again."}
-        </p>
-        <FormInput
-          type="text"
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          value={code}
-          onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-          placeholder="123456"
-          disabled={submitting}
-          aria-label="Security code"
-          className="!text-center !font-mono !text-lg !tracking-[0.5em]"
-        />
+        <Field
+          htmlFor={inputId}
+          label="Security code"
+          hint={
+            method === "totp"
+              ? "Codes rotate every 30 seconds. After this check, further money actions in the next 30 minutes won\u2019t ask again."
+              : "Codes expire in 10 minutes. After this check, further money actions in the next 30 minutes won\u2019t ask again."
+          }
+        >
+          <TextInput
+            id={inputId}
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            placeholder="123456"
+            disabled={submitting}
+            aria-invalid={errorMessage ? true : undefined}
+            className="h-12 text-center font-mono text-lg tracking-[0.5em]"
+          />
+        </Field>
         {errorMessage && (
-          <InlineAlert variant="error" size="sm">
+          <Callout tone="error" title="Verification failed">
             {errorMessage}
-          </InlineAlert>
+          </Callout>
         )}
       </div>
-      <ModalFooter>
+      <ModalFooter className="mt-6">
         <Button variant="ghost" onClick={onClose} disabled={submitting}>
           Cancel
         </Button>
         <Button
           variant="primary"
           onClick={handleSubmit}
-          loading={submitting}
-          loadingText="Verifying…"
           disabled={!canSubmit}
+          aria-busy={submitting || undefined}
         >
-          Verify
+          {submitting ? "Verifying…" : "Verify"}
         </Button>
       </ModalFooter>
     </Modal>
