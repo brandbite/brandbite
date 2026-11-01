@@ -295,7 +295,8 @@ export function KpiGrid({ children }: { children: ReactNode }) {
 const BADGE_TONE: Record<Tone, string> = {
   neutral: "bg-[var(--av2-track)] text-[var(--av2-text)]",
   lavender: "bg-[var(--av2-lavender-bg)] text-[#4b3fb0] dark:text-[#c3b9fa]",
-  peach: "bg-[var(--av2-selected)] text-[#a83210] dark:text-[#ff8a5f]",
+  peach:
+    "bg-[var(--av2-selected)] text-[#a83210] ring-1 ring-[var(--av2-accent)]/30 ring-inset dark:text-[#ff8a5f]",
   green: "bg-[var(--av2-success-bg)] text-[#256b3a] dark:text-[#7fd396]",
   red: "bg-[#fde3e1] text-[var(--av2-error-text)] dark:bg-[#3a1715]",
   amber: "bg-[#fff1d6] text-[#8a5300] dark:bg-[#37250f] dark:text-[#f2b35a]",
