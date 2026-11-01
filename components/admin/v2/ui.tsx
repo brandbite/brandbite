@@ -414,8 +414,9 @@ const BUTTON_VARIANT: Record<ButtonVariant, string> = {
   primary:
     "bg-[var(--av2-accent-strong)] text-white hover:brightness-110 disabled:bg-[var(--av2-track)] disabled:text-[var(--av2-text-2)] disabled:hover:brightness-100",
   secondary:
-    "border border-[var(--av2-border)] bg-[var(--av2-surface)] text-[var(--av2-text)] hover:bg-[var(--av2-bg)] disabled:text-[var(--av2-text-2)]",
-  ghost: "text-[var(--av2-text)] hover:bg-[var(--av2-bg)] disabled:text-[var(--av2-text-2)]",
+    "border border-[var(--av2-border)] bg-[var(--av2-surface)] text-[var(--av2-text)] hover:bg-[var(--av2-bg)] disabled:bg-[var(--av2-bg)] disabled:text-[var(--av2-text-2)] disabled:opacity-60 disabled:hover:bg-[var(--av2-bg)]",
+  ghost:
+    "text-[var(--av2-text)] hover:bg-[var(--av2-bg)] disabled:text-[var(--av2-text-2)] disabled:opacity-60",
   danger:
     "border border-[var(--av2-error)]/40 bg-[var(--av2-surface)] text-[var(--av2-error-text)] hover:bg-[#fde3e1] dark:hover:bg-[#3a1715] disabled:opacity-50",
 };
@@ -777,6 +778,62 @@ export function SearchInput({
   );
 }
 
+/**
+ * On/off toggle (role="switch"). Name it with `label` (visible text next to
+ * it) or `labelledBy` (id of an existing label element).
+ */
+export function Switch({
+  checked,
+  onChange,
+  label,
+  labelledBy,
+  describedBy,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label?: ReactNode;
+  labelledBy?: string;
+  describedBy?: string;
+  disabled?: boolean;
+}) {
+  const autoId = useId();
+  const labelId = labelledBy ?? (label ? `${autoId}-label` : undefined);
+  const button = (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-labelledby={labelId}
+      aria-describedby={describedBy}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={cx(
+        "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+        checked ? "bg-[var(--av2-accent-strong)]" : "bg-[var(--av2-fill-neutral)]",
+        FOCUS,
+      )}
+    >
+      <span
+        aria-hidden
+        className={cx(
+          "inline-block h-5 w-5 rounded-full bg-white transition-transform",
+          checked ? "translate-x-[22px]" : "translate-x-0.5",
+        )}
+      />
+    </button>
+  );
+  if (!label) return button;
+  return (
+    <span className="inline-flex items-center gap-3">
+      {button}
+      <span id={labelId} className="text-sm font-medium">
+        {label}
+      </span>
+    </span>
+  );
+}
+
 /** Row of filters above a list: search + selects + trailing count. */
 export function FilterBar({ children, trailing }: { children: ReactNode; trailing?: ReactNode }) {
   return (
@@ -800,10 +857,10 @@ export function SaveBar({
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <p role="status" className="text-sm text-[var(--av2-text-2)]">
+      <p role="status" className="min-w-[12rem] flex-1 text-sm text-[var(--av2-text-2)]">
         {status ?? (dirty ? "Unsaved changes" : "No unsaved changes")}
       </p>
-      <div className="flex flex-wrap items-center gap-2">{children}</div>
+      <div className="ml-auto flex shrink-0 flex-wrap items-center gap-2">{children}</div>
     </div>
   );
 }

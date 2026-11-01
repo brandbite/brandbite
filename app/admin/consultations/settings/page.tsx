@@ -39,10 +39,12 @@ import {
   buttonClass,
   fmt,
   plural,
+  Switch,
 } from "@/components/admin/v2/ui";
 import { IconArrowUpRight, IconClock, IconCoins } from "@/components/admin/v2/icons";
 import { IconConsultations } from "@/components/navigation/nav-icons";
 import { useSessionRole } from "@/lib/hooks/use-session-role";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 
 type Settings = {
   id: string;
@@ -262,39 +264,6 @@ function StatusPill({ icon, children }: { icon: ReactNode; children: ReactNode }
 }
 
 /** On/off switch (role="switch"); not in the shared primitives yet. */
-function Switch({
-  checked,
-  onChange,
-  labelledBy,
-  describedBy,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  labelledBy: string;
-  describedBy?: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-labelledby={labelledBy}
-      aria-describedby={describedBy}
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:ring-offset-1 focus-visible:outline-none ${
-        checked ? "bg-[var(--av2-accent-strong)]" : "bg-[var(--av2-fill-neutral)]"
-      }`}
-    >
-      <span
-        aria-hidden
-        className={`inline-block h-5 w-5 rounded-full bg-white transition-transform ${
-          checked ? "translate-x-[22px]" : "translate-x-0.5"
-        }`}
-      />
-    </button>
-  );
-}
-
 function SectionHeading({ title, description }: { title: string; description: string }) {
   return (
     <div className="mb-6">
@@ -411,6 +380,7 @@ export default function AdminConsultationSettingsPage() {
   const errors = useMemo(() => (draftPayload ? validate(draftPayload) : {}), [draftPayload]);
   const errorKeys = Object.keys(errors) as FieldKey[];
   const dirty = changed.length > 0;
+  const confirmDiscard = useUnsavedChanges(dirty, "Consultation settings");
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -443,6 +413,8 @@ export default function AdminConsultationSettingsPage() {
   };
 
   const handleDisconnect = async () => {
+    // Disconnecting reloads the settings, which replaces the form draft.
+    if (!(await confirmDiscard())) return;
     if (
       !window.confirm(
         "Disconnect Google Calendar? New bookings will fall back to the manual PENDING flow.",

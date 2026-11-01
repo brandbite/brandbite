@@ -45,6 +45,7 @@ import {
   plural,
 } from "@/components/admin/v2/ui";
 import { IconTicket } from "@/components/admin/v2/icons";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -125,6 +126,13 @@ function getEffectivePayout(t: AdminTicket): number | null {
   return t.creativePayoutOverride ?? t.jobType.creativePayoutTokens * (t.quantity ?? 1);
 }
 
+function isOverrideDirty(t: AdminTicket, d: OverrideDraft): boolean {
+  const base = initialDraft(t);
+  return (
+    d.costOverride.trim() !== base.costOverride || d.payoutOverride.trim() !== base.payoutOverride
+  );
+}
+
 function initialDraft(t: AdminTicket): OverrideDraft {
   return {
     costOverride: t.tokenCostOverride != null ? String(t.tokenCostOverride) : "",
@@ -186,8 +194,6 @@ export default function AdminTicketsPage() {
 
   // Override editing — keyed by ticket id
   const [editingOverrides, setEditingOverrides] = useState<Record<string, OverrideDraft>>({});
-  // Assignment drafts — keyed by ticket id ("" = unassigned)
-  const [assignDrafts, setAssignDrafts] = useState<Record<string, string>>({});
 
   // Detail panel
   const [activeTicketId, setActiveTicketId] = useState<string | null>(null);
@@ -294,11 +300,6 @@ export default function AdminTicketsPage() {
       setTickets((prev) =>
         prev.map((t) => (t.id === ticketId ? { ...t, creative: updatedCreative } : t)),
       );
-      setAssignDrafts((prev) => {
-        const next = { ...prev };
-        delete next[ticketId];
-        return next;
-      });
     } catch (err) {
       console.error("[AdminTicketsPage] assign error", err);
       setError(err instanceof Error ? err.message : "Failed to assign creative. Please try again.");
@@ -556,6 +557,18 @@ export default function AdminTicketsPage() {
     ? (tickets.find((t) => t.id === activeTicketId) ?? null)
     : null;
 
+  // Pricing drafts are kept per ticket, so switching rows or closing the
+  // panel never drops them — only leaving the page does.
+  const pricingDirty = useMemo(
+    () =>
+      Object.entries(editingOverrides).some(([id, d]) => {
+        const t = tickets.find((x) => x.id === id);
+        return t ? isOverrideDirty(t, d) : false;
+      }),
+    [editingOverrides, tickets],
+  );
+  useUnsavedChanges(pricingDirty, "Ticket pricing");
+
   const openTicket = (id: string) => {
     setActiveTicketId(id);
     // Below xl the panel stacks under the list — bring it into view.
@@ -600,20 +613,7 @@ export default function AdminTicketsPage() {
         onOverrideChange={(patch) => updateOverrideDraft(activeTicket, patch)}
         onDiscardOverrides={() => cancelEditingOverrides(activeTicket.id)}
         onApplyOverrides={() => handleSaveOverrides(activeTicket.id)}
-        assignDraft={
-          activeTicket.id in assignDrafts
-            ? assignDrafts[activeTicket.id]
-            : (activeTicket.creative?.id ?? "")
-        }
-        onAssignChange={(v) => setAssignDrafts((prev) => ({ ...prev, [activeTicket.id]: v }))}
-        onDiscardAssign={() =>
-          setAssignDrafts((prev) => {
-            const next = { ...prev };
-            delete next[activeTicket.id];
-            return next;
-          })
-        }
-        onApplyAssign={(v) => handleAssignCreative(activeTicket.id, v || null)}
+        onAssignCreative={(v) => handleAssignCreative(activeTicket.id, v || null)}
         error={error}
         formatDateTime={formatDateTime}
       />
@@ -1014,10 +1014,7 @@ function ManageTicketPanel({
   onOverrideChange,
   onDiscardOverrides,
   onApplyOverrides,
-  assignDraft,
-  onAssignChange,
-  onDiscardAssign,
-  onApplyAssign,
+  onAssignCreative,
   error,
   formatDateTime,
 }: {
@@ -1031,10 +1028,7 @@ function ManageTicketPanel({
   onOverrideChange: (patch: Partial<OverrideDraft>) => void;
   onDiscardOverrides: () => void;
   onApplyOverrides: () => void;
-  assignDraft: string;
-  onAssignChange: (v: string) => void;
-  onDiscardAssign: () => void;
-  onApplyAssign: (v: string) => void;
+  onAssignCreative: (creativeId: string) => void;
   error: string | null;
   formatDateTime: (iso: string) => string;
 }) {
@@ -1045,11 +1039,7 @@ function ManageTicketPanel({
 
   const base = initialDraft(t);
   const draft = overrideDraft ?? base;
-  const pricingDirty =
-    overrideDraft != null &&
-    (overrideDraft.costOverride.trim() !== base.costOverride ||
-      overrideDraft.payoutOverride.trim() !== base.payoutOverride);
-  const assignDirty = assignDraft !== (t.creative?.id ?? "");
+  const pricingDirty = overrideDraft != null && isOverrideDirty(t, overrideDraft);
 
   // Effective values implied by the current draft (empty = job-type default)
   const parse = (v: string, fallback: number | null) => {
@@ -1087,23 +1077,9 @@ function ManageTicketPanel({
     </PanelSection>
   );
 
+  // Assignment saves instantly on change, so only the Pricing tab has a draft.
   const footer =
-    tab === "assignment" ? (
-      <SaveBar dirty={assignDirty} status={saving ? "Saving…" : undefined}>
-        {assignDirty && (
-          <Button variant="ghost" onClick={onDiscardAssign} disabled={saving}>
-            Discard
-          </Button>
-        )}
-        <Button
-          variant="primary"
-          disabled={!assignDirty || saving}
-          onClick={() => onApplyAssign(assignDraft)}
-        >
-          {saving ? "Saving…" : "Apply assignment"}
-        </Button>
-      </SaveBar>
-    ) : t.jobType ? (
+    tab === "pricing" && t.jobType ? (
       <SaveBar dirty={pricingDirty} status={saving ? "Saving…" : undefined}>
         {pricingDirty && (
           <Button variant="ghost" onClick={onDiscardOverrides} disabled={saving}>
@@ -1141,17 +1117,7 @@ function ManageTicketPanel({
         tabs={[
           {
             value: "assignment",
-            label: (
-              <span className="inline-flex items-center gap-1.5">
-                Assignment
-                {assignDirty && (
-                  <span
-                    aria-label="unsaved"
-                    className="h-1.5 w-1.5 rounded-full bg-[var(--av2-accent)]"
-                  />
-                )}
-              </span>
-            ),
+            label: "Assignment",
           },
           {
             value: "pricing",
@@ -1185,17 +1151,13 @@ function ManageTicketPanel({
               <Field
                 label="Assigned creative"
                 htmlFor="manage-ticket-creative"
-                hint={
-                  assignDirty
-                    ? `Currently ${currentCreative ?? "unassigned"}. Apply to save the change.`
-                    : "Choose who works on this ticket."
-                }
+                hint={saving ? "Saving…" : "Choose who works on this ticket. Saves immediately."}
               >
                 <Select
                   id="manage-ticket-creative"
-                  value={assignDraft}
+                  value={t.creative?.id ?? ""}
                   disabled={saving}
-                  onChange={(e) => onAssignChange(e.target.value)}
+                  onChange={(e) => onAssignCreative(e.target.value)}
                 >
                   <option value="">Unassigned</option>
                   {creatives.map((d) => (

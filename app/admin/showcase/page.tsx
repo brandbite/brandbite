@@ -1,18 +1,54 @@
+// -----------------------------------------------------------------------------
 // @file: app/admin/showcase/page.tsx
-// @purpose: Admin CMS page for managing showcase portfolio works
+// @purpose: Admin CMS page for managing showcase portfolio works. Portfolio
+//           list on the left, editor panel on the right. The editor splits a
+//           work into Details / Media / Content / Publishing tabs.
+// @version: v2.0.0
+// @status: active
+// @lastUpdate: 2026-11-01
+// -----------------------------------------------------------------------------
 
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { FormInput, FormTextarea, FormSelect } from "@/components/ui/form-field";
-import { Badge } from "@/components/ui/badge";
-import { LoadingState } from "@/components/ui/loading-state";
-import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast-provider";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { CmsImageUpload } from "@/components/ui/cms-image-upload";
 import { CmsGalleryUpload } from "@/components/ui/cms-gallery-upload";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  Badge,
+  Button,
+  Callout,
+  Card,
+  CardTitle,
+  DASH,
+  DetailPanel,
+  EmptyState,
+  Field,
+  FilterBar,
+  KeyValueList,
+  PageHeader,
+  PanelSection,
+  SaveBar,
+  SearchInput,
+  Select,
+  Skeleton,
+  SplitView,
+  Switch,
+  TabPanel,
+  Table,
+  TableFooter,
+  Tabs,
+  Td,
+  TextInput,
+  Th,
+  Tr,
+  fmt,
+  plural,
+} from "@/components/admin/v2/ui";
+import { IconPortfolio } from "@/components/navigation/nav-icons";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                      */
@@ -46,6 +82,39 @@ type ShowcaseListResponse = {
   works: ShowcaseWork[];
 };
 
+type EditorTab = "details" | "media" | "content" | "publishing";
+type StatusFilter = "ALL" | "PUBLISHED" | "DRAFT";
+
+type FormState = {
+  title: string;
+  slug: string;
+  subtitle: string;
+  clientName: string;
+  category: string;
+  tags: string;
+  thumbnail: ImageRef | null;
+  hero: ImageRef | null;
+  gallery: GalleryImage[];
+  description: string;
+  published: boolean;
+  sortOrder: string;
+};
+
+const EMPTY_FORM: FormState = {
+  title: "",
+  slug: "",
+  subtitle: "",
+  clientName: "",
+  category: "",
+  tags: "",
+  thumbnail: null,
+  hero: null,
+  gallery: [],
+  description: "",
+  published: false,
+  sortOrder: "0",
+};
+
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                    */
 /* -------------------------------------------------------------------------- */
@@ -60,9 +129,87 @@ function generateSlugFromTitle(title: string): string {
 }
 
 function formatDate(dateStr: string | null): string {
-  if (!dateStr) return "\u2014";
+  if (!dateStr) return DASH;
   return new Date(dateStr).toLocaleDateString();
 }
+
+const formFromWork = (work: ShowcaseWork): FormState => ({
+  title: work.title,
+  slug: work.slug,
+  subtitle: work.subtitle ?? "",
+  clientName: work.clientName ?? "",
+  category: work.category ?? "",
+  tags: work.tags.join(", "),
+  thumbnail:
+    work.thumbnailStorageKey && work.thumbnailUrl
+      ? { storageKey: work.thumbnailStorageKey, url: work.thumbnailUrl }
+      : null,
+  hero:
+    work.heroStorageKey && work.heroUrl
+      ? { storageKey: work.heroStorageKey, url: work.heroUrl }
+      : null,
+  gallery: (work.galleryImages as GalleryImage[]) ?? [],
+  description: work.description ?? "",
+  published: work.status === "PUBLISHED",
+  sortOrder: String(work.sortOrder),
+});
+
+const sameForm = (a: FormState, b: FormState) => JSON.stringify(a) === JSON.stringify(b);
+
+function IconPlus() {
+  return (
+    <svg
+      width={18}
+      height={18}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      aria-hidden
+    >
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+function IconImage() {
+  return (
+    <svg
+      width={18}
+      height={18}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="9" cy="10" r="1.5" />
+      <path d="m21 16-5-5-9 9" />
+    </svg>
+  );
+}
+
+function Thumb({ url }: { url: string | null }) {
+  return url ? (
+    <img
+      src={url}
+      alt=""
+      className="h-12 w-12 shrink-0 rounded-lg border border-[var(--av2-border)] object-cover"
+      loading="lazy"
+    />
+  ) : (
+    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-[var(--av2-border)] bg-[var(--av2-bg)] text-[var(--av2-text-2)]">
+      <IconImage />
+    </span>
+  );
+}
+
+const StatusBadge = ({ status }: { status: ShowcaseWork["status"] }) =>
+  status === "PUBLISHED" ? <Badge tone="green">Published</Badge> : <Badge>Draft</Badge>;
 
 /* -------------------------------------------------------------------------- */
 /*  Page Component                                                             */
@@ -78,42 +225,30 @@ export default function AdminShowcasePage() {
 
   // ---- Filters ----
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | "PUBLISHED" | "DRAFT">("ALL");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
 
   // ---- Selection / editing ----
   const [selected, setSelected] = useState<ShowcaseWork | null>(null);
-
-  // ---- Form fields ----
-  const [formTitle, setFormTitle] = useState("");
-  const [formSlug, setFormSlug] = useState("");
-  const [formSubtitle, setFormSubtitle] = useState("");
-  const [formClientName, setFormClientName] = useState("");
-  const [formCategory, setFormCategory] = useState("");
-  const [formTags, setFormTags] = useState("");
-  const [formThumbnail, setFormThumbnail] = useState<ImageRef | null>(null);
-  const [formHero, setFormHero] = useState<ImageRef | null>(null);
-  const [formGallery, setFormGallery] = useState<GalleryImage[]>([]);
-  const [formDescription, setFormDescription] = useState("");
-  const [formPublished, setFormPublished] = useState(false);
-  const [formSortOrder, setFormSortOrder] = useState("0");
+  const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [tab, setTab] = useState<EditorTab>("details");
+  const [titleError, setTitleError] = useState<string | null>(null);
 
   // ---- Mutation state ----
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   /* ---------------------------------------------------------------------- */
   /*  Derived data                                                           */
   /* ---------------------------------------------------------------------- */
 
-  const works = data?.works ?? [];
+  const works = useMemo(() => data?.works ?? [], [data]);
 
   const filteredWorks = useMemo(() => {
     return works.filter((w) => {
-      // Status filter
       if (statusFilter === "PUBLISHED" && w.status !== "PUBLISHED") return false;
       if (statusFilter === "DRAFT" && w.status !== "DRAFT") return false;
 
-      // Search filter
       if (searchQuery.trim()) {
         const q = searchQuery.trim().toLowerCase();
         const titleMatch = w.title.toLowerCase().includes(q);
@@ -130,48 +265,41 @@ export default function AdminShowcasePage() {
   const publishedCount = works.filter((w) => w.status === "PUBLISHED").length;
   const draftCount = totalCount - publishedCount;
 
+  const filtersActive = searchQuery.trim() !== "" || statusFilter !== "ALL";
+  const resetFilters = () => {
+    setSearchQuery("");
+    setStatusFilter("ALL");
+  };
+
+  const baseline = selected ? formFromWork(selected) : EMPTY_FORM;
+  const dirty = !sameForm(form, baseline);
+  const confirmDiscard = useUnsavedChanges(dirty, "Showcase work");
+
+  /** Run `fn` now, or after the user agrees to drop unsaved edits. */
+  const guarded = async (fn: () => void) => {
+    if (await confirmDiscard()) fn();
+  };
+
+  const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
+    setForm((f) => ({ ...f, [key]: value }));
+    if (key === "title") setTitleError(null);
+  };
+
   /* ---------------------------------------------------------------------- */
   /*  Form helpers                                                           */
   /* ---------------------------------------------------------------------- */
 
   const resetForm = () => {
     setSelected(null);
-    setFormTitle("");
-    setFormSlug("");
-    setFormSubtitle("");
-    setFormClientName("");
-    setFormCategory("");
-    setFormTags("");
-    setFormThumbnail(null);
-    setFormHero(null);
-    setFormGallery([]);
-    setFormDescription("");
-    setFormPublished(false);
-    setFormSortOrder("0");
+    setForm(EMPTY_FORM);
+    setTab("details");
+    setTitleError(null);
   };
 
   const fillFormFromWork = (work: ShowcaseWork) => {
     setSelected(work);
-    setFormTitle(work.title);
-    setFormSlug(work.slug);
-    setFormSubtitle(work.subtitle ?? "");
-    setFormClientName(work.clientName ?? "");
-    setFormCategory(work.category ?? "");
-    setFormTags(work.tags.join(", "));
-    setFormThumbnail(
-      work.thumbnailStorageKey && work.thumbnailUrl
-        ? { storageKey: work.thumbnailStorageKey, url: work.thumbnailUrl }
-        : null,
-    );
-    setFormHero(
-      work.heroStorageKey && work.heroUrl
-        ? { storageKey: work.heroStorageKey, url: work.heroUrl }
-        : null,
-    );
-    setFormGallery((work.galleryImages as GalleryImage[]) ?? []);
-    setFormDescription(work.description ?? "");
-    setFormPublished(work.status === "PUBLISHED");
-    setFormSortOrder(String(work.sortOrder));
+    setForm(formFromWork(work));
+    setTitleError(null);
   };
 
   /* ---------------------------------------------------------------------- */
@@ -222,29 +350,38 @@ export default function AdminShowcasePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // The title input used to carry `required`; with tabbed groups it isn't
+    // always mounted, so the check runs here and jumps to the Details tab.
+    if (!form.title.trim()) {
+      setTitleError("Title is required.");
+      setTab("details");
+      return;
+    }
+
     setSaving(true);
 
     try {
-      const tags = formTags
+      const tags = form.tags
         .split(",")
         .map((t) => t.trim())
         .filter(Boolean);
 
       const payload: Record<string, unknown> = {
-        title: formTitle.trim(),
-        slug: formSlug.trim() || undefined,
-        subtitle: formSubtitle.trim() || null,
-        clientName: formClientName.trim() || null,
-        category: formCategory.trim() || null,
+        title: form.title.trim(),
+        slug: form.slug.trim() || undefined,
+        subtitle: form.subtitle.trim() || null,
+        clientName: form.clientName.trim() || null,
+        category: form.category.trim() || null,
         tags,
-        thumbnailStorageKey: formThumbnail?.storageKey ?? null,
-        thumbnailUrl: formThumbnail?.url ?? null,
-        heroStorageKey: formHero?.storageKey ?? null,
-        heroUrl: formHero?.url ?? null,
-        galleryImages: formGallery.length > 0 ? formGallery : null,
-        description: formDescription || null,
-        status: formPublished ? "PUBLISHED" : "DRAFT",
-        sortOrder: parseInt(formSortOrder, 10) || 0,
+        thumbnailStorageKey: form.thumbnail?.storageKey ?? null,
+        thumbnailUrl: form.thumbnail?.url ?? null,
+        heroStorageKey: form.hero?.storageKey ?? null,
+        heroUrl: form.hero?.url ?? null,
+        galleryImages: form.gallery.length > 0 ? form.gallery : null,
+        description: form.description || null,
+        status: form.published ? "PUBLISHED" : "DRAFT",
+        sortOrder: parseInt(form.sortOrder, 10) || 0,
       };
 
       const isEditing = !!selected;
@@ -292,11 +429,6 @@ export default function AdminShowcasePage() {
   const handleDelete = async () => {
     if (!selected) return;
 
-    const confirmed = window.confirm(
-      `Are you sure you want to delete "${selected.title}"? This action cannot be undone.`,
-    );
-    if (!confirmed) return;
-
     setDeleting(true);
 
     try {
@@ -321,16 +453,279 @@ export default function AdminShowcasePage() {
   };
 
   /* ---------------------------------------------------------------------- */
-  /*  Event handlers                                                         */
+  /*  Editor panel                                                           */
   /* ---------------------------------------------------------------------- */
 
-  const handleRowClick = (work: ShowcaseWork) => {
-    fillFormFromWork(work);
-  };
+  const tabIds = "showcase-editor";
+  const mediaCount = (form.thumbnail ? 1 : 0) + (form.hero ? 1 : 0) + form.gallery.length;
 
-  const handleNewClick = () => {
-    resetForm();
-  };
+  const panelTitle = (
+    <span className="flex min-w-0 flex-wrap items-center gap-3">
+      <span className="truncate">{selected ? selected.title : "New work"}</span>
+      {selected ? <StatusBadge status={selected.status} /> : <Badge tone="peach">Not saved</Badge>}
+    </span>
+  );
+
+  const panel = (
+    <form onSubmit={handleSubmit} noValidate className="contents">
+      <DetailPanel
+        title={panelTitle}
+        onClose={selected ? () => void guarded(resetForm) : undefined}
+        closeLabel="Clear selection"
+        footer={
+          <SaveBar
+            dirty={dirty}
+            status={
+              saving
+                ? "Saving…"
+                : selected
+                  ? dirty
+                    ? "Unsaved changes"
+                    : "No unsaved changes"
+                  : dirty
+                    ? "New work · not saved"
+                    : "New work · nothing entered yet"
+            }
+          >
+            {dirty && (
+              <Button
+                variant="ghost"
+                disabled={saving}
+                onClick={() => {
+                  setForm(baseline);
+                  setTitleError(null);
+                }}
+              >
+                {selected ? "Discard" : "Cancel"}
+              </Button>
+            )}
+            <Button type="submit" variant="primary" disabled={!dirty || saving || deleting}>
+              {saving ? "Saving…" : selected ? "Save changes" : "Create work"}
+            </Button>
+          </SaveBar>
+        }
+      >
+        <Tabs
+          idPrefix={tabIds}
+          label="Work settings"
+          value={tab}
+          onChange={setTab}
+          tabs={[
+            { value: "details", label: "Details" },
+            {
+              value: "media",
+              label: mediaCount > 0 ? `Media · ${mediaCount}` : "Media",
+            },
+            { value: "content", label: "Content" },
+            { value: "publishing", label: "Publishing" },
+          ]}
+        />
+
+        <div className="pt-5">
+          {tab === "details" && (
+            <TabPanel idPrefix={tabIds} value="details">
+              <div className="space-y-5">
+                <Field
+                  label={
+                    <>
+                      Title <span className="text-[var(--av2-error-text)]">*</span>
+                    </>
+                  }
+                  htmlFor="showcase-title"
+                  error={titleError ?? undefined}
+                >
+                  <TextInput
+                    id="showcase-title"
+                    type="text"
+                    value={form.title}
+                    onChange={(e) => set("title", e.target.value)}
+                    aria-invalid={!!titleError}
+                    aria-required
+                    placeholder="e.g. Acme Corp Brand Identity"
+                  />
+                </Field>
+
+                <Field
+                  label="Slug"
+                  htmlFor="showcase-slug"
+                  hint="Leave blank to auto-generate from the title."
+                >
+                  <TextInput
+                    id="showcase-slug"
+                    type="text"
+                    value={form.slug}
+                    onChange={(e) => set("slug", e.target.value)}
+                    spellCheck={false}
+                    placeholder={
+                      form.title ? generateSlugFromTitle(form.title) : "auto-generated-from-title"
+                    }
+                  />
+                </Field>
+
+                <Field label="Subtitle" htmlFor="showcase-subtitle">
+                  <TextInput
+                    id="showcase-subtitle"
+                    type="text"
+                    value={form.subtitle}
+                    onChange={(e) => set("subtitle", e.target.value)}
+                    placeholder="e.g. A complete brand overhaul"
+                  />
+                </Field>
+
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <Field label="Client name" htmlFor="showcase-client">
+                    <TextInput
+                      id="showcase-client"
+                      type="text"
+                      value={form.clientName}
+                      onChange={(e) => set("clientName", e.target.value)}
+                      placeholder="e.g. Acme Corp"
+                    />
+                  </Field>
+                  <Field label="Category" htmlFor="showcase-category">
+                    <TextInput
+                      id="showcase-category"
+                      type="text"
+                      value={form.category}
+                      onChange={(e) => set("category", e.target.value)}
+                      placeholder="e.g. Brand Identity"
+                    />
+                  </Field>
+                </div>
+
+                <Field label="Tags" htmlFor="showcase-tags" hint="Comma-separated list of tags.">
+                  <TextInput
+                    id="showcase-tags"
+                    type="text"
+                    value={form.tags}
+                    onChange={(e) => set("tags", e.target.value)}
+                    placeholder="e.g. branding, logo, identity"
+                  />
+                </Field>
+
+                <p className="text-xs text-[var(--av2-text-2)]">
+                  Images and the description are managed in their own tabs.
+                </p>
+              </div>
+            </TabPanel>
+          )}
+
+          {tab === "media" && (
+            <TabPanel idPrefix={tabIds} value="media">
+              <div className="space-y-5">
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <CmsImageUpload
+                    type="showcase"
+                    value={form.thumbnail}
+                    onChange={(v) => set("thumbnail", v)}
+                    label="Thumbnail"
+                    aspectRatio="4/3"
+                  />
+                  <CmsImageUpload
+                    type="showcase"
+                    value={form.hero}
+                    onChange={(v) => set("hero", v)}
+                    label="Hero image"
+                    aspectRatio="16/9"
+                  />
+                </div>
+                <PanelSection
+                  title="Gallery"
+                  action={
+                    <span className="text-xs text-[var(--av2-text-2)] tabular-nums">
+                      {fmt(form.gallery.length)} {plural(form.gallery.length, "image", "images")}
+                    </span>
+                  }
+                >
+                  <CmsGalleryUpload value={form.gallery} onChange={(v) => set("gallery", v)} />
+                </PanelSection>
+              </div>
+            </TabPanel>
+          )}
+
+          {tab === "content" && (
+            <TabPanel idPrefix={tabIds} value="content">
+              <p className="mb-1.5 text-sm font-medium">Description</p>
+              <RichTextEditor
+                value={form.description}
+                onChange={(v) => set("description", v)}
+                placeholder="Write a detailed description of this work..."
+                minHeight="200px"
+                enableHeadings
+              />
+            </TabPanel>
+          )}
+
+          {tab === "publishing" && (
+            <TabPanel idPrefix={tabIds} value="publishing">
+              <div className="space-y-5">
+                <div className="rounded-lg border border-[var(--av2-border)] p-4">
+                  <Switch
+                    checked={form.published}
+                    onChange={(v) => set("published", v)}
+                    label="Published"
+                    describedBy="showcase-published-hint"
+                  />
+                  <p id="showcase-published-hint" className="mt-2 text-xs text-[var(--av2-text-2)]">
+                    {form.published
+                      ? "Visible on the public showcase after saving."
+                      : "Draft — hidden from the public showcase."}
+                  </p>
+                </div>
+
+                <Field
+                  label="Sort order"
+                  htmlFor="showcase-sort-order"
+                  hint="Lower numbers appear first."
+                >
+                  <TextInput
+                    id="showcase-sort-order"
+                    type="number"
+                    inputMode="numeric"
+                    value={form.sortOrder}
+                    onChange={(e) => set("sortOrder", e.target.value)}
+                    placeholder="0"
+                    className="max-w-[160px]"
+                  />
+                </Field>
+
+                {selected && (
+                  <PanelSection>
+                    <KeyValueList
+                      rows={[
+                        { label: "Published", value: formatDate(selected.publishedAt) },
+                        { label: "Created", value: formatDate(selected.createdAt) },
+                        { label: "Last updated", value: formatDate(selected.updatedAt) },
+                      ]}
+                    />
+                  </PanelSection>
+                )}
+
+                {selected && (
+                  <PanelSection title="Danger zone">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-sm text-[var(--av2-text-2)]">
+                        Deleting removes this work permanently.
+                      </p>
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        disabled={deleting || saving}
+                        aria-busy={deleting}
+                        onClick={() => setConfirmDelete(true)}
+                      >
+                        {deleting ? "Deleting…" : "Delete work"}
+                      </Button>
+                    </div>
+                  </PanelSection>
+                )}
+              </div>
+            </TabPanel>
+          )}
+        </div>
+      </DetailPanel>
+    </form>
+  );
 
   /* ---------------------------------------------------------------------- */
   /*  Render                                                                 */
@@ -338,443 +733,167 @@ export default function AdminShowcasePage() {
 
   return (
     <>
-      {/* Page header */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-4 px-6 pt-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Showcase Works</h1>
-          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-            Manage your portfolio showcase items. Create, edit, and publish works.
-          </p>
-        </div>
-        <Button onClick={handleNewClick}>New Work</Button>
-      </div>
+      <PageHeader
+        title="Showcase"
+        description="Manage your portfolio showcase items. Create, edit, and publish works."
+        meta={
+          data ? (
+            <span className="tabular-nums">
+              {fmt(totalCount)} {plural(totalCount, "work", "works")} · {fmt(publishedCount)}{" "}
+              published · {fmt(draftCount)} {plural(draftCount, "draft", "drafts")}
+            </span>
+          ) : undefined
+        }
+        actions={
+          <Button variant="primary" onClick={() => void guarded(resetForm)}>
+            <IconPlus />
+            New work
+          </Button>
+        }
+      />
 
-      {/* Error banner */}
       {error && (
-        <div className="mx-6 mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+        <div className="mb-6">
+          <Callout tone="error" title="Couldn't load showcase works">
+            {error}
+          </Callout>
         </div>
       )}
 
-      {/* Summary cards */}
-      <section className="mb-6 grid gap-4 px-6 md:grid-cols-3">
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-          <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-muted)] uppercase">
-            Total
-          </p>
-          <p className="mt-2 text-3xl font-semibold text-[var(--bb-secondary)]">
-            {loading ? "\u2014" : totalCount}
-          </p>
-          <p className="mt-1 text-xs text-[var(--bb-text-muted)]">All showcase works.</p>
-        </div>
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-          <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-muted)] uppercase">
-            Published
-          </p>
-          <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
-            {loading ? "\u2014" : publishedCount}
-          </p>
-          <p className="mt-1 text-xs text-[var(--bb-text-muted)]">
-            Visible on the public showcase.
-          </p>
-        </div>
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-          <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-muted)] uppercase">
-            Draft
-          </p>
-          <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
-            {loading ? "\u2014" : draftCount}
-          </p>
-          <p className="mt-1 text-xs text-[var(--bb-text-muted)]">Unpublished works in progress.</p>
-        </div>
-      </section>
-
-      {/* Split-view grid: list + form */}
-      <section className="grid grid-cols-1 gap-6 px-6 pb-6 xl:grid-cols-[3fr_2fr]">
-        {/* ---------------------------------------------------------------- */}
-        {/*  Left Panel: List                                                 */}
-        {/* ---------------------------------------------------------------- */}
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
-          {/* Search bar */}
-          <div className="mb-3">
-            <div className="relative">
-              <svg
-                className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[var(--bb-text-muted)]"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={2}
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+      <SplitView panel={panel}>
+        <Card padding="none">
+          <div className="px-6 pt-5">
+            <CardTitle>Portfolio</CardTitle>
+            <div className="mt-4">
+              <FilterBar>
+                <SearchInput
+                  className="min-w-[200px] flex-1"
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  placeholder="Search title, client or category"
+                  label="Search works by title, client or category"
                 />
-              </svg>
-              <input
-                type="text"
-                placeholder="Search by title, client, or category..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] py-2 pr-3 pl-10 text-sm text-[var(--bb-secondary)] transition-colors outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="absolute top-1/2 right-3 -translate-y-1/2 text-[var(--bb-text-muted)] hover:text-[var(--bb-secondary)]"
-                >
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    strokeWidth={2}
-                    stroke="currentColor"
+                <div className="w-full sm:w-40">
+                  <Select
+                    aria-label="Filter by status"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
                   >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              )}
+                    <option value="ALL">All statuses</option>
+                    <option value="PUBLISHED">Published</option>
+                    <option value="DRAFT">Draft</option>
+                  </Select>
+                </div>
+              </FilterBar>
             </div>
           </div>
 
-          {/* Filters row */}
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold tracking-tight">Works</h2>
-              <Badge variant="info">{filteredWorks.length}</Badge>
-              <FormSelect
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as "ALL" | "PUBLISHED" | "DRAFT")}
-                size="sm"
-                className="w-auto"
-              >
-                <option value="ALL">All status</option>
-                <option value="PUBLISHED">Published</option>
-                <option value="DRAFT">Draft</option>
-              </FormSelect>
+          {loading && !data ? (
+            <div className="space-y-3 border-t border-[var(--av2-border)] px-6 py-5" role="status">
+              <span className="sr-only">Loading showcase works…</span>
+              {[0, 1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-14 w-full" />
+              ))}
             </div>
-            <p className="text-xs text-[var(--bb-text-muted)]">
-              Showing {filteredWorks.length} of {totalCount}
-            </p>
-          </div>
-
-          {/* Table */}
-          {loading ? (
-            <LoadingState message="Loading showcase works..." />
+          ) : !data ? null : works.length === 0 ? (
+            <div className="border-t border-[var(--av2-border)]">
+              <EmptyState
+                icon={<IconPortfolio width={28} height={28} />}
+                title="No showcase works yet"
+                description="Create the first portfolio item with the New work button."
+              />
+            </div>
           ) : filteredWorks.length === 0 ? (
-            <EmptyState
-              title={searchQuery ? "No works match your search." : "No showcase works found."}
-            />
+            <div className="border-t border-[var(--av2-border)]">
+              <EmptyState
+                title="No works match these filters"
+                description="Try a different search or status."
+                action={<Button onClick={resetFilters}>Clear filters</Button>}
+              />
+            </div>
           ) : (
-            <div className="max-h-[520px] overflow-x-auto overflow-y-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-[var(--bb-border)] text-xs tracking-[0.08em] text-[var(--bb-text-muted)] uppercase">
-                    <th className="w-[40px] px-2 py-2" />
-                    <th className="px-2 py-2">Title</th>
-                    <th className="px-2 py-2">Client</th>
-                    <th className="px-2 py-2">Category</th>
-                    <th className="px-2 py-2 text-center">Status</th>
-                    <th className="px-2 py-2">Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredWorks.map((work) => (
-                    <tr
-                      key={work.id}
-                      onClick={() => handleRowClick(work)}
-                      className={`cursor-pointer border-b border-[var(--bb-border-subtle)] text-xs transition-colors last:border-b-0 ${
-                        selected?.id === work.id
-                          ? "border-l-2 border-l-[var(--bb-primary)] bg-[var(--bb-bg-warm)]"
-                          : "bg-[var(--bb-bg-page)] hover:bg-[var(--bb-bg-warm)]"
-                      }`}
-                    >
-                      {/* Thumbnail */}
-                      <td className="px-2 py-2">
-                        {work.thumbnailUrl ? (
-                          <img
-                            src={work.thumbnailUrl}
-                            alt=""
-                            className="h-10 w-10 rounded object-cover"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="flex h-10 w-10 items-center justify-center rounded bg-[var(--bb-bg-card)] text-[var(--bb-text-muted)]">
-                            <svg
-                              className="h-4 w-4"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              strokeWidth={1.5}
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z"
-                              />
-                            </svg>
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Title */}
-                      <td className="px-2 py-2 align-top">
-                        <div className="font-semibold text-[var(--bb-secondary)]">{work.title}</div>
-                        {work.subtitle && (
-                          <div className="mt-0.5 line-clamp-1 text-[10px] text-[var(--bb-text-secondary)]">
-                            {work.subtitle}
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Client */}
-                      <td className="px-2 py-2 align-top text-[var(--bb-text-secondary)]">
-                        {work.clientName || "\u2014"}
-                      </td>
-
-                      {/* Category */}
-                      <td className="px-2 py-2 align-top text-[var(--bb-text-secondary)]">
-                        {work.category || "\u2014"}
-                      </td>
-
-                      {/* Status */}
-                      <td className="px-2 py-2 text-center align-top">
-                        <Badge variant={work.status === "PUBLISHED" ? "success" : "neutral"}>
-                          {work.status === "PUBLISHED" ? "Published" : "Draft"}
-                        </Badge>
-                      </td>
-
-                      {/* Date */}
-                      <td className="px-2 py-2 align-top text-[var(--bb-text-muted)]">
-                        {formatDate(work.updatedAt)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Table label="Showcase works">
+              <thead>
+                <tr>
+                  <Th>Work</Th>
+                  <Th>Client</Th>
+                  <Th>Category</Th>
+                  <Th>Status</Th>
+                  <Th>Updated</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredWorks.map((work) => (
+                  <Tr
+                    key={work.id}
+                    selected={selected?.id === work.id}
+                    onSelect={() => {
+                      if (selected?.id === work.id) return;
+                      void guarded(() => fillFormFromWork(work));
+                    }}
+                    label={`${work.title}, ${work.status === "PUBLISHED" ? "published" : "draft"}`}
+                  >
+                    <Td>
+                      <div className="flex min-w-[200px] items-center gap-3">
+                        <Thumb url={work.thumbnailUrl} />
+                        <div className="min-w-0">
+                          <div className="font-semibold">{work.title}</div>
+                          {work.subtitle && (
+                            <div className="line-clamp-1 text-xs text-[var(--av2-text-2)]">
+                              {work.subtitle}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </Td>
+                    <Td className="text-[var(--av2-text-2)]">{work.clientName || DASH}</Td>
+                    <Td className="text-[var(--av2-text-2)]">{work.category || DASH}</Td>
+                    <Td>
+                      <StatusBadge status={work.status} />
+                    </Td>
+                    <Td className="whitespace-nowrap text-[var(--av2-text-2)] tabular-nums">
+                      {formatDate(work.updatedAt)}
+                    </Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </Table>
           )}
-        </div>
 
-        {/* ---------------------------------------------------------------- */}
-        {/*  Right Panel: Form                                                */}
-        {/* ---------------------------------------------------------------- */}
-        <div className="self-start rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-          <h2 className="text-sm font-semibold tracking-tight">
-            {selected ? `Edit: ${selected.title}` : "Create work"}
-          </h2>
-          <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
-            {selected
-              ? "Update the fields below and save your changes."
-              : "Fill in the details to create a new showcase work."}
-          </p>
-
-          <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
-            {/* Title */}
-            <div className="flex flex-col gap-1">
-              <label
-                htmlFor="showcase-title"
-                className="text-xs font-medium text-[var(--bb-secondary)]"
-              >
-                Title <span className="text-[var(--bb-primary)]">*</span>
-              </label>
-              <FormInput
-                id="showcase-title"
-                type="text"
-                value={formTitle}
-                onChange={(e) => setFormTitle(e.target.value)}
-                required
-                placeholder="e.g. Acme Corp Brand Identity"
-              />
-            </div>
-
-            {/* Slug */}
-            <div className="flex flex-col gap-1">
-              <label
-                htmlFor="showcase-slug"
-                className="text-xs font-medium text-[var(--bb-secondary)]"
-              >
-                Slug
-              </label>
-              <FormInput
-                id="showcase-slug"
-                type="text"
-                value={formSlug}
-                onChange={(e) => setFormSlug(e.target.value)}
-                placeholder={
-                  formTitle ? generateSlugFromTitle(formTitle) : "auto-generated-from-title"
-                }
-              />
-              <p className="text-[10px] text-[var(--bb-text-muted)]">
-                Leave blank to auto-generate from the title.
-              </p>
-            </div>
-
-            {/* Subtitle */}
-            <div className="flex flex-col gap-1">
-              <label
-                htmlFor="showcase-subtitle"
-                className="text-xs font-medium text-[var(--bb-secondary)]"
-              >
-                Subtitle
-              </label>
-              <FormInput
-                id="showcase-subtitle"
-                type="text"
-                value={formSubtitle}
-                onChange={(e) => setFormSubtitle(e.target.value)}
-                placeholder="e.g. A complete brand overhaul"
-              />
-            </div>
-
-            {/* Client Name */}
-            <div className="flex flex-col gap-1">
-              <label
-                htmlFor="showcase-client"
-                className="text-xs font-medium text-[var(--bb-secondary)]"
-              >
-                Client name
-              </label>
-              <FormInput
-                id="showcase-client"
-                type="text"
-                value={formClientName}
-                onChange={(e) => setFormClientName(e.target.value)}
-                placeholder="e.g. Acme Corp"
-              />
-            </div>
-
-            {/* Category */}
-            <div className="flex flex-col gap-1">
-              <label
-                htmlFor="showcase-category"
-                className="text-xs font-medium text-[var(--bb-secondary)]"
-              >
-                Category
-              </label>
-              <FormInput
-                id="showcase-category"
-                type="text"
-                value={formCategory}
-                onChange={(e) => setFormCategory(e.target.value)}
-                placeholder="e.g. Brand Identity, Web Design"
-              />
-            </div>
-
-            {/* Tags */}
-            <div className="flex flex-col gap-1">
-              <label
-                htmlFor="showcase-tags"
-                className="text-xs font-medium text-[var(--bb-secondary)]"
-              >
-                Tags
-              </label>
-              <FormInput
-                id="showcase-tags"
-                type="text"
-                value={formTags}
-                onChange={(e) => setFormTags(e.target.value)}
-                placeholder="e.g. branding, logo, identity"
-              />
-              <p className="text-[10px] text-[var(--bb-text-muted)]">
-                Comma-separated list of tags.
-              </p>
-            </div>
-
-            {/* Thumbnail */}
-            <div className="flex flex-col gap-1">
-              <CmsImageUpload
-                type="showcase"
-                value={formThumbnail}
-                onChange={setFormThumbnail}
-                label="Thumbnail"
-                aspectRatio="4/3"
-              />
-            </div>
-
-            {/* Hero Image */}
-            <div className="flex flex-col gap-1">
-              <CmsImageUpload
-                type="showcase"
-                value={formHero}
-                onChange={setFormHero}
-                label="Hero Image"
-                aspectRatio="16/9"
-              />
-            </div>
-
-            {/* Gallery */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-[var(--bb-text-secondary)]">Gallery</label>
-              <CmsGalleryUpload value={formGallery} onChange={setFormGallery} />
-            </div>
-
-            {/* Description (Rich Text) */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-[var(--bb-secondary)]">Description</label>
-              <RichTextEditor
-                value={formDescription}
-                onChange={setFormDescription}
-                placeholder="Write a detailed description of this work..."
-                minHeight="200px"
-                enableHeadings
-              />
-            </div>
-
-            {/* Published toggle */}
-            <label className="flex items-center gap-2 text-xs font-medium text-[var(--bb-secondary)]">
-              <input
-                type="checkbox"
-                checked={formPublished}
-                onChange={(e) => setFormPublished(e.target.checked)}
-                className="h-3.5 w-3.5 rounded border-[var(--bb-border)] text-[var(--bb-primary)] focus:ring-[var(--bb-primary)]"
-              />
-              Published
-            </label>
-
-            {/* Sort Order */}
-            <div className="flex flex-col gap-1">
-              <label
-                htmlFor="showcase-sort-order"
-                className="text-xs font-medium text-[var(--bb-secondary)]"
-              >
-                Sort Order
-              </label>
-              <FormInput
-                id="showcase-sort-order"
-                type="number"
-                value={formSortOrder}
-                onChange={(e) => setFormSortOrder(e.target.value)}
-                placeholder="0"
-              />
-            </div>
-
-            {/* Action buttons */}
-            <div className="flex items-center gap-2 pt-2">
-              <Button type="submit" loading={saving} loadingText="Saving...">
-                {selected ? "Save changes" : "Create work"}
-              </Button>
-
-              {selected && (
-                <Button
-                  type="button"
-                  variant="danger"
-                  onClick={handleDelete}
-                  loading={deleting}
-                  loadingText="Deleting..."
-                >
-                  Delete
+          {data && works.length > 0 && (
+            <TableFooter>
+              <span className="tabular-nums">
+                Showing {fmt(filteredWorks.length)} of {fmt(totalCount)}
+              </span>
+              {filtersActive ? (
+                <Button size="sm" variant="ghost" onClick={resetFilters}>
+                  Clear filters
                 </Button>
+              ) : (
+                <span>Select a work to edit it.</span>
               )}
+            </TableFooter>
+          )}
+        </Card>
+      </SplitView>
 
-              <Button type="button" variant="ghost" onClick={resetForm}>
-                Cancel
-              </Button>
-            </div>
-          </form>
-        </div>
-      </section>
+      <ConfirmDialog
+        open={confirmDelete}
+        onClose={() => !deleting && setConfirmDelete(false)}
+        onConfirm={async () => {
+          await handleDelete();
+          setConfirmDelete(false);
+        }}
+        loading={deleting}
+        variant="danger"
+        title="Delete this work?"
+        description={
+          selected
+            ? `Are you sure you want to delete "${selected.title}"? This action cannot be undone.`
+            : undefined
+        }
+        confirmLabel="Delete"
+      />
     </>
   );
 }

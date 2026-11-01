@@ -17,16 +17,17 @@
 //             - `onSubmit` returns a Promise so the caller can show the
 //               loading state on the submit button while the server call
 //               is in flight. Errors bubble up via a thrown Error; we
-//               catch + surface them under the input as InlineAlert.
+//               catch + surface them under the input as a v2 Callout.
+//             - Styled with the admin design language v1 primitives; the
+//               shared Modal shell picks up the v2 palette through the
+//               `.bb-admin-v2` legacy-token bridge.
 // -----------------------------------------------------------------------------
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
-import { Button } from "@/components/ui/button";
-import { FormInput } from "@/components/ui/form-field";
-import { InlineAlert } from "@/components/ui/inline-alert";
+import { Button, Callout, Field, TextInput } from "@/components/admin/v2/ui";
 import { Modal, ModalFooter, ModalHeader } from "@/components/ui/modal";
 
 type ConfirmTypedPhraseModalProps = {
@@ -46,10 +47,20 @@ type ConfirmTypedPhraseModalProps = {
   onSubmit: () => Promise<void> | void;
 };
 
-const TONE_CLASSES: Record<NonNullable<ConfirmTypedPhraseModalProps["submitTone"]>, string> = {
-  danger: "!bg-red-600 hover:!bg-red-700",
-  warning: "!bg-amber-600 hover:!bg-amber-700",
-  primary: "",
+// Submit styling per severity. `enabled:` keeps the v2 disabled look until
+// the phrase matches. Danger is a solid error fill (the only action in a
+// dialog the admin explicitly opened); warning is the outlined danger
+// button; primary is the brand fill.
+const TONE_BUTTON: Record<
+  NonNullable<ConfirmTypedPhraseModalProps["submitTone"]>,
+  { variant: "primary" | "danger"; className?: string }
+> = {
+  danger: {
+    variant: "primary",
+    className: "enabled:bg-[var(--av2-error-text)] enabled:hover:brightness-110",
+  },
+  warning: { variant: "danger" },
+  primary: { variant: "primary" },
 };
 
 export function ConfirmTypedPhraseModal({
@@ -65,6 +76,8 @@ export function ConfirmTypedPhraseModal({
   const [typed, setTyped] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const inputId = useId();
+  const tone = TONE_BUTTON[submitTone];
 
   // Reset the typed input + any prior error every time the modal opens.
   // Without this, re-opening after a cancel leaves the previous attempt.
@@ -92,45 +105,60 @@ export function ConfirmTypedPhraseModal({
   };
 
   return (
-    <Modal open={open} onClose={submitting ? () => {} : onClose} size="md">
+    <Modal
+      open={open}
+      onClose={submitting ? () => {} : onClose}
+      size="md"
+      className="border border-[var(--av2-border)]"
+    >
       <ModalHeader title={title} onClose={submitting ? () => {} : onClose} />
-      <div className="space-y-3 px-6 pb-4 text-sm text-[var(--bb-text-secondary)]">
+      <div className="space-y-4 text-sm text-[var(--av2-text-2)]">
         {description}
-        <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-          Type <strong className="font-mono text-[var(--bb-secondary)]">{requiredPhrase}</strong> to
-          confirm.
-        </p>
-        <FormInput
-          type="text"
-          value={typed}
-          onChange={(e) => setTyped(e.target.value)}
-          placeholder={requiredPhrase}
-          disabled={submitting}
-          // Don't let password managers or clipboard suggestions autofill —
-          // the physical typing step is the whole point.
-          autoComplete="off"
-          spellCheck={false}
-          aria-label={`Type ${requiredPhrase} to confirm`}
-        />
+        <Field
+          htmlFor={inputId}
+          label={
+            <>
+              Type{" "}
+              <strong className="rounded bg-[var(--av2-bg)] px-1.5 py-0.5 font-mono font-semibold text-[var(--av2-text)]">
+                {requiredPhrase}
+              </strong>{" "}
+              to confirm
+            </>
+          }
+        >
+          <TextInput
+            id={inputId}
+            type="text"
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            placeholder={requiredPhrase}
+            disabled={submitting}
+            // Don't let password managers or clipboard suggestions autofill —
+            // the physical typing step is the whole point.
+            autoComplete="off"
+            spellCheck={false}
+            aria-label={`Type ${requiredPhrase} to confirm`}
+            className="font-mono"
+          />
+        </Field>
         {errorMessage && (
-          <InlineAlert variant="error" size="sm">
+          <Callout tone="error" title="Action failed">
             {errorMessage}
-          </InlineAlert>
+          </Callout>
         )}
       </div>
-      <ModalFooter>
+      <ModalFooter className="mt-6">
         <Button variant="ghost" onClick={onClose} disabled={submitting}>
           Cancel
         </Button>
         <Button
-          variant="primary"
+          variant={tone.variant}
           onClick={handleSubmit}
-          loading={submitting}
-          loadingText="Working…"
           disabled={!canSubmit}
-          className={TONE_CLASSES[submitTone]}
+          aria-busy={submitting || undefined}
+          className={tone.className}
         >
-          {submitLabel}
+          {submitting ? "Working…" : submitLabel}
         </Button>
       </ModalFooter>
     </Modal>
