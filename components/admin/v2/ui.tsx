@@ -856,10 +856,10 @@ export function SaveBar({
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <p role="status" className="text-sm text-[var(--av2-text-2)]">
+      <p role="status" className="min-w-[12rem] flex-1 text-sm text-[var(--av2-text-2)]">
         {status ?? (dirty ? "Unsaved changes" : "No unsaved changes")}
       </p>
-      <div className="flex flex-wrap items-center gap-2">{children}</div>
+      <div className="ml-auto flex shrink-0 flex-wrap items-center gap-2">{children}</div>
     </div>
   );
 }
