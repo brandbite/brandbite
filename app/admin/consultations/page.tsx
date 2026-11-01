@@ -43,6 +43,7 @@ import {
   type Tone,
 } from "@/components/admin/v2/ui";
 import { IconClock } from "@/components/admin/v2/icons";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { IconConsultations, IconSettings } from "@/components/navigation/nav-icons";
 
 type ConsultationStatus = "PENDING" | "SCHEDULED" | "COMPLETED" | "CANCELED";
@@ -265,6 +266,15 @@ export default function AdminConsultationsPage() {
       },
     }));
     setTab("schedule");
+  };
+
+  // Cancelling refunds the booking tokens to the company — confirm first.
+  const [cancelTarget, setCancelTarget] = useState<AdminConsultation | null>(null);
+
+  const confirmCancel = async () => {
+    if (!cancelTarget) return;
+    await submitUpdate(cancelTarget.id, { status: "CANCELED" });
+    setCancelTarget(null);
   };
 
   const cancelSchedule = (id: string) => {
@@ -499,7 +509,7 @@ export default function AdminConsultationsPage() {
                   <div className="mt-4">
                     <Button
                       variant="danger"
-                      onClick={() => submitUpdate(c.id, { status: "CANCELED" })}
+                      onClick={() => setCancelTarget(c)}
                       disabled={saving}
                       aria-busy={saving}
                     >
@@ -799,6 +809,22 @@ export default function AdminConsultationsPage() {
           </p>
         )}
       </SplitView>
+
+      <ConfirmDialog
+        open={cancelTarget !== null}
+        onClose={() => savingId === null && setCancelTarget(null)}
+        onConfirm={confirmCancel}
+        loading={cancelTarget !== null && savingId === cancelTarget.id}
+        variant="danger"
+        title="Cancel this consultation?"
+        description={
+          cancelTarget
+            ? `${cancelTarget.company.name}'s booking will be cancelled and ${fmt(cancelTarget.tokenCost)} ${plural(cancelTarget.tokenCost, "token", "tokens")} refunded to the company. This can't be undone.`
+            : undefined
+        }
+        confirmLabel="Cancel & refund"
+        cancelLabel="Keep booking"
+      />
     </div>
   );
 }
