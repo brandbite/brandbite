@@ -251,6 +251,74 @@ h6 {
   font-family: var(--font-josefin), "Josefin Sans", sans-serif;
 }
 
+/* ── Admin design language v1 (Brandbite_Tasarim_Dili, Nov 2026) ──────────
+   Scoped to `.bb-admin-v2` so admin pages can migrate one at a time without
+   restyling the customer / creative portals. Light values are the guide's
+   hex standards; dark values are tuned equivalents for the theme switcher. */
+.bb-admin-v2 {
+  --av2-accent: #ff5b2a; /* brand accent: borders, dots, icon glyphs */
+  --av2-accent-strong: #fe5000; /* button fill — white text is ~3.3:1 (below AA for 14px) */
+  --av2-link: #fe5000; /* link text — same as button fill; ~3.3:1 on white (below AA for 14px) */
+  --av2-bg: #f7f6f2;
+  --av2-surface: #ffffff;
+  --av2-text: #292827;
+  --av2-text-2: #666a73;
+  --av2-border: #e4e2dd;
+  --av2-selected: #fff0e9;
+  --av2-lavender-bg: #f0edff;
+  --av2-success-bg: #e8f4eb;
+  /* Error, split by role so small text stays WCAG AA (4.5:1):
+     --av2-error       large figures, icons, dots, borders (needs 3:1)
+     --av2-error-text  body-size error copy (≥5.1:1 on white, page bg and
+                       the light-red alert fill #fdecea) */
+  --av2-error: #f31000;
+  --av2-error-text: #d10e00;
+  --av2-attention-from: #fff4ee;
+  --av2-attention-to: #ffe9df;
+  --av2-attention-border: #fbd5c4;
+  /* Data fills: ticket status + priority */
+  --av2-fill-neutral: #b4b2ae;
+  --av2-fill-lavender: #a99cf2;
+  --av2-fill-orange: #ff7a45;
+  --av2-fill-green: #8ccf98;
+  --av2-fill-amber: #f2a33a;
+  --av2-fill-red: #e5484d;
+  --av2-track: #eeece8;
+
+  font-family: var(--font-jakarta), "Plus Jakarta Sans", system-ui, sans-serif;
+  color: var(--av2-text);
+}
+
+.dark .bb-admin-v2 {
+  --av2-accent: #ff6a3d;
+  --av2-accent-strong: #fe5000;
+  --av2-link: #fe5000;
+  --av2-bg: #111114;
+  --av2-surface: #18181b;
+  --av2-text: #ececee;
+  --av2-text-2: #a1a1aa;
+  --av2-border: #2e2e33;
+  --av2-selected: #2a1a14;
+  --av2-lavender-bg: #221d3a;
+  --av2-success-bg: #10291a;
+  --av2-error: #f31000;
+  --av2-error-text: #ff5a4a; /* 5.75:1 on the dark surface */
+  --av2-attention-from: #24160f;
+  --av2-attention-to: #2c1910;
+  --av2-attention-border: #5c3122;
+  --av2-fill-neutral: #6b6a70;
+  --av2-fill-lavender: #8f80e8;
+  --av2-fill-orange: #ff7a45;
+  --av2-fill-green: #5fb071;
+  --av2-fill-amber: #e0952f;
+  --av2-fill-red: #ef5b5f;
+  --av2-track: #27272a;
+}
+
+.bb-admin-v2 :is(h1, h2, h3, h4, h5, h6) {
+  font-family: inherit;
+}
+
 /* Utility class for Josefin Sans on non-heading elements (e.g. logo, brand text) */
 .font-brand {
   font-family: var(--font-josefin), "Josefin Sans", sans-serif;

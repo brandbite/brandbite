@@ -1,18 +1,31 @@
 // -----------------------------------------------------------------------------
 // @file: app/admin/page.tsx
-// @purpose: Admin analytics dashboard — platform-wide metrics, charts, health
-// @version: v1.0.0
+// @purpose: Admin analytics dashboard — platform-wide metrics, ticket workflow,
+//           "needs attention" health signals, token economy and withdrawal
+//           queue. First screen migrated to the admin design language v1
+//           (Plus Jakarta Sans, `.bb-admin-v2` tokens in globals.css).
+// @version: v2.0.0
 // @status: active
-// @lastUpdate: 2025-11-25
+// @lastUpdate: 2026-11-01
 // -----------------------------------------------------------------------------
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { InlineAlert } from "@/components/ui/inline-alert";
-import { LoadingState } from "@/components/ui/loading-state";
-import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from "recharts";
+import { adminFont } from "@/lib/fonts/admin";
+import {
+  IconAlertCircle,
+  IconArrowUpRight,
+  IconBuilding,
+  IconClock,
+  IconCoins,
+  IconDocument,
+  IconTicket,
+  IconUsers,
+  IconWallet,
+} from "@/components/admin/v2/icons";
 
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -52,39 +65,150 @@ type DashboardState =
   | { status: "error"; message: string }
   | { status: "ready"; data: AdminDashboardResponse };
 
-/* Status accent colors for chart bars */
-const STATUS_COLORS: Record<TicketStatus, string> = {
-  TODO: "#9CA3AF",
-  IN_PROGRESS: "#3B82F6",
-  IN_REVIEW: "#F15B2B",
-  DONE: "#22C55E",
-};
+// Status → fill. Guide: Backlog neutral, In progress lavender, In review
+// orange, Done green. Every swatch also carries a visible text label.
+const STATUS_META: { key: TicketStatus; label: string; fill: string }[] = [
+  { key: "TODO", label: "Backlog", fill: "var(--av2-fill-neutral)" },
+  { key: "IN_PROGRESS", label: "In progress", fill: "var(--av2-fill-lavender)" },
+  { key: "IN_REVIEW", label: "In review", fill: "var(--av2-fill-orange)" },
+  { key: "DONE", label: "Done", fill: "var(--av2-fill-green)" },
+];
 
-const STATUS_LABELS: Record<TicketStatus, string> = {
-  TODO: "Backlog",
-  IN_PROGRESS: "In progress",
-  IN_REVIEW: "In review",
-  DONE: "Done",
-};
+const PRIORITY_META: { key: TicketPriority; label: string; fill: string }[] = [
+  { key: "URGENT", label: "Urgent", fill: "var(--av2-fill-red)" },
+  { key: "HIGH", label: "High", fill: "var(--av2-fill-amber)" },
+  { key: "MEDIUM", label: "Medium", fill: "var(--av2-fill-lavender)" },
+  { key: "LOW", label: "Low", fill: "var(--av2-fill-neutral)" },
+];
 
-const STATUS_ORDER: TicketStatus[] = ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"];
+const DASH = "—";
 
-/* Priority accent colors */
-const PRIORITY_COLORS: Record<TicketPriority, string> = {
-  URGENT: "#EF4444",
-  HIGH: "#F59E0B",
-  MEDIUM: "#3B82F6",
-  LOW: "#9CA3AF",
-};
+/** Format a number, or an em dash while the value is unknown (never fake a 0). */
+const fmt = (n: number | null | undefined) => (typeof n === "number" ? n.toLocaleString() : DASH);
 
-const PRIORITY_LABELS: Record<TicketPriority, string> = {
-  URGENT: "Urgent",
-  HIGH: "High",
-  MEDIUM: "Medium",
-  LOW: "Low",
-};
+const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
-const PRIORITY_ORDER: TicketPriority[] = ["URGENT", "HIGH", "MEDIUM", "LOW"];
+// ---------------------------------------------------------------------------
+// Small building blocks
+// ---------------------------------------------------------------------------
+
+function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return (
+    <section
+      className={`rounded-2xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-6 ${className}`}
+    >
+      {children}
+    </section>
+  );
+}
+
+function CardLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex items-center gap-1 rounded text-sm font-semibold whitespace-nowrap text-[var(--av2-link)] hover:underline focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
+    >
+      {children}
+      <IconArrowUpRight />
+    </Link>
+  );
+}
+
+function IconTile({
+  children,
+  tone,
+}: {
+  children: ReactNode;
+  tone: "lavender" | "peach" | "green";
+}) {
+  const bg =
+    tone === "lavender"
+      ? "bg-[var(--av2-lavender-bg)] text-[#5b4fc4] dark:text-[#b8adf7]"
+      : tone === "green"
+        ? "bg-[var(--av2-success-bg)] text-[#2f7a45] dark:text-[#7fd396]"
+        : "bg-[var(--av2-selected)] text-[var(--av2-link)]";
+  return (
+    <span className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${bg}`}>
+      {children}
+    </span>
+  );
+}
+
+function KpiCard({
+  icon,
+  tone,
+  label,
+  value,
+  hint,
+  highlight = false,
+}: {
+  icon: ReactNode;
+  tone: "lavender" | "peach" | "green";
+  label: string;
+  value: string;
+  hint: ReactNode;
+  highlight?: boolean;
+}) {
+  return (
+    <section
+      className={`relative flex gap-4 overflow-hidden rounded-2xl border bg-[var(--av2-surface)] p-6 ${
+        highlight ? "border-[var(--av2-accent)]/40" : "border-[var(--av2-border)]"
+      }`}
+    >
+      {highlight && (
+        <span aria-hidden className="absolute inset-x-0 top-0 h-[3px] bg-[var(--av2-accent)]" />
+      )}
+      <IconTile tone={tone}>{icon}</IconTile>
+      <div className="min-w-0">
+        <p className="text-xs font-medium tracking-[0.12em] text-[var(--av2-text-2)] uppercase">
+          {label}
+        </p>
+        <p className="mt-1 text-[32px] leading-10 font-bold tracking-tight tabular-nums">{value}</p>
+        <p className="mt-1 text-xs text-[var(--av2-text-2)]">{hint}</p>
+      </div>
+    </section>
+  );
+}
+
+function AttentionItem({
+  icon,
+  iconClass,
+  count,
+  title,
+  description,
+  href,
+  linkLabel,
+}: {
+  icon: ReactNode;
+  iconClass: string;
+  count: number | null;
+  title: string;
+  description: string;
+  href: string;
+  linkLabel: string;
+}) {
+  return (
+    <div className="flex gap-4 xl:px-6 xl:first:pl-0 xl:last:pr-0">
+      <span
+        className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${iconClass}`}
+      >
+        {icon}
+      </span>
+      <div className="min-w-0">
+        <p className="text-[32px] leading-10 font-bold tabular-nums">{fmt(count)}</p>
+        <p className="text-base font-semibold">{title}</p>
+        <p className="mt-0.5 text-sm text-[var(--av2-text-2)]">{description}</p>
+        <div className="mt-3">
+          <CardLink href={href}>{linkLabel}</CardLink>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
 
 export default function AdminDashboardPage() {
   const [state, setState] = useState<DashboardState>({ status: "loading" });
@@ -107,10 +231,7 @@ export default function AdminDashboardPage() {
 
         if (cancelled) return;
 
-        setState({
-          status: "ready",
-          data: json as AdminDashboardResponse,
-        });
+        setState({ status: "ready", data: json as AdminDashboardResponse });
       } catch (err: any) {
         console.error("[AdminDashboard] load error", err);
         if (!cancelled) {
@@ -130,7 +251,6 @@ export default function AdminDashboardPage() {
   }, []);
 
   const isLoading = state.status === "loading";
-  const isError = state.status === "error";
   const data = state.status === "ready" ? state.data : null;
 
   const platform = data?.platform ?? null;
@@ -138,404 +258,343 @@ export default function AdminDashboardPage() {
   const withdrawals = data?.withdrawals ?? null;
   const health = data?.health ?? null;
 
-  /* Chart data */
-  const statusChartData = platform
-    ? STATUS_ORDER.map((s) => ({
-        name: STATUS_LABELS[s],
-        count: platform.ticketsByStatus[s] ?? 0,
-        fill: STATUS_COLORS[s],
-      }))
-    : [];
+  const totalTickets = platform?.totalTickets ?? 0;
+  const statusRows = STATUS_META.map((s) => ({
+    ...s,
+    count: platform ? (platform.ticketsByStatus[s.key] ?? 0) : null,
+  }));
+  const priorityRows = PRIORITY_META.map((p) => ({
+    ...p,
+    count: platform ? (platform.ticketsByPriority[p.key] ?? 0) : null,
+  }));
 
-  const priorityChartData = platform
-    ? PRIORITY_ORDER.map((p) => ({
-        name: PRIORITY_LABELS[p],
-        count: platform.ticketsByPriority[p] ?? 0,
-        fill: PRIORITY_COLORS[p],
-      }))
-    : [];
+  const attentionAreas = health
+    ? [health.overdueTickets, health.staleTickets, health.companiesLowBalance].filter((n) => n > 0)
+        .length
+    : null;
+
+  const pendingCount = withdrawals?.pendingCount ?? 0;
+  const net = tokens?.globalNet ?? null;
 
   return (
-    <>
+    <div className={`${adminFont.variable} bb-admin-v2`}>
       {/* Header */}
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--bb-text-muted)] uppercase">
-            Admin
-          </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Dashboard</h1>
-          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-            Platform-wide analytics and health overview.
-          </p>
-        </div>
-        {isLoading && <LoadingState display="inline" message="Loading dashboard..." />}
-      </div>
+      <header className="mb-6">
+        <h1 className="text-[32px] leading-10 font-bold tracking-tight">Dashboard</h1>
+        <p className="mt-1 text-base text-[var(--av2-text-2)]">
+          A clear view of your creative operations.
+        </p>
+      </header>
 
-      {/* Error */}
-      {isError && (
-        <InlineAlert variant="error" title="Something went wrong" className="mb-4">
+      {state.status === "error" && (
+        <InlineAlert variant="error" title="Something went wrong" className="mb-6">
           {state.message}
         </InlineAlert>
       )}
 
-      {/* Content */}
-      {!isError && (
-        <div className="space-y-4">
-          {/* Row 1: Platform overview cards */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {/* Companies */}
-            <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-[#6366F1] to-[#A5B4FC]" />
-              <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
-                Companies
-              </p>
-              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">
-                {platform?.totalCompanies ?? "\u2014"}
-              </p>
-              <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-                <span className="font-semibold text-[#6366F1]">
-                  {platform?.activeCompanies ?? 0}
-                </span>{" "}
-                active last 30 days
-              </p>
-            </section>
-
-            {/* Creatives */}
-            <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-[#F15B2B] to-[#f6a07a]" />
-              <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
-                Creatives
-              </p>
-              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">
-                {platform?.totalCreatives ?? "\u2014"}
-              </p>
-              <p className="text-[11px] text-[var(--bb-text-tertiary)]">registered on platform</p>
-            </section>
-
-            {/* Tickets */}
-            <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-[#3B82F6] to-[#93C5FD]" />
-              <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
-                Tickets
-              </p>
-              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">
-                {platform?.totalTickets ?? "\u2014"}
-              </p>
-              <div className="flex gap-3 text-[11px] text-[var(--bb-text-tertiary)]">
-                <span>
-                  <span className="font-semibold text-[#22C55E]">
-                    +{platform?.ticketsCreatedLast30Days ?? 0}
-                  </span>{" "}
-                  created
-                </span>
-                <span>
-                  <span className="font-semibold text-[#3B82F6]">
-                    {platform?.ticketsCompletedLast30Days ?? 0}
-                  </span>{" "}
-                  completed
-                </span>
-              </div>
-            </section>
-
-            {/* Tokens */}
-            <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-[#22C55E] to-[#86EFAC]" />
-              <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
-                Token economy
-              </p>
-              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">
-                {tokens?.totalCompanyBalances?.toLocaleString() ?? "\u2014"}
-              </p>
-              <p className="text-[11px] text-[var(--bb-text-tertiary)]">total company balances</p>
-              {tokens && (
-                <div className="mt-2 flex gap-3 text-[11px] text-[var(--bb-text-tertiary)]">
-                  <span>
-                    Credits{" "}
-                    <span className="font-semibold text-[#22C55E]">
-                      {tokens.globalCredits.toLocaleString()}
-                    </span>
-                  </span>
-                  <span>
-                    Debits{" "}
-                    <span className="font-semibold text-[#EF4444]">
-                      {tokens.globalDebits.toLocaleString()}
-                    </span>
-                  </span>
-                </div>
-              )}
-            </section>
-          </div>
-
-          {/* Row 2: Charts */}
-          {platform && platform.totalTickets > 0 && (
-            <div className="grid gap-4 md:grid-cols-2">
-              {/* Ticket distribution chart */}
-              <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-                <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
-                  Ticket distribution
-                </h2>
-                <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
-                  All tickets by workflow status
-                </p>
-                <div className="mt-4 h-48">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={statusChartData}
-                      margin={{ top: 4, right: 0, bottom: 0, left: -20 }}
-                    >
-                      <XAxis
-                        dataKey="name"
-                        tick={{ fontSize: 11, fill: "var(--bb-text-tertiary)" }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        allowDecimals={false}
-                        tick={{ fontSize: 11, fill: "var(--bb-text-tertiary)" }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          borderRadius: 12,
-                          border: "1px solid var(--bb-border)",
-                          fontSize: 12,
-                        }}
-                      />
-                      <Bar dataKey="count" radius={[6, 6, 0, 0]} maxBarSize={56}>
-                        {statusChartData.map((entry, i) => (
-                          <Cell key={i} fill={entry.fill} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </section>
-
-              {/* Priority distribution chart */}
-              <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-                <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
-                  Priority distribution
-                </h2>
-                <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
-                  All tickets by priority level
-                </p>
-                <div className="mt-4 h-48">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={priorityChartData}
-                      margin={{ top: 4, right: 0, bottom: 0, left: -20 }}
-                    >
-                      <XAxis
-                        dataKey="name"
-                        tick={{ fontSize: 11, fill: "var(--bb-text-tertiary)" }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        allowDecimals={false}
-                        tick={{ fontSize: 11, fill: "var(--bb-text-tertiary)" }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          borderRadius: 12,
-                          border: "1px solid var(--bb-border)",
-                          fontSize: 12,
-                        }}
-                      />
-                      <Bar dataKey="count" radius={[6, 6, 0, 0]} maxBarSize={56}>
-                        {priorityChartData.map((entry, i) => (
-                          <Cell key={i} fill={entry.fill} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </section>
-            </div>
+      {state.status !== "error" && (
+        <div className="space-y-6" aria-busy={isLoading}>
+          {isLoading && (
+            <p className="sr-only" role="status">
+              Loading dashboard…
+            </p>
           )}
 
-          {/* Row 3: Health indicators + metrics */}
-          <div className="grid gap-4 md:grid-cols-3">
-            {/* Health: Low balance companies */}
-            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <div className="flex items-center gap-2">
-                <span
-                  className={`inline-flex h-2.5 w-2.5 rounded-full ${
-                    (health?.companiesLowBalance ?? 0) > 0 ? "bg-[#EF4444]" : "bg-[#22C55E]"
-                  }`}
-                  aria-label={
-                    (health?.companiesLowBalance ?? 0) > 0 ? "Attention needed" : "All clear"
-                  }
-                  title={(health?.companiesLowBalance ?? 0) > 0 ? "Attention needed" : "All clear"}
-                />
-                <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
-                  Low balance
-                </h2>
-              </div>
-              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">
-                {health?.companiesLowBalance ?? 0}
-              </p>
-              <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-                companies with &lt; 5 tokens
-              </p>
-            </section>
-
-            {/* Health: Overdue tickets */}
-            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <div className="flex items-center gap-2">
-                <span
-                  className={`inline-flex h-2.5 w-2.5 rounded-full ${
-                    (health?.overdueTickets ?? 0) > 0 ? "bg-[#F59E0B]" : "bg-[#22C55E]"
-                  }`}
-                  aria-label={(health?.overdueTickets ?? 0) > 0 ? "Attention needed" : "All clear"}
-                  title={(health?.overdueTickets ?? 0) > 0 ? "Attention needed" : "All clear"}
-                />
-                <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
-                  Overdue tickets
-                </h2>
-              </div>
-              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">
-                {health?.overdueTickets ?? 0}
-              </p>
-              <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-                past due date, not completed
-              </p>
-            </section>
-
-            {/* Health: Stale tickets */}
-            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <div className="flex items-center gap-2">
-                <span
-                  className={`inline-flex h-2.5 w-2.5 rounded-full ${
-                    (health?.staleTickets ?? 0) > 0 ? "bg-[#F59E0B]" : "bg-[#22C55E]"
-                  }`}
-                  aria-label={(health?.staleTickets ?? 0) > 0 ? "Attention needed" : "All clear"}
-                  title={(health?.staleTickets ?? 0) > 0 ? "Attention needed" : "All clear"}
-                />
-                <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
-                  Stale tickets
-                </h2>
-              </div>
-              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">
-                {health?.staleTickets ?? 0}
-              </p>
-              <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-                in progress &gt; 7 days without update
-              </p>
-            </section>
+          {/* Row 1 — headline KPIs */}
+          <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+            <KpiCard
+              icon={<IconBuilding />}
+              tone="lavender"
+              label="Companies"
+              value={fmt(platform?.totalCompanies)}
+              hint={`${fmt(platform?.activeCompanies)} active in the last 30 days`}
+            />
+            <KpiCard
+              icon={<IconUsers />}
+              tone="peach"
+              label="Creatives"
+              value={fmt(platform?.totalCreatives)}
+              hint="Registered on the platform"
+            />
+            <KpiCard
+              icon={<IconTicket />}
+              tone="lavender"
+              label="Tickets"
+              value={fmt(platform?.totalTickets)}
+              hint={`${fmt(platform?.ticketsCreatedLast30Days)} created · ${fmt(
+                platform?.ticketsCompletedLast30Days,
+              )} completed in the last 30 days`}
+            />
+            <KpiCard
+              icon={<IconCoins />}
+              tone="green"
+              label="Token balance"
+              value={fmt(tokens?.totalCompanyBalances)}
+              hint="Across all companies"
+              highlight
+            />
           </div>
 
-          {/* Row 4: Additional metrics + Quick links */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {/* Avg revisions */}
-            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
-                Avg. revisions
+          {/* Row 2 — needs attention */}
+          <section
+            aria-labelledby="needs-attention-title"
+            className="rounded-2xl border border-[var(--av2-attention-border)] bg-gradient-to-r from-[var(--av2-attention-from)] to-[var(--av2-attention-to)] p-6"
+          >
+            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+              <h2 id="needs-attention-title" className="text-xl leading-7 font-semibold">
+                Needs attention
+              </h2>
+              <p className="text-sm text-[var(--av2-text-2)]">
+                {attentionAreas === null
+                  ? DASH
+                  : attentionAreas === 0
+                    ? "All clear — nothing to check right now"
+                    : `${attentionAreas} ${plural(attentionAreas, "area", "areas")} to check`}
               </p>
-              <p className="mt-2 text-2xl font-bold text-[var(--bb-secondary)]">
-                {platform?.avgRevisionCount ?? "\u2014"}
-              </p>
-              <p className="text-[11px] text-[var(--bb-text-tertiary)]">per completed ticket</p>
-            </section>
+            </div>
+            <div className="mt-4 grid divide-y divide-[var(--av2-attention-border)] xl:grid-cols-3 xl:divide-x xl:divide-y-0 [&>*]:py-4 xl:[&>*]:py-2">
+              <AttentionItem
+                icon={<IconClock />}
+                iconClass="bg-[#fde3e1] text-[var(--av2-error)] dark:bg-[#3a1715]"
+                count={health?.overdueTickets ?? null}
+                title="Overdue tickets"
+                description="Past due and not completed"
+                href="/admin/board"
+                linkLabel="View tickets"
+              />
+              <AttentionItem
+                icon={<IconAlertCircle />}
+                iconClass="bg-[#feead3] text-[#b25e09] dark:bg-[#37250f] dark:text-[#f2a33a]"
+                count={health?.staleTickets ?? null}
+                title="Stale tickets"
+                description="In progress, no update for over 7 days"
+                href="/admin/board"
+                linkLabel="Review tickets"
+              />
+              <AttentionItem
+                icon={<IconWallet />}
+                iconClass="bg-[var(--av2-selected)] text-[var(--av2-link)] dark:bg-[#3a2016]"
+                count={health?.companiesLowBalance ?? null}
+                title="Low-balance companies"
+                description="Fewer than 5 tokens remaining"
+                href="/admin/companies"
+                linkLabel="View companies"
+              />
+            </div>
+          </section>
 
-            {/* Pending withdrawals */}
-            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
-                Pending payouts
-              </p>
-              <p className="mt-2 text-2xl font-bold text-[var(--bb-secondary)]">
-                {withdrawals?.pendingCount ?? 0}
-              </p>
-              <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-                {withdrawals?.pendingAmount?.toLocaleString() ?? 0} tokens total
-              </p>
-            </section>
+          {/* Row 3 — ticket workflow + priority */}
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+            <Card>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-xl leading-7 font-semibold">Ticket workflow</h2>
+                  <p className="mt-0.5 text-sm text-[var(--av2-text-2)]">
+                    {platform
+                      ? `${fmt(totalTickets)} ${plural(totalTickets, "ticket", "tickets")} across all stages`
+                      : DASH}
+                  </p>
+                </div>
+                <CardLink href="/admin/board">Open board</CardLink>
+              </div>
 
-            {/* Total paid */}
-            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
-                Total paid out
-              </p>
-              <p className="mt-2 text-2xl font-bold text-[var(--bb-secondary)]">
-                {withdrawals?.totalPaid?.toLocaleString() ?? 0}
-              </p>
-              <p className="text-[11px] text-[var(--bb-text-tertiary)]">tokens to creatives</p>
-            </section>
-
-            {/* Net tokens */}
-            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
-                Net token flow
-              </p>
-              <p
-                className={`mt-2 text-2xl font-bold ${
-                  (tokens?.globalNet ?? 0) >= 0 ? "text-[#22C55E]" : "text-[#EF4444]"
-                }`}
+              <div
+                role="img"
+                aria-label={
+                  platform
+                    ? `Ticket workflow: ${statusRows.map((s) => `${s.label} ${s.count}`).join(", ")}`
+                    : "Ticket workflow loading"
+                }
+                className="mt-6 flex h-7 w-full gap-[3px] overflow-hidden rounded-lg bg-[var(--av2-track)]"
               >
-                {(tokens?.globalNet ?? 0) >= 0 ? "+" : ""}
-                {tokens?.globalNet?.toLocaleString() ?? 0}
-              </p>
-              <p className="text-[11px] text-[var(--bb-text-tertiary)]">credits minus debits</p>
-            </section>
+                {totalTickets > 0 &&
+                  statusRows.map((s) =>
+                    s.count ? (
+                      <span
+                        key={s.key}
+                        className="h-full first:rounded-l-lg last:rounded-r-lg"
+                        style={{ width: `${(s.count / totalTickets) * 100}%`, background: s.fill }}
+                      />
+                    ) : null,
+                  )}
+              </div>
+
+              <dl className="mt-6 grid grid-cols-2 gap-y-4 sm:grid-cols-4 sm:divide-x sm:divide-[var(--av2-border)]">
+                {statusRows.map((s) => (
+                  <div key={s.key} className="sm:px-6 sm:first:pl-0">
+                    <dt className="flex items-center gap-2 text-sm text-[var(--av2-text-2)]">
+                      <span
+                        aria-hidden
+                        className="h-3 w-3 rounded-full"
+                        style={{ background: s.fill }}
+                      />
+                      {s.label}
+                    </dt>
+                    <dd className="mt-1 pl-5 text-2xl leading-8 font-bold tabular-nums">
+                      {fmt(s.count)}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </Card>
+
+            <Card>
+              <h2 className="text-xl leading-7 font-semibold">Priority breakdown</h2>
+              <ul className="mt-5 space-y-4">
+                {priorityRows.map((p) => {
+                  const pct = totalTickets > 0 && p.count ? (p.count / totalTickets) * 100 : 0;
+                  return (
+                    <li
+                      key={p.key}
+                      className="grid grid-cols-[88px_minmax(0,1fr)_32px] items-center gap-4"
+                    >
+                      <span className="flex items-center gap-2 text-sm font-medium">
+                        <span
+                          aria-hidden
+                          className="h-3 w-3 rounded-full"
+                          style={{ background: p.fill }}
+                        />
+                        {p.label}
+                      </span>
+                      <span
+                        aria-hidden
+                        className="h-2.5 overflow-hidden rounded-full bg-[var(--av2-track)]"
+                      >
+                        <span
+                          className="block h-full rounded-full"
+                          style={{ width: `${pct}%`, background: p.fill }}
+                        />
+                      </span>
+                      <span className="text-right text-sm font-semibold tabular-nums">
+                        {fmt(p.count)}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </Card>
           </div>
 
-          {/* Row 5: Quick links */}
-          <div className="grid gap-4 md:grid-cols-3">
-            <Link
-              href="/admin/withdrawals"
-              className="group rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm transition-colors hover:border-[#F15B2B]"
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-[var(--bb-secondary)]">
-                  Withdrawal queue
-                </h3>
-                <span className="text-xs text-[#F15B2B] opacity-0 transition-opacity group-hover:opacity-100">
-                  Open &rarr;
-                </span>
+          {/* Row 4 — token economy + withdrawal queue */}
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+            <Card>
+              <div className="flex items-start justify-between gap-4">
+                <h2 className="text-xl leading-7 font-semibold">Token economy</h2>
+                <CardLink href="/admin/token-analytics">View analytics</CardLink>
               </div>
-              <p className="mt-1 text-[11px] text-[var(--bb-text-tertiary)]">
-                {withdrawals?.pendingCount ?? 0} pending request
-                {(withdrawals?.pendingCount ?? 0) !== 1 ? "s" : ""}
-              </p>
-            </Link>
 
-            <Link
-              href="/admin/token-analytics"
-              className="group rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm transition-colors hover:border-[#F15B2B]"
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-[var(--bb-secondary)]">
-                  Token analytics
-                </h3>
-                <span className="text-xs text-[#F15B2B] opacity-0 transition-opacity group-hover:opacity-100">
-                  Open &rarr;
-                </span>
-              </div>
-              <p className="mt-1 text-[11px] text-[var(--bb-text-tertiary)]">
-                Detailed per-company token breakdowns
-              </p>
-            </Link>
+              <dl className="mt-5 grid grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] gap-x-8 gap-y-4">
+                {[
+                  { label: "Total credits", value: fmt(tokens?.globalCredits), tone: "" },
+                  { label: "Total debits", value: fmt(tokens?.globalDebits), tone: "" },
+                  {
+                    label: "Net token flow",
+                    value: net === null ? DASH : `${net > 0 ? "+" : ""}${net.toLocaleString()}`,
+                    tone:
+                      net === null
+                        ? ""
+                        : net < 0
+                          ? "text-[var(--av2-error)]"
+                          : "text-[var(--bb-success-text)]",
+                  },
+                ].map((m) => (
+                  <div key={m.label} className="min-w-0">
+                    <dt className="text-sm text-[var(--av2-text-2)]">{m.label}</dt>
+                    <dd
+                      className={`mt-1 text-[32px] leading-10 font-bold tracking-tight whitespace-nowrap tabular-nums ${m.tone}`}
+                    >
+                      {m.value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
 
-            <Link
-              href="/admin/companies"
-              className="group rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm transition-colors hover:border-[#F15B2B]"
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-[var(--bb-secondary)]">All companies</h3>
-                <span className="text-xs text-[#F15B2B] opacity-0 transition-opacity group-hover:opacity-100">
-                  Open &rarr;
-                </span>
+              <dl className="mt-6 grid gap-4 border-t border-[var(--av2-border)] pt-5 sm:grid-cols-2 sm:gap-0 sm:divide-x sm:divide-[var(--av2-border)]">
+                <div className="flex items-center gap-4 sm:pr-6">
+                  <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--av2-bg)] text-[var(--av2-text-2)]">
+                    <IconDocument />
+                  </span>
+                  <div>
+                    <dt className="text-sm text-[var(--av2-text-2)]">Avg. revisions</dt>
+                    <dd className="flex items-baseline gap-2">
+                      <span className="text-2xl leading-8 font-bold tabular-nums">
+                        {fmt(platform?.avgRevisionCount)}
+                      </span>
+                      <span className="text-sm text-[var(--av2-text-2)]">per completed ticket</span>
+                    </dd>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4 sm:pl-6">
+                  <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--av2-bg)] text-[var(--av2-text-2)]">
+                    <IconCoins />
+                  </span>
+                  <div>
+                    <dt className="text-sm text-[var(--av2-text-2)]">Total paid out</dt>
+                    <dd className="flex items-baseline gap-2">
+                      <span className="text-2xl leading-8 font-bold tabular-nums">
+                        {fmt(withdrawals?.totalPaid)}
+                      </span>
+                      <span className="text-sm text-[var(--av2-text-2)]">tokens</span>
+                    </dd>
+                  </div>
+                </div>
+              </dl>
+            </Card>
+
+            <Card className="flex flex-col">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <IconTile tone="peach">
+                    <IconWallet />
+                  </IconTile>
+                  <h2 className="text-xl leading-7 font-semibold">Withdrawal queue</h2>
+                </div>
+                {withdrawals && (
+                  <span
+                    className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold whitespace-nowrap ${
+                      pendingCount > 0
+                        ? "bg-[var(--av2-selected)] text-[var(--av2-link)]"
+                        : "bg-[var(--av2-success-bg)] text-[var(--bb-success-text)]"
+                    }`}
+                  >
+                    {pendingCount > 0 ? `${pendingCount} pending` : "All clear"}
+                  </span>
+                )}
               </div>
-              <p className="mt-1 text-[11px] text-[var(--bb-text-tertiary)]">
-                {platform?.totalCompanies ?? 0} companies registered
-              </p>
-            </Link>
+
+              <div className="mt-6 flex flex-1 flex-wrap items-end justify-between gap-4">
+                <div>
+                  <p className="text-[32px] leading-10 font-bold tracking-tight tabular-nums">
+                    {fmt(withdrawals?.pendingAmount)} <span className="text-2xl">tokens</span>
+                  </p>
+                  <p className="text-sm text-[var(--av2-text-2)]">
+                    {withdrawals
+                      ? `Awaiting payout · ${pendingCount} ${plural(pendingCount, "request", "requests")}`
+                      : DASH}
+                  </p>
+                </div>
+                <Link
+                  href="/admin/withdrawals"
+                  className={`inline-flex h-10 items-center gap-1.5 rounded-lg px-4 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:ring-offset-2 focus-visible:outline-none ${
+                    pendingCount > 0
+                      ? "bg-[var(--av2-accent-strong)] text-white hover:brightness-110"
+                      : "border border-[var(--av2-border)] text-[var(--av2-text)] hover:bg-[var(--av2-bg)]"
+                  }`}
+                >
+                  {pendingCount > 0
+                    ? `Review ${plural(pendingCount, "withdrawal", "withdrawals")}`
+                    : "Open withdrawals"}
+                  <IconArrowUpRight />
+                </Link>
+              </div>
+
+              <div className="mt-6 border-t border-[var(--av2-border)] pt-4">
+                <CardLink href="/admin/companies">View all companies</CardLink>
+              </div>
+            </Card>
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }
