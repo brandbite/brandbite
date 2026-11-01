@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ui/toast-provider";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useSessionRole } from "@/lib/hooks/use-session-role";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 import {
   Badge,
   Button,
@@ -276,16 +277,7 @@ export default function AdminPayoutRulesPage() {
     return () => {
       cancelled = true;
     };
-     
   }, []);
-
-  const handleEditClick = (r: PayoutRule) => {
-    fillFormFromSelection(r);
-  };
-
-  const handleNewClick = () => {
-    resetForm();
-  };
 
   // Dirty state for the SaveBar — compares the editor against the selected
   // rule (or the blank "new rule" form).
@@ -316,6 +308,19 @@ export default function AdminPayoutRulesPage() {
     formPayoutPercent !== baseline.payout ||
     formPriority !== baseline.priority ||
     formIsActive !== baseline.isActive;
+  const confirmDiscard = useUnsavedChanges(dirty, selected ? `Rule: ${selected.name}` : "New rule");
+
+  const handleEditClick = async (r: PayoutRule) => {
+    if (r.id === selected?.id) return;
+    if (!(await confirmDiscard())) return;
+    fillFormFromSelection(r);
+  };
+
+  // "New rule" and closing the editor both reset the form.
+  const handleNewClick = async () => {
+    if (!(await confirmDiscard())) return;
+    resetForm();
+  };
 
   const discardChanges = () => {
     if (selected) {
@@ -520,7 +525,7 @@ export default function AdminPayoutRulesPage() {
     <form onSubmit={handleSubmit} className="contents">
       <DetailPanel
         title={panelTitle}
-        onClose={selected ? resetForm : undefined}
+        onClose={selected ? handleNewClick : undefined}
         closeLabel="Clear selection"
         footer={
           <SaveBar

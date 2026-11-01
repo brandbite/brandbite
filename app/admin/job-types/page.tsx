@@ -44,6 +44,7 @@ import {
 } from "@/components/admin/v2/ui";
 import { IconAlertCircle, IconDocument } from "@/components/admin/v2/icons";
 import { IconServices } from "@/components/navigation/nav-icons";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 
 type CategoryRef = {
   id: string;
@@ -240,6 +241,10 @@ export default function AdminJobTypesPage() {
     formDefaultQuantity !== baseline.defaultQuantity ||
     formAiPromptTemplate !== baseline.aiPromptTemplate ||
     formIsActive !== baseline.isActive;
+  const confirmDiscard = useUnsavedChanges(
+    dirty,
+    selected ? `Job type: ${selected.name}` : "New job type",
+  );
 
   // Duplicate detection — check when name changes
   useEffect(() => {
@@ -342,7 +347,6 @@ export default function AdminJobTypesPage() {
     return () => {
       cancelled = true;
     };
-     
   }, []);
 
   // Keep the selected row object in sync after a reload (same id).
@@ -353,11 +357,19 @@ export default function AdminJobTypesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobTypes]);
 
-  const handleEditClick = (jt: JobType) => {
+  const handleEditClick = async (jt: JobType) => {
+    if (jt.id === selected?.id) return;
+    if (!(await confirmDiscard())) return;
     fillFormFromSelection(jt);
   };
 
-  const handleNewClick = () => {
+  const handleNewClick = async () => {
+    if (!(await confirmDiscard())) return;
+    resetForm();
+  };
+
+  const handleClosePanel = async () => {
+    if (!(await confirmDiscard())) return;
     resetForm();
   };
 
@@ -475,7 +487,7 @@ export default function AdminJobTypesPage() {
           )}
         </span>
       }
-      onClose={selected ? resetForm : undefined}
+      onClose={selected ? handleClosePanel : undefined}
       closeLabel="Clear selection"
       footer={panelFooter}
     >

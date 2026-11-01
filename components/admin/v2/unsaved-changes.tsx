@@ -107,7 +107,11 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
       void confirmDiscard().then((ok) => {
         if (!ok) return;
         entries.current.clear();
-        router.push(url.pathname + url.search + url.hash);
+        const dest = url.pathname + url.search + url.hash;
+        // Route handlers (/api/*, e.g. OAuth connect redirects) and anything
+        // outside the app router need a real document navigation.
+        if (url.pathname.startsWith("/api/")) window.location.assign(dest);
+        else router.push(dest);
       });
     };
     document.addEventListener("click", onClick, true);

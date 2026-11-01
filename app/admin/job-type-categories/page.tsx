@@ -44,6 +44,7 @@ import {
 } from "@/components/admin/v2/ui";
 import { IconDocument } from "@/components/admin/v2/icons";
 import { IconCatalog } from "@/components/navigation/nav-icons";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 
 type Category = {
   id: string;
@@ -129,7 +130,6 @@ export default function AdminJobTypeCategoriesPage() {
 
   useEffect(() => {
     load();
-     
   }, []);
 
   // Keep the selected object in sync with reloaded data (same id).
@@ -307,6 +307,22 @@ export default function AdminJobTypeCategoriesPage() {
     formIcon !== baseline.icon ||
     formSortOrder !== baseline.sortOrder ||
     formIsActive !== baseline.isActive;
+  const confirmDiscard = useUnsavedChanges(
+    dirty,
+    selected ? `Category: ${selected.name}` : "New category",
+  );
+
+  const handleSelect = async (cat: Category) => {
+    if (cat.id === selected?.id) return;
+    if (!(await confirmDiscard())) return;
+    fillForm(cat);
+  };
+
+  // "New category" and closing the editor both reset the form.
+  const handleReset = async () => {
+    if (!(await confirmDiscard())) return;
+    resetForm();
+  };
 
   const sortOrderError =
     formSortOrder.trim() !== "" && !(parseInt(formSortOrder, 10) >= 0)
@@ -348,7 +364,7 @@ export default function AdminJobTypeCategoriesPage() {
           )}
         </span>
       }
-      onClose={selected ? resetForm : undefined}
+      onClose={selected ? handleReset : undefined}
       closeLabel="Clear selection"
       footer={panelFooter}
     >
@@ -472,7 +488,7 @@ export default function AdminJobTypeCategoriesPage() {
           ) : null
         }
         actions={
-          <Button variant="primary" onClick={resetForm}>
+          <Button variant="primary" onClick={handleReset}>
             <span aria-hidden className="text-lg leading-none">
               +
             </span>
@@ -578,7 +594,7 @@ export default function AdminJobTypeCategoriesPage() {
                   <Tr
                     key={cat.id}
                     selected={selected?.id === cat.id}
-                    onSelect={() => fillForm(cat)}
+                    onSelect={() => handleSelect(cat)}
                     label={`${cat.name}, order ${cat.sortOrder}, ${cat.jobTypeCount} linked job types`}
                   >
                     <Td align="right" className="text-[var(--av2-text-2)]">
