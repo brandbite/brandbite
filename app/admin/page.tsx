@@ -15,6 +15,15 @@ import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import {
+  Card,
+  DASH,
+  IconTile,
+  KpiCard,
+  TextLink as CardLink,
+  fmt,
+  plural,
+} from "@/components/admin/v2/ui";
+import {
   IconAlertCircle,
   IconArrowUpRight,
   IconBuilding,
@@ -80,94 +89,9 @@ const PRIORITY_META: { key: TicketPriority; label: string; fill: string }[] = [
   { key: "LOW", label: "Low", fill: "var(--av2-fill-neutral)" },
 ];
 
-const DASH = "—";
-
-/** Format a number, or an em dash while the value is unknown (never fake a 0). */
-const fmt = (n: number | null | undefined) => (typeof n === "number" ? n.toLocaleString() : DASH);
-
-const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
-
 // ---------------------------------------------------------------------------
 // Small building blocks
 // ---------------------------------------------------------------------------
-
-function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return (
-    <section
-      className={`rounded-2xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-6 ${className}`}
-    >
-      {children}
-    </section>
-  );
-}
-
-function CardLink({ href, children }: { href: string; children: ReactNode }) {
-  return (
-    <Link
-      href={href}
-      className="inline-flex items-center gap-1 rounded text-sm font-semibold whitespace-nowrap text-[var(--av2-link)] hover:underline focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
-    >
-      {children}
-      <IconArrowUpRight />
-    </Link>
-  );
-}
-
-function IconTile({
-  children,
-  tone,
-}: {
-  children: ReactNode;
-  tone: "lavender" | "peach" | "green";
-}) {
-  const bg =
-    tone === "lavender"
-      ? "bg-[var(--av2-lavender-bg)] text-[#5b4fc4] dark:text-[#b8adf7]"
-      : tone === "green"
-        ? "bg-[var(--av2-success-bg)] text-[#2f7a45] dark:text-[#7fd396]"
-        : "bg-[var(--av2-selected)] text-[var(--av2-link)]";
-  return (
-    <span className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${bg}`}>
-      {children}
-    </span>
-  );
-}
-
-function KpiCard({
-  icon,
-  tone,
-  label,
-  value,
-  hint,
-  highlight = false,
-}: {
-  icon: ReactNode;
-  tone: "lavender" | "peach" | "green";
-  label: string;
-  value: string;
-  hint: ReactNode;
-  highlight?: boolean;
-}) {
-  return (
-    <section
-      className={`relative flex gap-4 overflow-hidden rounded-2xl border bg-[var(--av2-surface)] p-6 ${
-        highlight ? "border-[var(--av2-accent)]/40" : "border-[var(--av2-border)]"
-      }`}
-    >
-      {highlight && (
-        <span aria-hidden className="absolute inset-x-0 top-0 h-[3px] bg-[var(--av2-accent)]" />
-      )}
-      <IconTile tone={tone}>{icon}</IconTile>
-      <div className="min-w-0">
-        <p className="text-xs font-medium tracking-[0.12em] text-[var(--av2-text-2)] uppercase">
-          {label}
-        </p>
-        <p className="mt-1 text-[32px] leading-10 font-bold tracking-tight tabular-nums">{value}</p>
-        <p className="mt-1 text-xs text-[var(--av2-text-2)]">{hint}</p>
-      </div>
-    </section>
-  );
-}
 
 function AttentionItem({
   icon,
