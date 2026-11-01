@@ -1,19 +1,55 @@
 // -----------------------------------------------------------------------------
 // @file: app/admin/users/page.tsx
-// @purpose: Admin user directory — view all users, filter by role, change roles
+// @purpose: Admin user directory — view all users, filter by role, change roles.
+//           Paginated list on the left; selecting a user opens a "Manage user"
+//           panel holding identity, the platform-role control (explicit Apply,
+//           typed-phrase + MFA guards for privilege changes), creative-only
+//           settings and the owner-only delete action.
+// @version: v2.0.0
+// @status: active
+// @lastUpdate: 2026-11-01
 // -----------------------------------------------------------------------------
 
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useEffect, useMemo, useState, type SVGProps } from "react";
 import { useToast } from "@/components/ui/toast-provider";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import { LoadingState } from "@/components/ui/loading-state";
-import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmTypedPhraseModal } from "@/components/admin/confirm-typed-phrase-modal";
 import { MfaChallengeModal, type MfaChallengeInfo } from "@/components/admin/mfa-challenge-modal";
 import { useSessionRole } from "@/lib/hooks/use-session-role";
+import {
+  Avatar,
+  Badge,
+  Button,
+  Callout,
+  Card,
+  DASH,
+  DetailPanel,
+  EmptyState,
+  Field,
+  FilterBar,
+  IconTile,
+  PageHeader,
+  Pager,
+  PanelSection,
+  SaveBar,
+  SearchInput,
+  Select,
+  Skeleton,
+  SplitView,
+  Switch,
+  Table,
+  TableFooter,
+  Td,
+  TextInput,
+  TextLink,
+  Th,
+  Tr,
+  fmt,
+  plural,
+  type Tone,
+} from "@/components/admin/v2/ui";
+import { IconBuilding, IconTicket, IconUsers } from "@/components/admin/v2/icons";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -52,12 +88,64 @@ const ROLE_LABELS: Record<string, string> = {
   CUSTOMER: "Customer",
 };
 
-const ROLE_COLORS: Record<string, string> = {
-  SITE_OWNER: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
-  SITE_ADMIN: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
-  DESIGNER: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300",
-  CUSTOMER: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+const ROLE_TONES: Record<string, Tone> = {
+  SITE_OWNER: "amber",
+  SITE_ADMIN: "blue",
+  DESIGNER: "green",
+  CUSTOMER: "lavender",
 };
+
+const ROLE_HINTS: Record<string, string> = {
+  SITE_OWNER: "Full access, including owner-only money-moving actions.",
+  SITE_ADMIN: "Runs the admin workspace. No owner-only money actions.",
+  DESIGNER: "Works on assigned tickets in the creative workspace.",
+  CUSTOMER: "Uses the customer portal for their companies.",
+};
+
+const PAGE_SIZES = [10, 25, 50];
+
+const formatDate = (iso: string) =>
+  new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+const displayName = (u: Pick<UserRow, "name" | "email">) => u.name || u.email;
+
+function IconChevronRight() {
+  return (
+    <svg
+      width={18}
+      height={18}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="m9 6 6 6-6 6" />
+    </svg>
+  );
+}
+
+function IconCalendar(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      width={20}
+      height={20}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      {...p}
+    >
+      <rect x="3.5" y="5" width="17" height="15" rx="2" />
+      <path d="M3.5 10h17M8 3v4M16 3v4" />
+    </svg>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Component
@@ -71,6 +159,7 @@ export default function AdminUsersPage() {
   const { isSiteOwner } = useSessionRole();
 
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -82,24 +171,32 @@ export default function AdminUsersPage() {
   // includes them so an admin can trace audit rows back to a tombstone.
   const [showDeleted, setShowDeleted] = useState(false);
 
-  // Role editing
-  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  // Client-side pagination over the fetched list.
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
+
+  // Selection (drives the Manage user panel). `?user=<id>` preselects —
+  // the detail page's "Manage user" button links here with it.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [preselectId, setPreselectId] = useState<string | null>(null);
+
+  // Role editing — draft role for the selected user; Apply commits it.
   const [pendingRole, setPendingRole] = useState("");
   const [saving, setSaving] = useState(false);
   const [togglingNotesId, setTogglingNotesId] = useState<string | null>(null);
 
-  // PR11 — inline cap editor. Tracks the row currently being edited
-  // and the in-progress draft (string so the input doesn't clamp on
-  // every keystroke).
-  const [editingCapId, setEditingCapId] = useState<string | null>(null);
+  // PR11 — cap editor draft (string so the input doesn't clamp on every
+  // keystroke). Workload PR — working-hours draft. Both belong to the
+  // selected user and are reset whenever the selection changes.
   const [pendingCap, setPendingCap] = useState<string>("");
   const [savingCap, setSavingCap] = useState(false);
-
-  // Workload PR — inline working-hours editor. Same shape as the cap
-  // editor: one row at a time, free-text draft, server-validated.
-  const [editingHoursId, setEditingHoursId] = useState<string | null>(null);
   const [pendingHours, setPendingHours] = useState<string>("");
   const [savingHours, setSavingHours] = useState(false);
+
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("user");
+    if (id) setPreselectId(id);
+  }, []);
 
   // Debounce search
   useEffect(() => {
@@ -126,7 +223,11 @@ export default function AdminUsersPage() {
         if (!res.ok) {
           throw new Error(json?.error || "Failed to load users");
         }
-        if (!cancelled) setUsers(json.users ?? []);
+        if (!cancelled) {
+          setUsers(json.users ?? []);
+          setLoaded(true);
+          setPage(1);
+        }
       } catch (err: unknown) {
         if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load users");
       } finally {
@@ -139,6 +240,40 @@ export default function AdminUsersPage() {
       cancelled = true;
     };
   }, [roleFilter, debouncedSearch, showDeleted]);
+
+  // Open the panel for a `?user=` id once the list is in, on the right page.
+  useEffect(() => {
+    if (!preselectId || !loaded) return;
+    const idx = users.findIndex((u) => u.id === preselectId);
+    if (idx >= 0) {
+      setSelectedId(preselectId);
+      setPage(Math.floor(idx / pageSize) + 1);
+    }
+    setPreselectId(null);
+  }, [preselectId, loaded, users, pageSize]);
+
+  // Below xl the panel stacks under the list — bring it into view.
+  const selectUser = (id: string) => {
+    setSelectedId(id);
+    if (window.matchMedia("(max-width: 1279px)").matches) {
+      requestAnimationFrame(() =>
+        document
+          .getElementById("manage-user-panel")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+      );
+    }
+  };
+
+  const selected = users.find((u) => u.id === selectedId) ?? null;
+
+  // Reset the drafts whenever a different user is selected.
+  useEffect(() => {
+    if (!selected) return;
+    setPendingRole(selected.role);
+    setPendingCap(selected.tasksPerWeekCap == null ? "" : String(selected.tasksPerWeekCap));
+    setPendingHours(selected.workingHours ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset on selection change only
+  }, [selected?.id]);
 
   // Confirmation-modal state for privilege-escalation role changes (L2).
   // Non-privilege role swaps (e.g. CUSTOMER <-> DESIGNER) skip the modal
@@ -203,6 +338,7 @@ export default function AdminUsersPage() {
       // server-side; a subsequent reload would show "deleted-…" if we
       // didn't filter, which would be confusing.
       setUsers((prev) => prev.filter((u) => u.id !== userId));
+      setSelectedId((prev) => (prev === userId ? null : prev));
       showToast({ title: "User deleted", type: "success" });
     } finally {
       setDeleting(false);
@@ -245,9 +381,28 @@ export default function AdminUsersPage() {
 
       setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)));
       showToast({ title: `Role updated to ${ROLE_LABELS[newRole] || newRole}`, type: "success" });
-      setEditingUserId(null);
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Apply the drafted role. Privilege-escalation changes require the
+  // typed-phrase confirmation; everything else runs direct.
+  const applyRole = (u: UserRow) => {
+    if (pendingRole === u.role) return;
+    const isPrivilegeChange =
+      pendingRole === "SITE_OWNER" || pendingRole === "SITE_ADMIN" || u.role === "SITE_OWNER";
+    if (isPrivilegeChange) {
+      setPendingPromote({
+        userId: u.id,
+        targetEmail: u.email,
+        currentRole: u.role,
+        newRole: pendingRole,
+      });
+    } else {
+      void handleRoleChange(u.id, pendingRole).catch(() => {
+        // error toast already shown
+      });
     }
   };
 
@@ -291,8 +446,7 @@ export default function AdminUsersPage() {
         title: nextCap == null ? "Cap cleared" : `Cap set to ${nextCap}`,
         type: "success",
       });
-      setEditingCapId(null);
-      setPendingCap("");
+      setPendingCap(nextCap == null ? "" : String(nextCap));
     } catch {
       showToast({ title: "Failed to save cap", type: "error" });
     } finally {
@@ -321,8 +475,7 @@ export default function AdminUsersPage() {
         title: next == null ? "Working hours cleared" : "Working hours updated",
         type: "success",
       });
-      setEditingHoursId(null);
-      setPendingHours("");
+      setPendingHours(next ?? "");
     } catch {
       showToast({ title: "Failed to save working hours", type: "error" });
     } finally {
@@ -363,380 +516,472 @@ export default function AdminUsersPage() {
   };
 
   // ---------------------------------------------------------------------------
+  // Derived list state
+  // ---------------------------------------------------------------------------
+
+  const filtersActive = roleFilter !== "" || debouncedSearch.trim() !== "" || showDeleted;
+  const resetFilters = () => {
+    setRoleFilter("");
+    setSearch("");
+    setDebouncedSearch("");
+    setShowDeleted(false);
+  };
+
+  const pageCount = Math.max(1, Math.ceil(users.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const pageRows = useMemo(
+    () => users.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [users, currentPage, pageSize],
+  );
+  const rangeStart = users.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const rangeEnd = Math.min(currentPage * pageSize, users.length);
+
+  // ---------------------------------------------------------------------------
+  // Manage user panel
+  // ---------------------------------------------------------------------------
+
+  const roleDirty = selected != null && pendingRole !== "" && pendingRole !== selected.role;
+  const capDirty =
+    selected != null &&
+    pendingCap.trim() !==
+      (selected.tasksPerWeekCap == null ? "" : String(selected.tasksPerWeekCap));
+  const hoursDirty = selected != null && pendingHours.trim() !== (selected.workingHours ?? "");
+
+  const panel = selected ? (
+    <div id="manage-user-panel" className="min-w-0 scroll-mt-24">
+      <DetailPanel
+        title="Manage user"
+        onClose={() => setSelectedId(null)}
+        closeLabel="Close user panel"
+        footer={
+          selected.deletedAt ? undefined : (
+            <SaveBar
+              dirty={roleDirty}
+              status={
+                saving
+                  ? "Applying role…"
+                  : roleDirty
+                    ? `Role will change to ${ROLE_LABELS[pendingRole] || pendingRole}`
+                    : undefined
+              }
+            >
+              {roleDirty && (
+                <Button
+                  variant="ghost"
+                  onClick={() => setPendingRole(selected.role)}
+                  disabled={saving}
+                >
+                  Reset
+                </Button>
+              )}
+              <Button
+                variant="primary"
+                onClick={() => applyRole(selected)}
+                disabled={!roleDirty || saving}
+                aria-busy={saving}
+              >
+                {saving ? "Applying…" : "Apply role"}
+              </Button>
+            </SaveBar>
+          )
+        }
+      >
+        <PanelSection>
+          <div className="flex items-start gap-4">
+            <Avatar name={displayName(selected)} size={64} tone="neutral" />
+            <div className="min-w-0">
+              <p className="truncate text-xl leading-7 font-bold">{selected.name || DASH}</p>
+              <p className="truncate text-sm text-[var(--av2-text-2)]">{selected.email}</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <Badge tone={ROLE_TONES[selected.role] ?? "neutral"}>
+                  {ROLE_LABELS[selected.role] || selected.role}
+                </Badge>
+                {selected.role === "DESIGNER" && selected.isPaused && (
+                  <Badge tone="amber">Paused</Badge>
+                )}
+                {selected.deletedAt && <Badge tone="red">Deleted</Badge>}
+              </div>
+              <div className="mt-3">
+                <TextLink href={`/admin/users/${selected.id}`}>Open user profile</TextLink>
+              </div>
+            </div>
+          </div>
+        </PanelSection>
+
+        {selected.deletedAt ? (
+          <PanelSection>
+            {/* Tombstone — auth is revoked and the identity is anonymized,
+              so every action here would 400. Show when it happened instead. */}
+            <Callout tone="info" title={`Deleted ${formatDate(selected.deletedAt)}`}>
+              This account was anonymized. Its tickets, ledger entries and audit rows are kept, but
+              it can no longer be edited.
+            </Callout>
+          </PanelSection>
+        ) : (
+          <PanelSection title="Platform role">
+            <Field
+              label={<span className="sr-only">Platform role</span>}
+              htmlFor="user-role"
+              hint={
+                ROLE_HINTS[pendingRole] ??
+                "This role controls what the person can access across the platform."
+              }
+            >
+              <Select
+                id="user-role"
+                value={pendingRole}
+                onChange={(e) => setPendingRole(e.target.value)}
+                disabled={saving}
+              >
+                {ROLE_OPTIONS.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            {roleDirty &&
+              (pendingRole === "SITE_OWNER" ||
+                pendingRole === "SITE_ADMIN" ||
+                selected.role === "SITE_OWNER") && (
+                <p className="mt-3 text-xs text-[var(--av2-text-2)]">
+                  Admin-level change: you&apos;ll be asked to type PROMOTE, and may need to verify
+                  with MFA.
+                </p>
+              )}
+          </PanelSection>
+        )}
+
+        <PanelSection title="Activity">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex items-center gap-3 rounded-xl border border-[var(--av2-border)] p-3">
+              <IconTile tone="lavender" size={40}>
+                <IconBuilding width={20} height={20} />
+              </IconTile>
+              <div className="min-w-0">
+                <p className="text-xs text-[var(--av2-text-2)]">Companies</p>
+                <p className="text-xl leading-7 font-bold tabular-nums">
+                  {fmt(selected.companyCount)}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 rounded-xl border border-[var(--av2-border)] p-3">
+              <IconTile tone="peach" size={40}>
+                <IconTicket width={20} height={20} />
+              </IconTile>
+              <div className="min-w-0">
+                <p className="text-xs text-[var(--av2-text-2)]">Assigned tickets</p>
+                <p className="text-xl leading-7 font-bold tabular-nums">
+                  {fmt(selected.assignedTickets)}
+                </p>
+              </div>
+            </div>
+          </div>
+          <p className="mt-4 flex items-center gap-2 text-sm text-[var(--av2-text-2)]">
+            <IconCalendar width={18} height={18} className="shrink-0" />
+            Joined {formatDate(selected.createdAt)}
+          </p>
+        </PanelSection>
+
+        {selected.role === "DESIGNER" && !selected.deletedAt && (
+          <PanelSection title="Creative settings">
+            <div className="space-y-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p id="revision-notes-label" className="text-sm font-medium">
+                    Revision notes
+                  </p>
+                  <p id="revision-notes-hint" className="mt-0.5 text-xs text-[var(--av2-text-2)]">
+                    Let this creative attach notes when submitting a revision.
+                  </p>
+                </div>
+                <Switch
+                  checked={selected.creativeRevisionNotesEnabled}
+                  onChange={() =>
+                    handleToggleRevisionNotes(selected.id, selected.creativeRevisionNotesEnabled)
+                  }
+                  labelledBy="revision-notes-label"
+                  describedBy="revision-notes-hint"
+                  disabled={togglingNotesId === selected.id}
+                />
+              </div>
+
+              {/* PR11 — tasks/week cap. Auto-assign in lib/tickets/create-ticket.ts
+                skips this creative when their open count >= cap. Empty = no cap. */}
+              <Field
+                label="Open task cap"
+                htmlFor="user-cap"
+                hint="Auto-assign skips this creative once their open tickets reach the cap. 1–40, empty for no cap."
+              >
+                <div className="flex gap-2">
+                  <div className="w-28">
+                    <TextInput
+                      id="user-cap"
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      max={40}
+                      value={pendingCap}
+                      onChange={(e) => setPendingCap(e.target.value)}
+                      placeholder="No cap"
+                    />
+                  </div>
+                  <Button
+                    onClick={() => handleSaveCap(selected.id)}
+                    disabled={!capDirty || savingCap}
+                    aria-busy={savingCap}
+                  >
+                    {savingCap ? "Saving…" : "Save cap"}
+                  </Button>
+                </div>
+              </Field>
+
+              {/* Workload PR — free-form availability hint. Empty clears. */}
+              <Field
+                label="Working hours"
+                htmlFor="user-hours"
+                hint="Free-form availability hint shown to scheduling admins. Empty to unset."
+              >
+                <div className="flex gap-2">
+                  <div className="min-w-0 flex-1">
+                    <TextInput
+                      id="user-hours"
+                      type="text"
+                      value={pendingHours}
+                      onChange={(e) => setPendingHours(e.target.value)}
+                      placeholder="9–18 weekdays, Europe/Istanbul"
+                      maxLength={200}
+                    />
+                  </div>
+                  <Button
+                    onClick={() => handleSaveHours(selected.id)}
+                    disabled={!hoursDirty || savingHours}
+                    aria-busy={savingHours}
+                  >
+                    {savingHours ? "Saving…" : "Save"}
+                  </Button>
+                </div>
+              </Field>
+            </div>
+          </PanelSection>
+        )}
+
+        {/* Hard-delete — SITE_OWNER only. Hidden for site owners themselves
+          (the API blocks it too); they must demote first via the role. */}
+        {isSiteOwner && selected.role !== "SITE_OWNER" && !selected.deletedAt && (
+          <PanelSection title="Account actions">
+            <p className="text-sm text-[var(--av2-text-2)]">
+              Permanently anonymize this user and revoke their access. Cannot be undone.
+            </p>
+            <Button
+              variant="danger"
+              size="sm"
+              className="mt-3"
+              onClick={() =>
+                setPendingDelete({
+                  userId: selected.id,
+                  targetEmail: selected.email,
+                  targetRole: selected.role,
+                })
+              }
+            >
+              Delete user
+            </Button>
+          </PanelSection>
+        )}
+      </DetailPanel>
+    </div>
+  ) : null;
+
+  // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
 
   return (
-    <div className="mx-auto max-w-6xl">
-      <div className="mb-6">
-        <h1 className="text-xl font-bold text-[var(--bb-secondary)]">Users</h1>
-        <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-          Manage platform users and their roles.
-        </p>
-      </div>
+    <>
+      <PageHeader title="Users" description="Find people and manage their platform roles." />
 
-      {/* Filters */}
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <input
-          type="text"
-          placeholder="Search by name or email..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] px-3.5 py-2 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)] sm:max-w-xs"
-        />
-        <select
-          value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value)}
-          className="rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] px-3.5 py-2 text-sm text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
-        >
-          <option value="">All roles</option>
-          {ROLE_OPTIONS.map((r) => (
-            <option key={r.value} value={r.value}>
-              {r.label}
-            </option>
-          ))}
-        </select>
-        <label className="flex cursor-pointer items-center gap-1.5 text-xs text-[var(--bb-text-muted)] select-none">
-          <input
-            type="checkbox"
-            checked={showDeleted}
-            onChange={(e) => setShowDeleted(e.target.checked)}
-            className="h-3.5 w-3.5 accent-[var(--bb-primary)]"
-          />
-          Show deleted
-        </label>
-        <span className="text-xs text-[var(--bb-text-muted)]">
-          {users.length} user{users.length !== 1 ? "s" : ""}
-        </span>
-      </div>
-
-      {/* Content */}
-      {loading && <LoadingState message="Loading users..." />}
-      {error && <InlineAlert variant="error">{error}</InlineAlert>}
-
-      {!loading && !error && users.length === 0 && (
-        <EmptyState title="No users found" description="Try adjusting your search or filter." />
-      )}
-
-      {!loading && !error && users.length > 0 && (
-        <div className="overflow-x-auto rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)]">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-[var(--bb-border-subtle)] text-[11px] font-semibold tracking-wider text-[var(--bb-text-muted)] uppercase">
-                <th className="px-4 py-3">User</th>
-                <th className="px-4 py-3">Role</th>
-                <th className="hidden px-4 py-3 sm:table-cell">Companies</th>
-                <th className="hidden px-4 py-3 md:table-cell">Tickets</th>
-                <th className="hidden px-4 py-3 md:table-cell">Joined</th>
-                <th className="px-4 py-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((u) => (
-                <tr
-                  key={u.id}
-                  className={`border-b border-[var(--bb-border-subtle)] last:border-b-0 ${
-                    u.deletedAt ? "opacity-60" : ""
-                  }`}
+      <SplitView panel={panel}>
+        <Card padding="none">
+          <div className="px-6 pt-5">
+            <FilterBar
+              trailing={
+                loaded && !error
+                  ? `${fmt(users.length)} ${plural(users.length, "user", "users")}`
+                  : null
+              }
+            >
+              <SearchInput
+                className="min-w-[200px] flex-1"
+                value={search}
+                onChange={setSearch}
+                placeholder="Search name or email"
+                label="Search users by name or email"
+              />
+              <div className="w-full sm:w-40">
+                <Select
+                  aria-label="Filter by role"
+                  value={roleFilter}
+                  onChange={(e) => setRoleFilter(e.target.value)}
                 >
-                  {/* User info */}
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--bb-bg-page)] text-xs font-semibold text-[var(--bb-text-secondary)]">
-                        {(u.name || u.email)[0]?.toUpperCase()}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-[var(--bb-secondary)]">
-                          <Link
-                            href={`/admin/users/${u.id}`}
-                            className="hover:text-[var(--bb-primary)] hover:underline"
-                            title="Open profile"
-                          >
-                            {u.name || "\u2014"}
-                          </Link>
-                        </p>
-                        <p className="truncate text-xs text-[var(--bb-text-muted)]">{u.email}</p>
-                      </div>
-                    </div>
-                  </td>
+                  <option value="">All roles</option>
+                  {ROLE_OPTIONS.map((r) => (
+                    <option key={r.value} value={r.value}>
+                      {r.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <Switch checked={showDeleted} onChange={setShowDeleted} label="Show deleted" />
+            </FilterBar>
+          </div>
 
-                  {/* Role badge */}
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${ROLE_COLORS[u.role] || "bg-gray-100 text-gray-700"}`}
-                    >
-                      {ROLE_LABELS[u.role] || u.role}
-                    </span>
-                    {u.role === "DESIGNER" && u.isPaused && (
-                      <span className="ml-1.5 text-[10px] text-[var(--bb-text-muted)]">
-                        (paused)
-                      </span>
-                    )}
-                    {u.deletedAt && (
-                      <span className="ml-1.5 inline-block rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-semibold text-gray-500 dark:bg-gray-800 dark:text-gray-400">
-                        Deleted
-                      </span>
-                    )}
-                  </td>
-
-                  {/* Companies */}
-                  <td className="hidden px-4 py-3 text-sm text-[var(--bb-text-secondary)] sm:table-cell">
-                    {u.companyCount}
-                  </td>
-
-                  {/* Tickets */}
-                  <td className="hidden px-4 py-3 text-sm text-[var(--bb-text-secondary)] md:table-cell">
-                    {u.assignedTickets}
-                  </td>
-
-                  {/* Joined */}
-                  <td className="hidden px-4 py-3 text-xs text-[var(--bb-text-muted)] md:table-cell">
-                    {new Date(u.createdAt).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
-                  </td>
-
-                  {/* Actions */}
-                  <td className="px-4 py-3">
-                    {u.deletedAt ? (
-                      // Tombstone row — auth is revoked and the identity is
-                      // anonymized, so every action here would 400. Show when
-                      // it happened instead.
-                      <span className="text-xs text-[var(--bb-text-muted)]">
-                        Deleted{" "}
-                        {new Date(u.deletedAt).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
-                      </span>
-                    ) : (
-                      <div className="flex flex-col gap-1.5">
-                        {editingUserId === u.id ? (
-                          <div className="flex items-center gap-2">
-                            <select
-                              value={pendingRole}
-                              onChange={(e) => setPendingRole(e.target.value)}
-                              disabled={saving}
-                              className="rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-card)] px-2 py-1 text-xs text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)]"
-                            >
-                              {ROLE_OPTIONS.map((r) => (
-                                <option key={r.value} value={r.value}>
-                                  {r.label}
-                                </option>
-                              ))}
-                            </select>
-                            <button
-                              onClick={() => {
-                                // Privilege-escalation changes require the
-                                // typed-phrase confirmation. Everything else
-                                // runs direct.
-                                const isPrivilegeChange =
-                                  pendingRole === "SITE_OWNER" ||
-                                  pendingRole === "SITE_ADMIN" ||
-                                  u.role === "SITE_OWNER";
-                                if (isPrivilegeChange) {
-                                  setPendingPromote({
-                                    userId: u.id,
-                                    targetEmail: u.email,
-                                    currentRole: u.role,
-                                    newRole: pendingRole,
-                                  });
-                                } else {
-                                  void handleRoleChange(u.id, pendingRole).catch(() => {
-                                    // error toast already shown
-                                  });
-                                }
-                              }}
-                              disabled={saving || pendingRole === u.role}
-                              className="rounded-lg bg-[var(--bb-primary)] px-2.5 py-1 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-                            >
-                              {saving ? "..." : "Save"}
-                            </button>
-                            <button
-                              onClick={() => setEditingUserId(null)}
-                              disabled={saving}
-                              className="text-xs text-[var(--bb-text-muted)] hover:text-[var(--bb-secondary)]"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              setEditingUserId(u.id);
-                              setPendingRole(u.role);
-                            }}
-                            className="rounded-lg border border-[var(--bb-border)] px-2.5 py-1 text-xs font-medium text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
-                          >
-                            Change role
-                          </button>
-                        )}
-                        {u.role === "DESIGNER" && (
-                          <button
-                            onClick={() =>
-                              handleToggleRevisionNotes(u.id, u.creativeRevisionNotesEnabled)
-                            }
-                            disabled={togglingNotesId === u.id}
-                            className="flex items-center gap-1.5 text-[10px] text-[var(--bb-text-muted)] transition-colors hover:text-[var(--bb-secondary)] disabled:opacity-50"
-                          >
-                            <span
-                              className={`inline-block h-3 w-5 rounded-full transition-colors ${
-                                u.creativeRevisionNotesEnabled
-                                  ? "bg-[var(--bb-primary)]"
-                                  : "bg-[var(--bb-border)]"
-                              }`}
-                            >
-                              <span
-                                className={`block h-2.5 w-2.5 translate-y-[1px] rounded-full bg-white transition-transform ${
-                                  u.creativeRevisionNotesEnabled
-                                    ? "translate-x-[9px]"
-                                    : "translate-x-[1px]"
-                                }`}
-                              />
-                            </span>
-                            Revision notes
-                          </button>
-                        )}
-                        {/* PR11 — inline tasks/week cap editor for DESIGNER rows.
-                          Read-only label until clicked; expands into a small
-                          number input + Save / Cancel. Auto-assign in
-                          lib/tickets/create-ticket.ts skips this creative when
-                          their open count >= cap. Empty input clears (no cap). */}
-                        {u.role === "DESIGNER" && editingCapId === u.id ? (
-                          <div className="flex items-center gap-1 text-[10px]">
-                            <input
-                              type="number"
-                              inputMode="numeric"
-                              min={1}
-                              max={40}
-                              value={pendingCap}
-                              onChange={(e) => setPendingCap(e.target.value)}
-                              placeholder="—"
-                              className="h-6 w-12 rounded border border-[var(--bb-border)] px-1 text-center text-xs"
-                              aria-label="Tasks per week cap"
-                            />
-                            <button
-                              onClick={() => handleSaveCap(u.id)}
-                              disabled={savingCap}
-                              className="rounded bg-[var(--bb-primary)] px-2 py-0.5 text-[10px] font-medium text-white disabled:opacity-50"
-                            >
-                              {savingCap ? "…" : "Save"}
-                            </button>
-                            <button
-                              onClick={() => {
-                                setEditingCapId(null);
-                                setPendingCap("");
-                              }}
-                              disabled={savingCap}
-                              className="text-[10px] text-[var(--bb-text-muted)] hover:text-[var(--bb-secondary)] disabled:opacity-50"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : u.role === "DESIGNER" ? (
-                          <button
-                            onClick={() => {
-                              setEditingCapId(u.id);
-                              setPendingCap(
-                                u.tasksPerWeekCap == null ? "" : String(u.tasksPerWeekCap),
-                              );
-                            }}
-                            className="flex items-center gap-1 text-[10px] text-[var(--bb-text-muted)] transition-colors hover:text-[var(--bb-secondary)]"
-                            title="Auto-assign skips this creative when their open ticket count reaches this cap. Empty = no cap."
-                          >
-                            <span>Cap:</span>
-                            <span
-                              className={`rounded border border-[var(--bb-border)] px-1.5 py-0.5 ${
-                                u.tasksPerWeekCap == null ? "text-[var(--bb-text-muted)]" : ""
-                              }`}
-                            >
-                              {u.tasksPerWeekCap == null ? "—" : u.tasksPerWeekCap}
-                            </span>
-                          </button>
-                        ) : null}
-                        {/* Workload PR — inline working-hours editor.
-                          DESIGNER only. Same shape as the cap editor:
-                          read-only badge until clicked; expands into a
-                          text input + Save / Cancel. Empty saves null
-                          (clears the value). */}
-                        {u.role === "DESIGNER" && editingHoursId === u.id ? (
-                          <div className="flex items-center gap-1 text-[10px]">
-                            <input
-                              type="text"
-                              value={pendingHours}
-                              onChange={(e) => setPendingHours(e.target.value)}
-                              placeholder="9–18 weekdays, Europe/Istanbul"
-                              maxLength={200}
-                              className="h-6 w-48 rounded border border-[var(--bb-border)] px-1.5 text-xs"
-                              aria-label="Working hours"
-                            />
-                            <button
-                              onClick={() => handleSaveHours(u.id)}
-                              disabled={savingHours}
-                              className="rounded bg-[var(--bb-primary)] px-2 py-0.5 text-[10px] font-medium text-white disabled:opacity-50"
-                            >
-                              {savingHours ? "…" : "Save"}
-                            </button>
-                            <button
-                              onClick={() => {
-                                setEditingHoursId(null);
-                                setPendingHours("");
-                              }}
-                              disabled={savingHours}
-                              className="text-[10px] text-[var(--bb-text-muted)] hover:text-[var(--bb-secondary)] disabled:opacity-50"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : u.role === "DESIGNER" ? (
-                          <button
-                            onClick={() => {
-                              setEditingHoursId(u.id);
-                              setPendingHours(u.workingHours ?? "");
-                            }}
-                            className="flex max-w-[260px] items-center gap-1 truncate text-[10px] text-[var(--bb-text-muted)] transition-colors hover:text-[var(--bb-secondary)]"
-                            title="Free-form availability hint shown to scheduling admins. Empty = unset."
-                          >
-                            <span className="shrink-0">Hours:</span>
-                            <span
-                              className={`min-w-0 truncate rounded border border-[var(--bb-border)] px-1.5 py-0.5 ${
-                                u.workingHours == null ? "text-[var(--bb-text-muted)]" : ""
-                              }`}
-                            >
-                              {u.workingHours == null ? "—" : u.workingHours}
-                            </span>
-                          </button>
-                        ) : null}
-                        {/* Hard-delete — SITE_OWNER only. Hidden for site
-                          owners themselves (the API blocks it too); they
-                          must demote first via Change role. */}
-                        {isSiteOwner && u.role !== "SITE_OWNER" && (
-                          <button
-                            onClick={() =>
-                              setPendingDelete({
-                                userId: u.id,
-                                targetEmail: u.email,
-                                targetRole: u.role,
-                              })
-                            }
-                            className="text-[10px] font-medium text-red-600 transition-colors hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                            title="Permanently anonymize this user and revoke their access. Cannot be undone."
-                          >
-                            Delete user
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </td>
-                </tr>
+          {error ? (
+            <div className="border-t border-[var(--av2-border)] px-6 py-5">
+              <Callout tone="error" title="Couldn't load users">
+                {error}
+              </Callout>
+            </div>
+          ) : loading && !loaded ? (
+            <div className="space-y-3 border-t border-[var(--av2-border)] px-6 py-5" role="status">
+              <span className="sr-only">Loading users…</span>
+              {[0, 1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-12 w-full" />
               ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+            </div>
+          ) : users.length === 0 ? (
+            <div className="border-t border-[var(--av2-border)]">
+              {filtersActive ? (
+                <EmptyState
+                  title="No users match these filters"
+                  description="Try a different name, email or role."
+                  action={<Button onClick={resetFilters}>Clear filters</Button>}
+                />
+              ) : (
+                <EmptyState
+                  icon={<IconUsers width={28} height={28} />}
+                  title="No users yet"
+                  description="People appear here once they sign up or are invited."
+                />
+              )}
+            </div>
+          ) : (
+            <div aria-busy={loading} className={loading ? "opacity-60 transition-opacity" : ""}>
+              <Table label="Users">
+                <thead>
+                  <tr>
+                    <Th>User</Th>
+                    <Th>Role</Th>
+                    <Th align="right" className="hidden sm:table-cell">
+                      Companies
+                    </Th>
+                    <Th align="right" className="hidden md:table-cell">
+                      Tickets
+                    </Th>
+                    <Th className="hidden md:table-cell">Joined</Th>
+                    {!selected && (
+                      <Th align="right">
+                        <span className="sr-only">Open</span>
+                      </Th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageRows.map((u) => (
+                    <Tr
+                      key={u.id}
+                      selected={u.id === selectedId}
+                      onSelect={() => selectUser(u.id)}
+                      label={`${displayName(u)}, ${ROLE_LABELS[u.role] || u.role}`}
+                    >
+                      <Td>
+                        <div
+                          className={`flex items-center gap-3 ${u.deletedAt ? "opacity-60" : ""}`}
+                        >
+                          <Avatar name={displayName(u)} size={40} tone="neutral" />
+                          <div className="min-w-0">
+                            <div className="truncate font-semibold">{u.name || DASH}</div>
+                            <div className="truncate text-xs text-[var(--av2-text-2)]">
+                              {u.email}
+                            </div>
+                          </div>
+                        </div>
+                      </Td>
+                      <Td>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Badge tone={ROLE_TONES[u.role] ?? "neutral"}>
+                            {ROLE_LABELS[u.role] || u.role}
+                          </Badge>
+                          {u.role === "DESIGNER" && u.isPaused && (
+                            <Badge tone="amber">Paused</Badge>
+                          )}
+                          {u.deletedAt && <Badge tone="red">Deleted</Badge>}
+                        </div>
+                      </Td>
+                      <Td align="right" className="hidden sm:table-cell">
+                        {fmt(u.companyCount)}
+                      </Td>
+                      <Td align="right" className="hidden md:table-cell">
+                        {fmt(u.assignedTickets)}
+                      </Td>
+                      <Td className="hidden whitespace-nowrap text-[var(--av2-text-2)] md:table-cell">
+                        {formatDate(u.createdAt)}
+                      </Td>
+                      {!selected && (
+                        <Td align="right" className="text-[var(--av2-text-2)]">
+                          <span className="inline-flex">
+                            <IconChevronRight />
+                          </span>
+                        </Td>
+                      )}
+                    </Tr>
+                  ))}
+                </tbody>
+              </Table>
+            </div>
+          )}
+
+          {loaded && !error && users.length > 0 && (
+            <TableFooter>
+              <span className="tabular-nums">
+                {fmt(rangeStart)}–{fmt(rangeEnd)} of {fmt(users.length)}{" "}
+                {plural(users.length, "user", "users")}
+              </span>
+              <Pager page={currentPage} pageCount={pageCount} onPage={setPage} />
+              <div className="flex items-center gap-3">
+                {filtersActive && (
+                  <Button size="sm" variant="ghost" onClick={resetFilters}>
+                    Clear filters
+                  </Button>
+                )}
+                <div className="w-32">
+                  <Select
+                    aria-label="Rows per page"
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setPage(1);
+                    }}
+                  >
+                    {PAGE_SIZES.map((n) => (
+                      <option key={n} value={n}>
+                        {n} per page
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              </div>
+            </TableFooter>
+          )}
+        </Card>
+
+        {!selected && loaded && !error && users.length > 0 && (
+          <p className="mt-6 flex items-center gap-2 text-sm text-[var(--av2-text-2)]">
+            <IconUsers width={18} height={18} className="shrink-0" />
+            Select a user to view details and change their role.
+          </p>
+        )}
+      </SplitView>
 
       {/* Typed-phrase confirmation for privilege-escalation role changes. */}
       <ConfirmTypedPhraseModal
@@ -796,7 +1041,7 @@ export default function AdminUsersPage() {
                 You are about to permanently delete <strong>{pendingDelete.targetEmail}</strong> (
                 {ROLE_LABELS[pendingDelete.targetRole] || pendingDelete.targetRole}).
               </p>
-              <p className="text-[var(--bb-text-secondary)]">
+              <p>
                 Their auth credentials are revoked, their identity is anonymized, and any tickets or
                 audit rows they were attached to remain — labelled as a deleted account. This cannot
                 be undone.
@@ -813,6 +1058,6 @@ export default function AdminUsersPage() {
           setPendingDelete(null);
         }}
       />
-    </div>
+    </>
   );
 }
