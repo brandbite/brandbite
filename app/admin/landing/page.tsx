@@ -1,10 +1,13 @@
 // -----------------------------------------------------------------------------
 // @file: app/admin/landing/page.tsx
-// @purpose: Admin route for editing the public landing page (`/`) section
-//           by section. Phase 1 ships the HERO editor only — variant +
-//           headline + subhead + CTA pair + optional image. Subsequent
-//           phases add forms for HOW_IT_WORKS, PRICING, SHOWCASE,
-//           FEATURE_GRID, FAQ, and CALL_TO_ACTION.
+// @purpose: LEGACY editor for the page-block landing layout (pageKey
+//           "home"): Hero, How it works, Pricing header, Showcase header,
+//           Why Brandbite (FEATURE_GRID), Call to action and FAQ. A section
+//           selector shows one block form at a time (all stay mounted).
+//
+//           NOTE: the live homepage (app/page.tsx) is static since the 2026
+//           redesign and nothing renders these blocks any more; the page
+//           says so in a warning callout.
 //
 //           Server component: loads the existing hero block via the
 //           server-only `getPageBlocks` helper so the form can hydrate
@@ -18,6 +21,12 @@
 // -----------------------------------------------------------------------------
 
 import { OwnerOnlyBanner } from "@/components/admin/owner-only-banner";
+import { Badge, Callout, PageHeader, TextLink } from "@/components/admin/v2/ui";
+import {
+  Code,
+  SectionSwitcher,
+  type SwitcherSection,
+} from "@/components/blocks/admin/block-form-ui";
 import { CallToActionBlockForm } from "@/components/blocks/admin/CallToActionBlockForm";
 import { FaqBlockForm } from "@/components/blocks/admin/FaqBlockForm";
 import { FeatureGridBlockForm } from "@/components/blocks/admin/FeatureGridBlockForm";
@@ -93,134 +102,183 @@ export default async function AdminLandingPage() {
   const initialFaq: FaqData =
     faqBlock && faqBlock.type === BLOCK_TYPES.FAQ ? faqBlock.data : DEFAULT_FAQ_DATA;
 
+  const sections: SwitcherSection[] = [
+    {
+      id: "hero",
+      label: "Hero",
+      icon: <IconLines />,
+      description:
+        "The above-the-fold area. Pick a layout variant, then fill in the headline, subhead and call-to-action. Image-based variants need a hero photo.",
+      content: <HeroBlockForm initial={initialHero} pageKey={PAGE_KEY} />,
+    },
+    {
+      id: "how-it-works",
+      label: "How it works",
+      icon: <IconList />,
+      description:
+        "The numbered steps section under the hero. 1 to 5 steps, plus an optional eyebrow and section title above the grid.",
+      content: <HowItWorksBlockForm initial={initialHowItWorks} pageKey={PAGE_KEY} />,
+    },
+    {
+      id: "pricing",
+      label: "Pricing header",
+      icon: <IconDollar />,
+      description:
+        "The eyebrow and title above the plan cards, plus the optional right-side “Need a custom plan? Let’s talk” prompt.",
+      content: <PricingHeaderBlockForm initial={initialPricing} pageKey={PAGE_KEY} />,
+    },
+    {
+      id: "showcase",
+      label: "Showcase header",
+      icon: <IconGrid />,
+      description:
+        "The title and subtitle above the gallery grid, plus the right-side “View the full gallery” button.",
+      content: <ShowcaseHeaderBlockForm initial={initialShowcase} pageKey={PAGE_KEY} />,
+    },
+    {
+      id: "why-brandbite",
+      label: "Why Brandbite",
+      icon: <IconStar />,
+      description:
+        "The feature grid: 1 to 12 benefits, each with an optional emoji and body. Add a side image for a 2-column layout.",
+      content: <FeatureGridBlockForm initial={initialFeatureGrid} pageKey={PAGE_KEY} />,
+    },
+    {
+      id: "cta",
+      label: "Call to action",
+      icon: <IconPointer />,
+      description:
+        "Full-width conversion band between Why Brandbite and the FAQ: headline, optional subhead and a primary button.",
+      content: <CallToActionBlockForm initial={initialCta} pageKey={PAGE_KEY} />,
+    },
+    {
+      id: "faq",
+      label: "FAQ",
+      icon: <IconHelp />,
+      description:
+        "The question/answer accordion near the bottom. Pick up to 40 questions from the central FAQ list and set their order.",
+      content: <FaqBlockForm initial={initialFaq} pageKey={PAGE_KEY} />,
+    },
+  ];
+
   return (
     <>
-      {/* Page header */}
-      <div className="mb-4">
-        <h1 className="text-2xl font-semibold tracking-tight">Landing page</h1>
-        <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-          Edit the public landing page section by section. Changes apply to{" "}
-          <code className="rounded bg-[var(--bb-bg-warm)] px-1 py-0.5 text-xs">/</code> within a
-          minute thanks to ISR. Phase 1 ships the hero block; remaining sections still ship from
-          code and become editable in subsequent phases.
-        </p>
-      </div>
+      <PageHeader
+        title={
+          <span className="inline-flex flex-wrap items-center gap-3">
+            Landing page
+            <Badge tone="neutral" className="tracking-normal">
+              Legacy editor
+            </Badge>
+          </span>
+        }
+        description="Edit the saved legacy landing-page layout one section at a time."
+      />
 
       <OwnerOnlyBanner action="edit landing-page content" />
 
-      {/* Hero section ------------------------------------------------- */}
-      <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-6 py-5 shadow-sm">
-        <header className="mb-5 border-b border-[var(--bb-border-subtle)] pb-3">
-          <h2 className="text-lg font-semibold tracking-tight">Hero</h2>
-          <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
-            The above-the-fold area visitors see first. Pick a layout variant, then fill in the
-            headline, subhead, and call-to-action. Image-based variants need a hero photo uploaded
-            to R2.
-          </p>
-        </header>
+      <div className="mb-6">
+        <Callout tone="warning" title="Not connected to the live homepage">
+          The public homepage (<Code>/</Code>) is a static page and doesn&apos;t read these blocks,
+          and no other page renders them either. Saving here stores the content but changes nothing
+          visitors see.
+        </Callout>
+      </div>
 
-        <HeroBlockForm initial={initialHero} pageKey={PAGE_KEY} />
-      </section>
-
-      {/* How it works ------------------------------------------------- */}
-      <section className="mt-6 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-6 py-5 shadow-sm">
-        <header className="mb-5 border-b border-[var(--bb-border-subtle)] pb-3">
-          <h2 className="text-lg font-semibold tracking-tight">How it works</h2>
-          <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
-            The numbered steps section under the hero. Add 1 to 5 steps, reorder them, and add an
-            optional eyebrow + section title above the grid.
-          </p>
-        </header>
-
-        <HowItWorksBlockForm initial={initialHowItWorks} pageKey={PAGE_KEY} />
-      </section>
-
-      {/* Pricing header (PRICING) ------------------------------------- */}
-      <section className="mt-6 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-6 py-5 shadow-sm">
-        <header className="mb-5 border-b border-[var(--bb-border-subtle)] pb-3">
-          <h2 className="text-lg font-semibold tracking-tight">Pricing header</h2>
-          <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
-            The eyebrow / title above the plan cards plus the optional right-side &ldquo;Need a
-            custom plan? Let&apos;s talk&rdquo; prompt. Per-plan prices come from Stripe; per-plan
-            tagline + feature copy will become editable in a follow-up.
-          </p>
-        </header>
-
-        <PricingHeaderBlockForm initial={initialPricing} pageKey={PAGE_KEY} />
-      </section>
-
-      {/* Showcase header (SHOWCASE) ----------------------------------- */}
-      <section className="mt-6 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-6 py-5 shadow-sm">
-        <header className="mb-5 border-b border-[var(--bb-border-subtle)] pb-3">
-          <h2 className="text-lg font-semibold tracking-tight">Showcase header</h2>
-          <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
-            The title / subtitle above the gallery grid plus the right-side &ldquo;View the full
-            gallery&rdquo; button. Gallery items themselves are managed in Content &rarr; Showcase.
-          </p>
-        </header>
-
-        <ShowcaseHeaderBlockForm initial={initialShowcase} pageKey={PAGE_KEY} />
-      </section>
-
-      {/* Why Brandbite (FEATURE_GRID) --------------------------------- */}
-      <section className="mt-6 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-6 py-5 shadow-sm">
-        <header className="mb-5 border-b border-[var(--bb-border-subtle)] pb-3">
-          <h2 className="text-lg font-semibold tracking-tight">Why Brandbite</h2>
-          <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
-            The list of benefits with check icons. 1 to 12 items, each with optional emoji + body.
-            Add a side image for a 2-column layout, or leave it blank for centered single-column.
-          </p>
-        </header>
-
-        <FeatureGridBlockForm initial={initialFeatureGrid} pageKey={PAGE_KEY} />
-      </section>
-
-      {/* Call-to-action band (CALL_TO_ACTION) ------------------------- */}
-      <section className="mt-6 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-6 py-5 shadow-sm">
-        <header className="mb-5 border-b border-[var(--bb-border-subtle)] pb-3">
-          <h2 className="text-lg font-semibold tracking-tight">Call-to-action band</h2>
-          <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
-            Full-width conversion band rendered between Why Brandbite and FAQ. Headline + optional
-            subhead + a primary CTA. Cream-background style matches the &ldquo;Still have
-            questions?&rdquo; band on <code>/faq</code>.
-          </p>
-        </header>
-
-        <CallToActionBlockForm initial={initialCta} pageKey={PAGE_KEY} />
-      </section>
-
-      {/* FAQ ---------------------------------------------------------- */}
-      <section className="mt-6 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-6 py-5 shadow-sm">
-        <header className="mb-5 border-b border-[var(--bb-border-subtle)] pb-3">
-          <h2 className="text-lg font-semibold tracking-tight">FAQ</h2>
-          <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
-            The accordion of question/answer pairs near the bottom of the page. Add up to 40
-            Q&amp;As, reorder them, customise the section title and subtitle.
-          </p>
-        </header>
-
-        <FaqBlockForm initial={initialFaq} pageKey={PAGE_KEY} />
-      </section>
-
-      {/* Done state — every existing landing-page section is editable */}
-      <section className="mt-6 rounded-2xl border border-dashed border-[var(--bb-border)] bg-[var(--bb-bg-warm)] px-6 py-5">
-        <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-text-secondary)]">
-          That&apos;s every section on the landing page
-        </h2>
-        <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-          Plan-card copy is on{" "}
-          <code className="rounded bg-[var(--bb-bg-page)] px-1 py-0.5 text-[10px]">
-            /admin/plans
-          </code>{" "}
-          (Stripe drives prices, the form drives tagline / features / CTA). Showcase items are on{" "}
-          <code className="rounded bg-[var(--bb-bg-page)] px-1 py-0.5 text-[10px]">
-            /admin/showcase
-          </code>
-          . FAQ questions are on{" "}
-          <code className="rounded bg-[var(--bb-bg-page)] px-1 py-0.5 text-[10px]">/admin/faq</code>
-          . Site header and footer are still hardcoded — separate Phase.
-        </p>
-      </section>
+      <SectionSwitcher
+        label="Landing page sections"
+        sections={sections}
+        footer={
+          <>
+            <p className="font-semibold text-[var(--av2-text)]">Edited elsewhere</p>
+            <ul className="mt-2 space-y-1.5">
+              <li>
+                <TextLink href="/admin/plans">Plan cards</TextLink>
+              </li>
+              <li>
+                <TextLink href="/admin/showcase">Showcase items</TextLink>
+              </li>
+              <li>
+                <TextLink href="/admin/faq">FAQ questions</TextLink>
+              </li>
+              <li>
+                <TextLink href="/admin/site">Site header &amp; footer</TextLink>
+              </li>
+            </ul>
+          </>
+        }
+      />
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Section icons (page-local, same 24px / 1.75 stroke family as the v2 set)
+// ---------------------------------------------------------------------------
+
+const ICON = {
+  width: 20,
+  height: 20,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.75,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+};
+
+function IconLines() {
+  return (
+    <svg {...ICON}>
+      <path d="M4 6h16M4 12h16M4 18h10" />
+    </svg>
+  );
+}
+function IconList() {
+  return (
+    <svg {...ICON}>
+      <path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01" />
+    </svg>
+  );
+}
+function IconDollar() {
+  return (
+    <svg {...ICON}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M15 9.5c-.4-1-1.6-1.5-3-1.5-1.7 0-3 .8-3 2s1.3 1.7 3 2 3 .8 3 2-1.3 2-3 2c-1.4 0-2.6-.5-3-1.5M12 6.5v11" />
+    </svg>
+  );
+}
+function IconGrid() {
+  return (
+    <svg {...ICON}>
+      <rect x="4" y="4" width="6.5" height="6.5" rx="1.5" />
+      <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" />
+      <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" />
+      <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" />
+    </svg>
+  );
+}
+function IconStar() {
+  return (
+    <svg {...ICON}>
+      <path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />
+    </svg>
+  );
+}
+function IconPointer() {
+  return (
+    <svg {...ICON}>
+      <path d="M6 3.5 18.5 12l-5.6 1.3 3.2 6-2.4 1.2-3.2-6L6 18.5z" />
+    </svg>
+  );
+}
+function IconHelp() {
+  return (
+    <svg {...ICON}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01" />
+    </svg>
   );
 }

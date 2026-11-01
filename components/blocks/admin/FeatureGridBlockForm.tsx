@@ -19,11 +19,20 @@
 
 import { useState } from "react";
 
-import { Button } from "@/components/ui/button";
+import { Field, TextArea, TextInput } from "@/components/admin/v2/ui";
 import { CmsImageUpload } from "@/components/ui/cms-image-upload";
-import { FormInput } from "@/components/ui/form-field";
-import { InlineAlert } from "@/components/ui/inline-alert";
 import { useToast } from "@/components/ui/toast-provider";
+
+import {
+  AddButton,
+  BlockSaveFooter,
+  Code,
+  FormSection,
+  RepeaterItem,
+  ReorderActions,
+  Req,
+  useDirtyBaseline,
+} from "./block-form-ui";
 
 import type { FeatureGridData } from "@/lib/blocks/types";
 
@@ -61,6 +70,11 @@ export function FeatureGridBlockForm({ initial, pageKey }: FeatureGridBlockFormP
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Presentation only: drives the SaveBar status + disables Save when clean.
+  const { dirty, markSaved } = useDirtyBaseline(
+    JSON.stringify([title, subtitle, items, image, ctaLabel, ctaHref]),
+  );
 
   const updateItem = (idx: number, patch: Partial<ItemDraft>) => {
     setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
@@ -143,6 +157,7 @@ export function FeatureGridBlockForm({ initial, pageKey }: FeatureGridBlockFormP
         throw new Error(json?.reason || json?.error || "Save failed.");
       }
 
+      markSaved();
       showToast({
         type: "success",
         title: "Feature grid saved",
@@ -158,158 +173,107 @@ export function FeatureGridBlockForm({ initial, pageKey }: FeatureGridBlockFormP
   return (
     <form onSubmit={handleSave} className="space-y-6">
       {/* Title + subtitle (both optional) ----------------------------- */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <label
-            htmlFor="fg-title"
-            className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-          >
-            Section title (optional)
-          </label>
-          <FormInput
-            id="fg-title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Why Brandbite"
-            maxLength={120}
-          />
+      <FormSection title="Section heading" description="Both optional.">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <Field label="Section title (optional)" htmlFor="fg-title">
+            <TextInput
+              id="fg-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Why Brandbite"
+              maxLength={120}
+            />
+          </Field>
+          <Field label="Subtitle (optional)" htmlFor="fg-subtitle">
+            <TextInput
+              id="fg-subtitle"
+              value={subtitle}
+              onChange={(e) => setSubtitle(e.target.value)}
+              placeholder="Why brands choose Brandbite over freelancers."
+              maxLength={300}
+            />
+          </Field>
         </div>
-        <div>
-          <label
-            htmlFor="fg-subtitle"
-            className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-          >
-            Subtitle (optional)
-          </label>
-          <FormInput
-            id="fg-subtitle"
-            value={subtitle}
-            onChange={(e) => setSubtitle(e.target.value)}
-            placeholder="Why brands choose Brandbite over freelancers."
-            maxLength={300}
-          />
-        </div>
-      </div>
+      </FormSection>
 
       {/* Items list --------------------------------------------------- */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-[var(--bb-secondary)]">
-            Items ({items.length}/{MAX_ITEMS})
-          </h3>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={addItem}
-            disabled={items.length >= MAX_ITEMS}
-          >
+      <FormSection
+        title="Items"
+        count={`${items.length} / ${MAX_ITEMS}`}
+        description="Items without an emoji render with a brand-colour check icon."
+        action={
+          <AddButton onClick={addItem} disabled={items.length >= MAX_ITEMS}>
             Add item
-          </Button>
+          </AddButton>
+        }
+      >
+        <div className="space-y-3">
+          {items.map((item, idx) => (
+            <RepeaterItem
+              key={idx}
+              label={`Item ${idx + 1}`}
+              actions={
+                <ReorderActions
+                  noun={`item ${idx + 1}`}
+                  index={idx}
+                  count={items.length}
+                  onMove={(d) => moveItem(idx, d)}
+                  onRemove={() => removeItem(idx)}
+                  removeDisabled={items.length <= MIN_ITEMS}
+                />
+              }
+            >
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-[88px_1fr]">
+                  <Field label="Emoji" htmlFor={`fg-item-emoji-${idx}`}>
+                    <TextInput
+                      id={`fg-item-emoji-${idx}`}
+                      value={item.emoji}
+                      onChange={(e) => updateItem(idx, { emoji: e.target.value })}
+                      placeholder="⚡"
+                      maxLength={8}
+                    />
+                  </Field>
+                  <Field
+                    label={
+                      <>
+                        Title
+                        <Req />
+                      </>
+                    }
+                    htmlFor={`fg-item-title-${idx}`}
+                  >
+                    <TextInput
+                      id={`fg-item-title-${idx}`}
+                      value={item.title}
+                      onChange={(e) => updateItem(idx, { title: e.target.value })}
+                      placeholder="Fast turnaround (1 to 2 days per request)"
+                      maxLength={120}
+                    />
+                  </Field>
+                </div>
+                <Field label="Body (optional)" htmlFor={`fg-item-body-${idx}`}>
+                  <TextArea
+                    id={`fg-item-body-${idx}`}
+                    value={item.body}
+                    onChange={(e) => updateItem(idx, { body: e.target.value })}
+                    placeholder="Optional supporting paragraph."
+                    rows={2}
+                    maxLength={400}
+                    className="min-h-20"
+                  />
+                </Field>
+              </div>
+            </RepeaterItem>
+          ))}
         </div>
-
-        {items.map((item, idx) => (
-          <div
-            key={idx}
-            className="rounded-xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-warm)] px-4 py-4"
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-xs font-semibold tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
-                Item {idx + 1}
-              </span>
-              <div className="flex items-center gap-1">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => moveItem(idx, -1)}
-                  disabled={idx === 0}
-                  aria-label={`Move item ${idx + 1} up`}
-                >
-                  ↑
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => moveItem(idx, 1)}
-                  disabled={idx === items.length - 1}
-                  aria-label={`Move item ${idx + 1} down`}
-                >
-                  ↓
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeItem(idx)}
-                  disabled={items.length <= MIN_ITEMS}
-                  aria-label={`Remove item ${idx + 1}`}
-                >
-                  Remove
-                </Button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-[80px_1fr]">
-              <div>
-                <label
-                  htmlFor={`fg-item-emoji-${idx}`}
-                  className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-                >
-                  Emoji
-                </label>
-                <FormInput
-                  id={`fg-item-emoji-${idx}`}
-                  value={item.emoji}
-                  onChange={(e) => updateItem(idx, { emoji: e.target.value })}
-                  placeholder="⚡"
-                  maxLength={8}
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor={`fg-item-title-${idx}`}
-                  className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-                >
-                  Title <span className="text-[var(--bb-primary)]">*</span>
-                </label>
-                <FormInput
-                  id={`fg-item-title-${idx}`}
-                  value={item.title}
-                  onChange={(e) => updateItem(idx, { title: e.target.value })}
-                  placeholder="Fast turnaround (1 to 2 days per request)"
-                  maxLength={120}
-                />
-              </div>
-            </div>
-
-            <div className="mt-3">
-              <label
-                htmlFor={`fg-item-body-${idx}`}
-                className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-              >
-                Body (optional)
-              </label>
-              <textarea
-                id={`fg-item-body-${idx}`}
-                value={item.body}
-                onChange={(e) => updateItem(idx, { body: e.target.value })}
-                placeholder="Optional supporting paragraph."
-                rows={2}
-                maxLength={400}
-                className="w-full rounded-md border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-2 text-sm text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
-              />
-              <p className="mt-1 text-xs text-[var(--bb-text-muted)]">
-                Items without an emoji render with a brand-colour check icon.
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
+      </FormSection>
 
       {/* Optional supporting image ------------------------------------ */}
-      <div>
+      <FormSection
+        title="Media"
+        description="When set, the section renders 2-column with this image on the left and the items on the right. Leave blank for a centered single-column layout."
+      >
         <CmsImageUpload
           type="page-block"
           value={image}
@@ -317,67 +281,50 @@ export function FeatureGridBlockForm({ initial, pageKey }: FeatureGridBlockFormP
           label="Side image (optional)"
           aspectRatio="4/3"
         />
-        <p className="mt-1 text-xs text-[var(--bb-text-muted)]">
-          When set, the section renders 2-column with this image on the left and the items on the
-          right. Leave blank for a centered single-column layout.
-        </p>
-      </div>
+      </FormSection>
 
       {/* CTA pair (optional) ------------------------------------------ */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <label
-            htmlFor="fg-cta-label"
-            className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
-          >
-            CTA label (optional)
-          </label>
-          <FormInput
-            id="fg-cta-label"
-            value={ctaLabel}
-            onChange={(e) => setCtaLabel(e.target.value)}
-            placeholder="Explore Pricing"
-            maxLength={50}
-          />
-          <p className="mt-1 text-xs text-[var(--bb-text-muted)]">
-            Clear both label and destination to hide the button.
-          </p>
-        </div>
-        <div>
-          <label
+      <FormSection
+        title="Button"
+        description="Clear both label and destination to hide the button."
+      >
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <Field label="CTA label (optional)" htmlFor="fg-cta-label">
+            <TextInput
+              id="fg-cta-label"
+              value={ctaLabel}
+              onChange={(e) => setCtaLabel(e.target.value)}
+              placeholder="Explore Pricing"
+              maxLength={50}
+            />
+          </Field>
+          <Field
+            label="CTA destination (optional)"
             htmlFor="fg-cta-href"
-            className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
+            hint={
+              <>
+                Anchor like <Code>#pricing</Code>, internal path like <Code>/pricing</Code>, or full
+                URL.
+              </>
+            }
           >
-            CTA destination (optional)
-          </label>
-          <FormInput
-            id="fg-cta-href"
-            value={ctaHref}
-            onChange={(e) => setCtaHref(e.target.value)}
-            placeholder="#pricing"
-            maxLength={200}
-          />
-          <p className="mt-1 text-xs text-[var(--bb-text-muted)]">
-            Anchor like <code>#pricing</code>, internal path like <code>/pricing</code>, or full
-            URL.
-          </p>
+            <TextInput
+              id="fg-cta-href"
+              value={ctaHref}
+              onChange={(e) => setCtaHref(e.target.value)}
+              placeholder="#pricing"
+              maxLength={200}
+            />
+          </Field>
         </div>
-      </div>
+      </FormSection>
 
-      {/* Error + submit ---------------------------------------------- */}
-      {error ? <InlineAlert variant="error">{error}</InlineAlert> : null}
-
-      <div className="flex justify-end gap-3 pt-2">
-        <Button
-          type="submit"
-          variant="primary"
-          loading={submitting}
-          loadingText="Saving…"
-          disabled={submitting}
-        >
-          Save feature grid
-        </Button>
-      </div>
+      <BlockSaveFooter
+        error={error}
+        dirty={dirty}
+        submitting={submitting}
+        label="Save feature grid"
+      />
     </form>
   );
 }

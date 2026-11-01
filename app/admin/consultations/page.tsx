@@ -1,20 +1,51 @@
 // -----------------------------------------------------------------------------
 // @file: app/admin/consultations/page.tsx
-// @purpose: Admin queue for consultations. Pending requests are reviewed and
-//           scheduled inline (datetime + video link paste). Cancel refunds
-//           tokens to the company.
+// @purpose: Admin queue for consultations. Requests list on the left, detail
+//           panel of the selected request on the right. Pending requests are
+//           scheduled from the panel (datetime + video link paste). Cancel
+//           refunds tokens to the company.
+// @version: v2.0.0
+// @lastUpdate: 2026-11-01
 // -----------------------------------------------------------------------------
 
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
-import { FormInput, FormTextarea } from "@/components/ui/form-field";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import { LoadingState } from "@/components/ui/loading-state";
+import {
+  Badge,
+  Button,
+  ButtonLink,
+  Callout,
+  Card,
+  DASH,
+  DetailPanel,
+  EmptyState,
+  Field,
+  FilterChips,
+  PageHeader,
+  PanelSection,
+  SearchInput,
+  Skeleton,
+  Table,
+  TableFooter,
+  TabPanel,
+  Tabs,
+  Td,
+  TextArea,
+  TextInput,
+  TextLink,
+  Th,
+  Tr,
+  SplitView,
+  fmt,
+  plural,
+  type Tone,
+} from "@/components/admin/v2/ui";
+import { IconClock } from "@/components/admin/v2/icons";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
+import { IconConsultations, IconSettings } from "@/components/navigation/nav-icons";
 
 type ConsultationStatus = "PENDING" | "SCHEDULED" | "COMPLETED" | "CANCELED";
 
@@ -34,18 +65,11 @@ type AdminConsultation = {
   requestedBy: { id: string; name: string | null; email: string };
 };
 
-const STATUS_LABEL: Record<ConsultationStatus, string> = {
-  PENDING: "Pending",
-  SCHEDULED: "Scheduled",
-  COMPLETED: "Completed",
-  CANCELED: "Canceled",
-};
-
-const STATUS_VARIANT: Record<ConsultationStatus, "info" | "success" | "warning" | "neutral"> = {
-  PENDING: "warning",
-  SCHEDULED: "info",
-  COMPLETED: "success",
-  CANCELED: "neutral",
+const STATUS_META: Record<ConsultationStatus, { label: string; tone: Tone }> = {
+  PENDING: { label: "Pending", tone: "amber" },
+  SCHEDULED: { label: "Scheduled", tone: "lavender" },
+  COMPLETED: { label: "Completed", tone: "green" },
+  CANCELED: { label: "Canceled", tone: "neutral" },
 };
 
 const STATUS_FILTERS: { value: "ALL" | ConsultationStatus; label: string }[] = [
@@ -57,8 +81,16 @@ const STATUS_FILTERS: { value: "ALL" | ConsultationStatus; label: string }[] = [
 ];
 
 function formatDateTime(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return DASH;
   return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" });
+}
+
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
 /** Short offset label like "GMT+3" for an IANA zone at "now". */
@@ -113,11 +145,54 @@ function isoToDatetimeLocal(iso: string): string {
   );
 }
 
+/** Host name of a pasted meeting link, for a neutral label ("zoom.us"). */
+function linkHost(url: string): string {
+  try {
+    return new URL(url).host.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
+function IconChevronRight() {
+  return (
+    <svg
+      width={18}
+      height={18}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="m9 6 6 6-6 6" />
+    </svg>
+  );
+}
+
+type DetailTab = "request" | "schedule";
+
 export default function AdminConsultationsPage() {
   const [rows, setRows] = useState<AdminConsultation[]>([]);
   const [statusFilter, setStatusFilter] = useState<"ALL" | ConsultationStatus>("ALL");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [query, setQuery] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [tab, setTab] = useState<DetailTab>("request");
+  // Browser zone — every date on this page renders in it. Read after mount
+  // so the server render and the first client render agree.
+  const [viewerTz, setViewerTz] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      setViewerTz(Intl.DateTimeFormat().resolvedOptions().timeZone);
+    } catch {
+      setViewerTz(null);
+    }
+  }, []);
 
   // Inline-schedule state, keyed by consultation id
   type ScheduleDraft = { scheduledAt: string; videoLink: string; adminNotes: string };
@@ -148,6 +223,9 @@ export default function AdminConsultationsPage() {
     load();
   }, [load]);
 
+  // Counts come from the rows we have. The list is fetched per status, so a
+  // filtered view only knows its own count — other chips show no number
+  // rather than a misleading 0.
   const counts = useMemo(() => {
     const acc: Record<ConsultationStatus | "ALL", number> = {
       ALL: rows.length,
@@ -160,15 +238,62 @@ export default function AdminConsultationsPage() {
     return acc;
   }, [rows]);
 
+  const filteredRows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((c) =>
+      [c.company.name, c.company.slug, c.requestedBy.name ?? "", c.requestedBy.email].some((v) =>
+        v.toLowerCase().includes(q),
+      ),
+    );
+  }, [rows, query]);
+
+  const selected = rows.find((r) => r.id === selectedId) ?? null;
+
+  // Schedule drafts are kept per consultation, so switching rows or filters
+  // never drops them — only leaving the page does. A draft that still matches
+  // the consultation's saved values is not a change.
+  const scheduleDirty = useMemo(
+    () =>
+      Object.entries(drafts).some(([id, d]) => {
+        const c = rows.find((r) => r.id === id);
+        if (!c) return true;
+        return (
+          d.scheduledAt !== (c.scheduledAt ? isoToDatetimeLocal(c.scheduledAt) : "") ||
+          d.videoLink !== (c.videoLink ?? "") ||
+          d.adminNotes !== (c.adminNotes ?? "")
+        );
+      }),
+    [drafts, rows],
+  );
+  useUnsavedChanges(scheduleDirty, "Consultation schedule");
+
+  const selectRow = (id: string) => {
+    if (id !== selectedId) setTab(drafts[id] ? "schedule" : "request");
+    setSelectedId(id);
+  };
+
   const startSchedule = (c: AdminConsultation) => {
     setDrafts((prev) => ({
       ...prev,
       [c.id]: {
-        scheduledAt: c.scheduledAt ?? "",
+        // datetime-local needs "YYYY-MM-DDTHH:mm"; an ISO with "Z" would not
+        // render in the input.
+        scheduledAt: c.scheduledAt ? isoToDatetimeLocal(c.scheduledAt) : "",
         videoLink: c.videoLink ?? "",
         adminNotes: c.adminNotes ?? "",
       },
     }));
+    setTab("schedule");
+  };
+
+  // Cancelling refunds the booking tokens to the company — confirm first.
+  const [cancelTarget, setCancelTarget] = useState<AdminConsultation | null>(null);
+
+  const confirmCancel = async () => {
+    if (!cancelTarget) return;
+    await submitUpdate(cancelTarget.id, { status: "CANCELED" });
+    setCancelTarget(null);
   };
 
   const cancelSchedule = (id: string) => {
@@ -191,6 +316,7 @@ export default function AdminConsultationsPage() {
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error((json && json.error) || "Failed to update");
       cancelSchedule(id);
+      setTab("request");
       await load();
     } catch (err) {
       console.error("[AdminConsultationsPage] update error", err);
@@ -217,279 +343,507 @@ export default function AdminConsultationsPage() {
     });
   };
 
-  return (
-    <div className="mx-auto w-full max-w-5xl">
-      <header className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="font-brand text-2xl font-bold tracking-tight text-[var(--bb-secondary)]">
-            Consultations
-          </h1>
-          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-            Requests from company OWNER / PM members. Schedule, paste a Google Meet / Zoom link,
-            mark completed, or cancel and refund tokens.
-          </p>
+  const setDraftField = (id: string, field: keyof ScheduleDraft, value: string) =>
+    setDrafts((prev) => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
+
+  const errorCallout = error ? (
+    <Callout tone="error" title="Something went wrong">
+      {error}
+    </Callout>
+  ) : null;
+
+  // ---------------------------------------------------------------------------
+  // Detail panel
+  // ---------------------------------------------------------------------------
+
+  const renderPanel = (c: AdminConsultation) => {
+    const draft = drafts[c.id];
+    const isScheduling = Boolean(draft);
+    const saving = savingId === c.id;
+    const canSchedule = c.status === "PENDING" || c.status === "SCHEDULED";
+    const meta = STATUS_META[c.status];
+    const idPrefix = `consultation-${c.id}`;
+
+    return (
+      <DetailPanel
+        title="Consultation details"
+        onClose={() => setSelectedId(null)}
+        closeLabel="Close consultation details"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-xl leading-7 font-semibold">{c.company.name}</p>
+            <p className="mt-0.5 text-sm break-words text-[var(--av2-text-2)]">
+              {c.requestedBy.name ? `${c.requestedBy.name} · ` : ""}
+              {c.requestedBy.email}
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-col items-end gap-1.5">
+            <Badge tone={meta.tone}>{meta.label}</Badge>
+            <span className="text-xs text-[var(--av2-text-2)] tabular-nums">
+              {fmt(c.tokenCost)} {plural(c.tokenCost, "token", "tokens")}
+            </span>
+          </div>
         </div>
-        <a
-          href="/admin/consultations/settings"
-          className="shrink-0 rounded-full border border-[var(--bb-border)] bg-white px-3 py-1.5 text-xs font-medium text-[var(--bb-secondary)] hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
-        >
-          Settings
-        </a>
-      </header>
 
-      {/* Filter bar */}
-      <div className="mb-4 flex items-center gap-2">
-        {STATUS_FILTERS.map((f) => {
-          const active = statusFilter === f.value;
-          const count = counts[f.value];
-          return (
-            <button
-              key={f.value}
-              type="button"
-              onClick={() => setStatusFilter(f.value)}
-              className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                active
-                  ? "border-[var(--bb-secondary)] bg-[var(--bb-secondary)] text-white"
-                  : "border-[var(--bb-border)] text-[var(--bb-text-secondary)] hover:text-[var(--bb-secondary)]"
-              }`}
-            >
-              {f.label} · {count}
-            </button>
-          );
-        })}
-      </div>
+        <div className="mt-5">
+          <Tabs
+            label="Consultation sections"
+            idPrefix={idPrefix}
+            value={tab}
+            onChange={setTab}
+            tabs={[
+              { value: "request", label: "Request" },
+              { value: "schedule", label: isScheduling ? "Schedule · editing" : "Schedule" },
+            ]}
+          />
+        </div>
 
-      {loading && <LoadingState />}
-      {error && (
-        <InlineAlert variant="error" className="mb-4">
-          {error}
-        </InlineAlert>
-      )}
+        {error && <div className="mt-5">{errorCallout}</div>}
 
-      {!loading && rows.length === 0 && (
-        <EmptyState
-          title="Nothing here"
-          description="No consultations in this view. Pending requests show up first."
-        />
-      )}
-
-      {rows.length > 0 && (
-        <div className="space-y-3">
-          {rows.map((c) => {
-            const draft = drafts[c.id];
-            const isScheduling = Boolean(draft);
-            return (
-              <article
-                key={c.id}
-                className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] p-5"
-              >
-                <header className="mb-3 flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <Badge variant={STATUS_VARIANT[c.status]}>{STATUS_LABEL[c.status]}</Badge>
-                    <h2 className="mt-2 text-sm font-semibold text-[var(--bb-secondary)]">
-                      {c.company.name}
-                      <span className="ml-2 text-xs font-normal text-[var(--bb-text-muted)]">
-                        ({c.company.slug})
-                      </span>
-                    </h2>
-                    <p className="mt-0.5 text-xs text-[var(--bb-text-muted)]">
-                      {c.requestedBy.name ?? c.requestedBy.email} · {c.requestedBy.email}
-                    </p>
-                  </div>
-                  <div className="text-right text-xs text-[var(--bb-text-muted)]">
-                    <p>Requested {formatDateTime(c.createdAt)}</p>
-                    <p className="mt-0.5">{c.tokenCost} tokens</p>
-                  </div>
-                </header>
-
-                <p className="mb-3 text-sm whitespace-pre-wrap text-[var(--bb-text-secondary)]">
-                  {c.description}
+        {tab === "request" ? (
+          <TabPanel idPrefix={idPrefix} value="request">
+            <div className="mt-5">
+              <PanelSection title="Request">
+                <p className="text-sm whitespace-pre-wrap">{c.description}</p>
+                <p className="mt-2 text-xs text-[var(--av2-text-2)]">
+                  Requested {formatDateTime(c.createdAt)} · {c.company.slug}
                 </p>
+              </PanelSection>
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-tertiary)] uppercase">
-                      Preferred times
-                    </p>
-                    {c.preferredTimes && c.preferredTimes.length > 0 ? (
-                      <ul className="mt-1 space-y-1 text-xs text-[var(--bb-secondary)]">
-                        {c.preferredTimes.map((t, i) => (
-                          <li key={i} className="flex items-center justify-between gap-2">
-                            <span>· {formatPreferredSlot(t, c.timezone)}</span>
-                            {isIsoSlot(t) && c.status === "PENDING" && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setDrafts((prev) => ({
-                                    ...prev,
-                                    [c.id]: {
-                                      scheduledAt: isoToDatetimeLocal(t),
-                                      videoLink: prev[c.id]?.videoLink ?? c.videoLink ?? "",
-                                      adminNotes: prev[c.id]?.adminNotes ?? c.adminNotes ?? "",
-                                    },
-                                  }));
-                                }}
-                                className="shrink-0 rounded-full border border-[var(--bb-border)] bg-white px-2 py-0.5 text-[10px] font-medium text-[var(--bb-primary)] hover:border-[var(--bb-primary)]"
-                              >
-                                Use this
-                              </button>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="mt-1 text-xs text-[var(--bb-text-muted)]">—</p>
-                    )}
-                    {c.timezone && (
-                      <p className="mt-1 text-[11px] text-[var(--bb-text-muted)]">
-                        tz: {c.timezone}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-tertiary)] uppercase">
-                      Scheduled
-                    </p>
-                    <p className="mt-1 text-xs text-[var(--bb-secondary)]">
-                      {formatDateTime(c.scheduledAt)}
-                    </p>
+              {c.scheduledAt && (
+                <PanelSection>
+                  <div className="rounded-xl bg-[var(--av2-lavender-bg)] p-4">
+                    <div className="flex gap-4">
+                      <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--av2-surface)] text-[var(--av2-fill-lavender)]">
+                        <IconConsultations width={22} height={22} />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">Scheduled session</p>
+                        <p className="text-xl leading-7 font-bold">{formatDate(c.scheduledAt)}</p>
+                        <p className="text-sm">{formatTime(c.scheduledAt)}</p>
+                        {viewerTz && (
+                          <p className="text-xs text-[var(--av2-text-2)]">
+                            {viewerTz} · {tzShortLabel(viewerTz)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
                     {c.videoLink && (
-                      <a
-                        href={c.videoLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-1 block text-xs break-all text-[var(--bb-primary)] hover:underline"
-                      >
-                        {c.videoLink}
-                      </a>
+                      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--av2-border)] pt-3">
+                        <span className="min-w-0 truncate text-sm font-medium">
+                          {linkHost(c.videoLink)}
+                        </span>
+                        <TextLink href={c.videoLink} external>
+                          Open meeting
+                        </TextLink>
+                      </div>
                     )}
                   </div>
-                </div>
+                </PanelSection>
+              )}
 
-                {/* Inline schedule form */}
-                {isScheduling && (
-                  <div className="mt-4 space-y-3 rounded-xl border border-[var(--bb-border-subtle)] bg-white p-4">
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <div>
-                        <label className="mb-1 block text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-tertiary)] uppercase">
-                          Scheduled date + time
-                        </label>
-                        <input
-                          type="datetime-local"
-                          value={draft.scheduledAt}
-                          onChange={(e) =>
-                            setDrafts((prev) => ({
-                              ...prev,
-                              [c.id]: { ...prev[c.id], scheduledAt: e.target.value },
-                            }))
-                          }
-                          className="w-full rounded-md border border-[var(--bb-border-input)] bg-white px-3 py-1.5 text-sm text-[var(--bb-secondary)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)] focus:outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-tertiary)] uppercase">
-                          Video link
-                        </label>
-                        <FormInput
-                          placeholder="https://meet.google.com/..."
-                          value={draft.videoLink}
-                          onChange={(e) =>
-                            setDrafts((prev) => ({
-                              ...prev,
-                              [c.id]: { ...prev[c.id], videoLink: e.target.value },
-                            }))
-                          }
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-tertiary)] uppercase">
-                        Internal notes (optional)
-                      </label>
-                      <FormTextarea
-                        rows={2}
-                        value={draft.adminNotes}
-                        onChange={(e) =>
-                          setDrafts((prev) => ({
-                            ...prev,
-                            [c.id]: { ...prev[c.id], adminNotes: e.target.value },
-                          }))
-                        }
-                      />
-                    </div>
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => cancelSchedule(c.id)}
-                        disabled={savingId === c.id}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => handleConfirmSchedule(c.id)}
-                        loading={savingId === c.id}
-                        loadingText="Saving..."
-                      >
-                        Confirm schedule
-                      </Button>
-                    </div>
-                  </div>
+              <PanelSection
+                title={
+                  <span className="flex items-center gap-2">
+                    <IconClock width={18} height={18} className="text-[var(--av2-text-2)]" />
+                    Preferred times
+                  </span>
+                }
+              >
+                {c.preferredTimes && c.preferredTimes.length > 0 ? (
+                  <ul className="space-y-2 text-sm">
+                    {c.preferredTimes.map((t, i) => (
+                      <li key={i} className="flex items-center justify-between gap-3">
+                        <span className="tabular-nums">{formatPreferredSlot(t, c.timezone)}</span>
+                        {isIsoSlot(t) && c.status === "PENDING" && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-[var(--av2-link)]"
+                            onClick={() => {
+                              setDrafts((prev) => ({
+                                ...prev,
+                                [c.id]: {
+                                  scheduledAt: isoToDatetimeLocal(t),
+                                  videoLink: prev[c.id]?.videoLink ?? c.videoLink ?? "",
+                                  adminNotes: prev[c.id]?.adminNotes ?? c.adminNotes ?? "",
+                                },
+                              }));
+                              setTab("schedule");
+                            }}
+                          >
+                            Use this
+                          </Button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-[var(--av2-text-2)]">{DASH}</p>
                 )}
+                {c.timezone && (
+                  <p className="mt-2 text-xs text-[var(--av2-text-2)]">
+                    Requester time zone: {c.timezone}
+                  </p>
+                )}
+              </PanelSection>
 
-                {/* Actions */}
-                {!isScheduling && (
-                  <footer className="mt-4 flex flex-wrap items-center gap-2">
+              {c.adminNotes && (
+                <PanelSection title="Admin notes">
+                  <p className="text-sm whitespace-pre-wrap text-[var(--av2-text-2)]">
+                    {c.adminNotes}
+                  </p>
+                </PanelSection>
+              )}
+
+              {canSchedule && !isScheduling && (
+                <PanelSection>
+                  <div className="grid gap-3 sm:grid-cols-2">
                     {c.status === "PENDING" && (
-                      <Button size="sm" onClick={() => startSchedule(c)}>
+                      <Button
+                        variant="primary"
+                        onClick={() => startSchedule(c)}
+                        className="sm:col-span-2"
+                      >
                         Schedule
                       </Button>
                     )}
                     {c.status === "SCHEDULED" && (
                       <>
                         <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => startSchedule(c)}
-                          disabled={savingId === c.id}
-                        >
-                          Reschedule
-                        </Button>
-                        <Button
-                          size="sm"
+                          variant="primary"
                           onClick={() => submitUpdate(c.id, { status: "COMPLETED" })}
-                          loading={savingId === c.id}
-                          loadingText="Saving..."
+                          disabled={saving}
+                          aria-busy={saving}
                         >
-                          Mark completed
+                          {saving ? "Saving…" : "Mark completed"}
+                        </Button>
+                        <Button onClick={() => startSchedule(c)} disabled={saving}>
+                          Reschedule
                         </Button>
                       </>
                     )}
-                    {(c.status === "PENDING" || c.status === "SCHEDULED") && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => submitUpdate(c.id, { status: "CANCELED" })}
-                        loading={savingId === c.id}
-                        loadingText="Saving..."
-                      >
-                        Cancel &amp; refund tokens
-                      </Button>
-                    )}
-                  </footer>
-                )}
+                  </div>
+                  <div className="mt-4">
+                    <Button
+                      variant="danger"
+                      onClick={() => setCancelTarget(c)}
+                      disabled={saving}
+                      aria-busy={saving}
+                    >
+                      {saving
+                        ? "Saving…"
+                        : `Cancel & refund ${fmt(c.tokenCost)} ${plural(c.tokenCost, "token", "tokens")}`}
+                    </Button>
+                    <p className="mt-2 text-xs text-[var(--av2-text-2)]">
+                      Cancelling returns the booking tokens to the company.
+                    </p>
+                  </div>
+                </PanelSection>
+              )}
 
-                {c.adminNotes && !isScheduling && (
-                  <p className="mt-3 rounded-md bg-[var(--bb-bg-warm)] p-2 text-[11px] text-[var(--bb-text-muted)]">
-                    Admin notes: {c.adminNotes}
+              {canSchedule && isScheduling && (
+                <PanelSection>
+                  <p className="text-sm text-[var(--av2-text-2)]">
+                    You have an unsaved schedule for this request.
                   </p>
-                )}
-              </article>
-            );
-          })}
-        </div>
-      )}
+                  <Button className="mt-3" onClick={() => setTab("schedule")}>
+                    Continue scheduling
+                  </Button>
+                </PanelSection>
+              )}
+            </div>
+          </TabPanel>
+        ) : (
+          <TabPanel idPrefix={idPrefix} value="schedule">
+            <div className="mt-5">
+              {isScheduling ? (
+                <div className="space-y-4">
+                  <Field
+                    label="Scheduled date + time"
+                    htmlFor={`${idPrefix}-when`}
+                    hint={viewerTz ? `In your time zone (${viewerTz}).` : undefined}
+                  >
+                    <TextInput
+                      id={`${idPrefix}-when`}
+                      type="datetime-local"
+                      value={draft.scheduledAt}
+                      onChange={(e) => setDraftField(c.id, "scheduledAt", e.target.value)}
+                    />
+                  </Field>
+                  <Field label="Video link" htmlFor={`${idPrefix}-link`}>
+                    <TextInput
+                      id={`${idPrefix}-link`}
+                      type="url"
+                      placeholder="https://meet.google.com/..."
+                      value={draft.videoLink}
+                      onChange={(e) => setDraftField(c.id, "videoLink", e.target.value)}
+                    />
+                  </Field>
+                  <Field label="Internal notes (optional)" htmlFor={`${idPrefix}-notes`}>
+                    <TextArea
+                      id={`${idPrefix}-notes`}
+                      rows={3}
+                      value={draft.adminNotes}
+                      onChange={(e) => setDraftField(c.id, "adminNotes", e.target.value)}
+                    />
+                  </Field>
+                  <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[var(--av2-border)] pt-4">
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        cancelSchedule(c.id);
+                        setTab("request");
+                      }}
+                      disabled={saving}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="primary"
+                      onClick={() => handleConfirmSchedule(c.id)}
+                      disabled={saving}
+                      aria-busy={saving}
+                    >
+                      {saving ? "Saving…" : "Confirm schedule"}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <dl className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)] gap-x-4 gap-y-3 text-sm">
+                    <dt className="text-[var(--av2-text-2)]">Scheduled</dt>
+                    <dd className="font-medium">{formatDateTime(c.scheduledAt)}</dd>
+                    <dt className="text-[var(--av2-text-2)]">Video link</dt>
+                    <dd className="min-w-0 font-medium break-all">
+                      {c.videoLink ? (
+                        <a
+                          href={c.videoLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[var(--av2-link)] hover:underline"
+                        >
+                          {c.videoLink}
+                        </a>
+                      ) : (
+                        DASH
+                      )}
+                    </dd>
+                  </dl>
+                  {canSchedule ? (
+                    <Button
+                      variant={c.status === "PENDING" ? "primary" : "secondary"}
+                      className="mt-5"
+                      onClick={() => startSchedule(c)}
+                      disabled={saving}
+                    >
+                      {c.status === "PENDING" ? "Schedule" : "Reschedule"}
+                    </Button>
+                  ) : (
+                    <p className="mt-5 text-sm text-[var(--av2-text-2)]">
+                      This consultation is {meta.label.toLowerCase()}; scheduling is closed.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </TabPanel>
+        )}
+      </DetailPanel>
+    );
+  };
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
+
+  const activeFilterLabel = STATUS_FILTERS.find((f) => f.value === statusFilter)?.label ?? "";
+
+  return (
+    <div>
+      <PageHeader
+        title="Consultations"
+        description="Review requests, manage schedules and follow up."
+        actions={
+          <>
+            {viewerTz && (
+              <span className="mr-2 inline-flex items-center gap-2 text-sm text-[var(--av2-text-2)]">
+                <IconClock width={18} height={18} />
+                Times shown in {viewerTz} · {tzShortLabel(viewerTz)}
+              </span>
+            )}
+            <ButtonLink href="/admin/consultations/settings">
+              <IconSettings width={18} height={18} />
+              Settings
+            </ButtonLink>
+          </>
+        }
+      />
+
+      <div className="mb-6">
+        <FilterChips
+          label="Filter by status"
+          value={statusFilter}
+          onChange={setStatusFilter}
+          options={STATUS_FILTERS.map((f) => ({
+            value: f.value,
+            label: f.label,
+            count:
+              loading && rows.length === 0
+                ? null
+                : statusFilter === "ALL" || f.value === statusFilter
+                  ? counts[f.value]
+                  : null,
+          }))}
+        />
+      </div>
+
+      {error && !selected && <div className="mb-6">{errorCallout}</div>}
+
+      <SplitView panel={selected ? renderPanel(selected) : undefined}>
+        <Card padding="none">
+          <div className="flex flex-wrap items-center justify-between gap-4 px-6 pt-5 pb-4">
+            <h2 className="text-xl leading-7 font-semibold">Requests</h2>
+            <SearchInput
+              className="w-full sm:w-80"
+              value={query}
+              onChange={setQuery}
+              placeholder="Search company or requester"
+              label="Search consultations by company or requester"
+            />
+          </div>
+
+          {loading && rows.length === 0 ? (
+            <div className="space-y-3 border-t border-[var(--av2-border)] px-6 py-5" role="status">
+              <span className="sr-only">Loading consultations…</span>
+              {[0, 1, 2].map((i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
+          ) : rows.length === 0 ? (
+            <div className="border-t border-[var(--av2-border)]">
+              {statusFilter === "ALL" ? (
+                <EmptyState
+                  icon={<IconConsultations width={28} height={28} />}
+                  title="No consultation requests yet"
+                  description="Requests from company owners and project managers show up here, pending ones first."
+                />
+              ) : (
+                <EmptyState
+                  title={`No ${activeFilterLabel.toLowerCase()} consultations`}
+                  description="Nothing has this status right now."
+                  action={<Button onClick={() => setStatusFilter("ALL")}>Show all</Button>}
+                />
+              )}
+            </div>
+          ) : filteredRows.length === 0 ? (
+            <div className="border-t border-[var(--av2-border)]">
+              <EmptyState
+                title="No requests match your search"
+                description="Try a different company name, requester name or email."
+                action={<Button onClick={() => setQuery("")}>Clear search</Button>}
+              />
+            </div>
+          ) : (
+            <Table label="Consultation requests">
+              <thead>
+                <tr>
+                  <Th>Company</Th>
+                  <Th>Requested</Th>
+                  <Th>Scheduled</Th>
+                  <Th>Status</Th>
+                  <Th align="right">
+                    <span className="sr-only">Open</span>
+                  </Th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRows.map((c) => {
+                  const meta = STATUS_META[c.status];
+                  return (
+                    <Tr
+                      key={c.id}
+                      selected={c.id === selectedId}
+                      onSelect={() => selectRow(c.id)}
+                      label={`${c.company.name}, ${meta.label}, requested ${formatDateTime(c.createdAt)}`}
+                    >
+                      <Td>
+                        <div className="font-semibold">{c.company.name}</div>
+                        <div className="text-xs text-[var(--av2-text-2)]">
+                          {c.requestedBy.name ?? c.requestedBy.email}
+                        </div>
+                      </Td>
+                      <Td className="whitespace-nowrap tabular-nums">
+                        <div>{formatDate(c.createdAt)}</div>
+                        <div className="text-xs text-[var(--av2-text-2)]">
+                          {formatTime(c.createdAt)}
+                        </div>
+                      </Td>
+                      <Td className="whitespace-nowrap tabular-nums">
+                        {c.scheduledAt ? (
+                          <>
+                            <div>{formatDate(c.scheduledAt)}</div>
+                            <div className="text-xs text-[var(--av2-text-2)]">
+                              {formatTime(c.scheduledAt)}
+                            </div>
+                          </>
+                        ) : (
+                          <span className="text-[var(--av2-text-2)]">{DASH}</span>
+                        )}
+                      </Td>
+                      <Td>
+                        <Badge tone={meta.tone}>{meta.label}</Badge>
+                        {drafts[c.id] && (
+                          <div className="mt-1 text-xs text-[var(--av2-text-2)]">
+                            Draft schedule
+                          </div>
+                        )}
+                      </Td>
+                      <Td align="right" className="text-[var(--av2-text-2)]">
+                        <span className="inline-flex">
+                          <IconChevronRight />
+                        </span>
+                      </Td>
+                    </Tr>
+                  );
+                })}
+              </tbody>
+            </Table>
+          )}
+
+          {rows.length > 0 && (
+            <TableFooter>
+              <span className="tabular-nums">
+                Showing {fmt(filteredRows.length)} of {fmt(rows.length)}{" "}
+                {plural(rows.length, "request", "requests")}
+              </span>
+            </TableFooter>
+          )}
+        </Card>
+
+        {!selected && rows.length > 0 && (
+          <p className="mt-6 text-sm text-[var(--av2-text-2)]">
+            Select a request to review it, schedule it or follow up.
+          </p>
+        )}
+      </SplitView>
+
+      <ConfirmDialog
+        open={cancelTarget !== null}
+        onClose={() => savingId === null && setCancelTarget(null)}
+        onConfirm={confirmCancel}
+        loading={cancelTarget !== null && savingId === cancelTarget.id}
+        variant="danger"
+        title="Cancel this consultation?"
+        description={
+          cancelTarget
+            ? `${cancelTarget.company.name}'s booking will be cancelled and ${fmt(cancelTarget.tokenCost)} ${plural(cancelTarget.tokenCost, "token", "tokens")} refunded to the company. This can't be undone.`
+            : undefined
+        }
+        confirmLabel="Cancel & refund"
+        cancelLabel="Keep booking"
+      />
     </div>
   );
 }

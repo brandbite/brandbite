@@ -15,10 +15,20 @@
 
 import { useState } from "react";
 
-import { Button } from "@/components/ui/button";
-import { FormInput } from "@/components/ui/form-field";
-import { InlineAlert } from "@/components/ui/inline-alert";
+import { Button, Field, TextInput } from "@/components/admin/v2/ui";
 import { useToast } from "@/components/ui/toast-provider";
+
+import {
+  AddButton,
+  BlockSaveFooter,
+  FormSection,
+  IconTrash,
+  LinkList,
+  LinkRow,
+  ReorderActions,
+  Req,
+  useDirtyBaseline,
+} from "./block-form-ui";
 
 import type { SiteFooterData } from "@/lib/blocks/types";
 
@@ -51,6 +61,12 @@ export function SiteFooterBlockForm({ initial }: SiteFooterBlockFormProps) {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Presentation only: drives the SaveBar status + disables Save when clean.
+  const { dirty, markSaved } = useDirtyBaseline(
+    JSON.stringify([brandStatement, columns, legalLinks]),
+  );
+  const [selectedCol, setSelectedCol] = useState(0);
 
   // ---- Column-level operations --------------------------------------
 
@@ -208,6 +224,7 @@ export function SiteFooterBlockForm({ initial }: SiteFooterBlockFormProps) {
         throw new Error(json?.reason || json?.error || "Save failed.");
       }
 
+      markSaved();
       showToast({
         type: "success",
         title: "Footer saved",
@@ -220,245 +237,243 @@ export function SiteFooterBlockForm({ initial }: SiteFooterBlockFormProps) {
     }
   };
 
+  // ---- Column selection (presentation only) -------------------------
+  // Only one column's links are shown at a time; every column stays in
+  // `columns` state and is validated + saved together as before.
+
+  const sel = Math.min(selectedCol, columns.length - 1);
+  const selectedColumn = columns[sel];
+
+  const handleAddColumn = () => {
+    if (columns.length >= MAX_COLUMNS) return;
+    addColumn();
+    setSelectedCol(columns.length);
+  };
+
+  const handleRemoveColumn = (idx: number) => {
+    if (columns.length <= MIN_COLUMNS) return;
+    removeColumn(idx);
+    setSelectedCol((s) => (idx < s || s === columns.length - 1 ? Math.max(0, s - 1) : s));
+  };
+
+  const handleMoveColumn = (idx: number, direction: -1 | 1) => {
+    const target = idx + direction;
+    if (target < 0 || target >= columns.length) return;
+    moveColumn(idx, direction);
+    setSelectedCol((s) => (s === idx ? target : s === target ? idx : s));
+  };
+
   // ---- Render -------------------------------------------------------
 
   return (
     <form onSubmit={handleSave} className="space-y-6">
       {/* Brand statement -------------------------------------------- */}
-      <div>
-        <label
+      <FormSection>
+        <Field
+          label="Brand statement (optional)"
           htmlFor="ftr-brand-statement"
-          className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
+          hint="Renders below the logo. The text after the last comma is highlighted in the brand colour."
         >
-          Brand statement (optional)
-        </label>
-        <FormInput
-          id="ftr-brand-statement"
-          value={brandStatement}
-          onChange={(e) => setBrandStatement(e.target.value)}
-          placeholder="All your creatives, one subscription"
-          maxLength={200}
-        />
-        <p className="mt-1 text-xs text-[var(--bb-text-muted)]">
-          Renders below the logo. The text after the last comma is highlighted in the brand colour.
-        </p>
-      </div>
+          <TextInput
+            id="ftr-brand-statement"
+            value={brandStatement}
+            onChange={(e) => setBrandStatement(e.target.value)}
+            placeholder="All your creatives, one subscription"
+            maxLength={200}
+          />
+        </Field>
+      </FormSection>
 
       {/* Columns ---------------------------------------------------- */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-[var(--bb-secondary)]">
-            Link columns ({columns.length}/{MAX_COLUMNS})
-          </h3>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={addColumn}
-            disabled={columns.length >= MAX_COLUMNS}
-          >
+      <FormSection
+        title="Footer columns"
+        count={`${columns.length} / ${MAX_COLUMNS}`}
+        description="Select a column to edit its title and links."
+        action={
+          <AddButton onClick={handleAddColumn} disabled={columns.length >= MAX_COLUMNS}>
             Add column
-          </Button>
-        </div>
+          </AddButton>
+        }
+      >
+        <div className="grid items-start gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+          <ul aria-label="Footer columns" className="space-y-2">
+            {columns.map((col, colIdx) => {
+              const active = colIdx === sel;
+              return (
+                <li
+                  key={colIdx}
+                  className={`flex items-center gap-1 rounded-xl border py-1 pr-1 pl-1 transition-colors ${
+                    active
+                      ? "border-[var(--av2-accent)]/40 bg-[var(--av2-selected)]"
+                      : "border-[var(--av2-border)] bg-[var(--av2-surface)] hover:bg-[var(--av2-bg)]"
+                  }`}
+                >
+                  <button
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setSelectedCol(colIdx)}
+                    className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg px-3 py-2 text-left focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
+                  >
+                    <span
+                      className={`truncate text-sm font-semibold ${
+                        active ? "text-[var(--av2-link)]" : ""
+                      } ${col.title.trim() ? "" : "text-[var(--av2-text-2)] italic"}`}
+                    >
+                      {col.title.trim() || `Column ${colIdx + 1} (untitled)`}
+                    </span>
+                    <span className="shrink-0 text-xs text-[var(--av2-text-2)] tabular-nums">
+                      {col.links.length} {col.links.length === 1 ? "link" : "links"}
+                    </span>
+                  </button>
+                  <ReorderActions
+                    noun={`column ${colIdx + 1}`}
+                    index={colIdx}
+                    count={columns.length}
+                    onMove={(d) => handleMoveColumn(colIdx, d)}
+                  />
+                </li>
+              );
+            })}
+          </ul>
 
-        {columns.map((col, colIdx) => (
-          <div
-            key={colIdx}
-            className="rounded-xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-warm)] px-4 py-4"
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-xs font-semibold tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
-                Column {colIdx + 1}
-              </span>
-              <div className="flex items-center gap-1">
+          {selectedColumn && (
+            <div className="min-w-0 rounded-xl border border-[var(--av2-border)] p-5">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <h4 className="truncate text-lg font-semibold">
+                  {selectedColumn.title.trim() || `Column ${sel + 1}`}
+                </h4>
                 <Button
-                  type="button"
-                  variant="ghost"
                   size="sm"
-                  onClick={() => moveColumn(colIdx, -1)}
-                  disabled={colIdx === 0}
-                  aria-label={`Move column ${colIdx + 1} left`}
-                >
-                  ←
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => moveColumn(colIdx, 1)}
-                  disabled={colIdx === columns.length - 1}
-                  aria-label={`Move column ${colIdx + 1} right`}
-                >
-                  →
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeColumn(colIdx)}
+                  variant="danger"
+                  onClick={() => handleRemoveColumn(sel)}
                   disabled={columns.length <= MIN_COLUMNS}
-                  aria-label={`Remove column ${colIdx + 1}`}
+                  aria-label={`Remove column ${sel + 1}`}
                 >
-                  Remove
+                  <IconTrash width={16} height={16} />
+                  Remove column
                 </Button>
               </div>
-            </div>
 
-            <div className="mb-3">
-              <label
-                htmlFor={`ftr-col-title-${colIdx}`}
-                className="mb-1 block text-xs font-semibold text-[var(--bb-secondary)]"
+              <Field
+                label={
+                  <>
+                    Column title
+                    <Req />
+                  </>
+                }
+                htmlFor={`ftr-col-title-${sel}`}
               >
-                Column title <span className="text-[var(--bb-primary)]">*</span>
-              </label>
-              <FormInput
-                id={`ftr-col-title-${colIdx}`}
-                value={col.title}
-                onChange={(e) => updateColumnTitle(colIdx, e.target.value)}
-                placeholder="Platform"
-                maxLength={40}
-              />
-            </div>
+                <TextInput
+                  id={`ftr-col-title-${sel}`}
+                  value={selectedColumn.title}
+                  onChange={(e) => updateColumnTitle(sel, e.target.value)}
+                  placeholder="Platform"
+                  maxLength={40}
+                />
+              </Field>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-[var(--bb-secondary)]">
-                  Links ({col.links.length}/{MAX_LINKS_PER_COL})
-                </span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => addLink(colIdx)}
-                  disabled={col.links.length >= MAX_LINKS_PER_COL}
+              <div className="mt-5 mb-3 flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold">
+                  Links
+                  <span className="ml-2 font-medium text-[var(--av2-text-2)] tabular-nums">
+                    {selectedColumn.links.length} / {MAX_LINKS_PER_COL}
+                  </span>
+                </p>
+                <AddButton
+                  onClick={() => addLink(sel)}
+                  disabled={selectedColumn.links.length >= MAX_LINKS_PER_COL}
                 >
                   Add link
-                </Button>
+                </AddButton>
               </div>
 
-              {col.links.map((link, linkIdx) => (
-                <div key={linkIdx} className="rounded-md bg-[var(--bb-bg-page)] px-3 py-2">
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto]">
-                    <FormInput
+              <LinkList>
+                {selectedColumn.links.map((link, linkIdx) => (
+                  <LinkRow
+                    key={`${sel}-${linkIdx}`}
+                    actions={
+                      <ReorderActions
+                        noun={`link ${linkIdx + 1}`}
+                        index={linkIdx}
+                        count={selectedColumn.links.length}
+                        onMove={(d) => moveLink(sel, linkIdx, d)}
+                        onRemove={() => removeLink(sel, linkIdx)}
+                        removeDisabled={selectedColumn.links.length <= MIN_LINKS_PER_COL}
+                      />
+                    }
+                  >
+                    <TextInput
+                      aria-label={`Link ${linkIdx + 1} label`}
                       value={link.label}
-                      onChange={(e) => updateLink(colIdx, linkIdx, { label: e.target.value })}
+                      onChange={(e) => updateLink(sel, linkIdx, { label: e.target.value })}
                       placeholder="Label"
                       maxLength={40}
                     />
-                    <FormInput
+                    <TextInput
+                      aria-label={`Link ${linkIdx + 1} destination`}
                       value={link.href}
-                      onChange={(e) => updateLink(colIdx, linkIdx, { href: e.target.value })}
+                      onChange={(e) => updateLink(sel, linkIdx, { href: e.target.value })}
                       placeholder="/path"
                       maxLength={200}
                     />
-                    <div className="flex items-center gap-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => moveLink(colIdx, linkIdx, -1)}
-                        disabled={linkIdx === 0}
-                        aria-label="Move link up"
-                      >
-                        ↑
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => moveLink(colIdx, linkIdx, 1)}
-                        disabled={linkIdx === col.links.length - 1}
-                        aria-label="Move link down"
-                      >
-                        ↓
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeLink(colIdx, linkIdx)}
-                        disabled={col.links.length <= MIN_LINKS_PER_COL}
-                        aria-label="Remove link"
-                      >
-                        ✕
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                  </LinkRow>
+                ))}
+              </LinkList>
             </div>
-          </div>
-        ))}
-      </div>
+          )}
+        </div>
+      </FormSection>
 
       {/* Legal-link strip ------------------------------------------- */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-[var(--bb-secondary)]">
-            Bottom legal-link bar ({legalLinks.length}/{MAX_LEGAL_LINKS})
-          </h3>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={addLegalLink}
-            disabled={legalLinks.length >= MAX_LEGAL_LINKS}
-          >
+      <FormSection
+        title="Legal bar"
+        count={`${legalLinks.length} / ${MAX_LEGAL_LINKS}`}
+        description="The orange strip at the very bottom. Leave empty to hide it. Saved together with the footer."
+        action={
+          <AddButton onClick={addLegalLink} disabled={legalLinks.length >= MAX_LEGAL_LINKS}>
             Add legal link
-          </Button>
-        </div>
-        <p className="text-xs text-[var(--bb-text-muted)]">
-          The orange strip at the very bottom. Leave empty to hide it.
-        </p>
-
+          </AddButton>
+        }
+      >
         {legalLinks.length === 0 ? (
-          <p className="rounded-md border border-dashed border-[var(--bb-border)] bg-[var(--bb-bg-warm)] px-3 py-3 text-center text-xs text-[var(--bb-text-muted)]">
+          <div className="rounded-xl border border-dashed border-[var(--av2-border)] px-4 py-6 text-center text-sm text-[var(--av2-text-2)]">
             No legal links. The orange bottom strip will only show the copyright line.
-          </p>
+          </div>
         ) : (
-          legalLinks.map((link, idx) => (
-            <div key={idx} className="rounded-md bg-[var(--bb-bg-warm)] px-3 py-2">
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto]">
-                <FormInput
+          <LinkList>
+            {legalLinks.map((link, idx) => (
+              <LinkRow
+                key={idx}
+                actions={
+                  <ReorderActions
+                    noun={`legal link ${idx + 1}`}
+                    index={idx}
+                    count={legalLinks.length}
+                    onRemove={() => removeLegalLink(idx)}
+                  />
+                }
+              >
+                <TextInput
+                  aria-label={`Legal link ${idx + 1} label`}
                   value={link.label}
                   onChange={(e) => updateLegalLink(idx, { label: e.target.value })}
                   placeholder="Privacy Policy"
                   maxLength={40}
                 />
-                <FormInput
+                <TextInput
+                  aria-label={`Legal link ${idx + 1} destination`}
                   value={link.href}
                   onChange={(e) => updateLegalLink(idx, { href: e.target.value })}
                   placeholder="/privacy"
                   maxLength={200}
                 />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeLegalLink(idx)}
-                  aria-label="Remove legal link"
-                >
-                  ✕
-                </Button>
-              </div>
-            </div>
-          ))
+              </LinkRow>
+            ))}
+          </LinkList>
         )}
-      </div>
+      </FormSection>
 
-      {error ? <InlineAlert variant="error">{error}</InlineAlert> : null}
-
-      <div className="flex justify-end gap-3 pt-2">
-        <Button
-          type="submit"
-          variant="primary"
-          loading={submitting}
-          loadingText="Saving…"
-          disabled={submitting}
-        >
-          Save footer
-        </Button>
-      </div>
+      <BlockSaveFooter error={error} dirty={dirty} submitting={submitting} label="Save footer" />
     </form>
   );
 }

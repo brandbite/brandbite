@@ -1,22 +1,56 @@
 // -----------------------------------------------------------------------------
 // @file: app/admin/companies/page.tsx
-// @purpose: Admin-facing companies overview (tokens, plan & basic counts)
-// @version: v1.0.0
+// @purpose: Admin-facing companies overview (tokens, plan & basic counts).
+//           List on the left, detail panel of the selected company on the
+//           right. Token adjustments (L2 typed phrase + L4 MFA) and the
+//           company-wide auto-assign default are driven from the panel.
+// @version: v2.0.0
 // @status: active
-// @lastUpdate: 2025-11-15
+// @lastUpdate: 2026-11-01
 // -----------------------------------------------------------------------------
 
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { DataTable, THead, TH, TD } from "@/components/ui/data-table";
-import { EmptyState } from "@/components/ui/empty-state";
-import { FormInput, FormSelect, FormTextarea } from "@/components/ui/form-field";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import { LoadingState } from "@/components/ui/loading-state";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Modal, ModalFooter, ModalHeader } from "@/components/ui/modal";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 import { MfaChallengeModal, type MfaChallengeInfo } from "@/components/admin/mfa-challenge-modal";
+import {
+  Badge,
+  Button,
+  Callout,
+  Card,
+  DASH,
+  DetailPanel,
+  EmptyState,
+  Field,
+  FilterBar,
+  IconTile,
+  KpiCard,
+  PageHeader,
+  PanelSection,
+  SearchInput,
+  Select,
+  Skeleton,
+  SplitView,
+  StatusDot,
+  Table,
+  TableFooter,
+  Td,
+  TextArea,
+  TextInput,
+  TextLink,
+  Th,
+  Tr,
+  fmt,
+  plural,
+} from "@/components/admin/v2/ui";
+import {
+  IconAlertCircle,
+  IconBuilding,
+  IconCoins,
+  IconDocument,
+} from "@/components/admin/v2/icons";
 
 type CompanyPlan = {
   id: string;
@@ -56,12 +90,68 @@ type AdminCompaniesResponse = {
   companies: AdminCompany[];
 };
 
+/** Same threshold the dashboard's "Low-balance companies" signal uses. */
+const LOW_BALANCE = 5;
+
+type BalanceFilter = "ALL" | "LOW" | "OK";
+
+const isLow = (c: AdminCompany) => c.tokenBalance < LOW_BALANCE;
+
+function IconChevronRight() {
+  return (
+    <svg
+      width={18}
+      height={18}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="m9 6 6 6-6 6" />
+    </svg>
+  );
+}
+
+function IconFolder() {
+  return (
+    <svg
+      width={20}
+      height={20}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
+    </svg>
+  );
+}
+
+function LowBalanceNote() {
+  return (
+    <span className="mt-0.5 flex items-center gap-1 text-xs font-medium whitespace-nowrap text-[var(--av2-error-text)]">
+      <IconAlertCircle width={14} height={14} className="shrink-0" />
+      Low balance
+    </span>
+  );
+}
+
 export default function AdminCompaniesPage() {
   const [data, setData] = useState<AdminCompaniesResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [planFilter, setPlanFilter] = useState<"ALL" | "WITH_PLAN" | "WITHOUT_PLAN">("ALL");
+  // "ALL" | "WITH_PLAN" | "WITHOUT_PLAN" | "plan:<id>" (derived client-side)
+  const [planFilter, setPlanFilter] = useState<string>("ALL");
+  const [balanceFilter, setBalanceFilter] = useState<BalanceFilter>("ALL");
+  const [query, setQuery] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // Token-adjustment modal state
   const [adjustTarget, setAdjustTarget] = useState<AdminCompany | null>(null);
@@ -114,9 +204,8 @@ export default function AdminCompaniesPage() {
     load();
   }, [load]);
 
-  // Auto-assign toggle. Per-row busy id so a slow PATCH only disables the
-  // pill it belongs to. Errors land in the page-level banner — rare, and a
-  // per-row error surface isn't worth the layout churn.
+  // Auto-assign toggle. Per-company busy id so a slow PATCH only disables the
+  // control it belongs to. Errors land in the page-level banner.
   const [autoAssignBusyId, setAutoAssignBusyId] = useState<string | null>(null);
   // Confirm dialog when ENABLING for a company that has an unassigned backlog.
   const [autoAssignConfirm, setAutoAssignConfirm] = useState<{
@@ -196,6 +285,26 @@ export default function AdminCompaniesPage() {
     setAdjustError(null);
   };
 
+  // An unsubmitted amount or reason is a draft: dismissing the modal (Cancel,
+  // ×, Escape, backdrop) asks first. A successful submit calls closeAdjust.
+  const adjustDirty =
+    adjustTarget !== null && (adjustAmount.trim() !== "" || adjustNotes.trim() !== "");
+  const confirmDiscard = useUnsavedChanges(
+    adjustDirty,
+    adjustTarget ? `Token adjustment: ${adjustTarget.name}` : "Token adjustment",
+  );
+  // Escape reaches both this modal and the confirm dialog — ignore re-entry.
+  const closingAdjust = useRef(false);
+  const requestCloseAdjust = async () => {
+    if (closingAdjust.current) return;
+    closingAdjust.current = true;
+    try {
+      if (await confirmDiscard()) closeAdjust();
+    } finally {
+      closingAdjust.current = false;
+    }
+  };
+
   const submitAdjust = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!adjustTarget) return;
@@ -261,216 +370,436 @@ export default function AdminCompaniesPage() {
     }
   };
 
-  const companies = data?.companies ?? [];
+  const companies = useMemo(() => data?.companies ?? [], [data]);
   const stats = data?.stats;
 
-  const filteredCompanies = useMemo(
-    () =>
-      companies.filter((c) => {
-        if (planFilter === "WITH_PLAN") {
-          return c.plan != null;
-        }
-        if (planFilter === "WITHOUT_PLAN") {
-          return c.plan == null;
-        }
-        return true;
-      }),
-    [companies, planFilter],
-  );
+  // Distinct plans present in the list, for the plan filter.
+  const planOptions = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of companies) if (c.plan) m.set(c.plan.id, c.plan.name);
+    return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [companies]);
+
+  const filteredCompanies = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return companies.filter((c) => {
+      if (planFilter === "WITH_PLAN" && c.plan == null) return false;
+      if (planFilter === "WITHOUT_PLAN" && c.plan != null) return false;
+      if (planFilter.startsWith("plan:") && c.plan?.id !== planFilter.slice(5)) return false;
+      if (balanceFilter === "LOW" && !isLow(c)) return false;
+      if (balanceFilter === "OK" && isLow(c)) return false;
+      if (q && !c.name.toLowerCase().includes(q) && !c.slug.toLowerCase().includes(q)) {
+        return false;
+      }
+      return true;
+    });
+  }, [companies, planFilter, balanceFilter, query]);
+
+  const filtersActive = planFilter !== "ALL" || balanceFilter !== "ALL" || query.trim() !== "";
+  const resetFilters = () => {
+    setPlanFilter("ALL");
+    setBalanceFilter("ALL");
+    setQuery("");
+  };
+
+  const selected = companies.find((c) => c.id === selectedId) ?? null;
 
   const formatDate = (iso: string) => {
     const d = new Date(iso);
-    return d.toLocaleDateString();
+    return d.toLocaleDateString(undefined, { dateStyle: "medium" });
   };
 
-  const totalProjects = companies.reduce((sum, c) => sum + c.counts.projects, 0);
-  const totalTickets = companies.reduce((sum, c) => sum + c.counts.tickets, 0);
+  const totalProjects = data ? companies.reduce((sum, c) => sum + c.counts.projects, 0) : null;
+  const totalTickets = data ? companies.reduce((sum, c) => sum + c.counts.tickets, 0) : null;
+  const lowCount = data ? companies.filter(isLow).length : null;
 
-  return (
-    <>
-      {/* Page header */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Companies overview</h1>
-          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-            All companies using Brandbite, with token balance and high-level activity metrics.
-          </p>
+  // ---------------------------------------------------------------------------
+  // Detail panel
+  // ---------------------------------------------------------------------------
+
+  const panel = selected ? (
+    <DetailPanel
+      title="Company details"
+      onClose={() => setSelectedId(null)}
+      closeLabel="Close company details"
+    >
+      <div className="flex items-center gap-4">
+        <IconTile tone="lavender" size={56}>
+          <span className="text-2xl font-bold" aria-hidden>
+            {selected.name.trim().charAt(0).toUpperCase() || "?"}
+          </span>
+        </IconTile>
+        <div className="min-w-0">
+          <p className="truncate text-2xl leading-8 font-bold">{selected.name}</p>
+          <p className="truncate text-sm text-[var(--av2-text-2)]">{selected.slug}</p>
         </div>
       </div>
 
-      {/* Error */}
+      <div
+        className={`mt-5 rounded-2xl border p-5 ${
+          isLow(selected)
+            ? "border-[var(--av2-attention-border)] bg-[var(--av2-selected)]"
+            : "border-[var(--av2-border)] bg-[var(--av2-bg)]"
+        }`}
+      >
+        <p className="text-sm font-medium">Available tokens</p>
+        <p className="mt-1 text-[32px] leading-10 font-bold tracking-tight tabular-nums">
+          {fmt(selected.tokenBalance)}
+        </p>
+        {isLow(selected) && (
+          <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-[var(--av2-error-text)]">
+            <IconAlertCircle width={16} height={16} className="shrink-0" />
+            Low balance · below {LOW_BALANCE} tokens
+          </p>
+        )}
+        <Button variant="primary" className="mt-4 w-full" onClick={() => openAdjust(selected)}>
+          Adjust tokens
+        </Button>
+      </div>
+
+      <div className="mt-6">
+        <PanelSection title="Subscription">
+          {selected.plan ? (
+            <>
+              <Badge tone="lavender">{selected.plan.name}</Badge>
+              <p className="mt-2 text-sm text-[var(--av2-text-2)] tabular-nums">
+                {fmt(selected.plan.monthlyTokens)} tokens / month
+                {!selected.plan.isActive && " · plan inactive"}
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-[var(--av2-text-2)]">No plan assigned</p>
+          )}
+          <div className="mt-3">
+            <TextLink href="/admin/plan-assignment">Manage plan</TextLink>
+          </div>
+        </PanelSection>
+
+        <PanelSection title="Workspace activity">
+          <dl className="grid grid-cols-3 divide-x divide-[var(--av2-border)]">
+            {[
+              { label: "Members", value: selected.counts.members },
+              { label: "Projects", value: selected.counts.projects },
+              { label: "Tickets", value: selected.counts.tickets },
+            ].map((m) => (
+              <div key={m.label} className="px-4 first:pl-0">
+                <dt className="text-sm text-[var(--av2-text-2)]">{m.label}</dt>
+                <dd className="mt-1 text-2xl leading-8 font-bold tabular-nums">{fmt(m.value)}</dd>
+              </div>
+            ))}
+          </dl>
+          <div className="mt-3">
+            <TextLink href="/admin/board">Open board</TextLink>
+          </div>
+        </PanelSection>
+
+        <PanelSection title="Assignment">
+          {/* Company default; projects in INHERIT mode follow it.
+              Per-project ON/OFF overrides keep working unchanged. */}
+          <StatusDot
+            tone={selected.autoAssignDefaultEnabled ? "green" : "neutral"}
+            label={
+              selected.autoAssignDefaultEnabled
+                ? "Auto-assignment enabled"
+                : "Manual assignment (auto-assign off)"
+            }
+          />
+          <p className="mt-2 text-sm text-[var(--av2-text-2)]">
+            {selected.autoAssignDefaultEnabled
+              ? "New tickets are auto-assigned to a matching creative."
+              : "New tickets land unassigned for manual triage."}
+          </p>
+          <Button
+            size="sm"
+            className="mt-3"
+            onClick={() => toggleAutoAssign(selected)}
+            disabled={autoAssignBusyId === selected.id}
+          >
+            {autoAssignBusyId === selected.id
+              ? "Updating…"
+              : selected.autoAssignDefaultEnabled
+                ? "Turn off auto-assign"
+                : "Turn on auto-assign"}
+          </Button>
+        </PanelSection>
+
+        <PanelSection>
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+            <span className="text-[var(--av2-text-2)]">
+              Created {formatDate(selected.createdAt)}
+            </span>
+            <TextLink href="/admin/ledger">Token ledger</TextLink>
+          </div>
+        </PanelSection>
+      </div>
+    </DetailPanel>
+  ) : null;
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
+
+  return (
+    <>
+      <PageHeader title="Companies" description="Your clients, plans and balances in one place." />
+
       {error && (
-        <InlineAlert variant="error" title="Error" className="mb-4">
-          {error}
-        </InlineAlert>
+        <div className="mb-6">
+          <Callout tone="error" title="Something went wrong">
+            {error}
+          </Callout>
+        </div>
       )}
 
       {autoAssignNotice && (
-        <InlineAlert variant="success" title="Auto-assign" className="mb-4">
-          {autoAssignNotice}
-        </InlineAlert>
+        <div className="mb-6">
+          <Callout
+            tone="success"
+            title="Auto-assign"
+            action={
+              <Button size="sm" variant="ghost" onClick={() => setAutoAssignNotice(null)}>
+                Dismiss
+              </Button>
+            }
+          >
+            {autoAssignNotice}
+          </Callout>
+        </div>
       )}
 
-      {/* Summary cards */}
-      <section className="mb-6 grid gap-4 md:grid-cols-4">
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-          <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
-            Total companies
-          </p>
-          <p className="mt-2 text-3xl font-semibold text-[var(--bb-secondary)]">
-            {loading ? "—" : stats ? stats.totalCompanies : 0}
-          </p>
-          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-            All companies currently in the database.
-          </p>
+      <SplitView panel={panel}>
+        {/* Summary cards */}
+        <div
+          className={`mb-6 grid gap-4 sm:grid-cols-2 ${selected ? "2xl:grid-cols-4" : "xl:grid-cols-4"}`}
+        >
+          <KpiCard
+            icon={<IconBuilding />}
+            tone="lavender"
+            label="Companies"
+            value={loading && !data ? DASH : fmt(stats?.totalCompanies)}
+            hint={
+              stats
+                ? `${fmt(stats.companiesWithPlan)} with a plan`
+                : "All companies in the database"
+            }
+          />
+          <KpiCard
+            icon={<IconCoins />}
+            tone="green"
+            label="Token balance"
+            value={fmt(stats?.totalTokenBalance)}
+            hint={
+              stats
+                ? `Avg ${fmt(Math.round(stats.avgTokenBalance))} per company`
+                : "Across all companies"
+            }
+          />
+          <KpiCard
+            icon={<IconAlertCircle />}
+            tone="peach"
+            label="Low balance"
+            value={fmt(lowCount)}
+            hint={`Below ${LOW_BALANCE} tokens`}
+          />
+          <KpiCard
+            icon={<IconFolder />}
+            tone="lavender"
+            label="Projects / tickets"
+            value={totalProjects === null ? DASH : `${fmt(totalProjects)} / ${fmt(totalTickets)}`}
+            hint="Across all companies"
+          />
         </div>
 
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-          <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
-            Total token balance
-          </p>
-          <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
-            {loading ? "—" : stats ? stats.totalTokenBalance : 0}
-          </p>
-          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-            Sum of token balances across all companies.
-          </p>
-        </div>
+        {lowCount !== null && lowCount > 0 && (
+          <div className="mb-6 flex flex-wrap items-center gap-4 rounded-2xl border border-[var(--av2-attention-border)] bg-gradient-to-r from-[var(--av2-attention-from)] to-[var(--av2-attention-to)] px-6 py-4">
+            <IconTile tone="red" size={40} round>
+              <IconAlertCircle />
+            </IconTile>
+            <p className="min-w-0 flex-1 text-base font-semibold">
+              {lowCount} {plural(lowCount, "company has", "companies have")} fewer than{" "}
+              {LOW_BALANCE} tokens.
+            </p>
+            {balanceFilter !== "LOW" ? (
+              <Button onClick={() => setBalanceFilter("LOW")}>Show low balance only</Button>
+            ) : (
+              <Button variant="ghost" onClick={() => setBalanceFilter("ALL")}>
+                Show all balances
+              </Button>
+            )}
+          </div>
+        )}
 
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-          <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
-            Average balance
-          </p>
-          <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
-            {loading ? "—" : stats ? Math.round(stats.avgTokenBalance) : 0}
-          </p>
-          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">Average tokens per company.</p>
-        </div>
-
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-          <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
-            Projects & tickets
-          </p>
-          <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
-            {loading ? "—" : totalProjects}
-            <span className="ml-1 text-xs font-normal text-[var(--bb-text-secondary)]">
-              projects
-            </span>
-          </p>
-          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-            {loading ? "" : `${totalTickets} tickets across all companies.`}
-          </p>
-        </div>
-      </section>
-
-      {/* Filter + table */}
-      <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
-        <div className="mb-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold tracking-tight">Company list</h2>
-            <FormSelect
-              size="sm"
-              className="w-auto"
-              value={planFilter}
-              onChange={(e) =>
-                setPlanFilter(e.target.value as "ALL" | "WITH_PLAN" | "WITHOUT_PLAN")
+        <Card padding="none">
+          <div className="px-6 pt-5">
+            <FilterBar
+              trailing={
+                data
+                  ? `${fmt(filteredCompanies.length)} ${plural(filteredCompanies.length, "company", "companies")}`
+                  : null
               }
             >
-              <option value="ALL">All</option>
-              <option value="WITH_PLAN">With plan</option>
-              <option value="WITHOUT_PLAN">Without plan</option>
-            </FormSelect>
-          </div>
-          <p className="text-xs text-[var(--bb-text-tertiary)]">
-            Showing {filteredCompanies.length} of {companies.length}
-          </p>
-        </div>
-
-        {loading ? (
-          <LoadingState message="Loading companies…" />
-        ) : filteredCompanies.length === 0 ? (
-          <EmptyState title="No companies match your filter." />
-        ) : (
-          <DataTable maxHeight="420px">
-            <THead>
-              <TH>Company</TH>
-              <TH>Plan</TH>
-              <TH align="right">Tokens</TH>
-              <TH align="right">Members</TH>
-              <TH align="right">Projects</TH>
-              <TH align="right">Tickets</TH>
-              <TH>Auto-assign</TH>
-              <TH align="right">Created</TH>
-              <TH align="right">Actions</TH>
-            </THead>
-            <tbody>
-              {filteredCompanies.map((c) => (
-                <tr
-                  key={c.id}
-                  className="border-b border-[var(--bb-border-subtle)] last:border-b-0"
+              <SearchInput
+                className="min-w-[200px] flex-1"
+                value={query}
+                onChange={setQuery}
+                placeholder="Search companies"
+                label="Search companies by name or slug"
+              />
+              <div className="w-full sm:w-40">
+                <Select
+                  aria-label="Filter by plan"
+                  value={planFilter}
+                  onChange={(e) => setPlanFilter(e.target.value)}
                 >
-                  <TD>
-                    <div className="font-semibold">{c.name}</div>
-                    <div className="text-[10px] text-[var(--bb-text-tertiary)]">{c.slug}</div>
-                  </TD>
-                  <TD>
-                    {c.plan ? (
-                      <>
-                        <div className="font-medium">{c.plan.name}</div>
-                        <div className="text-[10px] text-[var(--bb-text-tertiary)]">
-                          {c.plan.monthlyTokens} tokens / month
-                        </div>
-                      </>
-                    ) : (
-                      <span className="text-[11px] text-[var(--bb-text-tertiary)]">No plan</span>
-                    )}
-                  </TD>
-                  <TD align="right">{c.tokenBalance}</TD>
-                  <TD align="right">{c.counts.members}</TD>
-                  <TD align="right">{c.counts.projects}</TD>
-                  <TD align="right">{c.counts.tickets}</TD>
-                  <TD>
-                    {/* Company default; projects in INHERIT mode follow it.
-                        Per-project ON/OFF overrides keep working unchanged. */}
-                    <button
-                      type="button"
-                      onClick={() => toggleAutoAssign(c)}
-                      disabled={autoAssignBusyId === c.id}
-                      title={
-                        c.autoAssignDefaultEnabled
-                          ? "New tickets are auto-assigned to a matching creative. Click to turn off."
-                          : "New tickets land unassigned for manual triage. Click to turn on."
-                      }
-                      className={`rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors disabled:opacity-50 ${
-                        c.autoAssignDefaultEnabled
-                          ? "border-emerald-300 bg-emerald-50 text-emerald-800 hover:border-emerald-500"
-                          : "border-[var(--bb-border)] bg-white text-[var(--bb-text-secondary)] hover:border-[var(--bb-primary)]"
-                      }`}
-                    >
-                      {autoAssignBusyId === c.id ? "…" : c.autoAssignDefaultEnabled ? "On" : "Off"}
-                    </button>
-                  </TD>
-                  <TD align="right" className="text-[var(--bb-text-tertiary)]">
-                    {formatDate(c.createdAt)}
-                  </TD>
-                  <TD align="right">
-                    <button
-                      type="button"
-                      onClick={() => openAdjust(c)}
-                      className="rounded-full border border-[var(--bb-border)] bg-white px-2 py-0.5 text-[11px] font-medium text-[var(--bb-primary)] hover:border-[var(--bb-primary)]"
-                    >
-                      Adjust tokens
-                    </button>
-                  </TD>
-                </tr>
+                  <option value="ALL">All plans</option>
+                  <option value="WITH_PLAN">With plan</option>
+                  <option value="WITHOUT_PLAN">Without plan</option>
+                  {planOptions.map(([id, name]) => (
+                    <option key={id} value={`plan:${id}`}>
+                      {name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="w-full sm:w-40">
+                <Select
+                  aria-label="Filter by token balance"
+                  value={balanceFilter}
+                  onChange={(e) => setBalanceFilter(e.target.value as BalanceFilter)}
+                >
+                  <option value="ALL">All balances</option>
+                  <option value="LOW">Low balance (&lt; {LOW_BALANCE})</option>
+                  <option value="OK">{LOW_BALANCE}+ tokens</option>
+                </Select>
+              </div>
+            </FilterBar>
+          </div>
+
+          {loading && !data ? (
+            <div className="space-y-3 border-t border-[var(--av2-border)] px-6 py-5" role="status">
+              <span className="sr-only">Loading companies…</span>
+              {[0, 1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-12 w-full" />
               ))}
-            </tbody>
-          </DataTable>
+            </div>
+          ) : companies.length === 0 ? (
+            <div className="border-t border-[var(--av2-border)]">
+              <EmptyState
+                icon={<IconBuilding width={28} height={28} />}
+                title="No companies yet"
+                description="Companies appear here once a customer signs up and creates a workspace."
+              />
+            </div>
+          ) : filteredCompanies.length === 0 ? (
+            <div className="border-t border-[var(--av2-border)]">
+              <EmptyState
+                title="No companies match these filters"
+                description="Try a different search, plan or balance filter."
+                action={<Button onClick={resetFilters}>Clear filters</Button>}
+              />
+            </div>
+          ) : (
+            <Table label="Companies">
+              <thead>
+                <tr>
+                  <Th>Company</Th>
+                  <Th>Plan</Th>
+                  <Th align="right">Tokens</Th>
+                  <Th>Activity</Th>
+                  <Th>Assignment</Th>
+                  <Th align="right">
+                    <span className="sr-only">Open</span>
+                  </Th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCompanies.map((c) => (
+                  <Tr
+                    key={c.id}
+                    selected={c.id === selectedId}
+                    onSelect={() => setSelectedId(c.id)}
+                    label={`${c.name}, ${fmt(c.tokenBalance)} tokens`}
+                  >
+                    <Td>
+                      <div className="font-semibold">{c.name}</div>
+                      <div className="text-xs text-[var(--av2-text-2)]">{c.slug}</div>
+                    </Td>
+                    <Td>
+                      {c.plan ? (
+                        <>
+                          <Badge tone="lavender">{c.plan.name}</Badge>
+                          <div className="mt-1 text-xs whitespace-nowrap text-[var(--av2-text-2)] tabular-nums">
+                            {fmt(c.plan.monthlyTokens)} tokens / month
+                          </div>
+                        </>
+                      ) : (
+                        <span className="text-[var(--av2-text-2)]">No plan</span>
+                      )}
+                    </Td>
+                    <Td align="right">
+                      <div className="text-base font-semibold">{fmt(c.tokenBalance)}</div>
+                      {isLow(c) && (
+                        <div className="flex justify-end">
+                          <LowBalanceNote />
+                        </div>
+                      )}
+                    </Td>
+                    <Td className="whitespace-nowrap text-[var(--av2-text-2)] tabular-nums">
+                      <div>
+                        {fmt(c.counts.tickets)} {plural(c.counts.tickets, "ticket", "tickets")}
+                      </div>
+                      <div className="text-xs">
+                        {fmt(c.counts.members)} {plural(c.counts.members, "member", "members")}
+                      </div>
+                    </Td>
+                    <Td>
+                      {c.autoAssignDefaultEnabled ? (
+                        <Badge tone="green">Auto</Badge>
+                      ) : (
+                        <Badge>Manual</Badge>
+                      )}
+                    </Td>
+                    <Td align="right" className="text-[var(--av2-text-2)]">
+                      <span className="inline-flex">
+                        <IconChevronRight />
+                      </span>
+                    </Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
+
+          {data && companies.length > 0 && (
+            <TableFooter>
+              <span className="tabular-nums">
+                Showing {fmt(filteredCompanies.length)} of {fmt(companies.length)}{" "}
+                {plural(companies.length, "company", "companies")}
+              </span>
+              {filtersActive && (
+                <Button size="sm" variant="ghost" onClick={resetFilters}>
+                  Clear filters
+                </Button>
+              )}
+            </TableFooter>
+          )}
+        </Card>
+
+        {!selected && data && companies.length > 0 && (
+          <p className="mt-6 flex items-center gap-2 text-sm text-[var(--av2-text-2)]">
+            <IconDocument width={18} height={18} className="shrink-0" />
+            Select a company to view details and manage its balance.
+          </p>
         )}
-      </section>
+      </SplitView>
 
       {/* Token-adjustment modal */}
-      <Modal open={adjustTarget !== null} onClose={closeAdjust} size="md">
+      <Modal
+        open={adjustTarget !== null}
+        onClose={requestCloseAdjust}
+        size="md"
+        className="border border-[var(--av2-border)] bg-[var(--av2-surface)]! p-6! shadow-none!"
+      >
         <ModalHeader
           eyebrow="Admin adjustment"
           title={adjustTarget ? `Adjust tokens — ${adjustTarget.name}` : "Adjust tokens"}
@@ -479,33 +808,36 @@ export default function AdminCompaniesPage() {
               ? `Current balance: ${adjustTarget.tokenBalance} tokens. This writes a ledger entry with reason ADMIN_ADJUSTMENT.`
               : undefined
           }
-          onClose={closeAdjust}
+          onClose={requestCloseAdjust}
+          className="border-[var(--av2-border)]!"
         />
 
         <form onSubmit={submitAdjust} className="space-y-4">
           <div>
-            <label className="mb-1 block text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-tertiary)] uppercase">
+            <p id="adjust-action-label" className="mb-1.5 block text-sm font-medium">
               Action
-            </label>
-            <div className="flex gap-2">
+            </p>
+            <div role="group" aria-labelledby="adjust-action-label" className="flex gap-2">
               <button
                 type="button"
+                aria-pressed={adjustDirection === "CREDIT"}
                 onClick={() => setAdjustDirection("CREDIT")}
-                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                className={`h-10 flex-1 rounded-lg border px-3 text-sm font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none ${
                   adjustDirection === "CREDIT"
-                    ? "border-emerald-500 bg-emerald-50 text-emerald-900"
-                    : "border-[var(--bb-border)] text-[var(--bb-text-secondary)] hover:border-emerald-300"
+                    ? "border-[var(--av2-fill-green)] bg-[var(--av2-success-bg)] text-[var(--av2-text)]"
+                    : "border-[var(--av2-border)] text-[var(--av2-text-2)] hover:bg-[var(--av2-bg)]"
                 }`}
               >
                 + Grant tokens
               </button>
               <button
                 type="button"
+                aria-pressed={adjustDirection === "DEBIT"}
                 onClick={() => setAdjustDirection("DEBIT")}
-                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                className={`h-10 flex-1 rounded-lg border px-3 text-sm font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none ${
                   adjustDirection === "DEBIT"
-                    ? "border-rose-500 bg-rose-50 text-rose-900"
-                    : "border-[var(--bb-border)] text-[var(--bb-text-secondary)] hover:border-rose-300"
+                    ? "border-[var(--av2-error)] bg-[var(--av2-selected)] text-[var(--av2-error-text)]"
+                    : "border-[var(--av2-border)] text-[var(--av2-text-2)] hover:bg-[var(--av2-bg)]"
                 }`}
               >
                 − Revoke tokens
@@ -513,49 +845,60 @@ export default function AdminCompaniesPage() {
             </div>
           </div>
 
-          <div>
-            <label className="mb-1 block text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-tertiary)] uppercase">
-              Amount
-            </label>
-            <FormInput
+          <Field
+            label="Amount"
+            htmlFor="adjust-amount"
+            hint={
+              adjustDirection === "DEBIT" && adjustTarget
+                ? `Max revoke: ${adjustTarget.tokenBalance} (can't go below zero).`
+                : undefined
+            }
+          >
+            <TextInput
+              id="adjust-amount"
               type="number"
               min={1}
               step={1}
               value={adjustAmount}
               onChange={(e) => setAdjustAmount(e.target.value)}
               placeholder="e.g. 500"
+              suffix="tokens"
               autoFocus
             />
-            {adjustDirection === "DEBIT" && adjustTarget && (
-              <p className="mt-1 text-[11px] text-[var(--bb-text-muted)]">
-                Max revoke: {adjustTarget.tokenBalance} (can&apos;t go below zero).
-              </p>
-            )}
-          </div>
+          </Field>
 
-          <div>
-            <label className="mb-1 block text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-tertiary)] uppercase">
-              Reason / notes (required)
-            </label>
-            <FormTextarea
+          <Field
+            label="Reason / notes (required)"
+            htmlFor="adjust-notes"
+            hint="Shown on the token ledger for audit."
+          >
+            <TextArea
+              id="adjust-notes"
               rows={3}
               value={adjustNotes}
               onChange={(e) => setAdjustNotes(e.target.value)}
               placeholder="e.g. Compensation for platform outage 2026-04-18"
               maxLength={500}
             />
-            <p className="mt-1 text-[11px] text-[var(--bb-text-muted)]">
-              Shown on the token ledger for audit.
-            </p>
-          </div>
+          </Field>
 
           {/* Typed-phrase confirmation (Security Plan — L2). CREDIT needs
               "GRANT", DEBIT needs "DEBIT". Server enforces the match. */}
-          <div>
-            <label className="mb-1 block text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-tertiary)] uppercase">
-              Confirm
-            </label>
-            <FormInput
+          <Field
+            label="Confirm"
+            htmlFor="adjust-confirm"
+            hint={
+              <>
+                Type{" "}
+                <strong className="font-mono text-[var(--av2-text)]">
+                  {adjustDirection === "CREDIT" ? "GRANT" : "DEBIT"}
+                </strong>{" "}
+                to confirm this {adjustDirection === "CREDIT" ? "grant" : "debit"}.
+              </>
+            }
+          >
+            <TextInput
+              id="adjust-confirm"
               type="text"
               value={adjustConfirmation}
               onChange={(e) => setAdjustConfirmation(e.target.value)}
@@ -563,31 +906,43 @@ export default function AdminCompaniesPage() {
               autoComplete="off"
               spellCheck={false}
             />
-            <p className="mt-1 text-[11px] text-[var(--bb-text-muted)]">
-              Type{" "}
-              <strong className="font-mono text-[var(--bb-secondary)]">
-                {adjustDirection === "CREDIT" ? "GRANT" : "DEBIT"}
-              </strong>{" "}
-              to confirm this {adjustDirection === "CREDIT" ? "grant" : "debit"}.
-            </p>
-          </div>
+          </Field>
 
-          {adjustError && <InlineAlert variant="error">{adjustError}</InlineAlert>}
+          {adjustError && <Callout tone="error">{adjustError}</Callout>}
 
           <ModalFooter>
-            <Button variant="ghost" type="button" onClick={closeAdjust} disabled={adjustSaving}>
+            <Button
+              variant="ghost"
+              type="button"
+              onClick={requestCloseAdjust}
+              disabled={adjustSaving}
+            >
               Cancel
             </Button>
-            <Button type="submit" loading={adjustSaving} loadingText="Saving...">
-              {adjustDirection === "CREDIT" ? "Grant" : "Revoke"} {adjustAmount ? adjustAmount : ""}{" "}
-              tokens
+            <Button
+              type="submit"
+              variant={adjustDirection === "CREDIT" ? "primary" : "danger"}
+              disabled={adjustSaving}
+              aria-busy={adjustSaving}
+            >
+              {adjustSaving
+                ? "Saving…"
+                : `${adjustDirection === "CREDIT" ? "Grant" : "Revoke"} ${adjustAmount ? adjustAmount : ""} tokens`.replace(
+                    /\s+/g,
+                    " ",
+                  )}
             </Button>
           </ModalFooter>
         </form>
       </Modal>
 
       {/* Confirm sweeping the existing backlog when enabling auto-assign. */}
-      <Modal open={autoAssignConfirm !== null} onClose={() => setAutoAssignConfirm(null)} size="md">
+      <Modal
+        open={autoAssignConfirm !== null}
+        onClose={() => setAutoAssignConfirm(null)}
+        size="md"
+        className="border border-[var(--av2-border)] bg-[var(--av2-surface)]! p-6! shadow-none!"
+      >
         <ModalHeader
           eyebrow="Auto-assign"
           title={
@@ -596,17 +951,18 @@ export default function AdminCompaniesPage() {
               : "Enable auto-assign"
           }
           onClose={() => setAutoAssignConfirm(null)}
+          className="border-[var(--av2-border)]!"
         />
         <div className="space-y-3">
-          <p className="text-sm text-[var(--bb-text-secondary)]">
+          <p className="text-sm text-[var(--av2-text-2)]">
             New tickets will be auto-assigned to a matching creative. This company also has{" "}
-            <strong className="text-[var(--bb-secondary)]">
+            <strong className="text-[var(--av2-text)] tabular-nums">
               {autoAssignConfirm?.unassignedCount}
             </strong>{" "}
             unassigned to-do ticket{autoAssignConfirm?.unassignedCount === 1 ? "" : "s"} already in
             the backlog. Assign those now too?
           </p>
-          <p className="text-xs text-[var(--bb-text-tertiary)]">
+          <p className="text-xs text-[var(--av2-text-2)]">
             Tickets in projects with auto-assign turned off, or with no eligible creative, are left
             unassigned.
           </p>
@@ -623,13 +979,16 @@ export default function AdminCompaniesPage() {
             </Button>
             <Button
               type="button"
-              loading={autoAssignBusyId !== null}
-              loadingText="Assigning..."
+              variant="primary"
+              disabled={autoAssignBusyId !== null}
+              aria-busy={autoAssignBusyId !== null}
               onClick={() =>
                 autoAssignConfirm && patchAutoAssign(autoAssignConfirm.company, true, true)
               }
             >
-              Enable &amp; assign {autoAssignConfirm?.unassignedCount ?? ""}
+              {autoAssignBusyId !== null
+                ? "Assigning…"
+                : `Enable & assign ${autoAssignConfirm?.unassignedCount ?? ""}`}
             </Button>
           </ModalFooter>
         </div>

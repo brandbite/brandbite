@@ -1,29 +1,64 @@
 // -----------------------------------------------------------------------------
 // @file: app/admin/talent-applications/page.tsx
-// @purpose: Admin queue for the talent application form. List on the left,
-//           inline detail panel on the right. Two actions per submission:
-//           Accept (asks for an interview slot, creates the Google Cal event
-//           with Meet, sends the candidate the branded follow-up email) or
-//           Decline (optional reason, sends the polite rejection).
+// @purpose: Admin queue for the talent application form. Stage chips + list
+//           on the left, detail panel of the selected candidate on the
+//           right. The panel footer holds only the actions valid for the
+//           candidate's current status:
+//             - Accept (offer 3 interview slots → candidate books one; the
+//               Google Calendar event with Meet is created on booking and the
+//               candidate gets the branded follow-up email)
+//             - Confirm a candidate-proposed time, mark held / no-show,
+//               hire, onboard
+//             - Decline (optional reason, sends the polite rejection)
 //
-//           Visible to SITE_ADMIN (the OwnerOnlyBanner explains the action
+//           Visible to SITE_ADMIN (the owner-only note explains the action
 //           is restricted) but actions are SITE_OWNER-only — the API layer
 //           enforces the gate via canManageTalentApplications.
+// @version: v2.0.0
+// @lastUpdate: 2026-11-01
 // -----------------------------------------------------------------------------
 
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 
-import { OwnerOnlyBanner } from "@/components/admin/owner-only-banner";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { DataTable, TD, TH, THead } from "@/components/ui/data-table";
-import { EmptyState } from "@/components/ui/empty-state";
-import { FormInput, FormTextarea } from "@/components/ui/form-field";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import { LoadingState } from "@/components/ui/loading-state";
+import {
+  Avatar,
+  Badge,
+  Button,
+  Callout,
+  Card,
+  DASH,
+  DetailPanel,
+  EmptyState,
+  Field,
+  FilterBar,
+  FilterChips,
+  KeyValueList,
+  PageHeader,
+  PanelSection,
+  SearchInput,
+  Select,
+  Skeleton,
+  SplitView,
+  Table,
+  TableFooter,
+  TabPanel,
+  Tabs,
+  Td,
+  TextArea,
+  TextInput,
+  TextLink,
+  Th,
+  Tr,
+  fmt,
+  plural,
+  type Tone,
+} from "@/components/admin/v2/ui";
 import { useToast } from "@/components/ui/toast-provider";
+import { useSessionRole } from "@/lib/hooks/use-session-role";
+import { IconPeople } from "@/components/navigation/nav-icons";
 
 // Mirror the API response shape. We avoid importing the route module
 // because Next.js client components can't import server-only modules
@@ -94,38 +129,78 @@ type Application = {
   updatedAt: string;
 };
 
-type Filter = TalentApplicationStatus | "ALL";
+/** Funnel order — the status select walks a candidate's journey. */
+const ALL_STATUSES: TalentApplicationStatus[] = [
+  "SUBMITTED",
+  "IN_REVIEW",
+  "AWAITING_CANDIDATE_CHOICE",
+  "CANDIDATE_PROPOSED_TIME",
+  "ACCEPTED",
+  "MISSED",
+  "INTERVIEW_HELD",
+  "HIRED",
+  "ONBOARDED",
+  "DECLINED",
+  "REJECTED_AFTER_INTERVIEW",
+];
 
-const STATUS_LABELS: Record<TalentApplicationStatus, string> = {
+// Tone encodes whose turn it is: peach/amber/red = the admin should act,
+// blue = waiting on the candidate, green = positive outcome, neutral = closed.
+const STATUS_META: Record<TalentApplicationStatus, { label: string; tone: Tone }> = {
+  SUBMITTED: { label: "New", tone: "peach" },
+  IN_REVIEW: { label: "In review", tone: "lavender" },
+  AWAITING_CANDIDATE_CHOICE: { label: "Awaiting candidate", tone: "blue" },
+  CANDIDATE_PROPOSED_TIME: { label: "Candidate proposed", tone: "amber" },
+  ACCEPTED: { label: "Interview booked", tone: "blue" },
+  MISSED: { label: "Missed (no-show)", tone: "red" },
+  INTERVIEW_HELD: { label: "Interview held", tone: "amber" },
+  HIRED: { label: "Hired", tone: "green" },
+  ONBOARDED: { label: "Onboarded", tone: "green" },
+  DECLINED: { label: "Declined", tone: "neutral" },
+  REJECTED_AFTER_INTERVIEW: { label: "Declined post-interview", tone: "neutral" },
+};
+
+// Status labels used in the status filter — identical to the chip names the
+// page used before the restyle, so operators find the same buckets.
+const STATUS_FILTER_LABEL: Record<TalentApplicationStatus, string> = {
   SUBMITTED: "New",
   IN_REVIEW: "In review",
   AWAITING_CANDIDATE_CHOICE: "Awaiting candidate",
   CANDIDATE_PROPOSED_TIME: "Candidate proposed",
-  ACCEPTED: "Accepted",
-  MISSED: "Missed (no-show)",
+  ACCEPTED: "Accepted (interview booked)",
+  MISSED: "Missed",
   INTERVIEW_HELD: "Interview held",
   HIRED: "Hired",
   ONBOARDED: "Onboarded",
   DECLINED: "Declined",
-  REJECTED_AFTER_INTERVIEW: "Declined (post-interview)",
+  REJECTED_AFTER_INTERVIEW: "Declined post-interview",
 };
 
-const STATUS_BADGE_VARIANT: Record<
-  TalentApplicationStatus,
-  "info" | "primary" | "success" | "neutral" | "warning"
-> = {
-  SUBMITTED: "info",
-  IN_REVIEW: "primary",
-  AWAITING_CANDIDATE_CHOICE: "primary",
-  CANDIDATE_PROPOSED_TIME: "warning",
-  ACCEPTED: "success",
-  MISSED: "warning",
-  INTERVIEW_HELD: "warning",
-  HIRED: "success",
-  ONBOARDED: "success",
-  DECLINED: "neutral",
-  REJECTED_AFTER_INTERVIEW: "neutral",
-};
+// Main stages — group the 11 statuses into five readable buckets. Each
+// individual status stays reachable through the status select.
+type StageKey = "NEW" | "REVIEW" | "INTERVIEW" | "HIRING" | "CLOSED";
+type StageFilter = StageKey | "ALL";
+
+const STAGES: { key: StageKey; label: string; statuses: TalentApplicationStatus[] }[] = [
+  { key: "NEW", label: "New", statuses: ["SUBMITTED"] },
+  { key: "REVIEW", label: "In review", statuses: ["IN_REVIEW"] },
+  {
+    key: "INTERVIEW",
+    label: "Interviews",
+    statuses: [
+      "AWAITING_CANDIDATE_CHOICE",
+      "CANDIDATE_PROPOSED_TIME",
+      "ACCEPTED",
+      "MISSED",
+      "INTERVIEW_HELD",
+    ],
+  },
+  { key: "HIRING", label: "Hired", statuses: ["HIRED", "ONBOARDED"] },
+  { key: "CLOSED", label: "Closed", statuses: ["DECLINED", "REJECTED_AFTER_INTERVIEW"] },
+];
+
+const stageOf = (s: TalentApplicationStatus): StageKey =>
+  STAGES.find((st) => st.statuses.includes(s))?.key ?? "NEW";
 
 /** Format a stored array-shape `unknown` (Prisma JsonValue) into human
  *  text. Defensive — we never crash a row render because a JSON column
@@ -152,8 +227,28 @@ function defaultTasksCapForBucket(bucket: string | null): number {
   }
 }
 
+/** HIRE form pre-fill for a row: what the admin sees before typing anything.
+ *  Shared by the reset effect and the dirty check so they can't drift. */
+function hirePrefill(sel: Application | null | undefined) {
+  if (sel?.status !== "INTERVIEW_HELD") {
+    return { workingHours: sel?.workingHours ?? "", categoryIds: [] as string[], cap: "" };
+  }
+  return {
+    workingHours: sel.workingHours ?? "",
+    categoryIds: Array.isArray(sel.categoryIds)
+      ? (sel.categoryIds as unknown[]).filter((v): v is string => typeof v === "string")
+      : [],
+    // Prefer a previously-saved cap over the bucket default so an admin's
+    // override survives a reload / re-open.
+    cap: String(sel.approvedTasksPerWeekCap ?? defaultTasksCapForBucket(sel.preferredTasksPerWeek)),
+  };
+}
+
+const sameIds = (a: string[], b: string[]) =>
+  a.length === b.length && [...a].sort().join("\n") === [...b].sort().join("\n");
+
 function formatDateTime(iso: string | null, timezone?: string): string {
-  if (!iso) return "—";
+  if (!iso) return DASH;
   try {
     return new Intl.DateTimeFormat("en-GB", {
       day: "numeric",
@@ -169,22 +264,333 @@ function formatDateTime(iso: string | null, timezone?: string): string {
   }
 }
 
+function formatDate(iso: string): string {
+  try {
+    return new Intl.DateTimeFormat("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }).format(new Date(iso));
+  } catch {
+    return iso;
+  }
+}
+
+function formatTime(iso: string): string {
+  try {
+    return new Intl.DateTimeFormat("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(new Date(iso));
+  } catch {
+    return "";
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Local primitives
+// ---------------------------------------------------------------------------
+
+function IconChevronRight() {
+  return (
+    <svg
+      width={18}
+      height={18}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="m9 6 6 6-6 6" />
+    </svg>
+  );
+}
+
+function IconRefresh() {
+  return (
+    <svg
+      width={18}
+      height={18}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M20 11a8 8 0 0 0-14.9-3.9M4 4v4h4M4 13a8 8 0 0 0 14.9 3.9M20 20v-4h-4" />
+    </svg>
+  );
+}
+
+function IconVideo() {
+  return (
+    <svg
+      width={22}
+      height={22}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="3" y="6" width="13" height="12" rx="2" />
+      <path d="m16 10 5-3v10l-5-3" />
+    </svg>
+  );
+}
+
+/** Same rule as the shared OwnerOnlyBanner, drawn with the v2 Callout. */
+function OwnerOnlyNote({ action }: { action: string }) {
+  const { isSiteOwner, loading } = useSessionRole();
+  if (loading || isSiteOwner) return null;
+  return (
+    <div className="mb-6" role="note">
+      <Callout tone="warning" title="Site owner only">
+        Site admins can view this page, but only the site owner can {action}. Requests from admins
+        will be rejected with a 403.
+      </Callout>
+    </div>
+  );
+}
+
+/** External link that shows the URL without its protocol. */
+function ExternalLink({ href }: { href: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="font-medium break-all text-[var(--av2-link)] hover:underline focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
+    >
+      {href.replace(/^https?:\/\/(www\.)?/, "")}
+    </a>
+  );
+}
+
+// Lifecycle stepper (ui.tsx has no stepper; same drawing as withdrawals).
+type StepState = "done" | "current" | "upcoming" | "rejected";
+type Step = { key: string; label: string; state: StepState; detail?: ReactNode };
+
+function StepMarker({ state }: { state: StepState }) {
+  if (state === "done") {
+    return (
+      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--av2-text)] text-[var(--av2-surface)]">
+        <svg
+          width={12}
+          height={12}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={3}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
+        >
+          <path d="m5 12.5 4.5 4.5L19 7.5" />
+        </svg>
+      </span>
+    );
+  }
+  if (state === "rejected") {
+    return (
+      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--av2-error)] text-white">
+        <svg
+          width={11}
+          height={11}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={3}
+          strokeLinecap="round"
+          aria-hidden
+        >
+          <path d="M6 6l12 12M18 6 6 18" />
+        </svg>
+      </span>
+    );
+  }
+  if (state === "current") {
+    return (
+      <span className="flex h-5 w-5 items-center justify-center rounded-full border-2 border-[var(--av2-accent)] bg-[var(--av2-surface)]">
+        <span className="h-2 w-2 rounded-full bg-[var(--av2-accent)]" />
+      </span>
+    );
+  }
+  return (
+    <span className="block h-5 w-5 rounded-full border-2 border-[var(--av2-border)] bg-[var(--av2-surface)]" />
+  );
+}
+
+const STEP_SR: Record<StepState, string> = {
+  done: "completed",
+  current: "current step",
+  upcoming: "not started",
+  rejected: "closed",
+};
+
+function Stepper({ steps }: { steps: Step[] }) {
+  return (
+    <ol aria-label="Application progress">
+      {steps.map((s, i) => {
+        const last = i === steps.length - 1;
+        return (
+          <li
+            key={s.key}
+            aria-current={s.state === "current" ? "step" : undefined}
+            className="relative flex gap-3 pb-5 last:pb-0"
+          >
+            {!last && (
+              <span
+                aria-hidden
+                className={`absolute top-6 bottom-1 left-[9px] w-0.5 rounded-full ${
+                  s.state === "done" ? "bg-[var(--av2-text)]" : "bg-[var(--av2-border)]"
+                }`}
+              />
+            )}
+            <span className="relative mt-0.5 shrink-0">
+              <StepMarker state={s.state} />
+            </span>
+            <div className="min-w-0">
+              <p
+                className={`text-sm font-semibold ${
+                  s.state === "upcoming"
+                    ? "text-[var(--av2-text-2)]"
+                    : s.state === "rejected"
+                      ? "text-[var(--av2-error-text)]"
+                      : ""
+                }`}
+              >
+                {s.label}
+                <span className="sr-only"> ({STEP_SR[s.state]})</span>
+              </p>
+              {s.detail && (
+                <div className="mt-0.5 text-sm text-[var(--av2-text-2)]">{s.detail}</div>
+              )}
+            </div>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/** Lifecycle derived from the status + the timestamps stored on the row. */
+function progressSteps(a: Application): Step[] {
+  const order = ["applied", "offered", "booked", "held", "hired", "onboarded"] as const;
+  type K = (typeof order)[number];
+  const labels: Record<K, string> = {
+    applied: "Applied",
+    offered: "Interview slots offered",
+    booked: "Interview booked",
+    held: "Interview held",
+    hired: "Hired",
+    onboarded: "Onboarded",
+  };
+  const details: Partial<Record<K, ReactNode>> = {
+    applied: formatDateTime(a.createdAt),
+    booked: a.interviewAt ? formatDateTime(a.interviewAt) : undefined,
+    hired: a.hiredAt
+      ? `${formatDateTime(a.hiredAt)}${a.hiredByUserEmail ? ` · ${a.hiredByUserEmail}` : ""}`
+      : undefined,
+  };
+
+  const build = (currentIdx: number, override?: { label?: string; detail?: ReactNode }): Step[] =>
+    order.map((k, i) => ({
+      key: k,
+      label: i === currentIdx && override?.label ? override.label : labels[k],
+      state: i < currentIdx ? "done" : i === currentIdx ? "current" : "upcoming",
+      detail: i === currentIdx && override?.detail ? override.detail : details[k],
+    }));
+
+  switch (a.status) {
+    case "SUBMITTED":
+      return build(1, { label: "Review & offer interview slots", detail: "Not reviewed yet" });
+    case "IN_REVIEW":
+      return build(1, { label: "Review & offer interview slots", detail: "In review" });
+    case "AWAITING_CANDIDATE_CHOICE":
+      return build(2, {
+        label: "Waiting for the candidate to book",
+        detail: `Booking link expires ${formatDateTime(a.bookingTokenExpiresAt)}`,
+      });
+    case "CANDIDATE_PROPOSED_TIME":
+      return build(2, {
+        label: "Candidate proposed another time",
+        detail: `${formatDateTime(a.candidateProposedAt, a.timezone)} (${a.timezone})`,
+      });
+    case "ACCEPTED":
+      return build(3, {
+        label: "Interview scheduled",
+        detail: `${formatDateTime(a.interviewAt, a.timezone)} (${a.timezone})`,
+      });
+    case "MISSED":
+      return build(3, {
+        label: "Candidate missed the interview",
+        detail: "Re-offer slots to reschedule, or decline.",
+      });
+    case "INTERVIEW_HELD":
+      return build(4, { label: "Hire decision pending" });
+    case "HIRED":
+      return build(5, { label: "Ready to onboard" });
+    case "ONBOARDED":
+      return order.map((k) => ({ key: k, label: labels[k], state: "done", detail: details[k] }));
+    case "DECLINED":
+      return [
+        { key: "applied", label: labels.applied, state: "done", detail: details.applied },
+        {
+          key: "declined",
+          label: "Declined",
+          state: "rejected",
+          detail: formatDateTime(a.reviewedAt),
+        },
+      ];
+    case "REJECTED_AFTER_INTERVIEW":
+      return [
+        { key: "applied", label: labels.applied, state: "done", detail: details.applied },
+        { key: "booked", label: labels.booked, state: "done", detail: details.booked },
+        {
+          key: "declined",
+          label: "Declined after interview",
+          state: "rejected",
+          detail: formatDateTime(a.reviewedAt),
+        },
+      ];
+  }
+}
+
+type DetailTab = "overview" | "answers" | "progress";
+type ActionMode = null | "offer" | "decline" | "hire" | "rejectPost";
+
 export default function TalentApplicationsPage() {
   const toast = useToast();
 
   const [items, setItems] = useState<Application[]>([]);
-  const [filter, setFilter] = useState<Filter>("SUBMITTED");
+  // Main stage chip + optional single-status refinement. Defaults to the
+  // "New" bucket, same as the old default SUBMITTED filter.
+  const [stage, setStage] = useState<StageFilter>("NEW");
+  const [statusFilter, setStatusFilter] = useState<TalentApplicationStatus | null>(null);
+  const [query, setQuery] = useState("");
   // Per-status counts across the entire table — populated from the API
-  // response on each load so the filter chips can show "(N)" badges
-  // for buckets the user isn't currently viewing.
+  // response on each load so the stage chips and the status select can show
+  // counts for buckets the user isn't currently viewing.
   const [statusCounts, setStatusCounts] = useState<
     Partial<Record<TalentApplicationStatus, number>>
   >({});
+  const [countsLoaded, setCountsLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Detail panel: id of the row currently expanded inline.
+  // Detail panel: id of the row currently selected.
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [tab, setTab] = useState<DetailTab>("overview");
+  const [mode, setMode] = useState<ActionMode>(null);
 
   // Map of JobTypeCategory.id -> human name. Loaded once on mount from the
   // public /api/talent/categories endpoint so the detail panel can render
@@ -231,33 +637,53 @@ export default function TalentApplicationsPage() {
     [items, selectedId],
   );
 
+  // The list endpoint filters by one status (or ALL). A stage with several
+  // statuses is fetched as one request per status and merged, so every row
+  // of the stage is present (each request keeps the endpoint's own paging).
+  const fetchKey = statusFilter
+    ? statusFilter
+    : stage === "ALL"
+      ? "ALL"
+      : STAGES.find((s) => s.key === stage)!.statuses.join(",");
+
   const refresh = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const url = new URL("/api/admin/talent-applications", window.location.origin);
-      url.searchParams.set("status", filter);
-      const res = await fetch(url.toString(), { cache: "no-store" });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(body?.error || `HTTP ${res.status}`);
+      const statuses = fetchKey.split(",");
+      const responses = await Promise.all(
+        statuses.map(async (status) => {
+          const url = new URL("/api/admin/talent-applications", window.location.origin);
+          url.searchParams.set("status", status);
+          const res = await fetch(url.toString(), { cache: "no-store" });
+          if (!res.ok) {
+            const body = (await res.json().catch(() => null)) as { error?: string } | null;
+            throw new Error(body?.error || `HTTP ${res.status}`);
+          }
+          return (await res.json()) as {
+            applications: Application[];
+            total: number;
+            counts?: Partial<Record<TalentApplicationStatus, number>>;
+          };
+        }),
+      );
+      const merged = responses
+        .flatMap((r) => r.applications)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      setItems(merged);
+      // Per-status counts are the source of truth for the chip counts.
+      const counts = responses.find((r) => r.counts)?.counts;
+      if (counts) {
+        setStatusCounts(counts);
+        setCountsLoaded(true);
       }
-      const json = (await res.json()) as {
-        applications: Application[];
-        total: number;
-        counts?: Partial<Record<TalentApplicationStatus, number>>;
-      };
-      setItems(json.applications);
-      // Per-status counts are the new source of truth for the chip
-      // badges; the old top-of-header "(N)" beside the dropdown is gone.
-      if (json.counts) setStatusCounts(json.counts);
     } catch (err) {
       console.error("[admin/talent] load failed", err);
       setLoadError(err instanceof Error ? err.message : "Failed to load");
     } finally {
       setLoading(false);
     }
-  }, [filter]);
+  }, [fetchKey]);
 
   useEffect(() => {
     void refresh();
@@ -275,30 +701,93 @@ export default function TalentApplicationsPage() {
     setHireNotesLocal("");
     setActionStatus("idle");
     setActionError(null);
-
-    const sel = items.find((it) => it.id === selectedId);
+    setMode(null);
 
     // Pre-fill working hours from the saved application value so an admin
     // returning to the row (or after a background list reload) sees what was
-    // already entered instead of a blank field they have to re-type.
-    setWorkingHoursLocal(sel?.workingHours ?? "");
-
-    if (sel?.status === "INTERVIEW_HELD") {
-      // Pre-fill HIRE form from the application data.
-      const applied = Array.isArray(sel.categoryIds)
-        ? (sel.categoryIds as unknown[]).filter((v): v is string => typeof v === "string")
-        : [];
-      setApprovedCategoryIdsLocal(applied);
-      // Prefer a previously-saved cap over the bucket default so an admin's
-      // override survives a reload / re-open.
-      setTasksPerWeekCapLocal(
-        String(sel.approvedTasksPerWeekCap ?? defaultTasksCapForBucket(sel.preferredTasksPerWeek)),
-      );
-    } else {
-      setApprovedCategoryIdsLocal([]);
-      setTasksPerWeekCapLocal("");
-    }
+    // already entered instead of a blank field they have to re-type. At
+    // INTERVIEW_HELD the HIRE form is pre-filled from the application data.
+    const prefill = hirePrefill(items.find((it) => it.id === selectedId));
+    setWorkingHoursLocal(prefill.workingHours);
+    setApprovedCategoryIdsLocal(prefill.categoryIds);
+    setTasksPerWeekCapLocal(prefill.cap);
   }, [selectedId, items]);
+
+  // An open action form with input is a draft. Selecting another row,
+  // changing the stage/status filter, Refresh and closing the panel all
+  // reset it, so they ask first.
+  const formDirty = (() => {
+    if (!selected || !mode) return false;
+    if (mode === "offer") return proposedSlotsLocal.some((v) => v) || customMessage.trim() !== "";
+    if (mode === "decline" || mode === "rejectPost") return declineReason.trim() !== "";
+    const prefill = hirePrefill(selected);
+    return (
+      workingHoursLocal !== prefill.workingHours ||
+      !sameIds(approvedCategoryIdsLocal, prefill.categoryIds) ||
+      tasksPerWeekCapLocal !== prefill.cap ||
+      hireNotesLocal.trim() !== ""
+    );
+  })();
+  const formLabel =
+    mode === "offer"
+      ? "Offer slots"
+      : mode === "hire"
+        ? "Hire form"
+        : mode === "decline" || mode === "rejectPost"
+          ? "Decline reason"
+          : undefined;
+  const confirmDiscard = useUnsavedChanges(formDirty, formLabel);
+
+  // Cancel on an action form: ask if it has input, then clear that form so
+  // re-opening it starts fresh (and the page is clean again).
+  const cancelForm = async () => {
+    if (!(await confirmDiscard())) return;
+    if (mode === "offer") {
+      setProposedSlotsLocal(["", "", ""]);
+      setCustomMessage("");
+    } else if (mode === "decline" || mode === "rejectPost") {
+      setDeclineReason("");
+    } else if (mode === "hire") {
+      const prefill = hirePrefill(selected);
+      setWorkingHoursLocal(prefill.workingHours);
+      setApprovedCategoryIdsLocal(prefill.categoryIds);
+      setTasksPerWeekCapLocal(prefill.cap);
+      setHireNotesLocal("");
+    }
+    setActionError(null);
+    setMode(null);
+  };
+
+  const selectRow = async (id: string) => {
+    if (id === selectedId) return;
+    if (!(await confirmDiscard())) return;
+    setTab("overview");
+    setSelectedId(id);
+  };
+
+  const closePanel = async () => {
+    if (!(await confirmDiscard())) return;
+    setSelectedId(null);
+  };
+
+  const refreshList = async () => {
+    if (!(await confirmDiscard())) return;
+    await refresh();
+  };
+
+  // Below xl the panel stacks under the list; bring it into view on select.
+  useEffect(() => {
+    if (!selectedId || window.innerWidth >= 1280) return;
+    document
+      .getElementById("talent-panel-top")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [selectedId]);
+
+  // Opening an action form swaps the panel body; start it from the top.
+  useEffect(() => {
+    if (!mode) return;
+    document.getElementById("talent-panel-top")?.scrollIntoView({ block: "nearest" });
+  }, [mode]);
 
   async function submitAction(payload: Record<string, unknown>) {
     if (!selected) return;
@@ -433,932 +922,1070 @@ export default function TalentApplicationsPage() {
     void submitAction({ action: "ONBOARD" });
   }
 
-  // Filter chips ordered by the actual hiring funnel — left-to-right
-  // walks a candidate's journey from first submission to onboarded
-  // creative, with the two terminal "no" states tucked at the end
-  // before the catch-all. The tone still encodes urgency at a glance
-  // (orange = your turn to act, blue = waiting on the candidate, green
-  // = positive outcome, slate = closed-no), but the order itself is
-  // now narrative so a new operator can read it like a process diagram.
-  //
-  //   1. SUBMITTED                    new application landed
-  //   2. IN_REVIEW                    admin is looking it over
-  //   3. AWAITING_CANDIDATE_CHOICE    admin offered 3 slots, waiting
-  //   4. CANDIDATE_PROPOSED_TIME      candidate countered with own time
-  //   5. ACCEPTED                     slot booked, interview scheduled
-  //   6. INTERVIEW_HELD               call done, hire/no-hire pending
-  //   7. HIRED                        we said yes, onboarding next
-  //   8. ONBOARDED                    UserAccount created, in the system
-  //   9. DECLINED                     pre-interview rejection
-  //  10. REJECTED_AFTER_INTERVIEW     post-interview rejection
-  //  11. ALL                          full table
-  const FILTER_CHIPS: Array<{
-    key: Filter;
-    label: string;
-    tone: "action" | "wait" | "done" | "decline" | "all";
-  }> = [
-    { key: "SUBMITTED", label: "New", tone: "action" },
-    { key: "IN_REVIEW", label: "In review", tone: "action" },
-    { key: "AWAITING_CANDIDATE_CHOICE", label: "Awaiting candidate", tone: "wait" },
-    { key: "CANDIDATE_PROPOSED_TIME", label: "Candidate proposed", tone: "action" },
-    { key: "ACCEPTED", label: "Accepted", tone: "wait" },
-    { key: "MISSED", label: "Missed", tone: "action" },
-    { key: "INTERVIEW_HELD", label: "Interview held", tone: "action" },
-    { key: "HIRED", label: "Hired", tone: "done" },
-    { key: "ONBOARDED", label: "Onboarded", tone: "done" },
-    { key: "DECLINED", label: "Declined", tone: "decline" },
-    { key: "REJECTED_AFTER_INTERVIEW", label: "Declined post-interview", tone: "decline" },
-    { key: "ALL", label: "All", tone: "all" },
-  ];
+  // ---------------------------------------------------------------------------
+  // Filters
+  // ---------------------------------------------------------------------------
 
-  // Tone → tailwind classes for the active and inactive chip states.
-  // Active: solid coloured background, white text.
-  // Inactive: bordered, muted text, faint coloured dot for tone hint.
-  const TONE_STYLES: Record<
-    (typeof FILTER_CHIPS)[number]["tone"],
-    { active: string; dot: string }
-  > = {
-    action: {
-      active: "bg-[var(--bb-primary)] text-white border-[var(--bb-primary)]",
-      dot: "bg-[var(--bb-primary)]",
-    },
-    wait: {
-      active: "bg-blue-600 text-white border-blue-600",
-      dot: "bg-blue-500",
-    },
-    done: {
-      active: "bg-emerald-600 text-white border-emerald-600",
-      dot: "bg-emerald-500",
-    },
-    decline: {
-      active: "bg-slate-600 text-white border-slate-600",
-      dot: "bg-slate-400",
-    },
-    all: {
-      active: "bg-[var(--bb-secondary)] text-white border-[var(--bb-secondary)]",
-      dot: "bg-[var(--bb-text-muted)]",
-    },
+  const totalCount = useMemo(
+    () => Object.values(statusCounts).reduce<number>((a, b) => a + (b ?? 0), 0),
+    [statusCounts],
+  );
+
+  const stageCount = (key: StageFilter): number | null => {
+    if (!countsLoaded) return null;
+    if (key === "ALL") return totalCount;
+    return STAGES.find((s) => s.key === key)!.statuses.reduce(
+      (a, s) => a + (statusCounts[s] ?? 0),
+      0,
+    );
   };
 
-  function chipCount(key: Filter): number {
-    if (key === "ALL") {
-      return Object.values(statusCounts).reduce<number>((a, b) => a + (b ?? 0), 0);
+  const selectStage = async (next: StageFilter) => {
+    if (!(await confirmDiscard())) return;
+    setStage(next);
+    setStatusFilter(null);
+    setSelectedId(null);
+  };
+
+  const selectStatus = async (value: string) => {
+    if (!(await confirmDiscard())) return;
+    if (value === "") {
+      setStatusFilter(null);
+    } else {
+      const s = value as TalentApplicationStatus;
+      setStatusFilter(s);
+      setStage(stageOf(s));
     }
-    return statusCounts[key] ?? 0;
-  }
+    setSelectedId(null);
+  };
 
-  return (
-    <div className="space-y-5">
-      {/* Header — title + concise description on one row, refresh
-          tucked at the right. The previous design squeezed a long
-          dropdown next to a long description, which is what made the
-          status filter so easy to miss. */}
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-[var(--bb-secondary)]">Talent applications</h1>
-          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-            Review submissions from the public /talent form. Pick a status below to triage.
-          </p>
+  // Statuses offered in the select: those of the active stage, or all.
+  const selectableStatuses =
+    stage === "ALL" ? ALL_STATUSES : STAGES.find((s) => s.key === stage)!.statuses;
+
+  const filteredItems = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((a) =>
+      [a.fullName, a.email, a.country].some((v) => v.toLowerCase().includes(q)),
+    );
+  }, [items, query]);
+
+  const viewLabel = statusFilter
+    ? STATUS_FILTER_LABEL[statusFilter]
+    : stage === "ALL"
+      ? "All"
+      : STAGES.find((s) => s.key === stage)!.label;
+
+  const categoryLabel = (id: string) => categoryNames.get(id) ?? "(removed)";
+
+  // ---------------------------------------------------------------------------
+  // Detail panel
+  // ---------------------------------------------------------------------------
+
+  const renderPanel = (item: Application) => {
+    const meta = STATUS_META[item.status];
+    const submitting = actionStatus === "submitting";
+    const idPrefix = `talent-${item.id}`;
+
+    // Action availability matrix. Re-derived per render so a status change
+    // (after a submitAction → refresh → status update) immediately flips
+    // which actions are offered.
+    //   - SUBMITTED / IN_REVIEW: offer 3 slots (ACCEPT) or DECLINE
+    //   - AWAITING_CANDIDATE_CHOICE: RE-OFFER slots (fresh booking link —
+    //     the unstick path when the link expired or candidate-side booking
+    //     kept failing) or DECLINE (revoking the offer)
+    //   - CANDIDATE_PROPOSED_TIME: ACCEPT_PROPOSED, RE-OFFER (counter-
+    //     propose 3 fresh slots) or DECLINE
+    //   - ACCEPTED (PR9): MARK_INTERVIEW_HELD, MARK_MISSED or
+    //     REJECT_POST_INTERVIEW (no-show path)
+    //   - INTERVIEW_HELD (PR9): HIRE or REJECT_POST_INTERVIEW
+    //   - HIRED (PR10): ONBOARD
+    //   - ONBOARDED / DECLINED / REJECTED_AFTER_INTERVIEW: terminal info
+    // MISSED behaves like a re-offer origin: from a no-show the admin can send
+    // fresh slots + a new booking link to reschedule the interview.
+    const isReoffer =
+      item.status === "AWAITING_CANDIDATE_CHOICE" ||
+      item.status === "CANDIDATE_PROPOSED_TIME" ||
+      item.status === "MISSED";
+    const canOfferSlots = item.status === "SUBMITTED" || item.status === "IN_REVIEW" || isReoffer;
+    const canConfirmProposed = item.status === "CANDIDATE_PROPOSED_TIME";
+    const canDecline =
+      item.status === "SUBMITTED" ||
+      item.status === "IN_REVIEW" ||
+      item.status === "AWAITING_CANDIDATE_CHOICE" ||
+      item.status === "CANDIDATE_PROPOSED_TIME" ||
+      item.status === "MISSED";
+    const canMarkInterviewHeld = item.status === "ACCEPTED";
+    const canHire = item.status === "INTERVIEW_HELD";
+    const canRejectPostInterview = item.status === "ACCEPTED" || item.status === "INTERVIEW_HELD";
+    const canOnboard = item.status === "HIRED";
+
+    const appliedCategoryIds = formatList(item.categoryIds);
+    const appliedCategoryOptions = appliedCategoryIds.map((id) => ({
+      id,
+      name: categoryLabel(id),
+    }));
+    const social = formatList(item.socialLinks);
+    const categories = appliedCategoryIds.map(categoryLabel);
+    const tools = formatList(item.tools);
+    const workedWith = formatList(item.workedWith);
+
+    const tasksCapNum = Number.parseInt(tasksPerWeekCapLocal, 10);
+    const tasksCapError =
+      tasksPerWeekCapLocal && (!Number.isFinite(tasksCapNum) || tasksCapNum < 1 || tasksCapNum > 40)
+        ? "Tasks per week cap must be between 1 and 40."
+        : null;
+
+    // ----- Footer: only the actions valid for this status -----------------
+    const busyLabel = (idle: string, busy: string) => (submitting ? busy : idle);
+
+    let footer: ReactNode = null;
+    if (mode === "offer") {
+      footer = (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button variant="ghost" onClick={() => void cancelForm()} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleAccept}
+            disabled={proposedSlotsLocal.some((s) => !s) || submitting}
+            aria-busy={submitting}
+          >
+            {busyLabel(
+              isReoffer ? "Re-offer & email new booking link" : "Accept & email booking link",
+              "Sending…",
+            )}
+          </Button>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => void refresh()}
-          aria-label="Refresh applications"
-        >
-          ↻ Refresh
-        </Button>
-      </header>
-
-      {/* Filter chips — each lifecycle status as its own chip with a
-          live count. Horizontally scrollable on mobile (no clipping,
-          no need for a hidden dropdown), wraps on desktop. Active chip
-          is filled in the bucket's tone; inactive chips show a small
-          coloured dot so the tone is still readable. */}
-      <nav
-        aria-label="Filter applications by status"
-        className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0"
-      >
-        <div className="flex flex-nowrap gap-2 sm:flex-wrap">
-          {FILTER_CHIPS.map((chip) => {
-            const count = chipCount(chip.key);
-            const active = filter === chip.key;
-            const styles = TONE_STYLES[chip.tone];
-            return (
-              <button
-                key={chip.key}
-                type="button"
-                onClick={() => {
-                  setFilter(chip.key);
-                  setSelectedId(null);
-                }}
-                aria-pressed={active}
-                className={[
-                  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors",
-                  active
-                    ? styles.active
-                    : "border-[var(--bb-border)] bg-[var(--bb-bg-card)] text-[var(--bb-text-secondary)] hover:border-[var(--bb-primary)] hover:text-[var(--bb-secondary)]",
-                ].join(" ")}
-              >
-                {!active && (
-                  <span
-                    aria-hidden="true"
-                    className={`inline-block h-1.5 w-1.5 rounded-full ${styles.dot}`}
-                  />
-                )}
-                <span>{chip.label}</span>
-                {count > 0 && (
-                  <span
-                    className={[
-                      "inline-flex min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums",
-                      active
-                        ? "bg-white/20 text-white"
-                        : "bg-[var(--bb-bg-page)] text-[var(--bb-text-secondary)]",
-                    ].join(" ")}
-                  >
-                    {count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+      );
+    } else if (mode === "decline" || mode === "rejectPost") {
+      footer = (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button variant="ghost" onClick={() => void cancelForm()} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            onClick={mode === "decline" ? handleDecline : handleRejectPostInterview}
+            disabled={submitting}
+            aria-busy={submitting}
+          >
+            {busyLabel("Decline & send email", "Sending…")}
+          </Button>
         </div>
-      </nav>
-
-      <OwnerOnlyBanner action="accept or decline talent applications" />
-
-      {loadError && (
-        <InlineAlert variant="error" title="Couldn't load applications">
-          {loadError}
-        </InlineAlert>
-      )}
-
-      {loading ? (
-        <LoadingState message="Loading applications…" />
-      ) : items.length === 0 ? (
-        <EmptyState
-          title="No applications in this view"
-          description="When candidates submit the public form at /talent, they'll show up here."
-        />
-      ) : (
-        <DataTable>
-          <THead>
-            <TH>Candidate</TH>
-            <TH className="w-[110px]">Status</TH>
-            <TH className="w-[180px]">Submitted</TH>
-            <TH className="w-[140px]">Country</TH>
-            <TH align="right" className="w-[90px]">
-              Action
-            </TH>
-          </THead>
-          <tbody>
-            {items.map((it) => {
-              const isSelected = it.id === selectedId;
-              return (
-                <>
-                  <tr key={it.id} className={isSelected ? "bg-[var(--bb-bg-warm)]" : undefined}>
-                    <TD>
-                      <div className="font-medium text-[var(--bb-secondary)]">{it.fullName}</div>
-                      <div className="flex items-center gap-2 text-xs text-[var(--bb-text-muted)]">
-                        <span>{it.email}</span>
-                        {it.existingCustomer && <Badge variant="warning">Existing customer</Badge>}
-                      </div>
-                    </TD>
-                    <TD>
-                      <Badge variant={STATUS_BADGE_VARIANT[it.status]}>
-                        {STATUS_LABELS[it.status]}
-                      </Badge>
-                    </TD>
-                    <TD>
-                      <span className="text-xs text-[var(--bb-text-secondary)]">
-                        {formatDateTime(it.createdAt)}
-                      </span>
-                    </TD>
-                    <TD>
-                      <span className="text-xs text-[var(--bb-text-secondary)]">{it.country}</span>
-                    </TD>
-                    <TD align="right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setSelectedId(isSelected ? null : it.id)}
-                      >
-                        {isSelected ? "Hide" : "Open"}
-                      </Button>
-                    </TD>
-                  </tr>
-                  {isSelected && (
-                    <tr key={`${it.id}-detail`}>
-                      <td colSpan={5} className="bg-[var(--bb-bg-warm)] p-6">
-                        <DetailPanel
-                          item={it}
-                          categoryNames={categoryNames}
-                          proposedSlotsLocal={proposedSlotsLocal}
-                          onProposedSlotChange={(idx, v) =>
-                            setProposedSlotsLocal((prev) => {
-                              const next = [...prev];
-                              next[idx] = v;
-                              return next;
-                            })
-                          }
-                          customMessage={customMessage}
-                          onCustomMessageChange={setCustomMessage}
-                          declineReason={declineReason}
-                          onDeclineReasonChange={setDeclineReason}
-                          workingHoursLocal={workingHoursLocal}
-                          onWorkingHoursChange={setWorkingHoursLocal}
-                          approvedCategoryIdsLocal={approvedCategoryIdsLocal}
-                          onApprovedCategoriesChange={setApprovedCategoryIdsLocal}
-                          tasksPerWeekCapLocal={tasksPerWeekCapLocal}
-                          onTasksPerWeekCapChange={setTasksPerWeekCapLocal}
-                          hireNotesLocal={hireNotesLocal}
-                          onHireNotesChange={setHireNotesLocal}
-                          actionStatus={actionStatus}
-                          actionError={actionError}
-                          onAccept={handleAccept}
-                          onAcceptProposed={handleAcceptProposed}
-                          onDecline={handleDecline}
-                          onMarkInterviewHeld={handleMarkInterviewHeld}
-                          onMarkMissed={handleMarkMissed}
-                          onHire={handleHire}
-                          onRejectPostInterview={handleRejectPostInterview}
-                          onOnboard={handleOnboard}
-                        />
-                      </td>
-                    </tr>
-                  )}
-                </>
-              );
-            })}
-          </tbody>
-        </DataTable>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Detail panel — every field on the application + the action controls.
-// ---------------------------------------------------------------------------
-
-function DetailPanel({
-  item,
-  categoryNames,
-  proposedSlotsLocal,
-  onProposedSlotChange,
-  customMessage,
-  onCustomMessageChange,
-  declineReason,
-  onDeclineReasonChange,
-  workingHoursLocal,
-  onWorkingHoursChange,
-  approvedCategoryIdsLocal,
-  onApprovedCategoriesChange,
-  tasksPerWeekCapLocal,
-  onTasksPerWeekCapChange,
-  hireNotesLocal,
-  onHireNotesChange,
-  actionStatus,
-  actionError,
-  onAccept,
-  onAcceptProposed,
-  onDecline,
-  onMarkInterviewHeld,
-  onMarkMissed,
-  onHire,
-  onRejectPostInterview,
-  onOnboard,
-}: {
-  item: Application;
-  categoryNames: Map<string, string>;
-  proposedSlotsLocal: string[];
-  onProposedSlotChange: (idx: number, v: string) => void;
-  customMessage: string;
-  onCustomMessageChange: (v: string) => void;
-  declineReason: string;
-  onDeclineReasonChange: (v: string) => void;
-  workingHoursLocal: string;
-  onWorkingHoursChange: (v: string) => void;
-  approvedCategoryIdsLocal: string[];
-  onApprovedCategoriesChange: (v: string[]) => void;
-  tasksPerWeekCapLocal: string;
-  onTasksPerWeekCapChange: (v: string) => void;
-  hireNotesLocal: string;
-  onHireNotesChange: (v: string) => void;
-  actionStatus: "idle" | "submitting";
-  actionError: string | null;
-  onAccept: () => void;
-  onAcceptProposed: () => void;
-  onDecline: () => void;
-  onMarkInterviewHeld: () => void;
-  onMarkMissed: () => void;
-  onHire: () => void;
-  onRejectPostInterview: () => void;
-  onOnboard: () => void;
-}) {
-  // Action availability matrix. Re-derived per render so a status change
-  // (after a submitAction → refresh → status update) immediately flips
-  // which panels are visible.
-  //   - SUBMITTED / IN_REVIEW: offer 3 slots (ACCEPT) or DECLINE
-  //   - AWAITING_CANDIDATE_CHOICE: RE-OFFER slots (fresh booking link —
-  //     the unstick path when the link expired or candidate-side booking
-  //     kept failing) or DECLINE (revoking the offer)
-  //   - CANDIDATE_PROPOSED_TIME: ACCEPT_PROPOSED, RE-OFFER (counter-
-  //     propose 3 fresh slots) or DECLINE
-  //   - ACCEPTED (PR9): MARK_INTERVIEW_HELD or REJECT_POST_INTERVIEW (no-show path)
-  //   - INTERVIEW_HELD (PR9): HIRE or REJECT_POST_INTERVIEW
-  //   - HIRED / ONBOARDED / DECLINED / REJECTED_AFTER_INTERVIEW: terminal info
-  // MISSED behaves like a re-offer origin: from a no-show the admin can send
-  // fresh slots + a new booking link to reschedule the interview.
-  const isReoffer =
-    item.status === "AWAITING_CANDIDATE_CHOICE" ||
-    item.status === "CANDIDATE_PROPOSED_TIME" ||
-    item.status === "MISSED";
-  const canOfferSlots = item.status === "SUBMITTED" || item.status === "IN_REVIEW" || isReoffer;
-  const canConfirmProposed = item.status === "CANDIDATE_PROPOSED_TIME";
-  const canDecline =
-    item.status === "SUBMITTED" ||
-    item.status === "IN_REVIEW" ||
-    item.status === "AWAITING_CANDIDATE_CHOICE" ||
-    item.status === "CANDIDATE_PROPOSED_TIME" ||
-    item.status === "MISSED";
-  // PR9 — post-interview action gates. The "Did the interview happen?" panel
-  // (gated on canMarkInterviewHeld) offers all three ACCEPTED outcomes: held,
-  // no-show→reschedule (MARK_MISSED), and no-show→decline.
-  const canMarkInterviewHeld = item.status === "ACCEPTED";
-  const canHire = item.status === "INTERVIEW_HELD";
-  const canRejectPostInterview = item.status === "ACCEPTED" || item.status === "INTERVIEW_HELD";
-
-  // Resolve applied categories to display names for the HIRE form's
-  // multi-select. Same lookup as the read-only "Skills" section above.
-  const appliedCategoryIds = formatList(item.categoryIds);
-  const appliedCategoryOptions = appliedCategoryIds.map((id) => ({
-    id,
-    name: categoryNames.get(id) ?? "(removed)",
-  }));
-  const social = formatList(item.socialLinks);
-  const categoryIds = formatList(item.categoryIds);
-  // Resolve raw cuids to human category names; show "(removed)" for any
-  // ID that no longer maps (category was deleted/deactivated since the
-  // candidate submitted). Falling back to the raw ID would expose
-  // implementation detail to the admin reading the page.
-  const categories = categoryIds.map((id) => categoryNames.get(id) ?? "(removed)");
-  const tools = formatList(item.tools);
-  const workedWith = formatList(item.workedWith);
-
-  return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      {/* ----- Left: candidate snapshot ----- */}
-      <div className="space-y-4">
-        {item.existingCustomer && (
-          <InlineAlert variant="warning" title="Existing customer email">
-            This applicant&apos;s email matches a registered Brandbite UserAccount. Could be
-            intentional (a customer joining the team) or accidental (used their work email by
-            mistake). Worth a check before acting.
-          </InlineAlert>
-        )}
-        <SectionHeading>Contact</SectionHeading>
-        <KeyValue label="Email" value={<a href={`mailto:${item.email}`}>{item.email}</a>} />
-        <KeyValue label="WhatsApp" value={item.whatsappNumber} />
-        <KeyValue label="Country" value={item.country} />
-        <KeyValue label="Timezone" value={item.timezone} />
-
-        <SectionHeading>Portfolio</SectionHeading>
-        <KeyValue label="Portfolio" value={<ExternalLink href={item.portfolioUrl} />} />
-        {item.linkedinUrl && (
-          <KeyValue label="LinkedIn" value={<ExternalLink href={item.linkedinUrl} />} />
-        )}
-        {social.length > 0 && (
-          <KeyValue
-            label="Other links"
-            value={
-              <ul className="space-y-0.5">
-                {social.map((url) => (
-                  <li key={url}>
-                    <ExternalLink href={url} />
-                  </li>
-                ))}
-              </ul>
+      );
+    } else if (mode === "hire") {
+      footer = (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button variant="ghost" onClick={() => void cancelForm()} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleHire}
+            disabled={
+              submitting || !workingHoursLocal.trim() || approvedCategoryIdsLocal.length === 0
             }
-          />
-        )}
+            aria-busy={submitting}
+          >
+            {busyLabel("Hire", "Hiring…")}
+          </Button>
+        </div>
+      );
+    } else {
+      // Idle: one primary action for the current step + secondary paths.
+      let primary: ReactNode = null;
+      const secondary: ReactNode[] = [];
+      let hint: ReactNode = null;
 
-        <SectionHeading>Skills</SectionHeading>
-        <KeyValue
-          label={`Categories (${categories.length})`}
-          value={
-            categories.length > 0 ? (
-              <span className="text-xs text-[var(--bb-text-muted)]">{categories.join(", ")}</span>
-            ) : (
-              "—"
-            )
-          }
-        />
+      if (canConfirmProposed) {
+        primary = (
+          <Button
+            variant="primary"
+            className="w-full"
+            onClick={handleAcceptProposed}
+            disabled={submitting}
+            aria-busy={submitting}
+          >
+            {busyLabel("Confirm this time & book interview", "Booking…")}
+          </Button>
+        );
+        hint = "Or counter-propose by re-offering 3 fresh slots.";
+      } else if (canMarkInterviewHeld) {
+        primary = (
+          <Button
+            variant="primary"
+            className="w-full"
+            onClick={handleMarkInterviewHeld}
+            disabled={submitting}
+            aria-busy={submitting}
+          >
+            {busyLabel("Yes, interview held", "Saving…")}
+          </Button>
+        );
+        hint =
+          "Did the interview happen? Marking it held unlocks the Hire form. If the candidate didn’t show, mark a no-show to reschedule, or decline.";
+      } else if (canHire) {
+        primary = (
+          <Button
+            variant="primary"
+            className="w-full"
+            onClick={() => {
+              setActionError(null);
+              setMode("hire");
+            }}
+            disabled={submitting}
+          >
+            Hire & capture terms
+          </Button>
+        );
+      } else if (canOnboard) {
+        primary = (
+          <Button
+            variant="primary"
+            className="w-full"
+            onClick={handleOnboard}
+            disabled={submitting}
+            aria-busy={submitting}
+          >
+            {busyLabel("Onboard now · create account + send sign-in", "Onboarding…")}
+          </Button>
+        );
+        hint =
+          "Creates a DESIGNER UserAccount, seeds CreativeSkill rows from the approved categories, mirrors the tasks/week cap, sends magic-link + branded welcome email. Refuses if the email is already a customer.";
+      }
 
-        <SectionHeading>Experience</SectionHeading>
-        <KeyValue label="Total years" value={item.totalYears} />
-        <KeyValue
-          label="Remote experience"
-          value={item.hasRemoteExp ? `Yes (${item.yearsRemote ?? "?"} years)` : "No"}
-        />
-        <KeyValue
-          label="Worked at / with"
-          value={workedWith.length > 0 ? workedWith.join(", ") : "—"}
-        />
+      if (canOfferSlots) {
+        const offerBtn = (
+          <Button
+            key="offer"
+            variant={
+              primary || item.status === "AWAITING_CANDIDATE_CHOICE" ? "secondary" : "primary"
+            }
+            className="w-full"
+            onClick={() => {
+              setActionError(null);
+              setMode("offer");
+            }}
+            disabled={submitting}
+          >
+            {isReoffer ? "Re-offer 3 slots" : "Accept & offer 3 slots"}
+          </Button>
+        );
+        if (!primary && item.status !== "AWAITING_CANDIDATE_CHOICE") primary = offerBtn;
+        else secondary.push(offerBtn);
+      }
+      if (canMarkInterviewHeld) {
+        secondary.push(
+          <Button
+            key="missed"
+            className="w-full"
+            onClick={handleMarkMissed}
+            disabled={submitting}
+            aria-busy={submitting}
+          >
+            {busyLabel("No-show — reschedule", "Saving…")}
+          </Button>,
+        );
+      }
+      if (canDecline) {
+        secondary.push(
+          <Button
+            key="decline"
+            variant="danger"
+            className="w-full"
+            onClick={() => {
+              setActionError(null);
+              setMode("decline");
+            }}
+            disabled={submitting}
+          >
+            Decline
+          </Button>,
+        );
+      }
+      if (canRejectPostInterview) {
+        secondary.push(
+          <Button
+            key="reject-post"
+            variant="danger"
+            className="w-full"
+            onClick={() => {
+              setActionError(null);
+              setMode("rejectPost");
+            }}
+            disabled={submitting}
+          >
+            {item.status === "ACCEPTED" ? "No-show — decline" : "Decline after interview"}
+          </Button>,
+        );
+      }
+      if (item.status === "AWAITING_CANDIDATE_CHOICE") {
+        hint =
+          "Waiting for the candidate to book. Link expired, or the candidate reports a booking error? Re-offer — it emails a fresh link and kills the old one.";
+      }
 
-        <SectionHeading>Availability</SectionHeading>
-        <KeyValue label="Workload" value={item.workload.replace("_", "-").toLowerCase()} />
-        {item.preferredTasksPerWeek && (
-          <KeyValue label="Tasks per week" value={item.preferredTasksPerWeek} />
-        )}
-
-        <SectionHeading>Turnaround</SectionHeading>
-        <KeyValue label="24-48h ok?" value={item.turnaroundOk ? "Yes" : "No"} />
-        {item.turnaroundComment && <KeyValue label="Comment" value={item.turnaroundComment} />}
-
-        <SectionHeading>Tools</SectionHeading>
-        <KeyValue label="Selected" value={tools.length > 0 ? tools.join(", ") : "—"} />
-        {item.toolsOther && <KeyValue label="Other" value={item.toolsOther} />}
-
-        <SectionHeading>Other</SectionHeading>
-        <KeyValue label="Open to test task?" value={item.testTaskOk ? "Yes" : "No"} />
-        <KeyValue
-          label="Submitted"
-          value={`${formatDateTime(item.createdAt)} · ${item.ipAddress ?? "no IP"}`}
-        />
-      </div>
-
-      {/* ----- Right: action panel ----- */}
-      <div className="space-y-6">
-        {/* Awaiting-candidate state — admin already offered slots, candidate hasn't picked. */}
-        {item.status === "AWAITING_CANDIDATE_CHOICE" && (
-          <InlineAlert variant="info" title="Awaiting candidate">
-            <div className="space-y-1 text-sm">
-              <div>3 slots offered. Booking link expires:</div>
-              <div className="text-xs text-[var(--bb-text-muted)]">
-                {formatDateTime(item.bookingTokenExpiresAt)}
+      if (primary || secondary.length > 0) {
+        footer = (
+          <div className="space-y-3">
+            {primary}
+            {secondary.length > 0 && (
+              <div className={`grid gap-2 ${secondary.length > 1 ? "sm:grid-cols-2" : ""}`}>
+                {secondary}
               </div>
-              <div className="text-xs text-[var(--bb-text-muted)]">
-                Sent by {item.reviewedByUserEmail ?? "—"} · {formatDateTime(item.reviewedAt)}
-              </div>
-              <div className="text-xs text-[var(--bb-text-muted)]">
-                Link expired, or the candidate reports a booking error? Re-offer below — it emails a
-                fresh link and kills this one.
-              </div>
-            </div>
-          </InlineAlert>
-        )}
+            )}
+            {hint && <p className="text-xs text-[var(--av2-text-2)]">{hint}</p>}
+          </div>
+        );
+      }
+    }
 
-        {/* Candidate-proposed state — primary action surface for this status. */}
-        {item.status === "CANDIDATE_PROPOSED_TIME" && (
-          <div className="space-y-3 rounded-xl border border-[var(--bb-warning-border)] bg-[var(--bb-warning-bg)] p-4">
-            <div>
-              <SectionHeading>Candidate proposed a time</SectionHeading>
-              <p className="mt-1 text-sm text-[var(--bb-secondary)]">
-                <strong>{formatDateTime(item.candidateProposedAt, item.timezone)}</strong> (
-                {item.timezone})
+    // ----- Status card (current step context) -----------------------------
+    const statusCard: ReactNode = (() => {
+      switch (item.status) {
+        case "AWAITING_CANDIDATE_CHOICE":
+          return (
+            <Callout tone="info" title="Awaiting candidate">
+              3 slots offered. Booking link expires {formatDateTime(item.bookingTokenExpiresAt)}.
+              <span className="mt-1 block text-xs">
+                Sent by {item.reviewedByUserEmail ?? DASH} · {formatDateTime(item.reviewedAt)}
+              </span>
+            </Callout>
+          );
+        case "CANDIDATE_PROPOSED_TIME":
+          return (
+            <div className="rounded-xl border border-[var(--av2-attention-border)] bg-[var(--av2-attention-from)] p-4">
+              <p className="text-sm font-medium">Candidate proposed a time</p>
+              <p className="mt-1 text-xl leading-7 font-bold">
+                {formatDateTime(item.candidateProposedAt, item.timezone)}
               </p>
+              <p className="text-xs text-[var(--av2-text-2)]">{item.timezone}</p>
               {item.customMessage && (
-                <p className="mt-2 text-sm text-[var(--bb-text-secondary)] italic">
+                <p className="mt-3 text-sm text-[var(--av2-text-2)] italic">
                   &ldquo;{item.customMessage}&rdquo;
                 </p>
               )}
             </div>
-            <Button
-              className="w-full"
-              onClick={onAcceptProposed}
-              loading={actionStatus === "submitting"}
-              loadingText="Booking…"
-              disabled={actionStatus === "submitting"}
-            >
-              Confirm this time &amp; book interview
-            </Button>
-            <p className="text-xs text-[var(--bb-text-muted)]">
-              Or counter-propose by offering 3 fresh slots below.
-            </p>
-          </div>
-        )}
-
-        {item.status === "ACCEPTED" && (
-          <InlineAlert variant="success" title="Interview booked">
-            <div className="space-y-1 text-sm">
-              <div>
-                <strong>When:</strong> {formatDateTime(item.interviewAt, item.timezone)} (
-                {item.timezone})
-              </div>
-              {item.meetLink && (
-                <div>
-                  <strong>Meet:</strong> <ExternalLink href={item.meetLink} />
+          );
+        case "ACCEPTED":
+          return (
+            <div className="rounded-xl bg-[var(--av2-lavender-bg)] p-4">
+              <div className="flex gap-4">
+                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--av2-surface)] text-[var(--av2-fill-lavender)]">
+                  <IconVideo />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">Interview booked</p>
+                  <p className="text-xl leading-7 font-bold">
+                    {formatDateTime(item.interviewAt, item.timezone)}
+                  </p>
+                  <p className="text-xs text-[var(--av2-text-2)]">{item.timezone}</p>
                 </div>
-              )}
-              <div className="text-xs text-[var(--bb-text-muted)]">
-                Booked by {item.reviewedByUserEmail ?? "—"} · {formatDateTime(item.reviewedAt)}
+              </div>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--av2-border)] pt-3 text-xs text-[var(--av2-text-2)]">
+                <span>
+                  Booked by {item.reviewedByUserEmail ?? DASH} · {formatDateTime(item.reviewedAt)}
+                </span>
+                {item.meetLink && (
+                  <TextLink href={item.meetLink} external>
+                    Open Meet
+                  </TextLink>
+                )}
               </div>
             </div>
-          </InlineAlert>
-        )}
-
-        {item.status === "DECLINED" && (
-          <InlineAlert variant="warning" title="Application declined">
-            <div className="space-y-1 text-sm">
-              {item.declineReason && (
-                <div>
-                  <strong>Reason sent:</strong> {item.declineReason}
-                </div>
-              )}
-              <div className="text-xs text-[var(--bb-text-muted)]">
-                Declined by {item.reviewedByUserEmail ?? "—"} · {formatDateTime(item.reviewedAt)}
+          );
+        case "MISSED":
+          return (
+            <Callout tone="warning" title="Candidate missed the interview">
+              Re-offer 3 slots to reschedule, or decline.
+            </Callout>
+          );
+        case "INTERVIEW_HELD":
+          return (
+            <Callout tone="info" title="Interview held — decision pending">
+              Hire the candidate and capture the onboarding terms, or decline after interview.
+            </Callout>
+          );
+        case "HIRED":
+          return (
+            <div className="rounded-xl border border-[var(--av2-fill-green)]/40 bg-[var(--av2-success-bg)] p-4">
+              <p className="text-sm font-semibold">Hired — ready to onboard</p>
+              <div className="mt-3">
+                <KeyValueList
+                  rows={[
+                    { label: "Working hours", value: item.workingHours || DASH },
+                    { label: "Tasks / week cap", value: fmt(item.approvedTasksPerWeekCap) },
+                    {
+                      label: "Approved categories",
+                      value:
+                        formatList(item.approvedCategoryIds).map(categoryLabel).join(", ") || DASH,
+                    },
+                  ]}
+                />
               </div>
-            </div>
-          </InlineAlert>
-        )}
-
-        {/* PR9 terminal info panels. */}
-        {item.status === "INTERVIEW_HELD" && (
-          <InlineAlert variant="info" title="Interview held — decision pending">
-            <div className="text-xs text-[var(--bb-text-muted)]">
-              Marked held · awaiting hire / decline. Use the Hire form below or &ldquo;Decline after
-              interview&rdquo;.
-            </div>
-          </InlineAlert>
-        )}
-
-        {item.status === "HIRED" && (
-          <div className="space-y-3 rounded-xl border border-[var(--bb-success-border)] bg-[var(--bb-success-bg)] p-4">
-            <SectionHeading>Hired — ready to onboard</SectionHeading>
-            <div className="space-y-1 text-sm text-[var(--bb-secondary)]">
-              {item.workingHours && (
-                <div>
-                  <strong>Working hours:</strong> {item.workingHours}
-                </div>
-              )}
-              {item.approvedTasksPerWeekCap != null && (
-                <div>
-                  <strong>Tasks/week cap:</strong> {item.approvedTasksPerWeekCap}
-                </div>
-              )}
-              {Array.isArray(item.approvedCategoryIds) && item.approvedCategoryIds.length > 0 && (
-                <div>
-                  <strong>Approved categories:</strong>{" "}
-                  {formatList(item.approvedCategoryIds)
-                    .map((id) => categoryNames.get(id) ?? "(removed)")
-                    .join(", ")}
-                </div>
-              )}
               {item.hireNotes && (
-                <div className="text-xs text-[var(--bb-text-secondary)] italic">
+                <p className="mt-3 text-sm text-[var(--av2-text-2)] italic">
                   Note: {item.hireNotes}
-                </div>
+                </p>
               )}
-              <div className="text-xs text-[var(--bb-text-muted)]">
-                Hired by {item.hiredByUserEmail ?? "—"} · {formatDateTime(item.hiredAt)}
-              </div>
+              <p className="mt-3 text-xs text-[var(--av2-text-2)]">
+                Hired by {item.hiredByUserEmail ?? DASH} · {formatDateTime(item.hiredAt)}
+              </p>
             </div>
-            <Button
-              className="w-full"
-              onClick={onOnboard}
-              loading={actionStatus === "submitting"}
-              loadingText="Onboarding…"
-              disabled={actionStatus === "submitting"}
+          );
+        case "ONBOARDED":
+          return (
+            <Callout
+              tone="success"
+              title="Onboarded creative"
+              action={<TextLink href="/admin/users">Manage users</TextLink>}
             >
-              Onboard now &middot; create UserAccount + send sign-in
-            </Button>
-            <p className="text-xs text-[var(--bb-text-muted)]">
-              Creates a DESIGNER UserAccount, seeds CreativeSkill rows from the approved categories,
-              mirrors the tasks/week cap, sends magic-link + branded welcome email. Refuses if the
-              email is already a customer.
-            </p>
-          </div>
-        )}
-
-        {item.status === "ONBOARDED" && (
-          <InlineAlert variant="success" title="Onboarded creative">
-            <div className="text-xs text-[var(--bb-text-muted)]">
-              UserAccount linked: {item.hiredUserAccountId ?? "—"}. Manage at /admin/users.
-            </div>
-          </InlineAlert>
-        )}
-
-        {item.status === "REJECTED_AFTER_INTERVIEW" && (
-          <InlineAlert variant="warning" title="Declined after interview">
-            <div className="space-y-1 text-sm">
+              UserAccount linked: {item.hiredUserAccountId ?? DASH}
+            </Callout>
+          );
+        case "DECLINED":
+        case "REJECTED_AFTER_INTERVIEW":
+          return (
+            <Callout
+              tone="info"
+              title={
+                item.status === "DECLINED" ? "Application declined" : "Declined after interview"
+              }
+            >
               {item.declineReason && (
-                <div>
-                  <strong>Reason sent:</strong> {item.declineReason}
-                </div>
+                <span className="block">
+                  <strong className="font-semibold text-[var(--av2-text)]">Reason sent:</strong>{" "}
+                  {item.declineReason}
+                </span>
               )}
-              <div className="text-xs text-[var(--bb-text-muted)]">
-                Declined by {item.reviewedByUserEmail ?? "—"} · {formatDateTime(item.reviewedAt)}
-              </div>
-            </div>
-          </InlineAlert>
-        )}
-
-        {/* PR9 — MARK_INTERVIEW_HELD on ACCEPTED rows. */}
-        {canMarkInterviewHeld && (
-          <div className="rounded-xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-card)] p-4">
-            <SectionHeading>Did the interview happen?</SectionHeading>
-            <p className="mt-1 mb-3 text-xs text-[var(--bb-text-muted)]">
-              Click &ldquo;Yes&rdquo; to unlock the Hire form. If the candidate didn&rsquo;t show,
-              mark it a no-show — from there you can re-offer slots to reschedule, or decline.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                onClick={onMarkInterviewHeld}
-                loading={actionStatus === "submitting"}
-                loadingText="Saving…"
-                disabled={actionStatus === "submitting"}
-              >
-                Yes, mark held
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={onMarkMissed}
-                loading={actionStatus === "submitting"}
-                loadingText="Saving…"
-                disabled={actionStatus === "submitting"}
-              >
-                No-show — reschedule
-              </Button>
-              <Button
-                variant="danger"
-                onClick={onRejectPostInterview}
-                loading={actionStatus === "submitting"}
-                loadingText="Sending…"
-                disabled={actionStatus === "submitting"}
-              >
-                No-show — decline
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* PR9 — HIRE form on INTERVIEW_HELD rows. */}
-        {canHire && (
-          <div className="rounded-xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-card)] p-4">
-            <SectionHeading>Hire &amp; capture onboarding terms</SectionHeading>
-            <p className="mt-1 mb-3 text-xs text-[var(--bb-text-muted)]">
-              Captures the negotiated terms. The next PR&apos;s onboarding orchestrator turns these
-              into a real DESIGNER UserAccount + CreativeSkill rows + magic-link sign-in email.
-            </p>
-
-            <label className="mb-3 block">
-              <span className="mb-1 block text-xs font-medium text-[var(--bb-text-secondary)]">
-                Working hours
+              <span className="mt-1 block text-xs">
+                Declined by {item.reviewedByUserEmail ?? DASH} · {formatDateTime(item.reviewedAt)}
               </span>
-              <FormInput
+            </Callout>
+          );
+        default:
+          return null;
+      }
+    })();
+
+    // ----- Action forms (replace the tabs while open) ---------------------
+    const actionForm: ReactNode = (() => {
+      if (mode === "offer") {
+        return (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-lg leading-[26px] font-semibold">
+                {isReoffer ? "Re-offer 3 slots" : "Accept & offer 3 slots"}
+              </h3>
+              <p className="mt-1 text-sm text-[var(--av2-text-2)]">
+                {isReoffer
+                  ? "Offer three fresh 30-minute slots. The candidate gets a new email with a new booking link; the previous link stops working immediately. Use this when the old link expired, the candidate hit a booking error, or their proposed time doesn't work for you."
+                  : "Offer the candidate three 30-minute slots. They'll get an email with a tokenized link to pick one (or propose another time). Calendar event is created when they pick. Times are in your local timezone; the candidate sees them in theirs."}
+              </p>
+            </div>
+            {[0, 1, 2].map((idx) => (
+              <Field key={idx} label={`Slot ${idx + 1}`} htmlFor={`${idPrefix}-slot-${idx}`}>
+                <TextInput
+                  id={`${idPrefix}-slot-${idx}`}
+                  type="datetime-local"
+                  value={proposedSlotsLocal[idx] ?? ""}
+                  onChange={(e) =>
+                    setProposedSlotsLocal((prev) => {
+                      const next = [...prev];
+                      next[idx] = e.target.value;
+                      return next;
+                    })
+                  }
+                />
+              </Field>
+            ))}
+            <Field
+              label="Personal note (optional)"
+              htmlFor={`${idPrefix}-message`}
+              hint="Added to the email above the booking link."
+            >
+              <TextArea
+                id={`${idPrefix}-message`}
+                rows={3}
+                value={customMessage}
+                onChange={(e) => setCustomMessage(e.target.value)}
+                placeholder="e.g. Loved your motion reel — really excited to chat."
+                maxLength={500}
+              />
+            </Field>
+          </div>
+        );
+      }
+      if (mode === "decline" || mode === "rejectPost") {
+        return (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-lg leading-[26px] font-semibold">
+                {mode === "decline"
+                  ? "Decline politely"
+                  : item.status === "ACCEPTED"
+                    ? "No-show — decline"
+                    : "Decline after interview"}
+              </h3>
+              <p className="mt-1 text-sm text-[var(--av2-text-2)]">
+                {mode === "decline"
+                  ? "The candidate gets the standard rejection email. This closes the application."
+                  : "The candidate gets the post-interview decline email. This closes the application."}
+              </p>
+            </div>
+            <Field
+              label="Reason (optional)"
+              htmlFor={`${idPrefix}-reason`}
+              hint="Surfaced verbatim in the email above the standard copy. Leave blank for the generic version."
+            >
+              <TextArea
+                id={`${idPrefix}-reason`}
+                rows={4}
+                value={declineReason}
+                onChange={(e) => setDeclineReason(e.target.value)}
+                placeholder={
+                  mode === "decline"
+                    ? "e.g. We're focused on motion designers this quarter."
+                    : "e.g. The motion-graphics work you showed was great — we just don't have steady volume in that lane this quarter."
+                }
+                maxLength={500}
+              />
+            </Field>
+          </div>
+        );
+      }
+      if (mode === "hire") {
+        return (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-lg leading-[26px] font-semibold">
+                Hire &amp; capture onboarding terms
+              </h3>
+              <p className="mt-1 text-sm text-[var(--av2-text-2)]">
+                Captures the negotiated terms. Onboarding then turns these into a DESIGNER
+                UserAccount, CreativeSkill rows and a magic-link sign-in email.
+              </p>
+            </div>
+            <Field label="Working hours" htmlFor={`${idPrefix}-hours`}>
+              <TextInput
+                id={`${idPrefix}-hours`}
                 value={workingHoursLocal}
-                onChange={(e) => onWorkingHoursChange(e.target.value)}
+                onChange={(e) => setWorkingHoursLocal(e.target.value)}
                 placeholder={`e.g. 9-18 weekdays ${item.timezone}`}
                 maxLength={200}
+                aria-invalid={actionError === "Working hours is required." || undefined}
               />
-            </label>
-
-            <fieldset className="mb-3">
-              <legend className="mb-1 text-xs font-medium text-[var(--bb-text-secondary)]">
+            </Field>
+            <fieldset>
+              <legend className="mb-1.5 text-sm font-medium">
                 Approved categories ({approvedCategoryIdsLocal.length} of{" "}
                 {appliedCategoryOptions.length})
               </legend>
-              <div className="space-y-1.5">
-                {appliedCategoryOptions.map((opt) => {
-                  const checked = approvedCategoryIdsLocal.includes(opt.id);
-                  return (
-                    <label key={opt.id} className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            onApprovedCategoriesChange([
-                              ...approvedCategoryIdsLocal.filter((id) => id !== opt.id),
-                              opt.id,
-                            ]);
-                          } else {
-                            onApprovedCategoriesChange(
-                              approvedCategoryIdsLocal.filter((id) => id !== opt.id),
-                            );
-                          }
-                        }}
-                      />
-                      <span>{opt.name}</span>
-                    </label>
-                  );
-                })}
-              </div>
-              <p className="mt-1 text-[11px] text-[var(--bb-text-muted)]">
+              {appliedCategoryOptions.length > 0 ? (
+                <div className="space-y-2">
+                  {appliedCategoryOptions.map((opt) => {
+                    const checked = approvedCategoryIdsLocal.includes(opt.id);
+                    return (
+                      <label key={opt.id} className="flex items-center gap-2.5 text-sm">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 accent-[var(--av2-accent-strong)]"
+                          checked={checked}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setApprovedCategoryIdsLocal([
+                                ...approvedCategoryIdsLocal.filter((id) => id !== opt.id),
+                                opt.id,
+                              ]);
+                            } else {
+                              setApprovedCategoryIdsLocal(
+                                approvedCategoryIdsLocal.filter((id) => id !== opt.id),
+                              );
+                            }
+                          }}
+                        />
+                        <span>{opt.name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-[var(--av2-text-2)]">{DASH}</p>
+              )}
+              <p className="mt-1.5 text-xs text-[var(--av2-text-2)]">
                 Pre-filled with everything the candidate applied for. Deselect any you&apos;re not
                 hiring them for.
               </p>
             </fieldset>
-
-            <label className="mb-3 block">
-              <span className="mb-1 block text-xs font-medium text-[var(--bb-text-secondary)]">
-                Tasks per week cap{" "}
-                <span className="text-[var(--bb-text-muted)]">
-                  (applied bucket: {item.preferredTasksPerWeek ?? "—"})
-                </span>
-              </span>
-              <FormInput
+            <Field
+              label="Tasks per week cap"
+              htmlFor={`${idPrefix}-cap`}
+              hint={`Applied bucket: ${item.preferredTasksPerWeek ?? DASH}`}
+              error={tasksCapError}
+            >
+              <TextInput
+                id={`${idPrefix}-cap`}
                 type="number"
                 inputMode="numeric"
                 min={1}
                 max={40}
                 value={tasksPerWeekCapLocal}
-                onChange={(e) => onTasksPerWeekCapChange(e.target.value)}
+                onChange={(e) => setTasksPerWeekCapLocal(e.target.value)}
                 placeholder="e.g. 4"
+                aria-invalid={tasksCapError ? true : undefined}
               />
-            </label>
-
-            <label className="mb-3 block">
-              <span className="mb-1 block text-xs font-medium text-[var(--bb-text-secondary)]">
-                Internal hire notes (optional)
-              </span>
-              <FormTextarea
+            </Field>
+            <Field
+              label="Internal hire notes (optional)"
+              htmlFor={`${idPrefix}-notes`}
+              hint="Not shown to the candidate."
+            >
+              <TextArea
+                id={`${idPrefix}-notes`}
                 rows={3}
                 value={hireNotesLocal}
-                onChange={(e) => onHireNotesChange(e.target.value)}
-                placeholder="Negotiated rate, contract terms, anything for the team to remember. Not shown to the candidate."
+                onChange={(e) => setHireNotesLocal(e.target.value)}
+                placeholder="Negotiated rate, contract terms, anything for the team to remember."
                 maxLength={2000}
               />
-            </label>
+            </Field>
+          </div>
+        );
+      }
+      return null;
+    })();
 
-            <div className="flex gap-2">
-              <Button
-                onClick={onHire}
-                loading={actionStatus === "submitting"}
-                loadingText="Hiring…"
-                disabled={
-                  actionStatus === "submitting" ||
-                  !workingHoursLocal.trim() ||
-                  approvedCategoryIdsLocal.length === 0
-                }
-              >
-                Hire
-              </Button>
-              <Button
-                variant="danger"
-                onClick={onRejectPostInterview}
-                loading={actionStatus === "submitting"}
-                loadingText="Sending…"
-                disabled={actionStatus === "submitting"}
-              >
-                Decline after interview
-              </Button>
+    return (
+      <DetailPanel
+        title="Application details"
+        onClose={() => void closePanel()}
+        closeLabel="Close application details"
+        footer={footer}
+      >
+        <span id="talent-panel-top" aria-hidden className="block scroll-mt-40" />
+        <div className="flex items-start gap-3">
+          <Avatar name={item.fullName} size={48} />
+          <div className="min-w-0 flex-1">
+            <p className="text-lg leading-[26px] font-semibold break-words">{item.fullName}</p>
+            <p className="truncate text-sm text-[var(--av2-text-2)]">{item.email}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Badge tone={meta.tone} dot>
+                {meta.label}
+              </Badge>
+              <span className="text-xs text-[var(--av2-text-2)]">
+                Applied {formatDate(item.createdAt)}
+              </span>
             </div>
+          </div>
+        </div>
+
+        {item.existingCustomer && (
+          <div className="mt-4">
+            <Callout tone="warning" title="Existing customer email">
+              This applicant&apos;s email matches a registered Brandbite UserAccount. Could be
+              intentional (a customer joining the team) or accidental (used their work email by
+              mistake). Worth a check before acting.
+            </Callout>
           </div>
         )}
 
-        {/* PR9 — REJECT_POST_INTERVIEW reason field. Shown on ACCEPTED +
-            INTERVIEW_HELD so admin can add a reason before clicking the
-            decline button rendered above (in either the held-or-no-show
-            panel or the Hire form). Reuses `declineReason` state. */}
-        {canRejectPostInterview && (
-          <div className="rounded-xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-card)] p-4">
-            <SectionHeading>Optional decline reason</SectionHeading>
-            <p className="mt-1 mb-3 text-xs text-[var(--bb-text-muted)]">
-              Surfaced verbatim in the post-interview decline email above the standard copy. Leave
-              blank for the generic version.
-            </p>
-            <FormTextarea
-              rows={3}
-              value={declineReason}
-              onChange={(e) => onDeclineReasonChange(e.target.value)}
-              placeholder="e.g. The motion-graphics work you showed was great — we just don't have steady volume in that lane this quarter."
-              maxLength={500}
-            />
+        {actionError && (
+          <div className="mt-4">
+            <Callout tone="error" title="Action failed">
+              {actionError}
+            </Callout>
           </div>
         )}
 
-        {/* ACCEPT — offer 3 slots. On AWAITING_CANDIDATE_CHOICE /
-            CANDIDATE_PROPOSED_TIME the same action re-offers: fresh slots +
-            fresh booking link, old link invalidated. */}
-        {canOfferSlots && (
-          <div className="rounded-xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-card)] p-4">
-            <SectionHeading>
-              {isReoffer ? "Re-offer 3 slots" : "Accept & offer 3 slots"}
-            </SectionHeading>
-            <p className="mt-1 mb-3 text-xs text-[var(--bb-text-muted)]">
-              {isReoffer
-                ? "Offer three fresh 30-minute slots. The candidate gets a new email with a new booking link; the previous link stops working immediately. Use this when the old link expired, the candidate hit a booking error, or their proposed time doesn't work for you."
-                : "Offer the candidate three 30-minute slots. They'll get an email with a tokenized link to pick one (or propose another time). Calendar event is created when they pick. Times are in your local timezone; the candidate sees them in theirs."}
-            </p>
-            <div className="space-y-2">
-              {[0, 1, 2].map((idx) => (
-                <FormInput
-                  key={idx}
-                  type="datetime-local"
-                  value={proposedSlotsLocal[idx] ?? ""}
-                  onChange={(e) => onProposedSlotChange(idx, e.target.value)}
-                  aria-label={`Slot ${idx + 1}`}
-                  placeholder={`Slot ${idx + 1}`}
-                />
-              ))}
-            </div>
-            <div className="mt-3">
-              <FormTextarea
-                rows={3}
-                value={customMessage}
-                onChange={(e) => onCustomMessageChange(e.target.value)}
-                placeholder="Optional personal note for the email — e.g. 'Loved your motion reel — really excited to chat.'"
-                maxLength={500}
-                aria-label="Custom message (optional)"
+        {mode ? (
+          <div className="mt-5">{actionForm}</div>
+        ) : (
+          <>
+            <div className="mt-5">
+              <Tabs
+                label="Application sections"
+                idPrefix={idPrefix}
+                value={tab}
+                onChange={setTab}
+                tabs={[
+                  { value: "overview", label: "Overview" },
+                  { value: "answers", label: "Answers" },
+                  { value: "progress", label: "Progress" },
+                ]}
               />
             </div>
-            <Button
-              className="mt-3 w-full"
-              onClick={onAccept}
-              loading={actionStatus === "submitting"}
-              loadingText="Sending…"
-              disabled={proposedSlotsLocal.some((s) => !s) || actionStatus === "submitting"}
-            >
-              {isReoffer ? "Re-offer & email new booking link" : "Accept & email booking link"}
-            </Button>
-          </div>
-        )}
 
-        {/* DECLINE — available pre-final. */}
-        {canDecline && (
-          <div className="rounded-xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-card)] p-4">
-            <SectionHeading>Decline politely</SectionHeading>
-            <p className="mt-1 mb-3 text-xs text-[var(--bb-text-muted)]">
-              Optional one-line reason — surfaced verbatim in the email above the generic copy.
-              Leave blank to send the standard rejection.
-            </p>
-            <FormTextarea
-              rows={3}
-              value={declineReason}
-              onChange={(e) => onDeclineReasonChange(e.target.value)}
-              placeholder="e.g. We're focused on motion designers this quarter."
-              maxLength={500}
-              aria-label="Decline reason (optional)"
-            />
-            <Button
-              variant="danger"
-              className="mt-3 w-full"
-              onClick={onDecline}
-              loading={actionStatus === "submitting"}
-              loadingText="Sending…"
-              disabled={actionStatus === "submitting"}
-            >
-              Decline &amp; send email
-            </Button>
-          </div>
-        )}
+            {tab === "overview" && (
+              <TabPanel idPrefix={idPrefix} value="overview">
+                <div className="mt-5">
+                  {statusCard && <PanelSection>{statusCard}</PanelSection>}
+                  <PanelSection title="Contact">
+                    <KeyValueList
+                      rows={[
+                        {
+                          label: "Email",
+                          value: (
+                            <a
+                              href={`mailto:${item.email}`}
+                              className="break-all text-[var(--av2-link)] hover:underline"
+                            >
+                              {item.email}
+                            </a>
+                          ),
+                        },
+                        { label: "WhatsApp", value: item.whatsappNumber || DASH },
+                        { label: "Country", value: item.country || DASH },
+                        { label: "Timezone", value: item.timezone || DASH },
+                      ]}
+                    />
+                  </PanelSection>
+                  <PanelSection title="Links">
+                    <KeyValueList
+                      rows={[
+                        {
+                          label: "Portfolio",
+                          value: item.portfolioUrl ? (
+                            <ExternalLink href={item.portfolioUrl} />
+                          ) : (
+                            DASH
+                          ),
+                        },
+                        {
+                          label: "LinkedIn",
+                          value: item.linkedinUrl ? <ExternalLink href={item.linkedinUrl} /> : DASH,
+                        },
+                        {
+                          label: "Other links",
+                          value:
+                            social.length > 0 ? (
+                              <ul className="space-y-1">
+                                {social.map((url) => (
+                                  <li key={url}>
+                                    <ExternalLink href={url} />
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              DASH
+                            ),
+                        },
+                      ]}
+                    />
+                  </PanelSection>
+                  <PanelSection title={`Applied for (${categories.length})`}>
+                    {categories.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {categories.map((c, i) => (
+                          <Badge key={`${c}-${i}`}>{c}</Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-[var(--av2-text-2)]">{DASH}</p>
+                    )}
+                  </PanelSection>
+                </div>
+              </TabPanel>
+            )}
 
-        {actionError &&
-          (canOfferSlots ||
-            canConfirmProposed ||
-            canDecline ||
-            canMarkInterviewHeld ||
-            canHire ||
-            canRejectPostInterview ||
-            item.status === "HIRED") && (
-            <InlineAlert variant="error" title="Action failed">
-              {actionError}
-            </InlineAlert>
-          )}
+            {tab === "answers" && (
+              <TabPanel idPrefix={idPrefix} value="answers">
+                <div className="mt-5">
+                  <PanelSection title="Experience">
+                    <KeyValueList
+                      rows={[
+                        { label: "Total years", value: item.totalYears || DASH },
+                        {
+                          label: "Remote experience",
+                          value: item.hasRemoteExp
+                            ? `Yes (${item.yearsRemote ?? "?"} years)`
+                            : "No",
+                        },
+                        {
+                          label: "Worked at / with",
+                          value: workedWith.length > 0 ? workedWith.join(", ") : DASH,
+                        },
+                      ]}
+                    />
+                  </PanelSection>
+                  <PanelSection title="Availability">
+                    <KeyValueList
+                      rows={[
+                        {
+                          label: "Workload",
+                          value: item.workload
+                            ? item.workload.replace("_", "-").toLowerCase()
+                            : DASH,
+                        },
+                        { label: "Tasks per week", value: item.preferredTasksPerWeek || DASH },
+                      ]}
+                    />
+                  </PanelSection>
+                  <PanelSection title="Turnaround">
+                    <KeyValueList
+                      rows={[
+                        { label: "24–48h ok?", value: item.turnaroundOk ? "Yes" : "No" },
+                        { label: "Comment", value: item.turnaroundComment || DASH },
+                      ]}
+                    />
+                  </PanelSection>
+                  <PanelSection title="Tools">
+                    <KeyValueList
+                      rows={[
+                        { label: "Selected", value: tools.length > 0 ? tools.join(", ") : DASH },
+                        { label: "Other", value: item.toolsOther || DASH },
+                      ]}
+                    />
+                  </PanelSection>
+                  <PanelSection title="Other">
+                    <KeyValueList
+                      rows={[
+                        { label: "Open to test task?", value: item.testTaskOk ? "Yes" : "No" },
+                        {
+                          label: "Submitted",
+                          value: `${formatDateTime(item.createdAt)} · ${item.ipAddress ?? "no IP"}`,
+                        },
+                      ]}
+                    />
+                  </PanelSection>
+                </div>
+              </TabPanel>
+            )}
+
+            {tab === "progress" && (
+              <TabPanel idPrefix={idPrefix} value="progress">
+                <div className="mt-5">
+                  <PanelSection>
+                    <Stepper steps={progressSteps(item)} />
+                  </PanelSection>
+                </div>
+              </TabPanel>
+            )}
+          </>
+        )}
+      </DetailPanel>
+    );
+  };
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
+
+  const panel = selected ? renderPanel(selected) : undefined;
+  // With the panel open the list narrows; categories + country move to the panel.
+  const wideList = !selected;
+  const noApplicationsAtAll = countsLoaded && totalCount === 0 && !loadError;
+
+  return (
+    <div>
+      <PageHeader
+        title="Talent applications"
+        description="Review submissions from the public /talent form and move candidates through hiring."
+        actions={
+          <Button
+            onClick={() => void refreshList()}
+            disabled={loading}
+            aria-label="Refresh applications"
+          >
+            <IconRefresh />
+            Refresh
+          </Button>
+        }
+      />
+
+      <OwnerOnlyNote action="accept or decline talent applications" />
+
+      <div className="mb-6">
+        <FilterChips
+          label="Filter applications by stage"
+          value={stage}
+          onChange={(v) => void selectStage(v)}
+          options={[
+            { value: "ALL" as StageFilter, label: "All applications", count: stageCount("ALL") },
+            ...STAGES.map((s) => ({
+              value: s.key as StageFilter,
+              label: s.label,
+              count: stageCount(s.key),
+            })),
+          ]}
+        />
       </div>
+
+      {loadError && (
+        <div className="mb-6">
+          <Callout tone="error" title="Couldn't load applications">
+            {loadError}
+          </Callout>
+        </div>
+      )}
+
+      <SplitView panel={panel}>
+        <Card padding="none">
+          {!noApplicationsAtAll && (
+            <div className="px-6 pt-5">
+              <FilterBar
+                trailing={
+                  !loading || items.length > 0
+                    ? `${fmt(filteredItems.length)} ${plural(filteredItems.length, "application", "applications")}`
+                    : null
+                }
+              >
+                <SearchInput
+                  className="min-w-[200px] flex-1"
+                  value={query}
+                  onChange={setQuery}
+                  placeholder="Search name, email or country"
+                  label="Search applications by name, email or country"
+                />
+                <div className="w-full sm:w-64">
+                  <Select
+                    aria-label="Filter by individual status"
+                    value={statusFilter ?? ""}
+                    onChange={(e) => void selectStatus(e.target.value)}
+                  >
+                    <option value="">
+                      {stage === "ALL" ? "All statuses" : `All statuses in ${viewLabel}`}
+                    </option>
+                    {selectableStatuses.map((s) => (
+                      <option key={s} value={s}>
+                        {STATUS_FILTER_LABEL[s]}
+                        {countsLoaded ? ` · ${statusCounts[s] ?? 0}` : ""}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              </FilterBar>
+            </div>
+          )}
+
+          {loading && items.length === 0 ? (
+            <div className="space-y-3 border-t border-[var(--av2-border)] px-6 py-5" role="status">
+              <span className="sr-only">Loading applications…</span>
+              {[0, 1, 2].map((i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
+          ) : items.length === 0 ? (
+            <div className={noApplicationsAtAll ? "" : "border-t border-[var(--av2-border)]"}>
+              {noApplicationsAtAll ? (
+                <EmptyState
+                  icon={<IconPeople width={28} height={28} />}
+                  title="No applications yet"
+                  description="When candidates submit the public form at /talent, they'll show up here."
+                />
+              ) : (
+                <EmptyState
+                  title={`No applications in ${viewLabel}`}
+                  description="Nothing is at this stage right now."
+                  action={
+                    countsLoaded && totalCount > 0 ? (
+                      <Button onClick={() => void selectStage("ALL")}>Show all applications</Button>
+                    ) : undefined
+                  }
+                />
+              )}
+            </div>
+          ) : filteredItems.length === 0 ? (
+            <div className="border-t border-[var(--av2-border)]">
+              <EmptyState
+                title="No applications match your search"
+                description="Try a different name, email or country."
+                action={<Button onClick={() => setQuery("")}>Clear search</Button>}
+              />
+            </div>
+          ) : (
+            <Table label="Talent applications">
+              <thead>
+                <tr>
+                  <Th>Applicant</Th>
+                  {wideList && <Th>Applied for</Th>}
+                  <Th>Status</Th>
+                  {wideList && <Th>Country</Th>}
+                  <Th>Submitted</Th>
+                  <Th align="right">
+                    <span className="sr-only">Open</span>
+                  </Th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredItems.map((it) => {
+                  const meta = STATUS_META[it.status];
+                  const cats = formatList(it.categoryIds).map(categoryLabel);
+                  return (
+                    <Tr
+                      key={it.id}
+                      selected={it.id === selectedId}
+                      onSelect={() => void selectRow(it.id)}
+                      label={`${it.fullName}, ${meta.label}, submitted ${formatDateTime(it.createdAt)}`}
+                    >
+                      <Td>
+                        <div className="flex items-center gap-3">
+                          <Avatar name={it.fullName} size={36} />
+                          <div className="min-w-0">
+                            <div className="truncate font-semibold">{it.fullName}</div>
+                            <div className="truncate text-xs text-[var(--av2-text-2)]">
+                              {it.email}
+                            </div>
+                            {it.existingCustomer && (
+                              <Badge tone="amber" className="mt-1">
+                                Existing customer
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </Td>
+                      {wideList && (
+                        <Td className="max-w-[220px]">
+                          {cats.length > 0 ? (
+                            <span className="block truncate" title={cats.join(", ")}>
+                              {cats[0]}
+                              {cats.length > 1 && (
+                                <span className="text-[var(--av2-text-2)]">
+                                  {" "}
+                                  +{cats.length - 1}
+                                </span>
+                              )}
+                            </span>
+                          ) : (
+                            <span className="text-[var(--av2-text-2)]">{DASH}</span>
+                          )}
+                        </Td>
+                      )}
+                      <Td>
+                        <Badge tone={meta.tone} dot>
+                          {meta.label}
+                        </Badge>
+                      </Td>
+                      {wideList && <Td>{it.country || DASH}</Td>}
+                      <Td className="whitespace-nowrap tabular-nums">
+                        <div>{formatDate(it.createdAt)}</div>
+                        <div className="text-xs text-[var(--av2-text-2)]">
+                          {formatTime(it.createdAt)}
+                        </div>
+                      </Td>
+                      <Td align="right" className="text-[var(--av2-text-2)]">
+                        <span className="inline-flex">
+                          <IconChevronRight />
+                        </span>
+                      </Td>
+                    </Tr>
+                  );
+                })}
+              </tbody>
+            </Table>
+          )}
+
+          {items.length > 0 && (
+            <TableFooter>
+              <span className="tabular-nums">
+                Showing {fmt(filteredItems.length)} of {fmt(items.length)} in {viewLabel}
+              </span>
+              {!selected && <span>Select a candidate to review and act.</span>}
+            </TableFooter>
+          )}
+        </Card>
+      </SplitView>
     </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Tiny helpers — kept inline because they're not reused outside this page.
-// ---------------------------------------------------------------------------
-
-// Section header for the detail panel. Polish round 1: scale up size +
-// contrast and add a top divider so the eight sections (Contact /
-// Portfolio / Skills / Experience / …) read as discrete blocks rather
-// than a flat run of label-value rows. The first heading suppresses its
-// top border via the `:first-of-type` selector applied at the parent so
-// nothing nests against the panel's outer padding.
-function SectionHeading({ children }: { children: React.ReactNode }) {
-  return (
-    <h3 className="mt-4 flex items-center gap-2 border-t border-[var(--bb-border-subtle)] pt-3 text-xs font-bold tracking-[0.12em] text-[var(--bb-secondary)] uppercase first-of-type:mt-0 first-of-type:border-t-0 first-of-type:pt-0">
-      <span className="inline-block h-2 w-1 rounded-full bg-[var(--bb-primary)]" aria-hidden />
-      {children}
-    </h3>
-  );
-}
-
-function KeyValue({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
-      <span className="text-[var(--bb-text-muted)]">{label}</span>
-      <span className="text-[var(--bb-secondary)]">{value}</span>
-    </div>
-  );
-}
-
-function ExternalLink({ href }: { href: string }) {
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="break-all text-[var(--bb-primary)] hover:underline"
-    >
-      {href}
-    </a>
   );
 }
