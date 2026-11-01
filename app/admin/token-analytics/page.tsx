@@ -1,19 +1,43 @@
 // -----------------------------------------------------------------------------
 // @file: app/admin/token-analytics/page.tsx
-// @purpose: Admin-facing token analytics (global + per company)
-// @version: v1.0.0
+// @purpose: Admin-facing token analytics (global + per company), admin design
+//           language v1. Scope is company token movements only — creative
+//           wallet rows live in the global ledger (/admin/ledger). KPI cards
+//           + a per-company breakdown table; the old single-series bar chart
+//           duplicated the table's net column and was removed.
+// @version: v2.0.0
 // @status: active
-// @lastUpdate: 2025-11-15
+// @lastUpdate: 2026-11-01
 // -----------------------------------------------------------------------------
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import { EmptyState } from "@/components/ui/empty-state";
-import { FormSelect } from "@/components/ui/form-field";
-import { LoadingState } from "@/components/ui/loading-state";
-import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  Button,
+  ButtonLink,
+  Callout,
+  Card,
+  CardTitle,
+  DASH,
+  EmptyState,
+  FilterBar,
+  IconTile,
+  KpiCard,
+  PageHeader,
+  Pager,
+  Select,
+  Skeleton,
+  Table,
+  TableFooter,
+  Td,
+  TextLink,
+  Th,
+  Tr,
+  fmt,
+  plural,
+} from "@/components/admin/v2/ui";
+import { IconArrowUpRight, IconBuilding, IconCoins } from "@/components/admin/v2/icons";
 
 type CompanyAnalytics = {
   companyId: string;
@@ -39,12 +63,63 @@ type TokenAnalyticsResponse = {
   perCompany: CompanyAnalytics[];
 };
 
+const PAGE_SIZE = 15;
+
+/** Signed token amount: "+12", "−235" (true minus sign), "0". */
+function signed(n: number | null | undefined) {
+  if (typeof n !== "number" || !Number.isFinite(n)) return DASH;
+  if (n > 0) return `+${fmt(n)}`;
+  if (n < 0) return `−${fmt(Math.abs(n))}`;
+  return "0";
+}
+
+function Glyph({ children }: { children: ReactNode }) {
+  return (
+    <svg
+      width={20}
+      height={20}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      {children}
+    </svg>
+  );
+}
+
+const IconFlow = () => (
+  <Glyph>
+    <path d="M4 8h14l-3-3M20 16H6l3 3" />
+  </Glyph>
+);
+const IconUp = () => (
+  <Glyph>
+    <path d="M12 19V5M5 12l7-7 7 7" />
+  </Glyph>
+);
+const IconDown = () => (
+  <Glyph>
+    <path d="M12 5v14M19 12l-7 7-7-7" />
+  </Glyph>
+);
+const IconBook = () => (
+  <Glyph>
+    <path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4Z" />
+    <path d="M5 17a3 3 0 0 1 3-3h11M9 8h6" />
+  </Glyph>
+);
+
 export default function AdminTokenAnalyticsPage() {
   const [data, setData] = useState<TokenAnalyticsResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   const [companyFilter, setCompanyFilter] = useState<string>("ALL");
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     let cancelled = false;
@@ -93,11 +168,13 @@ export default function AdminTokenAnalyticsPage() {
   }, []);
 
   const stats = data?.stats;
-  const companies = data?.perCompany ?? [];
+  const companies = useMemo(() => data?.perCompany ?? [], [data]);
 
   const companyNames = useMemo(
     () =>
-      Array.from(new Set(companies.map((c) => c.company?.name).filter((n): n is string => !!n))),
+      Array.from(
+        new Set(companies.map((c) => c.company?.name).filter((n): n is string => !!n)),
+      ).sort((a, b) => a.localeCompare(b)),
     [companies],
   );
 
@@ -110,203 +187,245 @@ export default function AdminTokenAnalyticsPage() {
     [companies, companyFilter],
   );
 
-  const chartData = useMemo(
-    () =>
-      filteredCompanies.map((c) => ({
-        name: c.company?.name ?? "Unknown",
-        netTokens: c.netTokens,
-      })),
-    [filteredCompanies],
-  );
+  const pageCount = Math.max(1, Math.ceil(filteredCompanies.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const pageStart = (currentPage - 1) * PAGE_SIZE;
+  const pageRows = filteredCompanies.slice(pageStart, pageStart + PAGE_SIZE);
+
+  const filtersActive = companyFilter !== "ALL";
+  const resetFilters = () => {
+    setCompanyFilter("ALL");
+    setPage(1);
+  };
+
+  const pending = loading && !data;
 
   return (
     <>
-      {/* Page header */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Token analytics</h1>
-          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-            High-level overview of token movements across all companies.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Token analytics"
+        description="Company token movements only. Creative payouts and withdrawals are in the global ledger."
+        actions={
+          <ButtonLink href="/admin/ledger">
+            Open global ledger
+            <IconArrowUpRight />
+          </ButtonLink>
+        }
+      />
 
-      {/* Error */}
       {error && (
-        <InlineAlert variant="error" title="Something went wrong" className="mb-4">
-          {error}
-        </InlineAlert>
+        <div className="mb-6">
+          <Callout tone="error" title="Something went wrong">
+            {error}
+          </Callout>
+        </div>
       )}
 
-      {/* Summary cards */}
-      <section className="mb-6 grid gap-4 md:grid-cols-4">
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-          <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
-            Net tokens
-          </p>
-          <p className="mt-2 text-3xl font-semibold text-[var(--bb-primary)]">
-            {loading ? "—" : stats ? stats.globalNet : 0}
-          </p>
-          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-            Total credits minus debits across all companies.
-          </p>
+      <div className="mb-4 flex flex-wrap items-baseline gap-x-2">
+        <h2 className="text-lg font-semibold">Company ledger totals</h2>
+        <span className="text-sm text-[var(--av2-text-2)]">· All time</span>
+      </div>
+
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
+        <KpiCard
+          icon={<IconFlow />}
+          tone="peach"
+          label="Net token flow"
+          value={pending ? DASH : signed(stats?.globalNet)}
+          hint="Total credits minus debits across all companies"
+        />
+        <KpiCard
+          icon={<IconUp />}
+          tone="green"
+          label="Total credits"
+          value={pending ? DASH : fmt(stats?.globalCredits)}
+          hint="Tokens added via plans, top-ups, bonuses, etc."
+        />
+        <KpiCard
+          icon={<IconDown />}
+          tone="red"
+          label="Total debits"
+          value={pending ? DASH : fmt(stats?.globalDebits)}
+          hint="Tokens spent on jobs and corrections"
+        />
+        <KpiCard
+          icon={<IconBuilding />}
+          tone="lavender"
+          label="Companies with activity"
+          value={pending ? DASH : fmt(stats?.companiesWithLedger)}
+          hint={
+            stats
+              ? `${fmt(stats.ledgerEntriesCount)} company ${plural(
+                  stats.ledgerEntriesCount,
+                  "entry",
+                  "entries",
+                )} in total`
+              : "Companies with at least one ledger entry"
+          }
+        />
+      </div>
+
+      <Card padding="none">
+        <div className="px-6 pt-5">
+          <div className="mb-4">
+            <CardTitle
+              description="Sorted by net token flow, highest first."
+              action={
+                data ? (
+                  <span className="pt-1 text-sm whitespace-nowrap text-[var(--av2-text-2)] tabular-nums">
+                    {fmt(companies.length)} {plural(companies.length, "company", "companies")} with
+                    ledger activity
+                  </span>
+                ) : null
+              }
+            >
+              Company breakdown
+            </CardTitle>
+          </div>
+          <FilterBar>
+            <div className="w-full sm:w-64">
+              <Select
+                aria-label="Filter by company"
+                value={companyFilter}
+                onChange={(e) => {
+                  setCompanyFilter(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="ALL">All companies</option>
+                {companyNames.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </FilterBar>
         </div>
 
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-          <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
-            Total credits
-          </p>
-          <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
-            {loading ? "—" : stats ? stats.globalCredits : 0}
-          </p>
-          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-            Tokens added via plans, top-ups, bonuses, etc.
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-          <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
-            Total debits
-          </p>
-          <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
-            {loading ? "—" : stats ? stats.globalDebits : 0}
-          </p>
-          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-            Tokens spent on jobs, withdrawals and corrections.
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-          <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
-            Companies with activity
-          </p>
-          <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
-            {loading ? "—" : stats ? stats.companiesWithLedger : 0}
-          </p>
-          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-            Companies that have at least one ledger entry.
-          </p>
-        </div>
-      </section>
-
-      {/* Filter bar */}
-      <section className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-        <div className="flex items-center gap-2">
-          <label className="text-xs font-medium text-[var(--bb-secondary)]">Company</label>
-          <FormSelect
-            value={companyFilter}
-            onChange={(e) => setCompanyFilter(e.target.value)}
-            className="w-auto"
-          >
-            <option value="ALL">All companies</option>
-            {companyNames.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
+        {pending ? (
+          <div className="space-y-3 border-t border-[var(--av2-border)] px-6 py-5" role="status">
+            <span className="sr-only">Loading companies…</span>
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} className="h-12 w-full" />
             ))}
-          </FormSelect>
-        </div>
-      </section>
-
-      {/* Chart + table — stacks below lg so neither column gets squeezed
-          next to the fixed sidebar. */}
-      <section className="grid gap-4 xl:grid-cols-[3fr_4fr]">
-        {/* Chart */}
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold tracking-tight">Net tokens by company</h2>
-            <p className="text-xs text-[var(--bb-text-tertiary)]">Shows filtered companies only.</p>
           </div>
-          {loading ? (
-            <LoadingState message="Loading chart…" />
-          ) : chartData.length === 0 ? (
+        ) : companies.length === 0 ? (
+          <div className="border-t border-[var(--av2-border)]">
             <EmptyState
-              title="No data to display."
-              description="Token activity will appear here once companies start using tokens."
+              icon={<IconCoins width={28} height={28} />}
+              title="No company token activity yet"
+              description="Totals appear here once companies start buying and spending tokens."
             />
-          ) : (
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={(value: any) => [value, "Net tokens"]} />
-                  <Bar
-                    dataKey="netTokens"
-                    // color is left to Recharts default styling
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </div>
-
-        {/* Table */}
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold tracking-tight">Companies overview</h2>
-            <p className="text-xs text-[var(--bb-text-tertiary)]">
-              Sorted by net tokens (descending).
-            </p>
           </div>
-
-          {loading ? (
-            <LoadingState message="Loading companies…" />
-          ) : filteredCompanies.length === 0 ? (
+        ) : filteredCompanies.length === 0 ? (
+          <div className="border-t border-[var(--av2-border)]">
             <EmptyState
-              title="No companies match your filter."
-              description="Try selecting a different company or choose 'All companies'."
+              title="No companies match this filter"
+              description="Choose a different company or show all companies."
+              action={<Button onClick={resetFilters}>Show all companies</Button>}
             />
-          ) : (
-            <div className="max-h-80 overflow-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-[var(--bb-border)] text-xs tracking-[0.08em] text-[var(--bb-text-tertiary)] uppercase">
-                    <th className="px-2 py-2">Company</th>
-                    <th className="px-2 py-2 text-right">Credits</th>
-                    <th className="px-2 py-2 text-right">Debits</th>
-                    <th className="px-2 py-2 text-right">Net</th>
-                    <th className="px-2 py-2 text-right">Entries</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredCompanies.map((c) => (
-                    <tr
-                      key={c.companyId}
-                      className="border-b border-[var(--bb-border-subtle)] text-xs last:border-b-0"
-                    >
-                      <td className="px-2 py-2 align-top text-[11px] text-[var(--bb-secondary)]">
-                        {c.company ? (
-                          <>
-                            <div className="font-medium">{c.company.name}</div>
-                            <div className="text-[10px] text-[var(--bb-text-tertiary)]">
-                              {c.company.slug}
-                            </div>
-                          </>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                      <td className="px-2 py-2 text-right align-top text-[11px] text-[var(--bb-secondary)]">
-                        {c.totalCredits}
-                      </td>
-                      <td className="px-2 py-2 text-right align-top text-[11px] text-[var(--bb-secondary)]">
-                        {c.totalDebits}
-                      </td>
-                      <td className="px-2 py-2 text-right align-top text-[11px] text-[var(--bb-secondary)]">
-                        {c.netTokens}
-                      </td>
-                      <td className="px-2 py-2 text-right align-top text-[11px] text-[var(--bb-text-tertiary)]">
-                        {c.entriesCount}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          </div>
+        ) : (
+          <Table label="Token totals by company">
+            <thead>
+              <tr>
+                <Th>Company</Th>
+                <Th align="right">Credits</Th>
+                <Th align="right">Debits</Th>
+                <Th align="right">Net flow</Th>
+                <Th align="right">Entries</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {pageRows.map((c) => (
+                <Tr key={c.companyId}>
+                  <Td>
+                    {c.company ? (
+                      <>
+                        <div className="font-semibold">{c.company.name}</div>
+                        <div className="text-xs text-[var(--av2-text-2)]">{c.company.slug}</div>
+                      </>
+                    ) : (
+                      <span className="text-[var(--av2-text-2)]">Unknown company</span>
+                    )}
+                  </Td>
+                  <Td align="right">{fmt(c.totalCredits)}</Td>
+                  <Td align="right">{fmt(c.totalDebits)}</Td>
+                  <Td
+                    align="right"
+                    className={`font-semibold ${
+                      c.netTokens < 0 ? "text-[var(--av2-error-text)]" : ""
+                    }`}
+                  >
+                    {signed(c.netTokens)}
+                  </Td>
+                  <Td align="right" className="text-[var(--av2-text-2)]">
+                    {fmt(c.entriesCount)}
+                  </Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+        )}
+
+        {data && filteredCompanies.length > 0 && (
+          <TableFooter>
+            <span className="tabular-nums">
+              Showing {fmt(pageStart + 1)}–{fmt(pageStart + pageRows.length)} of{" "}
+              {fmt(filteredCompanies.length)}{" "}
+              {plural(filteredCompanies.length, "company", "companies")}
+              {filtersActive && ` (filtered from ${fmt(companies.length)})`}
+            </span>
+            <div className="flex flex-wrap items-center gap-3">
+              {filtersActive && (
+                <Button size="sm" variant="ghost" onClick={resetFilters}>
+                  Clear filter
+                </Button>
+              )}
+              <Pager page={currentPage} pageCount={pageCount} onPage={setPage} />
             </div>
-          )}
-        </div>
-      </section>
+          </TableFooter>
+        )}
+      </Card>
+
+      {/* Explainers: what "net flow" means + the scope of these numbers. */}
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <Card>
+          <div className="flex gap-4">
+            <IconTile tone="lavender">
+              <IconFlow />
+            </IconTile>
+            <div className="min-w-0">
+              <h2 className="text-xl leading-7 font-semibold">About net flow</h2>
+              <p className="mt-2 text-sm text-[var(--av2-text-2)]">
+                Credits minus debits over the recorded history. It is not a live balance — use the
+                company profile to check a company&apos;s current token balance.
+              </p>
+              <div className="mt-3">
+                <TextLink href="/admin/companies">Open companies</TextLink>
+              </div>
+            </div>
+          </div>
+        </Card>
+        <Card>
+          <div className="flex gap-4">
+            <IconTile tone="green">
+              <IconBook />
+            </IconTile>
+            <div className="min-w-0">
+              <h2 className="text-xl leading-7 font-semibold">Company ledger scope</h2>
+              <p className="mt-2 text-sm text-[var(--av2-text-2)]">
+                These totals cover company token movements only. Creative wallet movements (job
+                payouts and withdrawals) are excluded here; the global ledger shows both.
+              </p>
+              <div className="mt-3">
+                <TextLink href="/admin/ledger">View global ledger</TextLink>
+              </div>
+            </div>
+          </div>
+        </Card>
+      </div>
     </>
   );
 }
