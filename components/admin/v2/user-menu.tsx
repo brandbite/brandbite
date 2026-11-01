@@ -14,6 +14,7 @@ import { authClient } from "@/lib/auth-client";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { IconLogout, IconMembers, IconSettings } from "@/components/navigation/nav-icons";
 import type { AdminSessionUser } from "./use-admin-session";
+import { useConfirmDiscard } from "./unsaved-changes";
 
 export function Avatar({ user, size = 40 }: { user: AdminSessionUser | null; size?: number }) {
   return (
@@ -66,8 +67,11 @@ export function UserMenu({
     };
   }, [open]);
 
+  const confirmDiscard = useConfirmDiscard();
+
   const signOut = async () => {
     setOpen(false);
+    if (!(await confirmDiscard())) return;
     if (isDemoMode) {
       router.push("/debug/demo-user");
       return;
