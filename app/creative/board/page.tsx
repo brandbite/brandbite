@@ -18,6 +18,7 @@ import {
   getImageDimensions,
   isOutputMimeAllowed,
   OUTPUT_ACCEPT_ATTR,
+  validateFileSize,
 } from "@/lib/upload-helpers";
 import { useToast } from "@/components/ui/toast-provider";
 import { InlineAlert } from "@/components/ui/inline-alert";
@@ -96,6 +97,8 @@ type CreativeTicketsStats = {
 type CreativeTicketsResponse = {
   stats: CreativeTicketsStats;
   tickets: CreativeTicket[];
+  /** Whether a "Note to your customer" is saved for this creative. */
+  revisionNotesEnabled?: boolean;
 };
 
 type RevisionAsset = {
@@ -920,7 +923,24 @@ export default function CreativeBoardPage() {
 
   const handleAddReviewFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    const incoming = Array.from(files).filter((f) => isOutputMimeAllowed(f.type));
+    // Reject bad files here, before "Upload & send" creates the version —
+    // otherwise the customer gets a version whose files then fail to upload.
+    const all = Array.from(files);
+    const wrongType = all.filter((f) => !isOutputMimeAllowed(f.type));
+    const tooBig = all.filter((f) => isOutputMimeAllowed(f.type) && validateFileSize(f));
+    const incoming = all.filter((f) => isOutputMimeAllowed(f.type) && !validateFileSize(f));
+    if (wrongType.length > 0 || tooBig.length > 0) {
+      showToast({
+        type: "warning",
+        title: "Some files weren't added",
+        description: [
+          wrongType.length > 0 ? `${wrongType.length} not an image or PDF` : null,
+          tooBig.length > 0 ? `${tooBig.length} larger than 4 MB` : null,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+      });
+    }
     setReviewFiles((prev) => {
       const room = Math.max(0, MAX_REVIEW_FILES - prev.length);
       return [
@@ -943,7 +963,7 @@ export default function CreativeBoardPage() {
 
     // Step 1: Persist status transition (creates revision, returns revisionId)
     const result = await persistTicketStatus(ticket.id, targetStatus, {
-      creativeMessage: creativeNote.trim() || null,
+      creativeMessage: data?.revisionNotesEnabled ? creativeNote.trim() || null : null,
     });
 
     // If PATCH failed or no files to upload, just close
@@ -2063,7 +2083,7 @@ export default function CreativeBoardPage() {
                 </button>
               </p>
               <p className="mt-1 text-[10px] text-[var(--bb-text-muted)]">
-                PNG, JPG, WebP, PDF — up to {MAX_REVIEW_FILES} files
+                Images or PDF, 4 MB each — up to {MAX_REVIEW_FILES} files
               </p>
               <input
                 ref={reviewFileInputRef}
@@ -2121,21 +2141,24 @@ export default function CreativeBoardPage() {
             )}
           </div>
 
-          {/* Creative note */}
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-[var(--bb-secondary)]">
-              Note to your customer{" "}
-              <span className="font-normal text-[var(--bb-text-tertiary)]">(optional)</span>
-            </label>
-            <textarea
-              value={creativeNote}
-              onChange={(e) => setCreativeNote(e.target.value)}
-              rows={3}
-              disabled={reviewUploading}
-              placeholder="Highlight what you changed, any open questions, or how they should review this version."
-              className="w-full rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-2.5 text-xs text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)] disabled:opacity-50"
-            />
-          </div>
+          {/* Creative note — only when an admin has enabled notes for this
+              creative; the server drops it otherwise. */}
+          {data?.revisionNotesEnabled && (
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-[var(--bb-secondary)]">
+                Note to your customer{" "}
+                <span className="font-normal text-[var(--bb-text-tertiary)]">(optional)</span>
+              </label>
+              <textarea
+                value={creativeNote}
+                onChange={(e) => setCreativeNote(e.target.value)}
+                rows={3}
+                disabled={reviewUploading}
+                placeholder="Highlight what you changed, any open questions, or how they should review this version."
+                className="w-full rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-2.5 text-xs text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)] disabled:opacity-50"
+              />
+            </div>
+          )}
 
           {/* Upload progress */}
           {reviewUploadProgress && (
