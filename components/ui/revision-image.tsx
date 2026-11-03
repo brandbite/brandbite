@@ -12,6 +12,7 @@ import { PinSidebar, PinBottomSheet } from "./pin-sidebar";
 import { PdfCanvas } from "./pdf-canvas";
 import { downloadSingleAsset, downloadAssetsAsZip } from "@/lib/download-helpers";
 import { isImageAsset } from "@/lib/upload-helpers";
+import { useToast } from "@/components/ui/toast-provider";
 
 /** Uppercase extension label for a non-image file chip (e.g. "PDF"). */
 function fileExtLabel(name: string | null, url: string | null): string {
@@ -406,6 +407,7 @@ function ImageLightbox({
   const [activePinOrder, setActivePinOrder] = useState<number | null>(null);
   const [existingPinsLoaded, setExistingPinsLoaded] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
+  const { showToast } = useToast();
   const [validationErrors, setValidationErrors] = useState<Set<number>>(new Set());
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [mobileAutoExpand, setMobileAutoExpand] = useState(false);
@@ -680,10 +682,20 @@ function ImageLightbox({
       onClose();
     } catch (err) {
       console.error("[Lightbox] submit revision error:", err);
+      // Keep the lightbox open so the notes aren't lost, and say so — this
+      // used to fail silently and users assumed their feedback was sent.
+      showToast({
+        type: "error",
+        title: "Your notes weren't sent",
+        description:
+          err instanceof Error && err.message
+            ? err.message
+            : "Something went wrong. Please try again.",
+      });
     } finally {
       setSubmitting(false);
     }
-  }, [pinsPerAsset, assets, ticketId, onRevisionSubmitted, onClose]);
+  }, [pinsPerAsset, assets, ticketId, onRevisionSubmitted, onClose, showToast]);
 
   // ---------------------------------------------------------------------------
   // Render

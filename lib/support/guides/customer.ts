@@ -5,14 +5,9 @@
 //           CUSTOMER_NAV and the pages they describe — when a customer page
 //           changes, update its guide in the same PR.
 //
-//           Deliberately NOT documented (flagged off, or known-broken and
-//           tracked separately — update the guide when that changes):
-//           - Tags (TAGS_ENABLED, off by default) and "Work with AI" tickets
-//             (AI_TICKETS_MODE).
-//           - Settings → "Manage billing" (opens a new checkout rather than
-//             managing the existing subscription).
-//           - Pin notes from the full ticket page (/customer/tickets/[id]) —
-//             sending fails there; guides point to the Board ticket window.
+//           Deliberately NOT documented (flagged off — update the guide when
+//           that changes): Tags (TAGS_ENABLED, off by default) and "Work with
+//           AI" tickets (AI_TICKETS_MODE).
 // -----------------------------------------------------------------------------
 
 import type { SupportGuide } from "../types";
@@ -552,7 +547,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           {
             type: "steps",
             items: [
-              "Open the request **from the Board** and click an image in the current version.",
+              "Open the request and click an image in the current version.",
               "Click anywhere on the image to drop a numbered pin, and write what should change there.",
               "Add as many pins as you need. Use the arrow keys to move between images.",
               "Click **Send all notes**. The request goes back to **In progress** with your notes.",
@@ -1056,7 +1051,20 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Only **Owners** and **Billing managers** can change the plan or buy tokens. Everyone else sees the plan in **Settings → Subscription plan** with a **Limited access** note.",
+            text: "Only **Owners** and **Billing managers** can start a subscription, change the plan or buy tokens. Everyone else sees the plan in **Settings → Subscription plan** with a **Limited access** note.",
+          },
+        ],
+      },
+      {
+        heading: "Starting a subscription",
+        blocks: [
+          {
+            type: "p",
+            text: "If your company doesn't have a subscription yet, click **Start subscription** in **Settings → Subscription plan** and pay through Stripe. Your plan's monthly tokens are added as soon as the payment succeeds.",
+          },
+          {
+            type: "p",
+            text: "Once you're subscribed, the button goes away. Use **Switch to a different plan** to change plans. For invoices, your payment method or cancelling, contact us at the email shown there.",
           },
         ],
       },
@@ -1404,7 +1412,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Shows your plan, monthly tokens, price and subscription status. Owners and Billing managers can switch plans and buy top-ups here. See **Plans, upgrades and top-ups**.",
+            text: "Shows your plan, monthly tokens, price and subscription status. Owners and Billing managers can start a subscription, switch plans and buy top-ups here. See **Plans, upgrades and top-ups**.",
           },
         ],
       },

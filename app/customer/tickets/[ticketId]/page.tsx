@@ -12,6 +12,7 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { InlineAlert } from "@/components/ui/inline-alert";
+import { useToast } from "@/components/ui/toast-provider";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -215,6 +216,18 @@ export default function CustomerTicketDetailPage() {
   // Core data
   const [state, setState] = useState<ViewState>({ status: "loading" });
   const [refreshCounter, setRefreshCounter] = useState(0);
+  const { showToast } = useToast();
+
+  // Pin notes sent from the revision viewer move the ticket back to
+  // IN_PROGRESS server-side; reload so the status and revisions catch up.
+  const handlePinsSubmitted = useCallback(() => {
+    setRefreshCounter((c) => c + 1);
+    showToast({
+      type: "success",
+      title: "Changes requested",
+      description: "Your pin notes have been sent to your creative.",
+    });
+  }, [showToast]);
 
   // Company role
   const [companyRole, setCompanyRole] = useState<CompanyRole | null>(null);
@@ -1131,11 +1144,15 @@ export default function CustomerTicketDetailPage() {
                                 <RevisionImageLarge
                                   assets={revAssets}
                                   pinMode={ticket.status === "IN_REVIEW" ? "review" : "view"}
+                                  ticketId={ticket.id}
+                                  onRevisionSubmitted={handlePinsSubmitted}
                                 />
                               ) : (
                                 <RevisionImageGrid
                                   assets={revAssets}
                                   pinMode={ticket.status === "IN_REVIEW" ? "review" : "view"}
+                                  ticketId={ticket.id}
+                                  onRevisionSubmitted={handlePinsSubmitted}
                                 />
                               )}
                             </div>

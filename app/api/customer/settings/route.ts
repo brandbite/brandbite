@@ -11,6 +11,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { normalizeCompanyRole, canEditCompanyProfile } from "@/lib/permissions/companyRoles";
 import { parseBody } from "@/lib/schemas/helpers";
+import { hasLiveSubscription } from "@/lib/billing/subscription";
 import { updateCustomerSettingsSchema } from "@/lib/schemas/settings.schemas";
 
 type UserRole = "SITE_OWNER" | "SITE_ADMIN" | "DESIGNER" | "CUSTOMER";
@@ -32,6 +33,8 @@ type CustomerSettingsResponse = {
     website: string | null;
     tokenBalance: number;
     billingStatus: BillingStatus | null;
+    /** A Stripe subscription exists and isn't cancelled (lib/billing/subscription). */
+    hasLiveSubscription: boolean;
     createdAt: string;
     updatedAt: string;
     counts: {
@@ -107,6 +110,7 @@ export async function GET(_req: NextRequest) {
         website: company.website ?? null,
         tokenBalance: company.tokenBalance,
         billingStatus: (company.billingStatus as BillingStatus | null) ?? null,
+        hasLiveSubscription: hasLiveSubscription(company),
         createdAt: company.createdAt.toISOString(),
         updatedAt: company.updatedAt.toISOString(),
         counts: {

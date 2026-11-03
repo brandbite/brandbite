@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Modal, ModalHeader, ModalFooter } from "@/components/ui/modal";
 import { TagBadge } from "@/components/ui/tag-badge";
+import { CONTACT_EMAIL } from "@/lib/brand";
 import { TAG_COLORS, TAG_COLOR_KEYS, type TagColorKey } from "@/lib/tag-colors";
 
 type UserRole = "SITE_OWNER" | "SITE_ADMIN" | "DESIGNER" | "CUSTOMER";
@@ -39,6 +40,7 @@ type CustomerSettingsResponse = {
     website: string | null;
     tokenBalance: number;
     billingStatus: BillingStatus | null;
+    hasLiveSubscription: boolean;
     createdAt: string;
     updatedAt: string;
     counts: {
@@ -1098,11 +1100,17 @@ export default function CustomerSettingsPage() {
 
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <div className="rounded-lg bg-[var(--bb-bg-page)] px-3 py-2 text-[11px] text-[var(--bb-text-secondary)]">
-                    {canManagePlan ? (
+                    {canManagePlan && company?.hasLiveSubscription ? (
                       <>
-                        Use the button on the right to manage your subscription and billing details
-                        through Stripe.
+                        To upgrade or downgrade, use <strong>Switch to a different plan</strong>{" "}
+                        below. For invoices, your payment method or cancelling, contact us at{" "}
+                        <a href={`mailto:${CONTACT_EMAIL}`} className="underline">
+                          {CONTACT_EMAIL}
+                        </a>
+                        .
                       </>
+                    ) : canManagePlan ? (
+                      <>Start your subscription through Stripe to receive your monthly tokens.</>
                     ) : (
                       <>
                         Need to change something? Ask your company owner or billing manager to
@@ -1111,14 +1119,17 @@ export default function CustomerSettingsPage() {
                     )}
                   </div>
 
-                  {canManagePlan && (
+                  {/* Only offered when there's no live subscription — a second
+                      checkout would create a second, double-billed subscription
+                      (the API refuses it too). */}
+                  {canManagePlan && !company?.hasLiveSubscription && (
                     <button
                       type="button"
                       onClick={handleStartBillingCheckout}
                       disabled={billingLoading || !plan.isActive}
                       className="inline-flex flex-shrink-0 items-center justify-center rounded-full bg-[var(--bb-primary)] px-3 py-2 text-[11px] font-semibold text-white shadow-sm disabled:opacity-60"
                     >
-                      {billingLoading ? "Redirecting\u2026" : "Manage billing"}
+                      {billingLoading ? "Redirecting\u2026" : "Start subscription"}
                     </button>
                   )}
                 </div>
