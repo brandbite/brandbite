@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BoardViewToggle } from "@/components/board/board-view-toggle";
 import { buildTicketCode } from "@/lib/ticket-code";
+import { allowedCreativeTargets } from "@/lib/tickets/creative-transitions";
 import { DataTable, THead, TH, TD } from "@/components/ui/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FormSelect } from "@/components/ui/form-field";
@@ -61,6 +62,23 @@ type CreativeTicket = {
     creativePayoutTokens: number;
   } | null;
 };
+
+const STATUS_OPTION_LABEL: Record<string, string> = {
+  TODO: "To do",
+  IN_PROGRESS: "In progress",
+  IN_REVIEW: "In review",
+  DONE: "Done",
+};
+
+/**
+ * The current status plus the moves a creative may make from it (shared rule,
+ * lib/tickets/creative-transitions). In review is left out as a target:
+ * sending work belongs on the Board's Upload work step, which attaches files.
+ */
+function tableStatusOptions(current: TicketStatus): string[] {
+  const targets = allowedCreativeTargets(current).filter((s) => s !== "IN_REVIEW" && s !== "DONE");
+  return [current, ...targets];
+}
 
 type CreativeTicketsResponse = {
   stats: {
@@ -435,11 +453,17 @@ export default function CreativeTicketsPage() {
                           size="sm"
                           className="w-auto"
                         >
-                          <option value="TODO">To do</option>
-                          <option value="IN_PROGRESS">In progress</option>
-                          <option value="IN_REVIEW">In review</option>
-                          {/* Creatives cannot set DONE; clients close tickets */}
+                          {tableStatusOptions(t.status).map((s) => (
+                            <option key={s} value={s}>
+                              {STATUS_OPTION_LABEL[s]}
+                            </option>
+                          ))}
                         </FormSelect>
+                        {t.status === "IN_PROGRESS" && (
+                          <span className="text-xs text-[var(--bb-text-tertiary)]">
+                            Send work for review from the Board.
+                          </span>
+                        )}
                         {isUpdating(t.id) && (
                           <span className="text-xs text-[var(--bb-text-tertiary)]">
                             Updating status…

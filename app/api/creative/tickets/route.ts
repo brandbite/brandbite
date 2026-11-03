@@ -55,6 +55,10 @@ type CreativeTicketsResponse = {
     loadScore: number;
   };
   tickets: CreativeTicket[];
+  /** Admin-controlled: whether this creative's "Note to your customer" on a
+   *  new version is saved (lib/tickets/transition-status.ts). The board hides
+   *  the field when false instead of silently dropping what was typed. */
+  revisionNotesEnabled: boolean;
 };
 
 type PatchPayload = {
@@ -230,6 +234,11 @@ export async function GET(req: NextRequest) {
       prisma.ticket.count({ where }),
     ]);
 
+    const creativeFlags = await prisma.userAccount.findUnique({
+      where: { id: user.id },
+      select: { creativeRevisionNotesEnabled: true },
+    });
+
     const response = {
       stats: {
         byStatus,
@@ -296,6 +305,7 @@ export async function GET(req: NextRequest) {
         offset,
         hasMore: offset + limit < totalCount,
       },
+      revisionNotesEnabled: creativeFlags?.creativeRevisionNotesEnabled ?? false,
     };
 
     return NextResponse.json(response, { status: 200 });
@@ -371,6 +381,9 @@ export async function PATCH(req: NextRequest) {
       }
       if (outcome.code === "NOT_FOUND") {
         return NextResponse.json({ error: outcome.message }, { status: 404 });
+      }
+      if (outcome.code === "INVALID_TRANSITION") {
+        return NextResponse.json({ error: outcome.message }, { status: 409 });
       }
       // CONCURRENCY_LIMIT
       return NextResponse.json(

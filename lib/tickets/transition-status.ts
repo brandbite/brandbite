@@ -14,6 +14,7 @@
 import { TicketStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { creativeTransitionError } from "@/lib/tickets/creative-transitions";
 
 export type TransitionStatusInput = {
   creativeUserId: string;
@@ -49,6 +50,7 @@ export type TransitionStatusFailure =
   | { success: false; code: "CREATIVE_NOT_FOUND"; message: string }
   | { success: false; code: "NOT_FOUND"; message: string }
   | { success: false; code: "ALREADY_DONE"; message: string }
+  | { success: false; code: "INVALID_TRANSITION"; message: string }
   | {
       success: false;
       code: "CONCURRENCY_LIMIT";
@@ -103,6 +105,11 @@ export async function transitionCreativeTicketStatus(
       code: "ALREADY_DONE",
       message: "This ticket is already marked as DONE and cannot be changed by a creative.",
     };
+  }
+
+  const transitionError = creativeTransitionError(ticket.status, nextStatus);
+  if (transitionError) {
+    return { success: false, code: "INVALID_TRANSITION", message: transitionError };
   }
 
   // Plan-based concurrency gate — only relevant when transitioning INTO
