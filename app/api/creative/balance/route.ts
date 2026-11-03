@@ -32,7 +32,7 @@ export async function GET(_request: Request) {
 
     const userId = currentUser.id;
 
-    const [user, balance, ledger] = await Promise.all([
+    const [user, balance, ledger, sums] = await Promise.all([
       prisma.userAccount.findUnique({
         where: { id: userId },
         select: {
@@ -61,7 +61,17 @@ export async function GET(_request: Request) {
           companyId: true,
         },
       }),
+      // Lifetime totals over the whole ledger — the page used to sum only
+      // the 50 rows above, so totals stopped adding up for busy creatives.
+      prisma.tokenLedger.groupBy({
+        by: ["direction"],
+        where: { userId },
+        _sum: { amount: true },
+      }),
     ]);
+
+    const sumFor = (direction: "CREDIT" | "DEBIT") =>
+      sums.find((s) => s.direction === direction)?._sum.amount ?? 0;
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -71,6 +81,7 @@ export async function GET(_request: Request) {
       user,
       balance,
       ledger,
+      totals: { credits: sumFor("CREDIT"), debits: sumFor("DEBIT") },
     });
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {

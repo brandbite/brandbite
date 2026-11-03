@@ -12,6 +12,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BoardViewToggle } from "@/components/board/board-view-toggle";
 import { buildTicketCode } from "@/lib/ticket-code";
+import { fetchAllTickets } from "@/lib/fetch-all-tickets";
 import {
   type PendingFile,
   getImageDimensions,
@@ -78,6 +79,8 @@ type CreativeTicket = {
     creativePayoutTokens: number;
   } | null;
   revisionCount: number;
+  /** Payout at the creative's current rate (server: computeCreativePayout). */
+  estimatedPayout: number | null;
   latestRevisionHasFeedback: boolean;
   latestRevisionFeedbackSnippet: string | null;
 };
@@ -178,25 +181,15 @@ export default function CreativeBoardPage() {
     setError(null);
 
     try {
-      const res = await fetch("/api/creative/tickets", {
-        cache: "no-store",
-      });
-      const json = await res.json().catch(() => null);
-
-      if (!res.ok) {
-        if (res.status === 401) {
-          throw new Error("You need to sign in as a creative.");
-        }
-        if (res.status === 403) {
-          throw new Error(
-            json?.error || "You do not have access to creative tickets in this workspace.",
-          );
-        }
-        const msg = json?.error || `Request failed with status ${res.status}`;
-        throw new Error(msg);
-      }
-
-      setData(json as CreativeTicketsResponse);
+      // All pages — the API returns 50 per page by default, which used to
+      // hide older tickets from the board.
+      const json = await fetchAllTickets<CreativeTicketsResponse>("/api/creative/tickets").catch(
+        (err: Error & { status?: number }) => {
+          if (err.status === 401) throw new Error("You need to sign in as a creative.");
+          throw err;
+        },
+      );
+      setData(json);
     } catch (err: unknown) {
       console.error("[CreativeBoard] load error", err);
       const message = err instanceof Error ? err.message : "Failed to load creative tickets.";
@@ -1319,8 +1312,7 @@ export default function CreativeBoardPage() {
                             const canDrag = !selectionMode && t.status !== "DONE" && !isUpdating;
                             const isSelected = selectedTicketIds.has(t.id);
 
-                            const payoutTokens =
-                              t.jobType?.creativePayoutTokens ?? t.jobType?.tokenCost ?? null;
+                            const payoutTokens = t.estimatedPayout ?? null;
 
                             const showRevisionBadge = t.revisionCount > 0;
                             const showFeedbackBadge = t.latestRevisionHasFeedback;
@@ -1918,7 +1910,7 @@ export default function CreativeBoardPage() {
                       <div>
                         <p className="text-[var(--bb-text-tertiary)]">Payout</p>
                         <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
-                          {detailTicket.jobType.creativePayoutTokens} tokens
+                          {detailTicket.estimatedPayout ?? "—"} tokens
                         </p>
                       </div>
                     )}
