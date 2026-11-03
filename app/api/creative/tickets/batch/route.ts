@@ -11,6 +11,7 @@ import { TicketStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { createNotification } from "@/lib/notifications";
+import { creativeTransitionError } from "@/lib/tickets/creative-transitions";
 
 type TicketStatusString = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 
@@ -181,6 +182,14 @@ export async function PATCH(req: NextRequest) {
           success: false,
           error: "Ticket is already DONE and cannot be changed.",
         });
+        continue;
+      }
+
+      // Same move rules as the single-ticket PATCH — e.g. bulk "Move to
+      // Backlog" must not pull delivered (IN_REVIEW) work back to TODO.
+      const transitionError = creativeTransitionError(ticket.status, nextStatus);
+      if (transitionError) {
+        results.push({ ticketId, success: false, error: transitionError });
         continue;
       }
 
