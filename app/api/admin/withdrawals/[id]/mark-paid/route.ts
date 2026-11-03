@@ -6,6 +6,7 @@
 // -----------------------------------------------------------------------------
 
 import { NextResponse } from "next/server";
+import { notifyWithdrawalOutcome } from "@/lib/withdrawal-notifications";
 import { prisma } from "@/lib/prisma";
 import { AdminActionType, WithdrawalStatus } from "@prisma/client";
 import { getCurrentUserOrThrow } from "@/lib/auth";
@@ -87,6 +88,13 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         creativeId: updated.creativeId,
       },
       context: auditCtx,
+    });
+
+    notifyWithdrawalOutcome({
+      creativeId: updated.creativeId,
+      amountTokens: updated.amountTokens,
+      outcome: "PAID",
+      actorId: user.id,
     });
 
     return NextResponse.json(

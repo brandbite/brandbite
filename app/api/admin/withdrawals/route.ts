@@ -7,6 +7,7 @@
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
+import { notifyWithdrawalOutcome } from "@/lib/withdrawal-notifications";
 import { prisma } from "@/lib/prisma";
 import { AdminActionType } from "@prisma/client";
 import { getCurrentUserOrThrow } from "@/lib/auth";
@@ -378,6 +379,13 @@ export async function PATCH(req: NextRequest) {
         newStatus: updated.status,
       },
       context: auditCtx,
+    });
+
+    notifyWithdrawalOutcome({
+      creativeId: updated.creative.id,
+      amountTokens: updated.amountTokens,
+      outcome: action === "APPROVE" ? "APPROVED" : action === "REJECT" ? "REJECTED" : "PAID",
+      actorId: user.id,
     });
 
     return NextResponse.json({

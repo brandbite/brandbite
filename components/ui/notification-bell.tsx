@@ -46,6 +46,7 @@ const TYPE_ICONS: Record<string, string> = {
   TICKET_ASSIGNED: "\u{1F4CB}",
   TICKET_STATUS_CHANGED: "\u{1F504}",
   PIN_RESOLVED: "\u{1F4CC}",
+  WITHDRAWAL_UPDATED: "\u{1F4B8}",
 };
 
 // ---------------------------------------------------------------------------
@@ -170,6 +171,13 @@ export function NotificationBell({
             setUnreadCount((c) => Math.max(0, c - 1));
           })
           .catch(() => {});
+      }
+
+      // Withdrawal updates have no ticket — send creatives to their history.
+      if (notif.type === "WITHDRAWAL_UPDATED" && role === "creative") {
+        setOpen(false);
+        router.push("/creative/withdrawals");
+        return;
       }
 
       if (notif.ticketId) {
