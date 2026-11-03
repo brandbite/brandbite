@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { computeCreativePayout, evaluateCreativePayoutPercent } from "@/lib/token-engine";
 
 type RouteContext = {
   params: Promise<{
@@ -100,11 +101,18 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
       );
     }
 
-    // Effective payout for the creative (quantity × base, with possible override)
-    const qty = ticket.quantity ?? 1;
+    // What the creative is paid on approval — same formula as the credit
+    // (override, else token cost × quantity × their current payout %).
+    const { payoutPercent } = await evaluateCreativePayoutPercent(user.id);
     const effectivePayout = ticket.jobType
-      ? (ticket.creativePayoutOverride ?? ticket.jobType.creativePayoutTokens * qty)
+      ? computeCreativePayout({
+          tokenCost: ticket.jobType.tokenCost,
+          quantity: ticket.quantity,
+          creativePayoutOverride: ticket.creativePayoutOverride,
+          payoutPercent,
+        })
       : null;
+    const payoutIsOverride = ticket.creativePayoutOverride != null;
 
     return NextResponse.json(
       {
@@ -119,8 +127,9 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
           createdAt: ticket.createdAt.toISOString(),
           updatedAt: ticket.updatedAt.toISOString(),
           companyTicketNumber: ticket.companyTicketNumber,
-          quantity: qty,
+          quantity: ticket.quantity ?? 1,
           effectivePayout,
+          payoutPercent: payoutIsOverride ? null : payoutPercent,
           project: ticket.project,
           jobType: ticket.jobType,
           creative: ticket.creative,

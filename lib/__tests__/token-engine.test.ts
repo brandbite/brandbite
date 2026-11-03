@@ -4,7 +4,11 @@
 // -----------------------------------------------------------------------------
 
 import { describe, it, expect } from "vitest";
-import { getEffectiveTokenValues, BASE_PAYOUT_PERCENT } from "@/lib/token-engine";
+import {
+  computeCreativePayout,
+  getEffectiveTokenValues,
+  BASE_PAYOUT_PERCENT,
+} from "@/lib/token-engine";
 
 // ---------------------------------------------------------------------------
 // getEffectiveTokenValues
@@ -114,5 +118,40 @@ describe("getEffectiveTokenValues", () => {
 describe("BASE_PAYOUT_PERCENT", () => {
   it("is 60%", () => {
     expect(BASE_PAYOUT_PERCENT).toBe(60);
+  });
+});
+
+describe("computeCreativePayout", () => {
+  it("uses token cost × quantity × payout percent", () => {
+    expect(
+      computeCreativePayout({
+        tokenCost: 30,
+        quantity: 2,
+        creativePayoutOverride: null,
+        payoutPercent: 60,
+      }),
+    ).toBe(36);
+  });
+
+  it("rounds to whole tokens and defaults quantity to 1", () => {
+    expect(
+      computeCreativePayout({
+        tokenCost: 25,
+        quantity: null,
+        creativePayoutOverride: null,
+        payoutPercent: 65,
+      }),
+    ).toBe(16); // 16.25
+  });
+
+  it("lets an admin override win", () => {
+    expect(
+      computeCreativePayout({
+        tokenCost: 30,
+        quantity: 3,
+        creativePayoutOverride: 12,
+        payoutPercent: 80,
+      }),
+    ).toBe(12);
   });
 });

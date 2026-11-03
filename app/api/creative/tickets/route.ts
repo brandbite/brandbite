@@ -12,6 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { createNotification } from "@/lib/notifications";
 import { transitionCreativeTicketStatus } from "@/lib/tickets/transition-status";
+import { computeCreativePayout, evaluateCreativePayoutPercent } from "@/lib/token-engine";
 
 type TicketStatusString = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 
@@ -44,6 +45,9 @@ type CreativeTicket = {
   revisionCount: number;
   latestRevisionHasFeedback: boolean;
   latestRevisionFeedbackSnippet: string | null;
+  /** What this creative would be paid on approval at their current rate
+   *  (computeCreativePayout — same formula as the actual credit). */
+  estimatedPayout: number | null;
 };
 
 type CreativeTicketsResponse = {
@@ -55,6 +59,10 @@ type CreativeTicketsResponse = {
     loadScore: number;
   };
   tickets: CreativeTicket[];
+  /** Admin-controlled: whether this creative's "Note to your customer" on a
+   *  new version is saved (lib/tickets/transition-status.ts). The board hides
+   *  the field when false instead of silently dropping what was typed. */
+  revisionNotesEnabled: boolean;
 };
 
 type PatchPayload = {
@@ -214,6 +222,8 @@ export async function GET(req: NextRequest) {
             },
           },
           revisionCount: true,
+          quantity: true,
+          creativePayoutOverride: true,
           revisions: {
             orderBy: {
               version: "desc",
@@ -229,6 +239,13 @@ export async function GET(req: NextRequest) {
       }),
       prisma.ticket.count({ where }),
     ]);
+
+    const { payoutPercent } = await evaluateCreativePayoutPercent(user.id);
+
+    const creativeFlags = await prisma.userAccount.findUnique({
+      where: { id: user.id },
+      select: { creativeRevisionNotesEnabled: true },
+    });
 
     const response = {
       stats: {
@@ -288,6 +305,14 @@ export async function GET(req: NextRequest) {
           revisionCount: t.revisionCount ?? 0,
           latestRevisionHasFeedback,
           latestRevisionFeedbackSnippet,
+          estimatedPayout: t.jobType
+            ? computeCreativePayout({
+                tokenCost: t.jobType.tokenCost,
+                quantity: t.quantity,
+                creativePayoutOverride: t.creativePayoutOverride,
+                payoutPercent,
+              })
+            : null,
         };
       }),
       pagination: {
@@ -296,6 +321,7 @@ export async function GET(req: NextRequest) {
         offset,
         hasMore: offset + limit < totalCount,
       },
+      revisionNotesEnabled: creativeFlags?.creativeRevisionNotesEnabled ?? false,
     };
 
     return NextResponse.json(response, { status: 200 });
@@ -371,6 +397,9 @@ export async function PATCH(req: NextRequest) {
       }
       if (outcome.code === "NOT_FOUND") {
         return NextResponse.json({ error: outcome.message }, { status: 404 });
+      }
+      if (outcome.code === "INVALID_TRANSITION") {
+        return NextResponse.json({ error: outcome.message }, { status: 409 });
       }
       // CONCURRENCY_LIMIT
       return NextResponse.json(

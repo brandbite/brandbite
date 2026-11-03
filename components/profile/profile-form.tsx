@@ -282,6 +282,13 @@ function ProfilePanel({
 
 type Role = "SITE_OWNER" | "SITE_ADMIN" | "DESIGNER" | "CUSTOMER";
 
+/** Where each role's profile lives — the email-change link returns here. */
+function profilePathFor(role: Role): string {
+  if (role === "CUSTOMER") return "/customer/profile";
+  if (role === "DESIGNER") return "/creative/profile";
+  return "/admin/profile";
+}
+
 type ProfileUser = {
   id: string;
   email: string;
@@ -498,6 +505,16 @@ function ProfileFormBody({ layout }: { layout: ProfileFormLayout }) {
 
   // ---- core profile load ----
   const [user, setUser] = useState<ProfileUser | null>(null);
+
+  // Landing from the email-change confirmation link: say so once, then drop
+  // the query param so a refresh doesn't repeat it.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("emailChanged") !== "1") return;
+    showToast({ type: "success", title: "Email address updated" });
+    url.searchParams.delete("emailChanged");
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+  }, [showToast]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -821,7 +838,12 @@ function ProfileFormBody({ layout }: { layout: ProfileFormLayout }) {
       const res = await fetch("/api/auth/change-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ newEmail: target, callbackURL: "/profile?emailChanged=1" }),
+        // There is no top-level /profile route — send the confirmation link
+        // back to this role's own profile page (it used to 404).
+        body: JSON.stringify({
+          newEmail: target,
+          callbackURL: `${profilePathFor(user.role)}?emailChanged=1`,
+        }),
       });
       const body = (await res.json().catch(() => null)) as {
         status?: boolean;
@@ -932,57 +954,65 @@ function ProfileFormBody({ layout }: { layout: ProfileFormLayout }) {
     }
   }, [showToast, user, workingHoursDraft]);
 
-  const handleSaveTasksCap = useCallback(async () => {
-    if (!user) return;
-    const trimmed = tasksCapDraft.trim();
-    const current = user.tasksPerWeekCap == null ? "" : String(user.tasksPerWeekCap);
-    if (trimmed === current) {
-      showToast({ type: "info", title: "No changes to save." });
-      return;
-    }
-    let nextCap: number | null;
-    if (trimmed === "") {
-      nextCap = null;
-    } else {
-      const parsed = Number.parseInt(trimmed, 10);
-      if (!Number.isFinite(parsed) || parsed < 1 || parsed > 40) {
-        showToast({
-          type: "error",
-          title: "Cap must be a whole number between 1 and 40, or empty.",
-        });
+  // `draft` lets Clear save "" directly: setTasksCapDraft("") hasn't landed
+  // in state yet when the handler runs, so reading the state saved the old
+  // value and reported "No changes to save."
+  const handleSaveTasksCap = useCallback(
+    async (draft?: string) => {
+      if (!user) return;
+      const trimmed = (draft ?? tasksCapDraft).trim();
+      const current = user.tasksPerWeekCap == null ? "" : String(user.tasksPerWeekCap);
+      if (trimmed === current) {
+        showToast({ type: "info", title: "No changes to save." });
         return;
       }
-      nextCap = parsed;
-    }
-    setSavingTasksCap(true);
-    try {
-      const res = await fetch("/api/profile", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tasksPerWeekCap: nextCap }),
-      });
-      const body = (await res.json().catch(() => null)) as {
-        user?: ProfileUser;
-        error?: string;
-      } | null;
-      if (!res.ok || !body?.user) {
-        throw new Error(body?.error || "Failed to save");
+      let nextCap: number | null;
+      if (trimmed === "") {
+        nextCap = null;
+      } else {
+        const parsed = Number.parseInt(trimmed, 10);
+        if (!Number.isFinite(parsed) || parsed < 1 || parsed > 40) {
+          showToast({
+            type: "error",
+            title: "Cap must be a whole number between 1 and 40, or empty.",
+          });
+          return;
+        }
+        nextCap = parsed;
       }
-      setUser(body.user);
-      setTasksCapDraft(body.user.tasksPerWeekCap == null ? "" : String(body.user.tasksPerWeekCap));
-      showToast({
-        type: "success",
-        title: nextCap == null ? "Cap cleared" : `Cap set to ${nextCap}`,
-      });
-    } catch (err) {
-      showToast({
-        type: "error",
-        title: err instanceof Error ? err.message : "Failed to save cap",
-      });
-    } finally {
-      setSavingTasksCap(false);
-    }
-  }, [showToast, tasksCapDraft, user]);
+      setSavingTasksCap(true);
+      try {
+        const res = await fetch("/api/profile", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tasksPerWeekCap: nextCap }),
+        });
+        const body = (await res.json().catch(() => null)) as {
+          user?: ProfileUser;
+          error?: string;
+        } | null;
+        if (!res.ok || !body?.user) {
+          throw new Error(body?.error || "Failed to save");
+        }
+        setUser(body.user);
+        setTasksCapDraft(
+          body.user.tasksPerWeekCap == null ? "" : String(body.user.tasksPerWeekCap),
+        );
+        showToast({
+          type: "success",
+          title: nextCap == null ? "Cap cleared" : `Cap set to ${nextCap}`,
+        });
+      } catch (err) {
+        showToast({
+          type: "error",
+          title: err instanceof Error ? err.message : "Failed to save cap",
+        });
+      } finally {
+        setSavingTasksCap(false);
+      }
+    },
+    [showToast, tasksCapDraft, user],
+  );
 
   const handleAutoDetectTimezone = useCallback(() => {
     const tz = detectBrowserTimezone();
@@ -1391,7 +1421,7 @@ function ProfileFormBody({ layout }: { layout: ProfileFormLayout }) {
             <div>
               <h2 className={T.h2}>Identity</h2>
               <p className={T.desc}>
-                Your name appears on tickets, comments, and emails creatives receive.
+                Your name appears on tickets, comments, and the emails we send about your work.
               </p>
             </div>
             <PBadge variant="neutral">{ROLE_LABELS[user.role]}</PBadge>
@@ -1655,7 +1685,7 @@ function ProfileFormBody({ layout }: { layout: ProfileFormLayout }) {
                       variant="ghost"
                       onClick={() => {
                         setTasksCapDraft("");
-                        void handleSaveTasksCap();
+                        void handleSaveTasksCap("");
                       }}
                       disabled={savingTasksCap}
                     >
