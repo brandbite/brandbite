@@ -732,7 +732,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
           },
           {
             type: "p",
-            text: "The dashboard doesn't send a notification when a status changes, so check this page. For questions about a payout, use the feedback button.",
+            text: "You get a notification (and an email) when a request is approved, rejected or paid. You can turn these off under **Withdrawal updates** in Settings or your Profile. For questions about a payout, use the feedback button.",
           },
         ],
       },
