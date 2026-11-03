@@ -21,7 +21,8 @@ export default function CreativeProfilePage() {
       <div className="rounded-xl border border-[var(--bb-info-border)] bg-[var(--bb-info-bg)] px-4 py-3 text-sm text-[var(--bb-info-text)]">
         <p className="font-semibold">Finish setting up your account</p>
         <p className="mt-1 text-[13px]">
-          Complete your profile below, then set your working hours, skills, and availability in{" "}
+          Complete your profile below, including your working hours under Workload, then set your
+          skills and availability in{" "}
           <Link href="/creative/settings" className="font-semibold underline">
             Settings
           </Link>{" "}

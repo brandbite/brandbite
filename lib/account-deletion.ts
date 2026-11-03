@@ -98,7 +98,16 @@ export async function deleteOwnAccount(
   }
 
   // -------------------------------------------------------------------------
-  // 3. Anonymize via the shared helper so self-delete and admin-delete
+  // 3. Things the account still holds that deleting would strand. Self-
+  //    delete only — the admin USER_HARD_DELETE flow decides for itself.
+  // -------------------------------------------------------------------------
+  const blocker = await findSelfDeletionBlocker(account.id, account.role);
+  if (blocker) {
+    return { ok: false, status: 409, error: blocker };
+  }
+
+  // -------------------------------------------------------------------------
+  // 4. Anonymize via the shared helper so self-delete and admin-delete
   //    can never drift on FK cleanup order or anonymization shape.
   // -------------------------------------------------------------------------
   await applyAccountAnonymization({
@@ -107,6 +116,68 @@ export async function deleteOwnAccount(
   });
 
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Self-deletion blockers
+// ---------------------------------------------------------------------------
+
+const OPEN_TICKET_STATUSES = ["TODO", "IN_PROGRESS", "IN_REVIEW"] as const;
+const IN_FLIGHT_WITHDRAWAL_STATUSES = ["PENDING", "APPROVED"] as const;
+
+/**
+ * Returns a user-facing reason the account can't delete itself yet, or null.
+ * Deletion stays possible in every case once the blocker is cleared — this
+ * never takes away the right to erasure, it only stops people stranding
+ * others (an ownerless company) or work and money in flight.
+ *
+ * - CUSTOMER: the only (non-deleted) OWNER of a company that still has other
+ *   active members must hand ownership over first. A sole member may delete.
+ * - DESIGNER: open assigned tickets, or withdrawals still pending/approved.
+ *
+ * Memberships survive anonymization, so "other owner/member" means another
+ * non-deleted UserAccount.
+ */
+export async function findSelfDeletionBlocker(
+  accountId: string,
+  role: UserRole,
+  db: Pick<PrismaClient, "companyMember" | "ticket" | "withdrawal"> = prisma,
+): Promise<string | null> {
+  if (role === "CUSTOMER") {
+    const owned = await db.companyMember.findMany({
+      where: { userId: accountId, roleInCompany: "OWNER" },
+      select: { companyId: true, company: { select: { name: true } } },
+    });
+    for (const m of owned) {
+      const others = await db.companyMember.findMany({
+        where: { companyId: m.companyId, userId: { not: accountId }, user: { deletedAt: null } },
+        select: { roleInCompany: true },
+      });
+      const hasOtherOwner = others.some((o) => o.roleInCompany === "OWNER");
+      if (others.length > 0 && !hasOtherOwner) {
+        return `You're the only Owner of ${m.company.name}. Make another member an Owner on the Members page before deleting your account.`;
+      }
+    }
+    return null;
+  }
+
+  if (role === "DESIGNER") {
+    const openTickets = await db.ticket.count({
+      where: { creativeId: accountId, status: { in: [...OPEN_TICKET_STATUSES] } },
+    });
+    if (openTickets > 0) {
+      return `You still have ${openTickets} open job${openTickets === 1 ? "" : "s"} assigned to you. Finish ${openTickets === 1 ? "it" : "them"}, or contact us so we can reassign ${openTickets === 1 ? "it" : "them"}, before deleting your account.`;
+    }
+    const inFlight = await db.withdrawal.count({
+      where: { creativeId: accountId, status: { in: [...IN_FLIGHT_WITHDRAWAL_STATUSES] } },
+    });
+    if (inFlight > 0) {
+      return "You have a withdrawal that hasn't been paid yet. Wait until it's paid, or cancel it if it's still pending, before deleting your account.";
+    }
+    return null;
+  }
+
+  return null;
 }
 
 // ---------------------------------------------------------------------------
