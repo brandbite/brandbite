@@ -10,7 +10,7 @@ import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 
 import type { GuideBlock, SupportGuide, SupportRole } from "@/lib/support";
-import { primaryRoute, supportBasePath } from "@/lib/support";
+import { guideHref, primaryRoute, relatedGuides, supportBasePath } from "@/lib/support";
 
 /**
  * Support pages render inside two different shells. Map each shell's tokens
@@ -133,7 +133,16 @@ function sectionId(heading: string) {
     .replace(/(^-|-$)/g, "");
 }
 
-export function SupportGuideView({ role, guide }: { role: SupportRole; guide: SupportGuide }) {
+export function SupportGuideView({
+  role,
+  guide,
+  isSiteOwner = false,
+}: {
+  role: SupportRole;
+  guide: SupportGuide;
+  isSiteOwner?: boolean;
+}) {
+  const related = relatedGuides(role, guide, { isSiteOwner });
   const openHref = primaryRoute(guide);
   const showOpen = openHref && openHref !== supportBasePath(role);
   const showToc = guide.sections.length >= 3;
@@ -198,6 +207,27 @@ export function SupportGuideView({ role, guide }: { role: SupportRole; guide: Su
           </section>
         ))}
       </div>
+
+      {related.length > 0 && (
+        <nav aria-label="Related guides" className="mt-12 border-t border-[var(--sp-border)] pt-6">
+          <h2 className="mb-3 text-lg font-bold tracking-tight">Related guides</h2>
+          <ul className="grid gap-3 sm:grid-cols-2">
+            {related.map((g) => (
+              <li key={g.slug}>
+                <Link
+                  href={guideHref(role, g.slug)}
+                  className="block h-full rounded-xl border border-[var(--sp-border)] bg-[var(--sp-card)] px-5 py-4 transition-colors hover:bg-[var(--sp-card-hover)] focus-visible:ring-2 focus-visible:ring-[var(--sp-accent)] focus-visible:outline-none"
+                >
+                  <span className="block font-semibold">{g.title}</span>
+                  <span className="mt-1 block text-sm leading-6 text-[var(--sp-muted)]">
+                    {g.summary}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      )}
     </SupportScope>
   );
 }

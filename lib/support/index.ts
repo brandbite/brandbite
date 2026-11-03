@@ -59,32 +59,57 @@ export function groupGuides(role: SupportRole, guides: SupportGuide[]) {
     .map(([category, items]) => ({ category, items }));
 }
 
-function routeMatches(route: string, pathname: string, role: SupportRole): boolean {
-  if (route === `/${role}`) return pathname === route;
-  return pathname === route || pathname.startsWith(`${route}/`);
+const isParam = (seg: string) => seg.startsWith("[") && seg.endsWith("]");
+
+/**
+ * Specificity score of `route` for `pathname`, or -1 when it doesn't match.
+ * Literal segments weigh more than [param] segments so static routes win.
+ */
+function routeScore(route: string, pathname: string, role: SupportRole): number {
+  if (route === `/${role}`) return pathname === route ? 100 : -1;
+  const want = route.split("/").filter(Boolean);
+  const have = pathname.split("/").filter(Boolean);
+  if (have.length < want.length) return -1;
+  let score = 0;
+  for (let i = 0; i < want.length; i++) {
+    if (isParam(want[i])) score += 1;
+    else if (want[i] === have[i]) score += 100;
+    else return -1;
+  }
+  return score;
 }
 
-/** The guide documenting `pathname`, or undefined. Longest route wins. */
+/** The guide documenting `pathname`, or undefined. Most specific route wins. */
 export function findGuideForPath(
   role: SupportRole,
   pathname: string,
   opts: { isSiteOwner?: boolean } = {},
 ): SupportGuide | undefined {
-  let best: { guide: SupportGuide; len: number } | undefined;
+  let best: { guide: SupportGuide; score: number } | undefined;
   for (const guide of getGuides(role, opts)) {
     for (const r of guide.routes) {
-      if (routeMatches(r, pathname, role) && (!best || r.length > best.len)) {
-        best = { guide, len: r.length };
-      }
+      const score = routeScore(r, pathname, role);
+      if (score >= 0 && (!best || score > best.score)) best = { guide, score };
     }
   }
   return best?.guide;
 }
 
-/** A guide's route is linkable when it has no dynamic segment. */
+/** The first route without a dynamic segment — the "Open this page" target. */
 export function primaryRoute(guide: SupportGuide): string | undefined {
-  const r = guide.routes[0];
-  return r && !r.includes("[") ? r : undefined;
+  return guide.routes.find((r) => !r.includes("["));
+}
+
+/** Related guides that exist and are visible to the viewer. */
+export function relatedGuides(
+  role: SupportRole,
+  guide: SupportGuide,
+  opts: { isSiteOwner?: boolean } = {},
+): SupportGuide[] {
+  const visible = getGuides(role, opts);
+  return (guide.related ?? [])
+    .map((slug) => visible.find((g) => g.slug === slug))
+    .filter((g): g is SupportGuide => !!g);
 }
 
 // --- Search ------------------------------------------------------------------
