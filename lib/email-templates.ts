@@ -31,6 +31,7 @@ const SUBJECT_MAP: Record<NotificationType, string> = {
   TICKET_ASSIGNED: "New ticket assigned to you",
   TICKET_STATUS_CHANGED: "Ticket status updated",
   PIN_RESOLVED: "Feedback note resolved",
+  WITHDRAWAL_UPDATED: "Withdrawal update",
 };
 
 export function getSubjectForType(type: NotificationType, title: string): string {
@@ -51,6 +52,10 @@ function getCTAUrl(
   // Customer-facing notifications link to the ticket detail
   if (ticketId && recipientRole === "customer") {
     return `${baseUrl}/customer/tickets/${ticketId}`;
+  }
+
+  if (type === "WITHDRAWAL_UPDATED" && recipientRole === "creative") {
+    return `${baseUrl}/creative/withdrawals`;
   }
 
   // Creative-facing notifications link to the board
@@ -74,6 +79,7 @@ const CTA_LABELS: Record<NotificationType, string> = {
   TICKET_ASSIGNED: "View Ticket",
   TICKET_STATUS_CHANGED: "View Ticket",
   PIN_RESOLVED: "View Ticket",
+  WITHDRAWAL_UPDATED: "View Withdrawals",
 };
 
 // ---------------------------------------------------------------------------
@@ -87,6 +93,7 @@ const TYPE_EMOJI: Record<NotificationType, string> = {
   TICKET_ASSIGNED: "\u{1F4CB}",
   TICKET_STATUS_CHANGED: "\u{1F504}",
   PIN_RESOLVED: "\u{1F4CC}",
+  WITHDRAWAL_UPDATED: "\u{1F4B8}",
 };
 
 // ---------------------------------------------------------------------------

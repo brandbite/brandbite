@@ -21,6 +21,7 @@ import {
   requiresCoApproval,
 } from "@/lib/withdrawal-coapproval";
 import { sendCoApprovalRequest } from "@/lib/admin-action-email";
+import { notifyWithdrawalOutcome } from "@/lib/withdrawal-notifications";
 
 /**
  * POST /api/admin/withdrawals/:id/approve
@@ -223,6 +224,13 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         creativeId: withdrawal.creativeId,
       },
       context: auditCtx,
+    });
+
+    notifyWithdrawalOutcome({
+      creativeId: withdrawal.creativeId,
+      amountTokens: withdrawal.amountTokens,
+      outcome: "APPROVED",
+      actorId: user.id,
     });
 
     return NextResponse.json(

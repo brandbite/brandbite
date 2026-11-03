@@ -312,7 +312,8 @@ type NotificationType =
   | "TICKET_COMPLETED"
   | "TICKET_ASSIGNED"
   | "TICKET_STATUS_CHANGED"
-  | "PIN_RESOLVED";
+  | "PIN_RESOLVED"
+  | "WITHDRAWAL_UPDATED";
 
 type NotificationPreference = {
   type: NotificationType;
@@ -368,6 +369,15 @@ const NOTIFICATION_LABELS: Record<NotificationType, { title: string; description
     title: "Pin resolved",
     description: "A creative resolved a pin you placed on an asset.",
   },
+  WITHDRAWAL_UPDATED: {
+    title: "Withdrawal updates",
+    description: "A withdrawal you requested was approved, rejected or paid.",
+  },
+};
+
+/** Types that only make sense for one role; others are shown to everyone. */
+const NOTIFICATION_ROLE_ONLY: Partial<Record<NotificationType, Role>> = {
+  WITHDRAWAL_UPDATED: "DESIGNER",
 };
 
 // Stable order for rendering the toggle list. Matches the order of the
@@ -380,6 +390,7 @@ const NOTIFICATION_ORDER: NotificationType[] = [
   "FEEDBACK_SUBMITTED",
   "PIN_RESOLVED",
   "TICKET_COMPLETED",
+  "WITHDRAWAL_UPDATED",
 ];
 
 // ---------------------------------------------------------------------------
@@ -1718,7 +1729,10 @@ function ProfileFormBody({ layout }: { layout: ProfileFormLayout }) {
             <div className={T.muted}>Loading preferences…</div>
           ) : (
             <ul className={T.divide}>
-              {NOTIFICATION_ORDER.map((type) => {
+              {NOTIFICATION_ORDER.filter(
+                (type) =>
+                  !NOTIFICATION_ROLE_ONLY[type] || NOTIFICATION_ROLE_ONLY[type] === user.role,
+              ).map((type) => {
                 const pref = prefs[type];
                 const meta = NOTIFICATION_LABELS[type];
                 const inAppKey = `${type}:enabled`;

@@ -17,6 +17,7 @@ const VALID_TYPES: NotificationType[] = [
   "TICKET_ASSIGNED",
   "TICKET_STATUS_CHANGED",
   "PIN_RESOLVED",
+  "WITHDRAWAL_UPDATED",
 ];
 
 // ---------------------------------------------------------------------------

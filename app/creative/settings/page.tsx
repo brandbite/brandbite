@@ -65,6 +65,11 @@ const CREATIVE_PREFS: {
     label: "Ticket completed",
     description: "Get notified when a ticket is marked as done",
   },
+  {
+    type: "WITHDRAWAL_UPDATED",
+    label: "Withdrawal updates",
+    description: "Get notified when a withdrawal you requested is approved, rejected or paid",
+  },
 ];
 
 // ---------------------------------------------------------------------------

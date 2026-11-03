@@ -116,6 +116,7 @@ enum NotificationType {
   TICKET_ASSIGNED // Ticket assigned to creative
   TICKET_STATUS_CHANGED // Any status transition
   PIN_RESOLVED // Creative resolved a pin
+  WITHDRAWAL_UPDATED // Creative's withdrawal approved, rejected or paid
 }
 
 // --- CMS Content ---
