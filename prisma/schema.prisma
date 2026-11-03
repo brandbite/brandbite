@@ -2263,6 +2263,8 @@ enum AdminActionType {
   COMPANY_AUTO_ASSIGN_EDIT
   // Global AppSetting change (/admin/settings)
   APP_SETTING_EDIT
+  // Bulk status change from /admin/tickets (one row per batch)
+  TICKET_BULK_STATUS_CHANGE
   // Owner turned off authenticator-app MFA for money actions
   ADMIN_MFA_DISABLE
   // Talent applications (SITE_OWNER only — see canManageTalentApplications)

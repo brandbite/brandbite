@@ -46,6 +46,7 @@ import {
 } from "@/components/admin/v2/ui";
 import { IconTicket } from "@/components/admin/v2/icons";
 import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -212,6 +213,8 @@ export default function AdminTicketsPage() {
   const [bulkMessage, setBulkMessage] = useState<string | null>(null);
   const [bulkCreativeId, setBulkCreativeId] = useState<string>(""); // "" = placeholder, "__none__" = unassign
   const [bulkStatus, setBulkStatus] = useState<TicketStatus | "">("");
+  // Bulk status changes are confirmed first — Done pays every creative.
+  const [confirmBulkStatus, setConfirmBulkStatus] = useState(false);
   const [bulkPriority, setBulkPriority] = useState<TicketPriority | "">("");
 
   const toggleSelected = (id: string) => {
@@ -794,7 +797,7 @@ export default function AdminTicketsPage() {
                   disabled={bulkStatus === "" || bulkSaving}
                   onClick={() => {
                     if (bulkStatus === "") return;
-                    runBulk({ op: "status", status: bulkStatus });
+                    setConfirmBulkStatus(true);
                   }}
                 >
                   {bulkSaving ? "Applying…" : "Apply"}
@@ -995,6 +998,29 @@ export default function AdminTicketsPage() {
 
         {panel}
       </div>
+
+      <ConfirmDialog
+        open={confirmBulkStatus}
+        onClose={() => !bulkSaving && setConfirmBulkStatus(false)}
+        onConfirm={async () => {
+          if (bulkStatus === "") return;
+          await runBulk({ op: "status", status: bulkStatus });
+          setConfirmBulkStatus(false);
+        }}
+        loading={bulkSaving}
+        variant={bulkStatus === "DONE" ? "danger" : "warning"}
+        title={
+          bulkStatus === "DONE"
+            ? `Complete ${selectedIds.size} ${plural(selectedIds.size, "ticket", "tickets")} and pay creatives?`
+            : `Move ${selectedIds.size} ${plural(selectedIds.size, "ticket", "tickets")} to ${bulkStatus ? TICKET_STATUS[bulkStatus].label : ""}?`
+        }
+        description={
+          bulkStatus === "DONE"
+            ? "Each ticket is marked done and its creative is paid now, without waiting for the customer to approve. This can't be undone."
+            : "This skips the usual customer and creative steps: no tokens are charged or refunded. The customer and creative are notified. Done tickets are left as they are."
+        }
+        confirmLabel={bulkStatus === "DONE" ? "Complete & pay" : "Move tickets"}
+      />
     </div>
   );
 }

@@ -12,6 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 import { canAssignCompanyPlan } from "@/lib/roles";
+import { hasLiveSubscription } from "@/lib/billing/subscription";
 import { parseBody } from "@/lib/schemas/helpers";
 import { assignPlanSchema } from "@/lib/schemas/plan-assignment.schemas";
 
@@ -41,11 +42,33 @@ export async function PATCH(req: NextRequest) {
     // Validate company exists
     const company = await prisma.company.findUnique({
       where: { id: companyId },
-      select: { id: true },
+      select: { id: true, planId: true, stripeSubscriptionId: true, billingStatus: true },
     });
 
     if (!company) {
       return NextResponse.json({ error: "Company not found" }, { status: 404 });
+    }
+
+    // This only relinks Company.planId — it doesn't touch Stripe. For a
+    // company that's subscribed, renewals would then credit the new plan's
+    // tokens while Stripe keeps charging the old price (and a later Stripe
+    // update can flip the link back). Paying customers change plans through
+    // Settings → Switch to a different plan, which updates Stripe with
+    // proration.
+    if ((planId ?? null) !== company.planId && hasLiveSubscription(company)) {
+      const message =
+        "This company pays through a Stripe subscription. Change its plan from the customer's Settings → Switch to a different plan, so Stripe bills the new price.";
+      await logAdminAction({
+        actor: user,
+        action: AdminActionType.PLAN_ASSIGN,
+        outcome: "BLOCKED",
+        targetType: "Company",
+        targetId: companyId,
+        metadata: { attemptedPlanId: planId ?? null, currentPlanId: company.planId },
+        errorMessage: message,
+        context: extractAuditContext(req),
+      });
+      return NextResponse.json({ error: message }, { status: 409 });
     }
 
     // If planId provided, validate plan exists
@@ -58,8 +81,10 @@ export async function PATCH(req: NextRequest) {
       if (!plan) {
         return NextResponse.json({ error: "Plan not found" }, { status: 404 });
       }
-      // We could additionally reject assignment to an inactive plan here;
-      // for now, existence is enough.
+      // The UI only offers active plans; enforce it here too.
+      if (!plan.isActive && planId !== company.planId) {
+        return NextResponse.json({ error: "Only active plans can be assigned." }, { status: 400 });
+      }
     }
 
     const updated = await prisma.company.update({

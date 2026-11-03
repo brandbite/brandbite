@@ -11,11 +11,10 @@
 //           - Board / Tickets load only the 50 most recent tickets.
 //           - The Tickets list "payout" is jobType.creativePayoutTokens, not
 //             the payout actually credited (see the payouts guide).
-//           - Bulk "Set status" writes raw statuses (no refunds/notifications/
-//             audit); bulk Done pays the creative.
+//           - Bulk "Set status" skips the customer/creative rules (no
+//             refunds or charges); it is confirmed, audited and notifies.
 //           - Landing editor and 6 of 7 Pages entries affect nothing public.
 //           - Meta title/description are only used by Blog posts.
-//           - Plan assignment doesn't touch Stripe.
 //           - Owner-only controls are visible to SITE_ADMIN (server refuses).
 // -----------------------------------------------------------------------------
 
@@ -355,7 +354,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
           },
           {
             type: "warning",
-            text: "Bulk **Set status → Done** completes the jobs and pays the creatives, with no confirmation. Other bulk status changes skip the usual rules: no refunds, charges or notifications. Prefer letting customers and creatives move requests themselves.",
+            text: "Bulk status changes ask you to confirm first. **Set status → Done** completes the jobs and pays the creatives straight away. Other status changes skip the usual customer and creative steps, so no tokens are charged or refunded. Done requests can't be moved back in bulk. The customer and creative are notified, and each batch is recorded in the Audit Log. Prefer letting customers and creatives move requests themselves.",
           },
         ],
       },
@@ -603,7 +602,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
           },
           {
             type: "warning",
-            text: "This only changes which plan the company is linked to. It doesn't change their Stripe subscription or what they're charged — for paying customers, change plans through Stripe instead, or the two will disagree.",
+            text: "This only changes which plan the company is linked to; it doesn't change Stripe billing. It's refused for companies with an active Stripe subscription — they change plans from **Settings → Switch to a different plan**, which updates Stripe with proration. Use plan assignment for companies that don't pay through Stripe.",
           },
         ],
       },

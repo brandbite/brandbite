@@ -18,6 +18,16 @@ import { prisma } from "@/lib/prisma";
 import { parseBody } from "@/lib/schemas/helpers";
 import { bulkTicketsSchema, type BulkTicketsInput } from "@/lib/schemas/bulk-tickets.schemas";
 import { completeTicketAndApplyTokens } from "@/lib/token-engine";
+import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
+import { createNotification } from "@/lib/notifications";
+import { AdminActionType } from "@prisma/client";
+
+const STATUS_LABEL: Record<string, string> = {
+  TODO: "To do",
+  IN_PROGRESS: "In progress",
+  IN_REVIEW: "In review",
+  DONE: "Done",
+};
 
 type BulkResult = {
   succeeded: string[];
@@ -53,6 +63,9 @@ export async function POST(req: NextRequest) {
     }
 
     const result: BulkResult = { succeeded: [], failed: [] };
+    // Status changes actually applied (no-ops skipped) — for the audit row
+    // and the notifications sent after the loop.
+    const transitions: { id: string; from: TicketStatus; to: TicketStatus }[] = [];
 
     // Intentionally sequential: keeps the per-row error messages attributable
     // to a specific ticket id and avoids racy status side-effects. A dozen
@@ -83,22 +96,34 @@ export async function POST(req: NextRequest) {
           // through the same completion engine the per-ticket path uses so
           // the payout still happens. Idempotent: a ticket already DONE (or
           // already paid) is a no-op inside the engine.
+          if (existing.status === data.status) {
+            result.succeeded.push(id);
+            continue;
+          }
+          // A Done ticket has already paid its creative; moving it back
+          // wouldn't reverse that payout, so don't allow it in bulk.
+          if (existing.status === TicketStatus.DONE) {
+            result.failed.push({
+              id,
+              error:
+                "Done tickets can't be moved back in bulk — the creative has already been paid.",
+            });
+            continue;
+          }
           if (data.status === TicketStatus.DONE) {
-            if (existing.status !== TicketStatus.DONE) {
-              if (existing.jobTypeId) {
-                await completeTicketAndApplyTokens(id);
-              } else {
-                await prisma.ticket.update({
-                  where: { id },
-                  data: { status: TicketStatus.DONE },
-                });
-              }
-              if (!existing.completedAt) {
-                await prisma.ticket.update({
-                  where: { id },
-                  data: { completedAt: new Date(), completedById: user.id },
-                });
-              }
+            if (existing.jobTypeId) {
+              await completeTicketAndApplyTokens(id);
+            } else {
+              await prisma.ticket.update({
+                where: { id },
+                data: { status: TicketStatus.DONE },
+              });
+            }
+            if (!existing.completedAt) {
+              await prisma.ticket.update({
+                where: { id },
+                data: { completedAt: new Date(), completedById: user.id },
+              });
             }
           } else {
             await prisma.ticket.update({
@@ -106,6 +131,7 @@ export async function POST(req: NextRequest) {
               data: { status: data.status },
             });
           }
+          transitions.push({ id, from: existing.status, to: data.status });
         } else if (data.op === "priority") {
           await prisma.ticket.update({
             where: { id },
@@ -119,6 +145,43 @@ export async function POST(req: NextRequest) {
           id,
           error: err instanceof Error ? err.message : "Unexpected error",
         });
+      }
+    }
+
+    if (data.op === "status" && transitions.length > 0) {
+      await logAdminAction({
+        actor: user,
+        action: AdminActionType.TICKET_BULK_STATUS_CHANGE,
+        outcome: "SUCCESS",
+        targetType: "Ticket",
+        targetId: transitions.length === 1 ? transitions[0].id : `bulk:${transitions.length}`,
+        metadata: {
+          status: data.status,
+          transitions,
+          failedCount: result.failed.length,
+          paidOut: data.status === TicketStatus.DONE,
+        },
+        context: extractAuditContext(req),
+      });
+
+      // Tell the people on each ticket — admin moves used to be silent.
+      const tickets = await prisma.ticket.findMany({
+        where: { id: { in: transitions.map((t) => t.id) } },
+        select: { id: true, title: true, createdById: true, creativeId: true },
+      });
+      const done = data.status === TicketStatus.DONE;
+      for (const t of tickets) {
+        const recipients = new Set([t.createdById, t.creativeId].filter((x): x is string => !!x));
+        for (const userId of recipients) {
+          createNotification({
+            userId,
+            type: done ? "TICKET_COMPLETED" : "TICKET_STATUS_CHANGED",
+            title: done ? "Ticket completed" : "Ticket status updated",
+            message: `"${t.title}" was moved to ${STATUS_LABEL[data.status] ?? data.status} by the Brandbite team.`,
+            ticketId: t.id,
+            actorId: user.id,
+          });
+        }
       }
     }
 

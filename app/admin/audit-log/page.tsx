@@ -87,6 +87,7 @@ const ACTION_LABELS: Record<string, string> = {
   GOOGLE_OAUTH_CONFIG_EDIT: "Google OAuth config changed",
   COMPANY_AUTO_ASSIGN_EDIT: "Company auto-assign changed",
   APP_SETTING_EDIT: "Platform setting changed",
+  TICKET_BULK_STATUS_CHANGE: "Ticket statuses changed in bulk",
   ADMIN_MFA_DISABLE: "Authenticator two-factor turned off",
   TALENT_APPLICATION_ACCEPTED: "Talent application accepted",
   TALENT_APPLICATION_DECLINED: "Talent application declined",

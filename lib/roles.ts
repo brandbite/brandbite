@@ -95,8 +95,9 @@ export function canManagePlans(role: AppUserRole): boolean {
   return isSiteOwnerRole(role);
 }
 
-/** Assign a specific Plan to a Company (changes their Stripe
- *  billing + monthly token allotment). */
+/** Link a Company to a Plan from /admin/plan-assignment. Sets which plan's
+ *  tokens renewals credit; it does NOT change Stripe billing, so the API
+ *  refuses it for companies with a live subscription. */
 export function canAssignCompanyPlan(role: AppUserRole): boolean {
   return isSiteOwnerRole(role);
 }
