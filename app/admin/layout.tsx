@@ -11,7 +11,9 @@ import { SessionTimeoutWarning } from "@/components/auth/session-timeout-warning
 import { FeedbackWidget } from "@/components/feedback/feedback-widget";
 import { GoogleConnectionBanner } from "@/components/admin/google-connection-banner";
 import { AdminShell } from "@/components/admin/v2/admin-shell";
-import { adminFont } from "@/lib/fonts/admin";
+// Admin typeface (design language v1), self-hosted; --font-jakarta is set
+// in globals.css. Browsers only download the files on pages that use it.
+import "@fontsource-variable/plus-jakarta-sans";
 
 // All admin routes are auth-gated. Skip SSG so the build does not prerender
 // pages that depend on the live DB or client-only libraries.
@@ -19,7 +21,7 @@ export const dynamic = "force-dynamic";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className={`${adminFont.variable} bb-admin-v2 min-h-screen bg-[var(--av2-bg)]`}>
+    <div className="bb-admin-v2 min-h-screen bg-[var(--av2-bg)]">
       {/* WCAG 2.2.1 — warn before the BetterAuth session expires. No-op
           in demo mode (the /api/session response's expiresAt is null). */}
       <SessionTimeoutWarning />
