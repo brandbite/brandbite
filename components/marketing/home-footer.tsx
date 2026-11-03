@@ -37,9 +37,9 @@ export const FOOTER_SOCIAL_LINKS = [
   },
 ];
 
-// Cookie information lives as a section inside the Privacy Policy (the site
-// sets no analytics/advertising cookies, so there is no preference centre and
-// nothing to opt out of). /cookies permanently redirects there.
+// Cookie information lives as a section inside the Privacy Policy, which also
+// hosts the "Cookie settings" button for the analytics consent banner.
+// /cookies permanently redirects there.
 export const FOOTER_LEGAL_LINKS = [
   { label: "Privacy Policy", href: "/privacy" },
   { label: "Cookie Notice", href: "/privacy#cookies" },

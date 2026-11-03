@@ -16,6 +16,7 @@ import { HomeFooter } from "@/components/marketing/home-footer";
 import { HomeHeader } from "@/components/marketing/home-header";
 import { COMPANY_ADDRESS, COMPANY_LEGAL_NAME, CONTACT_EMAIL } from "@/lib/brand";
 import { QuestionsBand } from "@/components/marketing/questions-band";
+import { CookieSettingsButton } from "@/components/analytics/cookie-consent-banner";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
@@ -44,11 +45,12 @@ const RULES: { id?: string; icon: string; title: string; body: string }[] = [
   {
     // Cookie notice — linked from the footer as /privacy#cookies and from the
     // legacy /cookies redirect. Keep this in sync with what the app actually
-    // sets: a session cookie and Cloudflare Turnstile on sign-up, nothing else.
+    // sets: a session cookie, Cloudflare Turnstile on sign-up, and Google
+    // Analytics on public pages only after consent (lib/analytics.ts).
     id: "cookies",
     icon: "/home/step-brief.png",
     title: "Cookies, kept to a minimum",
-    body: "We set one cookie to keep you signed in, and the sign-up form uses Cloudflare Turnstile to block bots. Your theme preference stays in your browser's local storage. No analytics, advertising or tracking cookies, so there is nothing to opt out of.",
+    body: "We set one cookie to keep you signed in, and the sign-up form uses Cloudflare Turnstile to block bots. On our public pages we use Google Analytics to understand how visitors find and use the site, and its cookies are only set if you accept them in the cookie banner. Inside your account nothing is sent to analytics. Your theme and cookie choices stay in your browser's local storage. No advertising cookies, ever.",
   },
 ];
 
@@ -123,6 +125,9 @@ export default function PrivacyPage() {
                   {rule.title}
                 </h2>
                 <p className="text-base leading-6 text-[#2B2D33]">{rule.body}</p>
+                {rule.id === "cookies" && (
+                  <CookieSettingsButton className="mt-1 cursor-pointer text-base leading-6 font-semibold text-[#2B2D33] underline underline-offset-2 hover:text-[#FF6426]" />
+                )}
               </div>
             </div>
           ))}

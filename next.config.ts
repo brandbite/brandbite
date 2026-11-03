@@ -47,13 +47,14 @@ const securityHeaders = [
       "default-src 'self'",
       // - js.stripe.com: Stripe.js for checkout
       // - challenges.cloudflare.com: Cloudflare Turnstile widget script (PR #218)
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://challenges.cloudflare.com",
+      // - googletagmanager.com: GA4 gtag.js (marketing pages, components/analytics)
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://challenges.cloudflare.com https://www.googletagmanager.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       // media.brandbite.studio: R2 public asset domain (R2_PUBLIC_BASE_URL).
       // Must be listed here or the browser CSP-blocks avatars/assets served
       // from it, even though images.remotePatterns already allows it.
-      "img-src 'self' data: blob: https://*.r2.cloudflarestorage.com https://media.brandbite.studio https://placehold.co https://img.youtube.com https://i.ytimg.com https://i3.ytimg.com https://i.vimeocdn.com",
+      "img-src 'self' data: blob: https://*.r2.cloudflarestorage.com https://media.brandbite.studio https://placehold.co https://img.youtube.com https://i.ytimg.com https://i3.ytimg.com https://i.vimeocdn.com https://*.google-analytics.com https://*.googletagmanager.com",
       // - api.stripe.com: Stripe.js calls home from the browser during checkout
       // - sentry: error reporting
       // - challenges.cloudflare.com: Turnstile widget posts the token here for verification
@@ -62,7 +63,8 @@ const securityHeaders = [
       //   file" button and zip bundling are CSP-blocked.
       // - media.brandbite.studio: R2 public asset domain, in case assets are
       //   fetched (not just <img>-rendered) client-side.
-      "connect-src 'self' https://api.stripe.com https://*.ingest.sentry.io https://challenges.cloudflare.com https://*.r2.cloudflarestorage.com https://media.brandbite.studio",
+      // - google-analytics / analytics.google / googletagmanager: GA4 hits
+      "connect-src 'self' https://api.stripe.com https://*.ingest.sentry.io https://challenges.cloudflare.com https://*.r2.cloudflarestorage.com https://media.brandbite.studio https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com",
       // - js.stripe.com: Stripe checkout iframe
       // - challenges.cloudflare.com: Turnstile renders inside an iframe, must be allowed here
       // - youtube/vimeo/loom: embedded media
@@ -104,9 +106,8 @@ const nextConfig: NextConfig = {
   ],
   redirects: async () => [
     {
-      // The cookie notice is a section of the Privacy Policy now; the site
-      // sets no analytics/advertising cookies, so the standalone CMS page
-      // was retired. Keep old links + the retired CMS footer working.
+      // The cookie notice is a section of the Privacy Policy now, so the
+      // standalone CMS page was retired. Keep old links + the retired CMS footer working.
       source: "/cookies",
       destination: "/privacy#cookies",
       permanent: true,

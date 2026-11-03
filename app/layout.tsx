@@ -16,6 +16,8 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { AuthGuard } from "@/components/auth-guard";
 import { SessionStaleDetector } from "@/components/auth/session-stale-detector";
 import { A11yDevMonitor } from "@/components/a11y-dev-monitor";
+import { GoogleAnalytics } from "@/components/analytics/google-analytics";
+import { CookieConsentBanner } from "@/components/analytics/cookie-consent-banner";
 
 const josefin = Josefin_Sans({
   subsets: ["latin"],
@@ -135,6 +137,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </a>
             {isDemoMode && <DemoPersonaBanner />}
             {children}
+            {/* GA4 on public marketing pages only, behind Consent Mode v2.
+                Both render nothing unless NEXT_PUBLIC_GA_MEASUREMENT_ID is set. */}
+            <GoogleAnalytics />
+            <CookieConsentBanner />
           </ToastProvider>
         </ThemeProvider>
       </body>
