@@ -36,6 +36,7 @@ import {
 } from "@/components/admin/v2/ui";
 import { useToast } from "@/components/ui/toast-provider";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { MfaChallengeModal, type MfaChallengeInfo } from "@/components/admin/mfa-challenge-modal";
 
 type EnrolmentSession = {
   secret: string;
@@ -132,6 +133,21 @@ export default function AdminMfaSettingsPage() {
     }
   }, [enrolled, session, startEnrolment]);
 
+  // Replacing or turning off an existing authenticator needs a fresh
+  // security check: the API answers 202 { requiresMfa } and we retry the
+  // same request once the modal verifies.
+  const [pendingMfa, setPendingMfa] = useState<{
+    challenge: MfaChallengeInfo;
+    retry: () => Promise<void>;
+  } | null>(null);
+  const toChallenge = (json: MfaChallengeInfo): MfaChallengeInfo => ({
+    method: json.method,
+    challengeId: json.challengeId,
+    maskedEmail: json.maskedEmail,
+    expiresAt: json.expiresAt,
+    actionTag: json.actionTag,
+  });
+
   const handleConfirm = async () => {
     if (!session) return;
     setSubmitting(true);
@@ -142,7 +158,14 @@ export default function AdminMfaSettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ secret: session.secret, code: code.trim() }),
       });
-      const json = (await res.json().catch(() => null)) as { error?: string } | null;
+      const json = (await res.json().catch(() => null)) as
+        | ({ error?: string; requiresMfa?: boolean } & MfaChallengeInfo)
+        | null;
+      // Replacing an existing authenticator: prove the current one first.
+      if (res.status === 202 && json?.requiresMfa) {
+        setPendingMfa({ challenge: toChallenge(json), retry: handleConfirm });
+        return;
+      }
       if (!res.ok) {
         throw new Error(json?.error || "Failed to enrol.");
       }
@@ -169,6 +192,15 @@ export default function AdminMfaSettingsPage() {
     setErrorMessage(null);
     try {
       const res = await fetch("/api/admin/mfa/enroll", { method: "DELETE" });
+      if (res.status === 202) {
+        const json = (await res.json().catch(() => null)) as
+          | (MfaChallengeInfo & { requiresMfa?: boolean })
+          | null;
+        if (json?.requiresMfa) {
+          setPendingMfa({ challenge: toChallenge(json), retry: handleDisable });
+          return;
+        }
+      }
       if (!res.ok) {
         const json = (await res.json().catch(() => null)) as { error?: string } | null;
         throw new Error(json?.error || "Failed to disable TOTP.");
@@ -442,6 +474,16 @@ export default function AdminMfaSettingsPage() {
         description="Future money actions will email codes instead of asking for your authenticator app."
         confirmLabel="Disable"
         cancelLabel="Keep it on"
+      />
+      <MfaChallengeModal
+        open={pendingMfa !== null}
+        challenge={pendingMfa?.challenge ?? null}
+        onClose={() => setPendingMfa(null)}
+        onVerified={async () => {
+          const retry = pendingMfa?.retry;
+          setPendingMfa(null);
+          await retry?.();
+        }}
       />
     </>
   );

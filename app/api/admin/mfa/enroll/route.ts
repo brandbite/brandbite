@@ -11,9 +11,10 @@
 //             DELETE → disable TOTP on the caller's account (falls back
 //                    to email codes).
 //
-//           SITE_OWNER only. Clears any existing secret-change from the
-//           TOTP trust window so the cofounder can't inherit a stale
-//           "recent MFA" when they re-enrol.
+//           SITE_OWNER only. DELETE requires a fresh MFA check (the same
+//           MONEY_ACTION challenge as withdrawals), so a hijacked session
+//           can't quietly downgrade the owner back to emailed codes, and is
+//           recorded in the audit log (ADMIN_MFA_DISABLE).
 // -----------------------------------------------------------------------------
 
 export const runtime = "nodejs";
@@ -22,7 +23,15 @@ import { NextRequest, NextResponse } from "next/server";
 import QRCode from "qrcode";
 
 import { getCurrentUserOrThrow } from "@/lib/auth";
-import { buildOtpauthUrl, generateTotpSecret, verifyTotpCode } from "@/lib/mfa";
+import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
+import {
+  MFA_ACTION_TAG_MONEY,
+  buildOtpauthUrl,
+  generateTotpSecret,
+  requireFreshMfa,
+  verifyTotpCode,
+} from "@/lib/mfa";
+import { AdminActionType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { isSiteOwnerRole, type AppUserRole } from "@/lib/roles";
 
@@ -96,6 +105,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Replacing an existing authenticator needs proof of the current one —
+    // otherwise a hijacked owner session could swap in its own app and own
+    // every future money-action check. First-time enrolment needs no check.
+    const existing = await prisma.userAccount.findUnique({
+      where: { id: user.id },
+      select: { totpSecret: true },
+    });
+    if (existing?.totpSecret) {
+      const auditCtx = extractAuditContext(req);
+      const mfa = await requireFreshMfa(user, MFA_ACTION_TAG_MONEY, {
+        ipAddress: auditCtx.ipAddress,
+        userAgent: auditCtx.userAgent,
+      });
+      if (!mfa.ok) return mfa.response;
+    }
+
     await prisma.userAccount.update({
       where: { id: user.id },
       data: {
@@ -119,15 +144,36 @@ export async function POST(req: NextRequest) {
 // fall back to email codes.
 // ---------------------------------------------------------------------------
 
-export async function DELETE() {
+export async function DELETE(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
     const gate = requireOwner(user.role);
     if (gate) return gate;
 
+    const auditCtx = extractAuditContext(req);
+
+    // Proof of the current factor before removing it. TOTP-enrolled owners
+    // get the authenticator prompt; a 202 { requiresMfa } sends the client
+    // through the challenge modal and it retries this DELETE.
+    const mfa = await requireFreshMfa(user, MFA_ACTION_TAG_MONEY, {
+      ipAddress: auditCtx.ipAddress,
+      userAgent: auditCtx.userAgent,
+    });
+    if (!mfa.ok) return mfa.response;
+
     await prisma.userAccount.update({
       where: { id: user.id },
       data: { totpSecret: null, totpEnrolledAt: null },
+    });
+
+    await logAdminAction({
+      actor: user,
+      action: AdminActionType.ADMIN_MFA_DISABLE,
+      outcome: "SUCCESS",
+      targetType: "UserAccount",
+      targetId: user.id,
+      metadata: {},
+      context: auditCtx,
     });
 
     return NextResponse.json({ ok: true });

@@ -10,7 +10,11 @@
 import { SessionTimeoutWarning } from "@/components/auth/session-timeout-warning";
 import { FeedbackWidget } from "@/components/feedback/feedback-widget";
 import { GoogleConnectionBanner } from "@/components/admin/google-connection-banner";
+import { redirect } from "next/navigation";
+
 import { AdminShell } from "@/components/admin/v2/admin-shell";
+import { getCurrentUser } from "@/lib/auth";
+import { isSiteAdminRole } from "@/lib/roles";
 // Admin typeface (design language v1), self-hosted; --font-jakarta is set
 // in globals.css. Browsers only download the files on pages that use it.
 import "@fontsource-variable/plus-jakarta-sans";
@@ -19,7 +23,17 @@ import "@fontsource-variable/plus-jakarta-sans";
 // pages that depend on the live DB or client-only libraries.
 export const dynamic = "force-dynamic";
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  // Page-level role gate. proxy.ts only checks that a session cookie exists,
+  // so without this any signed-in customer or creative could load the admin
+  // shell (and server components in it, like the Google banner). Every admin
+  // API still checks the role itself — this is defence in depth.
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  if (!isSiteAdminRole(user.role)) {
+    redirect(user.role === "DESIGNER" ? "/creative" : "/customer");
+  }
+
   return (
     <div className="bb-admin-v2 min-h-screen bg-[var(--av2-bg)]">
       {/* WCAG 2.2.1 — warn before the BetterAuth session expires. No-op

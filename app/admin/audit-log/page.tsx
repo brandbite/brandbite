@@ -85,6 +85,16 @@ const ACTION_LABELS: Record<string, string> = {
   AI_PRICING_EDIT: "AI pricing edited",
   CONSULTATION_PRICING_EDIT: "Consultation pricing edited",
   GOOGLE_OAUTH_CONFIG_EDIT: "Google OAuth config changed",
+  COMPANY_AUTO_ASSIGN_EDIT: "Company auto-assign changed",
+  APP_SETTING_EDIT: "Platform setting changed",
+  ADMIN_MFA_DISABLE: "Authenticator two-factor turned off",
+  TALENT_APPLICATION_ACCEPTED: "Talent application accepted",
+  TALENT_APPLICATION_DECLINED: "Talent application declined",
+  TALENT_INTERVIEW_HELD: "Talent interview held",
+  TALENT_INTERVIEW_MISSED: "Talent interview missed",
+  TALENT_HIRED: "Talent applicant hired",
+  TALENT_REJECTED_AFTER_INTERVIEW: "Talent declined after interview",
+  TALENT_ONBOARDED: "Talent onboarded as creative",
 };
 
 const OUTCOME: Record<LogEntry["outcome"], { label: string; tone: Tone }> = {

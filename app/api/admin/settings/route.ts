@@ -9,7 +9,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { getAppSetting, setAppSetting } from "@/lib/app-settings";
 import { parseBody } from "@/lib/schemas/helpers";
-import { ADMIN_SETTING_KEYS, updateAdminSettingSchema } from "@/lib/schemas/admin-settings.schemas";
+import {
+  ADMIN_SETTING_KEYS,
+  OWNER_ONLY_SETTING_KEYS,
+  updateAdminSettingSchema,
+} from "@/lib/schemas/admin-settings.schemas";
+import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
+import { isSiteOwnerRole } from "@/lib/roles";
+import { AdminActionType } from "@prisma/client";
 
 function requireAdmin(userRole: string) {
   if (userRole !== "SITE_OWNER" && userRole !== "SITE_ADMIN") {
@@ -82,8 +89,39 @@ export async function PATCH(req: NextRequest) {
     const parsed = await parseBody(req, updateAdminSettingSchema);
     if (!parsed.success) return parsed.response;
     const { key, value } = parsed.data;
+    const auditCtx = extractAuditContext(req);
 
+    // Withdrawal minimum and auto-payouts move money: owner-only, like
+    // approving withdrawals. Other settings stay open to site admins.
+    if (OWNER_ONLY_SETTING_KEYS.has(key) && !isSiteOwnerRole(user.role)) {
+      await logAdminAction({
+        actor: user,
+        action: AdminActionType.APP_SETTING_EDIT,
+        outcome: "BLOCKED",
+        targetType: "AppSetting",
+        targetId: key,
+        metadata: { key, attemptedValue: value },
+        errorMessage: "Only site owners can change payout settings.",
+        context: auditCtx,
+      });
+      return NextResponse.json(
+        { error: "Only site owners can change payout settings." },
+        { status: 403 },
+      );
+    }
+
+    const previous = await getAppSetting(key);
     await setAppSetting(key, value);
+
+    await logAdminAction({
+      actor: user,
+      action: AdminActionType.APP_SETTING_EDIT,
+      outcome: "SUCCESS",
+      targetType: "AppSetting",
+      targetId: key,
+      metadata: { key, previousValue: previous, newValue: value },
+      context: auditCtx,
+    });
 
     return NextResponse.json({ key, value });
   } catch (error: any) {

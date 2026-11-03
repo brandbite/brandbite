@@ -243,7 +243,7 @@ export async function PATCH(req: NextRequest) {
     const auditCtx = extractAuditContext(req);
 
     // Role escalation guard — only SITE_OWNER can hand out admin roles
-    // or demote an existing SITE_OWNER. SITE_ADMIN can still change
+    // or change an existing admin's role. SITE_ADMIN can still change
     // CUSTOMER / DESIGNER roles (helping customers, managing creatives).
     if (role === "SITE_OWNER" || role === "SITE_ADMIN") {
       if (!canPromoteToSiteAdmin(user.role)) {
@@ -264,7 +264,10 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
-    if (target.role === "SITE_OWNER" && !canPromoteToSiteAdmin(user.role)) {
+    // Changing an existing admin's role (e.g. demoting a SITE_ADMIN) is as
+    // privileged as granting one — owner-only, per canPromoteToSiteAdmin.
+    const targetIsAdmin = target.role === "SITE_OWNER" || target.role === "SITE_ADMIN";
+    if (targetIsAdmin && !canPromoteToSiteAdmin(user.role)) {
       await logAdminAction({
         actor: user,
         action: AdminActionType.USER_PROMOTE_TO_ADMIN,
@@ -276,11 +279,11 @@ export async function PATCH(req: NextRequest) {
           targetEmail: target.email,
           targetCurrentRole: target.role,
         },
-        errorMessage: "Only site owners can modify another site owner's role.",
+        errorMessage: "Only site owners can change an admin's role.",
         context: auditCtx,
       });
       return NextResponse.json(
-        { error: "Only site owners can modify another site owner's role." },
+        { error: "Only site owners can change an admin's role." },
         { status: 403 },
       );
     }
@@ -289,8 +292,7 @@ export async function PATCH(req: NextRequest) {
     // (new role is an admin role, or target is currently SITE_OWNER). Other
     // role changes — CUSTOMER <-> DESIGNER for example — don't require
     // confirmation because they're not privilege-escalation events.
-    const isPrivilegeChange =
-      role === "SITE_OWNER" || role === "SITE_ADMIN" || target.role === "SITE_OWNER";
+    const isPrivilegeChange = role === "SITE_OWNER" || role === "SITE_ADMIN" || targetIsAdmin;
     if (isPrivilegeChange) {
       const phraseCheck = checkConfirmationPhrase(
         confirmation,
@@ -333,7 +335,7 @@ export async function PATCH(req: NextRequest) {
     // Only log a role change to SITE_OWNER / SITE_ADMIN under the
     // PROMOTE_TO_ADMIN event — changing a CUSTOMER to DESIGNER is not a
     // privilege-escalation event and shouldn't clutter the log.
-    if (role === "SITE_OWNER" || role === "SITE_ADMIN" || target.role === "SITE_OWNER") {
+    if (isPrivilegeChange) {
       await logAdminAction({
         actor: user,
         action: AdminActionType.USER_PROMOTE_TO_ADMIN,
