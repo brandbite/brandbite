@@ -11,6 +11,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { canManagePlan } from "@/lib/permissions/companyRoles";
 import { stripe, getAppBaseUrl } from "@/lib/stripe";
+import { hasLiveSubscription } from "@/lib/billing/subscription";
 
 type CheckoutRequestBody = {
   planId?: string;
@@ -69,6 +70,30 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const company = await prisma.company.findUnique({
+      where: { id: user.activeCompanyId },
+      select: { stripeCustomerId: true, stripeSubscriptionId: true, billingStatus: true },
+    });
+
+    if (!company) {
+      return NextResponse.json({ error: "Active company not found." }, { status: 404 });
+    }
+
+    // A second subscription checkout would bill the company twice: the webhook
+    // overwrites Company.stripeSubscriptionId with the new id and the old
+    // subscription keeps charging, untracked. Plan changes go through
+    // /api/billing/change-plan (prorated update of the existing subscription).
+    if (plan.isRecurring && hasLiveSubscription(company)) {
+      return NextResponse.json(
+        {
+          error:
+            "Your company already has an active subscription. To change plans, use “Switch to a different plan” on the Settings page.",
+          code: "SUBSCRIPTION_EXISTS",
+        },
+        { status: 409 },
+      );
+    }
+
     const baseUrl = getAppBaseUrl();
 
     // Recurring plans use Stripe subscription mode; one-time "top-up" packs
@@ -78,6 +103,9 @@ export async function POST(req: NextRequest) {
 
     const session = await stripe.checkout.sessions.create({
       mode,
+      // Reuse the company's Stripe customer so payments, invoices and saved
+      // cards stay on one record instead of a new customer per checkout.
+      ...(company.stripeCustomerId ? { customer: company.stripeCustomerId } : {}),
       payment_method_types: ["card"],
       line_items: [
         {

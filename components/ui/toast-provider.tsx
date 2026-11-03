@@ -130,8 +130,10 @@ function ToastViewport({ toasts, onClose }: ToastViewportProps) {
   const politeToasts = toasts.filter((t) => t.type === "success" || t.type === "info");
   const assertiveToasts = toasts.filter((t) => t.type === "error" || t.type === "warning");
 
+  // z-[300] keeps toasts above every overlay (revision lightbox z-[100],
+  // revision compare z-[200]) — errors raised from inside them must be seen.
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-3 z-50 flex justify-end px-4 sm:top-4 sm:px-6">
+    <div className="pointer-events-none fixed inset-x-0 top-3 z-[300] flex justify-end px-4 sm:top-4 sm:px-6">
       {/*
         aria-live regions: visually empty wrappers whose only job is to
         announce new toasts to screen readers. The actual visual toast
