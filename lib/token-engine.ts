@@ -227,19 +227,27 @@ export async function applyCompanyLedgerEntry(input: ApplyCompanyLedgerInput) {
 }
 
 /**
- * Ledger reasons that move a creative's wallet. These rows can also carry the
- * ticket's companyId, so "has a companyId" alone doesn't mean "company money".
- * "Has a userId" doesn't work either: company rows such as TOKEN_TOPUP,
- * SUBSCRIPTION_INITIAL_CREDIT and CONSULTATION_BOOKING record the acting user.
- * DESIGNER_JOB_PAYOUT is the legacy name of JOB_PAYMENT.
+ * Ledger reasons used for a creative's wallet. DESIGNER_JOB_PAYOUT is the
+ * legacy name of JOB_PAYMENT.
  */
 export const CREATIVE_WALLET_REASONS = ["JOB_PAYMENT", "WITHDRAWAL_PAID", "DESIGNER_JOB_PAYOUT"];
 
-/** Prisma filter for ledger rows that move a company's wallet. */
+/**
+ * Prisma filter for ledger rows that move a company's wallet.
+ *
+ * A row belongs to a creative's wallet only when it has a userId AND a
+ * creative-wallet reason. Neither test alone works:
+ * - creative payouts also carry the ticket's companyId;
+ * - company rows such as TOKEN_TOPUP, SUBSCRIPTION_INITIAL_CREDIT and
+ *   CONSULTATION_BOOKING record the acting user in userId;
+ * - older company rows may use JOB_PAYMENT with no userId.
+ * Written as an OR so NULL reasons/userIds aren't dropped by SQL's
+ * three-valued logic.
+ */
 export function companyWalletLedgerWhere(companyId?: string): Prisma.TokenLedgerWhereInput {
   return {
     companyId: companyId ?? { not: null },
-    OR: [{ reason: null }, { reason: { notIn: CREATIVE_WALLET_REASONS } }],
+    OR: [{ userId: null }, { reason: null }, { reason: { notIn: CREATIVE_WALLET_REASONS } }],
   };
 }
 
