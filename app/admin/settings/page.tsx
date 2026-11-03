@@ -117,7 +117,6 @@ const SETTING_META: Record<string, SettingMeta> = {
     defaultValue: "off",
     options: [
       { value: "off", label: "Off — hidden for everyone" },
-      { value: "test", label: "Test — site admins only" },
       { value: "on", label: "On — all customers" },
     ],
   },

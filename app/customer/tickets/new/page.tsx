@@ -12,7 +12,6 @@ import { getCurrentUserOrThrow } from "@/lib/auth";
 import NewTicketForm from "./NewTicketForm";
 import type { TagOption } from "@/components/ui/tag-multi-select";
 import { getAiTicketsMode, isAiTicketsAllowed, isTagsEnabled } from "@/lib/feature-flags";
-import { isSiteAdminRole } from "@/lib/roles";
 
 export default async function CustomerNewTicketPage({
   searchParams,
@@ -89,7 +88,7 @@ export default async function CustomerNewTicketPage({
   // Skip the tag query entirely when the global flag is off — the form
   // renders the TagMultiSelect only if it has at least one option OR
   // canCreateTags is true, so an empty array is the natural hide path.
-  const aiEnabled = isAiTicketsAllowed(await getAiTicketsMode(), isSiteAdminRole(user.role));
+  const aiEnabled = isAiTicketsAllowed(await getAiTicketsMode());
 
   const tagsEnabled = await isTagsEnabled();
   const tags = tagsEnabled

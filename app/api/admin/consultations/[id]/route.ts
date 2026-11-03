@@ -14,6 +14,12 @@ import { cancelConsultationEvent } from "@/lib/google/calendar";
 import { prisma } from "@/lib/prisma";
 import { parseBody } from "@/lib/schemas/helpers";
 import { updateConsultationSchema } from "@/lib/schemas/consultation.schemas";
+import { sendNotificationEmail } from "@/lib/email";
+import {
+  renderConsultationUpdateEmail,
+  type ConsultationUpdateKind,
+} from "@/lib/email-templates/consultation/update";
+import { BRAND_WEBSITE } from "@/lib/email-templates/tokens";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -146,6 +152,38 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           err,
         );
       }
+    }
+
+    // Tell the customer who booked it. Admin scheduling used to send
+    // nothing, so they never learned the time or the video link.
+    const emailKind: ConsultationUpdateKind | null =
+      updated.status === "CANCELED" && existing.status !== "CANCELED"
+        ? "canceled"
+        : updated.status === "SCHEDULED" && existing.status !== "SCHEDULED"
+          ? "scheduled"
+          : updated.status === "SCHEDULED" &&
+              (updated.scheduledAt?.getTime() !== existing.scheduledAt?.getTime() ||
+                updated.videoLink !== existing.videoLink)
+            ? "rescheduled"
+            : null;
+    if (emailKind) {
+      void (async () => {
+        const requester = await prisma.userAccount.findUnique({
+          where: { id: updated.requestedByUserId },
+          select: { email: true, name: true, deletedAt: true },
+        });
+        if (!requester || requester.deletedAt) return;
+        const { subject, html } = await renderConsultationUpdateEmail({
+          kind: emailKind,
+          recipientName: requester.name,
+          scheduledAt: updated.scheduledAt?.toISOString() ?? null,
+          timeZone: updated.timezone,
+          videoLink: updated.videoLink,
+          refundedTokens: emailKind === "canceled" ? existing.tokenCost : null,
+          consultationsUrl: `${BRAND_WEBSITE}/customer/consultation`,
+        });
+        await sendNotificationEmail(requester.email, subject, html);
+      })().catch((err) => console.error("[admin/consultations/:id] customer email failed", err));
     }
 
     return NextResponse.json({

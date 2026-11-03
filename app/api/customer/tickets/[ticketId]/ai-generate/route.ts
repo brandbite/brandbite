@@ -15,7 +15,6 @@ import { buildImagePrompt } from "@/lib/ai/prompts";
 import { saveAiImageToR2 } from "@/lib/ai/asset-pipeline";
 import { readIdempotencyKey } from "@/lib/ai/idempotency";
 import { getAiTicketsMode, isAiTicketsAllowed } from "@/lib/feature-flags";
-import { isSiteAdminRole } from "@/lib/roles";
 import { Prisma } from "@prisma/client";
 
 export async function POST(
@@ -39,7 +38,7 @@ export async function POST(
 
     // AI generation is behind the AI_TICKETS_MODE flag (off by default).
     const aiMode = await getAiTicketsMode();
-    if (!isAiTicketsAllowed(aiMode, isSiteAdminRole(user.role))) {
+    if (!isAiTicketsAllowed(aiMode)) {
       return NextResponse.json({ error: "AI generation isn't available yet." }, { status: 403 });
     }
 
