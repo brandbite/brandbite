@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getUserTokenBalance } from "@/lib/token-engine";
 import { isSiteAdminRole } from "@/lib/roles";
 
 // --------------------------------------------------------------------------
@@ -204,8 +205,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ use
           })
         : Promise.resolve(null),
       user.role === "DESIGNER"
-        ? prisma.withdrawal.aggregate({
-            where: { creativeId: user.id },
+        ? // Paid withdrawals only: that's when tokens actually leave the
+          // creative's balance. Pending/approved/rejected ones never did.
+          prisma.withdrawal.aggregate({
+            where: { creativeId: user.id, status: "PAID" },
             _sum: { amountTokens: true },
             _count: true,
           })
@@ -295,6 +298,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ use
       };
     })();
 
+    const creativeBalance = user.role === "DESIGNER" ? await getUserTokenBalance(user.id) : null;
+
     return NextResponse.json({
       user: {
         id: user.id,
@@ -369,6 +374,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ use
                 totalEarned: earningsAgg?._sum.amount ?? 0,
                 totalWithdrawn: withdrawalsAgg?._sum.amountTokens ?? 0,
                 withdrawalCount: withdrawalsAgg?._count ?? 0,
+                // The real ledger balance (same figure the creative sees).
+                currentBalance: creativeBalance ?? 0,
               },
               ratings: ratingAgg
                 ? {

@@ -11,6 +11,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { fetchAllTickets } from "@/lib/fetch-all-tickets";
 import Link from "next/link";
 import { useToast } from "@/components/ui/toast-provider";
 import { STATUS_ORDER, isDueDateOverdue } from "@/lib/board";
@@ -139,27 +140,9 @@ export default function AdminBoardPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/tickets", {
-        cache: "no-store",
-      });
-
-      const json = (await res.json().catch(() => null)) as
-        | AdminTicketsResponse
-        | { error?: string }
-        | null;
-
-      if (!res.ok) {
-        const message =
-          json && json && "error" in json && json.error
-            ? json.error
-            : `Request failed with status ${res.status}`;
-        throw new Error(message);
-      }
-
-      if (!json || !("tickets" in json)) {
-        throw new Error("Unexpected response from server.");
-      }
-
+      // All pages — the API returns the 50 newest by default, which capped
+      // the board (and its counts and filters) at 50 tickets.
+      const json = await fetchAllTickets<AdminTicketsResponse>("/api/admin/tickets");
       setTickets(json.tickets);
     } catch (err) {
       console.error("[AdminBoardPage] load error", err);

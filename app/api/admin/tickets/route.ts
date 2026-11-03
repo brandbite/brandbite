@@ -12,7 +12,13 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 import { canOverrideTicketFinancials } from "@/lib/roles";
-import { applyCompanyLedgerEntry, getEffectiveTokenValues } from "@/lib/token-engine";
+import {
+  BASE_PAYOUT_PERCENT,
+  applyCompanyLedgerEntry,
+  computeCreativePayout,
+  evaluateCreativePayoutPercent,
+  getEffectiveTokenValues,
+} from "@/lib/token-engine";
 import { isTagsEnabled } from "@/lib/feature-flags";
 
 type PatchPayload = {
@@ -167,13 +173,43 @@ export async function GET(req: NextRequest) {
     // When the global TAGS_ENABLED flag is off, return `tags: []` for
     // every row — DB rows are preserved, just stripped from the response.
     const tagsEnabled = await isTagsEnabled();
+
+    // Payout at each assigned creative's current rate — the same formula the
+    // credit uses at approval (computeCreativePayout). Unassigned tickets use
+    // the base rate. jobType.creativePayoutTokens is not what anyone is paid.
+    const creativeIds = [
+      ...new Set(tickets.map((t) => t.creative?.id).filter((id): id is string => !!id)),
+    ];
+    const rateByCreative = new Map(
+      await Promise.all(
+        creativeIds.map(
+          async (id) => [id, (await evaluateCreativePayoutPercent(id)).payoutPercent] as const,
+        ),
+      ),
+    );
+
     const ticketsPayload = tickets.map((t) => {
       const { tagAssignments, ...rest } = t as typeof t & {
         tagAssignments: { tag: { id: string; name: string; color: string } }[];
       };
+      const payoutPercent =
+        (t.creative?.id && rateByCreative.get(t.creative.id)) || BASE_PAYOUT_PERCENT;
+      const payoutArgs = t.jobType
+        ? { tokenCost: t.jobType.tokenCost, quantity: t.quantity, payoutPercent }
+        : null;
       return {
         ...rest,
         tags: tagsEnabled ? tagAssignments.map((ta) => ta.tag) : [],
+        payoutPercent,
+        defaultPayout: payoutArgs
+          ? computeCreativePayout({ ...payoutArgs, creativePayoutOverride: null })
+          : null,
+        estimatedPayout: payoutArgs
+          ? computeCreativePayout({
+              ...payoutArgs,
+              creativePayoutOverride: t.creativePayoutOverride,
+            })
+          : null,
       };
     });
 

@@ -57,6 +57,7 @@ export async function GET(_req: NextRequest) {
         status: true,
         companyTicketNumber: true,
         updatedAt: true,
+        completedAt: true,
         company: {
           select: {
             id: true,
@@ -96,6 +97,7 @@ export async function GET(_req: NextRequest) {
           select: {
             id: true,
             createdAt: true,
+            amount: true,
           },
         },
       },
@@ -121,9 +123,13 @@ export async function GET(_req: NextRequest) {
         projectName: t.project?.name ?? null,
         creativeName: t.creative?.name ?? null,
         creativeEmail: t.creative?.email ?? null,
-        completedAt: t.updatedAt.toISOString(),
+        // completedAt when recorded; updatedAt moves on any later edit.
+        completedAt: (t.completedAt ?? t.updatedAt).toISOString(),
         jobTypeName: t.jobType?.name ?? null,
-        creativePayoutTokens: t.jobType?.creativePayoutTokens ?? null,
+        // What the creative was actually paid (the ledger entry). The job
+        // type's creativePayoutTokens isn't the paid amount — payouts are
+        // token cost × quantity × the creative's rate, or an override.
+        creativePayoutTokens: hasPayoutEntry ? t.ledgerEntries[0].amount : null,
         hasPayoutEntry,
         payoutLedgerCreatedAt,
       };

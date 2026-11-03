@@ -12,6 +12,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { fetchAllTickets } from "@/lib/fetch-all-tickets";
 import { buildTicketCode } from "@/lib/ticket-code";
 import {
   Badge,
@@ -83,6 +84,10 @@ type AdminTicket = {
     tokenCost: number;
     creativePayoutTokens: number;
   } | null;
+  /** Server-computed (computeCreativePayout) at the assigned creative's rate. */
+  defaultPayout?: number | null;
+  estimatedPayout?: number | null;
+  payoutPercent?: number;
 };
 
 type AdminTicketsResponse = {
@@ -122,9 +127,15 @@ function getEffectiveCost(t: AdminTicket): number | null {
   return t.tokenCostOverride ?? t.jobType.tokenCost * (t.quantity ?? 1);
 }
 
+/** Rate-based default payout (no override), as the server computed it. */
+function getDefaultPayout(t: AdminTicket): number | null {
+  if (!t.jobType) return null;
+  return t.defaultPayout ?? t.jobType.creativePayoutTokens * (t.quantity ?? 1);
+}
+
 function getEffectivePayout(t: AdminTicket): number | null {
   if (!t.jobType) return null;
-  return t.creativePayoutOverride ?? t.jobType.creativePayoutTokens * (t.quantity ?? 1);
+  return t.creativePayoutOverride ?? t.estimatedPayout ?? getDefaultPayout(t);
 }
 
 function isOverrideDirty(t: AdminTicket, d: OverrideDraft): boolean {
@@ -231,32 +242,18 @@ export default function AdminTicketsPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/tickets", {
-        cache: "no-store",
-      });
-      const json = (await res.json().catch(() => null)) as
-        | AdminTicketsResponse
-        | { error?: string }
-        | null;
-
-      if (!res.ok) {
-        if (res.status === 401) {
-          throw new Error("You need to sign in as an admin to view this page.");
-        }
-        if (res.status === 403) {
-          throw new Error("Only site owners or admins can manage tickets from this screen.");
-        }
-        throw new Error(
-          json && "error" in json && json.error
-            ? json.error
-            : `Request failed with status ${res.status}`,
-        );
-      }
-
-      if (!json || !("tickets" in json)) {
-        throw new Error("Unexpected response format from server.");
-      }
-
+      // All pages — see lib/fetch-all-tickets (the API pages at 50).
+      const json = await fetchAllTickets<AdminTicketsResponse>("/api/admin/tickets").catch(
+        (err: Error & { status?: number }) => {
+          if (err.status === 401) {
+            throw new Error("You need to sign in as an admin to view this page.");
+          }
+          if (err.status === 403) {
+            throw new Error("Only site owners or admins can manage tickets from this screen.");
+          }
+          throw err;
+        },
+      );
       setTickets(json.tickets);
       setCreatives(json.creatives);
     } catch (err) {
@@ -378,7 +375,7 @@ export default function AdminTicketsPage() {
       if (jobType) {
         const qty = ticket?.quantity ?? 1;
         const defaultCost = jobType.tokenCost * qty;
-        const defaultPayout = jobType.creativePayoutTokens * qty;
+        const defaultPayout = (ticket && getDefaultPayout(ticket)) ?? 0;
         const warnings: string[] = [];
         if (
           costVal !== "" &&
@@ -1061,7 +1058,7 @@ function ManageTicketPanel({
   const status = TICKET_STATUS[t.status];
   const qty = t.quantity ?? 1;
   const defaultCost = t.jobType ? t.jobType.tokenCost * qty : null;
-  const defaultPayout = t.jobType ? t.jobType.creativePayoutTokens * qty : null;
+  const defaultPayout = getDefaultPayout(t);
 
   const base = initialDraft(t);
   const draft = overrideDraft ?? base;
@@ -1093,7 +1090,12 @@ function ManageTicketPanel({
           },
           {
             label: "Default payout",
-            value: <span className="tabular-nums">{fmt(defaultPayout)} tokens</span>,
+            value: (
+              <span className="tabular-nums">
+                {fmt(defaultPayout)} tokens
+                {t.payoutPercent != null ? ` (${t.payoutPercent}% rate)` : ""}
+              </span>
+            ),
           },
           { label: "Creative", value: currentCreative ?? "Unassigned" },
           { label: "Project", value: t.project?.name ?? DASH },
@@ -1237,7 +1239,7 @@ function ManageTicketPanel({
                     htmlFor="manage-ticket-payout"
                     hint={
                       draft.payoutOverride.trim() === ""
-                        ? `Job-type default (${fmt(defaultPayout)})`
+                        ? `Rate-based default (${fmt(defaultPayout)})`
                         : undefined
                     }
                   >

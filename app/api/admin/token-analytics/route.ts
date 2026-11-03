@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { companyWalletLedgerWhere } from "@/lib/token-engine";
 import { LedgerDirection } from "@prisma/client";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { isSiteAdminRole } from "@/lib/roles";
@@ -25,16 +26,11 @@ export async function GET(_req: NextRequest) {
 
     const [ledger, companies] = await Promise.all([
       prisma.tokenLedger.findMany({
-        where: {
-          companyId: {
-            not: null,
-          },
-          // Exclude creative-scoped rows (JOB_PAYMENT credits / WITHDRAW debits
-          // that also carry the ticket's companyId). They belong to a
-          // creative's balance, not the company's, and would otherwise inflate
-          // per-company credit/net figures.
-          userId: null,
-        },
+        // Company-wallet rows only. Creative payouts and withdrawals can carry
+        // the ticket's companyId too; filtering on userId instead (as before)
+        // also dropped real company rows that record the acting user —
+        // top-ups, first subscription credits, consultation bookings/refunds.
+        where: companyWalletLedgerWhere(),
         orderBy: {
           createdAt: "asc",
         },

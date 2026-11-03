@@ -23,6 +23,11 @@ function requireAdmin(userRole: string) {
   }
 }
 
+/** Open = what auto-assign counts against a creative's cap. Cancelled
+ *  tickets used to be counted as active here too. */
+const OPEN_STATUSES = new Set(["TODO", "IN_PROGRESS", "IN_REVIEW"]);
+const isOpenStatus = (status: string) => OPEN_STATUSES.has(status);
+
 export async function GET() {
   try {
     const user = await getCurrentUserOrThrow();
@@ -89,8 +94,10 @@ export async function GET() {
         }),
 
         // 5. Withdrawals grouped by creative
+        // Paid only — pending/approved/rejected requests never left the balance.
         prisma.withdrawal.groupBy({
           by: ["creativeId"],
+          where: { status: "PAID" },
           _sum: { amountTokens: true },
           _count: true,
         }),
@@ -184,7 +191,7 @@ export async function GET() {
       // Tickets
       const dTickets = tickets.filter((t) => t.creativeId === d.id);
       const completedTickets = dTickets.filter((t) => t.status === "DONE").length;
-      const activeTickets = dTickets.filter((t) => t.status !== "DONE").length;
+      const activeTickets = dTickets.filter((t) => isOpenStatus(t.status)).length;
       const totalTickets = dTickets.length;
 
       // Per-status breakdown for the "who's holding what" column.
@@ -222,10 +229,10 @@ export async function GET() {
       const avgTurnaroundHours =
         turnaroundCount > 0 ? Math.round((turnaroundSum / turnaroundCount) * 10) / 10 : 0;
 
-      // Load score (priority-weighted, non-DONE tickets only)
+      // Load score (priority-weighted, open tickets only)
       let loadScore = 0;
       for (const t of dTickets) {
-        if (t.status !== "DONE") {
+        if (isOpenStatus(t.status)) {
           const weight = priorityWeights[t.priority as TicketPriority] ?? 2;
           const tokenCost = t.jobType?.tokenCost ?? 1;
           loadScore += weight * tokenCost;

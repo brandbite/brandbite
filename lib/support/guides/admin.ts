@@ -8,9 +8,6 @@
 //
 //           Known gaps the guides describe honestly or warn about (tracked
 //           for fixing — update the guide when each is fixed):
-//           - Board / Tickets load only the 50 most recent tickets.
-//           - The Tickets list "payout" is jobType.creativePayoutTokens, not
-//             the payout actually credited (see the payouts guide).
 //           - Bulk "Set status" skips the customer/creative rules (no
 //             refunds or charges); it is confirmed, audited and notifies.
 //           - Landing editor and 6 of 7 Pages entries affect nothing public.
@@ -125,7 +122,8 @@ export const ADMIN_GUIDES: SupportGuide[] = [
               "create, edit and delete payout rules,",
               "change AI tool prices and rate limits,",
               "change consultation settings and connect Google Calendar,",
-              "give anyone an admin role, change a site owner's role, or delete a user,",
+              "change the withdrawal minimum and auto-payout settings,",
+              "give anyone an admin role, change any admin's role, or delete a user,",
               "manage talent applications, and delete feedback and contact messages.",
             ],
           },
@@ -314,10 +312,6 @@ export const ADMIN_GUIDES: SupportGuide[] = [
             type: "p",
             text: "**Re-run auto-assign** tries to assign every unassigned Backlog request across all companies that have auto-assign on. It runs straight away, without a confirmation.",
           },
-          {
-            type: "warning",
-            text: "The Board and the Tickets table show the **50 most recent** requests.",
-          },
         ],
       },
       {
@@ -337,7 +331,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "On the **Pricing** tab you can set a custom **Ticket cost** and **Creative payout**. Leave a field empty to use the job type's default, then click **Apply pricing**.",
+            text: "On the **Pricing** tab you can set a custom **Ticket cost** and **Creative payout**. Leave a field empty to use the default — the job type's cost, and a payout at the assigned creative's current rate — then click **Apply pricing**.",
           },
           {
             type: "warning",
@@ -866,7 +860,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
           },
           {
             type: "p",
-            text: "If the banner says some jobs have **no matching ledger entry**, click **Show these only** and open each ticket to investigate. Jobs without a job type are never paid, so they show no entry.",
+            text: "The payout shown is the amount actually credited to the creative. If the banner says some jobs have **no matching ledger entry**, click **Show these only** and open each ticket to investigate. Jobs without a job type are never paid, so they show no entry.",
           },
         ],
       },
@@ -905,7 +899,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
           },
           {
             type: "p",
-            text: "Making someone a site admin or site owner, or changing a site owner's role, is site owner only and needs **PROMOTE** plus a security check. You can't change your own role.",
+            text: "Giving someone an admin role, or changing the role of anyone who is already a site admin or site owner, is site owner only and needs **PROMOTE** plus a security check. Site admins can change customers and creatives. You can't change your own role.",
           },
         ],
       },
@@ -1336,7 +1330,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
           },
           {
             type: "p",
-            text: "Each setting has its own **Save** button and takes effect immediately.",
+            text: "Each setting has its own **Save** button and takes effect immediately. The withdrawal minimum and the two auto-payout settings are site owner only. Every change is recorded in the Audit Log.",
           },
         ],
       },
@@ -1468,7 +1462,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
           },
           {
             type: "p",
-            text: "Security checks for money actions then ask for a code from the app instead of emailing one. **Disable authenticator app** switches back to emailed codes.",
+            text: "Security checks for money actions then ask for a code from the app instead of emailing one. **Disable authenticator app** switches back to emailed codes. Turning it off, or replacing it with a new app, first asks for a code from your **current** app, and is recorded in the Audit Log.",
           },
           {
             type: "tip",

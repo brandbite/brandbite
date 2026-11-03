@@ -224,5 +224,38 @@ describe("token accounting (integration)", () => {
       const real = await recalculateCompanyTokenBalance(company.id);
       expect(real).toBe(0); // pre-fix this was 60 (inflated by the payout row)
     });
+
+    it("counts company rows that record the acting user (top-ups, bookings)", async () => {
+      const company = await createCompany({ tokenBalance: 0 });
+      const customer = await createUser({ role: "CUSTOMER" });
+
+      // A top-up bought by a customer: company money, but userId is set.
+      await prisma.tokenLedger.create({
+        data: {
+          companyId: company.id,
+          userId: customer.id,
+          direction: "CREDIT",
+          amount: 200,
+          reason: "TOKEN_TOPUP",
+          balanceBefore: 0,
+          balanceAfter: 200,
+        },
+      });
+      // A consultation booked by the same customer.
+      await prisma.tokenLedger.create({
+        data: {
+          companyId: company.id,
+          userId: customer.id,
+          direction: "DEBIT",
+          amount: 50,
+          reason: "CONSULTATION_BOOKING",
+          balanceBefore: 200,
+          balanceAfter: 150,
+        },
+      });
+
+      const real = await recalculateCompanyTokenBalance(company.id);
+      expect(real).toBe(150); // pre-fix this was 0 (both rows skipped)
+    });
   });
 });
