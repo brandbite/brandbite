@@ -303,7 +303,8 @@ export default function AdminCompletedJobsPage() {
             ]}
           />
           <p className="mt-3 text-xs text-[var(--av2-text-2)]">
-            Payout tokens come from the job type&apos;s current settings, not from the ledger entry.
+            Payout tokens are the amount on the creative&apos;s payout ledger entry. Jobs without an
+            entry show none.
           </p>
         </PanelSection>
 

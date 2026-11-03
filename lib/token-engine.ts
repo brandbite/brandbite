@@ -227,24 +227,46 @@ export async function applyCompanyLedgerEntry(input: ApplyCompanyLedgerInput) {
 }
 
 /**
+ * Ledger reasons used for a creative's wallet. DESIGNER_JOB_PAYOUT is the
+ * legacy name of JOB_PAYMENT.
+ */
+export const CREATIVE_WALLET_REASONS = ["JOB_PAYMENT", "WITHDRAWAL_PAID", "DESIGNER_JOB_PAYOUT"];
+
+/**
+ * Prisma filter for ledger rows that move a company's wallet.
+ *
+ * A row belongs to a creative's wallet only when it has a userId AND a
+ * creative-wallet reason. Neither test alone works:
+ * - creative payouts also carry the ticket's companyId;
+ * - company rows such as TOKEN_TOPUP, SUBSCRIPTION_INITIAL_CREDIT and
+ *   CONSULTATION_BOOKING record the acting user in userId;
+ * - older company rows may use JOB_PAYMENT with no userId.
+ * Written as an OR so NULL reasons/userIds aren't dropped by SQL's
+ * three-valued logic.
+ */
+export function companyWalletLedgerWhere(companyId?: string): Prisma.TokenLedgerWhereInput {
+  return {
+    companyId: companyId ?? { not: null },
+    OR: [{ userId: null }, { reason: null }, { reason: { notIn: CREATIVE_WALLET_REASONS } }],
+  };
+}
+
+/**
  * Safety / repair helper:
  * - Reads every ledger entry for the given company and computes the real balance.
  * - Sets Company.tokenBalance to that value.
  */
 export async function recalculateCompanyTokenBalance(companyId: string) {
   return prisma.$transaction(async (tx) => {
-    // Only company-scoped rows move Company.tokenBalance. Creative payout
-    // (JOB_PAYMENT CREDIT) and withdrawal (DEBIT) rows also carry this
-    // companyId but belong to a UserAccount's balance (they set userId).
-    // Excluding userId rows keeps this repair helper from inflating the
-    // company balance by every creative payout ever made against it.
+    // Only company-wallet rows move Company.tokenBalance — see
+    // companyWalletLedgerWhere for why this filters by reason, not userId.
     const credits = await tx.tokenLedger.aggregate({
-      where: { companyId, userId: null, direction: "CREDIT" },
+      where: { ...companyWalletLedgerWhere(companyId), direction: "CREDIT" },
       _sum: { amount: true },
     });
 
     const debits = await tx.tokenLedger.aggregate({
-      where: { companyId, userId: null, direction: "DEBIT" },
+      where: { ...companyWalletLedgerWhere(companyId), direction: "DEBIT" },
       _sum: { amount: true },
     });
 
