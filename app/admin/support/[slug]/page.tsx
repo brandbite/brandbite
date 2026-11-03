@@ -25,10 +25,9 @@ export default async function AdminSupportGuidePage({ params }: Props) {
   if (!guide) notFound();
 
   // Owner-only guides mirror ownerOnly nav items — hide them from SITE_ADMIN.
-  if (guide.ownerOnly) {
-    const user = await getCurrentUser();
-    if (!user || !isSiteOwnerRole(user.role)) notFound();
-  }
+  const user = await getCurrentUser();
+  const isSiteOwner = !!user && isSiteOwnerRole(user.role);
+  if (guide.ownerOnly && !isSiteOwner) notFound();
 
-  return <SupportGuideView role="admin" guide={guide} />;
+  return <SupportGuideView role="admin" guide={guide} isSiteOwner={isSiteOwner} />;
 }

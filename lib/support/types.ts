@@ -37,10 +37,15 @@ export type SupportGuide = {
    * Dashboard paths this guide documents. Drives the per-page "?" help link:
    * a path matches itself and its children (/customer/tickets matches
    * /customer/tickets/abc), except the role root (/customer), which only
-   * matches exactly. The longest match wins. The first route is also the
-   * "Open this page" target on the guide.
+   * matches exactly. A `[param]` segment matches any one segment
+   * (/customer/tickets/[ticketId]). The most specific match wins: more
+   * literal segments beat fewer, so /customer/tickets/new beats
+   * /customer/tickets/[ticketId]. The first route without a `[param]` is the
+   * "Open this page" target. Empty for topic guides that span pages.
    */
   routes: string[];
+  /** Slugs of guides listed under "Related guides" at the end. */
+  related?: string[];
   /** Extra search terms that don't appear in the text (synonyms, old names). */
   keywords?: string[];
   /** Admin only: hide from SITE_ADMIN (mirrors ownerOnly nav items). */
