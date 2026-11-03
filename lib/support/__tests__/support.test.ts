@@ -72,6 +72,16 @@ describe("findGuideForPath", () => {
   });
 });
 
+describe("findGuideForPath — creative", () => {
+  it("maps the creative dashboard pages", () => {
+    expect(findGuideForPath("creative", "/creative")?.slug).toBe("overview");
+    expect(findGuideForPath("creative", "/creative/board")?.slug).toBe("board");
+    expect(findGuideForPath("creative", "/creative/tickets")?.slug).toBe("tickets-table");
+    expect(findGuideForPath("creative", "/creative/tickets/abc123")?.slug).toBe("ticket-details");
+    expect(findGuideForPath("creative", "/creative/withdrawals")?.slug).toBe("withdrawals");
+  });
+});
+
 describe("primaryRoute", () => {
   it("skips dynamic routes", () => {
     const guide = getGuides("customer").find((g) => g.slug === "review-and-approve")!;
