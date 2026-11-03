@@ -3,8 +3,9 @@
 // @purpose: Regression coverage for the access-control fixes shipped in the
 //           security audit (PR #268):
 //             - POST /api/tickets/[id]/complete is no longer unauthenticated;
-//               only site admins or the assigned creative may complete a ticket
-//               (and mint the payout).
+//               only site admins may complete a ticket (and mint the payout).
+//               The assigned creative was allowed until Nov 2026, which let
+//               them skip customer approval — now 403.
 //             - PATCH /api/customer/members/[memberId] only lets an OWNER grant
 //               the OWNER role — a PM can no longer self-escalate.
 //
@@ -115,7 +116,7 @@ describe("POST /api/tickets/[id]/complete — authorization", () => {
     expect(res.status).toBe(403);
   });
 
-  it("allows the assigned creative and applies the payout", async () => {
+  it("rejects the assigned creative with 403 — they can't approve their own work", async () => {
     const { ticket, creative } = await seedAssignedTicket();
     mockGetUser.mockResolvedValue({
       id: creative.id,
@@ -124,12 +125,27 @@ describe("POST /api/tickets/[id]/complete — authorization", () => {
     });
 
     const res = await completeTicket(dummyReq(), completeCtx(ticket.id));
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(403);
 
+    // Nothing changed: still awaiting the customer, no payout minted.
     const t = await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } });
-    expect(t.status).toBe("DONE");
-    // A payout was applied (exact amount is covered in token-accounting.test.ts).
-    expect(await getUserTokenBalance(creative.id)).toBeGreaterThan(0);
+    expect(t.status).toBe("IN_REVIEW");
+    expect(await prisma.tokenLedger.count({ where: { ticketId: ticket.id } })).toBe(0);
+    expect(await getUserTokenBalance(creative.id)).toBe(0);
+  });
+
+  it("rejects the assigned creative even while the ticket is still IN_PROGRESS", async () => {
+    const { ticket, creative } = await seedAssignedTicket();
+    await prisma.ticket.update({ where: { id: ticket.id }, data: { status: "IN_PROGRESS" } });
+    mockGetUser.mockResolvedValue({
+      id: creative.id,
+      email: "assignee@test.local",
+      role: "DESIGNER",
+    });
+
+    const res = await completeTicket(dummyReq(), completeCtx(ticket.id));
+    expect(res.status).toBe(403);
+    expect(await prisma.tokenLedger.count({ where: { ticketId: ticket.id } })).toBe(0);
   });
 
   it("allows a site admin to complete", async () => {
