@@ -46,6 +46,7 @@ const ACTION_SUBJECT_FRAGMENT: Record<AdminActionType, string> = {
   GOOGLE_OAUTH_CONFIG_EDIT: "changed the Google Calendar connection",
   COMPANY_AUTO_ASSIGN_EDIT: "changed a company's auto-assign setting",
   APP_SETTING_EDIT: "changed a platform setting",
+  TICKET_BULK_STATUS_CHANGE: "changed ticket statuses in bulk",
   ADMIN_MFA_DISABLE: "turned off authenticator two-factor",
   TALENT_APPLICATION_ACCEPTED: "accepted a talent application",
   TALENT_APPLICATION_DECLINED: "declined a talent application",
