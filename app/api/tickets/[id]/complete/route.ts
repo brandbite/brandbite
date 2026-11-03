@@ -16,10 +16,12 @@ import { isSiteAdminRole } from "@/lib/roles";
  * Usage:
  * POST /api/tickets/:id/complete
  *
- * Authorization: site admins, or the creative assigned to the ticket. This
- * endpoint mints a creative payout, so it must never be reachable
- * unauthenticated. (Customer-side completion goes through
- * /api/customer/tickets/status, which enforces the board state machine.)
+ * Authorization: site admins only. This endpoint marks the ticket DONE and
+ * mints the creative payout without checking the ticket's status, so it must
+ * not be reachable by the creative who gets paid — that let an assigned
+ * creative complete their own ticket from any status and skip customer
+ * approval. Customers approve through /api/customer/tickets/status, which
+ * enforces the board state machine (IN_REVIEW → DONE). No UI calls this.
  */
 export async function POST(_request: Request, context: { params: Promise<{ id: string }> }) {
   const { id: ticketId } = await context.params;
@@ -31,18 +33,16 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
   try {
     const user = await getCurrentUserOrThrow();
 
-    const authTicket = await prisma.ticket.findUnique({
-      where: { id: ticketId },
-      select: { creativeId: true },
-    });
-    if (!authTicket) {
-      return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
+    if (!isSiteAdminRole(user.role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const isSiteAdmin = isSiteAdminRole(user.role);
-    const isAssignedCreative = !!authTicket.creativeId && authTicket.creativeId === user.id;
-    if (!isSiteAdmin && !isAssignedCreative) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const exists = await prisma.ticket.findUnique({
+      where: { id: ticketId },
+      select: { id: true },
+    });
+    if (!exists) {
+      return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
     }
 
     const result = await completeTicketAndApplyTokens(ticketId);
