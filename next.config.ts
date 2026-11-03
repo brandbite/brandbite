@@ -88,6 +88,23 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["isomorphic-dompurify"],
+  // Keep Prisma's unused engines out of every Vercel Function bundle.
+  // @prisma/client ships WebAssembly engines for every database (Postgres,
+  // MySQL, SQL Server, SQLite, CockroachDB — as .js and .mjs) plus a wasm
+  // client for edge runtimes. We use the native Node "library" engine
+  // (.prisma/client/index.js → runtime/library.js) and no driver adapters,
+  // so these ~55 MB per function are dead weight that counts toward
+  // Functions Storage on every deployment. Re-check if we ever adopt
+  // @prisma/client/edge, /wasm or a driver adapter.
+  outputFileTracingExcludes: {
+    "*": [
+      "node_modules/@prisma/client/runtime/*.wasm-base64.js",
+      "node_modules/@prisma/client/runtime/*.wasm-base64.mjs",
+      "node_modules/@prisma/client/runtime/*.wasm",
+      "node_modules/.prisma/client/*.wasm",
+      "node_modules/.prisma/client/wasm*",
+    ],
+  },
   images: {
     // R2-hosted assets (hero images, thumbnails) served either through the
     // S3-compatible origin or an optional custom public domain (R2_PUBLIC_BASE_URL).
