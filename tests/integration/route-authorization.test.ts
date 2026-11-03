@@ -31,6 +31,7 @@ import { prisma } from "@/lib/prisma";
 import { BASE_PAYOUT_PERCENT, getUserTokenBalance } from "@/lib/token-engine";
 import { POST as completeTicket } from "@/app/api/tickets/[id]/complete/route";
 import { PATCH as patchMember } from "@/app/api/customer/members/[memberId]/route";
+import { PATCH as patchUser } from "@/app/api/admin/users/route";
 import { PATCH as patchStatus } from "@/app/api/customer/tickets/status/route";
 import { resetDatabase } from "./helpers/db";
 import {
@@ -278,5 +279,45 @@ describe("PATCH /api/customer/tickets/status — DONE pays via the gamification 
     });
     expect(payout?.reason).toBe("JOB_PAYMENT");
     expect(payout?.amount).toBe(expected);
+  });
+});
+
+describe("PATCH /api/admin/users — changing an admin's role is owner-only", () => {
+  function patchReq(body: unknown) {
+    return new Request("http://localhost/test", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it("blocks a SITE_ADMIN from demoting another SITE_ADMIN (403, role unchanged)", async () => {
+    const actor = await createUser({ role: "SITE_ADMIN" });
+    const target = await createUser({ role: "SITE_ADMIN" });
+    mockGetUser.mockResolvedValue({ id: actor.id, email: "a@test.local", role: "SITE_ADMIN" });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const res = await patchUser(patchReq({ userId: target.id, role: "CUSTOMER" }) as any);
+    expect(res.status).toBe(403);
+
+    const after = await prisma.userAccount.findUniqueOrThrow({ where: { id: target.id } });
+    expect(after.role).toBe("SITE_ADMIN");
+    expect(
+      await prisma.adminActionLog.count({
+        where: { targetId: target.id, outcome: "BLOCKED" },
+      }),
+    ).toBe(1);
+  });
+
+  it("still lets a SITE_ADMIN change a customer to a creative", async () => {
+    const actor = await createUser({ role: "SITE_ADMIN" });
+    const target = await createUser({ role: "CUSTOMER" });
+    mockGetUser.mockResolvedValue({ id: actor.id, email: "a@test.local", role: "SITE_ADMIN" });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const res = await patchUser(patchReq({ userId: target.id, role: "DESIGNER" }) as any);
+    expect(res.status).toBe(200);
+    const after = await prisma.userAccount.findUniqueOrThrow({ where: { id: target.id } });
+    expect(after.role).toBe("DESIGNER");
   });
 });

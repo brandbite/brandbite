@@ -2261,6 +2261,10 @@ enum AdminActionType {
   GOOGLE_OAUTH_CONFIG_EDIT
   // Company auto-assign default toggle (/admin/companies)
   COMPANY_AUTO_ASSIGN_EDIT
+  // Global AppSetting change (/admin/settings)
+  APP_SETTING_EDIT
+  // Owner turned off authenticator-app MFA for money actions
+  ADMIN_MFA_DISABLE
   // Talent applications (SITE_OWNER only — see canManageTalentApplications)
   TALENT_APPLICATION_ACCEPTED
   TALENT_APPLICATION_DECLINED

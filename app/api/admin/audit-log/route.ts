@@ -11,7 +11,8 @@
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
-import type { AdminActionOutcome, AdminActionType, Prisma } from "@prisma/client";
+import { AdminActionType } from "@prisma/client";
+import type { AdminActionOutcome, Prisma } from "@prisma/client";
 
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -22,23 +23,9 @@ const DEFAULT_LIMIT = 50;
 
 const VALID_OUTCOMES = new Set<AdminActionOutcome>(["SUCCESS", "BLOCKED", "ERROR"]);
 
-const VALID_ACTIONS = new Set<AdminActionType>([
-  "WITHDRAWAL_APPROVE",
-  "WITHDRAWAL_MARK_PAID",
-  "WITHDRAWAL_REJECT",
-  "PLAN_CREATE",
-  "PLAN_EDIT",
-  "PLAN_DELETE",
-  "PLAN_ASSIGN",
-  "COMPANY_TOKEN_GRANT",
-  "PAYOUT_RULE_EDIT",
-  "TICKET_FINANCIAL_OVERRIDE",
-  "USER_PROMOTE_TO_ADMIN",
-  "USER_HARD_DELETE",
-  "AI_PRICING_EDIT",
-  "CONSULTATION_PRICING_EDIT",
-  "GOOGLE_OAUTH_CONFIG_EDIT",
-]);
+// Every audit action is filterable — derived from the enum so new actions
+// (e.g. talent lifecycle, settings edits) don't need a second list here.
+const VALID_ACTIONS = new Set<AdminActionType>(Object.values(AdminActionType));
 
 export async function GET(req: NextRequest) {
   try {
