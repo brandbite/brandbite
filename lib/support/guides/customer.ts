@@ -1443,7 +1443,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "warning",
-            text: "**Delete my account** is permanent. Type your email to confirm. You are signed out and your personal details are removed. Requests and token history stay with your company, without your name.",
+            text: "**Delete my account** is permanent. Type your email to confirm. You are signed out and your personal details are removed. Requests and token history stay with your company, without your name. If you're the only Owner and others are still in the company, make someone else an Owner first.",
           },
         ],
       },

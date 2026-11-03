@@ -5,17 +5,9 @@
 //           sync with CREATIVE_NAV and the pages they describe — when a
 //           creative page changes, update its guide in the same PR.
 //
-//           Deliberately NOT documented (known issues, tracked separately —
-//           update the guide when they're fixed):
-//           - "Note to your customer" in Upload work: dropped server-side
-//             unless an admin enabled creativeRevisionNotesEnabled.
-//           - Status changes from the Table dropdown / bulk "Move to
-//             Backlog": they skip the board rules (e.g. In review without a
-//             version). Guides send creatives to the Board's Upload work.
-//           - The "Payout" figure on board cards is the job type's base
-//             payout, not the tier-based amount actually credited.
-//           - Profile → Concurrent task cap "Clear" doesn't clear (guide
-//             says: empty the field, then Save).
+//           Rules described here are enforced server-side
+//           (lib/tickets/creative-transitions.ts, computeCreativePayout in
+//           lib/token-engine.ts) — keep the guide and those in step.
 // -----------------------------------------------------------------------------
 
 import type { SupportGuide } from "../types";
@@ -408,12 +400,12 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
             ],
           },
           {
-            type: "warning",
-            text: "The version is created before the files upload. Check every file is under 4 MB before you send. If a file fails, the customer still gets the version without it.",
+            type: "p",
+            text: "Files that are too large or aren't an image or PDF are refused as you add them, with a note saying why.",
           },
           {
-            type: "tip",
-            text: "Always send from the Board with **Upload work**, so the customer gets your files with the version.",
+            type: "p",
+            text: "If our team has turned on notes for you, you can also add a **Note to your customer** explaining what changed.",
           },
         ],
       },
@@ -567,8 +559,8 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
             ],
           },
           {
-            type: "tip",
-            text: "To start a job or send a version, use the Board. Its **Upload work** step makes sure your files reach the customer.",
+            type: "p",
+            text: "The status dropdown offers only the moves you can make from the job's current status. To send a version for review, use **Upload work** on the Board so your files go with it.",
           },
         ],
       },
@@ -608,8 +600,8 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
             text: "Everyone starts on the **Base Rate** of 60%.",
           },
           {
-            type: "tip",
-            text: "The payout shown on Board cards is the job type's standard figure. Your actual payout is calculated with your rate at approval and appears in **Balance**.",
+            type: "p",
+            text: "The payout shown on your Board cards and job pages is calculated this way at your current rate. If your rate changes before the job is approved, the amount you're paid changes with it.",
           },
         ],
       },
@@ -845,7 +837,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
           },
           {
             type: "tip",
-            text: "To remove your cap, empty the field and click **Save**.",
+            text: "Click **Clear** to remove your cap.",
           },
         ],
       },
@@ -941,7 +933,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "warning",
-            text: "**Delete my account** is permanent. Type your email to confirm. Before you delete, finish or hand back your open jobs and withdraw your balance: there's no way back afterwards.",
+            text: "**Delete my account** is permanent. Type your email to confirm. You can't delete while you still have open jobs or a withdrawal that hasn't been paid, so finish those first (or ask us to reassign a job). Withdraw any remaining balance before you go: there's no way back afterwards.",
           },
         ],
       },
