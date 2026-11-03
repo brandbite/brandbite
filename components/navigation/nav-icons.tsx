@@ -204,6 +204,20 @@ export function IconFaq(p: Props) {
   );
 }
 
+/** Lifebuoy — the in-dashboard Support section. */
+export function IconSupport(p: Props) {
+  return (
+    <svg {...base} {...p}>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="4" />
+      <path d="m5.6 5.6 3.6 3.6" />
+      <path d="m14.8 14.8 3.6 3.6" />
+      <path d="m14.8 9.2 3.6-3.6" />
+      <path d="m5.6 18.4 3.6-3.6" />
+    </svg>
+  );
+}
+
 // ---- Creative -------------------------------------------------------------
 
 export function IconPortfolio(p: Props) {

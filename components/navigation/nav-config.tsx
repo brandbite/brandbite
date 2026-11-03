@@ -29,6 +29,7 @@ import {
   IconPortfolio,
   IconServices,
   IconSettings,
+  IconSupport,
   IconTokens,
   IconWithdrawals,
 } from "./nav-icons";
@@ -199,6 +200,7 @@ export const CUSTOMER_NAV: NavConfig = {
         { href: "/customer/members", label: "Members", icon: IconMembers },
         { href: "/customer/settings", label: "Settings", icon: IconSettings },
         { href: "/customer/faq", label: "FAQ", icon: IconFaq },
+        { href: "/customer/support", label: "Support", icon: IconSupport },
       ],
     },
   ],
@@ -234,6 +236,7 @@ export const CREATIVE_NAV: NavConfig = {
         { href: "/creative/profile", label: "Profile", icon: IconMembers },
         { href: "/creative/settings", label: "Settings", icon: IconSettings },
         { href: "/creative/faq", label: "FAQ", icon: IconFaq },
+        { href: "/creative/support", label: "Support", icon: IconSupport },
       ],
     },
   ],
