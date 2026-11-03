@@ -125,7 +125,12 @@ type DetailResponse = {
       completedThisWeek: number;
     };
     skills: { jobTypeId: string; jobTypeName: string; categoryId: string }[];
-    earnings: { totalEarned: number; totalWithdrawn: number; withdrawalCount: number };
+    earnings: {
+      totalEarned: number;
+      totalWithdrawn: number;
+      withdrawalCount: number;
+      currentBalance?: number;
+    };
     ratings: {
       count: number;
       quality: number | null;
@@ -648,7 +653,10 @@ export default function AdminUserDetailPage() {
   // Role-specific "Account activity" summary on the overview.
   let activityCard: ReactNode = null;
   if (designer) {
-    const balance = designer.earnings.totalEarned - designer.earnings.totalWithdrawn;
+    // Server-computed ledger balance; older responses fall back to the sum.
+    const balance =
+      designer.earnings.currentBalance ??
+      designer.earnings.totalEarned - designer.earnings.totalWithdrawn;
     activityCard = (
       <Card>
         <CardTitle>Account activity</CardTitle>
@@ -907,7 +915,10 @@ export default function AdminUserDetailPage() {
                   icon={<IconCoins />}
                   tone="green"
                   label="Current balance"
-                  value={fmt(designer.earnings.totalEarned - designer.earnings.totalWithdrawn)}
+                  value={fmt(
+                    designer.earnings.currentBalance ??
+                      designer.earnings.totalEarned - designer.earnings.totalWithdrawn,
+                  )}
                   hint="tokens"
                 />
               </div>
