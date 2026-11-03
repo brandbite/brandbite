@@ -82,6 +82,29 @@ describe("findGuideForPath — creative", () => {
   });
 });
 
+describe("findGuideForPath — admin", () => {
+  const owner = { isSiteOwner: true };
+
+  it("prefers the most specific admin route", () => {
+    expect(findGuideForPath("admin", "/admin", owner)?.slug).toBe("dashboard");
+    expect(findGuideForPath("admin", "/admin/tickets", owner)?.slug).toBe("board-and-tickets");
+    expect(findGuideForPath("admin", "/admin/tickets/abc123", owner)?.slug).toBe("ticket-detail");
+    expect(findGuideForPath("admin", "/admin/settings", owner)?.slug).toBe("settings");
+    expect(findGuideForPath("admin", "/admin/settings/mfa", owner)?.slug).toBe("two-factor");
+    expect(findGuideForPath("admin", "/admin/consultations/settings", owner)?.slug).toBe(
+      "consultation-settings",
+    );
+  });
+
+  it("hides owner-only guides from site admins", () => {
+    expect(findGuideForPath("admin", "/admin/audit-log", owner)?.slug).toBe("audit-log");
+    expect(findGuideForPath("admin", "/admin/audit-log", { isSiteOwner: false })).toBeUndefined();
+    const adminSlugs = getGuides("admin", { isSiteOwner: false }).map((g) => g.slug);
+    expect(adminSlugs).not.toContain("talent-applications");
+    expect(adminSlugs).not.toContain("two-factor");
+  });
+});
+
 describe("primaryRoute", () => {
   it("skips dynamic routes", () => {
     const guide = getGuides("customer").find((g) => g.slug === "review-and-approve")!;
