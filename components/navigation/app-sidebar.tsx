@@ -19,6 +19,7 @@ import { NotificationBell } from "@/components/ui/notification-bell";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { BrandLogo, BrandMark } from "@/components/ui/brand-logo";
 import { useSessionRole } from "@/lib/hooks/use-session-role";
+import { PageHelpLink } from "@/components/support/page-help-link";
 import { getNavConfig, type NavConfig, type NavLeaf, type NavRole } from "./nav-config";
 import { IconChevronsLeft, IconLogout, IconMenu, IconX } from "./nav-icons";
 
@@ -300,6 +301,15 @@ export function AppSidebar({ role }: { role: NavRole }) {
                   below the viewport (short screens). */}
               <NotificationBell role={role} placement="top-right" />
             </div>
+
+            {/* Help for the current page — links to its Support guide, or
+                the Support home when the page has none yet. */}
+            {role !== "admin" && (
+              <PageHelpLink
+                role={role}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--bb-text-secondary)] hover:bg-[var(--bb-bg-warm)] hover:text-[var(--bb-secondary)] focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:outline-none"
+              />
+            )}
 
             <button
               type="button"

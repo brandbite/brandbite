@@ -15,6 +15,7 @@ import { Fragment, useCallback, useEffect, useState, type ReactNode } from "reac
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { NotificationBell } from "@/components/ui/notification-bell";
 import { IconMenu } from "@/components/navigation/nav-icons";
+import { PageHelpLink } from "@/components/support/page-help-link";
 import { useSessionRole } from "@/lib/hooks/use-session-role";
 import { getAdminPageIndex, getBreadcrumb } from "./admin-nav";
 import { AdminSidebar } from "./admin-sidebar";
@@ -192,6 +193,12 @@ export function AdminShell({ children }: { children: ReactNode }) {
                 {isMac ? "⌘K" : "Ctrl K"}
               </kbd>
             </button>
+
+            <PageHelpLink
+              role="admin"
+              iconSize={20}
+              className="flex h-10 w-10 items-center justify-center rounded-lg text-[var(--av2-text)] hover:bg-[var(--av2-surface)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
+            />
 
             <div className="flex h-10 w-10 items-center justify-center rounded-lg text-[var(--av2-text)]">
               <NotificationBell role="admin" placement="bottom-right" />

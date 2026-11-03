@@ -14,7 +14,12 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { BrandLogo, BrandMark } from "@/components/ui/brand-logo";
 import type { NavLeaf } from "@/components/navigation/nav-config";
-import { IconChevronsLeft, IconSettings, IconX } from "@/components/navigation/nav-icons";
+import {
+  IconChevronsLeft,
+  IconSettings,
+  IconSupport,
+  IconX,
+} from "@/components/navigation/nav-icons";
 import { useSessionRole } from "@/lib/hooks/use-session-role";
 import {
   DEFAULT_COLLAPSED_GROUPS,
@@ -78,6 +83,7 @@ export function AdminSidebar({
 
   const badges: Record<string, number> = { "/admin/withdrawals": pendingWithdrawals };
   const settingsActive = pathname === "/admin/settings";
+  const supportActive = pathname === "/admin/support" || pathname.startsWith("/admin/support/");
 
   return (
     <aside
@@ -180,6 +186,15 @@ export function AdminSidebar({
 
       {/* Footer */}
       <div className="shrink-0 border-t border-[var(--av2-border)] px-3 py-3">
+        <Link
+          href="/admin/support"
+          aria-current={supportActive ? "page" : undefined}
+          title={collapsed ? "Support" : undefined}
+          className={itemClass(supportActive, collapsed)}
+        >
+          <IconSupport width={20} height={20} className="shrink-0" />
+          <span className={collapsed ? "md:sr-only" : ""}>Support</span>
+        </Link>
         <Link
           href="/admin/settings"
           aria-current={settingsActive ? "page" : undefined}

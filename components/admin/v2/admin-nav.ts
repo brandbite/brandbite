@@ -9,7 +9,7 @@
 import { ADMIN_NAV, type NavLeaf, type NavSection } from "@/components/navigation/nav-config";
 
 /** Links pinned to the sidebar footer / user menu instead of the section list. */
-export const PINNED_HREFS = new Set(["/admin/settings", "/admin/profile"]);
+export const PINNED_HREFS = new Set(["/admin/settings", "/admin/profile", "/admin/support"]);
 
 export const WORKSPACE_LABEL = "Workspace";
 
@@ -34,6 +34,7 @@ const EXTRA_PAGES: [string, string, string][] = [
   ["/admin/plan-assignment", "Catalog", "Plan assignment"],
   ["/admin/profile", "Account", "Profile"],
   ["/admin/settings", "System", "Settings"],
+  ["/admin/support", "System", "Support"],
 ];
 
 export type PageEntry = { href: string; section: string; label: string };
