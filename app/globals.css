@@ -3,6 +3,15 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
+  /* ── Fonts ─────────────────────────────────────────────────────────────── */
+  /* Self-hosted via @fontsource-variable (imported in app/layout.tsx and
+     app/admin/layout.tsx). next/font/google fetched these from Google at
+     build time and the fetch failed intermittently, breaking deploys. */
+  --font-inter: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-josefin: "Josefin Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-caveat: "Caveat Variable", cursive;
+  --font-jakarta: "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, sans-serif;
+
   /* ── Brand ─────────────────────────────────────────────────────────────── */
   --bb-primary: #f15b2b;
   --bb-primary-hover: #e44f20;

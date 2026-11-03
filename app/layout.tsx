@@ -9,7 +9,11 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
-import { Josefin_Sans, Inter, Caveat } from "next/font/google";
+// Self-hosted variable fonts (all subsets, split by unicode-range so browsers
+// fetch only what a page uses). The --font-* variables live in globals.css.
+import "@fontsource-variable/inter";
+import "@fontsource-variable/josefin-sans";
+import "@fontsource-variable/caveat";
 import DemoPersonaBanner from "../components/demo-persona-banner";
 import { ToastProvider } from "@/components/ui/toast-provider";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -18,29 +22,6 @@ import { SessionStaleDetector } from "@/components/auth/session-stale-detector";
 import { A11yDevMonitor } from "@/components/a11y-dev-monitor";
 import { GoogleAnalytics } from "@/components/analytics/google-analytics";
 import { CookieConsentBanner } from "@/components/analytics/cookie-consent-banner";
-
-const josefin = Josefin_Sans({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-  display: "swap",
-  variable: "--font-josefin",
-});
-
-const inter = Inter({
-  subsets: ["latin"],
-  // 800 (ExtraBold) drives the display headings on the marketing redesign.
-  weight: ["300", "400", "500", "600", "700", "800"],
-  display: "swap",
-  variable: "--font-inter",
-});
-
-// Handwritten accent font for the marketing pages (sticky notes, doodles).
-const caveat = Caveat({
-  subsets: ["latin"],
-  weight: ["400", "700"],
-  display: "swap",
-  variable: "--font-caveat",
-});
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
@@ -108,9 +89,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body
-        className={`${inter.variable} ${josefin.variable} ${caveat.variable} min-h-screen bg-[var(--bb-bg-page)] text-[var(--bb-secondary)] antialiased`}
-      >
+      <body className="min-h-screen bg-[var(--bb-bg-page)] text-[var(--bb-secondary)] antialiased">
         <ThemeProvider>
           <ToastProvider>
             <AuthGuard />
