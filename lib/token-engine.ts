@@ -78,6 +78,25 @@ export function getEffectiveTokenValues(ticket: {
   };
 }
 
+/**
+ * The creative payout for a ticket — the single formula used both when the
+ * payout is credited (completeTicketAndApplyTokens) and when it's shown to
+ * the creative ahead of time (board, ticket page). An admin override wins;
+ * otherwise it's the job's token cost × quantity × the creative's payout %.
+ *
+ * Note: getEffectiveTokenValues (above) reports jobType.creativePayoutTokens
+ * × quantity, which is NOT what a creative is paid when assigned.
+ */
+export function computeCreativePayout(args: {
+  tokenCost: number;
+  quantity: number | null | undefined;
+  creativePayoutOverride: number | null | undefined;
+  payoutPercent: number;
+}): number {
+  if (args.creativePayoutOverride != null) return args.creativePayoutOverride;
+  return Math.round(args.tokenCost * (args.quantity ?? 1) * (args.payoutPercent / 100));
+}
+
 // -----------------------------------------------------------------------------
 // Payout rule evaluation (gamification system)
 // -----------------------------------------------------------------------------
@@ -441,9 +460,12 @@ export async function completeTicketAndApplyTokens(
       appliedPayoutPercent = ruleResult.payoutPercent;
       matchedRuleId = ruleResult.matchedRuleId;
       matchedRuleName = ruleResult.matchedRuleName;
-      effectivePayout = Math.round(
-        ticket.jobType.tokenCost * (ticket.quantity ?? 1) * (appliedPayoutPercent / 100),
-      );
+      effectivePayout = computeCreativePayout({
+        tokenCost: ticket.jobType.tokenCost,
+        quantity: ticket.quantity,
+        creativePayoutOverride: null,
+        payoutPercent: appliedPayoutPercent,
+      });
     } else {
       effectivePayout = ticket.jobType.creativePayoutTokens * (ticket.quantity ?? 1);
     }

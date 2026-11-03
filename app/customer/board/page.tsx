@@ -22,6 +22,7 @@ import {
 } from "@/lib/permissions/companyRoles";
 import { TicketStatus, TicketPriority } from "@prisma/client";
 import { useToast } from "@/components/ui/toast-provider";
+import { fetchAllTickets } from "@/lib/fetch-all-tickets";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
@@ -448,16 +449,9 @@ export default function CustomerBoardPage() {
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await fetch("/api/customer/tickets", {
-        cache: "no-store",
-      });
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || `Failed to load tickets (status ${res.status}).`);
-      }
-
-      const json = (await res.json()) as CustomerBoardResponse;
+      // All pages — the API returns the 50 newest by default, which used to
+      // hide older open requests from the board.
+      const json = await fetchAllTickets<CustomerBoardResponse>("/api/customer/tickets");
       setData({
         ...json,
         stats: computeStats(json.tickets),

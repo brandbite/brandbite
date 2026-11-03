@@ -18,6 +18,8 @@ import { LoadingState } from "@/components/ui/loading-state";
 type LedgerDirection = "CREDIT" | "DEBIT";
 
 type CreativeBalanceResponse = {
+  /** Lifetime sums over the whole ledger (not just the rows below). */
+  totals?: { credits: number; debits: number };
   user: {
     id: string;
     email: string;
@@ -86,14 +88,20 @@ export default function CreativeBalancePage() {
   const creative = data?.user;
   const ledger = data?.ledger ?? [];
 
+  // Lifetime totals come from the API (whole ledger); fall back to summing
+  // the visible rows only if an older API response has no totals.
   const totalCredits = useMemo(
-    () => ledger.filter((l) => l.direction === "CREDIT").reduce((sum, l) => sum + l.amount, 0),
-    [ledger],
+    () =>
+      data?.totals?.credits ??
+      ledger.filter((l) => l.direction === "CREDIT").reduce((sum, l) => sum + l.amount, 0),
+    [data?.totals?.credits, ledger],
   );
 
   const totalDebits = useMemo(
-    () => ledger.filter((l) => l.direction === "DEBIT").reduce((sum, l) => sum + l.amount, 0),
-    [ledger],
+    () =>
+      data?.totals?.debits ??
+      ledger.filter((l) => l.direction === "DEBIT").reduce((sum, l) => sum + l.amount, 0),
+    [data?.totals?.debits, ledger],
   );
 
   const netBalance = data?.balance ?? totalCredits - totalDebits;
@@ -191,7 +199,7 @@ export default function CreativeBalancePage() {
             {loading ? "—" : totalDebits}
           </p>
           <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-            Tokens deducted due to corrections or withdrawals.
+            Tokens paid out to you through withdrawals.
           </p>
         </div>
       </section>

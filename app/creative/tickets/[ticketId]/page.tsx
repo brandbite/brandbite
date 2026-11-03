@@ -57,6 +57,8 @@ type TicketDetailResponse = {
     companyTicketNumber: number | null;
     quantity: number;
     effectivePayout: number | null;
+    /** Rate used for effectivePayout; null when an admin set a fixed payout. */
+    payoutPercent?: number | null;
     project: {
       id: string;
       name: string;
@@ -521,12 +523,10 @@ export default function CreativeTicketDetailPage() {
                     Creative payout:{" "}
                     <span className="font-semibold text-[var(--bb-secondary)]">
                       {ticket.effectivePayout != null
-                        ? ticket.quantity > 1 && ticket.jobType
-                          ? `${ticket.jobType.creativePayoutTokens} × ${ticket.quantity} = ${ticket.effectivePayout} tokens`
+                        ? ticket.payoutPercent != null
+                          ? `${ticket.effectivePayout} tokens (${ticket.payoutPercent}% of ${ticket.jobType ? ticket.jobType.tokenCost * ticket.quantity : "—"})`
                           : `${ticket.effectivePayout} tokens`
-                        : ticket.jobType?.creativePayoutTokens != null
-                          ? `${ticket.jobType.creativePayoutTokens} tokens`
-                          : "—"}
+                        : "—"}
                     </span>
                   </p>
                   {ticket.quantity > 1 && (

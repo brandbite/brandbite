@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BoardViewToggle } from "@/components/board/board-view-toggle";
 import { buildTicketCode } from "@/lib/ticket-code";
+import { fetchAllTickets } from "@/lib/fetch-all-tickets";
 import { allowedCreativeTargets } from "@/lib/tickets/creative-transitions";
 import { DataTable, THead, TH, TD } from "@/components/ui/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -105,23 +106,20 @@ export default function CreativeTicketsPage() {
     setError(null);
 
     try {
-      const res = await fetch("/api/creative/tickets", {
-        cache: "no-store",
-      });
-      const json = await res.json().catch(() => null);
-
-      if (!res.ok) {
-        if (res.status === 401) {
-          throw new Error("You must be signed in as a creative to view this page.");
-        }
-        if (res.status === 403) {
-          throw new Error("You do not have permission to view creative tickets.");
-        }
-        const msg = json?.error || `Request failed with status ${res.status}`;
-        throw new Error(msg);
-      }
-
-      setData(json as CreativeTicketsResponse);
+      // All pages — this table has no paging of its own, and the API returns
+      // 50 per page by default.
+      const json = await fetchAllTickets<CreativeTicketsResponse>("/api/creative/tickets").catch(
+        (err: Error & { status?: number }) => {
+          if (err.status === 401) {
+            throw new Error("You must be signed in as a creative to view this page.");
+          }
+          if (err.status === 403) {
+            throw new Error("You do not have permission to view creative tickets.");
+          }
+          throw err;
+        },
+      );
+      setData(json);
     } catch (err: unknown) {
       console.error("Creative tickets fetch error:", err);
       const message = err instanceof Error ? err.message : "Failed to load creative tickets.";

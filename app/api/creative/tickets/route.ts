@@ -12,6 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { createNotification } from "@/lib/notifications";
 import { transitionCreativeTicketStatus } from "@/lib/tickets/transition-status";
+import { computeCreativePayout, evaluateCreativePayoutPercent } from "@/lib/token-engine";
 
 type TicketStatusString = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 
@@ -44,6 +45,9 @@ type CreativeTicket = {
   revisionCount: number;
   latestRevisionHasFeedback: boolean;
   latestRevisionFeedbackSnippet: string | null;
+  /** What this creative would be paid on approval at their current rate
+   *  (computeCreativePayout — same formula as the actual credit). */
+  estimatedPayout: number | null;
 };
 
 type CreativeTicketsResponse = {
@@ -218,6 +222,8 @@ export async function GET(req: NextRequest) {
             },
           },
           revisionCount: true,
+          quantity: true,
+          creativePayoutOverride: true,
           revisions: {
             orderBy: {
               version: "desc",
@@ -233,6 +239,8 @@ export async function GET(req: NextRequest) {
       }),
       prisma.ticket.count({ where }),
     ]);
+
+    const { payoutPercent } = await evaluateCreativePayoutPercent(user.id);
 
     const creativeFlags = await prisma.userAccount.findUnique({
       where: { id: user.id },
@@ -297,6 +305,14 @@ export async function GET(req: NextRequest) {
           revisionCount: t.revisionCount ?? 0,
           latestRevisionHasFeedback,
           latestRevisionFeedbackSnippet,
+          estimatedPayout: t.jobType
+            ? computeCreativePayout({
+                tokenCost: t.jobType.tokenCost,
+                quantity: t.quantity,
+                creativePayoutOverride: t.creativePayoutOverride,
+                payoutPercent,
+              })
+            : null,
         };
       }),
       pagination: {
