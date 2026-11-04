@@ -108,7 +108,7 @@ export const auth = betterAuth({
         try {
           await sendNotificationEmail(
             newEmail,
-            "Confirm your new Brandbite email",
+            "Confirm your new brandbite email",
             [
               "<div style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto;\">",
               '<div style="background: #f15b2b; padding: 20px 24px; border-radius: 12px 12px 0 0;">',
@@ -116,7 +116,7 @@ export const auth = betterAuth({
               "</div>",
               '<div style="background: #fff; padding: 28px 24px; border: 1px solid #e3e1dc; border-top: none;">',
               `<p style="margin: 0 0 16px; font-size: 14px; color: #424143;">Hi${user.name ? ` ${user.name}` : ""},</p>`,
-              `<p style="margin: 0 0 16px; font-size: 14px; color: #424143;">We received a request to change the email on your Brandbite account from <strong>${user.email}</strong> to <strong>${newEmail}</strong>. Click the button below to confirm:</p>`,
+              `<p style="margin: 0 0 16px; font-size: 14px; color: #424143;">We received a request to change the email on your brandbite account from <strong>${user.email}</strong> to <strong>${newEmail}</strong>. Click the button below to confirm:</p>`,
               '<table role="presentation" cellpadding="0" cellspacing="0" style="margin: 24px 0;">',
               "<tr>",
               '<td style="border-radius: 8px; background: #f15b2b;">',
@@ -127,7 +127,7 @@ export const auth = betterAuth({
               '<p style="margin: 0; font-size: 13px; color: #7a7a7a;">This link expires in 1 hour. If you didn&apos;t request this change, you can ignore this email — your account email won&apos;t change unless the link is clicked.</p>',
               "</div>",
               '<div style="background: #faf9f7; padding: 16px 24px; border-radius: 0 0 12px 12px; border: 1px solid #e3e1dc; border-top: none;">',
-              '<p style="margin: 0; font-size: 11px; color: #9a9892; text-align: center;">Brandbite &mdash; Creative-as-a-service platform</p>',
+              '<p style="margin: 0; font-size: 11px; color: #9a9892; text-align: center;">brandbite &mdash; Creative-as-a-service platform</p>',
               "</div>",
               "</div>",
             ].join("\n"),
@@ -245,7 +245,7 @@ export const auth = betterAuth({
       try {
         await sendNotificationEmail(
           user.email,
-          "Reset your Brandbite password",
+          "Reset your brandbite password",
           [
             "<div style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto;\">",
             '<div style="background: #f15b2b; padding: 20px 24px; border-radius: 12px 12px 0 0;">',
@@ -264,7 +264,7 @@ export const auth = betterAuth({
             '<p style="margin: 0; font-size: 13px; color: #7a7a7a;">This link expires in 1 hour. If you didn\'t request a password reset, you can safely ignore this email.</p>',
             "</div>",
             '<div style="background: #faf9f7; padding: 16px 24px; border-radius: 0 0 12px 12px; border: 1px solid #e3e1dc; border-top: none;">',
-            '<p style="margin: 0; font-size: 11px; color: #9a9892; text-align: center;">Brandbite &mdash; Creative-as-a-service platform</p>',
+            '<p style="margin: 0; font-size: 11px; color: #9a9892; text-align: center;">brandbite &mdash; Creative-as-a-service platform</p>',
             "</div>",
             "</div>",
           ].join("\n"),
@@ -318,17 +318,17 @@ export const auth = betterAuth({
     // magic link instead of entering a password.
     // ----------------------------------------------------------------
     twoFactor({
-      issuer: "Brandbite",
+      issuer: "brandbite",
     }),
     magicLink({
       sendMagicLink: async ({ email, url }) => {
         try {
           await sendNotificationEmail(
             email,
-            "Sign in to Brandbite",
+            "Sign in to brandbite",
             [
               '<div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">',
-              '<h2 style="color: #111;">Sign in to Brandbite</h2>',
+              '<h2 style="color: #111;">Sign in to brandbite</h2>',
               "<p>Click the button below to sign in to your account:</p>",
               '<p style="text-align: center; margin: 32px 0;">',
               `<a href="${url}" style="display: inline-block; padding: 12px 32px; background: #111; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600;">`,

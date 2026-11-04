@@ -17,7 +17,7 @@ import { useSessionRole } from "@/lib/hooks/use-session-role";
 import { SupportScope } from "./support-ui";
 
 const INTRO: Record<SupportRole, string> = {
-  customer: "Step-by-step help for every part of your Brandbite dashboard.",
+  customer: "Step-by-step help for every part of your brandbite dashboard.",
   creative: "Step-by-step help for every part of your creative dashboard.",
   admin: "How each admin page works, what its settings do and what to watch out for.",
 };

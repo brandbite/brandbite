@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
 
     sendNotificationEmail(
       email,
-      `You've been invited to join ${companyName} on Brandbite`,
+      `You've been invited to join ${companyName} on brandbite`,
       [
         "<div style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto;\">",
         '<div style="background: #f15b2b; padding: 20px 24px; border-radius: 12px 12px 0 0;">',
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
         "</div>",
         '<div style="background: #fff; padding: 28px 24px; border: 1px solid #e3e1dc; border-top: none;">',
         `<p style="margin: 0 0 16px; font-size: 14px; color: #424143;">Hi,</p>`,
-        `<p style="margin: 0 0 16px; font-size: 14px; color: #424143;"><strong>${inviterName}</strong> has invited you to join <strong>${companyName}</strong> on Brandbite as a ${roleInCompany.toLowerCase()}.</p>`,
+        `<p style="margin: 0 0 16px; font-size: 14px; color: #424143;"><strong>${inviterName}</strong> has invited you to join <strong>${companyName}</strong> on brandbite as a ${roleInCompany.toLowerCase()}.</p>`,
         '<table role="presentation" cellpadding="0" cellspacing="0" style="margin: 24px 0;">',
         "<tr>",
         '<td style="border-radius: 8px; background: #f15b2b;">',
@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
         '<p style="margin: 0; font-size: 13px; color: #7a7a7a;">If you weren\'t expecting this invitation, you can safely ignore this email.</p>',
         "</div>",
         '<div style="background: #faf9f7; padding: 16px 24px; border-radius: 0 0 12px 12px; border: 1px solid #e3e1dc; border-top: none;">',
-        '<p style="margin: 0; font-size: 11px; color: #9a9892; text-align: center;">Brandbite &mdash; Creative-as-a-service platform</p>',
+        '<p style="margin: 0; font-size: 11px; color: #9a9892; text-align: center;">brandbite &mdash; Creative-as-a-service platform</p>',
         "</div>",
         "</div>",
       ].join("\n"),

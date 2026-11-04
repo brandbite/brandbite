@@ -83,7 +83,7 @@ export function WelcomeEmailTemplate({
       }
     >
       <Paragraph>
-        We&apos;re really glad you went with us. Brandbite isn&apos;t a marketplace and it
+        We&apos;re really glad you went with us. brandbite isn&apos;t a marketplace and it
         isn&apos;t a freelancer roulette. You get a small, vetted team that learns your brand and
         gets faster every project.
       </Paragraph>
@@ -144,7 +144,7 @@ export function WelcomeEmailTemplate({
             <LinkText href={docsUrl}>brandbite.studio/documentation</LinkText>.
           </>
         }
-        from="Alper, Brandbite"
+        from="Alper, brandbite"
       />
     </BaseLayout>
   );
@@ -161,7 +161,7 @@ export async function renderWelcomeEmail(props: WelcomeEmailProps): Promise<{
 }> {
   const html = await render(<WelcomeEmailTemplate {...props} />);
   return {
-    subject: "Welcome to Brandbite. Let's make something good.",
+    subject: "Welcome to brandbite. Let's make something good.",
     html,
   };
 }

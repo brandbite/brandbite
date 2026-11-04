@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   description: "Have a project in mind? A question? Drop us a message. We'll get back to you ASAP.",
 };
 
-const displayFont = "font-[family-name:var(--font-inter)]";
+const displayFont = "font-[family-name:var(--font-jakarta)]";
 
 export default function ContactPage() {
   return (

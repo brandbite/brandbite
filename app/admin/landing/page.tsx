@@ -137,7 +137,7 @@ export default async function AdminLandingPage() {
     },
     {
       id: "why-brandbite",
-      label: "Why Brandbite",
+      label: "Why brandbite",
       icon: <IconStar />,
       description:
         "The feature grid: 1 to 12 benefits, each with an optional emoji and body. Add a side image for a 2-column layout.",
@@ -148,7 +148,7 @@ export default async function AdminLandingPage() {
       label: "Call to action",
       icon: <IconPointer />,
       description:
-        "Full-width conversion band between Why Brandbite and the FAQ: headline, optional subhead and a primary button.",
+        "Full-width conversion band between Why brandbite and the FAQ: headline, optional subhead and a primary button.",
       content: <CallToActionBlockForm initial={initialCta} pageKey={PAGE_KEY} />,
     },
     {

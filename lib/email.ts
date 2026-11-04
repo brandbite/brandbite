@@ -18,7 +18,7 @@ import { Resend } from "resend";
 const apiKey = process.env.RESEND_API_KEY;
 const resend = apiKey ? new Resend(apiKey) : null;
 
-const FROM = process.env.EMAIL_FROM || "BrandBite <notifications@brandbite.studio>";
+const FROM = process.env.EMAIL_FROM || "brandbite <notifications@brandbite.studio>";
 
 /** Bound how long we'll wait for Resend before giving up. The Vercel
  *  serverless function's own timeout is 10s on Hobby / 60s on Pro;

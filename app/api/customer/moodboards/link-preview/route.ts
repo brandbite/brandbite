@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
         res = await fetch(current.href, {
           signal: controller.signal,
           headers: {
-            "User-Agent": "Mozilla/5.0 (compatible; BrandBite/1.0; +https://brandbite.studio)",
+            "User-Agent": "Mozilla/5.0 (compatible; brandbite/1.0; +https://brandbite.studio)",
             Accept: "text/html",
           },
           redirect: "manual",

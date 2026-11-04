@@ -18,7 +18,7 @@ export default async function ColorMeaningsHubPage() {
       title="Every color has a"
       accent="story."
       blurb="Explore the associations behind a shade, then put it to work."
-      ctaBlurb="Turn color insights into on-brand palettes, shades, and more with Brandbite."
+      ctaBlurb="Turn color insights into on-brand palettes, shades, and more with brandbite."
     >
       <ColorMeaningsView meanings={meanings} />
     </StudioShell>

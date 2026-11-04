@@ -114,8 +114,8 @@ async function createCalendarEvent(settings: ConsultationSettings, meeting: Meet
   // address was typed, so it must not be a way to message a third party.
   return createConsultationEvent(settings, {
     calendarId: settings.googleCalendarId ?? "primary",
-    summary: "Brandbite intro call",
-    description: `A ${MEETING_MINUTES}-minute call with Brandbite.`,
+    summary: "brandbite intro call",
+    description: `A ${MEETING_MINUTES}-minute call with brandbite.`,
     startIso: meeting.startsAt.toISOString(),
     endIso: meeting.endsAt.toISOString(),
     timeZone: "UTC",

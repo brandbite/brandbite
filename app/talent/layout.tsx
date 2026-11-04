@@ -9,11 +9,11 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Apply to join Brandbite",
+  title: "Apply to join brandbite",
   description:
     "Tell us about your work and how you'd like to collaborate. We review every application and reply within a few days.",
   openGraph: {
-    title: "Apply to join Brandbite",
+    title: "Apply to join brandbite",
     description:
       "Tell us about your work and how you'd like to collaborate. We review every application and reply within a few days.",
     type: "website",

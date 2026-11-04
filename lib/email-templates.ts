@@ -35,7 +35,7 @@ const SUBJECT_MAP: Record<NotificationType, string> = {
 };
 
 export function getSubjectForType(type: NotificationType, title: string): string {
-  const base = SUBJECT_MAP[type] || "Notification from BrandBite";
+  const base = SUBJECT_MAP[type] || "Notification from brandbite";
   return title ? `${base}: ${title}` : base;
 }
 
@@ -118,7 +118,7 @@ export function buildNotificationEmailHtml(params: EmailTemplateParams): string 
   const greeting = recipientName ? `Hi ${recipientName},` : "Hi,";
   const emoji = TYPE_EMOJI[type] || "";
   const ctaUrl = getCTAUrl(baseUrl, type, ticketId, recipientRole);
-  const ctaLabel = CTA_LABELS[type] || "View in BrandBite";
+  const ctaLabel = CTA_LABELS[type] || "View in brandbite";
   const settingsUrl = getSettingsUrl(baseUrl, recipientRole);
   const actorLine = actorName
     ? `<p style="margin:0 0 12px;font-size:13px;color:#7a7a7a;">By ${actorName}</p>`
@@ -140,7 +140,7 @@ export function buildNotificationEmailHtml(params: EmailTemplateParams): string 
           <!-- Header -->
           <tr>
             <td style="background-color:#f15b2b;padding:20px 24px;border-radius:12px 12px 0 0;">
-              <span style="font-size:20px;font-weight:700;color:#ffffff;font-family:'Josefin Sans',sans-serif;letter-spacing:0.5px;">
+              <span style="font-size:20px;font-weight:700;color:#ffffff;font-family:'Plus Jakarta Sans',sans-serif;letter-spacing:0.5px;">
                 brandbite
               </span>
             </td>
@@ -176,7 +176,7 @@ export function buildNotificationEmailHtml(params: EmailTemplateParams): string 
           <tr>
             <td style="background-color:#faf9f7;padding:16px 24px;border-radius:0 0 12px 12px;border-top:1px solid #e3e1dc;">
               <p style="margin:0;font-size:11px;color:#9a9892;text-align:center;">
-                You received this email because of your notification settings on BrandBite.
+                You received this email because of your notification settings on brandbite.
                 <br />
                 <a href="${settingsUrl}" style="color:#f15b2b;text-decoration:underline;">Manage email preferences</a>
               </p>

@@ -180,7 +180,7 @@ export function FeatureGridBlockForm({ initial, pageKey }: FeatureGridBlockFormP
               id="fg-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Why Brandbite"
+              placeholder="Why brandbite"
               maxLength={120}
             />
           </Field>
@@ -189,7 +189,7 @@ export function FeatureGridBlockForm({ initial, pageKey }: FeatureGridBlockFormP
               id="fg-subtitle"
               value={subtitle}
               onChange={(e) => setSubtitle(e.target.value)}
-              placeholder="Why brands choose Brandbite over freelancers."
+              placeholder="Why brands choose brandbite over freelancers."
               maxLength={300}
             />
           </Field>

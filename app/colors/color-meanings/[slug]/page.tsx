@@ -32,7 +32,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (!meaning) return { title: "Color not found", robots: { index: false, follow: false } };
   return {
     // The parent layout's plain title turns off the site's "| Brandbite" template.
-    title: { absolute: meaning.metaTitle || `${meaning.name} Color Meaning | Brandbite` },
+    title: { absolute: meaning.metaTitle || `${meaning.name} Color Meaning | brandbite` },
     description:
       meaning.metaDescription ||
       `What ${meaning.name.toLowerCase()} can communicate: ${meaning.summary ?? meaning.associations.join(", ")}`,

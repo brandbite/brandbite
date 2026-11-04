@@ -9,14 +9,49 @@
 
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { InlineAlert } from "@/components/ui/inline-alert";
+import { IconClock } from "@/components/admin/v2/icons";
+import {
+  Button,
+  Callout,
+  Card,
+  DASH,
+  EmptyState,
+  Eyebrow,
+  Field,
+  IconTile,
+  KeyValueList,
+  plural,
+  Select,
+  Skeleton,
+  TabPanel,
+  Tabs,
+  TextArea,
+  TextInput,
+} from "@/components/admin/v2/ui";
+import {
+  BackLink,
+  CollapsedVersion,
+  CommentsPanel,
+  CurrentVersionCard,
+  DetailColumns,
+  DetailSkeleton,
+  DownloadFilesButton,
+  FilePreviews,
+  PersonRow,
+  PriorityBadge,
+  StatusBadge,
+  TicketHeader,
+  TicketTitle,
+  tokenCount,
+  versionAssets,
+  VersionsHeading,
+  type TicketComment,
+  type TicketVersion,
+} from "@/components/dashboard/tickets/shared";
 import { useToast } from "@/components/ui/toast-provider";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { FormInput, FormSelect } from "@/components/ui/form-field";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { SafeHtml } from "@/components/ui/safe-html";
 import { Modal, ModalHeader, ModalFooter } from "@/components/ui/modal";
@@ -26,27 +61,8 @@ import { TagBadge } from "@/components/ui/tag-badge";
 import { TagMultiSelect, type TagOption } from "@/components/ui/tag-multi-select";
 import type { TagColorKey } from "@/lib/tag-colors";
 import { BRIEF_ACCEPT_ATTR, BRIEF_ACCEPTED_LABEL, isBriefMimeAllowed } from "@/lib/upload-helpers";
-import {
-  RevisionImageLarge,
-  RevisionImageGrid,
-  DownloadAllButton,
-  BriefThumbnailRow,
-} from "@/components/ui/revision-image";
 import type { AssetEntry } from "@/components/ui/revision-image";
-import {
-  STATUS_LABELS,
-  PRIORITY_LABELS,
-  priorityBadgeVariant,
-  statusBadgeVariant,
-  formatBoardDate,
-  formatDateTime,
-  formatDueDateCountdown,
-  isDueDateOverdue,
-  avatarColor,
-  getInitials,
-  priorityIconMap,
-  priorityColorClass,
-} from "@/lib/board";
+import { formatBoardDate, formatDueDateCountdown } from "@/lib/board";
 import type { TicketStatus, TicketPriority } from "@/lib/board";
 import {
   CompanyRole,
@@ -56,7 +72,6 @@ import {
   isCompanyAdminRole,
   canMarkTicketsDoneForCompany,
 } from "@/lib/permissions/companyRoles";
-import { downloadSingleAsset, downloadAssetsAsZip } from "@/lib/download-helpers";
 import { RevisionCompare } from "@/components/ui/revision-compare";
 import { AiTicketControls } from "@/components/ui/ai-ticket-controls";
 
@@ -135,17 +150,9 @@ type NewTicketMetadata = {
   tagsEnabled?: boolean;
 };
 
-type TicketComment = {
-  id: string;
-  body: string;
-  createdAt: string;
-  author: {
-    id: string;
-    name: string | null;
-    email: string;
-    role: string;
-  };
-};
+type DetailTab = "current" | "brief" | "versions" | "comments";
+
+const TAB_PREFIX = "request-detail";
 
 type TicketAsset = {
   id: string;
@@ -168,19 +175,6 @@ type ViewState =
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
-  const units = ["B", "KB", "MB", "GB"];
-  let i = 0;
-  let v = bytes;
-  while (v >= 1024 && i < units.length - 1) {
-    v = v / 1024;
-    i += 1;
-  }
-  const precision = i === 0 ? 0 : i === 1 ? 0 : 1;
-  return `${v.toFixed(precision)} ${units[i]}`;
-}
 
 async function getImageDimensions(file: File): Promise<{ width: number; height: number } | null> {
   if (!file.type.startsWith("image/")) return null;
@@ -245,6 +239,11 @@ export default function CustomerTicketDetailPage() {
   const [briefAssetsError, setBriefAssetsError] = useState<string | null>(null);
   const [uploadingBriefs, setUploadingBriefs] = useState(false);
   const [uploadProgressText, setUploadProgressText] = useState<string | null>(null);
+  const briefInputRef = useRef<HTMLInputElement>(null);
+
+  // Section tabs. Null until the customer picks one, so the default can follow
+  // the data: the current version when one exists, otherwise the brief.
+  const [tab, setTab] = useState<DetailTab | null>(null);
 
   // Revisions
   const [revisions, setRevisions] = useState<TicketRevisionEntry[] | null>(null);
@@ -568,7 +567,7 @@ export default function CustomerTicketDetailPage() {
         // Prompt for a rating when the customer marks the ticket DONE. The
         // modal is skippable, so closing or dismissing it leaves the ticket
         // in DONE state with no rating attached.
-        if (newStatus === "DONE") {
+        if (newStatus === "DONE" && ticket?.isAssigned) {
           setShowRatingModal(true);
         }
         // Refresh all data
@@ -619,6 +618,8 @@ export default function CustomerTicketDetailPage() {
     });
     setEditError(null);
     setEditing(true);
+    // The description editor lives on the brief tab.
+    setTab("brief");
   }, [ticket]);
 
   const cancelEditing = useCallback(() => {
@@ -746,863 +747,644 @@ export default function CustomerTicketDetailPage() {
   // -------------------------------------------------------------------------
 
   if (state.status === "loading") {
-    return <TicketDetailSkeleton />;
+    return <DetailSkeleton label="Loading request" />;
   }
 
   // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
 
+  const backHref = fromBoard ? "/customer/board" : "/customer/tickets";
+  const backLabel = fromBoard ? "Back to board" : "Back to requests";
+
+  if (error || !ticket) {
+    return (
+      <>
+        <BackLink href={backHref}>{backLabel}</BackLink>
+        {error ? (
+          <Callout tone="error" title="We couldn't load this request">
+            {error}
+          </Callout>
+        ) : (
+          <Callout tone="warning" title="Request could not be loaded" />
+        )}
+      </>
+    );
+  }
+
+  const newestFirst: TicketVersion[] = revisions ? [...revisions].reverse() : [];
+  const latest = newestFirst[0] ?? null;
+  const pinMode = ticket.status === "IN_REVIEW" ? "review" : "view";
+  const showCurrentTab =
+    ticket.status !== "TODO" &&
+    (revisions === null || revisions.length > 0 || ticket.creativeMode === "AI");
+  const activeTab: DetailTab =
+    tab && (tab !== "current" || showCurrentTab) ? tab : showCurrentTab ? "current" : "brief";
+  const versionsLoading = ticket.status !== "TODO" && revisions === null && !revisionsError;
+  const inReview = ticket.status === "IN_REVIEW";
+  const canRequestChanges = !!normalizedRole && canEditTickets(normalizedRole);
+  const canApprove = !!normalizedRole && userCanMarkDone;
+  const versionCopy = { feedbackLabel: "Your feedback" };
+  const dueCountdown = ticket.status === "DONE" ? null : formatDueDateCountdown(ticket.dueDate);
+  const openCompare = () => setShowCompare(true);
+
+  const versionsFeedback = revisionsError ? (
+    <Callout tone="error" title="We couldn't load the versions">
+      {revisionsError}
+    </Callout>
+  ) : versionsLoading || (revisionsLoading && !revisions) ? (
+    <div aria-busy="true" aria-label="Loading versions" className="space-y-3">
+      <Skeleton className="h-64" />
+      <Skeleton className="h-16" />
+    </div>
+  ) : null;
+
+  const noVersions = (
+    <Card>
+      <EmptyState
+        title="No versions yet"
+        description="Once your creative sends this request for review, you'll see each version and your feedback here."
+      />
+    </Card>
+  );
+
+  const tabs: { value: DetailTab; label: string }[] = [
+    ...(showCurrentTab ? [{ value: "current" as const, label: "Current version" }] : []),
+    { value: "brief", label: "Brief & files" },
+    {
+      value: "versions",
+      label: revisions && revisions.length > 0 ? `Versions (${revisions.length})` : "Versions",
+    },
+    { value: "comments", label: comments ? `Comments (${comments.length})` : "Comments" },
+  ];
+
   return (
     <>
-      {/* Page header */}
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <button
-            type="button"
-            onClick={() => router.push(fromBoard ? "/customer/board" : "/customer/tickets")}
-            className="mb-2 inline-flex items-center gap-1 text-xs text-[var(--bb-text-secondary)] hover:text-[var(--bb-secondary)]"
-          >
-            <span className="text-lg leading-none">&larr;</span>
-            <span>{fromBoard ? "Back to board" : "Back to tickets"}</span>
-          </button>
+      <BackLink href={backHref}>{backLabel}</BackLink>
 
-          <div className="flex items-center gap-3">
-            {editing ? (
-              <FormInput
-                value={editForm.title}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  setEditForm((f) => ({ ...f, title: e.target.value }))
-                }
-                disabled={editSaving}
-                className="text-2xl font-semibold"
-              />
-            ) : (
-              <h1 className="text-2xl font-semibold tracking-tight">{ticket?.title ?? "Ticket"}</h1>
-            )}
-          </div>
-
-          {ticket?.code && (
-            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-              Ticket code:{" "}
-              <span className="font-medium text-[var(--bb-secondary)]">{ticket.code}</span>
-            </p>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          {ticket && (
-            <div className="flex items-center gap-2">
-              <Badge variant={statusBadgeVariant(ticket.status)}>
-                {STATUS_LABELS[ticket.status]}
-              </Badge>
-              <Badge variant={priorityBadgeVariant(ticket.priority)}>
-                {PRIORITY_LABELS[ticket.priority]}
-              </Badge>
-            </div>
-          )}
-
-          {/* Edit / Save / Cancel buttons. Cancel-with-refund is a
-              separate action from "Cancel editing"; it sits next to
-              "Edit" for OWNER/PM when the ticket is still cancellable. */}
-          {!editing && (userCanEdit || userCanCancel) && (
-            <div className="flex items-center gap-2">
-              {userCanEdit && (
-                <Button variant="secondary" size="sm" onClick={startEditing}>
-                  Edit
-                </Button>
-              )}
-              {userCanCancel && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setCancelOpen(true)}
-                  className="!border-red-200 !text-red-600 hover:!border-red-400 hover:!bg-red-50"
-                >
-                  Cancel & refund
-                </Button>
-              )}
-            </div>
-          )}
-          {editing && (
-            <div className="flex items-center gap-2">
-              <Button size="sm" onClick={saveEdits} loading={editSaving} loadingText="Saving…">
-                Save changes
+      <TicketHeader
+        code={ticket.code}
+        title={
+          editing ? (
+            <TextInput
+              aria-label="Request title"
+              value={editForm.title}
+              onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))}
+              disabled={editSaving}
+              className="!text-base font-semibold"
+            />
+          ) : (
+            <TicketTitle>{ticket.title}</TicketTitle>
+          )
+        }
+        badges={
+          <>
+            <StatusBadge status={ticket.status} />
+            <PriorityBadge priority={ticket.priority} />
+          </>
+        }
+        actions={
+          editing ? (
+            <>
+              <Button variant="primary" onClick={saveEdits} disabled={editSaving}>
+                {editSaving ? "Saving…" : "Save changes"}
               </Button>
-              <Button variant="secondary" size="sm" onClick={cancelEditing} disabled={editSaving}>
+              <Button onClick={cancelEditing} disabled={editSaving}>
                 Cancel
               </Button>
+            </>
+          ) : userCanEdit || userCanCancel ? (
+            <>
+              {userCanEdit ? <Button onClick={startEditing}>Edit request</Button> : null}
+              {userCanCancel ? (
+                <Button variant="danger" onClick={() => setCancelOpen(true)}>
+                  Cancel & refund
+                </Button>
+              ) : null}
+            </>
+          ) : null
+        }
+      />
+
+      <div className="space-y-6">
+        {statusError ? (
+          <Callout tone="error" title="Status update failed">
+            {statusError}
+          </Callout>
+        ) : null}
+
+        {inReview ? (
+          <section className="flex items-start gap-4 rounded-2xl border border-[var(--av2-attention-border)] bg-gradient-to-r from-[var(--av2-attention-from)] to-[var(--av2-attention-to)] p-5">
+            <IconTile tone="peach" round size={44}>
+              <IconClock />
+            </IconTile>
+            <div className="min-w-0">
+              <h2 className="text-xl leading-7 font-semibold">Ready for your review</h2>
+              <p className="text-sm">
+                {normalizedRole && !canRequestChanges && !canApprove
+                  ? "The creative's work is below, waiting for your team's decision."
+                  : "Review the creative's work below, then approve it or request a revision."}
+              </p>
             </div>
-          )}
-        </div>
-      </div>
-
-      {/* Error state */}
-      {error && (
-        <InlineAlert variant="error" title="Something went wrong" className="mb-4">
-          {error}
-        </InlineAlert>
-      )}
-
-      {/* Status error (from status change attempt) */}
-      {statusError && (
-        <InlineAlert variant="error" title="Status update failed" className="mb-4">
-          {statusError}
-        </InlineAlert>
-      )}
-
-      {!error && ticket && (
-        <div className="grid gap-6 md:grid-cols-3">
-          {/* ============================================================= */}
-          {/* LEFT COLUMN — main content (2/3 width)                        */}
-          {/* ============================================================= */}
-          <section className="space-y-4 md:col-span-2">
-            {/* Status action banner — IN_REVIEW */}
-            {ticket.status === "IN_REVIEW" && normalizedRole && (
-              <div className="flex items-center gap-3 rounded-xl border border-[var(--bb-primary-border)] bg-[var(--bb-primary-light)] px-4 py-3">
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-[var(--bb-secondary)]">
-                    This request is ready for your review
-                  </p>
-                  <p className="mt-0.5 text-xs text-[var(--bb-text-secondary)]">
-                    Review the creative&apos;s work below, then approve it or request changes.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {canEditTickets(normalizedRole) && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setShowRevisionModal(true)}
-                      disabled={statusSaving}
-                    >
-                      Request changes
-                    </Button>
-                  )}
-                  {userCanMarkDone && (
-                    <Button
-                      size="sm"
-                      className="bg-[#32b37b] hover:bg-[#2ba06a]"
-                      onClick={() => setShowDoneModal(true)}
-                      disabled={statusSaving}
-                    >
-                      Mark as done
-                    </Button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Approval banner — DONE */}
-            {ticket.status === "DONE" && ticket.completedAt && (
-              <div className="flex items-center gap-3 rounded-xl border border-[var(--bb-success-border)] bg-[var(--bb-success-bg)] px-4 py-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#32b37b] text-white">
-                  &#10003;
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-[var(--bb-secondary)]">Approved</p>
-                  <p className="mt-0.5 text-xs text-[var(--bb-text-secondary)]">
-                    {ticket.completedBy?.name || ticket.completedBy?.email || "Customer"} marked
-                    this as complete on {formatBoardDate(ticket.completedAt)}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Brief card */}
-            <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">Brief</h2>
-                {ticket.status === "TODO" && (
-                  <div className="flex items-center gap-2">
-                    <label className="inline-flex cursor-pointer items-center rounded-full border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-1 text-[11px] font-medium text-[var(--bb-secondary)] hover:bg-[var(--bb-bg-warm)] disabled:cursor-not-allowed disabled:opacity-60">
-                      <input
-                        type="file"
-                        accept={BRIEF_ACCEPT_ATTR}
-                        multiple
-                        className="hidden"
-                        disabled={uploadingBriefs}
-                        onChange={(e) => {
-                          void handleUploadBriefFiles(e.target.files);
-                          e.currentTarget.value = "";
-                        }}
-                      />
-                      Add files
-                    </label>
-                  </div>
-                )}
-              </div>
-
-              {/* Description */}
-              {editing ? (
-                <div className="mt-3 space-y-1">
-                  <p className="text-[11px] font-semibold tracking-[0.16em] text-[var(--bb-text-muted)] uppercase">
-                    Description
-                  </p>
-                  <RichTextEditor
-                    value={editForm.description}
-                    onChange={(html) =>
-                      setEditForm((f) => ({
-                        ...f,
-                        description: html,
-                      }))
-                    }
-                    disabled={editSaving}
-                    minHeight="60px"
-                  />
-                </div>
-              ) : ticket.description ? (
-                <SafeHtml
-                  html={ticket.description}
-                  className="mt-2 text-sm text-[var(--bb-text-secondary)]"
-                />
-              ) : (
-                <p className="mt-2 text-xs text-[var(--bb-text-tertiary)]">
-                  No description was provided for this ticket.
-                </p>
-              )}
-
-              {editError && (
-                <InlineAlert variant="error" size="sm" className="mt-3">
-                  {editError}
-                </InlineAlert>
-              )}
-
-              {/* Brief attachments */}
-              <div className="mt-4">
-                {uploadProgressText && (
-                  <div className="mb-2 rounded-md border border-[var(--bb-border)] bg-[var(--bb-warning-bg)] px-3 py-2 text-[11px] text-[var(--bb-text-secondary)]">
-                    {uploadProgressText}
-                  </div>
-                )}
-
-                {briefAssetsError && (
-                  <InlineAlert variant="error" size="sm" className="mb-2">
-                    {briefAssetsError}
-                  </InlineAlert>
-                )}
-
-                {briefAssetsLoading && (
-                  <div className="flex items-center gap-2 py-3">
-                    <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--bb-border)] border-t-[var(--bb-text-tertiary)]" />
-                    <p className="text-xs text-[var(--bb-text-tertiary)]">Loading attachments…</p>
-                  </div>
-                )}
-
-                {!briefAssetsLoading && !briefAssetsError && briefAssetEntries.length === 0 && (
-                  <EmptyState
-                    title="No attachments yet."
-                    description={`Add reference files (${BRIEF_ACCEPTED_LABEL}) to help your creative.`}
-                  />
-                )}
-
-                {!briefAssetsLoading && !briefAssetsError && briefAssetEntries.length > 0 && (
-                  <div>
-                    <div className="mb-1.5 flex items-center justify-between">
-                      <p className="text-[11px] font-semibold tracking-[0.16em] text-[var(--bb-text-muted)] uppercase">
-                        Brief attachments
-                        <span className="ml-1.5 text-[var(--bb-text-tertiary)]">
-                          ({briefAssetEntries.length})
-                        </span>
-                      </p>
-                      <DownloadAllButton
-                        assets={briefAssetEntries}
-                        zipFilename="brief-attachments.zip"
-                      />
-                    </div>
-                    {hasCreativeWork ? (
-                      <BriefThumbnailRow assets={briefAssetEntries} />
-                    ) : (
-                      <RevisionImageLarge assets={briefAssetEntries} pinMode="view" />
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Revision History */}
-            {ticket.status !== "TODO" && (
-              <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
-                {/* AI Generation Controls (only for AI-mode tickets) */}
-                {ticket.creativeMode === "AI" && (
-                  <AiTicketControls
-                    ticketId={ticket.id}
-                    ticketStatus={ticket.status}
-                    hasRevisions={!!revisions && revisions.length > 0}
-                    onGenerated={() => {
-                      // Refresh revisions and ticket data
-                      setRevisionsLoading(true);
-                      fetch(`/api/customer/tickets/${ticket.id}/revisions`, { cache: "no-store" })
-                        .then((r) => r.json())
-                        .then((d) => setRevisions(d?.revisions ?? []))
-                        .catch(() => {})
-                        .finally(() => setRevisionsLoading(false));
-                      setRefreshCounter((c) => c + 1);
-                    }}
-                  />
-                )}
-
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">
-                    Revision history
-                  </h2>
-                  {revisions && revisions.length >= 2 && (
-                    <button
-                      type="button"
-                      onClick={() => setShowCompare(true)}
-                      className="inline-flex items-center gap-1 rounded-full border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-2.5 py-1 text-[11px] font-medium text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-primary)] hover:bg-[var(--bb-primary-light)] hover:text-[var(--bb-primary)]"
-                    >
-                      &#8596; Compare
-                    </button>
-                  )}
-                </div>
-
-                {revisionsLoading && (
-                  <div className="mt-3 flex items-center gap-2 py-3">
-                    <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--bb-border)] border-t-[var(--bb-text-tertiary)]" />
-                    <p className="text-xs text-[var(--bb-text-tertiary)]">Loading revisions…</p>
-                  </div>
-                )}
-
-                {revisionsError && (
-                  <InlineAlert variant="error" size="sm" className="mt-3">
-                    {revisionsError}
-                  </InlineAlert>
-                )}
-
-                {!revisionsLoading && !revisionsError && (!revisions || revisions.length === 0) && (
-                  <div className="mt-3">
-                    <EmptyState
-                      title="No revisions yet."
-                      description="Once your creative sends this ticket for review, you'll see each version and your feedback here."
-                    />
-                  </div>
-                )}
-
-                {!revisionsLoading && !revisionsError && revisions && revisions.length > 0 && (
-                  <div className="mt-3 space-y-6">
-                    {[...revisions].reverse().map((rev, idx) => {
-                      const isLatest = idx === 0;
-                      const revAssets: AssetEntry[] = rev.assets.map((a) => ({
-                        id: a.id,
-                        url: a.url,
-                        originalName: a.originalName,
-                        pinCount: a.pinCount,
-                      }));
-                      const totalOpen = rev.assets.reduce((sum, a) => sum + (a.openPins ?? 0), 0);
-                      const totalResolved = rev.assets.reduce(
-                        (sum, a) => sum + (a.resolvedPins ?? 0),
-                        0,
-                      );
-
-                      return (
-                        <div key={rev.version}>
-                          <div className="mb-2 flex items-center justify-between">
-                            <p className="flex items-center gap-2 text-[11px] font-semibold tracking-[0.14em] text-[var(--bb-text-muted)] uppercase">
-                              <span>Version {rev.version}</span>
-                              {isLatest && (
-                                <span className="rounded-full bg-[var(--bb-primary)] px-2 py-0.5 text-[8px] font-bold tracking-wider text-white uppercase">
-                                  Current
-                                </span>
-                              )}
-                              {rev.submittedAt && (
-                                <span className="font-normal tracking-normal text-[var(--bb-text-tertiary)] normal-case">
-                                  — {formatBoardDate(rev.submittedAt)} &middot; {revAssets.length}{" "}
-                                  file
-                                  {revAssets.length !== 1 ? "s" : ""}
-                                </span>
-                              )}
-                              {(totalOpen > 0 || totalResolved > 0) && (
-                                <span className="flex items-center gap-1.5 font-normal tracking-normal text-[var(--bb-text-tertiary)] normal-case">
-                                  &middot;
-                                  {totalOpen > 0 && (
-                                    <span className="flex items-center gap-0.5">
-                                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--bb-primary)]" />
-                                      {totalOpen} open
-                                    </span>
-                                  )}
-                                  {totalResolved > 0 && (
-                                    <span className="flex items-center gap-0.5">
-                                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#32b37b]" />
-                                      {totalResolved} resolved
-                                    </span>
-                                  )}
-                                </span>
-                              )}
-                            </p>
-                            {revAssets.length > 0 && (
-                              <DownloadAllButton
-                                assets={revAssets}
-                                zipFilename={`revision-v${rev.version}.zip`}
-                              />
-                            )}
-                          </div>
-
-                          {revAssets.length > 0 && (
-                            <div className="mb-2">
-                              {revAssets.length === 1 ? (
-                                <RevisionImageLarge
-                                  assets={revAssets}
-                                  pinMode={ticket.status === "IN_REVIEW" ? "review" : "view"}
-                                  ticketId={ticket.id}
-                                  onRevisionSubmitted={handlePinsSubmitted}
-                                />
-                              ) : (
-                                <RevisionImageGrid
-                                  assets={revAssets}
-                                  pinMode={ticket.status === "IN_REVIEW" ? "review" : "view"}
-                                  ticketId={ticket.id}
-                                  onRevisionSubmitted={handlePinsSubmitted}
-                                />
-                              )}
-                            </div>
-                          )}
-
-                          {/* Feedback message */}
-                          {rev.feedbackMessage && (
-                            <div className="mt-2 rounded-lg border border-[var(--bb-primary-border)] bg-[var(--bb-primary-light)] px-3 py-2">
-                              <p className="text-[10px] font-semibold tracking-[0.12em] text-[var(--bb-primary-hover)] uppercase">
-                                Your feedback
-                              </p>
-                              <p className="mt-1 text-xs text-[var(--bb-secondary)]">
-                                {rev.feedbackMessage}
-                              </p>
-                              {rev.feedbackAt && (
-                                <p className="mt-1 text-[10px] text-[var(--bb-text-tertiary)]">
-                                  {formatBoardDate(rev.feedbackAt)}
-                                </p>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
           </section>
+        ) : null}
 
-          {/* ============================================================= */}
-          {/* RIGHT COLUMN — sidebar (1/3 width)                            */}
-          {/* ============================================================= */}
-          <aside className="space-y-4 md:col-span-1">
-            {/* Details card */}
-            <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
-              <h3 className="mb-3 text-xs font-semibold tracking-[0.18em] text-[var(--bb-text-muted)] uppercase">
-                Details
-              </h3>
-              <div className="space-y-3 text-xs">
-                {/* Status */}
-                <div>
-                  <p className="text-[var(--bb-text-tertiary)]">Status</p>
-                  <div className="mt-0.5">
-                    <Badge variant={statusBadgeVariant(ticket.status)}>
-                      {STATUS_LABELS[ticket.status]}
-                    </Badge>
-                  </div>
-                </div>
+        {ticket.status === "DONE" && ticket.completedAt ? (
+          <Callout tone="success" title="Approved">
+            {ticket.completedBy?.name || ticket.completedBy?.email || "Customer"} marked this as
+            complete on {formatBoardDate(ticket.completedAt)}.
+          </Callout>
+        ) : null}
 
-                {/* Priority */}
-                <div>
-                  <p className="text-[var(--bb-text-tertiary)]">Priority</p>
-                  {editing ? (
-                    <FormSelect
-                      size="sm"
-                      value={editForm.priority}
-                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                        setEditForm((f) => ({
-                          ...f,
-                          priority: e.target.value,
-                        }))
-                      }
-                      disabled={editSaving}
-                    >
-                      <option value="LOW">Low</option>
-                      <option value="MEDIUM">Medium</option>
-                      <option value="HIGH">High</option>
-                      <option value="URGENT">Urgent</option>
-                    </FormSelect>
-                  ) : (
-                    <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
-                      <span className={priorityColorClass(ticket.priority)}>
-                        {priorityIconMap[ticket.priority]}
-                      </span>{" "}
-                      {PRIORITY_LABELS[ticket.priority]}
-                    </p>
-                  )}
-                </div>
+        <Tabs
+          label="Request sections"
+          idPrefix={TAB_PREFIX}
+          tabs={tabs}
+          value={activeTab}
+          onChange={setTab}
+        />
 
-                {/* Project */}
-                <div>
-                  <p className="text-[var(--bb-text-tertiary)]">Project</p>
-                  {editing ? (
-                    <FormSelect
-                      size="sm"
-                      value={editForm.projectId}
-                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                        setEditForm((f) => ({
-                          ...f,
-                          projectId: e.target.value,
-                        }))
-                      }
-                      disabled={editSaving || !editMeta}
-                    >
-                      <option value="">No specific project</option>
-                      {(editMeta?.projects ?? []).map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                          {p.code ? ` (${p.code})` : ""}
-                        </option>
-                      ))}
-                    </FormSelect>
-                  ) : (
-                    <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
-                      {ticket.project?.name || "—"}
-                    </p>
-                  )}
-                </div>
-
-                {/* Job type */}
-                <div>
-                  <p className="text-[var(--bb-text-tertiary)]">Job type</p>
-                  {editing ? (
-                    <FormSelect
-                      size="sm"
-                      value={editForm.jobTypeId}
-                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                        setEditForm((f) => ({
-                          ...f,
-                          jobTypeId: e.target.value,
-                        }))
-                      }
-                      disabled={editSaving || !editMeta}
-                    >
-                      <option value="">Choose a job type</option>
-                      {(editMeta?.jobTypes ?? []).map((jt) => (
-                        <option key={jt.id} value={jt.id}>
-                          {jt.name}
-                        </option>
-                      ))}
-                    </FormSelect>
-                  ) : (
-                    <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
-                      {ticket.jobType?.name || "—"}
-                    </p>
-                  )}
-                </div>
-
-                {/* Tags — entire row hidden when the global TAGS_ENABLED
-                    feature flag is off. editMeta is fetched lazily on
-                    enter-edit, so before that we show the row optimistically
-                    (the read-only chip area below stays empty when the API
-                    has stripped tags). */}
-                <div hidden={editMeta?.tagsEnabled === false}>
-                  <p className="text-[var(--bb-text-tertiary)]">Tags</p>
-                  {editing ? (
-                    <div className="mt-1">
-                      <TagMultiSelect
-                        availableTags={(editMeta?.tags ?? []) as TagOption[]}
-                        selectedTagIds={editForm.tagIds}
-                        onChange={(tagIds) => setEditForm((f) => ({ ...f, tagIds }))}
-                        onCreateTag={async (name, color) => {
-                          try {
-                            const res = await fetch("/api/customer/tags", {
-                              method: "POST",
-                              headers: {
-                                "Content-Type": "application/json",
-                              },
-                              body: JSON.stringify({ name, color }),
-                            });
-                            const json = await res.json().catch(() => null);
-                            if (!res.ok) {
-                              setEditError(json?.error || "Failed to create tag");
+        <DetailColumns
+          rail={
+            <>
+              <Card>
+                <h2 className="mb-4 text-xl leading-7 font-semibold">Details</h2>
+                {editing ? (
+                  <div className="space-y-4">
+                    <Field label="Priority" htmlFor="edit-priority">
+                      <Select
+                        id="edit-priority"
+                        value={editForm.priority}
+                        onChange={(e) => setEditForm((f) => ({ ...f, priority: e.target.value }))}
+                        disabled={editSaving}
+                      >
+                        <option value="LOW">Low</option>
+                        <option value="MEDIUM">Medium</option>
+                        <option value="HIGH">High</option>
+                        <option value="URGENT">Urgent</option>
+                      </Select>
+                    </Field>
+                    <Field label="Project" htmlFor="edit-project">
+                      <Select
+                        id="edit-project"
+                        value={editForm.projectId}
+                        onChange={(e) => setEditForm((f) => ({ ...f, projectId: e.target.value }))}
+                        disabled={editSaving || !editMeta}
+                      >
+                        <option value="">No specific project</option>
+                        {(editMeta?.projects ?? []).map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                            {p.code ? ` (${p.code})` : ""}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                    <Field label="Job type" htmlFor="edit-job-type">
+                      <Select
+                        id="edit-job-type"
+                        value={editForm.jobTypeId}
+                        onChange={(e) => setEditForm((f) => ({ ...f, jobTypeId: e.target.value }))}
+                        disabled={editSaving || !editMeta}
+                      >
+                        <option value="">Choose a job type</option>
+                        {(editMeta?.jobTypes ?? []).map((jt) => (
+                          <option key={jt.id} value={jt.id}>
+                            {jt.name}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                    {editMeta?.tagsEnabled === false ? null : (
+                      <Field label="Tags">
+                        <TagMultiSelect
+                          availableTags={(editMeta?.tags ?? []) as TagOption[]}
+                          selectedTagIds={editForm.tagIds}
+                          onChange={(tagIds) => setEditForm((f) => ({ ...f, tagIds }))}
+                          onCreateTag={async (name, color) => {
+                            try {
+                              const res = await fetch("/api/customer/tags", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ name, color }),
+                              });
+                              const json = await res.json().catch(() => null);
+                              if (!res.ok) {
+                                setEditError(json?.error || "Failed to create tag");
+                                return null;
+                              }
+                              const created = json.tag as TagOption;
+                              setEditMeta((prev) =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      tags: [...(prev.tags ?? []), created].sort((a, b) =>
+                                        a.name.localeCompare(b.name),
+                                      ),
+                                    }
+                                  : prev,
+                              );
+                              return created;
+                            } catch {
+                              setEditError("Failed to create tag");
                               return null;
                             }
-                            const created = json.tag as TagOption;
-                            setEditMeta((prev) =>
-                              prev
-                                ? {
-                                    ...prev,
-                                    tags: [...(prev.tags ?? []), created].sort((a, b) =>
-                                      a.name.localeCompare(b.name),
-                                    ),
-                                  }
-                                : prev,
-                            );
-                            return created;
-                          } catch {
-                            setEditError("Failed to create tag");
-                            return null;
-                          }
-                        }}
-                        canCreate={userCanManageTags}
+                          }}
+                          canCreate={userCanManageTags}
+                          disabled={editSaving}
+                        />
+                      </Field>
+                    )}
+                    <Field label="Due date" htmlFor="edit-due-date">
+                      <TextInput
+                        id="edit-due-date"
+                        type="date"
+                        className="dark:[color-scheme:dark]"
+                        value={editForm.dueDate}
+                        onChange={(e) => setEditForm((f) => ({ ...f, dueDate: e.target.value }))}
                         disabled={editSaving}
                       />
-                    </div>
-                  ) : (
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {ticket.tags && ticket.tags.length > 0 ? (
-                        ticket.tags.map((tag) => (
-                          <TagBadge key={tag.id} name={tag.name} color={tag.color as TagColorKey} />
-                        ))
-                      ) : (
-                        <p className="text-[11px] text-[var(--bb-text-tertiary)]">—</p>
-                      )}
-                    </div>
-                  )}
-                </div>
+                    </Field>
+                  </div>
+                ) : (
+                  <KeyValueList
+                    rows={[
+                      { label: "Status", value: <StatusBadge status={ticket.status} /> },
+                      { label: "Priority", value: <PriorityBadge priority={ticket.priority} /> },
+                      { label: "Project", value: ticket.project?.name || DASH },
+                      { label: "Job type", value: ticket.jobType?.name || DASH },
+                      ...(ticket.effectiveCost != null
+                        ? [
+                            {
+                              label: "Token cost",
+                              value: (
+                                <>
+                                  {ticket.quantity > 1 && ticket.jobType
+                                    ? `${ticket.jobType.tokenCost} × ${ticket.quantity} = ${tokenCount(ticket.effectiveCost)}`
+                                    : tokenCount(ticket.effectiveCost)}
+                                  {ticket.tokenCostOverride != null ? (
+                                    <span className="block text-xs font-normal text-[var(--av2-text-2)]">
+                                      Admin override applied
+                                    </span>
+                                  ) : null}
+                                </>
+                              ),
+                            },
+                          ]
+                        : []),
+                      ...(ticket.quantity > 1
+                        ? [{ label: "Quantity", value: `×${ticket.quantity}` }]
+                        : []),
+                      {
+                        label: "Due date",
+                        value: (
+                          <>
+                            <span
+                              className={
+                                dueCountdown?.overdue ? "text-[var(--av2-error-text)]" : undefined
+                              }
+                            >
+                              {formatBoardDate(ticket.dueDate)}
+                            </span>
+                            {dueCountdown ? (
+                              <span
+                                className={`block text-xs font-normal ${
+                                  dueCountdown.overdue
+                                    ? "text-[var(--av2-error-text)]"
+                                    : "text-[var(--av2-text-2)]"
+                                }`}
+                              >
+                                {dueCountdown.label}
+                              </span>
+                            ) : null}
+                          </>
+                        ),
+                      },
+                      ...(ticket.tags && ticket.tags.length > 0
+                        ? [
+                            {
+                              label: "Tags",
+                              value: (
+                                <span className="flex flex-wrap gap-1">
+                                  {ticket.tags.map((tag) => (
+                                    <TagBadge
+                                      key={tag.id}
+                                      name={tag.name}
+                                      color={tag.color as TagColorKey}
+                                    />
+                                  ))}
+                                </span>
+                              ),
+                            },
+                          ]
+                        : []),
+                      { label: "Created", value: formatBoardDate(ticket.createdAt) },
+                      { label: "Updated", value: formatBoardDate(ticket.updatedAt) },
+                    ]}
+                  />
+                )}
 
-                {/* Due date */}
-                <div>
-                  <p className="text-[var(--bb-text-tertiary)]">Due date</p>
-                  {editing ? (
-                    <FormInput
-                      type="date"
-                      size="sm"
-                      value={editForm.dueDate}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setEditForm((f) => ({
-                          ...f,
-                          dueDate: e.target.value,
-                        }))
-                      }
-                      disabled={editSaving}
-                    />
-                  ) : (
-                    <>
-                      <p
-                        className={`mt-0.5 font-semibold ${isDueDateOverdue(ticket.dueDate) ? "text-[var(--bb-danger-text)]" : "text-[var(--bb-secondary)]"}`}
-                      >
-                        {formatBoardDate(ticket.dueDate)}
-                      </p>
-                      {(() => {
-                        const countdown = formatDueDateCountdown(ticket.dueDate);
-                        if (!countdown) return null;
-                        return (
-                          <p
-                            className={`mt-0.5 text-[10px] font-medium ${countdown.overdue ? "text-[var(--bb-danger-text)]" : "text-[var(--bb-text-secondary)]"}`}
+                {ticket.moodboards && ticket.moodboards.length > 0 ? (
+                  <div className="mt-4 border-t border-[var(--av2-border)] pt-4">
+                    <p className="mb-2 text-sm text-[var(--av2-text-2)]">Moodboards</p>
+                    <ul className="space-y-2">
+                      {ticket.moodboards.map((mb) => (
+                        <li key={mb.id}>
+                          <Link
+                            href={`/customer/moodboards/${mb.id}`}
+                            className="flex min-h-10 items-center justify-between gap-3 rounded-lg border border-[var(--av2-border)] px-3 py-2 text-sm hover:bg-[var(--av2-bg)]"
                           >
-                            {countdown.label}
-                          </p>
-                        );
-                      })()}
-                    </>
-                  )}
-                </div>
+                            <span className="truncate font-medium">{mb.title}</span>
+                            <span className="shrink-0 text-xs text-[var(--av2-text-2)]">
+                              {mb.itemCount} {plural(mb.itemCount, "item", "items")}
+                            </span>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </Card>
 
-                {/* Token cost */}
-                {ticket.effectiveCost != null && (
-                  <div>
-                    <p className="text-[var(--bb-text-tertiary)]">Token cost</p>
-                    <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
-                      {ticket.quantity > 1 && ticket.jobType
-                        ? `${ticket.jobType.tokenCost} × ${ticket.quantity} = ${ticket.effectiveCost} tokens`
-                        : `${ticket.effectiveCost} tokens`}
+              <Card>
+                <h2 className="mb-4 text-xl leading-7 font-semibold">People</h2>
+                <div className="space-y-4">
+                  <PersonRow
+                    name={ticket.createdBy?.name || ticket.createdBy?.email || DASH}
+                    role="Requester"
+                  />
+                  <PersonRow
+                    name="Creative team"
+                    role={ticket.isAssigned ? "Assigned" : "Unassigned"}
+                    assigned={ticket.isAssigned}
+                  />
+                </div>
+              </Card>
+            </>
+          }
+        >
+          {activeTab === "current" ? (
+            <TabPanel idPrefix={TAB_PREFIX} value="current">
+              <div className="space-y-4">
+                {ticket.creativeMode === "AI" ? (
+                  <Card>
+                    <AiTicketControls
+                      ticketId={ticket.id}
+                      ticketStatus={ticket.status}
+                      hasRevisions={!!revisions && revisions.length > 0}
+                      onGenerated={() => {
+                        // Refresh revisions and ticket data
+                        setRevisionsLoading(true);
+                        fetch(`/api/customer/tickets/${ticket.id}/revisions`, { cache: "no-store" })
+                          .then((r) => r.json())
+                          .then((d) => setRevisions(d?.revisions ?? []))
+                          .catch(() => {})
+                          .finally(() => setRevisionsLoading(false));
+                        setRefreshCounter((c) => c + 1);
+                      }}
+                    />
+                  </Card>
+                ) : null}
+
+                {versionsFeedback ??
+                  (latest ? (
+                    <>
+                      <CurrentVersionCard
+                        version={latest}
+                        pinMode={pinMode}
+                        ticketId={ticket.id}
+                        zipFilename={`revision-v${latest.version}.zip`}
+                        onRevisionSubmitted={handlePinsSubmitted}
+                        copy={versionCopy}
+                      />
+                      {newestFirst.length > 1 ? (
+                        <>
+                          <VersionsHeading
+                            title="Previous versions"
+                            count={newestFirst.length}
+                            onCompare={openCompare}
+                          />
+                          {newestFirst.slice(1).map((rev) => (
+                            <CollapsedVersion
+                              key={rev.version}
+                              version={rev}
+                              pinMode={pinMode}
+                              ticketId={ticket.id}
+                              zipFilename={`revision-v${rev.version}.zip`}
+                              onRevisionSubmitted={handlePinsSubmitted}
+                              copy={versionCopy}
+                            />
+                          ))}
+                        </>
+                      ) : null}
+                    </>
+                  ) : (
+                    noVersions
+                  ))}
+              </div>
+            </TabPanel>
+          ) : null}
+
+          {activeTab === "brief" ? (
+            <TabPanel idPrefix={TAB_PREFIX} value="brief">
+              <div className="space-y-4">
+                <Card>
+                  <h2 className="text-xl leading-7 font-semibold">Brief</h2>
+                  {editing ? (
+                    <div className="mt-3">
+                      <RichTextEditor
+                        value={editForm.description}
+                        onChange={(html) => setEditForm((f) => ({ ...f, description: html }))}
+                        disabled={editSaving}
+                        minHeight="120px"
+                      />
+                    </div>
+                  ) : ticket.description ? (
+                    <SafeHtml html={ticket.description} className="mt-2 text-base" />
+                  ) : (
+                    <p className="mt-2 text-sm text-[var(--av2-text-2)]">
+                      No description was provided for this request.
                     </p>
-                    {ticket.tokenCostOverride != null && (
-                      <p className="mt-0.5 text-[10px] text-[var(--bb-primary)]">
-                        Admin override applied
+                  )}
+
+                  {editError ? (
+                    <div className="mt-3">
+                      <Callout tone="error" title="Changes weren't saved">
+                        {editError}
+                      </Callout>
+                    </div>
+                  ) : null}
+
+                  <div className="mt-6 border-t border-[var(--av2-border)] pt-5">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                      <Eyebrow>
+                        Brief attachments
+                        {briefAssetEntries.length > 0 ? ` (${briefAssetEntries.length})` : ""}
+                      </Eyebrow>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {ticket.status === "TODO" ? (
+                          <>
+                            <input
+                              ref={briefInputRef}
+                              type="file"
+                              aria-label="Add brief files"
+                              accept={BRIEF_ACCEPT_ATTR}
+                              multiple
+                              hidden
+                              disabled={uploadingBriefs}
+                              onChange={(e) => {
+                                void handleUploadBriefFiles(e.target.files);
+                                e.currentTarget.value = "";
+                              }}
+                            />
+                            <Button
+                              disabled={uploadingBriefs}
+                              onClick={() => briefInputRef.current?.click()}
+                            >
+                              Add files
+                            </Button>
+                          </>
+                        ) : null}
+                        <DownloadFilesButton
+                          assets={briefAssetEntries}
+                          zipFilename="brief-attachments.zip"
+                        />
+                      </div>
+                    </div>
+
+                    {uploadProgressText ? (
+                      <p role="status" className="mb-3 text-sm text-[var(--av2-text-2)]">
+                        {uploadProgressText}
+                      </p>
+                    ) : null}
+
+                    {briefAssetsError ? (
+                      <div className="mb-3">
+                        <Callout tone="error" title="Attachments">
+                          {briefAssetsError}
+                        </Callout>
+                      </div>
+                    ) : null}
+
+                    {briefAssetsLoading ? (
+                      <Skeleton className="h-44" />
+                    ) : briefAssetEntries.length > 0 ? (
+                      <FilePreviews assets={briefAssetEntries} />
+                    ) : briefAssetsError ? null : (
+                      <p className="text-sm text-[var(--av2-text-2)]">
+                        No attachments yet.
+                        {ticket.status === "TODO"
+                          ? ` Add reference files (${BRIEF_ACCEPTED_LABEL}) to help your creative.`
+                          : ""}
                       </p>
                     )}
                   </div>
-                )}
+                </Card>
 
-                {/* Quantity (when > 1) */}
-                {ticket.quantity > 1 && (
-                  <div>
-                    <p className="text-[var(--bb-text-tertiary)]">Quantity</p>
-                    <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
-                      ×{ticket.quantity}
-                    </p>
-                  </div>
-                )}
-
-                {/* Linked moodboards */}
-                {ticket.moodboards && ticket.moodboards.length > 0 && (
-                  <div>
-                    <p className="text-[var(--bb-text-tertiary)]">Moodboards</p>
-                    <div className="mt-1 space-y-1">
-                      {ticket.moodboards.map((mb) => (
-                        <a
-                          key={mb.id}
-                          href={`/customer/moodboards/${mb.id}`}
-                          className="flex items-center gap-2 rounded-md border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-warm)] px-2.5 py-1.5 text-xs text-[var(--bb-secondary)] transition-colors hover:border-[var(--bb-primary)] hover:bg-[#fff4e6]"
-                        >
-                          <svg
-                            className="h-3.5 w-3.5 shrink-0 text-[var(--bb-primary)]"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            strokeWidth={2}
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a1.5 1.5 0 001.5-1.5V5.25a1.5 1.5 0 00-1.5-1.5H3.75a1.5 1.5 0 00-1.5 1.5v14.25a1.5 1.5 0 001.5 1.5z"
-                            />
-                          </svg>
-                          <span className="truncate font-medium">{mb.title}</span>
-                          <span className="ml-auto shrink-0 text-[10px] text-[var(--bb-text-tertiary)]">
-                            {mb.itemCount} items
-                          </span>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Created / Updated */}
-                <div className="border-t border-[var(--bb-border-subtle)] pt-3">
-                  <div className="space-y-2">
-                    <div>
-                      <p className="text-[var(--bb-text-tertiary)]">Created</p>
-                      <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
-                        {formatBoardDate(ticket.createdAt)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[var(--bb-text-tertiary)]">Updated</p>
-                      <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
-                        {formatBoardDate(ticket.updatedAt)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                {ticket.status === "TODO" ? (
+                  <Callout tone="info" title="Handoff">
+                    Waiting for creative work to begin.
+                  </Callout>
+                ) : null}
               </div>
-            </div>
+            </TabPanel>
+          ) : null}
 
-            {/* People card */}
-            <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
-              <h3 className="mb-3 text-xs font-semibold tracking-[0.18em] text-[var(--bb-text-muted)] uppercase">
-                People
-              </h3>
-              <div className="space-y-3">
-                {/* Requester */}
-                <div className="flex items-center gap-2.5">
-                  <div
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
-                    style={{
-                      backgroundColor: avatarColor(
-                        ticket.createdBy?.name || ticket.createdBy?.email || "Unknown",
-                      ),
-                    }}
-                  >
-                    {getInitials(ticket.createdBy?.name ?? null, ticket.createdBy?.email ?? null)}
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-[var(--bb-secondary)]">
-                      {ticket.createdBy?.name || ticket.createdBy?.email || "—"}
-                    </p>
-                    <p className="text-[10px] text-[var(--bb-text-tertiary)]">Requester</p>
-                  </div>
+          {activeTab === "versions" ? (
+            <TabPanel idPrefix={TAB_PREFIX} value="versions">
+              {ticket.status === "TODO" ? (
+                noVersions
+              ) : (
+                <div className="space-y-4">
+                  {versionsFeedback ??
+                    (newestFirst.length === 0 ? (
+                      noVersions
+                    ) : (
+                      <>
+                        <VersionsHeading
+                          title="All versions"
+                          count={newestFirst.length}
+                          onCompare={openCompare}
+                        />
+                        {newestFirst.map((rev, i) => (
+                          <CollapsedVersion
+                            key={rev.version}
+                            version={rev}
+                            isCurrent={i === 0}
+                            pinMode={pinMode}
+                            ticketId={ticket.id}
+                            zipFilename={`revision-v${rev.version}.zip`}
+                            onRevisionSubmitted={handlePinsSubmitted}
+                            copy={versionCopy}
+                          />
+                        ))}
+                      </>
+                    ))}
                 </div>
-
-                {/* Assignment status */}
-                <div className="flex items-center gap-2.5">
-                  <div
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white ${
-                      ticket.isAssigned ? "bg-[#22C55E]" : "bg-[#9CA3AF]"
-                    }`}
-                  >
-                    {ticket.isAssigned ? "\u2713" : "\u2014"}
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-[var(--bb-secondary)]">
-                      {ticket.isAssigned ? "Assigned" : "Unassigned"}
-                    </p>
-                    <p className="text-[10px] text-[var(--bb-text-tertiary)]">Creative team</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Comments card */}
-            <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
-              <h3 className="mb-3 text-xs font-semibold tracking-[0.18em] text-[var(--bb-text-muted)] uppercase">
-                Comments
-              </h3>
-
-              {commentsError && (
-                <InlineAlert variant="error" size="sm" className="mb-2">
-                  {commentsError}
-                </InlineAlert>
               )}
+            </TabPanel>
+          ) : null}
 
-              <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
-                {commentsLoading && (
-                  <p className="text-[11px] text-[var(--bb-text-tertiary)]">Loading comments…</p>
-                )}
-                {!commentsLoading && !commentsError && (comments?.length ?? 0) === 0 && (
-                  <EmptyState
-                    title="No comments yet."
-                    description="Use the form below to start a thread with your team and the creative."
-                  />
-                )}
-                {!commentsLoading &&
-                  !commentsError &&
-                  (comments?.length ?? 0) > 0 &&
-                  comments!.map((c) => (
-                    <div
-                      key={c.id}
-                      className="rounded-lg bg-[var(--bb-bg-card)] px-3 py-2 text-[11px]"
-                    >
-                      <div className="mb-1 flex items-center justify-between">
-                        <span className="font-semibold text-[var(--bb-secondary)]">
-                          {c.author.name || c.author.email}
-                        </span>
-                        <span className="text-[10px] text-[var(--bb-text-tertiary)]">
-                          {formatDateTime(c.createdAt)}
-                        </span>
-                      </div>
-                      <p className="whitespace-pre-wrap text-[var(--bb-secondary)]">{c.body}</p>
-                    </div>
-                  ))}
-              </div>
+          {activeTab === "comments" ? (
+            <TabPanel idPrefix={TAB_PREFIX} value="comments">
+              <CommentsPanel
+                comments={comments}
+                loading={commentsLoading}
+                error={commentsError}
+                value={newComment}
+                onChange={setNewComment}
+                onSubmit={handleSubmitComment}
+                submitting={submittingComment}
+                placeholder="Share feedback, clarifications, or next steps for this request."
+                visibilityNote="Comments are visible to your team and brandbite creatives."
+                emptyDescription="Use the form below to start a thread with your team and the creative."
+              />
+            </TabPanel>
+          ) : null}
+        </DetailColumns>
 
-              {/* Add comment form */}
-              <div className="mt-3 border-t border-[var(--bb-border-subtle)] pt-3">
-                <label className="mb-1 block text-[11px] font-medium text-[var(--bb-secondary)]">
-                  Add a comment
-                </label>
-                <textarea
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  rows={3}
-                  placeholder="Share feedback, clarifications, or next steps for this ticket."
-                  className="w-full rounded-md border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-2 text-[11px] text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
+        {/* Review actions stay in view however long the content gets. */}
+        {inReview ? (
+          <div className="sticky bottom-4 z-20 flex flex-wrap items-center justify-end gap-2 rounded-2xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-3 sm:gap-3 sm:p-4">
+            {normalizedRole && !canRequestChanges && !canApprove ? (
+              <p className="min-w-0 flex-1 text-sm text-[var(--av2-text-2)]">
+                Your role can view this review, but can&apos;t approve it or request a revision.
+              </p>
+            ) : null}
+            {/* Phones: the version card has its own download; keep the two decisions in one row. */}
+            {latest ? (
+              <span className="max-sm:hidden">
+                <DownloadFilesButton
+                  assets={versionAssets(latest)}
+                  zipFilename={`revision-v${latest.version}.zip`}
                 />
-                <div className="mt-2 flex items-center justify-between">
-                  <p className="text-[10px] text-[var(--bb-text-tertiary)]">
-                    Comments are visible to your team and Brandbite creatives.
-                  </p>
-                  <button
-                    type="button"
-                    disabled={submittingComment || !newComment.trim() || !ticketId}
-                    onClick={handleSubmitComment}
-                    className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-medium ${
-                      submittingComment || !newComment.trim()
-                        ? "cursor-not-allowed bg-[var(--bb-border)] text-[var(--bb-text-tertiary)]"
-                        : "bg-[var(--bb-primary)] text-white hover:bg-[var(--bb-primary-hover)]"
-                    }`}
-                  >
-                    {submittingComment ? "Sending…" : "Add comment"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </aside>
-        </div>
-      )}
-
-      {!error && !ticket && (
-        <div className="mt-6 rounded-xl border border-amber-200 bg-[var(--bb-warning-bg)] px-4 py-3 text-sm text-amber-800">
-          Ticket could not be loaded.
-        </div>
-      )}
+              </span>
+            ) : null}
+            {canRequestChanges ? (
+              <Button
+                className="max-sm:flex-1 max-sm:!px-2"
+                onClick={() => setShowRevisionModal(true)}
+                disabled={statusSaving}
+              >
+                Request revision
+              </Button>
+            ) : null}
+            {canApprove ? (
+              <Button
+                variant="primary"
+                className="max-sm:flex-1 max-sm:!px-2"
+                onClick={() => setShowDoneModal(true)}
+                disabled={statusSaving}
+              >
+                Approve & complete
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
 
       {/* ================================================================= */}
-      {/* Request Changes Modal                                             */}
+      {/* Request revision modal                                            */}
       {/* ================================================================= */}
       <Modal open={showRevisionModal} onClose={handleCancelRevision} size="md">
         <ModalHeader
@@ -1610,115 +1392,72 @@ export default function CustomerTicketDetailPage() {
           subtitle="Your creative will see your message and continue working on this request. The status will move back to In progress."
         />
 
-        <div>
-          <label className="block text-xs font-medium text-[var(--bb-secondary)]">
-            Message for your creative
-          </label>
-          <textarea
+        <Field
+          label="Message for your creative"
+          htmlFor="revision-message"
+          error={revisionMessageError}
+        >
+          <TextArea
+            id="revision-message"
             value={revisionMessage}
+            aria-invalid={!!revisionMessageError}
             onChange={(e) => {
               setRevisionMessage(e.target.value);
               if (revisionMessageError) setRevisionMessageError(null);
             }}
             placeholder="For example: Could we make the hero headline larger and try a version with a darker background?"
-            className="mt-1.5 h-28 w-full rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-2.5 text-xs text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
+            className="h-28"
           />
-          {revisionMessageError && (
-            <p className="mt-1 text-[11px] text-[var(--bb-danger-text)]">{revisionMessageError}</p>
-          )}
-        </div>
+        </Field>
 
         <ModalFooter>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleCancelRevision}
-            disabled={statusSaving}
-          >
+          <Button onClick={handleCancelRevision} disabled={statusSaving}>
             Cancel
           </Button>
-          <Button
-            size="sm"
-            onClick={handleConfirmRevision}
-            loading={statusSaving}
-            loadingText="Sending…"
-          >
-            Send back to creative
+          <Button variant="primary" onClick={handleConfirmRevision} disabled={statusSaving}>
+            {statusSaving ? "Sending…" : "Send back to creative"}
           </Button>
         </ModalFooter>
       </Modal>
 
       {/* ================================================================= */}
-      {/* Mark as Done Modal                                                */}
+      {/* Approve modal                                                     */}
       {/* ================================================================= */}
-      <Modal open={showDoneModal} onClose={() => setShowDoneModal(false)} size="md">
+      <Modal open={showDoneModal} onClose={() => setShowDoneModal(false)} size="md" scrollable>
         <ModalHeader
-          title="Mark this request as done?"
-          subtitle="Once you mark this request as done, your creative will get paid for this job, and the ticket will move to Done."
+          title="Approve and complete this request?"
+          subtitle="Once you approve this request, your creative will get paid for this job, and it will move to Done."
         />
 
-        <div className="rounded-xl bg-[var(--bb-bg-warm)] px-3 py-3 text-xs text-[var(--bb-secondary)]">
-          <p className="font-semibold">{ticket?.title}</p>
-          {ticket?.project?.name && (
-            <p className="mt-1 text-[var(--bb-text-secondary)]">Project: {ticket.project.name}</p>
-          )}
-          {ticket?.jobType?.name && (
-            <p className="mt-0.5 text-[var(--bb-text-secondary)]">
-              Job type: {ticket.jobType.name}
-            </p>
-          )}
+        <div className="rounded-xl bg-[var(--av2-bg)] p-3 text-sm">
+          <p className="font-semibold">{ticket.title}</p>
+          {ticket.project?.name ? (
+            <p className="mt-1 text-[var(--av2-text-2)]">Project: {ticket.project.name}</p>
+          ) : null}
+          {ticket.jobType?.name ? (
+            <p className="mt-0.5 text-[var(--av2-text-2)]">Job type: {ticket.jobType.name}</p>
+          ) : null}
         </div>
 
-        {/* Latest revision preview */}
-        {(() => {
-          if (!revisions || revisions.length === 0) return null;
-          const latestRev = [...revisions].reverse()[0];
-          const finalAssets = latestRev?.assets ?? [];
-          if (finalAssets.length === 0) return null;
-
-          const assetEntries: AssetEntry[] = finalAssets.map((a) => ({
-            id: a.id,
-            url: a.url,
-            originalName: a.originalName,
-            pinCount: a.pinCount,
-          }));
-
-          return (
-            <div className="mt-3">
-              <p className="mb-2 flex items-center gap-2 text-[11px] font-semibold tracking-[0.14em] text-[var(--bb-text-muted)] uppercase">
-                <span>Final work</span>
-                <span className="font-normal tracking-normal text-[var(--bb-text-tertiary)] normal-case">
-                  — Version {latestRev.version} &middot; {finalAssets.length} file
-                  {finalAssets.length !== 1 ? "s" : ""}
-                </span>
-              </p>
-
-              {finalAssets.length === 1 ? (
-                <RevisionImageLarge assets={assetEntries} pinMode="view" />
-              ) : (
-                <RevisionImageGrid assets={assetEntries} pinMode="view" />
-              )}
-            </div>
-          );
-        })()}
+        {latest && latest.assets.length > 0 ? (
+          <div className="mt-3">
+            <p className="mb-2 text-sm font-semibold">
+              Final work{" "}
+              <span className="font-normal text-[var(--av2-text-2)]">
+                Version {latest.version}, {latest.assets.length}{" "}
+                {plural(latest.assets.length, "file", "files")}
+              </span>
+            </p>
+            <FilePreviews assets={versionAssets(latest)} />
+          </div>
+        ) : null}
 
         <ModalFooter>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setShowDoneModal(false)}
-            disabled={statusSaving}
-          >
+          <Button onClick={() => setShowDoneModal(false)} disabled={statusSaving}>
             Cancel
           </Button>
-          <Button
-            size="sm"
-            className="bg-[#32b37b] hover:bg-[#2ba06a]"
-            onClick={handleConfirmDone}
-            loading={statusSaving}
-            loadingText="Approving…"
-          >
-            Approve &amp; mark done
+          <Button variant="primary" onClick={handleConfirmDone} disabled={statusSaving}>
+            {statusSaving ? "Approving…" : "Approve & complete"}
           </Button>
         </ModalFooter>
       </Modal>
@@ -1763,46 +1502,12 @@ export default function CustomerTicketDetailPage() {
       )}
 
       {/* Creative rating modal — opens when the customer marks the ticket DONE */}
-      {ticket && (
-        <RateCreativeModal
-          open={showRatingModal}
-          ticketId={ticket.id}
-          ticketTitle={ticket.title}
-          onClose={() => setShowRatingModal(false)}
-        />
-      )}
-    </>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Skeleton
-// ---------------------------------------------------------------------------
-
-function TicketDetailSkeleton() {
-  return (
-    <>
-      {/* Header skeleton */}
-      <div className="mb-4">
-        <div className="mb-2 h-4 w-24 rounded bg-[var(--bb-border)]" />
-        <div className="h-7 w-72 rounded bg-[var(--bb-border)]" />
-        <div className="mt-2 h-3 w-40 rounded bg-[var(--bb-border)]" />
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-3">
-        {/* Left skeleton */}
-        <div className="space-y-4 md:col-span-2">
-          <div className="h-48 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)]" />
-          <div className="h-32 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)]" />
-        </div>
-
-        {/* Right skeleton */}
-        <div className="space-y-4 md:col-span-1">
-          <div className="h-64 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)]" />
-          <div className="h-24 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)]" />
-          <div className="h-40 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)]" />
-        </div>
-      </div>
+      <RateCreativeModal
+        open={showRatingModal}
+        ticketId={ticket.id}
+        ticketTitle={ticket.title}
+        onClose={() => setShowRatingModal(false)}
+      />
     </>
   );
 }

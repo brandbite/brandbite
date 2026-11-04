@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
       const res = await fetch(oembedUrl, {
         signal: controller.signal,
         headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; BrandBite/1.0; +https://brandbite.studio)",
+          "User-Agent": "Mozilla/5.0 (compatible; brandbite/1.0; +https://brandbite.studio)",
         },
       });
       clearTimeout(timeout);

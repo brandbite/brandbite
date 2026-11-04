@@ -22,14 +22,14 @@ import { prisma } from "@/lib/prisma";
 export const metadata: Metadata = {
   title: "Blog",
   description:
-    "Ideas, inspiration, and practical tips on branding, design, and creative workflows. Straight from the Brandbite team.",
+    "Ideas, inspiration, and practical tips on branding, design, and creative workflows. Straight from the brandbite team.",
 };
 
 // Render per-request: posts come from the database, which isn't reachable
 // during CI's static prerender pass — and admin publishes show up instantly.
 export const dynamic = "force-dynamic";
 
-const displayFont = "font-[family-name:var(--font-inter)]";
+const displayFont = "font-[family-name:var(--font-jakarta)]";
 
 export default async function BlogIndexPage() {
   const rows = await prisma.blogPost.findMany({
@@ -92,7 +92,7 @@ export default async function BlogIndexPage() {
             </h1>
             <p className="text-base leading-6 whitespace-pre-line text-[#2B2D33] max-[767px]:text-center max-[767px]:whitespace-normal">
               {
-                "Ideas, inspiration, and practical tips on branding, design,\nand creative workflows. Straight from the Brandbite team."
+                "Ideas, inspiration, and practical tips on branding, design,\nand creative workflows. Straight from the brandbite team."
               }
             </p>
           </div>

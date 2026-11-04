@@ -86,7 +86,7 @@ export function ContactForm() {
   if (sent) {
     return (
       <div className="flex w-full flex-col items-center gap-5 py-10 text-center">
-        <p className="font-[family-name:var(--font-inter)] text-4xl leading-9 font-extrabold text-[#2B2D33]">
+        <p className="font-[family-name:var(--font-jakarta)] text-4xl leading-9 font-extrabold text-[#2B2D33]">
           Message sent. <span className="text-[#FF6426]">Nice one!</span>
         </p>
         <p className="text-base leading-6 text-[#5E616E]">

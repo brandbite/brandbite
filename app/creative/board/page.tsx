@@ -1,126 +1,85 @@
 // -----------------------------------------------------------------------------
 // @file: app/creative/board/page.tsx
 // @purpose: Creative-facing kanban board for assigned tickets with revision
-//           indicators, filters, notes, toasts, and Figma redesign
-// @version: v2.0.0
-// @status: active
-// @lastUpdate: 2025-12-27
+//           indicators, filters, notes and toasts, on the dashboard design language.
 // -----------------------------------------------------------------------------
 
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BoardViewToggle } from "@/components/board/board-view-toggle";
-import { buildTicketCode } from "@/lib/ticket-code";
+
+import { IconDocument } from "@/components/admin/v2/icons";
+import {
+  Badge,
+  Button,
+  Callout,
+  EmptyState,
+  fmt,
+  PageHeader,
+  plural,
+  SearchInput,
+  SegmentedControl,
+  Select,
+  Skeleton,
+  TICKET_STATUS,
+} from "@/components/admin/v2/ui";
+import { PauseBanner } from "@/components/creative/pause-banner";
+import { IconCheckSquare } from "@/components/dashboard/creative-board/icons";
+import { JobCard, ticketCode } from "@/components/dashboard/creative-board/job-card";
+import {
+  initialDetailTab,
+  TicketDetailDialog,
+} from "@/components/dashboard/creative-board/ticket-detail-dialog";
+import type {
+  BriefAsset,
+  CreativeTicket,
+  CreativeTicketsResponse,
+  CreativeTicketsStats,
+  DetailTab,
+  TicketRevisionEntry,
+} from "@/components/dashboard/creative-board/types";
+import { UploadWorkDialog } from "@/components/dashboard/creative-board/upload-work-dialog";
+import { useToast } from "@/components/ui/toast-provider";
+import { STATUS_ORDER } from "@/lib/board";
+import type { TicketStatus, TicketPriority } from "@/lib/board";
 import { fetchAllTickets } from "@/lib/fetch-all-tickets";
 import {
   type PendingFile,
   getImageDimensions,
   isOutputMimeAllowed,
-  OUTPUT_ACCEPT_ATTR,
   validateFileSize,
 } from "@/lib/upload-helpers";
-import { useToast } from "@/components/ui/toast-provider";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import { PauseBanner } from "@/components/creative/pause-banner";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Badge } from "@/components/ui/badge";
-import { Modal, ModalHeader, ModalFooter } from "@/components/ui/modal";
-import {
-  RevisionImageGrid,
-  RevisionImageLarge,
-  DownloadAllButton,
-  BriefThumbnailRow,
-} from "@/components/ui/revision-image";
-import { Button } from "@/components/ui/button";
-import { SafeHtml, stripHtml } from "@/components/ui/safe-html";
-import {
-  STATUS_ORDER,
-  STATUS_LABELS,
-  formatBoardDate,
-  formatPriorityLabel,
-  priorityBadgeVariant,
-  columnAccentColor,
-  PROJECT_COLORS,
-  avatarColor,
-  getInitials,
-  priorityIconMap,
-  priorityColorClass,
-  formatDueDateShort,
-  isDueDateOverdue,
-  formatDueDateCountdown,
-  BOARD_COLUMN_HEADER,
-} from "@/lib/board";
-import type { TicketStatus, TicketPriority } from "@/lib/board";
 
-type CreativeTicket = {
-  id: string;
-  title: string;
-  description: string | null;
-  status: TicketStatus;
-  priority: TicketPriority;
-  dueDate: string | null;
-  companyTicketNumber: number | null;
-  createdAt: string;
-  updatedAt: string;
-  company: {
-    id: string;
-    name: string;
-    slug: string;
-  } | null;
-  project: {
-    id: string;
-    name: string;
-    code: string | null;
-  } | null;
-  jobType: {
-    id: string;
-    name: string;
-    tokenCost: number;
-    creativePayoutTokens: number;
-  } | null;
-  revisionCount: number;
-  /** Payout at the creative's current rate (server: computeCreativePayout). */
-  estimatedPayout: number | null;
-  latestRevisionHasFeedback: boolean;
-  latestRevisionFeedbackSnippet: string | null;
+const VIEW_OPTIONS = [
+  { value: "board", label: "Kanban", href: "/creative/board" },
+  { value: "table", label: "Table", href: "/creative/tickets" },
+];
+
+/** Column header tints. Every one is a token with its own dark value. */
+const COLUMN_TINT: Record<string, string> = {
+  TODO: "var(--av2-track)",
+  IN_PROGRESS: "var(--av2-lavender-bg)",
+  IN_REVIEW: "var(--av2-attention-to)",
+  DONE: "var(--av2-success-bg)",
 };
 
-type CreativeTicketsStats = {
-  byStatus: Record<TicketStatus, number>;
-  total: number;
-  openTotal: number;
-  byPriority: Record<TicketPriority, number>;
-  loadScore: number;
-};
-
-type CreativeTicketsResponse = {
-  stats: CreativeTicketsStats;
-  tickets: CreativeTicket[];
-  /** Whether a "Note to your customer" is saved for this creative. */
-  revisionNotesEnabled?: boolean;
-};
-
-type RevisionAsset = {
-  id: string;
-  url: string | null;
-  mimeType: string;
-  bytes: number;
-  width: number | null;
-  height: number | null;
-  originalName: string | null;
-  pinCount?: number;
-  openPins?: number;
-  resolvedPins?: number;
-};
-
-type TicketRevisionEntry = {
-  version: number;
-  submittedAt: string | null;
-  feedbackAt: string | null;
-  feedbackMessage: string | null;
-  creativeMessage?: string | null;
-  assets?: RevisionAsset[];
+const COLUMN_EMPTY: Record<string, { title: string; description: string }> = {
+  TODO: {
+    title: "No jobs in backlog.",
+    description: "New work assigned to you will appear here.",
+  },
+  IN_PROGRESS: {
+    title: "No jobs in progress.",
+    description: "Jobs you start will appear here.",
+  },
+  IN_REVIEW: {
+    title: "No jobs in review.",
+    description: "Work submitted for review will appear here.",
+  },
+  DONE: {
+    title: "No completed jobs.",
+    description: "Completed work will appear here.",
+  },
 };
 
 export default function CreativeBoardPage() {
@@ -155,10 +114,9 @@ export default function CreativeBoardPage() {
   const [detailRevisions, setDetailRevisions] = useState<TicketRevisionEntry[] | null>(null);
   const [detailRevisionsLoading, setDetailRevisionsLoading] = useState<boolean>(false);
   const [detailRevisionsError, setDetailRevisionsError] = useState<string | null>(null);
-  const [showPreviousVersions, setShowPreviousVersions] = useState(false);
+  const [detailTab, setDetailTab] = useState<DetailTab>("current");
 
   // Brief attachments state
-  type BriefAsset = { id: string; url: string | null; originalName: string | null };
   const [detailBriefAssets, setDetailBriefAssets] = useState<BriefAsset[]>([]);
   const [detailBriefAssetsLoading, setDetailBriefAssetsLoading] = useState(false);
 
@@ -172,7 +130,8 @@ export default function CreativeBoardPage() {
   const [reviewUploading, setReviewUploading] = useState(false);
   const [reviewUploadProgress, setReviewUploadProgress] = useState<string | null>(null);
   const reviewFileInputRef = useRef<HTMLInputElement | null>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
+  // The shared SearchInput doesn't forward a ref, so "/" finds the input through this.
+  const searchWrapRef = useRef<HTMLDivElement>(null);
   const MAX_REVIEW_FILES = 10;
 
   // ---------------------------------------------------------------------------
@@ -236,7 +195,7 @@ export default function CreativeBoardPage() {
       if (el.isContentEditable || el.closest?.('[contenteditable="true"]')) return;
       if (e.key === "/") {
         e.preventDefault();
-        searchRef.current?.focus();
+        searchWrapRef.current?.querySelector("input")?.focus();
       }
     };
     document.addEventListener("keydown", handler);
@@ -498,22 +457,13 @@ export default function CreativeBoardPage() {
   // ---------------------------------------------------------------------------
 
   const tickets = data?.tickets ?? [];
-  const stats = data?.stats ?? null;
 
   const changesRequestedCount = useMemo(
     () => tickets.filter((t) => t.latestRevisionHasFeedback).length,
     [tickets],
   );
 
-  const projects = useMemo(() => {
-    const set = new Set<string>();
-    tickets.forEach((t) => {
-      if (t.project?.name) set.add(t.project.name);
-    });
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [tickets]);
-
-  /** Projects with ticket counts for sidebar */
+  /** Projects with ticket counts for the project filter */
   const projectsWithCounts = useMemo(() => {
     const map = new Map<string, number>();
     tickets.forEach((t) => {
@@ -523,17 +473,6 @@ export default function CreativeBoardPage() {
     return Array.from(map.entries())
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [tickets]);
-
-  /** Unique companies for toolbar avatars */
-  const uniqueCompanies = useMemo(() => {
-    const seen = new Map<string, string>();
-    tickets.forEach((t) => {
-      if (t.company && !seen.has(t.company.id)) {
-        seen.set(t.company.id, t.company.name);
-      }
-    });
-    return Array.from(seen.values());
   }, [tickets]);
 
   const filteredTickets = useMemo(() => {
@@ -548,14 +487,8 @@ export default function CreativeBoardPage() {
 
       const q = search.trim().toLowerCase();
       if (q) {
-        const code = buildTicketCode({
-          projectCode: t.project?.code,
-          companyTicketNumber: t.companyTicketNumber,
-          ticketId: t.id,
-        });
-
         const haystack = [
-          code,
+          ticketCode(t),
           t.title,
           t.description ?? "",
           t.company?.name ?? "",
@@ -698,9 +631,8 @@ export default function CreativeBoardPage() {
     const selectedTickets = tickets.filter((t) => selectedTicketIds.has(t.id));
     const targets: string[] = [];
 
-    // Can move to TODO if any selected ticket is not already TODO
-    if (selectedTickets.some((t) => t.status !== "TODO" && t.status !== "DONE"))
-      targets.push("TODO");
+    // Only In progress work can go back to Backlog; the server refuses In review.
+    if (selectedTickets.some((t) => t.status === "IN_PROGRESS")) targets.push("TODO");
     // Can move to IN_PROGRESS if any selected ticket is not already IN_PROGRESS
     if (selectedTickets.some((t) => t.status !== "IN_PROGRESS" && t.status !== "DONE"))
       targets.push("IN_PROGRESS");
@@ -808,7 +740,7 @@ export default function CreativeBoardPage() {
   // ---------------------------------------------------------------------------
 
   const handleDragStart = (
-    event: React.DragEvent<HTMLDivElement>,
+    event: React.DragEvent<HTMLElement>,
     ticketId: string,
     ticketStatus: TicketStatus,
   ) => {
@@ -832,7 +764,7 @@ export default function CreativeBoardPage() {
     setDragOverStatus(null);
   };
 
-  const handleColumnDragOver = (event: React.DragEvent<HTMLDivElement>, status: TicketStatus) => {
+  const handleColumnDragOver = (event: React.DragEvent<HTMLElement>, status: TicketStatus) => {
     if (!draggingTicketId) return;
 
     const ticket = tickets.find((t) => t.id === draggingTicketId);
@@ -854,7 +786,7 @@ export default function CreativeBoardPage() {
     }
   };
 
-  const handleColumnDrop = async (event: React.DragEvent<HTMLDivElement>, status: TicketStatus) => {
+  const handleColumnDrop = async (event: React.DragEvent<HTMLElement>, status: TicketStatus) => {
     event.preventDefault();
 
     if (!draggingTicketId) {
@@ -902,12 +834,16 @@ export default function CreativeBoardPage() {
   // Detail modal helpers
   // ---------------------------------------------------------------------------
 
+  const openTicketDetails = (ticket: CreativeTicket) => {
+    setDetailTab(initialDetailTab(ticket));
+    setDetailTicketId(ticket.id);
+  };
+
   const closeTicketDetails = () => {
     setDetailTicketId(null);
     setDetailRevisions(null);
     setDetailRevisionsError(null);
     setDetailRevisionsLoading(false);
-    setShowPreviousVersions(false);
     setDetailBriefAssets([]);
     setDetailBriefAssetsLoading(false);
   };
@@ -1035,1153 +971,300 @@ export default function CreativeBoardPage() {
   // Render
   // ---------------------------------------------------------------------------
 
-  const activeProjectTitle = projectFilter === "ALL" ? "All projects" : projectFilter;
+  const filtersActive = projectFilter !== "ALL" || onlyChangesRequested || search.trim() !== "";
 
   return (
     <>
-      <div className="mt-4 grid gap-6 md:grid-cols-[240px_1fr] lg:grid-cols-[260px_1fr]">
-        {/* Left workspace rail (creative-specific) */}
-        <aside className="flex flex-col rounded-2xl bg-[var(--bb-bg-page)]/60 p-4">
-          <div>
-            <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--bb-text-muted)] uppercase">
-              Workspace
-            </p>
-            <h2 className="mt-2 text-sm font-semibold text-[var(--bb-secondary)]">
-              Your assigned work
-            </h2>
-            <p className="mt-1 text-[11px] text-[var(--bb-text-secondary)]">
-              Tickets currently assigned to you across all customer projects.
-            </p>
-          </div>
+      <PageHeader
+        title="Your assigned work"
+        description="Tickets currently assigned to you across all customer projects."
+      />
 
-          {/* Projects list */}
-          <div className="mt-4">
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-[10px] font-semibold tracking-[0.16em] text-[var(--bb-text-muted)] uppercase">
-                Projects
-              </p>
-            </div>
-            <div className="space-y-1">
-              <button
-                type="button"
-                onClick={() => setProjectFilter("ALL")}
-                className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-[11px] transition-colors ${
-                  projectFilter === "ALL"
-                    ? "bg-[var(--bb-bg-card)] font-semibold text-[var(--bb-secondary)]"
-                    : "text-[var(--bb-text-secondary)] hover:bg-[var(--bb-bg-card)]/60"
-                }`}
-              >
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-[#9CA3AF] text-[9px] font-bold text-white">
-                  All
-                </span>
-                <span className="flex-1 truncate">All projects</span>
-                <span className="text-[10px] text-[var(--bb-text-muted)]">{stats?.total ?? 0}</span>
-              </button>
-              {projectsWithCounts.map((p, i) => (
-                <button
-                  key={p.name}
-                  type="button"
-                  onClick={() => setProjectFilter(projectFilter === p.name ? "ALL" : p.name)}
-                  className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-[11px] transition-colors ${
-                    projectFilter === p.name
-                      ? "bg-[var(--bb-bg-card)] font-semibold text-[var(--bb-secondary)]"
-                      : "text-[var(--bb-text-secondary)] hover:bg-[var(--bb-bg-card)]/60"
-                  }`}
-                >
-                  <span
-                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[9px] font-bold text-white"
-                    style={{
-                      backgroundColor: PROJECT_COLORS[i % PROJECT_COLORS.length],
-                    }}
-                  >
-                    {p.name[0]?.toUpperCase()}
-                  </span>
-                  <span className="flex-1 truncate">{p.name}</span>
-                  <span className="text-[10px] text-[var(--bb-text-muted)]">{p.count}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+      <PauseBanner />
 
-          {/* Divider */}
-          <div className="my-3 border-t border-[var(--bb-border-subtle)]" />
+      {error && (
+        <div className="mb-4">
+          <Callout tone="error" title="Something went wrong">
+            {error}
+          </Callout>
+        </div>
+      )}
 
-          {/* Stats */}
-          <div className="space-y-2">
-            <div className="rounded-xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-warm)] p-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-semibold text-[var(--bb-secondary)]">
-                    All requests
-                  </p>
-                  <p className="mt-0.5 text-[10px] text-[var(--bb-text-tertiary)]">
-                    Your active creative workspace.
-                  </p>
-                </div>
-                {stats && (
-                  <span className="rounded-full bg-[var(--bb-bg-page)] px-3 py-1 text-[11px] font-semibold text-[var(--bb-secondary)]">
-                    {stats.total}
-                  </span>
-                )}
-              </div>
-            </div>
+      {mutationError && (
+        <div className="mb-4">
+          <Callout tone="warning" title="That job didn't move">
+            {mutationError}
+          </Callout>
+        </div>
+      )}
 
-            <div className="rounded-xl bg-[var(--bb-bg-card)] px-3 py-2 text-[10px] text-[var(--bb-text-secondary)]">
-              <p>
-                Changes requested: <span className="font-semibold">{changesRequestedCount}</span>
-              </p>
-            </div>
-          </div>
-        </aside>
+      {/* Filters. The project filter used to be a second sidebar. */}
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <div className="w-full sm:w-56">
+          <Select
+            aria-label="Filter by project"
+            value={projectFilter}
+            onChange={(e) => setProjectFilter(e.target.value)}
+          >
+            <option value="ALL">All projects ({tickets.length})</option>
+            {projectsWithCounts.map((p) => (
+              <option key={p.name} value={p.name}>
+                {p.name} ({p.count})
+              </option>
+            ))}
+          </Select>
+        </div>
 
-        {/* Main board area
-            min-w-0 lets this grid cell shrink below the intrinsic width
-            of the kanban columns. Without it, CSS grid's default
-            min-width:auto forces the cell to the sum of its column
-            widths, and the whole page scrolls horizontally — dragging
-            content under the fixed app sidebar — instead of engaging
-            the internal overflow-x-auto on the kanban strip below. */}
-        <main className="flex min-w-0 flex-col">
-          {/* View switcher — Kanban (this page) ↔ Table */}
-          <div className="mb-3">
-            <BoardViewToggle rolePath="/creative" />
-          </div>
+        <div ref={searchWrapRef} className="min-w-full flex-1 sm:min-w-[220px]">
+          <SearchInput
+            label="Search board"
+            placeholder="Search board"
+            value={search}
+            onChange={setSearch}
+          />
+        </div>
 
-          {/* Header */}
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--bb-text-muted)] uppercase">
-                Creative board
-              </p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-tight">{activeProjectTitle}</h1>
-            </div>
-            {loading && (
-              <div className="rounded-full bg-[var(--bb-bg-card)] px-3 py-1 text-[11px] text-[var(--bb-text-secondary)]">
-                Loading tickets…
-              </div>
-            )}
-          </div>
+        <button
+          type="button"
+          aria-pressed={onlyChangesRequested}
+          onClick={() => setOnlyChangesRequested((prev: boolean) => !prev)}
+          className={`inline-flex h-10 items-center gap-2 rounded-full border px-4 text-sm font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:ring-offset-1 focus-visible:outline-none ${
+            onlyChangesRequested
+              ? "border-[var(--av2-accent)] bg-[var(--av2-selected)]"
+              : "border-[var(--av2-border)] bg-[var(--av2-surface)] hover:bg-[var(--av2-bg)]"
+          }`}
+        >
+          <span aria-hidden className="h-2 w-2 rounded-full bg-[var(--av2-fill-amber)]" />
+          Changes requested
+          <Badge className="tabular-nums">{fmt(changesRequestedCount)}</Badge>
+        </button>
 
-          {/* Pause banner */}
-          <PauseBanner />
+        <Button
+          aria-pressed={selectionMode}
+          onClick={() => {
+            if (selectionMode) {
+              exitSelectionMode();
+            } else {
+              setSelectionMode(true);
+            }
+          }}
+        >
+          <IconCheckSquare />
+          <span>{selectionMode ? "Cancel" : "Select"}</span>
+        </Button>
 
-          {error && (
-            <InlineAlert variant="error" title="Something went wrong" className="mb-4">
-              {error}
-            </InlineAlert>
-          )}
+        {/* Taller segments than the shared default: 40px targets. */}
+        <div className="sm:ml-auto [&_a]:h-10 [&>div]:p-0">
+          <SegmentedControl label="Board view" value="board" options={VIEW_OPTIONS} />
+        </div>
+      </div>
 
-          {mutationError && (
-            <InlineAlert variant="warning" className="mb-4">
-              {mutationError}
-            </InlineAlert>
-          )}
-
-          {/* Toolbar: search + company avatars + changes requested toggle */}
-          <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
-            <div className="relative max-w-md flex-1">
-              <input
-                ref={searchRef}
-                type="text"
-                placeholder="Search board"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-2 text-xs text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
-              />
-            </div>
-
-            {/* Company avatar circles */}
-            {uniqueCompanies.length > 0 && (
-              <div className="flex items-center -space-x-1.5">
-                {uniqueCompanies.slice(0, 5).map((name, i) => (
-                  <div
-                    key={i}
-                    title={name}
-                    className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-[9px] font-bold text-white"
-                    style={{ backgroundColor: avatarColor(name) }}
-                  >
-                    {getInitials(name, null)}
-                  </div>
-                ))}
-                {uniqueCompanies.length > 5 && (
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[var(--bb-border)] text-[9px] font-bold text-[var(--bb-text-secondary)]">
-                    +{uniqueCompanies.length - 5}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Changes requested toggle */}
-            <button
-              type="button"
-              onClick={() => setOnlyChangesRequested((prev: boolean) => !prev)}
-              className={`flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs transition-colors ${
-                onlyChangesRequested
-                  ? "border-[var(--bb-primary)] bg-[var(--bb-primary-light)] text-[var(--bb-primary-hover)]"
-                  : "border-[var(--bb-border)] bg-[var(--bb-bg-page)] text-[var(--bb-text-secondary)] hover:border-[var(--bb-primary)]/60"
-              }`}
-            >
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--bb-warning-text)]" />
-              Changes requested
-              <span className="rounded-full bg-black/5 px-1.5 text-xs font-semibold">
-                {changesRequestedCount}
-              </span>
-            </button>
-
-            {/* Bulk select toggle */}
-            <button
-              type="button"
-              onClick={() => {
-                if (selectionMode) {
-                  exitSelectionMode();
-                } else {
-                  setSelectionMode(true);
-                }
-              }}
-              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors ${
-                selectionMode
-                  ? "border-[var(--bb-primary)] bg-[var(--bb-primary-light)] text-[var(--bb-primary-hover)]"
-                  : "border-[var(--bb-border)] bg-[var(--bb-bg-page)] text-[var(--bb-text-secondary)] hover:border-[var(--bb-primary)]/60"
-              }`}
-            >
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="9 11 12 14 22 4" />
-                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-              </svg>
-              {selectionMode ? "Cancel" : "Select"}
-            </button>
-          </div>
-
-          {/* Columns */}
-          <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 md:snap-none">
+      {loading && !data ? (
+        <div
+          aria-busy="true"
+          aria-label="Loading your board"
+          className="grid auto-cols-[minmax(288px,1fr)] grid-flow-col gap-4 overflow-x-auto"
+        >
+          {STATUS_ORDER.map((status) => (
+            <Skeleton key={status} className="h-[560px] rounded-2xl" />
+          ))}
+        </div>
+      ) : data ? (
+        <>
+          <div
+            aria-busy={loading}
+            // relative: keeps the cards' sr-only text inside this scroller, not the page's width.
+            className="relative grid snap-x snap-mandatory auto-cols-[minmax(288px,1fr)] grid-flow-col gap-4 overflow-x-auto pb-2 md:snap-none"
+          >
             {STATUS_ORDER.map((status) => {
               const columnTickets = ticketsByStatus[status] ?? [];
-              const columnTitle = STATUS_LABELS[status];
+              const label = TICKET_STATUS[status].label;
+              const headingId = `creative-board-column-${status}`;
               const isActiveDrop = dragOverStatus === status && !!draggingTicketId;
+              const empty = COLUMN_EMPTY[status];
 
               return (
-                <div
+                <section
                   key={status}
-                  className={`w-80 shrink-0 snap-start overflow-hidden rounded-2xl transition-colors ${
+                  aria-labelledby={headingId}
+                  className={`flex min-h-[560px] snap-start flex-col overflow-hidden rounded-2xl border transition-colors ${
                     isActiveDrop
-                      ? "bg-[var(--bb-primary-light)] ring-2 ring-[var(--bb-primary)]/60"
-                      : "bg-[var(--bb-bg-page)]/60"
+                      ? "border-[var(--av2-accent)] bg-[var(--av2-selected)]"
+                      : "border-[var(--av2-border)] bg-[var(--av2-bg)]"
                   }`}
                   onDragOver={(event) => handleColumnDragOver(event, status)}
                   onDrop={(event) => handleColumnDrop(event, status)}
                 >
-                  {/* Accent bar */}
-                  <div className="h-1" style={{ backgroundColor: columnAccentColor[status] }} />
-
-                  <div className="p-2">
-                    {/* Column header */}
-                    <div className="mb-2 flex items-center gap-1">
-                      <span className="text-[11px] font-semibold tracking-[0.18em] text-[var(--bb-text-tertiary)] uppercase">
-                        {columnTitle}
-                      </span>
-                      <span className="rounded-full bg-[var(--bb-bg-card)] px-2 py-0.5 text-[11px] font-semibold text-[var(--bb-text-secondary)]">
-                        {columnTickets.length}
-                      </span>
-                      {selectionMode && status !== "DONE" && columnTickets.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => selectAllInColumn(status)}
-                          className="ml-auto text-[10px] font-semibold text-[var(--bb-primary)] hover:underline"
-                        >
-                          Select all
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Cards */}
-                    <div className="space-y-2">
-                      {columnTickets.length === 0 ? (
-                        isActiveDrop ? (
-                          <div className="flex h-20 items-center justify-center rounded-xl border-2 border-dashed border-[var(--bb-primary)]/40 text-xs text-[var(--bb-primary)]/60">
-                            Drop here
-                          </div>
-                        ) : (
-                          <EmptyState
-                            title={
-                              status === "DONE"
-                                ? "Completed tickets will appear here."
-                                : "No tickets in this column."
-                            }
-                          />
-                        )
-                      ) : (
-                        <>
-                          {columnTickets.map((t) => {
-                            const ticketCode = buildTicketCode({
-                              projectCode: t.project?.code,
-                              companyTicketNumber: t.companyTicketNumber,
-                              ticketId: t.id,
-                            });
-
-                            const isUpdating = updatingTicketId === t.id;
-                            const isDragging = draggingTicketId === t.id;
-                            const canDrag = !selectionMode && t.status !== "DONE" && !isUpdating;
-                            const isSelected = selectedTicketIds.has(t.id);
-
-                            const payoutTokens = t.estimatedPayout ?? null;
-
-                            const showRevisionBadge = t.revisionCount > 0;
-                            const showFeedbackBadge = t.latestRevisionHasFeedback;
-
-                            const companyLabel = t.company?.name ?? "—";
-                            const dueDateLabel = formatDueDateShort(t.dueDate);
-                            const overdue = isDueDateOverdue(t.dueDate);
-
-                            return (
-                              <div
-                                key={t.id}
-                                className={`cursor-pointer rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] p-3 shadow-sm transition-all duration-200 ${
-                                  isSelected
-                                    ? "ring-2 ring-[var(--bb-primary)] ring-offset-1"
-                                    : isDragging
-                                      ? "scale-[1.02] opacity-50 shadow-lg"
-                                      : isUpdating
-                                        ? "opacity-60"
-                                        : "hover:-translate-y-0.5 hover:border-[var(--bb-primary-border)] hover:shadow-md"
-                                }`}
-                                draggable={canDrag}
-                                onDragStart={(event) => handleDragStart(event, t.id, t.status)}
-                                onDragEnd={handleDragEnd}
-                                onMouseDown={(e) => {
-                                  if (selectionMode) return;
-                                  setMouseDownInfo({
-                                    ticketId: t.id,
-                                    x: e.clientX,
-                                    y: e.clientY,
-                                    time: Date.now(),
-                                  });
-                                }}
-                                onMouseUp={(e) => {
-                                  if (selectionMode) return;
-                                  if (!mouseDownInfo) return;
-                                  const dx = e.clientX - mouseDownInfo.x;
-                                  const dy = e.clientY - mouseDownInfo.y;
-                                  const dt = Date.now() - mouseDownInfo.time;
-                                  setMouseDownInfo(null);
-                                  const distance = Math.sqrt(dx * dx + dy * dy);
-                                  if (distance < 5 && dt < 400 && !draggingTicketId) {
-                                    setDetailTicketId(t.id);
-                                  }
-                                }}
-                                onClick={() => {
-                                  if (selectionMode && t.status !== "DONE") {
-                                    toggleTicketSelection(t.id);
-                                  }
-                                }}
-                              >
-                                {/* Selection checkbox */}
-                                {selectionMode && t.status !== "DONE" && (
-                                  <div className="mb-2 flex items-center gap-2">
-                                    <div
-                                      className={`flex h-4 w-4 items-center justify-center rounded border-2 transition-colors ${
-                                        isSelected
-                                          ? "border-[var(--bb-primary)] bg-[var(--bb-primary)]"
-                                          : "border-[var(--bb-border-input)] bg-[var(--bb-bg-page)]"
-                                      }`}
-                                    >
-                                      {isSelected && (
-                                        <svg
-                                          width="10"
-                                          height="10"
-                                          viewBox="0 0 24 24"
-                                          fill="none"
-                                          stroke="white"
-                                          strokeWidth="3"
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                        >
-                                          <polyline points="20 6 9 17 4 12" />
-                                        </svg>
-                                      )}
-                                    </div>
-                                    <span className="text-[10px] text-[var(--bb-text-tertiary)]">
-                                      {isSelected ? "Selected" : "Select"}
-                                    </span>
-                                  </div>
-                                )}
-
-                                {/* Title */}
-                                <p className="text-sm leading-snug font-semibold text-[var(--bb-secondary)]">
-                                  {t.title}
-                                </p>
-
-                                {/* Description */}
-                                {t.description && (
-                                  <p className="mt-1 line-clamp-2 text-xs text-[var(--bb-text-secondary)]">
-                                    {stripHtml(t.description)}
-                                  </p>
-                                )}
-
-                                {/* Due date pill */}
-                                {dueDateLabel && (
-                                  <div className="mt-2">
-                                    <span
-                                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                                        overdue
-                                          ? "bg-[var(--bb-danger-bg)] text-[var(--bb-danger-text)]"
-                                          : "bg-[var(--bb-info-bg)] text-[var(--bb-info-text)]"
-                                      }`}
-                                    >
-                                      <span className="text-[9px]">{overdue ? "!" : "📅"}</span>
-                                      {dueDateLabel}
-                                    </span>
-                                  </div>
-                                )}
-
-                                {/* Changes requested badge + snippet */}
-                                {showFeedbackBadge && (
-                                  <div className="mt-2">
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--bb-primary-light)] px-2 py-0.5 text-[10px] font-medium text-[var(--bb-primary-hover)]">
-                                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--bb-warning-text)]" />
-                                      Changes requested
-                                    </span>
-                                  </div>
-                                )}
-                                {t.latestRevisionHasFeedback && t.latestRevisionFeedbackSnippet && (
-                                  <p className="mt-1 line-clamp-2 text-[10px] text-[var(--bb-text-secondary)] italic">
-                                    &ldquo;{t.latestRevisionFeedbackSnippet}&rdquo;
-                                  </p>
-                                )}
-
-                                {/* Footer separator */}
-                                <div className="mt-2.5 border-t border-[var(--bb-border-subtle)] pt-2">
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2 text-[10px] text-[var(--bb-text-tertiary)]">
-                                      <span className="font-medium">{ticketCode}</span>
-                                      {showRevisionBadge && (
-                                        <span className="rounded bg-[var(--bb-info-bg)] px-1 py-0.5 text-[9px] font-semibold text-[var(--bb-info-text)]">
-                                          v{t.revisionCount}
-                                        </span>
-                                      )}
-                                      <span
-                                        className={`text-xs ${priorityColorClass(t.priority)}`}
-                                        title={formatPriorityLabel(t.priority)}
-                                      >
-                                        {priorityIconMap[t.priority]}
-                                      </span>
-                                      {payoutTokens != null && (
-                                        <span className="rounded bg-[var(--bb-success-bg)] px-1 py-0.5 text-[9px] font-semibold text-[#22C55E]">
-                                          {payoutTokens}t
-                                        </span>
-                                      )}
-                                    </div>
-                                    {/* Company avatar */}
-                                    <div
-                                      title={companyLabel}
-                                      className="flex h-6 w-6 items-center justify-center rounded-full text-[8px] font-bold text-white"
-                                      style={{
-                                        backgroundColor: avatarColor(companyLabel),
-                                      }}
-                                    >
-                                      {getInitials(companyLabel, null)}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                          {/* Drop here placeholder when column has items */}
-                          {isActiveDrop && (
-                            <div className="flex h-16 items-center justify-center rounded-xl border-2 border-dashed border-[var(--bb-primary)]/40 text-xs text-[var(--bb-primary)]/60">
-                              Drop here
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
+                  <div
+                    className="flex min-h-14 items-center gap-2 px-4"
+                    style={{ background: COLUMN_TINT[status] }}
+                  >
+                    <h2 id={headingId} className="text-lg leading-6 font-semibold">
+                      {label}
+                    </h2>
+                    <span className="rounded-full bg-[var(--av2-surface)] px-2 text-sm font-medium tabular-nums">
+                      {columnTickets.length}
+                    </span>
+                    {selectionMode && status !== "DONE" && columnTickets.length > 0 && (
+                      <Button
+                        variant="ghost"
+                        className="ml-auto px-2!"
+                        onClick={() => selectAllInColumn(status)}
+                      >
+                        Select all
+                        <span className="sr-only"> in {label}</span>
+                      </Button>
+                    )}
                   </div>
-                </div>
+
+                  <div className="flex-1 space-y-3 p-3">
+                    {columnTickets.map((t) => {
+                      const isUpdating = updatingTicketId === t.id;
+                      return (
+                        <JobCard
+                          key={t.id}
+                          ticket={t}
+                          selectionMode={selectionMode}
+                          isSelected={selectedTicketIds.has(t.id)}
+                          isDragging={draggingTicketId === t.id}
+                          isUpdating={isUpdating}
+                          canDrag={!selectionMode && t.status !== "DONE" && !isUpdating}
+                          onOpen={() => openTicketDetails(t)}
+                          onToggleSelect={() => toggleTicketSelection(t.id)}
+                          onDragStart={(event) => handleDragStart(event, t.id, t.status)}
+                          onDragEnd={handleDragEnd}
+                          onMouseDown={(e) => {
+                            if (selectionMode) return;
+                            setMouseDownInfo({
+                              ticketId: t.id,
+                              x: e.clientX,
+                              y: e.clientY,
+                              time: Date.now(),
+                            });
+                          }}
+                          onMouseUp={(e) => {
+                            if (selectionMode) return;
+                            if (!mouseDownInfo) return;
+                            const dx = e.clientX - mouseDownInfo.x;
+                            const dy = e.clientY - mouseDownInfo.y;
+                            const dt = Date.now() - mouseDownInfo.time;
+                            setMouseDownInfo(null);
+                            const distance = Math.sqrt(dx * dx + dy * dy);
+                            if (distance < 5 && dt < 400 && !draggingTicketId) {
+                              openTicketDetails(t);
+                            }
+                          }}
+                          onClick={() => {
+                            if (selectionMode && t.status !== "DONE") {
+                              toggleTicketSelection(t.id);
+                            }
+                          }}
+                        />
+                      );
+                    })}
+
+                    {isActiveDrop && (
+                      <div className="flex h-16 items-center justify-center rounded-2xl border-2 border-dashed border-[var(--av2-accent)] text-sm font-medium text-[var(--av2-text-2)]">
+                        Drop here
+                      </div>
+                    )}
+
+                    {columnTickets.length === 0 && !isActiveDrop && (
+                      <EmptyState
+                        icon={<IconDocument width={24} height={24} />}
+                        title={filtersActive ? "No matching jobs." : empty.title}
+                        description={
+                          filtersActive
+                            ? "Try another project, search or filter."
+                            : empty.description
+                        }
+                      />
+                    )}
+                  </div>
+                </section>
               );
             })}
           </div>
-        </main>
-      </div>
+
+          <p role="status" className="mt-4 text-sm text-[var(--av2-text-2)]">
+            Showing {fmt(filteredTickets.length)} of {fmt(tickets.length)}{" "}
+            {plural(tickets.length, "job", "jobs")}
+          </p>
+        </>
+      ) : null}
 
       {/* Floating bulk action bar */}
       {selectionMode && selectedTicketIds.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-[slideUp_200ms_ease-out]">
-          <div className="flex items-center gap-3 rounded-full bg-[var(--bb-secondary)] px-5 py-2.5 shadow-2xl">
-            <span className="text-xs font-semibold text-white">
-              {selectedTicketIds.size} ticket{selectedTicketIds.size > 1 ? "s" : ""} selected
-            </span>
+        <div
+          role="toolbar"
+          aria-label="Bulk actions"
+          className="fixed inset-x-4 bottom-4 z-40 flex flex-wrap items-center justify-center gap-2 rounded-2xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-3 shadow-lg sm:right-auto sm:left-1/2 sm:-translate-x-1/2 sm:flex-nowrap"
+        >
+          <span className="px-2 text-sm font-semibold whitespace-nowrap">
+            {selectedTicketIds.size} {plural(selectedTicketIds.size, "ticket", "tickets")} selected
+          </span>
 
-            <div className="h-4 w-px bg-[var(--bb-bg-page)]/20" />
+          {bulkTargetStatuses.includes("TODO") && (
+            <Button disabled={bulkUpdating} onClick={() => handleBulkStatusChange("TODO")}>
+              {bulkUpdating ? "Moving…" : "Move to Backlog"}
+            </Button>
+          )}
 
-            {bulkTargetStatuses.includes("TODO") && (
-              <button
-                type="button"
-                disabled={bulkUpdating}
-                onClick={() => handleBulkStatusChange("TODO")}
-                className="rounded-full bg-[var(--bb-bg-page)]/10 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-[var(--bb-bg-page)]/20 disabled:opacity-50"
-              >
-                {bulkUpdating ? "Moving…" : "Move to Backlog"}
-              </button>
-            )}
-
-            {bulkTargetStatuses.includes("IN_PROGRESS") && (
-              <button
-                type="button"
-                disabled={bulkUpdating}
-                onClick={() => handleBulkStatusChange("IN_PROGRESS")}
-                className="rounded-full bg-[var(--bb-primary)] px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-[var(--bb-primary-hover)] disabled:opacity-50"
-              >
-                {bulkUpdating ? "Moving…" : "Start working"}
-              </button>
-            )}
-
-            <div className="h-4 w-px bg-[var(--bb-bg-page)]/20" />
-
-            <button
-              type="button"
-              onClick={exitSelectionMode}
-              className="text-xs font-medium text-white/60 transition-colors hover:text-white"
+          {bulkTargetStatuses.includes("IN_PROGRESS") && (
+            <Button
+              variant="primary"
+              disabled={bulkUpdating}
+              onClick={() => handleBulkStatusChange("IN_PROGRESS")}
             >
-              Cancel
-            </button>
-          </div>
+              {bulkUpdating ? "Moving…" : "Start working"}
+            </Button>
+          )}
+
+          <Button variant="ghost" onClick={exitSelectionMode}>
+            Cancel
+          </Button>
         </div>
       )}
 
-      {/* Detail modal — Jira-style two-column layout */}
-      <Modal open={!!detailTicket} onClose={closeTicketDetails} size="full">
-        <ModalHeader
-          eyebrow="Ticket"
-          title={detailTicket?.title ?? ""}
-          subtitle={
-            detailTicket?.companyTicketNumber ? `#${detailTicket.companyTicketNumber}` : undefined
-          }
-          onClose={closeTicketDetails}
-        />
+      <TicketDetailDialog
+        ticket={detailTicket}
+        tab={detailTab}
+        onTabChange={setDetailTab}
+        onClose={closeTicketDetails}
+        revisions={detailRevisions}
+        revisionsLoading={detailRevisionsLoading}
+        revisionsError={detailRevisionsError}
+        briefAssets={detailBriefAssets}
+        briefAssetsLoading={detailBriefAssetsLoading}
+        updating={!!detailTicket && updatingTicketId === detailTicket.id}
+        onUploadWork={() => {
+          if (!detailTicket) return;
+          closeTicketDetails();
+          setReviewModal({ ticket: detailTicket, targetStatus: "IN_REVIEW" });
+        }}
+        onPullBack={async () => {
+          if (!detailTicket) return;
+          await persistTicketStatus(detailTicket.id, "IN_PROGRESS");
+          closeTicketDetails();
+        }}
+      />
 
-        {detailTicket && (
-          <>
-            {/* Status context banner */}
-            {detailTicket.status === "IN_REVIEW" && (
-              <div
-                className={`mb-4 flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs ${
-                  detailTicket.latestRevisionHasFeedback
-                    ? "bg-[var(--bb-warning-bg)] text-[var(--bb-warning-text)]"
-                    : "bg-[var(--bb-info-bg)] text-[var(--bb-info-text)]"
-                }`}
-              >
-                <span className="text-sm">
-                  {detailTicket.latestRevisionHasFeedback ? "💬" : "⏳"}
-                </span>
-                <span className="font-medium">
-                  {detailTicket.latestRevisionHasFeedback
-                    ? `Customer requested changes${detailTicket.latestRevisionFeedbackSnippet ? `: "${detailTicket.latestRevisionFeedbackSnippet}"` : ""}`
-                    : "Waiting for customer feedback"}
-                </span>
-              </div>
-            )}
-
-            {/* Two-column Jira layout */}
-            <div className="grid min-h-0 flex-1 gap-6 overflow-y-auto md:grid-cols-[1fr_260px] md:overflow-visible">
-              {/* Left column — main content (scrollable on desktop) */}
-              <div className="min-w-0 md:overflow-y-auto md:pr-2">
-                {/* Description */}
-                {detailTicket.description && (
-                  <div className="mb-5">
-                    <p className="mb-1.5 text-[11px] font-semibold tracking-[0.16em] text-[var(--bb-text-muted)] uppercase">
-                      Description
-                    </p>
-                    <SafeHtml
-                      html={detailTicket.description}
-                      className="rounded-xl bg-[var(--bb-bg-warm)] px-4 py-3 text-xs leading-relaxed text-[var(--bb-secondary)]"
-                    />
-                  </div>
-                )}
-
-                {/* Brief attachments */}
-                {detailBriefAssetsLoading && (
-                  <div className="mb-5">
-                    <p className="mb-1.5 text-[11px] font-semibold tracking-[0.16em] text-[var(--bb-text-muted)] uppercase">
-                      Brief attachments
-                    </p>
-                    <div className="flex items-center gap-2 py-3">
-                      <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--bb-border)] border-t-[var(--bb-text-tertiary)]" />
-                      <p className="text-xs text-[var(--bb-text-tertiary)]">Loading attachments…</p>
-                    </div>
-                  </div>
-                )}
-
-                {!detailBriefAssetsLoading &&
-                  detailBriefAssets.length > 0 &&
-                  (() => {
-                    const hasCreativeWork =
-                      detailRevisions &&
-                      detailRevisions.length > 0 &&
-                      detailRevisions.some((r) => r.assets && r.assets.length > 0);
-
-                    return (
-                      <div className="mb-5">
-                        <div className="mb-1.5 flex items-center justify-between">
-                          <p className="text-[11px] font-semibold tracking-[0.16em] text-[var(--bb-text-muted)] uppercase">
-                            Brief attachments
-                            <span className="ml-1.5 text-[var(--bb-text-tertiary)]">
-                              ({detailBriefAssets.length})
-                            </span>
-                          </p>
-                          <DownloadAllButton
-                            assets={detailBriefAssets}
-                            zipFilename="brief-attachments.zip"
-                          />
-                        </div>
-                        {hasCreativeWork ? (
-                          <BriefThumbnailRow assets={detailBriefAssets} />
-                        ) : (
-                          <RevisionImageLarge assets={detailBriefAssets} pinMode="view" />
-                        )}
-                      </div>
-                    );
-                  })()}
-
-                {/* Divider between brief context and creative work */}
-                {detailRevisions && detailRevisions.length > 0 && (
-                  <div className="mb-5 border-t border-[var(--bb-border-subtle)]" />
-                )}
-
-                {/* Revisions — loading / error / empty states */}
-                {detailRevisionsLoading && (
-                  <p className="text-xs text-[var(--bb-text-tertiary)]">Loading revisions…</p>
-                )}
-
-                {!detailRevisionsLoading && detailRevisionsError && (
-                  <p className="text-xs text-[var(--bb-danger-text)]">{detailRevisionsError}</p>
-                )}
-
-                {!detailRevisionsLoading &&
-                  !detailRevisionsError &&
-                  (!detailRevisions || detailRevisions.length === 0) && (
-                    <EmptyState
-                      title="No revisions yet."
-                      description="Once you send this ticket for review and your customer requests changes, you'll see each version and their feedback here."
-                    />
-                  )}
-
-                {/* Current version + Previous versions */}
-                {!detailRevisionsLoading &&
-                  !detailRevisionsError &&
-                  detailRevisions &&
-                  detailRevisions.length > 0 &&
-                  (() => {
-                    const reversed = [...detailRevisions].reverse();
-                    const latestRev = reversed[0];
-                    const olderRevs = reversed.slice(1);
-
-                    return (
-                      <div className="space-y-5">
-                        {/* ── Current version ── */}
-                        <div>
-                          <p className="mb-2 text-[11px] font-semibold tracking-[0.16em] text-[var(--bb-text-muted)] uppercase">
-                            Current version
-                          </p>
-                          <div
-                            className={`rounded-xl border-2 bg-[var(--bb-bg-page)] px-4 py-4 ${
-                              latestRev.feedbackAt
-                                ? "border-[var(--bb-warning-border)]/40"
-                                : "border-[var(--bb-info-border)]/40"
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] text-white ${
-                                  latestRev.feedbackAt
-                                    ? "bg-[var(--bb-warning-text)]"
-                                    : "bg-[var(--bb-info-text)]"
-                                }`}
-                              >
-                                {latestRev.feedbackAt ? "✎" : "✓"}
-                              </span>
-                              <p className="text-xs font-semibold text-[var(--bb-secondary)]">
-                                Version {latestRev.version}
-                              </p>
-                              {latestRev.assets && latestRev.assets.length > 0 && (
-                                <DownloadAllButton
-                                  assets={latestRev.assets}
-                                  zipFilename={`version-${latestRev.version}.zip`}
-                                />
-                              )}
-                            </div>
-
-                            {latestRev.submittedAt && (
-                              <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-[var(--bb-info-text)]">
-                                <span className="text-[10px]">📤</span>
-                                You sent this for review on{" "}
-                                <span className="font-semibold">
-                                  {formatBoardDate(latestRev.submittedAt)}
-                                </span>
-                              </p>
-                            )}
-
-                            {latestRev.feedbackAt && (
-                              <p className="mt-1 flex items-center gap-1.5 text-[11px] text-[var(--bb-warning-text)]">
-                                <span className="text-[10px]">💬</span>
-                                Customer requested changes on{" "}
-                                <span className="font-semibold">
-                                  {formatBoardDate(latestRev.feedbackAt)}
-                                </span>
-                              </p>
-                            )}
-
-                            {latestRev.feedbackMessage && (
-                              <div className="mt-2 rounded-lg bg-[var(--bb-warning-bg)] px-3 py-2">
-                                <p className="text-[11px] text-[var(--bb-text-tertiary)] italic">
-                                  &ldquo;{latestRev.feedbackMessage}&rdquo;
-                                </p>
-                              </div>
-                            )}
-
-                            {typeof latestRev.creativeMessage === "string" &&
-                              latestRev.creativeMessage.trim().length > 0 && (
-                                <div className="mt-2 rounded-lg bg-[var(--bb-info-bg)] px-3 py-2">
-                                  <p className="text-[11px] text-[var(--bb-secondary)]">
-                                    <span className="font-semibold">Your note:</span>{" "}
-                                    {latestRev.creativeMessage}
-                                  </p>
-                                </div>
-                              )}
-
-                            {/* Large image display for current version */}
-                            {latestRev.assets && latestRev.assets.length > 0 && (
-                              <RevisionImageLarge
-                                assets={latestRev.assets}
-                                pinMode={
-                                  detailTicket?.status === "IN_PROGRESS" ? "resolve" : "view"
-                                }
-                                onUploadWork={
-                                  detailTicket?.status === "IN_PROGRESS"
-                                    ? () => {
-                                        closeTicketDetails();
-                                        setReviewModal({
-                                          ticket: detailTicket,
-                                          targetStatus: "IN_REVIEW",
-                                        });
-                                      }
-                                    : undefined
-                                }
-                              />
-                            )}
-                          </div>
-                        </div>
-
-                        {/* ── Previous versions (collapsible) ── */}
-                        {olderRevs.length > 0 && (
-                          <div>
-                            <button
-                              type="button"
-                              onClick={() => setShowPreviousVersions((v) => !v)}
-                              className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.16em] text-[var(--bb-text-muted)] uppercase transition-colors hover:text-[var(--bb-text-secondary)]"
-                            >
-                              <svg
-                                width="12"
-                                height="12"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                className={`transition-transform ${showPreviousVersions ? "rotate-90" : ""}`}
-                              >
-                                <polyline points="9 18 15 12 9 6" />
-                              </svg>
-                              Previous versions
-                              <span className="text-[var(--bb-text-tertiary)]">
-                                ({olderRevs.length})
-                              </span>
-                            </button>
-
-                            {showPreviousVersions && (
-                              <div className="space-y-2.5">
-                                {olderRevs.map((rev) => (
-                                  <div
-                                    key={rev.version}
-                                    className="rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-3"
-                                  >
-                                    <div className="flex items-center gap-2">
-                                      <span
-                                        className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] text-white ${
-                                          rev.feedbackAt
-                                            ? "bg-[var(--bb-warning-text)]"
-                                            : "bg-[var(--bb-info-text)]"
-                                        }`}
-                                      >
-                                        {rev.feedbackAt ? "✎" : "✓"}
-                                      </span>
-                                      <p className="text-xs font-semibold text-[var(--bb-secondary)]">
-                                        Version {rev.version}
-                                      </p>
-                                      {rev.assets && rev.assets.length > 0 && (
-                                        <DownloadAllButton
-                                          assets={rev.assets}
-                                          zipFilename={`version-${rev.version}.zip`}
-                                        />
-                                      )}
-                                    </div>
-
-                                    {rev.submittedAt && (
-                                      <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-[var(--bb-info-text)]">
-                                        <span className="text-[10px]">📤</span>
-                                        You sent this for review on{" "}
-                                        <span className="font-semibold">
-                                          {formatBoardDate(rev.submittedAt)}
-                                        </span>
-                                      </p>
-                                    )}
-
-                                    {rev.feedbackAt && (
-                                      <p className="mt-1 flex items-center gap-1.5 text-[11px] text-[var(--bb-warning-text)]">
-                                        <span className="text-[10px]">💬</span>
-                                        Customer requested changes on{" "}
-                                        <span className="font-semibold">
-                                          {formatBoardDate(rev.feedbackAt)}
-                                        </span>
-                                      </p>
-                                    )}
-
-                                    {rev.feedbackMessage && (
-                                      <div className="mt-2 rounded-lg bg-[var(--bb-warning-bg)] px-3 py-2">
-                                        <p className="text-[11px] text-[var(--bb-text-tertiary)] italic">
-                                          &ldquo;{rev.feedbackMessage}&rdquo;
-                                        </p>
-                                      </div>
-                                    )}
-
-                                    {typeof rev.creativeMessage === "string" &&
-                                      rev.creativeMessage.trim().length > 0 && (
-                                        <div className="mt-2 rounded-lg bg-[var(--bb-info-bg)] px-3 py-2">
-                                          <p className="text-[11px] text-[var(--bb-secondary)]">
-                                            <span className="font-semibold">Your note:</span>{" "}
-                                            {rev.creativeMessage}
-                                          </p>
-                                        </div>
-                                      )}
-
-                                    {/* Thumbnail grid for older versions */}
-                                    {rev.assets && rev.assets.length > 0 && (
-                                      <RevisionImageGrid assets={rev.assets} pinMode="view" />
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
-              </div>
-
-              {/* Right column — metadata sidebar (fixed while left scrolls) */}
-              <aside className="self-start overflow-y-auto rounded-xl bg-[var(--bb-bg-warm)] p-4">
-                {/* Details */}
-                <div className="mb-5">
-                  <p className="mb-2 text-[11px] font-semibold tracking-[0.16em] text-[var(--bb-text-muted)] uppercase">
-                    Details
-                  </p>
-                  <div className="space-y-3 text-xs">
-                    <div>
-                      <p className="text-[var(--bb-text-tertiary)]">Status</p>
-                      <div className="mt-0.5 flex items-center gap-1.5 font-semibold text-[var(--bb-secondary)]">
-                        <span
-                          className="inline-block h-1.5 w-1.5 rounded-full"
-                          style={{ backgroundColor: columnAccentColor[detailTicket.status] }}
-                        />
-                        {STATUS_LABELS[detailTicket.status]}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-[var(--bb-text-tertiary)]">Priority</p>
-                      <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
-                        <span className={priorityColorClass(detailTicket.priority)}>
-                          {priorityIconMap[detailTicket.priority]}
-                        </span>{" "}
-                        {formatPriorityLabel(detailTicket.priority)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[var(--bb-text-tertiary)]">Project</p>
-                      <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
-                        {detailTicket.project?.name || "—"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[var(--bb-text-tertiary)]">Job type</p>
-                      <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
-                        {detailTicket.jobType?.name || "—"}
-                      </p>
-                    </div>
-                    {detailTicket.jobType && (
-                      <div>
-                        <p className="text-[var(--bb-text-tertiary)]">Payout</p>
-                        <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
-                          {detailTicket.estimatedPayout ?? "—"} tokens
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Divider */}
-                <div className="mb-5 border-t border-[var(--bb-border-subtle)]" />
-
-                {/* Company */}
-                <div className="mb-5">
-                  <p className="mb-2 text-[11px] font-semibold tracking-[0.16em] text-[var(--bb-text-muted)] uppercase">
-                    Company
-                  </p>
-                  <div className="flex items-center gap-2.5">
-                    <div
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
-                      style={{ backgroundColor: avatarColor(detailTicket.company?.name || "—") }}
-                    >
-                      {getInitials(detailTicket.company?.name || null, null)}
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold text-[var(--bb-secondary)]">
-                        {detailTicket.company?.name || "—"}
-                      </p>
-                      <p className="text-[10px] text-[var(--bb-text-tertiary)]">Customer</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Divider */}
-                <div className="mb-5 border-t border-[var(--bb-border-subtle)]" />
-
-                {/* Dates */}
-                <div>
-                  <p className="mb-2 text-[11px] font-semibold tracking-[0.16em] text-[var(--bb-text-muted)] uppercase">
-                    Dates
-                  </p>
-                  <div className="space-y-2 text-xs">
-                    <div>
-                      <p className="text-[var(--bb-text-tertiary)]">Created</p>
-                      <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
-                        {formatBoardDate(detailTicket.createdAt)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[var(--bb-text-tertiary)]">Updated</p>
-                      <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
-                        {formatBoardDate(detailTicket.updatedAt)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[var(--bb-text-tertiary)]">Due date</p>
-                      <p
-                        className={`mt-0.5 font-semibold ${isDueDateOverdue(detailTicket.dueDate) ? "text-[var(--bb-danger-text)]" : "text-[var(--bb-secondary)]"}`}
-                      >
-                        {formatBoardDate(detailTicket.dueDate)}
-                      </p>
-                      {(() => {
-                        const countdown = formatDueDateCountdown(detailTicket.dueDate);
-                        if (!countdown) return null;
-                        return (
-                          <p
-                            className={`mt-0.5 text-[10px] font-medium ${countdown.overdue ? "text-[var(--bb-danger-text)]" : "text-[var(--bb-text-secondary)]"}`}
-                          >
-                            {countdown.label}
-                          </p>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                </div>
-              </aside>
-            </div>
-
-            {/* Quick actions footer */}
-            {detailTicket.status === "IN_PROGRESS" && (
-              <ModalFooter className="shrink-0 border-t border-[var(--bb-border-subtle)] pt-3">
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    closeTicketDetails();
-                    setReviewModal({ ticket: detailTicket, targetStatus: "IN_REVIEW" });
-                  }}
-                >
-                  Upload work
-                </Button>
-              </ModalFooter>
-            )}
-            {detailTicket.status === "IN_REVIEW" && (
-              <ModalFooter className="shrink-0 border-t border-[var(--bb-border-subtle)] pt-3">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={async () => {
-                    await persistTicketStatus(detailTicket.id, "IN_PROGRESS");
-                    closeTicketDetails();
-                  }}
-                >
-                  Pull back to In progress
-                </Button>
-              </ModalFooter>
-            )}
-          </>
-        )}
-      </Modal>
-
-      {/* Upload work modal (file upload + creative note) */}
-      <Modal open={!!reviewModal} onClose={closeReviewModal} size="xl" scrollable>
-        <ModalHeader
-          eyebrow="Upload work"
-          title={reviewModal?.ticket.title ?? ""}
-          subtitle="Attach your design files and optionally share a note with your customer."
-        />
-
-        <div className="space-y-4">
-          {/* File upload area */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-medium text-[var(--bb-secondary)]">
-                Design files{" "}
-                <span className="font-normal text-[var(--bb-text-tertiary)]">(optional)</span>
-              </label>
-              <span className="text-[11px] text-[var(--bb-text-tertiary)]">
-                {reviewFiles.length}/{MAX_REVIEW_FILES}
-              </span>
-            </div>
-
-            <div
-              className="rounded-xl border-2 border-dashed border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-4 py-4 text-center transition-colors hover:border-[var(--bb-primary)]/60"
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleAddReviewFiles(e.dataTransfer.files);
-              }}
-            >
-              <p className="text-xs text-[var(--bb-text-secondary)]">
-                Drag & drop images here, or{" "}
-                <button
-                  type="button"
-                  className="cursor-pointer font-semibold text-[var(--bb-primary)] hover:underline"
-                  disabled={reviewUploading || reviewFiles.length >= MAX_REVIEW_FILES}
-                  onClick={() => reviewFileInputRef.current?.click()}
-                >
-                  browse
-                </button>
-              </p>
-              <p className="mt-1 text-[10px] text-[var(--bb-text-muted)]">
-                Images or PDF, 4 MB each — up to {MAX_REVIEW_FILES} files
-              </p>
-              <input
-                ref={reviewFileInputRef}
-                type="file"
-                accept={OUTPUT_ACCEPT_ATTR}
-                multiple
-                className="hidden"
-                disabled={reviewUploading || reviewFiles.length >= MAX_REVIEW_FILES}
-                onChange={(e) => {
-                  handleAddReviewFiles(e.target.files);
-                  e.currentTarget.value = "";
-                }}
-              />
-            </div>
-
-            {/* Thumbnail previews */}
-            {reviewFiles.length > 0 && (
-              <div className="grid grid-cols-4 gap-2">
-                {reviewFiles.map((rf) => (
-                  <div
-                    key={rf.id}
-                    className="group relative overflow-hidden rounded-lg border border-[var(--bb-border)]"
-                  >
-                    {rf.file.type.startsWith("image/") ? (
-                      <img
-                        src={URL.createObjectURL(rf.file)}
-                        alt={rf.file.name}
-                        className="h-20 w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-20 w-full flex-col items-center justify-center gap-1 bg-[var(--bb-bg-warm)] text-[var(--bb-text-secondary)]">
-                        <span className="text-lg" aria-hidden>
-                          📄
-                        </span>
-                        <span className="text-[9px] font-semibold tracking-wide uppercase">
-                          {rf.file.name.split(".").pop() || "file"}
-                        </span>
-                      </div>
-                    )}
-                    {!reviewUploading && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveReviewFile(rf.id)}
-                        className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-[10px] text-white opacity-0 transition-opacity group-hover:opacity-100"
-                      >
-                        &times;
-                      </button>
-                    )}
-                    <p className="truncate px-1.5 py-0.5 text-[9px] text-[var(--bb-text-secondary)]">
-                      {rf.file.name}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Creative note — only when an admin has enabled notes for this
-              creative; the server drops it otherwise. */}
-          {data?.revisionNotesEnabled && (
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-[var(--bb-secondary)]">
-                Note to your customer{" "}
-                <span className="font-normal text-[var(--bb-text-tertiary)]">(optional)</span>
-              </label>
-              <textarea
-                value={creativeNote}
-                onChange={(e) => setCreativeNote(e.target.value)}
-                rows={3}
-                disabled={reviewUploading}
-                placeholder="Highlight what you changed, any open questions, or how they should review this version."
-                className="w-full rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-2.5 text-xs text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)] disabled:opacity-50"
-              />
-            </div>
-          )}
-
-          {/* Upload progress */}
-          {reviewUploadProgress && (
-            <div className="rounded-lg border border-[var(--bb-border)] bg-[var(--bb-warning-bg)] px-3 py-2 text-xs text-[var(--bb-text-secondary)]">
-              {reviewUploadProgress}
-            </div>
-          )}
-        </div>
-
-        <ModalFooter>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={closeReviewModal}
-            disabled={reviewUploading}
-          >
-            Cancel
-          </Button>
-          <Button size="sm" onClick={handleConfirmReviewWithNote} disabled={reviewUploading}>
-            {reviewUploading ? "Uploading..." : "Upload & send for review"}
-          </Button>
-        </ModalFooter>
-      </Modal>
+      <UploadWorkDialog
+        open={!!reviewModal}
+        ticketTitle={reviewModal?.ticket.title ?? ""}
+        files={reviewFiles}
+        maxFiles={MAX_REVIEW_FILES}
+        note={creativeNote}
+        notesEnabled={!!data?.revisionNotesEnabled}
+        uploading={reviewUploading}
+        sending={!!reviewModal && updatingTicketId === reviewModal.ticket.id}
+        progress={reviewUploadProgress}
+        onNoteChange={setCreativeNote}
+        onAddFiles={handleAddReviewFiles}
+        onRemoveFile={handleRemoveReviewFile}
+        onClose={closeReviewModal}
+        onConfirm={handleConfirmReviewWithNote}
+      />
     </>
   );
 }

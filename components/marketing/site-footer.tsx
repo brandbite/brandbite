@@ -60,7 +60,7 @@ export function SiteFooter() {
           <div className="lg:col-span-2">
             <Image
               src="/brandbite-logo-negative.svg"
-              alt="Brandbite"
+              alt="brandbite"
               width={140}
               height={29}
               className="h-7 w-auto"
@@ -103,7 +103,7 @@ export function SiteFooter() {
       <div className="bg-[var(--bb-primary)] px-6 py-3">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 sm:flex-row">
           <p className="text-xs text-white/80">
-            &copy; {new Date().getFullYear()} Brandbite. All rights reserved.
+            &copy; {new Date().getFullYear()} brandbite. All rights reserved.
           </p>
           {data.legalLinks && data.legalLinks.length > 0 ? (
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/80">

@@ -177,7 +177,7 @@ export default function InvitePageClient({ token }: InvitePageClientProps) {
             href="/"
             className="mt-4 inline-flex items-center justify-center rounded-full bg-[var(--bb-primary)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--bb-primary-hover)]"
           >
-            Go to Brandbite
+            Go to brandbite
           </a>
         </div>
       </div>
@@ -199,7 +199,7 @@ export default function InvitePageClient({ token }: InvitePageClientProps) {
             Invite
           </p>
           <h1 className="mt-1 text-xl font-semibold tracking-tight text-[var(--bb-secondary)]">
-            Join {company.name} on Brandbite
+            Join {company.name} on brandbite
           </h1>
           <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
             You have been invited to join{" "}
@@ -259,7 +259,7 @@ export default function InvitePageClient({ token }: InvitePageClientProps) {
             <p className="text-xs text-[var(--bb-text-tertiary)]">
               {process.env.NEXT_PUBLIC_DEMO_MODE === "true" ? (
                 <>
-                  To accept this invite, you need to browse Brandbite as a user. In this demo, use
+                  To accept this invite, you need to browse brandbite as a user. In this demo, use
                   the{" "}
                   <a
                     href="/debug/demo-user"
@@ -300,7 +300,7 @@ export default function InvitePageClient({ token }: InvitePageClientProps) {
             onClick={() => router.push("/")}
             className="mt-1 inline-flex items-center justify-center rounded-full border border-[var(--bb-border)] px-4 py-2 text-[11px] font-medium text-[var(--bb-text-secondary)] hover:bg-[var(--bb-bg-card)]"
           >
-            Back to Brandbite
+            Back to brandbite
           </button>
         </div>
       </div>

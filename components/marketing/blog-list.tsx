@@ -15,7 +15,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
-const displayFont = "font-[family-name:var(--font-inter)]";
+const displayFont = "font-[family-name:var(--font-jakarta)]";
 const PAGE_SIZE = 6;
 
 export type BlogCard = {

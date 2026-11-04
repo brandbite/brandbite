@@ -7,7 +7,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Reset password",
-  description: "Reset your Brandbite account password.",
+  description: "Reset your brandbite account password.",
 };
 
 export default function ResetPasswordLayout({ children }: { children: React.ReactNode }) {

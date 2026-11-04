@@ -109,7 +109,7 @@ type EmailableLogEntry = {
 
 function buildEmail(entry: EmailableLogEntry, appUrl: string) {
   const actionLabel = ACTION_SUBJECT_FRAGMENT[entry.action] ?? entry.action;
-  const subject = `Brandbite admin — ${actionLabel}`;
+  const subject = `brandbite admin — ${actionLabel}`;
   const when = formatWhen(entry.createdAt);
   const metaJson = formatMetadata(entry.metadata);
 
@@ -119,7 +119,7 @@ function buildEmail(entry: EmailableLogEntry, appUrl: string) {
     `<span style="font-size: 16px; font-weight: 700; color: #fff;">brandbite · security</span>`,
     `</div>`,
     `<div style="background: #fff; padding: 24px; border: 1px solid #e3e1dc; border-top: none;">`,
-    `<p style="margin: 0 0 12px; font-size: 14px; color: #424143;">An admin action just ran on Brandbite:</p>`,
+    `<p style="margin: 0 0 12px; font-size: 14px; color: #424143;">An admin action just ran on brandbite:</p>`,
     `<table role="presentation" cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: collapse; margin: 12px 0;">`,
     `<tr><td style="padding: 6px 0; font-size: 12px; color: #7a7a7a; width: 120px; vertical-align: top;">Actor</td><td style="padding: 6px 0; font-size: 13px; color: #2a2a2b;"><strong>${escapeHtml(entry.actorEmail)}</strong> · ${escapeHtml(entry.actorRole)}</td></tr>`,
     `<tr><td style="padding: 6px 0; font-size: 12px; color: #7a7a7a; vertical-align: top;">Action</td><td style="padding: 6px 0; font-size: 13px; color: #2a2a2b;">${escapeHtml(entry.action)} (${escapeHtml(entry.outcome)})</td></tr>`,
@@ -137,7 +137,7 @@ function buildEmail(entry: EmailableLogEntry, appUrl: string) {
     `<p style="margin: 18px 0 0; font-size: 13px; color: #424143;">If this wasn't expected, review the full log at <a href="${appUrl}/admin/audit-log" style="color: #f15b2b;">${appUrl}/admin/audit-log</a>.</p>`,
     `</div>`,
     `<div style="background: #faf9f7; padding: 12px 24px; border-radius: 0 0 10px 10px; border: 1px solid #e3e1dc; border-top: none;">`,
-    `<p style="margin: 0; font-size: 11px; color: #9a9892; text-align: center;">Brandbite security monitor — you received this because you are a site owner.</p>`,
+    `<p style="margin: 0; font-size: 11px; color: #9a9892; text-align: center;">brandbite security monitor — you received this because you are a site owner.</p>`,
     `</div>`,
     `</div>`,
   ]
@@ -218,7 +218,7 @@ export async function sendAdminActionReceipt(entry: EmailableLogEntry): Promise<
 
 function buildBlockedEmail(entry: EmailableLogEntry, appUrl: string) {
   const actionLabel = ACTION_SUBJECT_FRAGMENT[entry.action] ?? entry.action;
-  const subject = `⚠️ Brandbite admin — blocked attempt: ${actionLabel}`;
+  const subject = `⚠️ brandbite admin — blocked attempt: ${actionLabel}`;
   const when = formatWhen(entry.createdAt);
 
   const html = [
@@ -246,7 +246,7 @@ function buildBlockedEmail(entry: EmailableLogEntry, appUrl: string) {
     `<p style="margin: 8px 0 0; font-size: 12px; color: #7a7a7a;">Future repeats of this same attempt are rate-limited to one alert per hour — review the full audit log at <a href="${appUrl}/admin/audit-log" style="color: #b4232e;">${appUrl}/admin/audit-log</a>.</p>`,
     `</div>`,
     `<div style="background: #faf9f7; padding: 12px 24px; border-radius: 0 0 10px 10px; border: 1px solid #e3e1dc; border-top: none;">`,
-    `<p style="margin: 0; font-size: 11px; color: #9a9892; text-align: center;">Brandbite security monitor — you received this because you are a site owner.</p>`,
+    `<p style="margin: 0; font-size: 11px; color: #9a9892; text-align: center;">brandbite security monitor — you received this because you are a site owner.</p>`,
     `</div>`,
     `</div>`,
   ]
@@ -331,7 +331,7 @@ export async function sendCoApprovalRequest(input: CoApprovalRequestInput): Prom
     if (owners.length === 0) return;
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://brandbite.studio";
-    const subject = `⏳ Brandbite admin — withdrawal awaiting your co-approval`;
+    const subject = `⏳ brandbite admin — withdrawal awaiting your co-approval`;
 
     const html = [
       `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto;">`,
@@ -353,7 +353,7 @@ export async function sendCoApprovalRequest(input: CoApprovalRequestInput): Prom
       `<p style="margin: 18px 0 0; font-size: 12px; color: #7a7a7a;">If this wasn't expected — for example if ${escapeHtml(input.firstApproverEmail)} should not be approving withdrawals — do NOT approve. Investigate via <a href="${appUrl}/admin/audit-log" style="color: #f15b2b;">the audit log</a> first.</p>`,
       `</div>`,
       `<div style="background: #faf9f7; padding: 12px 24px; border-radius: 0 0 10px 10px; border: 1px solid #e3e1dc; border-top: none;">`,
-      `<p style="margin: 0; font-size: 11px; color: #9a9892; text-align: center;">Brandbite security monitor</p>`,
+      `<p style="margin: 0; font-size: 11px; color: #9a9892; text-align: center;">brandbite security monitor</p>`,
       `</div>`,
       `</div>`,
     ]

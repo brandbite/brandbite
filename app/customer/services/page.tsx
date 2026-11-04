@@ -1,17 +1,54 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/services/page.tsx
-// @purpose: Customer-facing service catalog with category grouping
-// @version: v2.0.0
-// @status: active
-// @lastUpdate: 2026-02-20
+// @purpose: Customer service catalog: one category at a time, search across the
+//           whole catalog, and the selected service's detail. Estimated hours are
+//           work effort, never a delivery time.
 // -----------------------------------------------------------------------------
 
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import { LoadingState } from "@/components/ui/loading-state";
+
+import { IconArrowUpRight, IconClock, IconCoins } from "@/components/admin/v2/icons";
+import {
+  Badge,
+  ButtonLink,
+  Callout,
+  Card,
+  CardTitle,
+  DASH,
+  DetailPanel,
+  EmptyState,
+  FilterChips,
+  fmt,
+  IconTile,
+  KeyValueList,
+  PageHeader,
+  PanelSection,
+  plural,
+  SearchInput,
+  Select,
+  Skeleton,
+  SplitView,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from "@/components/admin/v2/ui";
+import {
+  formatTokens,
+  ListFooter,
+  pageOf,
+  useRevealPanel,
+} from "@/components/dashboard/money/money-ui";
+import {
+  canCreateTickets,
+  canManageBilling,
+  normalizeCompanyRole,
+  type CompanyRole,
+} from "@/lib/permissions/companyRoles";
+
+const PAGE_SIZE = 10;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -39,6 +76,10 @@ type CategoryInfo = {
   sortOrder: number;
 };
 
+function formatEffort(hours: number | null): string {
+  return hours == null ? DASH : `~${hours}h`;
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -48,7 +89,16 @@ export default function CustomerServicesPage() {
   const [categories, setCategories] = useState<CategoryInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [balance, setBalance] = useState<number | null>(null);
+  const [companyRole, setCompanyRole] = useState<CompanyRole | null>(null);
+  const [roleKnown, setRoleKnown] = useState(false);
+
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const { ref: panelRef, reveal } = useRevealPanel();
 
   useEffect(() => {
     let cancelled = false;
@@ -77,7 +127,33 @@ export default function CustomerServicesPage() {
       }
     };
 
+    // The balance and role only add context to the detail panel, so a failure
+    // here must not block the catalog.
+    const loadContext = async () => {
+      try {
+        const [tokensRes, settingsRes] = await Promise.all([
+          fetch("/api/customer/tokens", { cache: "no-store" }),
+          fetch("/api/customer/settings", { cache: "no-store" }),
+        ]);
+        const [tokensJson, settingsJson] = await Promise.all([
+          tokensRes.json().catch(() => null),
+          settingsRes.json().catch(() => null),
+        ]);
+        if (cancelled) return;
+        if (tokensRes.ok && typeof tokensJson?.company?.tokenBalance === "number") {
+          setBalance(tokensJson.company.tokenBalance);
+        }
+        if (settingsRes.ok) {
+          setCompanyRole(normalizeCompanyRole(settingsJson?.user?.companyRole));
+          setRoleKnown(true);
+        }
+      } catch (err) {
+        console.error("[CustomerServices] balance or role load error", err);
+      }
+    };
+
     load();
+    loadContext();
     return () => {
       cancelled = true;
     };
@@ -119,149 +195,294 @@ export default function CustomerServicesPage() {
     return result;
   }, [services, categories]);
 
-  // Filtered view
-  const visibleGroups = activeCategory
-    ? grouped.filter((g) => g.category === activeCategory)
-    : grouped;
+  const activeGroup = grouped.find((g) => g.category === activeCategory) ?? grouped[0] ?? null;
+  const needle = query.trim().toLowerCase();
+  const searching = needle.length > 0;
 
-  const totalCount = services.length;
-  const categoryCount = grouped.length;
+  // Search spans the whole catalog: people rarely know which category holds a service.
+  const list = useMemo(() => {
+    if (!searching) return activeGroup?.services ?? [];
+    return grouped
+      .flatMap((g) => g.services)
+      .filter((s) =>
+        [s.name, s.description ?? "", s.category ?? ""].join(" ").toLowerCase().includes(needle),
+      );
+  }, [searching, needle, activeGroup, grouped]);
+
+  const paged = pageOf(list, page, PAGE_SIZE);
+  // Derived from the visible rows, so the panel always shows a row on this page.
+  const selected = paged.rows.find((s) => s.id === selectedId) ?? paged.rows[0] ?? null;
+
+  const chooseCategory = (category: string) => {
+    setActiveCategory(category);
+    setQuery("");
+    setPage(1);
+    setSelectedId(null);
+  };
+
+  const categoryOptions = grouped.map((g) => ({
+    value: g.category,
+    label: `${g.icon ? `${g.icon} ` : ""}${g.category}`,
+    count: g.services.length,
+  }));
+
+  const hideCreate = roleKnown && !canCreateTickets(companyRole);
+  const short = selected != null && balance != null && balance < selected.tokenCost;
 
   return (
-    <div className="mx-auto max-w-6xl">
-      {/* Header */}
-      <div className="mb-6">
-        <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
-          Service catalog
-        </p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--bb-secondary)]">
-          Services
-        </h1>
-        <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-          Browse our full service catalog.{" "}
-          {!loading && !error && (
-            <span className="text-[var(--bb-text-tertiary)]">
-              {totalCount} services across {categoryCount} categories
-            </span>
-          )}
-        </p>
-      </div>
+    <>
+      <PageHeader
+        title="Services"
+        description="Browse our full service catalog."
+        meta={
+          !loading && !error ? (
+            <>
+              {fmt(services.length)} {plural(services.length, "service", "services")} across{" "}
+              {fmt(grouped.length)} {plural(grouped.length, "category", "categories")}
+            </>
+          ) : null
+        }
+      />
 
-      {/* Loading */}
-      {loading && <LoadingState message="Loading services..." />}
-
-      {/* Error */}
-      {error && (
-        <InlineAlert variant="error" title="Something went wrong" className="mb-4">
+      {error ? (
+        <Callout tone="error" title="We couldn't load the services">
           {error}
-        </InlineAlert>
-      )}
-
-      {/* Category filter pills */}
-      {!loading && !error && services.length > 0 && (
-        <div className="mb-6 flex flex-wrap gap-2">
-          <button
-            onClick={() => setActiveCategory(null)}
-            className={`rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors ${
-              activeCategory === null
-                ? "bg-[var(--bb-primary)] text-white"
-                : "border border-[var(--bb-border)] bg-[var(--bb-bg-page)] text-[var(--bb-text-secondary)] hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
-            }`}
-          >
-            All ({totalCount})
-          </button>
-          {grouped.map((g) => (
-            <button
-              key={g.category}
-              onClick={() => setActiveCategory(activeCategory === g.category ? null : g.category)}
-              className={`rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors ${
-                activeCategory === g.category
-                  ? "bg-[var(--bb-primary)] text-white"
-                  : "border border-[var(--bb-border)] bg-[var(--bb-bg-page)] text-[var(--bb-text-secondary)] hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
-              }`}
-            >
-              {g.icon ?? ""} {g.category} ({g.services.length})
-            </button>
-          ))}
+        </Callout>
+      ) : loading ? (
+        <div aria-busy="true" aria-label="Loading services" className="space-y-6">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-96" />
         </div>
-      )}
+      ) : services.length === 0 ? (
+        <Card>
+          <EmptyState
+            title="No services available yet"
+            description="Services will appear here once they are published."
+          />
+        </Card>
+      ) : (
+        <>
+          <div className="max-sm:hidden">
+            <FilterChips
+              label="Service categories"
+              options={categoryOptions}
+              value={searching ? "" : (activeGroup?.category ?? "")}
+              onChange={chooseCategory}
+            />
+          </div>
 
-      {/* Service groups */}
-      {!loading && !error && (
-        <div className="space-y-8">
-          {visibleGroups.map((group) => (
-            <section key={group.category}>
-              {/* Category header */}
-              <div className="mb-4 flex items-center gap-3">
-                <h2 className="text-base font-semibold text-[var(--bb-secondary)]">
-                  {group.icon ?? ""} {group.category}
-                </h2>
-                <span className="rounded-full bg-[var(--bb-bg-card)] px-2 py-0.5 text-[10px] font-medium text-[var(--bb-text-secondary)]">
-                  {group.services.length}
-                </span>
-              </div>
-
-              {/* Service cards grid */}
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {group.services.map((svc) => (
-                  <ServiceCard key={svc.id} service={svc} />
+          <div className="mt-4 mb-6 grid gap-3 sm:grid-cols-[minmax(0,420px)]">
+            <div className="sm:hidden">
+              <Select
+                aria-label="Service category"
+                value={activeGroup?.category ?? ""}
+                onChange={(e) => chooseCategory(e.target.value)}
+              >
+                {categoryOptions.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label} ({o.count})
+                  </option>
                 ))}
+              </Select>
+            </div>
+            <SearchInput
+              value={query}
+              onChange={(v) => {
+                setQuery(v);
+                setPage(1);
+                setSelectedId(null);
+              }}
+              placeholder="Search all services"
+              label="Search all services"
+            />
+          </div>
+
+          <SplitView
+            panel={
+              selected ? (
+                <div ref={panelRef} className="scroll-mt-20 xl:contents">
+                  <ServiceDetail
+                    service={selected}
+                    balance={balance}
+                    short={short}
+                    hideCreate={hideCreate}
+                    canAddTokens={canManageBilling(companyRole)}
+                  />
+                </div>
+              ) : null
+            }
+          >
+            <Card padding="none">
+              <div className="px-6 pt-6 pb-4">
+                <CardTitle
+                  description={`${fmt(paged.total)} ${plural(paged.total, "service", "services")}`}
+                >
+                  {searching
+                    ? "Search results"
+                    : `${activeGroup?.icon ? `${activeGroup.icon} ` : ""}${activeGroup?.category ?? ""}`}
+                </CardTitle>
               </div>
-            </section>
-          ))}
-        </div>
+
+              {paged.total === 0 ? (
+                <EmptyState
+                  title="No services match your search"
+                  description="Try a different word, or pick a category above."
+                />
+              ) : (
+                <>
+                  <Table label="Services">
+                    <thead>
+                      <tr>
+                        <Th>Service</Th>
+                        <Th>Tokens</Th>
+                        <Th className="max-sm:hidden">Estimated effort</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paged.rows.map((svc) => (
+                        <Tr
+                          key={svc.id}
+                          selected={svc.id === selected?.id}
+                          onSelect={() => {
+                            setSelectedId(svc.id);
+                            reveal();
+                          }}
+                          label={svc.name}
+                        >
+                          <Td>
+                            <p className="font-semibold">{svc.name}</p>
+                            {svc.description ? (
+                              <p className="mt-0.5 line-clamp-2 text-[var(--av2-text-2)]">
+                                {svc.description}
+                              </p>
+                            ) : null}
+                            {searching && svc.category ? (
+                              <p className="mt-0.5 text-xs text-[var(--av2-text-2)]">
+                                {svc.category}
+                              </p>
+                            ) : null}
+                          </Td>
+                          <Td className="whitespace-nowrap">
+                            <Badge tone="peach">{formatTokens(svc.tokenCost)}</Badge>
+                          </Td>
+                          <Td className="whitespace-nowrap max-sm:hidden">
+                            {formatEffort(svc.estimatedHours)}
+                          </Td>
+                        </Tr>
+                      ))}
+                    </tbody>
+                  </Table>
+                  <ListFooter {...paged} onPage={setPage} />
+                </>
+              )}
+            </Card>
+          </SplitView>
+        </>
       )}
-    </div>
+    </>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Service card
+// Selected service
 // ---------------------------------------------------------------------------
 
-function ServiceCard({ service }: { service: Service }) {
+function ServiceDetail({
+  service,
+  balance,
+  short,
+  hideCreate,
+  canAddTokens,
+}: {
+  service: Service;
+  balance: number | null;
+  short: boolean;
+  hideCreate: boolean;
+  canAddTokens: boolean;
+}) {
   return (
-    <div className="flex flex-col rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm transition-colors hover:border-[var(--bb-primary)]/30">
-      {/* Name */}
-      <h3 className="text-sm font-semibold text-[var(--bb-secondary)]">{service.name}</h3>
+    <DetailPanel
+      title={service.name}
+      footer={
+        hideCreate ? (
+          <p className="text-sm text-[var(--av2-text-2)]">
+            Your role can&apos;t create requests. Ask an owner, project manager or member to create
+            this one.
+          </p>
+        ) : (
+          <ButtonLink
+            href={`/customer/tickets/new?jobTypeId=${service.id}`}
+            variant="primary"
+            className="w-full"
+          >
+            Create request
+            <IconArrowUpRight />
+          </ButtonLink>
+        )
+      }
+    >
+      <PanelSection>
+        {service.description ? <p className="text-base">{service.description}</p> : null}
 
-      {/* Description */}
-      {service.description && (
-        <p className="mt-1.5 line-clamp-2 text-[11px] leading-relaxed text-[var(--bb-text-secondary)]">
-          {service.description}
-        </p>
-      )}
+        <div className="mt-4 grid gap-4 rounded-xl bg-[var(--av2-bg)] p-4 sm:grid-cols-2">
+          <div className="flex min-w-0 items-center gap-3">
+            <IconTile tone="peach" size={40}>
+              <IconCoins />
+            </IconTile>
+            <div className="min-w-0">
+              <p className="text-xl leading-7 font-bold tabular-nums">
+                {formatTokens(service.tokenCost)}
+              </p>
+              <p className="text-xs text-[var(--av2-text-2)]">
+                {service.hasQuantity ? "Per unit" : "Token cost"}
+              </p>
+            </div>
+          </div>
+          <div className="flex min-w-0 items-center gap-3">
+            <IconTile tone="neutral" size={40}>
+              <IconClock />
+            </IconTile>
+            <div className="min-w-0">
+              <p className="text-xl leading-7 font-bold tabular-nums">
+                {formatEffort(service.estimatedHours)}
+              </p>
+              <p className="text-xs text-[var(--av2-text-2)]">
+                Estimated effort, not a delivery time
+              </p>
+            </div>
+          </div>
+        </div>
+      </PanelSection>
 
-      {/* Meta row */}
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        {/* Token cost */}
-        <span className="inline-flex items-center rounded-full bg-[var(--bb-primary-light)] px-2.5 py-1 text-[10px] font-semibold text-[var(--bb-primary)]">
-          {service.tokenCost} {service.tokenCost === 1 ? "token" : "tokens"}
-        </span>
-
-        {/* Estimated hours */}
-        {service.estimatedHours != null && (
-          <span className="text-[10px] text-[var(--bb-text-tertiary)]">
-            ~{service.estimatedHours}h
-          </span>
-        )}
-
-        {/* Quantity indicator */}
-        {service.hasQuantity && service.quantityLabel && (
-          <span className="text-[10px] text-[var(--bb-text-muted)]">{service.quantityLabel}</span>
-        )}
-      </div>
-
-      {/* Spacer to push button to bottom */}
-      <div className="flex-1" />
-
-      {/* Create ticket CTA */}
-      <Link
-        href={`/customer/tickets/new?jobTypeId=${service.id}`}
-        className="mt-4 inline-flex items-center justify-center rounded-full border border-[var(--bb-border)] bg-[var(--bb-bg-warm)] px-4 py-1.5 text-[11px] font-semibold text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
-      >
-        Create ticket
-      </Link>
-    </div>
+      <PanelSection>
+        <KeyValueList
+          rows={[
+            { label: "Company balance", value: formatTokens(balance) },
+            ...(service.hasQuantity && service.quantityLabel
+              ? [{ label: "Quantity", value: service.quantityLabel }]
+              : []),
+          ]}
+        />
+        {short ? (
+          <div className="mt-4">
+            <Callout
+              tone="warning"
+              title={`This service needs ${service.hasQuantity ? "at least " : ""}${formatTokens(service.tokenCost)}.`}
+              action={
+                canAddTokens ? (
+                  <ButtonLink href="/customer/settings" variant="secondary">
+                    Add tokens
+                  </ButtonLink>
+                ) : undefined
+              }
+            >
+              {canAddTokens
+                ? null
+                : "Your owner or billing manager can add tokens to your company balance."}
+            </Callout>
+          </div>
+        ) : null}
+      </PanelSection>
+    </DetailPanel>
   );
 }

@@ -72,7 +72,7 @@ export function TalentFinalConfirmationEmailTemplate({
 
   return (
     <BaseLayout
-      previewText="Your Brandbite interview is booked. Here are the details."
+      previewText="Your brandbite interview is booked. Here are the details."
       hero={
         <HeroBand>
           <Heading>You&apos;re booked in</Heading>
@@ -102,7 +102,7 @@ export function TalentFinalConfirmationEmailTemplate({
 
       <Signoff
         preamble="Looking forward to it. If anything is unclear before the call, reply here and you'll get a real reply, not a ticket number."
-        from="Alper, Brandbite"
+        from="Alper, brandbite"
       />
     </BaseLayout>
   );
@@ -113,7 +113,7 @@ export async function renderTalentFinalConfirmationEmail(
 ): Promise<{ subject: string; html: string }> {
   const html = await render(<TalentFinalConfirmationEmailTemplate {...props} />);
   return {
-    subject: "Your Brandbite interview is booked",
+    subject: "Your brandbite interview is booked",
     html,
   };
 }

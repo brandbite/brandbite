@@ -177,7 +177,7 @@ export async function POST(req: NextRequest) {
             userId,
             type: done ? "TICKET_COMPLETED" : "TICKET_STATUS_CHANGED",
             title: done ? "Ticket completed" : "Ticket status updated",
-            message: `"${t.title}" was moved to ${STATUS_LABEL[data.status] ?? data.status} by the Brandbite team.`,
+            message: `"${t.title}" was moved to ${STATUS_LABEL[data.status] ?? data.status} by the brandbite team.`,
             ticketId: t.id,
             actorId: user.id,
           });

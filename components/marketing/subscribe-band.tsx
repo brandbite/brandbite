@@ -59,7 +59,7 @@ export function SubscribeBand() {
   return (
     <section className="relative flex h-[309px] w-full flex-row items-center justify-between bg-[#B696FF] px-[70px] max-[1023px]:px-8 max-[767px]:h-auto max-[767px]:flex-col max-[767px]:items-center max-[767px]:gap-10 max-[767px]:px-5 max-[767px]:pt-10">
       <div className="flex w-[500px] flex-col items-start gap-6 max-[1023px]:w-[420px] max-[767px]:w-full max-[767px]:max-w-[500px]">
-        <h2 className="flex w-full flex-col gap-[5px] font-[family-name:var(--font-inter)] text-4xl leading-9 font-extrabold">
+        <h2 className="flex w-full flex-col gap-[5px] font-[family-name:var(--font-jakarta)] text-4xl leading-9 font-extrabold">
           <span className="text-white">Get fresh ideas</span>
           <span className="text-[#2B2D33]">in your inbox.</span>
         </h2>

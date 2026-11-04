@@ -91,7 +91,7 @@ export default function DocumentationHubPage() {
             Help Center
           </h1>
           <p className="mt-4 max-w-xl text-base leading-relaxed text-[var(--bb-text-secondary)]">
-            Everything you need to know about using the Brandbite platform.
+            Everything you need to know about using the brandbite platform.
           </p>
 
           {/* Search */}

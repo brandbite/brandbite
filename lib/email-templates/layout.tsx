@@ -368,7 +368,7 @@ type SignoffProps = {
  * out of purely-transactional emails like password reset — those stay
  * tight.
  */
-export function Signoff({ preamble, from = "The Brandbite team" }: SignoffProps) {
+export function Signoff({ preamble, from = "The brandbite team" }: SignoffProps) {
   return (
     <Section style={{ marginTop: "28px" }}>
       {preamble ? <Text style={paragraph}>{preamble}</Text> : null}

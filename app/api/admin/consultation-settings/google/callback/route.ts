@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
       return redirectWithFlag(
         req,
         "error",
-        "Google did not return a refresh token. Remove previous Brandbite access at myaccount.google.com/permissions, then try Connect again.",
+        "Google did not return a refresh token. Remove previous brandbite access at myaccount.google.com/permissions, then try Connect again.",
       );
     }
 

@@ -308,7 +308,7 @@ export function parseVideoUrl(
 // ---------------------------------------------------------------------------
 
 export const COLOR_PRESETS = [
-  { hex: "#F15B2B", name: "BrandBite Orange" },
+  { hex: "#F15B2B", name: "brandbite Orange" },
   { hex: "#424143", name: "Dark Gray" },
   { hex: "#4C8EF7", name: "Blue" },
   { hex: "#32B37B", name: "Green" },

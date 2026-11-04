@@ -72,7 +72,7 @@ export type NavConfig = {
 // ---------------------------------------------------------------------------
 
 export const ADMIN_NAV: NavConfig = {
-  brand: "Brandbite",
+  brand: "brandbite",
   roleLabel: "Admin",
   homeHref: "/admin",
   sections: [
@@ -170,7 +170,7 @@ export const ADMIN_NAV: NavConfig = {
 // ---------------------------------------------------------------------------
 
 export const CUSTOMER_NAV: NavConfig = {
-  brand: "Brandbite",
+  brand: "brandbite",
   homeHref: "/customer/board",
   sections: [
     {
@@ -214,7 +214,7 @@ export const CUSTOMER_NAV: NavConfig = {
 // ---------------------------------------------------------------------------
 
 export const CREATIVE_NAV: NavConfig = {
-  brand: "Brandbite",
+  brand: "brandbite",
   roleLabel: "Creative",
   homeHref: "/creative/board",
   sections: [

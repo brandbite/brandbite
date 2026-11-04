@@ -26,7 +26,7 @@ describe("getDashboardBreadcrumb", () => {
     ]);
     expect(getDashboardBreadcrumb("customer", "/customer/tickets/abc")).toEqual([
       "Customer workspace",
-      "Tickets",
+      "My requests",
       "Detail",
     ]);
   });

@@ -1,93 +1,76 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/board/page.tsx
-// @purpose: Customer-facing board view of company tickets (kanban + drag & drop
-//           + detail & revision modals + inline new ticket modal + toasts)
-// @version: v2.3.0
-// @status: active
-// @lastUpdate: 2025-12-12
+// @purpose: Customer board: four status columns with drag and drop from In review,
+//           top filters, a review prompt, the card detail dialog and the new-request
+//           and project dialogs.
 // -----------------------------------------------------------------------------
 
 "use client";
 
+import Link from "next/link";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BoardViewToggle } from "@/components/board/board-view-toggle";
 import {
   CompanyRole,
   normalizeCompanyRole,
+  canCreateTickets,
+  canMarkTicketsDoneForCompany,
   canMoveTicketsOnBoard,
   canEditTickets,
   canManageTags,
   canManageProjects,
   isCompanyAdminRole,
 } from "@/lib/permissions/companyRoles";
-import { TicketStatus, TicketPriority } from "@prisma/client";
+import type { TicketStatus, TicketPriority } from "@prisma/client";
 import { useToast } from "@/components/ui/toast-provider";
 import { fetchAllTickets } from "@/lib/fetch-all-tickets";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import { EmptyState } from "@/components/ui/empty-state";
-import {
-  STATUS_ORDER,
-  STATUS_LABELS,
-  statusColumnClass,
-  formatBoardDate,
-  PRIORITY_ORDER,
-  formatPriorityLabel,
-  priorityBadgeVariant,
-  statusBadgeVariant,
-  columnAccentColor,
-  PROJECT_COLORS,
-  AVATAR_COLORS,
-  avatarColor,
-  priorityIconMap,
-  priorityColorClass,
-  formatDueDateShort,
-  isDueDateOverdue,
-  formatDueDateCountdown,
-  getInitials,
-} from "@/lib/board";
-import { Badge } from "@/components/ui/badge";
-import { TagBadge } from "@/components/ui/tag-badge";
-import { BRIEF_ACCEPT_ATTR, isBriefMimeAllowed } from "@/lib/upload-helpers";
-import { TagMultiSelect, type TagOption } from "@/components/ui/tag-multi-select";
-import type { TagColorKey } from "@/lib/tag-colors";
-import { Modal, ModalHeader, ModalFooter } from "@/components/ui/modal";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import {
-  RevisionImage,
-  RevisionImageGrid,
-  RevisionImageLarge,
-  DownloadAllButton,
-  BriefThumbnailRow,
-} from "@/components/ui/revision-image";
-import { Button } from "@/components/ui/button";
-import { FormInput, FormSelect } from "@/components/ui/form-field";
-import { RichTextEditor } from "@/components/ui/rich-text-editor";
-import { SafeHtml, stripHtml } from "@/components/ui/safe-html";
+import { STATUS_ORDER, PRIORITY_ORDER } from "@/lib/board";
+import { isBriefMimeAllowed } from "@/lib/upload-helpers";
+import type { TagOption } from "@/components/ui/tag-multi-select";
+import { RevisionImage } from "@/components/ui/revision-image";
 import { downloadSingleAsset, downloadAssetsAsZip } from "@/lib/download-helpers";
+import { IconArrowUpRight, IconClock, IconDocument } from "@/components/admin/v2/icons";
+import {
+  Button,
+  ButtonLink,
+  Callout,
+  Card,
+  EmptyState,
+  Field,
+  IconTile,
+  PageHeader,
+  plural,
+  PRIORITY,
+  SearchInput,
+  Select,
+  Skeleton,
+  TextArea,
+  TextInput,
+  TICKET_STATUS,
+} from "@/components/admin/v2/ui";
+import { BoardDialog } from "@/components/dashboard/customer-board/board-dialog";
+import {
+  IconDownload,
+  IconExternal,
+  IconFilter,
+  IconKanban,
+  IconList,
+  IconPlus,
+  IconShare,
+} from "@/components/dashboard/customer-board/board-icons";
+import type {
+  BoardProject,
+  BriefAsset,
+  CustomerBoardTicket,
+  NewTicketMetadata,
+  TicketEditForm,
+  TicketRevisionEntry,
+} from "@/components/dashboard/customer-board/board-types";
+import { ProjectMenu } from "@/components/dashboard/customer-board/project-menu";
+import { TicketCard } from "@/components/dashboard/customer-board/ticket-card";
+import { TicketDetailDialog } from "@/components/dashboard/customer-board/ticket-detail-dialog";
 
 import NewTicketForm from "@/app/customer/tickets/new/NewTicketForm";
 import { RateCreativeModal } from "@/components/ratings/rate-creative-modal";
-
-type CustomerBoardTicket = {
-  id: string;
-  code: string | null;
-  title: string;
-  description?: string | null;
-  status: TicketStatus;
-  priority: TicketPriority;
-  projectId: string | null;
-  projectName: string | null;
-  projectCode: string | null;
-  isAssigned: boolean;
-  jobTypeId: string | null;
-  jobTypeName: string | null;
-  createdAt: string;
-  updatedAt?: string;
-  dueDate: string | null;
-  thumbnailUrl?: string | null;
-  thumbnailAssetId?: string | null;
-  tags?: { id: string; name: string; color: string }[];
-};
 
 type BoardStats = {
   total: number;
@@ -96,29 +79,9 @@ type BoardStats = {
 };
 
 type CustomerBoardResponse = {
+  company?: { id: string; name: string; slug: string };
   stats: BoardStats;
   tickets: CustomerBoardTicket[];
-};
-
-type RevisionAsset = {
-  id: string;
-  url: string | null;
-  mimeType: string;
-  bytes: number;
-  width: number | null;
-  height: number | null;
-  originalName: string | null;
-  pinCount?: number;
-  openPins?: number;
-  resolvedPins?: number;
-};
-
-type TicketRevisionEntry = {
-  version: number;
-  submittedAt: string | null;
-  feedbackAt: string | null;
-  feedbackMessage: string | null;
-  assets?: RevisionAsset[];
 };
 
 type CompanyRoleResponse = {
@@ -137,73 +100,20 @@ type UpdateStatusResponse = {
   stats?: BoardStats;
 };
 
-type NewTicketMetadataResponse = {
-  companySlug: string;
-  tokenBalance: number;
-  projects: {
-    id: string;
-    name: string;
-    code: string | null;
-  }[];
-  jobTypes: {
-    id: string;
-    name: string;
-    category: string | null;
-    description: string | null;
-    tokenCost: number;
-    hasQuantity?: boolean;
-    quantityLabel?: string | null;
-    defaultQuantity?: number;
-  }[];
-  tags?: {
-    id: string;
-    name: string;
-    color: string;
-  }[];
-  // Mirrors the global TAGS_ENABLED AppSetting. Falsy → hide the
-  // entire tag row in the edit panel and the new-ticket form's tag
-  // picker. Treated as `true` when missing so older deploys keep
-  // working.
-  tagsEnabled?: boolean;
+type AssignmentFilter = "ALL" | "ASSIGNED" | "UNASSIGNED";
+
+const STATUS_FILL: Partial<Record<TicketStatus, string>> = {
+  TODO: "var(--av2-fill-neutral)",
+  IN_PROGRESS: "var(--av2-fill-lavender)",
+  IN_REVIEW: "var(--av2-fill-orange)",
+  DONE: "var(--av2-fill-green)",
 };
 
-// priorityIconMap, priorityColorClass, columnAccentColor, PROJECT_COLORS,
-// AVATAR_COLORS, avatarColor, formatDueDateShort, isDueDateOverdue, getInitials
-// are now imported from @/lib/board
-
-const statusIndicatorColor = (status: TicketStatus): string => {
-  switch (status) {
-    case "TODO":
-      return "bg-[var(--bb-text-muted)]";
-    case "IN_PROGRESS":
-      return "bg-[var(--bb-info-text)]";
-    case "IN_REVIEW":
-      return "bg-[var(--bb-warning-text)]";
-    case "DONE":
-      return "bg-[#32b37b]";
-    default:
-      return "bg-[var(--bb-text-muted)]";
-  }
-};
-
-const formatTimeAgo = (iso: string | null): string => {
-  if (!iso) return "—";
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "—";
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  if (diffMs < 0) return "just now";
-  const diffMinutes = Math.floor(diffMs / (1000 * 60));
-  if (diffMinutes < 1) return "just now";
-  if (diffMinutes < 60) return `${diffMinutes} min ago`;
-  const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 30) return `${diffDays}d ago`;
-  const diffMonths = Math.floor(diffDays / 30);
-  if (diffMonths < 12) return `${diffMonths}mo ago`;
-  const diffYears = Math.floor(diffMonths / 12);
-  return `${diffYears}y ago`;
+const ROLE_LABEL: Record<CompanyRole, string> = {
+  OWNER: "Owner",
+  PM: "Project manager",
+  BILLING: "Billing manager",
+  MEMBER: "Member",
 };
 
 const computeStats = (tickets: CustomerBoardTicket[]): BoardStats => {
@@ -281,7 +191,7 @@ const canDropTicketToStatus = (
     return {
       allowed: false,
       reason:
-        "New requests in To do can only be picked up by your creative. You can approve or request changes once the ticket is In review.",
+        "New requests in Backlog can only be picked up by your creative. You can approve or request changes once the ticket is In review.",
     };
   }
 
@@ -320,12 +230,15 @@ export default function CustomerBoardPage() {
 
   const [projectFilter, setProjectFilter] = useState<string>("ALL");
   const [search, setSearch] = useState<string>("");
+  const [priorityFilter, setPriorityFilter] = useState<string>("ALL");
+  const [tagFilter, setTagFilter] = useState<string>("ALL");
+  const [assignmentFilter, setAssignmentFilter] = useState<AssignmentFilter>("ALL");
   const [filterOpen, setFilterOpen] = useState<boolean>(false);
 
   // Thumbnail presigned URL cache: assetId → downloadUrl
   const [thumbnailUrls, setThumbnailUrls] = useState<Record<string, string>>({});
   const thumbnailFetchingRef = useRef<Set<string>>(new Set());
-  const searchRef = useRef<HTMLInputElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   const [draggingTicketId, setDraggingTicketId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<TicketStatus | null>(null);
@@ -337,10 +250,8 @@ export default function CustomerBoardPage() {
   const [detailRevisions, setDetailRevisions] = useState<TicketRevisionEntry[] | null>(null);
   const [detailRevisionsLoading, setDetailRevisionsLoading] = useState<boolean>(false);
   const [detailRevisionsError, setDetailRevisionsError] = useState<string | null>(null);
-  const [showPreviousVersions, setShowPreviousVersions] = useState(false);
 
   // Brief attachments state
-  type BriefAsset = { id: string; url: string | null; originalName: string | null };
   const [detailBriefAssets, setDetailBriefAssets] = useState<BriefAsset[]>([]);
   const [detailBriefAssetsLoading, setDetailBriefAssetsLoading] = useState(false);
   const [uploadingBriefs, setUploadingBriefs] = useState(false);
@@ -357,7 +268,6 @@ export default function CustomerBoardPage() {
   );
   const [pendingDoneRevisionsLoading, setPendingDoneRevisionsLoading] = useState(false);
   const [doneModalDownloading, setDoneModalDownloading] = useState(false);
-  const [detailFooterDownloading, setDetailFooterDownloading] = useState(false);
 
   const [pendingRevisionTicketId, setPendingRevisionTicketId] = useState<string | null>(null);
   const [revisionMessage, setRevisionMessage] = useState<string>("");
@@ -371,7 +281,7 @@ export default function CustomerBoardPage() {
   } | null>(null);
 
   const [newTicketModalOpen, setNewTicketModalOpen] = useState<boolean>(false);
-  const [newTicketMeta, setNewTicketMeta] = useState<NewTicketMetadataResponse | null>(null);
+  const [newTicketMeta, setNewTicketMeta] = useState<NewTicketMetadata | null>(null);
   const [newTicketMetaLoading, setNewTicketMetaLoading] = useState<boolean>(false);
   const [newTicketMetaError, setNewTicketMetaError] = useState<string | null>(null);
 
@@ -381,22 +291,17 @@ export default function CustomerBoardPage() {
   const [newProjectSaving, setNewProjectSaving] = useState(false);
   const [newProjectError, setNewProjectError] = useState<string | null>(null);
 
-  // Sidebar projects (fetched from API — includes empty projects)
-  type SidebarProject = { id: string; name: string; code: string | null; ticketCount: number };
-  const [sidebarProjects, setSidebarProjects] = useState<SidebarProject[]>([]);
-
-  // Project context menu
-  const [projectMenuId, setProjectMenuId] = useState<string | null>(null);
-  const projectMenuRef = useRef<HTMLDivElement | null>(null);
+  // All company projects (fetched from API — includes empty projects)
+  const [boardProjects, setBoardProjects] = useState<BoardProject[]>([]);
 
   // Rename project modal
-  const [renameProject, setRenameProject] = useState<SidebarProject | null>(null);
+  const [renameProject, setRenameProject] = useState<BoardProject | null>(null);
   const [renameProjectName, setRenameProjectName] = useState("");
   const [renameProjectSaving, setRenameProjectSaving] = useState(false);
   const [renameProjectError, setRenameProjectError] = useState<string | null>(null);
 
   // Brand-guide modal (D19) — keyed off the project being edited.
-  const [brandGuideProject, setBrandGuideProject] = useState<SidebarProject | null>(null);
+  const [brandGuideProject, setBrandGuideProject] = useState<BoardProject | null>(null);
   const [brandGuideDraft, setBrandGuideDraft] = useState({
     brandLogoUrl: "",
     brandColors: "",
@@ -408,7 +313,7 @@ export default function CustomerBoardPage() {
   const [brandGuideError, setBrandGuideError] = useState<string | null>(null);
 
   // Delete project confirmation
-  const [deleteProject, setDeleteProject] = useState<SidebarProject | null>(null);
+  const [deleteProject, setDeleteProject] = useState<BoardProject | null>(null);
   const [deleteProjectSaving, setDeleteProjectSaving] = useState(false);
   const [deleteProjectError, setDeleteProjectError] = useState<string | null>(null);
 
@@ -421,15 +326,7 @@ export default function CustomerBoardPage() {
 
   // Inline edit state for detail modal
   const [isEditingDetail, setIsEditingDetail] = useState(false);
-  const [editForm, setEditForm] = useState<{
-    title: string;
-    description: string;
-    priority: string;
-    dueDate: string;
-    projectId: string;
-    jobTypeId: string;
-    tagIds: string[];
-  }>({
+  const [editForm, setEditForm] = useState<TicketEditForm>({
     title: "",
     description: "",
     priority: "MEDIUM",
@@ -531,7 +428,7 @@ export default function CustomerBoardPage() {
         );
       }
 
-      setNewTicketMeta(json as NewTicketMetadataResponse);
+      setNewTicketMeta(json as NewTicketMetadata);
     } catch (err: unknown) {
       console.error("[CustomerBoardPage] Failed to load new ticket metadata", err);
       const message = err instanceof Error ? err.message : "Failed to load data for new request.";
@@ -596,9 +493,9 @@ export default function CustomerBoardPage() {
         title: "Project created",
         description: `"${json.project.name}" (${json.project.code}) is ready.`,
       });
-      // Refresh board + sidebar projects + new-ticket metadata
+      // Refresh board + projects + new-ticket metadata
       void load();
-      void loadSidebarProjects();
+      void loadBoardProjects();
       setNewTicketMeta(null);
     } catch {
       setNewProjectError("Unexpected error creating project.");
@@ -608,26 +505,25 @@ export default function CustomerBoardPage() {
   };
 
   // ---------------------------------------------------------------------------
-  // Sidebar projects: fetch, rename, delete
+  // Projects: fetch, rename, delete
   // ---------------------------------------------------------------------------
 
-  const loadSidebarProjects = async () => {
+  const loadBoardProjects = async () => {
     try {
       const res = await fetch("/api/customer/projects", { cache: "no-store" });
       const json = await res.json().catch(() => null);
       if (res.ok && json?.projects) {
-        setSidebarProjects(json.projects);
+        setBoardProjects(json.projects);
       }
     } catch {
-      // Silently fail — sidebar falls back to empty
+      // Silently fail — the filter falls back to projects seen on tickets
     }
   };
 
-  const openRenameProject = (proj: SidebarProject) => {
+  const openRenameProject = (proj: BoardProject) => {
     setRenameProject(proj);
     setRenameProjectName(proj.name);
     setRenameProjectError(null);
-    setProjectMenuId(null);
   };
 
   const closeRenameProject = () => {
@@ -636,9 +532,8 @@ export default function CustomerBoardPage() {
   };
 
   // ---- Brand guide modal -----------------------------------------------
-  const openBrandGuide = async (proj: SidebarProject) => {
+  const openBrandGuide = async (proj: BoardProject) => {
     setBrandGuideProject(proj);
-    setProjectMenuId(null);
     setBrandGuideError(null);
     setBrandGuideDraft({ brandLogoUrl: "", brandColors: "", brandFonts: "", brandVoice: "" });
     setBrandGuideLoading(true);
@@ -709,10 +604,12 @@ export default function CustomerBoardPage() {
         setRenameProjectError(json?.error || "Failed to rename project.");
         return;
       }
+      // Keep the filter on the project that was just renamed.
+      if (projectFilter === renameProject.name) setProjectFilter(trimmed);
       closeRenameProject();
       showToast({ type: "success", title: "Project renamed" });
       void load();
-      void loadSidebarProjects();
+      void loadBoardProjects();
       setNewTicketMeta(null);
     } catch {
       setRenameProjectError("Unexpected error renaming project.");
@@ -721,10 +618,9 @@ export default function CustomerBoardPage() {
     }
   };
 
-  const openDeleteProject = (proj: SidebarProject) => {
+  const openDeleteProject = (proj: BoardProject) => {
     setDeleteProject(proj);
     setDeleteProjectError(null);
-    setProjectMenuId(null);
   };
 
   const closeDeleteProject = () => {
@@ -756,7 +652,7 @@ export default function CustomerBoardPage() {
             : undefined,
       });
       void load();
-      void loadSidebarProjects();
+      void loadBoardProjects();
       setNewTicketMeta(null);
     } catch {
       setDeleteProjectError("Unexpected error deleting project.");
@@ -765,24 +661,12 @@ export default function CustomerBoardPage() {
     }
   };
 
-  // Close project menu when clicking outside
-  useEffect(() => {
-    if (!projectMenuId) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (projectMenuRef.current && !projectMenuRef.current.contains(e.target as Node)) {
-        setProjectMenuId(null);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [projectMenuId]);
-
   useEffect(() => {
     let cancelled = false;
     const initialLoad = async () => {
       if (cancelled) return;
       await load();
-      await loadSidebarProjects();
+      await loadBoardProjects();
     };
     initialLoad();
     return () => {
@@ -1023,7 +907,7 @@ export default function CustomerBoardPage() {
             title: "Couldn't remove attachment",
             description:
               json?.error === "TICKET_NOT_EDITABLE"
-                ? "Attachments can only be removed while the ticket is in To do."
+                ? "Attachments can only be removed while the request is in Backlog."
                 : undefined,
           });
           return;
@@ -1043,13 +927,32 @@ export default function CustomerBoardPage() {
 
   const tickets = data?.tickets ?? [];
 
-  const projects = useMemo(() => {
-    const list = Array.from(
-      new Set(tickets.map((t) => t.projectName).filter((p): p is string => !!p)),
-    );
-    list.sort((a, b) => a.localeCompare(b));
-    return list;
+  // Every company project (including empty ones), plus any seen only on tickets
+  // in case the project list failed to load.
+  const projectOptions = useMemo(() => {
+    const options = new Map<string, { name: string; count: number | null }>();
+    for (const project of boardProjects) {
+      options.set(project.name, { name: project.name, count: project.ticketCount });
+    }
+    for (const ticket of tickets) {
+      if (ticket.projectName && !options.has(ticket.projectName)) {
+        options.set(ticket.projectName, { name: ticket.projectName, count: null });
+      }
+    }
+    return Array.from(options.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [boardProjects, tickets]);
+
+  const selectedProject = boardProjects.find((project) => project.name === projectFilter) ?? null;
+
+  const tagOptions = useMemo(() => {
+    const options = new Map<string, { id: string; name: string }>();
+    for (const ticket of tickets) {
+      for (const tag of ticket.tags ?? []) options.set(tag.id, tag);
+    }
+    return Array.from(options.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [tickets]);
+
+  const toReview = useMemo(() => tickets.filter((t) => t.status === "IN_REVIEW"), [tickets]);
 
   // Fetch presigned URLs for thumbnails that have an assetId but no public url
   useEffect(() => {
@@ -1088,7 +991,7 @@ export default function CustomerBoardPage() {
       if (el.isContentEditable || el.closest?.('[contenteditable="true"]')) return;
       if (e.key === "/") {
         e.preventDefault();
-        searchRef.current?.focus();
+        searchRef.current?.querySelector("input")?.focus();
       }
     };
     document.addEventListener("keydown", handler);
@@ -1097,28 +1000,25 @@ export default function CustomerBoardPage() {
 
   const assignedCount = useMemo(() => tickets.filter((t) => t.isAssigned).length, [tickets]);
 
-  const projectsWithColors = useMemo(() => {
-    const projectMap = new Map<string, { name: string; code: string | null; count: number }>();
-    for (const t of tickets) {
-      if (t.projectName) {
-        const existing = projectMap.get(t.projectName);
-        if (existing) {
-          existing.count += 1;
-        } else {
-          projectMap.set(t.projectName, {
-            name: t.projectName,
-            code: t.projectCode,
-            count: 1,
-          });
-        }
-      }
-    }
-    return Array.from(projectMap.values()).sort((a, b) => b.count - a.count);
-  }, [tickets]);
-
   const filteredTickets = useMemo(() => {
     return tickets.filter((t) => {
       if (projectFilter !== "ALL" && t.projectName !== projectFilter) {
+        return false;
+      }
+
+      if (priorityFilter !== "ALL" && t.priority !== priorityFilter) {
+        return false;
+      }
+
+      if (tagFilter !== "ALL" && !(t.tags ?? []).some((tag) => tag.id === tagFilter)) {
+        return false;
+      }
+
+      if (assignmentFilter === "ASSIGNED" && !t.isAssigned) {
+        return false;
+      }
+
+      if (assignmentFilter === "UNASSIGNED" && t.isAssigned) {
         return false;
       }
 
@@ -1135,7 +1035,22 @@ export default function CustomerBoardPage() {
 
       return true;
     });
-  }, [tickets, projectFilter, search]);
+  }, [tickets, projectFilter, priorityFilter, tagFilter, assignmentFilter, search]);
+
+  const panelFilterCount = (tagFilter !== "ALL" ? 1 : 0) + (assignmentFilter !== "ALL" ? 1 : 0);
+  const hasActiveFilters =
+    projectFilter !== "ALL" ||
+    priorityFilter !== "ALL" ||
+    panelFilterCount > 0 ||
+    search.trim().length > 0;
+
+  const clearFilters = () => {
+    setProjectFilter("ALL");
+    setPriorityFilter("ALL");
+    setTagFilter("ALL");
+    setAssignmentFilter("ALL");
+    setSearch("");
+  };
 
   const ticketsByStatus = useMemo(() => {
     const map: Record<TicketStatus, CustomerBoardTicket[]> = {
@@ -1177,6 +1092,7 @@ export default function CustomerBoardPage() {
   }, [pendingRevisionTicketId, tickets]);
 
   const currentStats = data?.stats ?? computeStats([]);
+  const companyName = data?.company?.name ?? null;
 
   // ---------------------------------------------------------------------------
   // Status update helper
@@ -1282,6 +1198,7 @@ export default function CustomerBoardPage() {
           const nextTickets = prev.tickets.map((t) => (t.id === json.ticket.id ? json.ticket : t));
 
           return {
+            ...prev,
             tickets: nextTickets,
             stats: json.stats,
           };
@@ -1386,7 +1303,7 @@ export default function CustomerBoardPage() {
     setDragOverStatus(null);
   };
 
-  const handleDragOver = (event: React.DragEvent<HTMLDivElement>, status: TicketStatus) => {
+  const handleDragOver = (event: React.DragEvent<HTMLElement>, status: TicketStatus) => {
     if (!draggingTicketId || !canDragTicket) return;
 
     const ticket = tickets.find((t) => t.id === draggingTicketId);
@@ -1409,7 +1326,7 @@ export default function CustomerBoardPage() {
     }
   };
 
-  const handleDrop = async (event: React.DragEvent<HTMLDivElement>, targetStatus: TicketStatus) => {
+  const handleDrop = async (event: React.DragEvent<HTMLElement>, targetStatus: TicketStatus) => {
     event.preventDefault();
     setDragOverStatus(null);
 
@@ -1476,7 +1393,6 @@ export default function CustomerBoardPage() {
     setDetailRevisions(null);
     setDetailRevisionsError(null);
     setDetailRevisionsLoading(false);
-    setShowPreviousVersions(false);
     setDetailBriefAssets([]);
     setDetailBriefAssetsLoading(false);
     setUploadingBriefs(false);
@@ -1642,6 +1558,38 @@ export default function CustomerBoardPage() {
     }
   };
 
+  const handleCreateTag = async (name: string, color: string): Promise<TagOption | null> => {
+    try {
+      const res = await fetch("/api/customer/tags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, color }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        showToast({
+          type: "error",
+          title: json?.error || "Failed to create tag",
+        });
+        return null;
+      }
+      const created = json.tag as TagOption;
+      // Add to local metadata cache
+      setNewTicketMeta((prev) =>
+        prev
+          ? {
+              ...prev,
+              tags: [...(prev.tags ?? []), created].sort((a, b) => a.name.localeCompare(b.name)),
+            }
+          : prev,
+      );
+      return created;
+    } catch {
+      showToast({ type: "error", title: "Failed to create tag" });
+      return null;
+    }
+  };
+
   const handleConfirmDone = async () => {
     if (!pendingDoneTicketId) return;
     const ticket = tickets.find((t) => t.id === pendingDoneTicketId);
@@ -1689,588 +1637,375 @@ export default function CustomerBoardPage() {
     setRevisionMessageError(null);
   };
 
-  const handleStatusBadgeClick = (status: TicketStatus) => {
-    const element = document.getElementById(`customer-board-column-${status}`);
-    if (!element) return;
-    element.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
-  const handleProjectFilterChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    setProjectFilter(event.target.value);
-  };
-
-  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setSearch(event.target.value);
-  };
-
-  // ---------------------------------------------------------------------------
-  // Render helpers
-  // ---------------------------------------------------------------------------
-
-  const renderTicketCard = (ticket: CustomerBoardTicket) => {
-    const isDragging = draggingTicketId === ticket.id;
-    const isUpdating = updatingTicketId === ticket.id;
-    const dueDateLabel = formatDueDateShort(ticket.dueDate);
-    const overdue = isDueDateOverdue(ticket.dueDate);
-    const thumbSrc =
-      ticket.thumbnailUrl ??
-      (ticket.thumbnailAssetId ? thumbnailUrls[ticket.thumbnailAssetId] : null) ??
-      null;
-
-    return (
-      <div
-        key={ticket.id}
-        className={`group cursor-pointer rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] p-3.5 text-xs shadow-sm transition-all duration-200 ${
-          isDragging
-            ? "scale-[1.02] opacity-50 shadow-lg"
-            : "hover:-translate-y-0.5 hover:border-[var(--bb-primary-border)] hover:shadow-md"
-        }`}
-        draggable={canDragTicket && ticket.status === "IN_REVIEW"}
-        onDragStart={(event) => handleDragStart(event, ticket.id, ticket.status)}
-        onDragEnd={handleDragEnd}
-        onMouseDown={(event) => handleMouseDown(event, ticket.id)}
-        onMouseUp={(event) => handleMouseUp(event, ticket.id)}
-      >
-        {/* Title */}
-        <p className="text-sm leading-snug font-semibold text-[var(--bb-secondary)]">
-          {ticket.title}
-        </p>
-
-        {/* Description */}
-        {ticket.description && (
-          <p className="mt-1 line-clamp-2 text-xs text-[var(--bb-text-secondary)]">
-            {stripHtml(ticket.description)}
-          </p>
-        )}
-
-        {/* Thumbnail */}
-        {thumbSrc && (
-          <div className="mt-2 overflow-hidden rounded-lg bg-[var(--bb-bg-card)]">
-            <img src={thumbSrc} alt="" className="h-28 w-full object-cover" loading="lazy" />
-          </div>
-        )}
-
-        {/* Due date pill */}
-        {dueDateLabel && (
-          <div className="mt-2">
-            <span
-              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                overdue
-                  ? "bg-[var(--bb-danger-bg)] text-[var(--bb-danger-text)]"
-                  : "bg-[var(--bb-info-bg)] text-[var(--bb-info-text)]"
-              }`}
-            >
-              <span className="text-[9px]">📅</span>
-              {dueDateLabel}
-            </span>
-          </div>
-        )}
-
-        {/* Tags */}
-        {ticket.tags && ticket.tags.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1">
-            {ticket.tags.slice(0, 3).map((tag) => (
-              <TagBadge key={tag.id} name={tag.name} color={tag.color as TagColorKey} />
-            ))}
-            {ticket.tags.length > 3 && (
-              <span className="inline-flex items-center text-[10px] text-[var(--bb-text-tertiary)]">
-                +{ticket.tags.length - 3}
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Footer: ticket code + priority icon + avatar */}
-        <div className="mt-3 flex items-center justify-between border-t border-[var(--bb-border-subtle)] pt-2.5 text-[10px] text-[var(--bb-text-tertiary)]">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-[#3B82F6]">✓</span>
-            {ticket.code && (
-              <span className="font-medium text-[var(--bb-text-secondary)]">{ticket.code}</span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <span
-              className={`text-[11px] ${priorityColorClass(ticket.priority)}`}
-              title={formatPriorityLabel(ticket.priority)}
-            >
-              {priorityIconMap[ticket.priority]}
-            </span>
-            {ticket.isAssigned && (
-              <span
-                className="flex h-6 w-6 items-center justify-center rounded-full bg-[#22C55E] text-[8px] font-bold text-white"
-                title="Assigned"
-              >
-                &#x2713;
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Updating indicator */}
-        {isUpdating && (
-          <div className="mt-2 text-[10px] text-[var(--bb-text-tertiary)]">Updating status…</div>
-        )}
-      </div>
-    );
-  };
-
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
 
   return (
     <>
-      <div className="mt-4 grid gap-6 md:grid-cols-[240px_1fr] lg:grid-cols-[260px_1fr]">
-        {/* Left sidebar — Projects + workspace info */}
-        <aside className="flex flex-col rounded-2xl bg-[var(--bb-bg-page)]/60 p-4">
-          {/* Projects header */}
-          <div className="flex items-center justify-between">
-            <p className="text-[11px] font-bold tracking-[0.18em] text-[var(--bb-text-tertiary)] uppercase">
-              Projects
-            </p>
-            <button
-              type="button"
-              onClick={openNewProjectModal}
-              className="flex h-6 w-6 items-center justify-center rounded-lg bg-[var(--bb-primary)] text-sm font-bold text-white shadow-sm transition-all hover:bg-[var(--bb-primary-hover)] hover:shadow-md active:scale-95"
-              title="Create new project"
-            >
-              +
-            </button>
-          </div>
-
-          {/* Project items list */}
-          <div className="mt-3 space-y-0.5">
-            {sidebarProjects.length === 0 && (
-              <p className="px-2 py-2 text-[11px] text-[var(--bb-text-muted)]">No projects yet.</p>
-            )}
-            {sidebarProjects.slice(0, 8).map((proj, idx) => {
-              const color = PROJECT_COLORS[idx % PROJECT_COLORS.length];
-              const isActive = projectFilter === proj.name;
-              const showMenu = canManageProjects(companyRole);
-              const menuOpen = projectMenuId === proj.id;
-              return (
-                <div key={proj.id} className="group relative">
-                  <button
-                    type="button"
-                    onClick={() => setProjectFilter(isActive ? "ALL" : proj.name)}
-                    className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[11px] transition-colors ${
-                      isActive
-                        ? "bg-[var(--bb-bg-card)] font-semibold text-[var(--bb-secondary)]"
-                        : "text-[var(--bb-text-secondary)] hover:bg-[var(--bb-bg-card)]"
-                    }`}
-                  >
-                    <span
-                      className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-[9px] font-bold text-white"
-                      style={{ backgroundColor: color }}
-                    >
-                      {proj.name.charAt(0).toUpperCase()}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate">{proj.name}</span>
-
-                    {/* Ticket count — hidden on hover when menu is available */}
-                    <span
-                      className={`flex-shrink-0 rounded-full bg-[var(--bb-border-subtle)] px-1.5 py-0.5 text-[10px] text-[var(--bb-text-tertiary)] tabular-nums ${showMenu ? "group-hover:hidden" : ""}`}
-                    >
-                      {proj.ticketCount}
-                    </span>
-
-                    {/* Menu trigger — replaces count on hover */}
-                    {showMenu && (
-                      <span
-                        role="button"
-                        tabIndex={-1}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setProjectMenuId(menuOpen ? null : proj.id);
-                        }}
-                        className={`hidden flex-shrink-0 items-center justify-center rounded-md px-1 py-0.5 text-[13px] leading-none font-bold tracking-wider text-[var(--bb-text-tertiary)] transition-colors group-hover:flex hover:bg-[var(--bb-border)] hover:text-[var(--bb-secondary)] ${menuOpen ? "!flex bg-[var(--bb-border)] text-[var(--bb-secondary)]" : ""}`}
-                      >
-                        &#8943;
-                      </span>
-                    )}
-                  </button>
-
-                  {/* Dropdown menu */}
-                  {menuOpen && (
-                    <div
-                      ref={projectMenuRef}
-                      className="absolute top-0 left-full z-50 ml-1 min-w-[140px] rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] py-1.5 shadow-xl"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => openRenameProject(proj)}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-medium text-[var(--bb-secondary)] transition-colors hover:bg-[var(--bb-bg-card)]"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 0 16 16"
-                          fill="currentColor"
-                          className="h-3 w-3 text-[var(--bb-text-tertiary)]"
-                        >
-                          <path d="M13.488 2.513a1.75 1.75 0 0 0-2.475 0L6.75 6.774a2.75 2.75 0 0 0-.596.892l-.848 2.047a.75.75 0 0 0 .98.98l2.047-.848a2.75 2.75 0 0 0 .892-.596l4.261-4.262a1.75 1.75 0 0 0 0-2.474Z" />
-                          <path d="M4.75 3.5c-.69 0-1.25.56-1.25 1.25v6.5c0 .69.56 1.25 1.25 1.25h6.5c.69 0 1.25-.56 1.25-1.25V9A.75.75 0 0 1 14 9v2.25A2.75 2.75 0 0 1 11.25 14h-6.5A2.75 2.75 0 0 1 2 11.25v-6.5A2.75 2.75 0 0 1 4.75 2H7a.75.75 0 0 1 0 1.5H4.75Z" />
-                        </svg>
-                        Rename
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openBrandGuide(proj)}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-medium text-[var(--bb-secondary)] transition-colors hover:bg-[var(--bb-bg-card)]"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 0 16 16"
-                          fill="currentColor"
-                          className="h-3 w-3 text-[var(--bb-text-tertiary)]"
-                        >
-                          <path d="M3 2a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H3Zm2 2h6v2H5V4Zm0 3h6v1H5V7Zm0 2h4v1H5V9Z" />
-                        </svg>
-                        Brand guide
-                      </button>
-                      <div className="mx-2 my-1 border-t border-[var(--bb-border-subtle)]" />
-                      <button
-                        type="button"
-                        onClick={() => openDeleteProject(proj)}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-medium text-red-600 transition-colors hover:bg-red-50"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 0 16 16"
-                          fill="currentColor"
-                          className="h-3 w-3"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M5 3.25V4H2.75a.75.75 0 0 0 0 1.5h.3l.815 8.15A1.5 1.5 0 0 0 5.357 15h5.285a1.5 1.5 0 0 0 1.493-1.35l.815-8.15h.3a.75.75 0 0 0 0-1.5H11v-.75A2.25 2.25 0 0 0 8.75 1h-1.5A2.25 2.25 0 0 0 5 3.25Zm2.25-.75a.75.75 0 0 0-.75.75V4h3v-.75a.75.75 0 0 0-.75-.75h-1.5ZM6.05 6a.75.75 0 0 1 .787.713l.275 5.5a.75.75 0 0 1-1.498.075l-.275-5.5A.75.75 0 0 1 6.05 6Zm3.9 0a.75.75 0 0 1 .712.787l-.275 5.5a.75.75 0 0 1-1.498-.075l.275-5.5a.75.75 0 0 1 .786-.711Z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                        Delete project
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* View all projects link */}
-          {sidebarProjects.length > 8 ? (
-            <button
-              type="button"
-              onClick={() => setProjectFilter("ALL")}
-              className="mt-2 text-left text-[10px] font-medium text-[var(--bb-primary)] hover:underline"
-            >
-              View all projects
-            </button>
-          ) : sidebarProjects.length > 0 ? (
-            <button
-              type="button"
-              onClick={() => setProjectFilter("ALL")}
-              className={`mt-1 text-left text-[10px] font-medium transition-colors ${
-                projectFilter === "ALL"
-                  ? "text-[var(--bb-secondary)]"
-                  : "text-[var(--bb-text-muted)] hover:text-[var(--bb-text-secondary)]"
-              }`}
-            >
-              All projects
-            </button>
-          ) : null}
-
-          {/* Divider */}
-          <div className="my-4 border-t border-[var(--bb-border)]" />
-
-          {/* All requests card */}
-          <div className="rounded-xl border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-warm)] p-3">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-semibold text-[var(--bb-secondary)]">All requests</p>
-                <p className="mt-0.5 text-[10px] text-[var(--bb-text-tertiary)]">
-                  Board for your active company.
-                </p>
-              </div>
-              {currentStats && (
-                <span className="rounded-full bg-[var(--bb-bg-page)] px-3 py-1 text-[11px] font-semibold text-[var(--bb-secondary)]">
-                  {currentStats.total}
+      <PageHeader
+        title="Creative requests board"
+        description={
+          <>
+            {companyName ? (
+              <>
+                Company <span className="font-medium text-[var(--av2-text)]">{companyName}</span>
+              </>
+            ) : null}
+            {companyName && companyRole ? " · " : null}
+            {companyRole ? (
+              <>
+                You are browsing as{" "}
+                <span className="font-medium text-[var(--av2-text)]">
+                  {ROLE_LABEL[companyRole]}
                 </span>
-              )}
-            </div>
+              </>
+            ) : null}
+            {data && (companyName || companyRole) ? " · " : null}
+            {data ? (
+              <>
+                {currentStats.total} {plural(currentStats.total, "request", "requests")}
+                {assignedCount > 0 ? `, ${assignedCount} assigned` : ""}
+              </>
+            ) : null}
+          </>
+        }
+      />
+
+      <div className="mb-6 space-y-3 empty:hidden">
+        {loadError ? (
+          <Callout tone="error" title="We couldn't load your board">
+            {loadError}
+          </Callout>
+        ) : null}
+        {companyRoleError ? (
+          <Callout tone="error" title="We couldn't load your permissions">
+            {companyRoleError}
+          </Callout>
+        ) : null}
+        {mutationError ? (
+          <Callout tone="warning" title="That didn't go through">
+            {mutationError}
+          </Callout>
+        ) : null}
+      </div>
+
+      {/* Only people who can act on a review are asked for one. */}
+      {toReview.length > 0 && canDragTicket ? (
+        <section className="mb-6 flex flex-wrap items-center gap-4 rounded-2xl border border-[var(--av2-attention-border)] bg-gradient-to-r from-[var(--av2-attention-from)] to-[var(--av2-attention-to)] px-6 py-4">
+          <IconTile tone="peach" round>
+            <IconClock />
+          </IconTile>
+          <div className="min-w-[200px] flex-1">
+            <h2 className="text-xl leading-7 font-semibold">
+              {toReview.length === 1
+                ? "Needs your review"
+                : `${toReview.length} requests need your review`}
+            </h2>
+            <p className="mt-0.5 text-base break-words">
+              {toReview[0].code ? (
+                <span className="text-[var(--av2-text-2)]">{toReview[0].code} </span>
+              ) : null}
+              {toReview[0].title}
+            </p>
           </div>
+          <Button variant="primary" onClick={() => setDetailTicketId(toReview[0].id)}>
+            Review request
+            <IconArrowUpRight />
+          </Button>
+        </section>
+      ) : null}
 
-          {/* Role display */}
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-[var(--bb-text-secondary)]">
-            <span className="font-semibold text-[var(--bb-secondary)]">Your role:</span>
-            {companyRoleLoading ? (
-              <span className="rounded-full bg-[var(--bb-bg-card)] px-2 py-0.5">Loading…</span>
-            ) : companyRole ? (
-              <span className="rounded-full bg-[var(--bb-bg-card)] px-2 py-0.5 font-semibold text-[var(--bb-secondary)]">
-                {companyRole}
-              </span>
-            ) : (
-              <span className="rounded-full bg-[var(--bb-bg-card)] px-2 py-0.5">Not set</span>
-            )}
-          </div>
-
-          <div className="mt-auto pt-4 text-[10px] text-[var(--bb-text-tertiary)]">
-            <p>Viewing creative requests for your workspace.</p>
-          </div>
-        </aside>
-
-        {/* Main board area */}
-        <main className="flex min-w-0 flex-col">
-          {/* View switcher — Kanban (this page) ↔ Table */}
-          <div className="mb-3">
-            <BoardViewToggle rolePath="/customer" />
-          </div>
-
-          {/* Header — project-aware */}
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              {projectFilter !== "ALL" ? (
-                <>
-                  <span
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-sm font-bold text-white"
-                    style={{
-                      backgroundColor:
-                        PROJECT_COLORS[
-                          projectsWithColors.findIndex((p) => p.name === projectFilter) %
-                            PROJECT_COLORS.length
-                        ] || "#3B82F6",
-                    }}
-                  >
-                    {projectFilter.charAt(0).toUpperCase()}
-                  </span>
-                  <div>
-                    <h1 className="text-xl font-semibold tracking-tight">{projectFilter}</h1>
-                    <button
-                      type="button"
-                      className="mt-0.5 text-[10px] text-[var(--bb-text-secondary)] hover:text-[var(--bb-secondary)] hover:underline"
-                    >
-                      ⚙ Project settings
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <div>
-                  <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--bb-text-muted)] uppercase">
-                    Customer board
-                  </p>
-                  <h1 className="mt-1 text-xl font-semibold tracking-tight">Creative requests</h1>
-                </div>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={openNewTicketModal}
-                className="inline-flex items-center gap-1 rounded-full bg-[var(--bb-primary)] px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition-transform hover:-translate-y-0.5 hover:bg-[var(--bb-primary-hover)]"
-              >
-                <span className="text-[13px]">+</span>
-                New ticket
-              </button>
-              {loading && (
-                <div className="rounded-full bg-[var(--bb-bg-card)] px-3 py-1 text-[11px] text-[var(--bb-text-secondary)]">
-                  Loading board…
-                </div>
-              )}
-            </div>
-          </div>
-          {/* Error / alerts */}
-          {loadError && (
-            <InlineAlert variant="error" className="mb-3">
-              {loadError}
-            </InlineAlert>
-          )}
-
-          {companyRoleError && (
-            <InlineAlert variant="error" className="mb-3">
-              {companyRoleError}
-            </InlineAlert>
-          )}
-
-          {mutationError && (
-            <InlineAlert variant="warning" className="mb-4">
-              {mutationError}
-            </InlineAlert>
-          )}
-
-          {/* Toolbar: search + avatars + share + filter */}
-          <div className="mb-3 flex items-center gap-3">
-            {/* Search */}
-            <div className="relative max-w-md flex-1">
-              <input
-                ref={searchRef}
-                type="text"
-                value={search}
-                onChange={handleSearchChange}
-                placeholder="Search board"
-                className="w-full rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-2 text-xs text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
-              />
-              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-[var(--bb-text-muted)]">
-                🔍
-              </span>
-            </div>
-
-            {/* Assignment summary */}
-            {assignedCount > 0 && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#f0fdf4] px-2.5 py-1 text-[11px] font-medium text-[#22C55E]">
-                <span className="inline-block h-2 w-2 rounded-full bg-[#22C55E]" />
-                {assignedCount} assigned
-              </span>
-            )}
-
-            {/* Share button — copies board URL to clipboard */}
-            <button
-              type="button"
-              onClick={() => {
-                navigator.clipboard.writeText(window.location.href).then(() => {
-                  showToast({ type: "success", title: "Link copied to clipboard" });
-                });
-              }}
-              className="inline-flex items-center gap-1 rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-2 text-[11px] font-medium text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-secondary)] hover:text-[var(--bb-secondary)]"
+      {/* Toolbar */}
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
+          <div className="min-w-0 flex-1 sm:w-52 sm:flex-none">
+            <Select
+              aria-label="Filter by project"
+              value={projectFilter}
+              onChange={(event) => setProjectFilter(event.target.value)}
             >
-              ↗ Share
-            </button>
-
-            {/* Filter button */}
-            <button
-              type="button"
-              onClick={() => setFilterOpen(!filterOpen)}
-              className={`inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-[11px] font-medium transition-colors ${
-                filterOpen
-                  ? "border-[var(--bb-primary)] bg-[var(--bb-primary-light)] text-[var(--bb-primary)]"
-                  : "border-[var(--bb-border)] bg-[var(--bb-bg-page)] text-[var(--bb-text-secondary)] hover:border-[var(--bb-secondary)] hover:text-[var(--bb-secondary)]"
-              }`}
-            >
-              ≡ Filter
-            </button>
+              <option value="ALL">All projects</option>
+              {projectOptions.map((project) => (
+                <option key={project.name} value={project.name}>
+                  {project.name}
+                  {project.count != null ? ` (${project.count})` : ""}
+                </option>
+              ))}
+            </Select>
           </div>
+          {canManageProjects(companyRole) ? (
+            <ProjectMenu
+              project={selectedProject}
+              onCreate={openNewProjectModal}
+              onRename={openRenameProject}
+              onBrandGuide={openBrandGuide}
+              onDelete={openDeleteProject}
+            />
+          ) : null}
+        </div>
 
-          {/* Collapsible filter dropdown */}
-          {filterOpen && (
-            <div className="mb-3 flex items-center gap-2 rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-2 text-[11px] text-[var(--bb-text-secondary)]">
-              <span className="font-medium">Project:</span>
-              <select
-                className="rounded-md border border-[var(--bb-border)] bg-[var(--bb-bg-warm)] px-2 py-1 text-[11px] outline-none"
-                value={projectFilter}
-                onChange={handleProjectFilterChange}
-              >
-                <option value="ALL">All projects</option>
-                {projects.map((projectName) => (
-                  <option key={projectName} value={projectName}>
-                    {projectName}
-                  </option>
-                ))}
-              </select>
-              {projectFilter !== "ALL" && (
-                <button
-                  type="button"
-                  onClick={() => setProjectFilter("ALL")}
-                  className="ml-1 text-[10px] text-[var(--bb-primary)] hover:underline"
+        <div ref={searchRef} className="w-full sm:w-auto sm:min-w-[200px] sm:flex-1">
+          <SearchInput
+            label="Search requests"
+            placeholder="Search requests"
+            value={search}
+            onChange={setSearch}
+          />
+        </div>
+
+        <div className="min-w-0 flex-1 sm:w-40 sm:flex-none">
+          <Select
+            aria-label="Filter by priority"
+            value={priorityFilter}
+            onChange={(event) => setPriorityFilter(event.target.value)}
+          >
+            <option value="ALL">All priorities</option>
+            {PRIORITY_ORDER.map((priority) => (
+              <option key={priority} value={priority}>
+                {PRIORITY[priority]?.label ?? priority}
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        <Button aria-expanded={filterOpen} onClick={() => setFilterOpen((open) => !open)}>
+          <IconFilter />
+          <span>Filter</span>
+          {panelFilterCount > 0 ? ` (${panelFilterCount})` : ""}
+        </Button>
+
+        <Button
+          onClick={() => {
+            navigator.clipboard.writeText(window.location.href).then(() => {
+              showToast({ type: "success", title: "Link copied to clipboard" });
+            });
+          }}
+        >
+          <IconShare />
+          Share
+        </Button>
+
+        <nav
+          aria-label="Board view"
+          className="flex h-10 items-center rounded-lg border border-[var(--av2-border)] bg-[var(--av2-surface)]"
+        >
+          <span
+            aria-current="page"
+            className="flex h-full items-center gap-2 rounded-l-lg bg-[var(--av2-selected)] px-3 text-sm font-semibold text-[var(--av2-link)]"
+          >
+            <IconKanban />
+            Kanban
+          </span>
+          <Link
+            href="/customer/tickets"
+            className="flex h-full items-center gap-2 rounded-r-lg px-3 text-sm font-medium hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
+          >
+            <IconList />
+            List
+          </Link>
+        </nav>
+
+        {canCreateTickets(companyRole) ? (
+          <Button variant="primary" className="ml-auto max-sm:w-full" onClick={openNewTicketModal}>
+            <IconPlus />
+            <span>New request</span>
+          </Button>
+        ) : null}
+      </div>
+
+      {filterOpen ? (
+        <div className="mb-3 flex flex-wrap items-end gap-3 rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-4">
+          {tagOptions.length > 0 ? (
+            <div className="w-full sm:w-52">
+              <Field label="Tag" htmlFor="customer-board-tag-filter">
+                <Select
+                  id="customer-board-tag-filter"
+                  value={tagFilter}
+                  onChange={(event) => setTagFilter(event.target.value)}
                 >
-                  Clear
-                </button>
-              )}
+                  <option value="ALL">All tags</option>
+                  {tagOptions.map((tag) => (
+                    <option key={tag.id} value={tag.id}>
+                      {tag.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
             </div>
-          )}
+          ) : null}
+          <div className="w-full sm:w-52">
+            <Field label="Assignment" htmlFor="customer-board-assignment-filter">
+              <Select
+                id="customer-board-assignment-filter"
+                value={assignmentFilter}
+                onChange={(event) => setAssignmentFilter(event.target.value as AssignmentFilter)}
+              >
+                <option value="ALL">Any assignment</option>
+                <option value="ASSIGNED">Assigned</option>
+                <option value="UNASSIGNED">Unassigned</option>
+              </Select>
+            </Field>
+          </div>
+        </div>
+      ) : null}
 
-          {/* Columns */}
-          {loading ? (
-            <div className="py-6 text-center text-sm text-[var(--bb-text-secondary)]">
-              Loading your board…
-            </div>
-          ) : (
-            <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 md:snap-none">
+      {hasActiveFilters ? (
+        <div className="mb-3 flex flex-wrap items-center gap-3 text-sm text-[var(--av2-text-2)]">
+          <p role="status">
+            Showing {filteredTickets.length} of {tickets.length}{" "}
+            {plural(tickets.length, "request", "requests")}
+          </p>
+          <Button variant="ghost" onClick={clearFilters}>
+            Clear filters
+          </Button>
+        </div>
+      ) : null}
+
+      <div className="mt-6">
+        {/* Columns */}
+        {loading ? (
+          <div
+            aria-busy="true"
+            aria-label="Loading your board"
+            className="grid auto-cols-[82%] grid-flow-col gap-3 overflow-hidden sm:auto-cols-[minmax(236px,1fr)]"
+          >
+            {STATUS_ORDER.map((status) => (
+              <Skeleton key={status} className="h-96 !rounded-2xl" />
+            ))}
+          </div>
+        ) : tickets.length === 0 && !loadError ? (
+          <Card padding="none">
+            <EmptyState
+              icon={<IconKanban width={28} height={28} />}
+              title="No requests yet"
+              description="New requests start in Backlog and move across the board as your creative works on them."
+              action={
+                canCreateTickets(companyRole) ? (
+                  <Button variant="primary" onClick={openNewTicketModal}>
+                    <IconPlus />
+                    New request
+                  </Button>
+                ) : undefined
+              }
+            />
+          </Card>
+        ) : (
+          <div className="overflow-x-auto pb-2">
+            <div className="grid snap-x snap-mandatory auto-cols-[82%] grid-flow-col gap-3 sm:auto-cols-[minmax(236px,1fr)] md:snap-none">
               {STATUS_ORDER.map((status) => {
                 const columnTickets = ticketsByStatus[status] ?? [];
-                const columnTitle = STATUS_LABELS[status];
                 const isDropTargetActive = dragOverStatus === status;
+                const label = TICKET_STATUS[status]?.label ?? status;
 
                 return (
-                  <div
+                  <section
                     key={status}
                     id={`customer-board-column-${status}`}
-                    className={`flex w-80 shrink-0 snap-start flex-col overflow-hidden rounded-xl transition-all duration-200 ${
+                    aria-label={label}
+                    className={`flex min-h-[480px] snap-start flex-col rounded-2xl border p-3 transition-colors ${
                       isDropTargetActive
-                        ? "bg-[var(--bb-primary-light)] ring-2 ring-[var(--bb-primary)]/60"
-                        : "bg-[var(--bb-bg-page)]/60 ring-0"
+                        ? "border-[var(--av2-accent)] bg-[var(--av2-selected)]"
+                        : "border-[var(--av2-border)] bg-[var(--av2-surface)]"
                     }`}
                     onDragOver={(event) => handleDragOver(event, status)}
                     onDrop={(event) => handleDrop(event, status)}
                   >
-                    {/* Colored accent bar */}
-                    <div
-                      className="h-1 w-full"
-                      style={{ backgroundColor: columnAccentColor[status] }}
-                    />
-
-                    {/* Column header */}
-                    <div className="flex items-center justify-between px-3 pt-2.5 pb-1">
-                      <span className="text-[11px] font-bold tracking-[0.15em] text-[var(--bb-text-secondary)] uppercase">
-                        {columnTitle}
-                      </span>
-                      <span className="rounded-full bg-[var(--bb-bg-card)] px-2 py-0.5 text-[10px] font-semibold text-[var(--bb-text-secondary)]">
+                    <div className="flex items-center gap-2 px-1 pt-1 pb-3">
+                      <span
+                        aria-hidden
+                        className="h-3 w-3 shrink-0 rounded-full"
+                        style={{ background: STATUS_FILL[status] }}
+                      />
+                      <h2 className="min-w-0 flex-1 truncate text-base font-semibold">{label}</h2>
+                      <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-[var(--av2-track)] px-2 text-xs font-medium tabular-nums">
                         {columnTickets.length}
                       </span>
                     </div>
 
-                    {/* Column body */}
-                    <div className="flex-1 space-y-2 p-2">
+                    <div className="flex-1 space-y-3">
                       {columnTickets.length === 0 && !isDropTargetActive ? (
-                        <EmptyState
-                          title={
-                            status === "DONE"
-                              ? "Completed tickets will appear here."
-                              : "No tickets here yet."
-                          }
-                        />
+                        <p className="px-1 py-6 text-center text-sm text-[var(--av2-text-2)]">
+                          {hasActiveFilters
+                            ? "No matching requests."
+                            : status === "DONE"
+                              ? "Completed requests will appear here."
+                              : "No requests here yet."}
+                        </p>
                       ) : (
-                        columnTickets.map((ticket) => renderTicketCard(ticket))
+                        columnTickets.map((ticket) => (
+                          <TicketCard
+                            key={ticket.id}
+                            ticket={ticket}
+                            thumbnailSrc={
+                              ticket.thumbnailUrl ??
+                              (ticket.thumbnailAssetId
+                                ? thumbnailUrls[ticket.thumbnailAssetId]
+                                : null) ??
+                              null
+                            }
+                            draggable={canDragTicket && ticket.status === "IN_REVIEW"}
+                            dragging={draggingTicketId === ticket.id}
+                            updating={updatingTicketId === ticket.id}
+                            onOpen={() => setDetailTicketId(ticket.id)}
+                            onDragStart={(event) =>
+                              handleDragStart(event, ticket.id, ticket.status)
+                            }
+                            onDragEnd={handleDragEnd}
+                            onMouseDown={(event) => handleMouseDown(event, ticket.id)}
+                            onMouseUp={(event) => handleMouseUp(event, ticket.id)}
+                          />
+                        ))
                       )}
-                      {/* Drop placeholder */}
-                      {isDropTargetActive && (
-                        <div className="animate-pulse rounded-xl border-2 border-dashed border-[var(--bb-primary)]/40 bg-[var(--bb-primary)]/5 px-3 py-4 text-center text-[11px] font-medium text-[var(--bb-primary)]/60">
+                      {isDropTargetActive ? (
+                        <div className="rounded-xl border-2 border-dashed border-[var(--av2-accent)]/50 px-3 py-4 text-center text-sm font-medium text-[var(--av2-link)]">
                           Drop here
                         </div>
-                      )}
+                      ) : null}
                     </div>
-
-                    {/* "+ Create" button at bottom of TO DO column */}
-                    {status === "TODO" && (
-                      <button
-                        type="button"
-                        onClick={openNewTicketModal}
-                        className="mx-2 mb-2 flex items-center justify-center gap-1 rounded-lg border border-dashed border-[var(--bb-border-input)] py-2 text-xs font-semibold text-[var(--bb-text-tertiary)] transition-colors hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
-                      >
-                        <span className="text-sm">+</span>
-                        Create
-                      </button>
-                    )}
-                  </div>
+                  </section>
                 );
               })}
             </div>
-          )}
-        </main>
+          </div>
+        )}
       </div>
 
-      {/* New ticket modal */}
-      <Modal open={newTicketModalOpen} onClose={closeNewTicketModal} size="2xl" scrollable>
-        <ModalHeader
-          eyebrow="New request"
-          title="Create a new creative request"
-          subtitle="This will be added to your board in the To do column."
-          onClose={closeNewTicketModal}
-        />
-
-        {newTicketMetaError && (
-          <InlineAlert variant="error" size="sm" className="mb-3">
-            {newTicketMetaError}
-          </InlineAlert>
-        )}
+      {/* New ticket dialog. The form inside brings its own fields and actions. */}
+      <BoardDialog
+        open={newTicketModalOpen}
+        onClose={closeNewTicketModal}
+        width="lg"
+        icon={
+          <IconTile tone="peach" size={48}>
+            <IconDocument />
+          </IconTile>
+        }
+        title="Create a new creative request"
+        subtitle="Added to Backlog when submitted."
+        headerActions={
+          <ButtonLink href="/customer/tickets/new" className="max-sm:!w-10 max-sm:!px-0">
+            <IconExternal />
+            <span className="max-sm:sr-only">Open full page</span>
+          </ButtonLink>
+        }
+      >
+        {newTicketMetaError ? (
+          <div className="mb-3">
+            <Callout tone="error" title="We couldn't open the form">
+              {newTicketMetaError}
+            </Callout>
+          </div>
+        ) : null}
 
         {newTicketMetaLoading || !newTicketMeta ? (
-          <p className="text-[11px] text-[var(--bb-text-secondary)]">Loading form…</p>
+          newTicketMetaError ? null : (
+            <div aria-busy="true" aria-label="Loading form" className="space-y-3">
+              <Skeleton className="h-10" />
+              <Skeleton className="h-40" />
+              <Skeleton className="h-10" />
+            </div>
+          )
         ) : (
           <NewTicketForm
             companySlug={newTicketMeta.companySlug}
@@ -2302,1316 +2037,451 @@ export default function CustomerBoardPage() {
               showToast({
                 type: "success",
                 title: "New request created",
-                description: "Your request was added to the To do column.",
+                description: "Your request was added to Backlog.",
               });
               void load();
             }}
           />
         )}
-      </Modal>
+      </BoardDialog>
 
-      {/* New project modal */}
-      <Modal open={newProjectModalOpen} onClose={closeNewProjectModal} size="sm">
-        <ModalHeader
-          eyebrow="New project"
-          title="Create a project"
-          subtitle="Group related creative requests under one project."
-          onClose={closeNewProjectModal}
-        />
-
-        <div className="space-y-4 px-5 pb-2">
-          {newProjectError && (
-            <InlineAlert variant="error" size="sm">
-              {newProjectError}
-            </InlineAlert>
-          )}
-
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-[var(--bb-secondary)]">Project name</label>
-            <FormInput
+      {/* New project */}
+      <BoardDialog
+        open={newProjectModalOpen}
+        onClose={closeNewProjectModal}
+        eyebrow="New project"
+        title="Create a project"
+        subtitle="Group related creative requests under one project."
+        footer={
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <Button onClick={closeNewProjectModal} disabled={newProjectSaving}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleCreateProject}
+              disabled={newProjectSaving || newProjectName.trim().length < 2}
+            >
+              {newProjectSaving ? "Creating…" : "Create project"}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          {newProjectError ? <Callout tone="error" title={newProjectError} /> : null}
+          <Field
+            label="Project name"
+            htmlFor="customer-board-new-project"
+            hint="A short code will be generated automatically from the name."
+          >
+            <TextInput
+              id="customer-board-new-project"
               type="text"
               value={newProjectName}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                setNewProjectName(e.target.value)
-              }
+              onChange={(event) => setNewProjectName(event.target.value)}
               placeholder="e.g. Q1 Campaign, Website Redesign"
               disabled={newProjectSaving}
               autoFocus
-              onKeyDown={(e: React.KeyboardEvent) => {
-                if (e.key === "Enter" && !newProjectSaving) {
-                  e.preventDefault();
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !newProjectSaving) {
+                  event.preventDefault();
                   handleCreateProject();
                 }
               }}
             />
-            <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-              A short code will be generated automatically from the name.
-            </p>
-          </div>
+          </Field>
         </div>
+      </BoardDialog>
 
-        <ModalFooter>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={closeNewProjectModal}
-            disabled={newProjectSaving}
-          >
-            Cancel
-          </Button>
-          <Button
-            size="sm"
-            onClick={handleCreateProject}
-            loading={newProjectSaving}
-            loadingText="Creating..."
-            disabled={!newProjectName.trim() || newProjectName.trim().length < 2}
-          >
-            Create project
-          </Button>
-        </ModalFooter>
-      </Modal>
-
-      {/* Rename project modal */}
-      <Modal open={!!renameProject} onClose={closeRenameProject} size="sm">
-        <ModalHeader
-          eyebrow="Rename project"
-          title={renameProject?.name ?? ""}
-          subtitle="Change the display name of this project."
-          onClose={closeRenameProject}
-        />
-
-        <div className="space-y-4 px-5 pb-2">
-          {renameProjectError && (
-            <InlineAlert variant="error" size="sm">
-              {renameProjectError}
-            </InlineAlert>
-          )}
-
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-[var(--bb-secondary)]">New name</label>
-            <FormInput
+      {/* Rename project */}
+      <BoardDialog
+        open={!!renameProject}
+        onClose={closeRenameProject}
+        eyebrow="Rename project"
+        title={renameProject?.name ?? ""}
+        subtitle="Change the display name of this project."
+        footer={
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <Button onClick={closeRenameProject} disabled={renameProjectSaving}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleRenameProject}
+              disabled={renameProjectSaving || renameProjectName.trim().length < 2}
+            >
+              {renameProjectSaving ? "Saving…" : "Save"}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          {renameProjectError ? <Callout tone="error" title={renameProjectError} /> : null}
+          <Field label="New name" htmlFor="customer-board-rename-project">
+            <TextInput
+              id="customer-board-rename-project"
               type="text"
               value={renameProjectName}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                setRenameProjectName(e.target.value)
-              }
+              onChange={(event) => setRenameProjectName(event.target.value)}
               placeholder="Project name"
               disabled={renameProjectSaving}
               autoFocus
-              onKeyDown={(e: React.KeyboardEvent) => {
-                if (e.key === "Enter" && !renameProjectSaving) {
-                  e.preventDefault();
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !renameProjectSaving) {
+                  event.preventDefault();
                   handleRenameProject();
                 }
               }}
             />
-          </div>
+          </Field>
         </div>
+      </BoardDialog>
 
-        <ModalFooter>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={closeRenameProject}
-            disabled={renameProjectSaving}
-          >
-            Cancel
-          </Button>
-          <Button
-            size="sm"
-            onClick={handleRenameProject}
-            loading={renameProjectSaving}
-            loadingText="Saving..."
-            disabled={!renameProjectName.trim() || renameProjectName.trim().length < 2}
-          >
-            Save
-          </Button>
-        </ModalFooter>
-      </Modal>
-
-      {/* Project brand guide modal (D19) */}
-      <Modal open={!!brandGuideProject} onClose={closeBrandGuide} size="md">
-        <ModalHeader
-          eyebrow="Brand guide"
-          title={brandGuideProject?.name ?? ""}
-          subtitle="Fill these once per project. They show up on every ticket for creatives and feed AI prompts automatically."
-          onClose={closeBrandGuide}
-        />
-
-        <div className="space-y-4 px-5 pb-2">
-          {brandGuideError && (
-            <InlineAlert variant="error" size="sm">
-              {brandGuideError}
-            </InlineAlert>
-          )}
-          {brandGuideLoading && (
-            <p className="text-[11px] text-[var(--bb-text-muted)]">Loading current values…</p>
-          )}
-
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-[var(--bb-secondary)]">Logo URL</label>
-            <FormInput
+      {/* Project brand guide (D19) */}
+      <BoardDialog
+        open={!!brandGuideProject}
+        onClose={closeBrandGuide}
+        width="md"
+        eyebrow="Brand guide"
+        title={brandGuideProject?.name ?? ""}
+        subtitle="Fill these once per project. They show up on every ticket for creatives and feed AI prompts automatically."
+        footer={
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <Button onClick={closeBrandGuide} disabled={brandGuideSaving}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleSaveBrandGuide} disabled={brandGuideSaving}>
+              {brandGuideSaving ? "Saving…" : "Save brand guide"}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          {brandGuideError ? <Callout tone="error" title={brandGuideError} /> : null}
+          {brandGuideLoading ? (
+            <p role="status" className="text-sm text-[var(--av2-text-2)]">
+              Loading current values…
+            </p>
+          ) : null}
+          <Field label="Logo URL" htmlFor="customer-board-brand-logo">
+            <TextInput
+              id="customer-board-brand-logo"
               type="url"
               value={brandGuideDraft.brandLogoUrl}
-              onChange={(e) =>
-                setBrandGuideDraft((prev) => ({ ...prev, brandLogoUrl: e.target.value }))
-              }
+              onChange={(event) => {
+                const brandLogoUrl = event.target.value;
+                setBrandGuideDraft((prev) => ({ ...prev, brandLogoUrl }));
+              }}
               placeholder="https://… (public image link)"
               disabled={brandGuideSaving}
             />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-[var(--bb-secondary)]">Brand colors</label>
-            <FormInput
+          </Field>
+          <Field
+            label="Brand colors"
+            htmlFor="customer-board-brand-colors"
+            hint="Comma-separated hex values."
+          >
+            <TextInput
+              id="customer-board-brand-colors"
               type="text"
               value={brandGuideDraft.brandColors}
-              onChange={(e) =>
-                setBrandGuideDraft((prev) => ({ ...prev, brandColors: e.target.value }))
-              }
+              onChange={(event) => {
+                const brandColors = event.target.value;
+                setBrandGuideDraft((prev) => ({ ...prev, brandColors }));
+              }}
               placeholder="#ff6600, #1e293b, #ffffff"
               disabled={brandGuideSaving}
             />
-            <p className="text-[11px] text-[var(--bb-text-muted)]">Comma-separated hex values.</p>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-[var(--bb-secondary)]">Fonts</label>
-            <FormInput
+          </Field>
+          <Field label="Fonts" htmlFor="customer-board-brand-fonts">
+            <TextInput
+              id="customer-board-brand-fonts"
               type="text"
               value={brandGuideDraft.brandFonts}
-              onChange={(e) =>
-                setBrandGuideDraft((prev) => ({ ...prev, brandFonts: e.target.value }))
-              }
+              onChange={(event) => {
+                const brandFonts = event.target.value;
+                setBrandGuideDraft((prev) => ({ ...prev, brandFonts }));
+              }}
               placeholder="Inter, Source Serif 4"
               disabled={brandGuideSaving}
             />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-[var(--bb-secondary)]">
-              Voice / tone notes
-            </label>
-            <textarea
+          </Field>
+          <Field label="Voice / tone notes" htmlFor="customer-board-brand-voice">
+            <TextArea
+              id="customer-board-brand-voice"
               value={brandGuideDraft.brandVoice}
-              onChange={(e) =>
-                setBrandGuideDraft((prev) => ({ ...prev, brandVoice: e.target.value }))
-              }
+              onChange={(event) => {
+                const brandVoice = event.target.value;
+                setBrandGuideDraft((prev) => ({ ...prev, brandVoice }));
+              }}
               placeholder="e.g. Warm, confident, lightly playful. We say ‘folks’ not ‘customers’. Avoid corporate jargon."
               rows={4}
               maxLength={2000}
               disabled={brandGuideSaving}
-              className="w-full rounded-md border border-[var(--bb-border-input)] bg-white px-3 py-2 text-sm text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
             />
-          </div>
+          </Field>
         </div>
+      </BoardDialog>
 
-        <ModalFooter>
-          <Button variant="ghost" size="sm" onClick={closeBrandGuide} disabled={brandGuideSaving}>
-            Cancel
-          </Button>
-          <Button
-            size="sm"
-            onClick={handleSaveBrandGuide}
-            loading={brandGuideSaving}
-            loadingText="Saving..."
-          >
-            Save brand guide
-          </Button>
-        </ModalFooter>
-      </Modal>
-
-      {/* Cancel-ticket confirmation. OWNER/PM only — server enforces
-          the same gate. Confirming POSTs to /cancel which flips status
-          to CANCELED and writes a REFUND ledger entry atomically. */}
-      <ConfirmDialog
+      {/* Cancel-ticket confirmation. OWNER/PM only — server enforces the same
+          gate. Confirming POSTs to /cancel which flips status to CANCELED and
+          writes a REFUND ledger entry atomically. Stacks on the detail dialog. */}
+      <BoardDialog
         open={cancelTicketId !== null}
+        elevated
         onClose={() => {
           if (!cancellingTicket) setCancelTicketId(null);
         }}
-        onConfirm={async () => {
-          if (!cancelTicketId) return;
-          await handleCancelTicket(cancelTicketId);
-          setCancelTicketId(null);
-        }}
-        title="Cancel this ticket?"
-        description="The ticket will be removed from your board and the full token cost will be refunded to your company. Brief uploads stay on file. This can't be undone."
-        confirmLabel="Cancel & refund"
-        loading={cancellingTicket}
-      />
+        title="Cancel this request?"
+        footer={
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <Button onClick={() => setCancelTicketId(null)} disabled={cancellingTicket}>
+              Keep request
+            </Button>
+            <Button
+              variant="danger"
+              disabled={cancellingTicket}
+              onClick={async () => {
+                if (!cancelTicketId) return;
+                await handleCancelTicket(cancelTicketId);
+                setCancelTicketId(null);
+              }}
+            >
+              {cancellingTicket ? "Cancelling…" : "Cancel & refund"}
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm leading-6 text-[var(--av2-text-2)]">
+          The request will be removed from your board and the full token cost will be refunded to
+          your company. Brief uploads stay on file. This can&apos;t be undone.
+        </p>
+      </BoardDialog>
 
-      {/* Delete project confirmation modal */}
-      <Modal open={!!deleteProject} onClose={closeDeleteProject} size="sm">
-        <ModalHeader
-          eyebrow="Delete project"
-          title={deleteProject?.name ?? ""}
-          onClose={closeDeleteProject}
-        />
-
-        <div className="space-y-3 px-5 pb-2">
-          {deleteProjectError && (
-            <InlineAlert variant="error" size="sm">
-              {deleteProjectError}
-            </InlineAlert>
-          )}
-
-          <p className="text-sm text-[var(--bb-secondary)]">
-            Are you sure you want to delete this project?
-          </p>
-
-          {deleteProject && deleteProject.ticketCount > 0 && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
-              <strong>
-                {deleteProject.ticketCount} ticket{deleteProject.ticketCount !== 1 ? "s" : ""}
-              </strong>{" "}
-              will be moved to &ldquo;No project&rdquo;. No tickets will be deleted.
-            </div>
-          )}
-
-          {deleteProject && deleteProject.ticketCount === 0 && (
-            <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-              This project has no tickets.
-            </p>
-          )}
+      {/* Delete project confirmation */}
+      <BoardDialog
+        open={!!deleteProject}
+        onClose={closeDeleteProject}
+        eyebrow="Delete project"
+        title={deleteProject?.name ?? ""}
+        footer={
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <Button onClick={closeDeleteProject} disabled={deleteProjectSaving}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={handleDeleteProject} disabled={deleteProjectSaving}>
+              {deleteProjectSaving ? "Deleting…" : "Delete project"}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          {deleteProjectError ? <Callout tone="error" title={deleteProjectError} /> : null}
+          <p className="text-sm">Are you sure you want to delete this project?</p>
+          {deleteProject && deleteProject.ticketCount > 0 ? (
+            <Callout tone="warning">
+              {deleteProject.ticketCount} {plural(deleteProject.ticketCount, "request", "requests")}{" "}
+              will be moved to &ldquo;No project&rdquo;. No requests will be deleted.
+            </Callout>
+          ) : null}
+          {deleteProject && deleteProject.ticketCount === 0 ? (
+            <p className="text-sm text-[var(--av2-text-2)]">This project has no requests.</p>
+          ) : null}
         </div>
+      </BoardDialog>
 
-        <ModalFooter>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={closeDeleteProject}
-            disabled={deleteProjectSaving}
-          >
-            Cancel
-          </Button>
-          <Button
-            size="sm"
-            onClick={handleDeleteProject}
-            loading={deleteProjectSaving}
-            loadingText="Deleting..."
-            className="bg-red-600 hover:bg-red-700"
-          >
-            Delete project
-          </Button>
-        </ModalFooter>
-      </Modal>
-
-      {/* Ticket detail modal — Jira-style two-column layout */}
-      <Modal open={!!detailTicket} onClose={closeTicketDetails} size="full">
-        <ModalHeader
-          eyebrow="Ticket"
-          title={detailTicket?.title ?? ""}
-          subtitle={detailTicket?.code ?? undefined}
+      {/* Card detail */}
+      {detailTicket ? (
+        <TicketDetailDialog
+          key={detailTicket.id}
+          ticket={detailTicket}
+          revisions={detailRevisions}
+          revisionsLoading={detailRevisionsLoading}
+          revisionsError={detailRevisionsError}
+          briefAssets={detailBriefAssets}
+          briefAssetsLoading={detailBriefAssetsLoading}
+          uploadingBriefs={uploadingBriefs}
+          uploadProgress={uploadBriefsProgress}
+          canEdit={canEditDetail}
+          canCancel={canCancelDetail}
+          canRequestRevision={canEditTickets(companyRole)}
+          canApprove={canMarkTicketsDoneForCompany("CUSTOMER", companyRole)}
+          canManageTags={canManageTags(companyRole)}
+          metadata={newTicketMeta}
+          isEditing={isEditingDetail}
+          editForm={editForm}
+          setEditForm={setEditForm}
+          editSaving={editSaving}
+          editError={editError}
           onClose={closeTicketDetails}
+          onStartEdit={startEditingDetail}
+          onCancelEdit={cancelEditingDetail}
+          onSaveEdit={saveDetailEdits}
+          onCancelTicket={() => setCancelTicketId(detailTicket.id)}
+          onRequestRevision={() => {
+            closeTicketDetails();
+            setPendingRevisionTicketId(detailTicket.id);
+          }}
+          onApprove={() => {
+            closeTicketDetails();
+            setPendingDoneTicketId(detailTicket.id);
+          }}
+          onUploadBrief={(files) => void handleUploadBriefFromBoard(files)}
+          onDeleteBrief={handleDeleteBriefAsset}
+          onCreateTag={handleCreateTag}
+          onPinRevisionSubmitted={() => {
+            closeTicketDetails();
+            showToast({
+              type: "success",
+              title: "Changes requested",
+              description: "Your pin annotations have been sent to your creative.",
+            });
+            void load();
+          }}
         />
+      ) : null}
 
-        {detailTicket && (
-          <>
-            {/* Edit + Cancel buttons — only for TODO tickets with
-                appropriate permission. Edit is shown for OWNER/PM/MEMBER
-                (canEditTickets); Cancel is OWNER/PM only (refund gravity). */}
-            {!isEditingDetail && (canEditDetail || canCancelDetail) && (
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                {canEditDetail && (
-                  <button
-                    type="button"
-                    onClick={startEditingDetail}
-                    className="flex items-center gap-1.5 rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-1.5 text-[11px] font-medium text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                      className="h-3.5 w-3.5"
-                    >
-                      <path d="m5.433 13.917 1.262-3.155A4 4 0 0 1 7.58 9.42l6.92-6.918a2.121 2.121 0 0 1 3 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 0 1-.65-.65Z" />
-                      <path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0 0 10 3H4.75A2.75 2.75 0 0 0 2 5.75v9.5A2.75 2.75 0 0 0 4.75 18h9.5A2.75 2.75 0 0 0 17 15.25V10a.75.75 0 0 0-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5Z" />
-                    </svg>
-                    Edit ticket
-                  </button>
-                )}
-                {canCancelDetail && detailTicket && (
-                  <button
-                    type="button"
-                    onClick={() => setCancelTicketId(detailTicket.id)}
-                    className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-[var(--bb-bg-page)] px-3 py-1.5 text-[11px] font-medium text-red-600 transition-colors hover:border-red-400 hover:bg-red-50"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                      className="h-3.5 w-3.5"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    Cancel & refund
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* Status / priority pills */}
-            <div className="mb-4 flex shrink-0 flex-wrap items-center gap-2">
-              <Badge variant={statusBadgeVariant(detailTicket.status)} className="gap-1.5">
-                <span
-                  className={`inline-block h-1.5 w-1.5 rounded-full ${statusIndicatorColor(
-                    detailTicket.status,
-                  )}`}
-                />
-                {STATUS_LABELS[detailTicket.status]}
-              </Badge>
-              <Badge variant={priorityBadgeVariant(detailTicket.priority)}>
-                <span className={priorityColorClass(detailTicket.priority)}>
-                  {priorityIconMap[detailTicket.priority]}
-                </span>{" "}
-                {formatPriorityLabel(detailTicket.priority)}
-              </Badge>
-            </div>
-
-            {/* Two-column Jira layout */}
-            <div className="grid min-h-0 flex-1 gap-6 overflow-y-auto md:grid-cols-[1fr_260px] md:overflow-visible">
-              {/* Left column — main content (scrollable on desktop) */}
-              <div className="min-w-0 md:overflow-y-auto md:pr-2">
-                {/* Description — edit mode or read mode */}
-                {isEditingDetail ? (
-                  <div className="mb-5 space-y-4">
-                    {editError && (
-                      <InlineAlert variant="error" size="sm">
-                        {editError}
-                      </InlineAlert>
-                    )}
-
-                    {/* Title edit */}
-                    <div className="space-y-1">
-                      <p className="text-[11px] font-semibold tracking-[0.16em] text-[var(--bb-text-muted)] uppercase">
-                        Title
-                      </p>
-                      <FormInput
-                        value={editForm.title}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                          setEditForm((f) => ({ ...f, title: e.target.value }))
-                        }
-                        disabled={editSaving}
-                      />
-                    </div>
-
-                    {/* Description edit */}
-                    <div className="space-y-1">
-                      <p className="text-[11px] font-semibold tracking-[0.16em] text-[var(--bb-text-muted)] uppercase">
-                        Description
-                      </p>
-                      <RichTextEditor
-                        value={editForm.description}
-                        onChange={(html) => setEditForm((f) => ({ ...f, description: html }))}
-                        disabled={editSaving}
-                        minHeight="60px"
-                      />
-                    </div>
-
-                    {/* Save/Cancel */}
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        onClick={saveDetailEdits}
-                        loading={editSaving}
-                        loadingText="Saving…"
-                      >
-                        Save changes
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={cancelEditingDetail}
-                        disabled={editSaving}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  detailTicket.description && (
-                    <div className="mb-5">
-                      <p className="mb-1.5 text-[11px] font-semibold tracking-[0.16em] text-[var(--bb-text-muted)] uppercase">
-                        Description
-                      </p>
-                      <SafeHtml
-                        html={detailTicket.description}
-                        className="rounded-xl bg-[var(--bb-bg-warm)] px-4 py-3 text-xs leading-relaxed text-[var(--bb-secondary)]"
-                      />
-                    </div>
-                  )
-                )}
-
-                {/* Brief attachments */}
-                {detailBriefAssetsLoading && (
-                  <div className="mb-5">
-                    <p className="mb-1.5 text-[11px] font-semibold tracking-[0.16em] text-[var(--bb-text-muted)] uppercase">
-                      Brief attachments
-                    </p>
-                    <div className="flex items-center gap-2 py-3">
-                      <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--bb-border)] border-t-[var(--bb-text-tertiary)]" />
-                      <p className="text-xs text-[var(--bb-text-tertiary)]">Loading attachments…</p>
-                    </div>
-                  </div>
-                )}
-
-                {!detailBriefAssetsLoading &&
-                  (() => {
-                    const hasAssets = detailBriefAssets.length > 0;
-                    const hasCreativeWork =
-                      detailRevisions &&
-                      detailRevisions.length > 0 &&
-                      detailRevisions.some((r) => r.assets && r.assets.length > 0);
-                    const canAddImages = detailTicket?.status === "TODO";
-
-                    // Show the section when there are attachments OR the user can add images
-                    if (!hasAssets && !canAddImages) return null;
-
-                    return (
-                      <div className="mb-5">
-                        <div className="mb-1.5 flex items-center justify-between">
-                          <p className="text-[11px] font-semibold tracking-[0.16em] text-[var(--bb-text-muted)] uppercase">
-                            Brief attachments
-                            {hasAssets && (
-                              <span className="ml-1.5 text-[var(--bb-text-tertiary)]">
-                                ({detailBriefAssets.length})
-                              </span>
-                            )}
-                          </p>
-                          <div className="flex items-center gap-2">
-                            {canAddImages && (
-                              <label className="inline-flex cursor-pointer items-center rounded-full border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-1 text-[11px] font-medium text-[var(--bb-secondary)] hover:bg-[var(--bb-bg-warm)] disabled:cursor-not-allowed disabled:opacity-60">
-                                <input
-                                  type="file"
-                                  accept={BRIEF_ACCEPT_ATTR}
-                                  multiple
-                                  className="hidden"
-                                  disabled={uploadingBriefs}
-                                  onChange={(e) => {
-                                    void handleUploadBriefFromBoard(e.target.files);
-                                    e.currentTarget.value = "";
-                                  }}
-                                />
-                                Add files
-                              </label>
-                            )}
-                            {hasAssets && (
-                              <DownloadAllButton
-                                assets={detailBriefAssets}
-                                zipFilename="brief-attachments.zip"
-                              />
-                            )}
-                          </div>
-                        </div>
-                        {uploadBriefsProgress && (
-                          <p className="mb-2 text-xs text-[var(--bb-text-tertiary)]">
-                            {uploadBriefsProgress}
-                          </p>
-                        )}
-                        {hasAssets && (
-                          <>
-                            {hasCreativeWork ? (
-                              <BriefThumbnailRow
-                                assets={detailBriefAssets}
-                                onDelete={canAddImages ? handleDeleteBriefAsset : undefined}
-                              />
-                            ) : (
-                              <RevisionImageLarge
-                                assets={detailBriefAssets}
-                                pinMode="view"
-                                onDelete={canAddImages ? handleDeleteBriefAsset : undefined}
-                              />
-                            )}
-                          </>
-                        )}
-                      </div>
-                    );
-                  })()}
-
-                {/* Divider between brief context and creative work */}
-                {detailRevisions && detailRevisions.length > 0 && (
-                  <div className="mb-5 border-t border-[var(--bb-border-subtle)]" />
-                )}
-
-                {/* Revisions — loading / error / empty states */}
-                {detailRevisionsLoading && (
-                  <p className="text-xs text-[var(--bb-text-tertiary)]">Loading revisions…</p>
-                )}
-
-                {!detailRevisionsLoading && detailRevisionsError && (
-                  <p className="text-xs text-[var(--bb-danger-text)]">{detailRevisionsError}</p>
-                )}
-
-                {!detailRevisionsLoading &&
-                  !detailRevisionsError &&
-                  (!detailRevisions || detailRevisions.length === 0) && (
-                    <EmptyState
-                      title="No revisions yet."
-                      description="Once your creative sends this ticket for review, you'll see each version and your feedback here."
-                    />
-                  )}
-
-                {/* Current version + Previous versions */}
-                {!detailRevisionsLoading &&
-                  !detailRevisionsError &&
-                  detailRevisions &&
-                  detailRevisions.length > 0 &&
-                  (() => {
-                    const reversed = [...detailRevisions].reverse();
-                    const latestRev = reversed[0];
-                    const olderRevs = reversed.slice(1);
-
-                    return (
-                      <div className="space-y-5">
-                        {/* ── Current version ── */}
-                        <div>
-                          <p className="mb-2 text-[11px] font-semibold tracking-[0.16em] text-[var(--bb-text-muted)] uppercase">
-                            Current version
-                          </p>
-                          <div
-                            className={`rounded-xl border-2 bg-[var(--bb-bg-page)] px-4 py-4 ${
-                              latestRev.feedbackAt
-                                ? "border-[var(--bb-warning-border)]/40"
-                                : "border-[var(--bb-info-border)]/40"
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] text-white ${
-                                  latestRev.feedbackAt
-                                    ? "bg-[var(--bb-warning-text)]"
-                                    : "bg-[var(--bb-info-text)]"
-                                }`}
-                              >
-                                {latestRev.feedbackAt ? "✎" : "✓"}
-                              </span>
-                              <p className="text-xs font-semibold text-[var(--bb-secondary)]">
-                                Version {latestRev.version}
-                              </p>
-                              {latestRev.assets && latestRev.assets.length > 0 && (
-                                <DownloadAllButton
-                                  assets={latestRev.assets}
-                                  zipFilename={`version-${latestRev.version}.zip`}
-                                />
-                              )}
-                            </div>
-
-                            {latestRev.submittedAt && (
-                              <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-[var(--bb-info-text)]">
-                                <span className="text-[10px]">📤</span>
-                                Sent for review on{" "}
-                                <span className="font-semibold">
-                                  {formatBoardDate(latestRev.submittedAt)}
-                                </span>
-                              </p>
-                            )}
-
-                            {latestRev.feedbackAt && (
-                              <p className="mt-1 flex items-center gap-1.5 text-[11px] text-[var(--bb-warning-text)]">
-                                <span className="text-[10px]">💬</span>
-                                Changes requested on{" "}
-                                <span className="font-semibold">
-                                  {formatBoardDate(latestRev.feedbackAt)}
-                                </span>
-                              </p>
-                            )}
-
-                            {latestRev.feedbackMessage && (
-                              <div className="mt-2 rounded-lg bg-[var(--bb-warning-bg)] px-3 py-2">
-                                <p className="text-[11px] text-[var(--bb-text-tertiary)] italic">
-                                  &ldquo;{latestRev.feedbackMessage}&rdquo;
-                                </p>
-                              </div>
-                            )}
-
-                            {/* Large image display for current version */}
-                            {latestRev.assets && latestRev.assets.length > 0 && (
-                              <RevisionImageLarge
-                                assets={latestRev.assets}
-                                pinMode={detailTicket?.status === "IN_REVIEW" ? "review" : "view"}
-                                ticketId={detailTicket?.id}
-                                onRevisionSubmitted={() => {
-                                  closeTicketDetails();
-                                  showToast({
-                                    type: "success",
-                                    title: "Changes requested",
-                                    description:
-                                      "Your pin annotations have been sent to your creative.",
-                                  });
-                                  void load();
-                                }}
-                              />
-                            )}
-                          </div>
-                        </div>
-
-                        {/* ── Previous versions (collapsible) ── */}
-                        {olderRevs.length > 0 && (
-                          <div>
-                            <button
-                              type="button"
-                              onClick={() => setShowPreviousVersions((v) => !v)}
-                              className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.16em] text-[var(--bb-text-muted)] uppercase transition-colors hover:text-[var(--bb-text-secondary)]"
-                            >
-                              <svg
-                                width="12"
-                                height="12"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                className={`transition-transform ${showPreviousVersions ? "rotate-90" : ""}`}
-                              >
-                                <polyline points="9 18 15 12 9 6" />
-                              </svg>
-                              Previous versions
-                              <span className="text-[var(--bb-text-tertiary)]">
-                                ({olderRevs.length})
-                              </span>
-                            </button>
-
-                            {showPreviousVersions && (
-                              <div className="space-y-2.5">
-                                {olderRevs.map((rev) => (
-                                  <div
-                                    key={rev.version}
-                                    className="rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-3"
-                                  >
-                                    <div className="flex items-center gap-2">
-                                      <span
-                                        className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] text-white ${
-                                          rev.feedbackAt
-                                            ? "bg-[var(--bb-warning-text)]"
-                                            : "bg-[var(--bb-info-text)]"
-                                        }`}
-                                      >
-                                        {rev.feedbackAt ? "✎" : "✓"}
-                                      </span>
-                                      <p className="text-xs font-semibold text-[var(--bb-secondary)]">
-                                        Version {rev.version}
-                                      </p>
-                                      {rev.assets && rev.assets.length > 0 && (
-                                        <DownloadAllButton
-                                          assets={rev.assets}
-                                          zipFilename={`version-${rev.version}.zip`}
-                                        />
-                                      )}
-                                    </div>
-
-                                    {rev.submittedAt && (
-                                      <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-[var(--bb-info-text)]">
-                                        <span className="text-[10px]">📤</span>
-                                        Sent for review on{" "}
-                                        <span className="font-semibold">
-                                          {formatBoardDate(rev.submittedAt)}
-                                        </span>
-                                      </p>
-                                    )}
-
-                                    {rev.feedbackAt && (
-                                      <p className="mt-1 flex items-center gap-1.5 text-[11px] text-[var(--bb-warning-text)]">
-                                        <span className="text-[10px]">💬</span>
-                                        Changes requested on{" "}
-                                        <span className="font-semibold">
-                                          {formatBoardDate(rev.feedbackAt)}
-                                        </span>
-                                      </p>
-                                    )}
-
-                                    {rev.feedbackMessage && (
-                                      <div className="mt-2 rounded-lg bg-[var(--bb-warning-bg)] px-3 py-2">
-                                        <p className="text-[11px] text-[var(--bb-text-tertiary)] italic">
-                                          &ldquo;{rev.feedbackMessage}&rdquo;
-                                        </p>
-                                      </div>
-                                    )}
-
-                                    {/* Thumbnail grid for older versions */}
-                                    {rev.assets && rev.assets.length > 0 && (
-                                      <RevisionImageGrid assets={rev.assets} pinMode="view" />
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
-              </div>
-
-              {/* Right column — metadata sidebar (fixed while left scrolls) */}
-              {/* Right column — details. Must stretch to the grid row height
-                  (not self-start, which sizes to content) so overflow-y-auto
-                  can actually scroll on desktop; otherwise tall details (dates
-                  etc.) overflow the modal with no way to reach them. */}
-              <aside className="min-w-0 rounded-xl bg-[var(--bb-bg-warm)] p-4 md:overflow-y-auto">
-                {/* Details */}
-                <div className="mb-5">
-                  <p className="mb-2 text-[11px] font-semibold tracking-[0.16em] text-[var(--bb-text-muted)] uppercase">
-                    Details
-                  </p>
-                  <div className="space-y-3 text-xs">
-                    <div>
-                      <p className="text-[var(--bb-text-tertiary)]">Status</p>
-                      <div className="mt-0.5 flex items-center gap-1.5 font-semibold text-[var(--bb-secondary)]">
-                        <span
-                          className={`inline-block h-1.5 w-1.5 rounded-full ${statusIndicatorColor(
-                            detailTicket.status,
-                          )}`}
-                        />
-                        {STATUS_LABELS[detailTicket.status]}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-[var(--bb-text-tertiary)]">Priority</p>
-                      {isEditingDetail ? (
-                        <FormSelect
-                          size="sm"
-                          value={editForm.priority}
-                          onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                            setEditForm((f) => ({ ...f, priority: e.target.value }))
-                          }
-                          disabled={editSaving}
-                        >
-                          <option value="LOW">Low</option>
-                          <option value="MEDIUM">Medium</option>
-                          <option value="HIGH">High</option>
-                          <option value="URGENT">Urgent</option>
-                        </FormSelect>
-                      ) : (
-                        <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
-                          <span className={priorityColorClass(detailTicket.priority)}>
-                            {priorityIconMap[detailTicket.priority]}
-                          </span>{" "}
-                          {formatPriorityLabel(detailTicket.priority)}
-                        </p>
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-[var(--bb-text-tertiary)]">Project</p>
-                      {isEditingDetail ? (
-                        <FormSelect
-                          size="sm"
-                          value={editForm.projectId}
-                          onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                            setEditForm((f) => ({ ...f, projectId: e.target.value }))
-                          }
-                          disabled={editSaving || !newTicketMeta}
-                        >
-                          <option value="">No specific project</option>
-                          {(newTicketMeta?.projects ?? []).map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.name}
-                              {p.code ? ` (${p.code})` : ""}
-                            </option>
-                          ))}
-                        </FormSelect>
-                      ) : (
-                        <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
-                          {detailTicket.projectName || "—"}
-                        </p>
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-[var(--bb-text-tertiary)]">Job type</p>
-                      {isEditingDetail ? (
-                        <FormSelect
-                          size="sm"
-                          value={editForm.jobTypeId}
-                          onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                            setEditForm((f) => ({ ...f, jobTypeId: e.target.value }))
-                          }
-                          disabled={editSaving || !newTicketMeta}
-                        >
-                          <option value="">Choose a job type</option>
-                          {(newTicketMeta?.jobTypes ?? []).map((jt) => (
-                            <option key={jt.id} value={jt.id}>
-                              {jt.name}
-                            </option>
-                          ))}
-                        </FormSelect>
-                      ) : (
-                        <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
-                          {detailTicket.jobTypeName || "—"}
-                        </p>
-                      )}
-                    </div>
-                    {/* Tag row hidden when the TAGS_ENABLED feature
-                        flag is off. The /api/customer/tickets/new-metadata
-                        response carries tagsEnabled; treated as `true`
-                        when undefined so older clients/deploys keep
-                        rendering. */}
-                    <div hidden={newTicketMeta?.tagsEnabled === false}>
-                      <p className="text-[var(--bb-text-tertiary)]">Tags</p>
-                      {isEditingDetail ? (
-                        <div className="mt-1">
-                          <TagMultiSelect
-                            availableTags={(newTicketMeta?.tags ?? []) as TagOption[]}
-                            selectedTagIds={editForm.tagIds}
-                            onChange={(tagIds) => setEditForm((f) => ({ ...f, tagIds }))}
-                            onCreateTag={async (name, color) => {
-                              try {
-                                const res = await fetch("/api/customer/tags", {
-                                  method: "POST",
-                                  headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({ name, color }),
-                                });
-                                const json = await res.json().catch(() => null);
-                                if (!res.ok) {
-                                  showToast({
-                                    type: "error",
-                                    title: json?.error || "Failed to create tag",
-                                  });
-                                  return null;
-                                }
-                                const created = json.tag as TagOption;
-                                // Add to local metadata cache
-                                setNewTicketMeta((prev) =>
-                                  prev
-                                    ? {
-                                        ...prev,
-                                        tags: [...(prev.tags ?? []), created].sort((a, b) =>
-                                          a.name.localeCompare(b.name),
-                                        ),
-                                      }
-                                    : prev,
-                                );
-                                return created;
-                              } catch {
-                                showToast({ type: "error", title: "Failed to create tag" });
-                                return null;
-                              }
-                            }}
-                            canCreate={canManageTags(companyRole)}
-                            disabled={editSaving}
-                          />
-                        </div>
-                      ) : (
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {detailTicket.tags && detailTicket.tags.length > 0 ? (
-                            detailTicket.tags.map((tag) => (
-                              <TagBadge
-                                key={tag.id}
-                                name={tag.name}
-                                color={tag.color as TagColorKey}
-                              />
-                            ))
-                          ) : (
-                            <p className="text-[11px] text-[var(--bb-text-tertiary)]">—</p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Divider */}
-                <div className="mb-5 border-t border-[var(--bb-border-subtle)]" />
-
-                {/* People */}
-                <div className="mb-5">
-                  <p className="mb-2 text-[11px] font-semibold tracking-[0.16em] text-[var(--bb-text-muted)] uppercase">
-                    People
-                  </p>
-                  <div className="flex items-center gap-2.5">
-                    <div
-                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white ${
-                        detailTicket.isAssigned ? "bg-[#22C55E]" : "bg-[#9CA3AF]"
-                      }`}
-                    >
-                      {detailTicket.isAssigned ? "\u2713" : "\u2014"}
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold text-[var(--bb-secondary)]">
-                        {detailTicket.isAssigned ? "Assigned" : "Unassigned"}
-                      </p>
-                      <p className="text-[10px] text-[var(--bb-text-tertiary)]">Creative team</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Divider */}
-                <div className="mb-5 border-t border-[var(--bb-border-subtle)]" />
-
-                {/* Dates */}
-                <div>
-                  <p className="mb-2 text-[11px] font-semibold tracking-[0.16em] text-[var(--bb-text-muted)] uppercase">
-                    Dates
-                  </p>
-                  <div className="space-y-2 text-xs">
-                    <div>
-                      <p className="text-[var(--bb-text-tertiary)]">Created</p>
-                      <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
-                        {formatBoardDate(detailTicket.createdAt)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[var(--bb-text-tertiary)]">Updated</p>
-                      <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
-                        {formatBoardDate(detailTicket.updatedAt ?? null)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[var(--bb-text-tertiary)]">Due date</p>
-                      {isEditingDetail ? (
-                        <FormInput
-                          type="date"
-                          size="sm"
-                          value={editForm.dueDate}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                            setEditForm((f) => ({ ...f, dueDate: e.target.value }))
-                          }
-                          disabled={editSaving}
-                        />
-                      ) : (
-                        <>
-                          <p
-                            className={`mt-0.5 font-semibold ${isDueDateOverdue(detailTicket.dueDate) ? "text-[var(--bb-danger-text)]" : "text-[var(--bb-secondary)]"}`}
-                          >
-                            {formatBoardDate(detailTicket.dueDate)}
-                          </p>
-                          {(() => {
-                            const countdown = formatDueDateCountdown(detailTicket.dueDate);
-                            if (!countdown) return null;
-                            return (
-                              <p
-                                className={`mt-0.5 text-[10px] font-medium ${countdown.overdue ? "text-[var(--bb-danger-text)]" : "text-[var(--bb-text-secondary)]"}`}
-                              >
-                                {countdown.label}
-                              </p>
-                            );
-                          })()}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </aside>
-            </div>
-
-            {/* Quick actions footer */}
-            {(() => {
-              // Get latest revision assets for download
-              const latestRevAssets = (() => {
-                if (!detailRevisions || detailRevisions.length === 0) return [];
-                const reversed = [...detailRevisions].reverse();
-                return reversed[0]?.assets ?? [];
-              })();
-
-              const handleFooterDownload = async () => {
-                if (latestRevAssets.length === 0) return;
-                setDetailFooterDownloading(true);
-                try {
-                  if (latestRevAssets.length === 1) {
-                    await downloadSingleAsset(
-                      latestRevAssets[0].id,
-                      latestRevAssets[0].originalName || "final-work",
-                    );
-                  } else {
-                    await downloadAssetsAsZip(
-                      latestRevAssets.map((a) => ({ id: a.id, originalName: a.originalName })),
-                      `${detailTicket.title?.replace(/[^a-zA-Z0-9]/g, "-") || "final-work"}.zip`,
-                    );
-                  }
-                } catch (err) {
-                  console.error("[DetailFooter] download error:", err);
-                } finally {
-                  setDetailFooterDownloading(false);
-                }
-              };
-
-              if (detailTicket.status === "DONE") {
-                return latestRevAssets.length > 0 ? (
-                  <ModalFooter className="shrink-0 border-t border-[var(--bb-border-subtle)] pt-3">
-                    <button
-                      type="button"
-                      disabled={detailFooterDownloading}
-                      onClick={handleFooterDownload}
-                      className="ml-auto flex items-center gap-1.5 rounded-lg bg-[var(--bb-primary)] px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-[var(--bb-primary-hover)] disabled:opacity-60"
-                    >
-                      {detailFooterDownloading ? (
-                        <>
-                          <span className="h-3 w-3 animate-spin rounded-full border-[1.5px] border-white border-t-transparent" />
-                          Downloading…
-                        </>
-                      ) : (
-                        <>
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                            className="h-3.5 w-3.5"
-                          >
-                            <path d="M10 3a.75.75 0 0 1 .75.75v7.19l2.72-2.72a.75.75 0 1 1 1.06 1.06l-4 4a.75.75 0 0 1-1.06 0l-4-4a.75.75 0 0 1 1.06-1.06l2.72 2.72V3.75A.75.75 0 0 1 10 3Z" />
-                            <path d="M3 15.75a.75.75 0 0 1 .75-.75h12.5a.75.75 0 0 1 0 1.5H3.75a.75.75 0 0 1-.75-.75Z" />
-                          </svg>
-                          Download final work
-                          {latestRevAssets.length > 1 ? ` (${latestRevAssets.length} files)` : ""}
-                        </>
-                      )}
-                    </button>
-                  </ModalFooter>
-                ) : null;
-              }
-
-              if (detailTicket.status === "IN_REVIEW") {
-                return (
-                  <ModalFooter className="shrink-0 border-t border-[var(--bb-border-subtle)] pt-3">
-                    {latestRevAssets.length > 0 && (
-                      <button
-                        type="button"
-                        disabled={detailFooterDownloading}
-                        onClick={handleFooterDownload}
-                        className="mr-auto flex items-center gap-1.5 rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-1.5 text-[11px] font-medium text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)] disabled:opacity-60"
-                      >
-                        {detailFooterDownloading ? (
-                          <>
-                            <span className="h-3 w-3 animate-spin rounded-full border-[1.5px] border-current border-t-transparent" />
-                            Downloading…
-                          </>
-                        ) : (
-                          <>
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              viewBox="0 0 20 20"
-                              fill="currentColor"
-                              className="h-3.5 w-3.5"
-                            >
-                              <path d="M10 3a.75.75 0 0 1 .75.75v7.19l2.72-2.72a.75.75 0 1 1 1.06 1.06l-4 4a.75.75 0 0 1-1.06 0l-4-4a.75.75 0 0 1 1.06-1.06l2.72 2.72V3.75A.75.75 0 0 1 10 3Z" />
-                              <path d="M3 15.75a.75.75 0 0 1 .75-.75h12.5a.75.75 0 0 1 0 1.5H3.75a.75.75 0 0 1-.75-.75Z" />
-                            </svg>
-                            Download
-                            {latestRevAssets.length > 1 ? ` (${latestRevAssets.length})` : ""}
-                          </>
-                        )}
-                      </button>
-                    )}
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => {
-                        closeTicketDetails();
-                        setPendingRevisionTicketId(detailTicket.id);
-                      }}
-                    >
-                      Request revision
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="bg-[#32b37b] hover:bg-[#2ba06a]"
-                      onClick={() => {
-                        closeTicketDetails();
-                        setPendingDoneTicketId(detailTicket.id);
-                      }}
-                    >
-                      Mark as done
-                    </Button>
-                  </ModalFooter>
-                );
-              }
-
-              return null;
-            })()}
-          </>
-        )}
-      </Modal>
-
-      {/* Revision modal */}
-      <Modal open={!!pendingRevisionTicket} onClose={handleCancelRevision} size="md">
-        <ModalHeader
-          title="Send this request back to your creative?"
-          subtitle="Your creative will see your message and continue working on this request. The status will move back to In progress."
-        />
-
-        <div>
-          <label className="block text-xs font-medium text-[var(--bb-secondary)]">
-            Message for your creative
-          </label>
-          <textarea
+      {/* Request revision */}
+      <BoardDialog
+        open={!!pendingRevisionTicket}
+        onClose={handleCancelRevision}
+        width="md"
+        title="Send this request back to your creative?"
+        subtitle="Your creative will see your message and continue working on this request. The status will move back to In progress."
+        footer={
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <Button onClick={handleCancelRevision}>Cancel</Button>
+            <Button variant="primary" onClick={handleConfirmRevision}>
+              Send back to creative
+            </Button>
+          </div>
+        }
+      >
+        <Field
+          label="Message for your creative"
+          htmlFor="customer-board-revision-message"
+          error={revisionMessageError}
+        >
+          <TextArea
+            id="customer-board-revision-message"
             value={revisionMessage}
-            onChange={(e) => {
-              setRevisionMessage(e.target.value);
-              if (revisionMessageError) {
-                setRevisionMessageError(null);
-              }
+            aria-invalid={revisionMessageError ? true : undefined}
+            onChange={(event) => {
+              setRevisionMessage(event.target.value);
+              if (revisionMessageError) setRevisionMessageError(null);
             }}
+            rows={5}
             placeholder="For example: Could we make the hero headline larger and try a version with a darker background?"
-            className="mt-1.5 h-28 w-full rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-3 py-2.5 text-xs text-[var(--bb-secondary)] outline-none placeholder:text-[var(--bb-text-muted)] focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
           />
-          {revisionMessageError && (
-            <p className="mt-1 text-[11px] text-[var(--bb-danger-text)]">{revisionMessageError}</p>
-          )}
-        </div>
+        </Field>
+      </BoardDialog>
 
-        <ModalFooter>
-          <Button variant="secondary" size="sm" onClick={handleCancelRevision}>
-            Cancel
-          </Button>
-          <Button size="sm" onClick={handleConfirmRevision}>
-            Send back to creative
-          </Button>
-        </ModalFooter>
-      </Modal>
-
-      {/* Done confirmation modal — with final work preview + download */}
-      <Modal open={!!pendingDoneTicket} onClose={() => setPendingDoneTicketId(null)} size="lg">
-        <ModalHeader
-          title="Mark this request as done?"
-          subtitle="Once you mark this request as done, your creative will get paid for this job, and the ticket will move to Done."
-        />
-
-        <div className="rounded-xl bg-[var(--bb-bg-warm)] px-3 py-3 text-xs text-[var(--bb-secondary)]">
-          <p className="font-semibold">{pendingDoneTicket?.title}</p>
-          {pendingDoneTicket?.projectName && (
-            <p className="mt-1 text-[var(--bb-text-secondary)]">
+      {/* Approve confirmation — with final work preview + download */}
+      <BoardDialog
+        open={!!pendingDoneTicket}
+        onClose={() => setPendingDoneTicketId(null)}
+        width="md"
+        title="Approve and complete this request?"
+        subtitle="Once you approve, your creative will get paid for this job and the request will move to Done."
+        footer={
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <Button onClick={() => setPendingDoneTicketId(null)}>Cancel</Button>
+            <Button variant="primary" onClick={handleConfirmDone}>
+              Yes, approve &amp; complete
+            </Button>
+          </div>
+        }
+      >
+        <div className="rounded-xl bg-[var(--av2-bg)] p-4 text-sm">
+          <p className="font-semibold break-words">{pendingDoneTicket?.title}</p>
+          {pendingDoneTicket?.projectName ? (
+            <p className="mt-1 text-[var(--av2-text-2)]">
               Project: {pendingDoneTicket.projectName}
             </p>
-          )}
+          ) : null}
         </div>
 
-        {/* Final work preview */}
-        {pendingDoneRevisionsLoading && (
-          <div className="mt-3 flex items-center justify-center py-6">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--bb-border)] border-t-[var(--bb-primary)]" />
-          </div>
-        )}
+        {pendingDoneRevisionsLoading ? (
+          <Skeleton className="mt-4 h-40" />
+        ) : (
+          (() => {
+            if (!pendingDoneRevisions || pendingDoneRevisions.length === 0) return null;
+            const latestRev = [...pendingDoneRevisions].reverse()[0];
+            const finalAssets = latestRev?.assets ?? [];
+            if (finalAssets.length === 0) return null;
 
-        {(() => {
-          if (
-            pendingDoneRevisionsLoading ||
-            !pendingDoneRevisions ||
-            pendingDoneRevisions.length === 0
-          )
-            return null;
-          const latestRev = [...pendingDoneRevisions].reverse()[0];
-          const finalAssets = latestRev?.assets ?? [];
-          if (finalAssets.length === 0) return null;
+            return (
+              <div className="mt-4">
+                <p className="mb-2 text-sm font-semibold">
+                  Final work{" "}
+                  <span className="font-normal text-[var(--av2-text-2)]">
+                    · Version {latestRev.version} · {finalAssets.length}{" "}
+                    {plural(finalAssets.length, "file", "files")}
+                  </span>
+                </p>
 
-          return (
-            <div className="mt-3">
-              <p className="mb-2 flex items-center gap-2 text-[11px] font-semibold tracking-[0.14em] text-[var(--bb-text-muted)] uppercase">
-                <span>Final work</span>
-                <span className="font-normal tracking-normal text-[var(--bb-text-tertiary)] normal-case">
-                  — Version {latestRev.version} • {finalAssets.length} file
-                  {finalAssets.length !== 1 ? "s" : ""}
-                </span>
-              </p>
+                <div
+                  className={`grid gap-2 rounded-xl border border-[var(--av2-border)] p-2 ${
+                    finalAssets.length === 1 ? "grid-cols-1" : "grid-cols-3"
+                  }`}
+                >
+                  {finalAssets.slice(0, 6).map((asset) => (
+                    <div
+                      key={asset.id}
+                      className="relative overflow-hidden rounded-lg bg-[var(--av2-bg)]"
+                      style={{ height: finalAssets.length === 1 ? "160px" : "80px" }}
+                    >
+                      <RevisionImage
+                        assetId={asset.id}
+                        url={asset.url}
+                        alt={asset.originalName || "Final work"}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  ))}
+                  {finalAssets.length > 6 ? (
+                    <div className="flex h-20 items-center justify-center rounded-lg bg-[var(--av2-bg)] text-sm font-medium text-[var(--av2-text-2)]">
+                      +{finalAssets.length - 6} more
+                    </div>
+                  ) : null}
+                </div>
 
-              {/* Thumbnail grid */}
-              <div
-                className={`grid gap-1.5 rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] p-2 ${
-                  finalAssets.length === 1 ? "grid-cols-1" : "grid-cols-3"
-                }`}
-              >
-                {finalAssets.slice(0, 6).map((asset) => (
-                  <div
-                    key={asset.id}
-                    className="relative overflow-hidden rounded-lg bg-[var(--bb-bg-card)]"
-                    style={{ height: finalAssets.length === 1 ? "160px" : "80px" }}
-                  >
-                    <RevisionImage
-                      assetId={asset.id}
-                      url={asset.url}
-                      alt={asset.originalName || "Final work"}
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
-                ))}
-                {finalAssets.length > 6 && (
-                  <div
-                    className="flex items-center justify-center rounded-lg bg-[var(--bb-border-subtle)] text-[11px] font-medium text-[var(--bb-text-secondary)]"
-                    style={{ height: "80px" }}
-                  >
-                    +{finalAssets.length - 6} more
-                  </div>
-                )}
-              </div>
-
-              {/* Prominent download button */}
-              <button
-                type="button"
-                disabled={doneModalDownloading}
-                onClick={async () => {
-                  setDoneModalDownloading(true);
-                  try {
-                    if (finalAssets.length === 1) {
-                      await downloadSingleAsset(
-                        finalAssets[0].id,
-                        finalAssets[0].originalName || "final-work",
-                      );
-                    } else {
-                      await downloadAssetsAsZip(
-                        finalAssets.map((a) => ({ id: a.id, originalName: a.originalName })),
-                        `${pendingDoneTicket?.title?.replace(/[^a-zA-Z0-9]/g, "-") || "final-work"}.zip`,
-                      );
+                <Button
+                  className="mt-3 w-full"
+                  disabled={doneModalDownloading}
+                  onClick={async () => {
+                    setDoneModalDownloading(true);
+                    try {
+                      if (finalAssets.length === 1) {
+                        await downloadSingleAsset(
+                          finalAssets[0].id,
+                          finalAssets[0].originalName || "final-work",
+                        );
+                      } else {
+                        await downloadAssetsAsZip(
+                          finalAssets.map((a) => ({ id: a.id, originalName: a.originalName })),
+                          `${pendingDoneTicket?.title?.replace(/[^a-zA-Z0-9]/g, "-") || "final-work"}.zip`,
+                        );
+                      }
+                    } catch (err) {
+                      console.error("[DoneModal] download error:", err);
+                    } finally {
+                      setDoneModalDownloading(false);
                     }
-                  } catch (err) {
-                    console.error("[DoneModal] download error:", err);
-                  } finally {
-                    setDoneModalDownloading(false);
-                  }
-                }}
-                className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--bb-primary)] px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-[var(--bb-primary-hover)] disabled:opacity-60"
-              >
-                {doneModalDownloading ? (
-                  <>
-                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-[1.5px] border-white border-t-transparent" />
-                    Preparing download…
-                  </>
-                ) : finalAssets.length === 1 ? (
-                  <>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                      className="h-4 w-4"
-                    >
-                      <path d="M10 3a.75.75 0 0 1 .75.75v7.19l2.72-2.72a.75.75 0 1 1 1.06 1.06l-4 4a.75.75 0 0 1-1.06 0l-4-4a.75.75 0 0 1 1.06-1.06l2.72 2.72V3.75A.75.75 0 0 1 10 3Z" />
-                      <path d="M3 15.75a.75.75 0 0 1 .75-.75h12.5a.75.75 0 0 1 0 1.5H3.75a.75.75 0 0 1-.75-.75Z" />
-                    </svg>
-                    Download final file
-                    {finalAssets[0].originalName && (
-                      <span className="font-normal opacity-70">
-                        ({finalAssets[0].originalName})
-                      </span>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                      className="h-4 w-4"
-                    >
-                      <path d="M10 3a.75.75 0 0 1 .75.75v7.19l2.72-2.72a.75.75 0 1 1 1.06 1.06l-4 4a.75.75 0 0 1-1.06 0l-4-4a.75.75 0 0 1 1.06-1.06l2.72 2.72V3.75A.75.75 0 0 1 10 3Z" />
-                      <path d="M3 15.75a.75.75 0 0 1 .75-.75h12.5a.75.75 0 0 1 0 1.5H3.75a.75.75 0 0 1-.75-.75Z" />
-                    </svg>
-                    Download all ({finalAssets.length} files)
-                  </>
-                )}
-              </button>
-            </div>
-          );
-        })()}
-
-        <ModalFooter>
-          <Button variant="secondary" size="sm" onClick={() => setPendingDoneTicketId(null)}>
-            Cancel
-          </Button>
-          <Button size="sm" onClick={handleConfirmDone} className="bg-[#32b37b] hover:bg-[#2ba06a]">
-            Yes, mark as done
-          </Button>
-        </ModalFooter>
-      </Modal>
+                  }}
+                >
+                  <IconDownload />
+                  {doneModalDownloading
+                    ? "Preparing download…"
+                    : finalAssets.length === 1
+                      ? "Download final file"
+                      : `Download all (${finalAssets.length} files)`}
+                </Button>
+              </div>
+            );
+          })()
+        )}
+      </BoardDialog>
 
       {/* Skippable creative rating modal — opens after a successful drag-to-DONE
           when the ticket had a creative assigned. Creatives never see these

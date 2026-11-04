@@ -15,9 +15,6 @@ import { redirect } from "next/navigation";
 import { AdminShell } from "@/components/admin/v2/admin-shell";
 import { getCurrentUser } from "@/lib/auth";
 import { isSiteAdminRole } from "@/lib/roles";
-// Admin typeface (design language v1), self-hosted; --font-jakarta is set
-// in globals.css. Browsers only download the files on pages that use it.
-import "@fontsource-variable/plus-jakarta-sans";
 
 // All admin routes are auth-gated. Skip SSG so the build does not prerender
 // pages that depend on the live DB or client-only libraries.

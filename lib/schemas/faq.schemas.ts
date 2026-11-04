@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // @file: lib/schemas/faq.schemas.ts
 // @purpose: Zod schemas for the admin FAQ CRUD endpoints. Mirrors the limits
-//           the public FaqBrowser renders against and the /admin/faq form
+//           the dashboard FaqExplorer renders against and the /admin/faq form
 //           enforces client-side, so a payload that gets past the form is
 //           guaranteed to be acceptable to the schema (and vice versa).
 // -----------------------------------------------------------------------------

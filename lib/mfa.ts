@@ -73,7 +73,7 @@ function generateNumericCode(length: number): string {
 // produce codes that shift at the boundary).
 // ---------------------------------------------------------------------------
 
-const TOTP_ISSUER = "Brandbite";
+const TOTP_ISSUER = "brandbite";
 const TOTP_VALIDATE_WINDOW = 1;
 
 export function generateTotpSecret(): string {
@@ -181,7 +181,7 @@ export async function issueChallenge(
   // throws, but we still double-wrap in case of a deeper failure we want
   // to swallow.
   try {
-    const subject = `Brandbite admin — security code ${code}`;
+    const subject = `brandbite admin — security code ${code}`;
     const minutesValid = Math.round(CHALLENGE_TTL_MS / 60_000);
     const html = [
       `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto;">`,
@@ -190,7 +190,7 @@ export async function issueChallenge(
       `</div>`,
       `<div style="background: #fff; padding: 24px; border: 1px solid #e3e1dc; border-top: none;">`,
       `<p style="margin: 0 0 12px; font-size: 14px; color: #424143;">Hi${userName ? " " + escapeHtml(userName) : ""},</p>`,
-      `<p style="margin: 0 0 16px; font-size: 14px; color: #424143;">Enter this code in the Brandbite admin panel to confirm a money-moving action:</p>`,
+      `<p style="margin: 0 0 16px; font-size: 14px; color: #424143;">Enter this code in the brandbite admin panel to confirm a money-moving action:</p>`,
       `<div style="text-align: center; margin: 20px 0;">`,
       `<span style="display: inline-block; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 32px; letter-spacing: 8px; font-weight: 700; color: #2a2a2b; background: #faf9f7; padding: 14px 24px; border-radius: 10px; border: 1px solid #e3e1dc;">${code}</span>`,
       `</div>`,
@@ -198,7 +198,7 @@ export async function issueChallenge(
       `<p style="margin: 0; font-size: 13px; color: #b4232e;">If you did NOT just try to perform a money action, someone has your password. <a href="${process.env.NEXT_PUBLIC_APP_URL || ""}/admin/audit-log" style="color: #b4232e;">Review the audit log</a> and change your password immediately.</p>`,
       `</div>`,
       `<div style="background: #faf9f7; padding: 12px 24px; border-radius: 0 0 10px 10px; border: 1px solid #e3e1dc; border-top: none;">`,
-      `<p style="margin: 0; font-size: 11px; color: #9a9892; text-align: center;">Brandbite security monitor</p>`,
+      `<p style="margin: 0; font-size: 11px; color: #9a9892; text-align: center;">brandbite security monitor</p>`,
       `</div>`,
       `</div>`,
     ].join("\n");

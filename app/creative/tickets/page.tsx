@@ -8,30 +8,41 @@
 
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BoardViewToggle } from "@/components/board/board-view-toggle";
+import {
+  Badge,
+  ButtonLink,
+  Callout,
+  Card,
+  DASH,
+  EmptyState,
+  fmt,
+  PageHeader,
+  plural,
+  SearchInput,
+  Select,
+  Skeleton,
+  Table,
+  TableFooter,
+  Td,
+  Th,
+  TICKET_STATUS,
+} from "@/components/admin/v2/ui";
+import {
+  DueDate,
+  PriorityBadge,
+  SortableTh,
+  StatusBadge,
+  TicketViewToggle,
+  tokenCount,
+} from "@/components/dashboard/tickets/shared";
 import { buildTicketCode } from "@/lib/ticket-code";
 import { fetchAllTickets } from "@/lib/fetch-all-tickets";
 import { allowedCreativeTargets } from "@/lib/tickets/creative-transitions";
-import { DataTable, THead, TH, TD } from "@/components/ui/data-table";
-import { EmptyState } from "@/components/ui/empty-state";
-import { FormSelect } from "@/components/ui/form-field";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import { LoadingState } from "@/components/ui/loading-state";
 import { useToast } from "@/components/ui/toast-provider";
-import { Badge } from "@/components/ui/badge";
-import {
-  priorityBadgeVariant,
-  statusBadgeVariant,
-  formatPriorityLabel,
-  formatBoardDate,
-  STATUS_LABELS,
-  STATUS_ORDER,
-  PRIORITY_ORDER,
-  isDueDateOverdue,
-  isDueDateSoon,
-} from "@/lib/board";
+import { STATUS_ORDER, PRIORITY_ORDER } from "@/lib/board";
 
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -62,14 +73,18 @@ type CreativeTicket = {
     tokenCost: number;
     creativePayoutTokens: number;
   } | null;
+  latestRevisionHasFeedback: boolean;
+  /** Payout at this creative's current rate; the same figure the board shows. */
+  estimatedPayout: number | null;
 };
 
-const STATUS_OPTION_LABEL: Record<string, string> = {
-  TODO: "To do",
-  IN_PROGRESS: "In progress",
-  IN_REVIEW: "In review",
-  DONE: "Done",
-};
+const STATUS_CARDS: { value: "ALL" | TicketStatus; label: string }[] = [
+  { value: "ALL", label: "All" },
+  { value: "TODO", label: "Backlog" },
+  { value: "IN_PROGRESS", label: "In progress" },
+  { value: "IN_REVIEW", label: "In review" },
+  { value: "DONE", label: "Done" },
+];
 
 /**
  * The current status plus the moves a creative may make from it (shared rule,
@@ -99,6 +114,7 @@ export default function CreativeTicketsPage() {
 
   const [statusFilter, setStatusFilter] = useState<"ALL" | TicketStatus>("ALL");
   const [projectFilter, setProjectFilter] = useState<string>("ALL");
+  const [search, setSearch] = useState("");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const load = async () => {
@@ -154,6 +170,7 @@ export default function CreativeTicketsPage() {
   }, [tickets]);
 
   const filteredTickets = useMemo(() => {
+    const query = search.trim().toLowerCase();
     return tickets.filter((t) => {
       if (statusFilter !== "ALL" && t.status !== statusFilter) {
         return false;
@@ -161,9 +178,21 @@ export default function CreativeTicketsPage() {
       if (projectFilter !== "ALL" && t.project?.name !== projectFilter) {
         return false;
       }
+      if (query) {
+        const code = buildTicketCode({
+          projectCode: t.project?.code,
+          companyTicketNumber: t.companyTicketNumber,
+          ticketId: t.id,
+        });
+        const haystack = [code, t.title, t.project?.name, t.company?.name]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (!haystack.includes(query)) return false;
+      }
       return true;
     });
-  }, [tickets, statusFilter, projectFilter]);
+  }, [tickets, statusFilter, projectFilter, search]);
 
   // ---------------------------------------------------------------------------
   // Column sorting
@@ -245,242 +274,232 @@ export default function CreativeTicketsPage() {
   };
 
   const isUpdating = (id: string) => updatingId === id;
+  const sortDirection = (field: SortField) => (sortField === field ? sortDir : null);
+  const stats = data?.stats ?? null;
+  const anyFilterActive = statusFilter !== "ALL" || projectFilter !== "ALL" || search.trim() !== "";
 
   return (
     <>
-      {/* View switcher — Kanban ↔ Table (this page) */}
-      <div className="mt-2 mb-4">
-        <BoardViewToggle rolePath="/creative" />
-      </div>
+      <PageHeader
+        title="My jobs"
+        description="Send work for review from the job. Clients approve completion, which triggers your payout."
+      />
 
-      {/* Page header */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">My tickets</h1>
-          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-            Tickets assigned to you, across all customer projects. You can move tickets between{" "}
-            <span className="font-medium">To do</span>,{" "}
-            <span className="font-medium">In progress</span> and{" "}
-            <span className="font-medium">In review</span>. Clients mark tickets as{" "}
-            <span className="font-medium">Done</span> to trigger payouts.
-          </p>
+      <div className="space-y-4">
+        <TicketViewToggle rolePath="/creative" />
+
+        {error ? (
+          <Callout tone="error" title="Something went wrong">
+            {error}
+          </Callout>
+        ) : null}
+
+        <div
+          role="group"
+          aria-label="Filter by status"
+          className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5"
+        >
+          {STATUS_CARDS.map((card) => {
+            const count =
+              loading || !stats
+                ? null
+                : card.value === "ALL"
+                  ? stats.total
+                  : stats.byStatus[card.value];
+            const active = statusFilter === card.value;
+            return (
+              <button
+                key={card.value}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setStatusFilter(card.value)}
+                className={`rounded-2xl border p-4 text-left transition-colors focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:ring-offset-1 focus-visible:outline-none ${
+                  active
+                    ? "border-[var(--av2-accent)] bg-[var(--av2-selected)]"
+                    : "border-[var(--av2-border)] bg-[var(--av2-surface)] hover:bg-[var(--av2-bg)]"
+                }`}
+              >
+                <span className="block text-sm text-[var(--av2-text-2)]">{card.label}</span>
+                <span className="mt-1 block text-2xl leading-8 font-bold tabular-nums">
+                  {fmt(count)}
+                </span>
+              </button>
+            );
+          })}
         </div>
-      </div>
 
-      {/* Error */}
-      {error && (
-        <InlineAlert variant="error" title="Error" className="mb-4">
-          {error}
-        </InlineAlert>
-      )}
-
-      {/* Summary cards */}
-      <section className="mb-6 grid gap-4 md:grid-cols-4">
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-          <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
-            Total
-          </p>
-          <p className="mt-2 text-3xl font-semibold text-[var(--bb-secondary)]">
-            {loading ? "—" : data ? data.stats.total : 0}
-          </p>
-          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-            All tickets assigned to you.
-          </p>
-        </div>
-
-        {(["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"] as TicketStatus[]).map((status) => (
-          <div
-            key={status}
-            className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm"
-          >
-            <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
-              {STATUS_LABELS[status]}
-            </p>
-            <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
-              {loading ? "—" : data ? data.stats.byStatus[status] : 0}
-            </p>
-            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-              Tickets currently in this state.
-            </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            label="Search jobs"
+            placeholder="Search jobs, project or customer…"
+            className="min-w-[240px] flex-1"
+          />
+          <div className="w-full sm:w-56">
+            <Select
+              aria-label="Filter by project"
+              value={projectFilter}
+              onChange={(e) => setProjectFilter(e.target.value)}
+            >
+              <option value="ALL">All projects</option>
+              {projects.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </Select>
           </div>
-        ))}
-      </section>
-
-      {/* Filters */}
-      <section className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-        <div className="flex items-center gap-2">
-          <label className="text-xs font-medium text-[var(--bb-secondary)]">Status</label>
-          <FormSelect
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as "ALL" | TicketStatus)}
-            className="w-auto"
-          >
-            <option value="ALL">All</option>
-            <option value="TODO">To do</option>
-            <option value="IN_PROGRESS">In progress</option>
-            <option value="IN_REVIEW">In review</option>
-            <option value="DONE">Done</option>
-          </FormSelect>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <label className="text-xs font-medium text-[var(--bb-secondary)]">Project</label>
-          <FormSelect
-            value={projectFilter}
-            onChange={(e) => setProjectFilter(e.target.value)}
-            className="w-auto"
-          >
-            <option value="ALL">All projects</option>
-            {projects.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </FormSelect>
-        </div>
-      </section>
-
-      {/* Tickets table */}
-      <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold tracking-tight">Assigned tickets</h2>
-          <p className="text-xs text-[var(--bb-text-tertiary)]">
-            Showing {filteredTickets.length} of {tickets.length} tickets.
-          </p>
         </div>
 
         {loading ? (
-          <LoadingState message="Loading tickets…" />
+          <div aria-busy="true" aria-label="Loading jobs" className="space-y-3">
+            <Skeleton className="h-20" />
+            <Skeleton className="h-20" />
+            <Skeleton className="h-20" />
+          </div>
         ) : filteredTickets.length === 0 ? (
-          <EmptyState title="No tickets match your filters." />
+          error ? null : (
+            <Card>
+              {anyFilterActive ? (
+                <EmptyState
+                  title="No jobs match these filters"
+                  description="Try a different status, project or search."
+                />
+              ) : (
+                <EmptyState
+                  title="No jobs assigned yet"
+                  description="Jobs assigned to you will appear here."
+                />
+              )}
+            </Card>
+          )
         ) : (
-          <DataTable>
-            <THead>
-              <TH>Ticket</TH>
-              <TH>Project</TH>
-              <TH
-                sortable
-                sortDirection={sortField === "status" ? sortDir : null}
-                onSort={() => handleSort("status")}
-              >
-                Status
-              </TH>
-              <TH
-                sortable
-                sortDirection={sortField === "priority" ? sortDir : null}
-                onSort={() => handleSort("priority")}
-              >
-                Priority
-              </TH>
-              <TH>Payout</TH>
-              <TH
-                className="hidden md:table-cell"
-                sortable
-                sortDirection={sortField === "due" ? sortDir : null}
-                onSort={() => handleSort("due")}
-              >
-                Due
-              </TH>
-              <TH>Actions</TH>
-            </THead>
-            <tbody>
-              {sortedTickets.map((t) => {
-                const statusLabel = STATUS_LABELS[t.status];
-                const ticketCode = buildTicketCode({
-                  projectCode: t.project?.code,
-                  companyTicketNumber: t.companyTicketNumber,
-                  ticketId: t.id,
-                });
+          <Card padding="none">
+            <Table label="Assigned jobs">
+              <thead className="max-lg:hidden">
+                <tr>
+                  <Th>Job</Th>
+                  <Th>Project</Th>
+                  <SortableTh
+                    label="Status"
+                    direction={sortDirection("status")}
+                    onSort={() => handleSort("status")}
+                  />
+                  <SortableTh
+                    label="Priority"
+                    direction={sortDirection("priority")}
+                    onSort={() => handleSort("priority")}
+                  />
+                  <Th>Payout</Th>
+                  <SortableTh
+                    label="Due"
+                    direction={sortDirection("due")}
+                    onSort={() => handleSort("due")}
+                  />
+                  <Th>Action</Th>
+                </tr>
+              </thead>
+              <tbody className="max-lg:block">
+                {sortedTickets.map((t) => {
+                  const ticketCode = buildTicketCode({
+                    projectCode: t.project?.code,
+                    companyTicketNumber: t.companyTicketNumber,
+                    ticketId: t.id,
+                  });
+                  const payoutTokens = t.estimatedPayout ?? t.jobType?.creativePayoutTokens ?? null;
+                  const options = tableStatusOptions(t.status);
 
-                const payoutTokens = t.jobType?.creativePayoutTokens ?? 0;
-
-                return (
-                  <tr
-                    key={t.id}
-                    className="cursor-pointer border-b border-[var(--bb-border-subtle)] text-xs transition-colors last:border-b-0 hover:bg-[var(--bb-bg-warm)]"
-                    onClick={() => router.push(`/creative/tickets/${t.id}`)}
-                  >
-                    <TD>
-                      <div className="font-medium">{ticketCode}</div>
-                      <div className="text-xs text-[var(--bb-text-secondary)]">{t.title}</div>
-                    </TD>
-                    <TD>
-                      {t.project ? (
-                        <>
-                          <div className="font-medium">{t.project.name}</div>
-                          <div className="text-xs text-[var(--bb-text-tertiary)]">
-                            {t.company?.name}
+                  return (
+                    <tr
+                      key={t.id}
+                      onClick={() => router.push(`/creative/tickets/${t.id}`)}
+                      className="cursor-pointer border-b border-[var(--av2-border)] last:border-b-0 hover:bg-[var(--av2-bg)] max-lg:block max-lg:p-4"
+                    >
+                      <Td className="max-lg:block max-lg:!p-0">
+                        <p className="text-[var(--av2-text-2)]">{ticketCode}</p>
+                        <Link
+                          href={`/creative/tickets/${t.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="font-semibold hover:underline"
+                        >
+                          {t.title}
+                        </Link>
+                        {t.latestRevisionHasFeedback && t.status !== "DONE" ? (
+                          <div className="mt-1">
+                            <Badge tone="peach">Changes requested</Badge>
                           </div>
-                        </>
-                      ) : (
-                        "—"
-                      )}
-                    </TD>
-                    <TD>
-                      <Badge variant={statusBadgeVariant(t.status)}>{statusLabel}</Badge>
-                    </TD>
-                    <TD>
-                      <Badge variant={priorityBadgeVariant(t.priority)}>
-                        {formatPriorityLabel(t.priority)}
-                      </Badge>
-                    </TD>
-                    <TD>{payoutTokens > 0 ? `${payoutTokens} tokens` : "—"}</TD>
-                    <TD className="hidden md:table-cell">
-                      {t.dueDate ? (
-                        <span
-                          className={
-                            isDueDateOverdue(t.dueDate)
-                              ? "font-semibold text-[var(--bb-danger-text)]"
-                              : isDueDateSoon(t.dueDate)
-                                ? "font-semibold text-[var(--bb-warning-text)]"
-                                : ""
-                          }
+                        ) : null}
+                      </Td>
+                      <Td className="max-lg:mt-1 max-lg:block max-lg:!p-0">
+                        <p>{t.project?.name ?? DASH}</p>
+                        {t.company?.name ? (
+                          <p className="text-xs text-[var(--av2-text-2)]">{t.company.name}</p>
+                        ) : null}
+                      </Td>
+                      <Td className="max-lg:mt-2 max-lg:inline-block max-lg:!p-0">
+                        <StatusBadge status={t.status} />
+                      </Td>
+                      <Td className="max-lg:mt-2 max-lg:ml-2 max-lg:inline-block max-lg:!p-0">
+                        <PriorityBadge priority={t.priority} />
+                      </Td>
+                      <Td className="whitespace-nowrap max-lg:mt-2 max-lg:block max-lg:!p-0">
+                        <span className="text-[var(--av2-text-2)] lg:hidden">Payout: </span>
+                        {payoutTokens != null && payoutTokens > 0 ? tokenCount(payoutTokens) : DASH}
+                      </Td>
+                      <Td className="whitespace-nowrap max-lg:mt-1 max-lg:block max-lg:!p-0">
+                        <span className="text-[var(--av2-text-2)] lg:hidden">Due: </span>
+                        <DueDate iso={t.dueDate} done={t.status === "DONE"} />
+                      </Td>
+                      <Td className="max-lg:mt-3 max-lg:block max-lg:!p-0">
+                        <div
+                          className="flex flex-wrap items-center gap-2 lg:w-[272px]"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          {formatBoardDate(t.dueDate)}
-                        </span>
-                      ) : (
-                        "—"
-                      )}
-                    </TD>
-                    <TD onClick={(e) => e.stopPropagation()}>
-                      <div className="flex flex-col gap-2">
-                        <FormSelect
-                          value={t.status}
-                          onChange={(e) => handleStatusChange(t.id, e.target.value as TicketStatus)}
-                          disabled={isUpdating(t.id) || t.status === "DONE"}
-                          size="sm"
-                          className="w-auto"
-                        >
-                          {tableStatusOptions(t.status).map((s) => (
-                            <option key={s} value={s}>
-                              {STATUS_OPTION_LABEL[s]}
-                            </option>
-                          ))}
-                        </FormSelect>
-                        {t.status === "IN_PROGRESS" && (
-                          <span className="text-xs text-[var(--bb-text-tertiary)]">
-                            Send work for review from the Board.
-                          </span>
-                        )}
-                        {isUpdating(t.id) && (
-                          <span className="text-xs text-[var(--bb-text-tertiary)]">
-                            Updating status…
-                          </span>
-                        )}
-                        {t.status === "DONE" && (
-                          <span className="text-xs text-[var(--bb-text-tertiary)]">
-                            Ticket is done. Only the client can reopen it.
-                          </span>
-                        )}
-                      </div>
-                    </TD>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </DataTable>
+                          {t.status === "DONE" ? null : (
+                            <div className="w-36">
+                              <Select
+                                aria-label={`Change status of ${t.title}`}
+                                value={t.status}
+                                onChange={(e) =>
+                                  handleStatusChange(t.id, e.target.value as TicketStatus)
+                                }
+                                disabled={isUpdating(t.id) || options.length < 2}
+                              >
+                                {options.map((s) => (
+                                  <option key={s} value={s}>
+                                    {TICKET_STATUS[s].label}
+                                  </option>
+                                ))}
+                              </Select>
+                            </div>
+                          )}
+                          <ButtonLink href={`/creative/tickets/${t.id}`} variant="primary">
+                            Open job
+                          </ButtonLink>
+                          {isUpdating(t.id) ? (
+                            <p role="status" className="w-full text-xs text-[var(--av2-text-2)]">
+                              Updating status…
+                            </p>
+                          ) : t.status === "DONE" ? (
+                            <p className="w-full text-xs text-[var(--av2-text-2)]">
+                              This job is done and can't be moved.
+                            </p>
+                          ) : null}
+                        </div>
+                      </Td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </Table>
+            <TableFooter>
+              Showing {filteredTickets.length} of {tickets.length}{" "}
+              {plural(tickets.length, "job", "jobs")}
+            </TableFooter>
+          </Card>
         )}
-      </section>
+      </div>
     </>
   );
 }

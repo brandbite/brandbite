@@ -1584,7 +1584,7 @@ export default function TalentApplicationsPage() {
         {item.existingCustomer && (
           <div className="mt-4">
             <Callout tone="warning" title="Existing customer email">
-              This applicant&apos;s email matches a registered Brandbite UserAccount. Could be
+              This applicant&apos;s email matches a registered brandbite UserAccount. Could be
               intentional (a customer joining the team) or accidental (used their work email by
               mistake). Worth a check before acting.
             </Callout>

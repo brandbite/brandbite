@@ -1,21 +1,62 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/tokens/page.tsx
 // @purpose: Customer-facing token balance & ledger view (session-based)
-// @version: v1.4.0
-// @status: active
-// @lastUpdate: 2025-11-22
 // -----------------------------------------------------------------------------
 
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { EmptyState } from "@/components/ui/empty-state";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import { LoadingState } from "@/components/ui/loading-state";
 
-type LedgerDirection = "CREDIT" | "DEBIT";
+import { IconCoins, IconTicket } from "@/components/admin/v2/icons";
+import {
+  Callout,
+  Card,
+  CardTitle,
+  DASH,
+  DetailPanel,
+  EmptyState,
+  FilterChips,
+  KeyValueList,
+  KpiCard,
+  PageHeader,
+  PanelSection,
+  SearchInput,
+  Skeleton,
+  SplitView,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from "@/components/admin/v2/ui";
+import {
+  DirectionBadge,
+  formatDateTime,
+  formatLedgerReason,
+  formatSignedTokens,
+  ListFooter,
+  pageOf,
+  RecordedBalance,
+  TokenFigure,
+  useRevealPanel,
+  type LedgerDirection,
+} from "@/components/dashboard/money/money-ui";
+import { canManageBilling, type CompanyRole } from "@/lib/permissions/companyRoles";
 
-type CompanyRole = "OWNER" | "PM" | "BILLING" | "MEMBER";
+const PAGE_SIZE = 6;
+
+type DirectionFilter = "ALL" | LedgerDirection;
+
+type LedgerEntry = {
+  id: string;
+  createdAt: string;
+  direction: LedgerDirection;
+  amount: number;
+  reason: string | null;
+  notes: string | null;
+  ticketCode: string | null;
+  balanceBefore: number | null;
+  balanceAfter: number | null;
+};
 
 type CustomerTokensResponse = {
   company: {
@@ -28,18 +69,23 @@ type CustomerTokensResponse = {
     totalCredits: number;
     totalDebits: number;
   };
-  ledger: {
-    id: string;
-    createdAt: string;
-    direction: LedgerDirection;
-    amount: number;
-    reason: string | null;
-    notes: string | null;
-    ticketCode: string | null;
-    balanceBefore: number | null;
-    balanceAfter: number | null;
-  }[];
+  ledger: LedgerEntry[];
 };
+
+function prettyCompanyRole(role: CompanyRole | null): string | null {
+  switch (role) {
+    case "OWNER":
+      return "Owner";
+    case "PM":
+      return "Project manager";
+    case "BILLING":
+      return "Billing manager";
+    case "MEMBER":
+      return "Member";
+    default:
+      return null;
+  }
+}
 
 export default function CustomerTokensPage() {
   const [data, setData] = useState<CustomerTokensResponse | null>(null);
@@ -47,7 +93,12 @@ export default function CustomerTokensPage() {
   const [error, setError] = useState<string | null>(null);
   const [companyRole, setCompanyRole] = useState<CompanyRole | null>(null);
 
-  const [directionFilter, setDirectionFilter] = useState<"ALL" | LedgerDirection>("ALL");
+  const [directionFilter, setDirectionFilter] = useState<DirectionFilter>("ALL");
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [panelClosed, setPanelClosed] = useState(false);
+  const { ref: panelRef, reveal } = useRevealPanel();
 
   useEffect(() => {
     let cancelled = false;
@@ -114,7 +165,8 @@ export default function CustomerTokensPage() {
   }, []);
 
   const company = data?.company;
-  const ledger = data?.ledger ?? [];
+  const ledger = useMemo(() => data?.ledger ?? [], [data]);
+  const needle = query.trim().toLowerCase();
 
   const filteredLedger = useMemo(
     () =>
@@ -122,222 +174,217 @@ export default function CustomerTokensPage() {
         if (directionFilter !== "ALL" && entry.direction !== directionFilter) {
           return false;
         }
+        if (needle) {
+          const haystack = [
+            entry.reason ?? "",
+            formatLedgerReason(entry.reason),
+            entry.notes ?? "",
+            entry.ticketCode ?? "",
+          ]
+            .join(" ")
+            .toLowerCase();
+          if (!haystack.includes(needle)) return false;
+        }
         return true;
       }),
-    [ledger, directionFilter],
+    [ledger, directionFilter, needle],
   );
 
-  const formatDateTime = (iso: string) => {
-    const d = new Date(iso);
-    return d.toLocaleString();
-  };
+  const paged = pageOf(filteredLedger, page, PAGE_SIZE);
+  // Derived from the visible rows, so the panel and the highlighted row always agree.
+  const selected = panelClosed
+    ? null
+    : (paged.rows.find((e) => e.id === selectedId) ?? paged.rows[0] ?? null);
 
-  const formatAmount = (amount: number) => `${amount.toLocaleString("en-US")} tokens`;
-
-  const pillClasses = (direction: LedgerDirection) => {
-    const base = "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium";
-    if (direction === "CREDIT") {
-      return `${base} bg-[var(--bb-success-bg)] text-[var(--bb-success-text)]`;
-    }
-    return `${base} bg-[var(--bb-danger-bg)] text-[var(--bb-danger-text)]`;
-  };
-
-  const directionLabel = (direction: LedgerDirection) =>
-    direction === "CREDIT" ? "Credit" : "Debit";
+  const roleLabel = prettyCompanyRole(companyRole);
 
   return (
     <>
-      {/* Page header */}
-      <div className="mt-2 mb-4 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Tokens overview</h1>
-          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-            Your company&apos;s token balance and recent usage across creative requests.
-          </p>
-          {company && (
-            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-              Company:{" "}
-              <span className="font-medium text-[var(--bb-secondary)]">{company.name}</span> (
-              {company.slug})
-            </p>
-          )}
-        </div>
-      </div>
+      <PageHeader
+        title="Tokens overview"
+        description="Your company's token balance and recent usage across creative requests."
+        meta={
+          company ? (
+            <>
+              Company <span className="font-medium text-[var(--av2-text)]">{company.name}</span>
+              {roleLabel ? (
+                <>
+                  {" · "}You are browsing as{" "}
+                  <span className="font-medium text-[var(--av2-text)]">{roleLabel}</span>
+                </>
+              ) : null}
+            </>
+          ) : null
+        }
+      />
 
-      {/* Limited access info for non-billing roles */}
-      {!error && companyRole && companyRole !== "OWNER" && companyRole !== "BILLING" && (
-        <div className="mb-4 rounded-xl border border-[var(--bb-warning-border)] bg-[var(--bb-warning-bg)] px-4 py-3 text-xs text-[var(--bb-text-secondary)]">
-          <p className="text-[11px] font-medium text-[var(--bb-warning-text)]">Limited access</p>
-          <p className="mt-1">
+      <div className="space-y-6">
+        {/* Limited access info for non-billing roles */}
+        {!error && companyRole && !canManageBilling(companyRole) ? (
+          <Callout tone="warning" title="Limited access">
             You can see your company&apos;s token balance and history, but only the owner or billing
             manager can request top-ups or billing changes.
-          </p>
-        </div>
-      )}
+          </Callout>
+        ) : null}
 
-      {/* Error state */}
-      {error && (
-        <InlineAlert variant="error" title="Error" className="mb-4">
-          {error}
-        </InlineAlert>
-      )}
+        {error ? (
+          <Callout tone="error" title="We couldn't load your tokens">
+            {error}
+          </Callout>
+        ) : null}
 
-      {/* Summary cards */}
-      <section className="mb-6 grid gap-4 md:grid-cols-3">
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-          <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
-            Current balance
-          </p>
-          <p className="mt-2 text-3xl font-semibold text-[var(--bb-primary)]">
-            {loading ? "—" : data ? data.company.tokenBalance : "0"}
-            <span className="ml-1 text-base font-normal text-[var(--bb-text-secondary)]">
-              tokens
-            </span>
-          </p>
-          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-            This is the balance after all debits and credits.
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-          <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
-            Total credits
-          </p>
-          <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
-            {loading ? "—" : data ? data.stats.totalCredits : "0"}
-          </p>
-          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-            Tokens added by plan renewals, manual top-ups or adjustments.
-          </p>
+        <div className="grid gap-6 xl:grid-cols-3">
+          <KpiCard
+            icon={<IconCoins />}
+            tone="green"
+            label="Current balance"
+            value={loading ? DASH : <TokenFigure value={data?.company.tokenBalance} />}
+            hint="Your company's current token balance."
+          />
+          <KpiCard
+            icon={<IconTicket />}
+            tone="lavender"
+            label="Credits"
+            value={loading ? DASH : <TokenFigure value={data?.stats.totalCredits} unit={false} />}
+            hint="Plan renewals, top-ups and adjustments in the 50 most recent movements."
+          />
+          <KpiCard
+            icon={<IconTicket />}
+            tone="peach"
+            label="Debits"
+            value={loading ? DASH : <TokenFigure value={data?.stats.totalDebits} unit={false} />}
+            hint="Ticket work and other debits in the 50 most recent movements."
+          />
         </div>
 
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-          <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
-            Total debits
-          </p>
-          <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
-            {loading ? "—" : data ? data.stats.totalDebits : "0"}
-          </p>
-          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-            Tokens consumed by ticket work and other debits.
-          </p>
-        </div>
-      </section>
-
-      {/* Ledger filters */}
-      <section className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold tracking-tight">Token ledger</h2>
-          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-            A chronological view of how tokens have moved in or out of your balance.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-[var(--bb-text-secondary)]">Filter:</span>
-          <div className="inline-flex overflow-hidden rounded-full border border-[var(--bb-border)] bg-[var(--bb-bg-page)]">
-            <button
-              type="button"
-              className={`px-3 py-1 text-xs ${
-                directionFilter === "ALL"
-                  ? "bg-[var(--bb-bg-card)] font-medium text-[var(--bb-secondary)]"
-                  : "text-[var(--bb-text-secondary)]"
-              }`}
-              onClick={() => setDirectionFilter("ALL")}
-            >
-              All
-            </button>
-            <button
-              type="button"
-              className={`border-l border-[var(--bb-border)] px-3 py-1 text-xs ${
-                directionFilter === "CREDIT"
-                  ? "bg-[var(--bb-bg-card)] font-medium text-[var(--bb-secondary)]"
-                  : "text-[var(--bb-text-secondary)]"
-              }`}
-              onClick={() => setDirectionFilter("CREDIT")}
-            >
-              Credits
-            </button>
-            <button
-              type="button"
-              className={`border-l border-[var(--bb-border)] px-3 py-1 text-xs ${
-                directionFilter === "DEBIT"
-                  ? "bg-[var(--bb-bg-card)] font-medium text-[var(--bb-secondary)]"
-                  : "text-[var(--bb-text-secondary)]"
-              }`}
-              onClick={() => setDirectionFilter("DEBIT")}
-            >
-              Debits
-            </button>
+        {error ? null : loading ? (
+          <div aria-busy="true" aria-label="Loading token ledger">
+            <Skeleton className="h-96" />
           </div>
-        </div>
-      </section>
-
-      {/* Ledger table */}
-      <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold tracking-tight">Recent token activity</h2>
-          <p className="text-xs text-[var(--bb-text-tertiary)]">
-            Showing the 50 most recent movements.
-          </p>
-        </div>
-
-        {loading ? (
-          <LoadingState message="Loading token ledger…" />
-        ) : filteredLedger.length === 0 ? (
-          <EmptyState title="No token movements yet." />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-[var(--bb-border-subtle)] text-[11px] tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
-                  <th className="py-2 pr-4">Date</th>
-                  <th className="py-2 pr-4">Direction</th>
-                  <th className="py-2 pr-4">Amount</th>
-                  <th className="py-2 pr-4">Reason</th>
-                  <th className="py-2 pr-4">Ticket</th>
-                  <th className="py-2 pr-4">Balance before</th>
-                  <th className="py-2 pr-4">Balance after</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredLedger.map((entry) => (
-                  <tr
-                    key={entry.id}
-                    className="border-b border-[var(--bb-border-subtle)] last:border-none"
-                  >
-                    <td className="py-2 pr-4 align-top text-[11px] text-[var(--bb-text-secondary)]">
-                      {formatDateTime(entry.createdAt)}
-                    </td>
-                    <td className="py-2 pr-4 align-top">
-                      <span className={pillClasses(entry.direction)}>
-                        {directionLabel(entry.direction)}
-                      </span>
-                    </td>
-                    <td className="py-2 pr-4 align-top text-[11px] text-[var(--bb-secondary)]">
-                      {formatAmount(entry.amount)}
-                    </td>
-                    <td className="py-2 pr-4 align-top text-[11px] text-[var(--bb-text-secondary)]">
-                      {entry.reason || "—"}
-                      {entry.notes ? (
-                        <span className="ml-1 text-[var(--bb-text-tertiary)]">({entry.notes})</span>
-                      ) : null}
-                    </td>
-                    <td className="py-2 pr-4 align-top text-[11px] text-[var(--bb-text-secondary)]">
-                      {entry.ticketCode || "—"}
-                    </td>
-                    <td className="py-2 pr-4 align-top text-[11px] text-[var(--bb-text-secondary)]">
-                      {entry.balanceBefore != null ? entry.balanceBefore : "—"}
-                    </td>
-                    <td className="py-2 pr-4 align-top text-[11px] text-[var(--bb-text-secondary)]">
-                      {entry.balanceAfter != null ? entry.balanceAfter : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <SplitView
+            panel={
+              selected ? (
+                <div ref={panelRef} className="scroll-mt-20 xl:contents">
+                  <LedgerDetail entry={selected} onClose={() => setPanelClosed(true)} />
+                </div>
+              ) : null
+            }
+          >
+            <Card padding="none">
+              <div className="px-6 pt-6">
+                <CardTitle description="A chronological view of how tokens have moved in or out of your balance.">
+                  Token ledger
+                </CardTitle>
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <FilterChips
+                    label="Filter by type"
+                    options={[
+                      { value: "ALL", label: "All" },
+                      { value: "CREDIT", label: "Credits" },
+                      { value: "DEBIT", label: "Debits" },
+                    ]}
+                    value={directionFilter}
+                    onChange={(v: DirectionFilter) => {
+                      setDirectionFilter(v);
+                      setPage(1);
+                    }}
+                  />
+                  <SearchInput
+                    className="min-w-[200px] flex-1"
+                    value={query}
+                    onChange={(v) => {
+                      setQuery(v);
+                      setPage(1);
+                    }}
+                    placeholder="Search ledger"
+                    label="Search ledger"
+                  />
+                </div>
+              </div>
+
+              {ledger.length === 0 ? (
+                <EmptyState title="No token movements yet." />
+              ) : paged.total === 0 ? (
+                <EmptyState
+                  title="No movements match these filters"
+                  description="Try another type, or clear the search."
+                />
+              ) : (
+                <div className="mt-4">
+                  <Table label="Token ledger">
+                    <thead>
+                      <tr>
+                        <Th>Date</Th>
+                        <Th className="max-2xl:hidden">Type</Th>
+                        <Th>Amount</Th>
+                        <Th className="max-md:hidden">Reason</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paged.rows.map((entry) => (
+                        <Tr
+                          key={entry.id}
+                          selected={entry.id === selected?.id}
+                          onSelect={() => {
+                            setSelectedId(entry.id);
+                            setPanelClosed(false);
+                            reveal();
+                          }}
+                          label={`${formatLedgerReason(entry.reason)}, ${formatSignedTokens(entry.direction, entry.amount)}`}
+                        >
+                          <Td className="2xl:whitespace-nowrap">
+                            {formatDateTime(entry.createdAt)}
+                          </Td>
+                          {/* Below 2xl the sign carries the direction; the panel shows the badge. */}
+                          <Td className="max-2xl:hidden">
+                            <DirectionBadge direction={entry.direction} />
+                          </Td>
+                          <Td className="font-semibold tabular-nums 2xl:whitespace-nowrap">
+                            {formatSignedTokens(entry.direction, entry.amount)}
+                          </Td>
+                          <Td className="max-md:hidden">{formatLedgerReason(entry.reason)}</Td>
+                        </Tr>
+                      ))}
+                    </tbody>
+                  </Table>
+                  <ListFooter
+                    {...paged}
+                    onPage={setPage}
+                    note="From the 50 most recent movements."
+                  />
+                </div>
+              )}
+            </Card>
+          </SplitView>
         )}
-      </section>
+      </div>
     </>
+  );
+}
+
+function LedgerDetail({ entry, onClose }: { entry: LedgerEntry; onClose: () => void }) {
+  return (
+    <DetailPanel title={formatLedgerReason(entry.reason)} onClose={onClose}>
+      <PanelSection>
+        <div className="flex flex-wrap items-center gap-3">
+          <DirectionBadge direction={entry.direction} />
+          <span className="text-xl leading-7 font-semibold break-words tabular-nums">
+            {formatSignedTokens(entry.direction, entry.amount)}
+          </span>
+        </div>
+      </PanelSection>
+      <PanelSection>
+        <KeyValueList
+          rows={[
+            { label: "Date", value: formatDateTime(entry.createdAt) },
+            { label: "Balance before", value: <RecordedBalance value={entry.balanceBefore} /> },
+            { label: "Balance after", value: <RecordedBalance value={entry.balanceAfter} /> },
+            { label: "Ticket", value: entry.ticketCode || DASH },
+            { label: "Notes", value: entry.notes || DASH },
+          ]}
+        />
+      </PanelSection>
+    </DetailPanel>
   );
 }

@@ -15,7 +15,7 @@
 export const COMPANY_LEGAL_NAME = "Brandbite FZE";
 
 /** Public-facing brand name (not the legal entity). */
-export const COMPANY_BRAND_NAME = "Brandbite";
+export const COMPANY_BRAND_NAME = "brandbite";
 
 /** Registered address, one entry per display line. */
 export const COMPANY_ADDRESS_LINES = [

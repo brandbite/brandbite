@@ -66,6 +66,7 @@ import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 import {
   Badge as V2Badge,
   Button as V2Button,
+  ButtonLink as V2ButtonLink,
   Callout as V2Callout,
   Select as V2Select,
   Skeleton as V2Skeleton,
@@ -73,6 +74,21 @@ import {
   Tabs as V2Tabs,
   TextInput as V2TextInput,
 } from "@/components/admin/v2/ui";
+import { useTabFromUrl } from "@/components/dashboard/account/account-ui";
+import {
+  NOTIFICATION_LABELS,
+  NOTIFICATION_ORDER,
+  NOTIFICATION_ROLE_ONLY,
+  NotificationMatrix,
+  type NotificationChannel,
+  type NotificationPreference,
+  type NotificationType,
+} from "@/components/dashboard/account/notification-matrix";
+import {
+  CreativeSetupBanner,
+  CreativeSetupChecklist,
+  CustomerAccountSummary,
+} from "@/components/dashboard/account/profile-asides";
 
 // ---------------------------------------------------------------------------
 // Layout modes.
@@ -83,13 +99,30 @@ import {
 //   "tabs" (admin only) — Personal / Notifications / Security tabs on the
 //     admin design language v1 (`.bb-admin-v2` primitives). Same state,
 //     handlers and API calls; only presentation differs.
+//
+// Surfaces, within "tabs":
+//   "admin" (default) — the three tabs above.
+//   "dashboard" — customer + creative: Personal details, Workload (creative),
+//     Notifications, Security, Sessions, Account management, controls at full
+//     height, a role-specific right-hand card, 2FA setup behind its own step.
 // ---------------------------------------------------------------------------
 
 export type ProfileFormLayout = "stacked" | "tabs";
+export type ProfileFormSurface = "admin" | "dashboard";
 
 const V2Context = createContext(false);
+const DashboardContext = createContext(false);
 
-type ProfileTab = "personal" | "notifications" | "security";
+type ProfileTab = "personal" | "workload" | "notifications" | "security" | "sessions" | "account";
+
+const DASHBOARD_TABS: readonly ProfileTab[] = [
+  "personal",
+  "workload",
+  "notifications",
+  "security",
+  "sessions",
+  "account",
+];
 
 /** Class names that differ between the two layouts. Stacked values are the
  *  original strings, verbatim. */
@@ -144,13 +177,14 @@ const T_TABS: typeof T_STACKED = {
 
 function PButton(props: ComponentProps<typeof Button>) {
   const v2 = useContext(V2Context);
+  const dashboard = useContext(DashboardContext);
   if (!v2) return <Button {...props} />;
   const { variant, size, loading, loadingText, children, disabled, ...rest } = props;
   return (
     <V2Button
       {...rest}
       variant={variant ?? "primary"}
-      size={size === "sm" ? "sm" : "md"}
+      size={size === "sm" && !dashboard ? "sm" : "md"}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
     >
@@ -253,15 +287,18 @@ function ProfilePanel({
   value,
   active,
   idPrefix,
+  flatten,
   children,
 }: {
   layout: ProfileFormLayout;
   value: ProfileTab;
   active: ProfileTab;
   idPrefix: string;
+  /** The content holds its own panels (see ProfileSubPanel). */
+  flatten?: boolean;
   children: ReactNode;
 }) {
-  if (layout !== "tabs") return <>{children}</>;
+  if (layout !== "tabs" || flatten) return <>{children}</>;
   return (
     <div
       role="tabpanel"
@@ -273,6 +310,16 @@ function ProfilePanel({
       {children}
     </div>
   );
+}
+
+/** A section that has its own tab on the dashboard surface and shares its
+ *  parent panel elsewhere, where it adds no markup at all. */
+function ProfileSubPanel({
+  dashboard,
+  ...props
+}: ComponentProps<typeof ProfilePanel> & { dashboard: boolean }) {
+  if (!dashboard) return <>{props.children}</>;
+  return <ProfilePanel {...props} />;
 }
 
 // ---------------------------------------------------------------------------
@@ -306,21 +353,6 @@ type ProfileUser = {
   tasksPerWeekCap: number | null;
 };
 
-type NotificationType =
-  | "REVISION_SUBMITTED"
-  | "FEEDBACK_SUBMITTED"
-  | "TICKET_COMPLETED"
-  | "TICKET_ASSIGNED"
-  | "TICKET_STATUS_CHANGED"
-  | "PIN_RESOLVED"
-  | "WITHDRAWAL_UPDATED";
-
-type NotificationPreference = {
-  type: NotificationType;
-  enabled: boolean;
-  emailEnabled: boolean;
-};
-
 // Subset of BetterAuth's listSessions response shape we render. Token is
 // included because /two-factor/revoke-session takes it; we never display
 // it. Created/updated come back as ISO strings on the wire.
@@ -340,58 +372,6 @@ const ROLE_LABELS: Record<Role, string> = {
   DESIGNER: "Creative",
   CUSTOMER: "Customer",
 };
-
-// Friendly descriptions for the notification toggle list. Keeping the
-// copy here rather than fetching from the API means we can keep the
-// list short and explanatory without a server round-trip.
-const NOTIFICATION_LABELS: Record<NotificationType, { title: string; description: string }> = {
-  REVISION_SUBMITTED: {
-    title: "Revision submitted",
-    description: "A creative submitted a new revision for one of your tickets.",
-  },
-  FEEDBACK_SUBMITTED: {
-    title: "Feedback submitted",
-    description: "A customer left feedback (pins or comments) on a revision.",
-  },
-  TICKET_COMPLETED: {
-    title: "Ticket completed",
-    description: "A ticket you're attached to has been marked as Done.",
-  },
-  TICKET_ASSIGNED: {
-    title: "Ticket assigned",
-    description: "A new ticket has been auto-assigned to you.",
-  },
-  TICKET_STATUS_CHANGED: {
-    title: "Status changed",
-    description: "Any other status transition on a ticket you're attached to.",
-  },
-  PIN_RESOLVED: {
-    title: "Pin resolved",
-    description: "A creative resolved a pin you placed on an asset.",
-  },
-  WITHDRAWAL_UPDATED: {
-    title: "Withdrawal updates",
-    description: "A withdrawal you requested was approved, rejected or paid.",
-  },
-};
-
-/** Types that only make sense for one role; others are shown to everyone. */
-const NOTIFICATION_ROLE_ONLY: Partial<Record<NotificationType, Role>> = {
-  WITHDRAWAL_UPDATED: "DESIGNER",
-};
-
-// Stable order for rendering the toggle list. Matches the order of the
-// candidate flow — ticket created → assigned → revisions → feedback →
-// pins resolved → completed.
-const NOTIFICATION_ORDER: NotificationType[] = [
-  "TICKET_ASSIGNED",
-  "TICKET_STATUS_CHANGED",
-  "REVISION_SUBMITTED",
-  "FEEDBACK_SUBMITTED",
-  "PIN_RESOLVED",
-  "TICKET_COMPLETED",
-  "WITHDRAWAL_UPDATED",
-];
 
 // ---------------------------------------------------------------------------
 // Timezone helpers
@@ -498,21 +478,30 @@ function relativeTime(iso: string): string {
 // Component
 // ---------------------------------------------------------------------------
 
-export function ProfileForm({ layout = "stacked" }: { layout?: ProfileFormLayout } = {}) {
-  // The provider renders no DOM, so the stacked markup is unchanged.
+export function ProfileForm({
+  layout = "stacked",
+  surface = "admin",
+}: { layout?: ProfileFormLayout; surface?: ProfileFormSurface } = {}) {
+  // The providers render no DOM, so the stacked markup is unchanged.
+  const dashboard = layout === "tabs" && surface === "dashboard";
   return (
     <V2Context.Provider value={layout === "tabs"}>
-      <ProfileFormBody layout={layout} />
+      <DashboardContext.Provider value={dashboard}>
+        <ProfileFormBody layout={layout} dashboard={dashboard} />
+      </DashboardContext.Provider>
     </V2Context.Provider>
   );
 }
 
-function ProfileFormBody({ layout }: { layout: ProfileFormLayout }) {
+function ProfileFormBody({ layout, dashboard }: { layout: ProfileFormLayout; dashboard: boolean }) {
   const { showToast } = useToast();
   const v2 = layout === "tabs";
   const T = v2 ? T_TABS : T_STACKED;
   const [tab, setTab] = useState<ProfileTab>("personal");
   const tabIdPrefix = useId();
+
+  // Dashboard links such as /customer/profile?tab=notifications open that tab.
+  useTabFromUrl<ProfileTab>(dashboard ? DASHBOARD_TABS : [], setTab);
 
   // ---- core profile load ----
   const [user, setUser] = useState<ProfileUser | null>(null);
@@ -613,6 +602,11 @@ function ProfileFormBody({ layout }: { layout: ProfileFormLayout }) {
   const [twoFaDisableOpen, setTwoFaDisableOpen] = useState(false);
   const [twoFaDisabling, setTwoFaDisabling] = useState(false);
   const [twoFaDisableError, setTwoFaDisableError] = useState<string | null>(null);
+  // Dashboard only: setup starts behind its own button rather than in the card.
+  const [twoFaSetupOpen, setTwoFaSetupOpen] = useState(false);
+
+  // Creative setup checklist. undefined = loading, null = couldn't tell.
+  const [skillCount, setSkillCount] = useState<number | null | undefined>(undefined);
 
   // ---- delete account modal ----
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -703,6 +697,27 @@ function ProfileFormBody({ layout }: { layout: ProfileFormLayout }) {
       cancelled = true;
     };
   }, []);
+
+  const isDesignerDashboard = dashboard && user?.role === "DESIGNER";
+  useEffect(() => {
+    if (!isDesignerDashboard) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/creative/skills", { cache: "no-store" });
+        const json = await res.json().catch(() => null);
+        if (cancelled) return;
+        setSkillCount(
+          res.ok && Array.isArray(json?.selectedJobTypeIds) ? json.selectedJobTypeIds.length : null,
+        );
+      } catch {
+        if (!cancelled) setSkillCount(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isDesignerDashboard]);
 
   // -----------------------------------------------------------------
   // Avatar upload + remove. The upload route returns the new public R2
@@ -1042,7 +1057,7 @@ function ProfileFormBody({ layout }: { layout: ProfileFormLayout }) {
   // also flip the in-app channel back to its previous value.
   // -----------------------------------------------------------------
   const handleTogglePref = useCallback(
-    async (type: NotificationType, channel: "enabled" | "emailEnabled", next: boolean) => {
+    async (type: NotificationType, channel: NotificationChannel, next: boolean) => {
       if (!prefs) return;
       const key = `${type}:${channel}`;
       setPrefsSaving((prev) => new Set(prev).add(key));
@@ -1377,7 +1392,25 @@ function ProfileFormBody({ layout }: { layout: ProfileFormLayout }) {
   const browserTz = detectBrowserTimezone();
   const browserTzMatchesSaved = !!user.timezone && browserTz === user.timezone;
 
-  const panel = { layout, active: tab, idPrefix: tabIdPrefix };
+  // ?tab=workload means nothing outside the creative portal.
+  const activeTab: ProfileTab = tab === "workload" && user.role !== "DESIGNER" ? "personal" : tab;
+  const panel = { layout, active: activeTab, idPrefix: tabIdPrefix };
+
+  const openTab = (next: ProfileTab) => {
+    setTab(next);
+    requestAnimationFrame(() => document.getElementById(`${tabIdPrefix}-tab-${next}`)?.focus());
+  };
+
+  const dashboardTabs: { value: ProfileTab; label: string }[] = [
+    { value: "personal", label: "Personal details" },
+    ...(user.role === "DESIGNER" ? [{ value: "workload" as const, label: "Workload" }] : []),
+    { value: "notifications", label: "Notifications" },
+    { value: "security", label: "Security" },
+    { value: "sessions", label: "Sessions" },
+    { value: "account", label: "Account management" },
+  ];
+
+  const setupComplete = !!user.name && !!user.workingHours && !!skillCount;
 
   return (
     <ProfileShell
@@ -1393,21 +1426,41 @@ function ProfileFormBody({ layout }: { layout: ProfileFormLayout }) {
       }
       tabBar={
         v2 ? (
-          <V2Tabs<ProfileTab>
-            label="Profile sections"
-            idPrefix={tabIdPrefix}
-            value={tab}
-            onChange={setTab}
-            tabs={[
-              { value: "personal", label: "Personal details" },
-              { value: "notifications", label: "Notifications" },
-              { value: "security", label: "Security & sessions" },
-            ]}
-          />
+          <>
+            {isDesignerDashboard && skillCount !== undefined && !setupComplete && (
+              <CreativeSetupBanner onOpenWorkload={() => openTab("workload")} />
+            )}
+            <V2Tabs<ProfileTab>
+              label="Profile sections"
+              idPrefix={tabIdPrefix}
+              value={activeTab}
+              onChange={setTab}
+              tabs={
+                dashboard
+                  ? dashboardTabs
+                  : [
+                      { value: "personal", label: "Personal details" },
+                      { value: "notifications", label: "Notifications" },
+                      { value: "security", label: "Security & sessions" },
+                    ]
+              }
+            />
+          </>
         ) : null
       }
       aside={
-        v2 ? (
+        dashboard ? (
+          user.role === "DESIGNER" ? (
+            <CreativeSetupChecklist
+              name={user.name}
+              workingHours={user.workingHours}
+              skillCount={skillCount ?? null}
+              onOpenWorkload={() => openTab("workload")}
+            />
+          ) : (
+            <CustomerAccountSummary roleLabel={ROLE_LABELS[user.role]} />
+          )
+        ) : v2 ? (
           <AccountSummary
             name={user.name}
             email={user.email}
@@ -1415,302 +1468,305 @@ function ProfileFormBody({ layout }: { layout: ProfileFormLayout }) {
             roleLabel={ROLE_LABELS[user.role]}
             twoFactorEnabled={user.twoFactorEnabled}
             sessionCount={sessionsList?.length ?? null}
-            onOpen={(next) => {
-              setTab(next);
-              requestAnimationFrame(() =>
-                document.getElementById(`${tabIdPrefix}-tab-${next}`)?.focus(),
-              );
-            }}
+            onOpen={openTab}
           />
         ) : null
       }
     >
-      <ProfilePanel value="personal" {...panel}>
-        {/* ---- Identity ---- */}
-        <section className={T.card}>
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <h2 className={T.h2}>Identity</h2>
-              <p className={T.desc}>
-                Your name appears on tickets, comments, and the emails we send about your work.
-              </p>
+      <ProfilePanel value="personal" {...panel} flatten={dashboard}>
+        <ProfileSubPanel value="personal" {...panel} dashboard={dashboard}>
+          {/* ---- Identity ---- */}
+          <section className={T.card}>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className={T.h2}>Identity</h2>
+                <p className={T.desc}>
+                  Your name appears on tickets, comments, and the emails we send about your work.
+                </p>
+              </div>
+              <PBadge variant="neutral">{ROLE_LABELS[user.role]}</PBadge>
             </div>
-            <PBadge variant="neutral">{ROLE_LABELS[user.role]}</PBadge>
-          </div>
 
-          {/* Avatar — circle, with initials fallback. Click anywhere on the
+            {/* Avatar — circle, with initials fallback. Click anywhere on the
             row to swap, or use the explicit Change/Remove buttons. The
             file input is hidden and triggered programmatically so the
             UI can stay restrained. */}
-          <div className="mb-5 flex flex-wrap items-center gap-4">
-            <div
-              className={T.avatar}
-              aria-label={user.image ? "Your avatar" : "Avatar placeholder with your initials"}
-            >
-              {user.image ? (
-                // Rendered via <img> rather than next/image because the
-                // source is a public R2 URL the optimizer can't help with
-                // and we don't need a layout-shift placeholder.
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={user.image} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <span aria-hidden="true">{(user.name || user.email)[0]?.toUpperCase() ?? "?"}</span>
-              )}
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) void handleUploadAvatar(f);
-                  // Reset so the same file can be re-selected (e.g. after
-                  // a failed upload).
-                  e.target.value = "";
-                }}
-              />
-              <PButton
-                variant="secondary"
-                size="sm"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingAvatar || removingAvatar}
-                loading={uploadingAvatar}
-                loadingText="Uploading…"
+            <div className="mb-5 flex flex-wrap items-center gap-4">
+              <div
+                className={T.avatar}
+                aria-label={user.image ? "Your avatar" : "Avatar placeholder with your initials"}
               >
-                {user.image ? "Change avatar" : "Upload avatar"}
-              </PButton>
-              {user.image && (
-                <PButton
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => void handleRemoveAvatar()}
-                  disabled={uploadingAvatar || removingAvatar}
-                  loading={removingAvatar}
-                  loadingText="Removing…"
-                >
-                  Remove
-                </PButton>
-              )}
-            </div>
-            <p className={T.avatarHint}>
-              PNG, JPEG, WebP, or GIF. 2&nbsp;MB max. Square images crop best.
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className={T.label}>Full name</label>
-              <div className={`${T.inputLabelGap} flex flex-wrap items-center gap-2`}>
-                <PInput
-                  value={nameDraft}
-                  onChange={(e) => setNameDraft(e.target.value)}
-                  placeholder="Your full name"
-                  autoComplete="name"
-                  maxLength={80}
-                  className="min-w-[200px] flex-1"
-                />
-                <PButton
-                  onClick={() => void handleSaveIdentity()}
-                  disabled={savingIdentity || nameDraft.trim() === (user.name ?? "")}
-                  loading={savingIdentity}
-                  loadingText="Saving…"
-                >
-                  Save name
-                </PButton>
+                {user.image ? (
+                  // Rendered via <img> rather than next/image because the
+                  // source is a public R2 URL the optimizer can't help with
+                  // and we don't need a layout-shift placeholder.
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={user.image} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <span aria-hidden="true">
+                    {(user.name || user.email)[0]?.toUpperCase() ?? "?"}
+                  </span>
+                )}
               </div>
-            </div>
-
-            <div>
-              <label className={T.label} htmlFor="profile-email">
-                Email
-              </label>
-              <div className={`${T.inputLabelGap} flex flex-wrap items-center gap-2`}>
-                <PInput
-                  id="profile-email"
-                  type="email"
-                  value={emailDraft}
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  className="hidden"
                   onChange={(e) => {
-                    setEmailDraft(e.target.value);
-                    if (emailError) setEmailError(null);
+                    const f = e.target.files?.[0];
+                    if (f) void handleUploadAvatar(f);
+                    // Reset so the same file can be re-selected (e.g. after
+                    // a failed upload).
+                    e.target.value = "";
                   }}
-                  autoComplete="email"
-                  placeholder="you@example.com"
-                  error={!!emailError}
-                  disabled={savingEmail}
-                  className="min-w-[200px] flex-1"
                 />
                 <PButton
-                  onClick={() => void handleRequestEmailChange()}
-                  disabled={
-                    savingEmail || emailDraft.trim().toLowerCase() === user.email.toLowerCase()
-                  }
-                  loading={savingEmail}
-                  loadingText="Sending…"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingAvatar || removingAvatar}
+                  loading={uploadingAvatar}
+                  loadingText="Uploading…"
                 >
-                  Change email
+                  {user.image ? "Change avatar" : "Upload avatar"}
                 </PButton>
+                {user.image && (
+                  <PButton
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => void handleRemoveAvatar()}
+                    disabled={uploadingAvatar || removingAvatar}
+                    loading={removingAvatar}
+                    loadingText="Removing…"
+                  >
+                    Remove
+                  </PButton>
+                )}
               </div>
-              {emailError && <p className={T.emailError}>{emailError}</p>}
-              {pendingEmail && !emailError && (
-                <p className={T.hint}>
-                  Pending — we sent a confirmation link to <strong>{pendingEmail}</strong>. Open it
-                  from that inbox to complete the swap. Until then, you stay signed in as{" "}
-                  <strong>{user.email}</strong>.
-                </p>
-              )}
-              {!pendingEmail && !emailError && (
-                <p className={T.hint}>
-                  We&apos;ll email a confirmation link to the new address. Your current email stays
-                  in effect until you open the link.
-                </p>
-              )}
-            </div>
-          </div>
-        </section>
-
-        {/* ---- Timezone ---- */}
-        <section className={T.card}>
-          <div className="mb-4">
-            <h2 className={T.h2}>Timezone</h2>
-            <p className={T.desc}>
-              Used to render due dates and notification timestamps in your local time. Falls back to
-              UTC when not set.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="min-w-[220px] flex-1">
-              <label className={T.label}>IANA timezone</label>
-              <PSelect
-                value={timezoneDraft}
-                onChange={(e) => setTimezoneDraft(e.target.value)}
-                className="mt-1 w-full"
-                aria-label="IANA timezone"
-              >
-                <option value="">— Not set (UTC) —</option>
-                {timezones.map((tz) => (
-                  <option key={tz} value={tz}>
-                    {tz}
-                  </option>
-                ))}
-              </PSelect>
-            </div>
-            <PButton
-              onClick={() => void handleSaveTimezone(timezoneDraft)}
-              disabled={savingTimezone || timezoneDraft === (user.timezone ?? "")}
-              loading={savingTimezone}
-              loadingText="Saving…"
-            >
-              Save
-            </PButton>
-            <PButton
-              variant="secondary"
-              onClick={handleAutoDetectTimezone}
-              disabled={savingTimezone || browserTzMatchesSaved}
-              title={
-                browserTzMatchesSaved
-                  ? "Already matches your browser's timezone"
-                  : "Use your browser's detected timezone"
-              }
-            >
-              Auto-detect
-            </PButton>
-          </div>
-          {browserTz && !browserTzMatchesSaved && (
-            <p className={T.hint2}>
-              Your browser thinks you&apos;re in <strong>{browserTz}</strong>.
-            </p>
-          )}
-        </section>
-
-        {/* ---- Workload (creative-only) ---- */}
-        {user.role === "DESIGNER" && (
-          <section className={T.card}>
-            <div className="mb-4">
-              <h2 className={T.h2}>Workload</h2>
-              <p className={T.desc}>
-                When you&apos;re available and how many tickets you&apos;re willing to hold at once.
-                Auto-assign uses the cap to skip you when you&apos;re already at capacity; admins
-                use the working-hours hint when scheduling rush work.
+              <p className={T.avatarHint}>
+                PNG, JPEG, WebP, or GIF. 2&nbsp;MB max. Square images crop best.
               </p>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className={T.label}>Working hours</label>
+                <label className={T.label}>Full name</label>
                 <div className={`${T.inputLabelGap} flex flex-wrap items-center gap-2`}>
                   <PInput
-                    value={workingHoursDraft}
-                    onChange={(e) => setWorkingHoursDraft(e.target.value)}
-                    placeholder="e.g. 9–18 weekdays, Europe/Istanbul"
-                    maxLength={200}
-                    className="min-w-[220px] flex-1"
+                    value={nameDraft}
+                    onChange={(e) => setNameDraft(e.target.value)}
+                    placeholder="Your full name"
+                    aria-label="Full name"
+                    autoComplete="name"
+                    maxLength={80}
+                    className="min-w-[200px] flex-1"
                   />
                   <PButton
-                    onClick={() => void handleSaveWorkingHours()}
-                    disabled={
-                      savingWorkingHours || workingHoursDraft.trim() === (user.workingHours ?? "")
-                    }
-                    loading={savingWorkingHours}
+                    onClick={() => void handleSaveIdentity()}
+                    disabled={savingIdentity || nameDraft.trim() === (user.name ?? "")}
+                    loading={savingIdentity}
                     loadingText="Saving…"
                   >
-                    Save
+                    Save name
                   </PButton>
                 </div>
-                <p className={T.hint}>
-                  Free-form text — describe the days and hours you&apos;re typically online.
-                  Anything an admin can read at a glance works.
-                </p>
               </div>
 
               <div>
-                <label className={T.label}>Concurrent task cap</label>
+                <label className={T.label} htmlFor="profile-email">
+                  Email
+                </label>
                 <div className={`${T.inputLabelGap} flex flex-wrap items-center gap-2`}>
                   <PInput
-                    type="number"
-                    inputMode="numeric"
-                    min={1}
-                    max={40}
-                    value={tasksCapDraft}
-                    onChange={(e) => setTasksCapDraft(e.target.value)}
-                    placeholder="No cap"
-                    aria-label="Concurrent task cap"
-                    className="w-32"
+                    id="profile-email"
+                    type="email"
+                    value={emailDraft}
+                    onChange={(e) => {
+                      setEmailDraft(e.target.value);
+                      if (emailError) setEmailError(null);
+                    }}
+                    autoComplete="email"
+                    placeholder="you@example.com"
+                    error={!!emailError}
+                    disabled={savingEmail}
+                    className="min-w-[200px] flex-1"
                   />
                   <PButton
-                    onClick={() => void handleSaveTasksCap()}
+                    onClick={() => void handleRequestEmailChange()}
                     disabled={
-                      savingTasksCap ||
-                      tasksCapDraft.trim() ===
-                        (user.tasksPerWeekCap == null ? "" : String(user.tasksPerWeekCap))
+                      savingEmail || emailDraft.trim().toLowerCase() === user.email.toLowerCase()
                     }
-                    loading={savingTasksCap}
-                    loadingText="Saving…"
+                    loading={savingEmail}
+                    loadingText="Sending…"
                   >
-                    Save
+                    Change email
                   </PButton>
-                  {user.tasksPerWeekCap != null && (
-                    <PButton
-                      variant="ghost"
-                      onClick={() => {
-                        setTasksCapDraft("");
-                        void handleSaveTasksCap("");
-                      }}
-                      disabled={savingTasksCap}
-                    >
-                      Clear
-                    </PButton>
-                  )}
                 </div>
-                <p className={T.hint}>
-                  Auto-assign skips you when your open ticket count reaches this number. Empty means
-                  no cap (the legacy behavior). Admin can also adjust this.
-                </p>
+                {emailError && <p className={T.emailError}>{emailError}</p>}
+                {pendingEmail && !emailError && (
+                  <p className={T.hint}>
+                    Pending — we sent a confirmation link to <strong>{pendingEmail}</strong>. Open
+                    it from that inbox to complete the swap. Until then, you stay signed in as{" "}
+                    <strong>{user.email}</strong>.
+                  </p>
+                )}
+                {!pendingEmail && !emailError && (
+                  <p className={T.hint}>
+                    We&apos;ll email a confirmation link to the new address. Your current email
+                    stays in effect until you open the link.
+                  </p>
+                )}
               </div>
             </div>
           </section>
+
+          {/* ---- Timezone ---- */}
+          <section className={T.card}>
+            <div className="mb-4">
+              <h2 className={T.h2}>Timezone</h2>
+              <p className={T.desc}>
+                Used to render due dates and notification timestamps in your local time. Falls back
+                to UTC when not set.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="min-w-[220px] flex-1">
+                <label className={T.label}>IANA timezone</label>
+                <PSelect
+                  value={timezoneDraft}
+                  onChange={(e) => setTimezoneDraft(e.target.value)}
+                  className="mt-1 w-full"
+                  aria-label="IANA timezone"
+                >
+                  <option value="">— Not set (UTC) —</option>
+                  {timezones.map((tz) => (
+                    <option key={tz} value={tz}>
+                      {tz}
+                    </option>
+                  ))}
+                </PSelect>
+              </div>
+              <PButton
+                onClick={() => void handleSaveTimezone(timezoneDraft)}
+                disabled={savingTimezone || timezoneDraft === (user.timezone ?? "")}
+                loading={savingTimezone}
+                loadingText="Saving…"
+              >
+                Save
+              </PButton>
+              <PButton
+                variant="secondary"
+                onClick={handleAutoDetectTimezone}
+                disabled={savingTimezone || browserTzMatchesSaved}
+                title={
+                  browserTzMatchesSaved
+                    ? "Already matches your browser's timezone"
+                    : "Use your browser's detected timezone"
+                }
+              >
+                Auto-detect
+              </PButton>
+            </div>
+            {browserTz && !browserTzMatchesSaved && (
+              <p className={T.hint2}>
+                Your browser thinks you&apos;re in <strong>{browserTz}</strong>.
+              </p>
+            )}
+          </section>
+        </ProfileSubPanel>
+
+        {/* ---- Workload (creative-only) ---- */}
+        {user.role === "DESIGNER" && (
+          <ProfileSubPanel value="workload" {...panel} dashboard={dashboard}>
+            <section className={T.card}>
+              <div className="mb-4">
+                <h2 className={T.h2}>Workload</h2>
+                <p className={T.desc}>
+                  When you&apos;re available and how many tickets you&apos;re willing to hold at
+                  once. Auto-assign uses the cap to skip you when you&apos;re already at capacity;
+                  admins use the working-hours hint when scheduling rush work.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className={T.label}>Working hours</label>
+                  <div className={`${T.inputLabelGap} flex flex-wrap items-center gap-2`}>
+                    <PInput
+                      value={workingHoursDraft}
+                      onChange={(e) => setWorkingHoursDraft(e.target.value)}
+                      placeholder="e.g. 9–18 weekdays, Europe/Istanbul"
+                      aria-label="Working hours"
+                      maxLength={200}
+                      className="min-w-[220px] flex-1"
+                    />
+                    <PButton
+                      onClick={() => void handleSaveWorkingHours()}
+                      disabled={
+                        savingWorkingHours || workingHoursDraft.trim() === (user.workingHours ?? "")
+                      }
+                      loading={savingWorkingHours}
+                      loadingText="Saving…"
+                    >
+                      Save
+                    </PButton>
+                  </div>
+                  <p className={T.hint}>
+                    Free-form text — describe the days and hours you&apos;re typically online.
+                    Anything an admin can read at a glance works.
+                  </p>
+                </div>
+
+                <div>
+                  <label className={T.label}>Concurrent task cap</label>
+                  <div className={`${T.inputLabelGap} flex flex-wrap items-center gap-2`}>
+                    <PInput
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      max={40}
+                      value={tasksCapDraft}
+                      onChange={(e) => setTasksCapDraft(e.target.value)}
+                      placeholder="No cap"
+                      aria-label="Concurrent task cap"
+                      className="w-32"
+                    />
+                    <PButton
+                      onClick={() => void handleSaveTasksCap()}
+                      disabled={
+                        savingTasksCap ||
+                        tasksCapDraft.trim() ===
+                          (user.tasksPerWeekCap == null ? "" : String(user.tasksPerWeekCap))
+                      }
+                      loading={savingTasksCap}
+                      loadingText="Saving…"
+                    >
+                      Save
+                    </PButton>
+                    {user.tasksPerWeekCap != null && (
+                      <PButton
+                        variant="ghost"
+                        onClick={() => {
+                          setTasksCapDraft("");
+                          void handleSaveTasksCap("");
+                        }}
+                        disabled={savingTasksCap}
+                      >
+                        Clear
+                      </PButton>
+                    )}
+                  </div>
+                  <p className={T.hint}>
+                    Auto-assign skips you when your open ticket count reaches this number. Empty
+                    means no cap (the legacy behavior). Admin can also adjust this.
+                  </p>
+                </div>
+              </div>
+            </section>
+          </ProfileSubPanel>
         )}
       </ProfilePanel>
 
@@ -1725,8 +1781,19 @@ function ProfileFormBody({ layout }: { layout: ProfileFormLayout }) {
             </p>
           </div>
 
-          {prefsLoading || !prefs ? (
+          {dashboard && !prefsLoading && !prefs ? (
+            <PAlert variant="error" title="We couldn't load your preferences">
+              Refresh the page to try again. Your saved choices haven&apos;t changed.
+            </PAlert>
+          ) : prefsLoading || !prefs ? (
             <div className={T.muted}>Loading preferences…</div>
+          ) : dashboard ? (
+            <NotificationMatrix
+              role={user.role}
+              prefs={prefs}
+              isSaving={(type, channel) => prefsSaving.has(`${type}:${channel}`)}
+              onToggle={(type, channel, next) => void handleTogglePref(type, channel, next)}
+            />
           ) : (
             <ul className={T.divide}>
               {NOTIFICATION_ORDER.filter(
@@ -1765,390 +1832,472 @@ function ProfileFormBody({ layout }: { layout: ProfileFormLayout }) {
         </section>
       </ProfilePanel>
 
-      <ProfilePanel value="security" {...panel}>
-        {/* ---- Two-factor authentication ---- */}
-        <section className={T.card}>
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <h2 className={T.h2}>Two-factor authentication</h2>
-              <p className={T.desc}>
-                Require a one-time code from your authenticator app each time you sign in. Backup
-                codes recover access if you lose your phone.
-              </p>
+      <ProfilePanel value="security" {...panel} flatten={dashboard}>
+        <ProfileSubPanel value="security" {...panel} dashboard={dashboard}>
+          {/* ---- Two-factor authentication ---- */}
+          <section className={T.card}>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className={T.h2}>Two-factor authentication</h2>
+                <p className={T.desc}>
+                  Require a one-time code from your authenticator app each time you sign in. Backup
+                  codes recover access if you lose your phone.
+                </p>
+              </div>
+              <PBadge variant={user.twoFactorEnabled ? "success" : "neutral"}>
+                {user.twoFactorEnabled ? "Enabled" : "Disabled"}
+              </PBadge>
             </div>
-            <PBadge variant={user.twoFactorEnabled ? "success" : "neutral"}>
-              {user.twoFactorEnabled ? "Enabled" : "Disabled"}
-            </PBadge>
-          </div>
 
-          {/* Disabled — show enable CTA. The password field below is bound
+            {/* Disabled — show enable CTA. The password field below is bound
             to twoFaPassword so the user types once and we forward it to
             BetterAuth's enable + (later) generate-backup-codes calls. */}
-          {!user.twoFactorEnabled && twoFaEnrollment.stage === "idle" && (
-            <div className="space-y-3">
-              <p className={T.body}>
-                We&apos;ll show you a QR code to scan with Google Authenticator, 1Password, Authy,
-                or your password manager of choice.
-              </p>
-              <div className="flex flex-wrap items-end gap-2">
-                <div className="min-w-[220px] flex-1">
-                  <label className={T.label}>Current password</label>
-                  <PInput
-                    type="password"
-                    value={twoFaPassword}
-                    onChange={(e) => setTwoFaPassword(e.target.value)}
-                    autoComplete="current-password"
-                    className="mt-1 w-full"
-                  />
-                </div>
-                <PButton onClick={() => void handleStart2FAEnable()} disabled={!twoFaPassword}>
-                  Set up
-                </PButton>
-              </div>
-            </div>
-          )}
+            {!user.twoFactorEnabled &&
+              twoFaEnrollment.stage === "idle" &&
+              dashboard &&
+              !twoFaSetupOpen && (
+                <PButton onClick={() => setTwoFaSetupOpen(true)}>Set up two-factor</PButton>
+              )}
 
-          {/* Enrolling — QR + secret + verify code input. */}
-          {twoFaEnrollment.stage === "qr" && (
-            <div className="space-y-4">
-              {twoFaEnrollment.uri ? (
-                <>
+            {!user.twoFactorEnabled &&
+              twoFaEnrollment.stage === "idle" &&
+              (!dashboard || twoFaSetupOpen) && (
+                <div className="space-y-3">
+                  {dashboard && <p className={T.rowTitle}>Step 1 of 3: Confirm your password</p>}
                   <p className={T.body}>
-                    Scan this QR code in your authenticator app, then enter the 6-digit code below
-                    to confirm.
+                    We&apos;ll show you a QR code to scan with Google Authenticator, 1Password,
+                    Authy, or your password manager of choice.
                   </p>
-                  <div className="flex flex-wrap items-start gap-4">
-                    {/* QR rendered by our own /api/profile/two-factor/qr —
-                      keeps the TOTP secret on our infrastructure. Using
-                      <img> rather than next/image because the source is
-                      a per-request server-rendered PNG, not a static
-                      asset Next can optimize. */}
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      alt="Two-factor QR code"
-                      className={T.qr}
-                      src={`/api/profile/two-factor/qr?uri=${encodeURIComponent(twoFaEnrollment.uri)}`}
-                    />
-                    <div className="min-w-[220px] flex-1 space-y-2">
-                      <p className={T.secretHint}>Or paste this secret manually:</p>
-                      <code className={T.code}>{twoFaEnrollment.secret}</code>
-                    </div>
-                  </div>
-                  <div>
-                    <label className={T.label}>Code from your app</label>
-                    <div className="mt-1 flex flex-wrap gap-2">
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div className="min-w-[220px] flex-1">
+                      <label className={T.label}>Current password</label>
                       <PInput
-                        inputMode="numeric"
-                        autoComplete="one-time-code"
-                        placeholder="123 456"
-                        value={twoFaEnrollment.codeDraft}
-                        onChange={(e) =>
-                          setTwoFaEnrollment({
-                            ...twoFaEnrollment,
-                            codeDraft: e.target.value,
-                            error: null,
-                          })
-                        }
-                        className="min-w-[160px] flex-1 tracking-widest"
+                        type="password"
+                        value={twoFaPassword}
+                        onChange={(e) => setTwoFaPassword(e.target.value)}
+                        autoComplete="current-password"
+                        aria-label="Current password"
+                        className="mt-1 w-full"
                       />
-                      <PButton
-                        onClick={() => void handleConfirm2FAEnable()}
-                        disabled={twoFaEnrollment.saving}
-                        loading={twoFaEnrollment.saving}
-                        loadingText="Verifying…"
-                      >
-                        Confirm and enable
-                      </PButton>
+                    </div>
+                    <PButton onClick={() => void handleStart2FAEnable()} disabled={!twoFaPassword}>
+                      {dashboard ? "Continue" : "Set up"}
+                    </PButton>
+                    {dashboard && (
                       <PButton
                         variant="ghost"
                         onClick={() => {
-                          setTwoFaEnrollment({ stage: "idle" });
+                          setTwoFaSetupOpen(false);
                           setTwoFaPassword("");
                         }}
                       >
                         Cancel
                       </PButton>
-                    </div>
+                    )}
                   </div>
-                </>
-              ) : (
-                twoFaEnrollment.error && <PAlert variant="error">{twoFaEnrollment.error}</PAlert>
-              )}
-              {twoFaEnrollment.uri && twoFaEnrollment.error && (
-                <PAlert variant="error">{twoFaEnrollment.error}</PAlert>
-              )}
-            </div>
-          )}
-
-          {/* Backup codes — shown ONCE on enable success. The user is
-            told to copy / print these somewhere safe. */}
-          {twoFaEnrollment.stage === "codes" && (
-            <div className="space-y-3">
-              <PAlert variant="success" title="Two-factor is now on">
-                Save these backup codes somewhere safe. Each one works exactly once and lets you
-                sign in if you lose access to your authenticator app.
-              </PAlert>
-              {twoFaEnrollment.backupCodes.length > 0 ? (
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  {twoFaEnrollment.backupCodes.map((code) => (
-                    <code key={code} className={T.backupCode}>
-                      {code}
-                    </code>
-                  ))}
                 </div>
-              ) : (
-                <p className={T.secretHint}>
-                  Backup codes weren&apos;t included in the response. Use the &quot;Regenerate
-                  backup codes&quot; option below to create a fresh set, then copy them to a safe
-                  place.
-                </p>
               )}
-              <div className="flex flex-wrap gap-2">
+
+            {/* Enrolling — QR + secret + verify code input. */}
+            {twoFaEnrollment.stage === "qr" && (
+              <div className="space-y-4">
+                {twoFaEnrollment.uri ? (
+                  <>
+                    {dashboard && <p className={T.rowTitle}>Step 2 of 3: Scan and verify</p>}
+                    <p className={T.body}>
+                      Scan this QR code in your authenticator app, then enter the 6-digit code below
+                      to confirm.
+                    </p>
+                    <div className="flex flex-wrap items-start gap-4">
+                      {/* QR rendered by our own /api/profile/two-factor/qr —
+                      keeps the TOTP secret on our infrastructure. Using
+                      <img> rather than next/image because the source is
+                      a per-request server-rendered PNG, not a static
+                      asset Next can optimize. */}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        alt="Two-factor QR code"
+                        className={T.qr}
+                        src={`/api/profile/two-factor/qr?uri=${encodeURIComponent(twoFaEnrollment.uri)}`}
+                      />
+                      <div className="min-w-[220px] flex-1 space-y-2">
+                        <p className={T.secretHint}>Or paste this secret manually:</p>
+                        <code className={T.code}>{twoFaEnrollment.secret}</code>
+                      </div>
+                    </div>
+                    <div>
+                      <label className={T.label}>Code from your app</label>
+                      <div className="mt-1 flex flex-wrap gap-2">
+                        <PInput
+                          inputMode="numeric"
+                          autoComplete="one-time-code"
+                          placeholder="123 456"
+                          value={twoFaEnrollment.codeDraft}
+                          onChange={(e) =>
+                            setTwoFaEnrollment({
+                              ...twoFaEnrollment,
+                              codeDraft: e.target.value,
+                              error: null,
+                            })
+                          }
+                          className="min-w-[160px] flex-1 tracking-widest"
+                        />
+                        <PButton
+                          onClick={() => void handleConfirm2FAEnable()}
+                          disabled={twoFaEnrollment.saving}
+                          loading={twoFaEnrollment.saving}
+                          loadingText="Verifying…"
+                        >
+                          Confirm and enable
+                        </PButton>
+                        <PButton
+                          variant="ghost"
+                          onClick={() => {
+                            setTwoFaEnrollment({ stage: "idle" });
+                            setTwoFaPassword("");
+                            setTwoFaSetupOpen(false);
+                          }}
+                        >
+                          Cancel
+                        </PButton>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  twoFaEnrollment.error && (
+                    <>
+                      <PAlert variant="error">{twoFaEnrollment.error}</PAlert>
+                      {dashboard && (
+                        <PButton
+                          variant="secondary"
+                          onClick={() => setTwoFaEnrollment({ stage: "idle" })}
+                        >
+                          Try again
+                        </PButton>
+                      )}
+                    </>
+                  )
+                )}
+                {twoFaEnrollment.uri && twoFaEnrollment.error && (
+                  <PAlert variant="error">{twoFaEnrollment.error}</PAlert>
+                )}
+              </div>
+            )}
+
+            {/* Backup codes — shown ONCE on enable success. The user is
+            told to copy / print these somewhere safe. */}
+            {twoFaEnrollment.stage === "codes" && (
+              <div className="space-y-3">
+                {dashboard && <p className={T.rowTitle}>Step 3 of 3: Save your backup codes</p>}
+                <PAlert variant="success" title="Two-factor is now on">
+                  Save these backup codes somewhere safe. Each one works exactly once and lets you
+                  sign in if you lose access to your authenticator app.
+                </PAlert>
+                {twoFaEnrollment.backupCodes.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {twoFaEnrollment.backupCodes.map((code) => (
+                      <code key={code} className={T.backupCode}>
+                        {code}
+                      </code>
+                    ))}
+                  </div>
+                ) : (
+                  <p className={T.secretHint}>
+                    Backup codes weren&apos;t included in the response. Use the &quot;Regenerate
+                    backup codes&quot; option below to create a fresh set, then copy them to a safe
+                    place.
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <PButton
+                    variant="secondary"
+                    onClick={() => {
+                      if (twoFaEnrollment.backupCodes.length === 0) return;
+                      void navigator.clipboard
+                        .writeText(twoFaEnrollment.backupCodes.join("\n"))
+                        .then(() => showToast({ type: "success", title: "Backup codes copied." }))
+                        .catch(() =>
+                          showToast({ type: "error", title: "Couldn't copy — copy manually." }),
+                        );
+                    }}
+                    disabled={twoFaEnrollment.backupCodes.length === 0}
+                  >
+                    Copy codes
+                  </PButton>
+                  <PButton
+                    onClick={() => {
+                      setTwoFaEnrollment({ stage: "idle" });
+                      setTwoFaSetupOpen(false);
+                    }}
+                  >
+                    I&apos;ve saved them
+                  </PButton>
+                </div>
+              </div>
+            )}
+
+            {/* Enabled (and not mid-enrollment) — show status + disable CTA. */}
+            {user.twoFactorEnabled && twoFaEnrollment.stage === "idle" && (
+              <div className="flex flex-wrap items-center gap-2">
+                <p className={T.body}>
+                  You&apos;re asked for an authenticator code every time you sign in.
+                </p>
                 <PButton
-                  variant="secondary"
+                  variant={v2 ? "danger" : "ghost"}
                   onClick={() => {
-                    if (twoFaEnrollment.backupCodes.length === 0) return;
-                    void navigator.clipboard
-                      .writeText(twoFaEnrollment.backupCodes.join("\n"))
-                      .then(() => showToast({ type: "success", title: "Backup codes copied." }))
-                      .catch(() =>
-                        showToast({ type: "error", title: "Couldn't copy — copy manually." }),
-                      );
+                    setTwoFaPassword("");
+                    setTwoFaDisableError(null);
+                    setTwoFaDisableOpen(true);
                   }}
-                  disabled={twoFaEnrollment.backupCodes.length === 0}
+                  className={v2 ? undefined : "text-red-600 hover:text-red-700 dark:text-red-400"}
                 >
-                  Copy codes
-                </PButton>
-                <PButton onClick={() => setTwoFaEnrollment({ stage: "idle" })}>
-                  I&apos;ve saved them
+                  Disable
                 </PButton>
               </div>
-            </div>
-          )}
+            )}
+          </section>
 
-          {/* Enabled (and not mid-enrollment) — show status + disable CTA. */}
-          {user.twoFactorEnabled && twoFaEnrollment.stage === "idle" && (
-            <div className="flex flex-wrap items-center gap-2">
-              <p className={T.body}>
-                You&apos;re asked for an authenticator code every time you sign in.
-              </p>
-              <PButton
-                variant={v2 ? "danger" : "ghost"}
-                onClick={() => {
-                  setTwoFaPassword("");
-                  setTwoFaDisableError(null);
-                  setTwoFaDisableOpen(true);
-                }}
-                className={v2 ? undefined : "text-red-600 hover:text-red-700 dark:text-red-400"}
-              >
-                Disable
-              </PButton>
-            </div>
-          )}
-        </section>
-
-        {/* ---- 2FA disable confirm modal ---- */}
-        <Modal
-          open={twoFaDisableOpen}
-          onClose={() => {
-            if (twoFaDisabling) return;
-            setTwoFaDisableOpen(false);
-            setTwoFaPassword("");
-            setTwoFaDisableError(null);
-          }}
-          size="md"
-        >
-          <ModalHeader
-            title="Turn off two-factor authentication?"
+          {/* ---- 2FA disable confirm modal ---- */}
+          <Modal
+            open={twoFaDisableOpen}
             onClose={() => {
               if (twoFaDisabling) return;
               setTwoFaDisableOpen(false);
               setTwoFaPassword("");
               setTwoFaDisableError(null);
             }}
-          />
-          <div className="space-y-3 px-6 pb-4 text-sm text-[var(--bb-text-secondary)]">
-            <p>
-              Confirm your current password to disable 2FA. Your existing backup codes will be
-              invalidated.
-            </p>
-            <PInput
-              type="password"
-              value={twoFaPassword}
-              onChange={(e) => setTwoFaPassword(e.target.value)}
-              placeholder="Current password"
-              autoComplete="current-password"
-              aria-label="Current password"
-            />
-            {twoFaDisableError && <PAlert variant="error">{twoFaDisableError}</PAlert>}
-          </div>
-          <ModalFooter>
-            <PButton
-              variant="ghost"
-              disabled={twoFaDisabling}
-              onClick={() => {
+            size="md"
+          >
+            <ModalHeader
+              title="Turn off two-factor authentication?"
+              onClose={() => {
+                if (twoFaDisabling) return;
                 setTwoFaDisableOpen(false);
                 setTwoFaPassword("");
                 setTwoFaDisableError(null);
               }}
-            >
-              Cancel
-            </PButton>
-            <PButton
-              variant="danger"
-              onClick={() => void handleConfirm2FADisable()}
-              loading={twoFaDisabling}
-              loadingText="Disabling…"
-              disabled={twoFaDisabling || !twoFaPassword}
-            >
-              Disable 2FA
-            </PButton>
-          </ModalFooter>
-        </Modal>
-
-        {/* ---- Active sessions ---- */}
-        <section className={T.card}>
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div>
-              <h2 className={T.h2}>Active sessions</h2>
-              <p className={T.desc}>
-                Every browser you&apos;re signed in with. Sign out individual devices, or everything
-                except this one in a single click.
+            />
+            <div className="space-y-3 px-6 pb-4 text-sm text-[var(--bb-text-secondary)]">
+              <p>
+                Confirm your current password to disable 2FA. Your existing backup codes will be
+                invalidated.
               </p>
+              <PInput
+                type="password"
+                value={twoFaPassword}
+                onChange={(e) => setTwoFaPassword(e.target.value)}
+                placeholder="Current password"
+                autoComplete="current-password"
+                aria-label="Current password"
+              />
+              {twoFaDisableError && <PAlert variant="error">{twoFaDisableError}</PAlert>}
             </div>
-            {sessionsList && sessionsList.length > 1 && (
+            <ModalFooter>
               <PButton
-                variant="secondary"
-                size="sm"
-                onClick={() => void handleRevokeOtherSessions()}
-                loading={revokingOthers}
-                loadingText="Signing out…"
-                disabled={revokingOthers}
+                variant="ghost"
+                disabled={twoFaDisabling}
+                onClick={() => {
+                  setTwoFaDisableOpen(false);
+                  setTwoFaPassword("");
+                  setTwoFaDisableError(null);
+                }}
               >
-                Sign out everywhere else
+                Cancel
               </PButton>
-            )}
-          </div>
-
-          {sessionsLoading && <p className={T.muted}>Loading sessions…</p>}
-          {!sessionsLoading && sessionsError && <PAlert variant="error">{sessionsError}</PAlert>}
-          {!sessionsLoading && !sessionsError && sessionsList && (
-            <ul className={T.divide}>
-              {sessionsList
-                // Newest first by last activity (updatedAt). Matches Gmail / GitHub UX.
-                .slice()
-                .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-                .map((s) => {
-                  const isCurrent = currentSessionId !== null && s.id === currentSessionId;
-                  const isRevoking = revokingTokens.has(s.token);
-                  return (
-                    <li key={s.id} className="flex flex-wrap items-start gap-3 py-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className={T.rowTitle}>{describeUserAgent(s.userAgent)}</p>
-                          {isCurrent && <PBadge variant="success">This device</PBadge>}
-                        </div>
-                        <p className={T.desc}>
-                          Last active {relativeTime(s.updatedAt)} &middot; First seen{" "}
-                          {relativeTime(s.createdAt)} &middot; IP {maskIp(s.ipAddress)}
-                        </p>
-                      </div>
-                      {!isCurrent && (
-                        <PButton
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => void handleRevokeSession(s.token)}
-                          loading={isRevoking}
-                          loadingText="Signing out…"
-                          disabled={isRevoking}
-                        >
-                          Sign out
-                        </PButton>
-                      )}
-                    </li>
-                  );
-                })}
-            </ul>
-          )}
-        </section>
-
-        {/* ---- Delete account ---- */}
-        {canSelfDelete && (
-          <section className="rounded-2xl border border-red-200 bg-red-50/50 p-6 dark:border-red-900/40 dark:bg-red-950/20">
-            <h2 className="text-base font-semibold text-red-700 dark:text-red-300">
-              Delete account
-            </h2>
-            <p className="mt-0.5 text-xs text-red-700/80 dark:text-red-300/80">
-              Permanently anonymize your account. Tickets and ledger entries you&apos;re attached to
-              stay for our financial records, but your name, email, and login credentials are
-              removed. This cannot be undone.
-            </p>
-            <div className="mt-3">
-              <PButton variant="danger" onClick={() => setDeleteOpen(true)}>
-                Delete my account…
+              <PButton
+                variant="danger"
+                onClick={() => void handleConfirm2FADisable()}
+                loading={twoFaDisabling}
+                loadingText="Disabling…"
+                disabled={twoFaDisabling || !twoFaPassword}
+              >
+                Disable 2FA
               </PButton>
+            </ModalFooter>
+          </Modal>
+        </ProfileSubPanel>
+
+        <ProfileSubPanel value="sessions" {...panel} dashboard={dashboard}>
+          {/* ---- Active sessions ---- */}
+          <section className={T.card}>
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h2 className={T.h2}>Active sessions</h2>
+                <p className={T.desc}>
+                  Every browser you&apos;re signed in with. Sign out individual devices, or
+                  everything except this one in a single click.
+                </p>
+              </div>
+              {sessionsList && sessionsList.length > 1 && (
+                <PButton
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => void handleRevokeOtherSessions()}
+                  loading={revokingOthers}
+                  loadingText="Signing out…"
+                  disabled={revokingOthers}
+                >
+                  Sign out everywhere else
+                </PButton>
+              )}
             </div>
-          </section>
-        )}
 
-        {/* ---- Delete modal ---- */}
-        <Modal
-          open={deleteOpen}
-          onClose={() => {
-            if (deleting) return;
-            setDeleteOpen(false);
-            setDeleteEmail("");
-            setDeleteError(null);
-          }}
-          size="md"
-        >
-          <ModalHeader
-            title="Delete your account?"
+            {sessionsLoading && <p className={T.muted}>Loading sessions…</p>}
+            {!sessionsLoading && sessionsError && <PAlert variant="error">{sessionsError}</PAlert>}
+            {!sessionsLoading && !sessionsError && sessionsList && (
+              <ul className={T.divide}>
+                {sessionsList
+                  // Newest first by last activity (updatedAt). Matches Gmail / GitHub UX.
+                  .slice()
+                  .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+                  .map((s) => {
+                    const isCurrent = currentSessionId !== null && s.id === currentSessionId;
+                    const isRevoking = revokingTokens.has(s.token);
+                    return (
+                      <li key={s.id} className="flex flex-wrap items-start gap-3 py-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className={T.rowTitle}>{describeUserAgent(s.userAgent)}</p>
+                            {isCurrent && <PBadge variant="success">This device</PBadge>}
+                          </div>
+                          <p className={T.desc}>
+                            Last active {relativeTime(s.updatedAt)} &middot; First seen{" "}
+                            {relativeTime(s.createdAt)} &middot; IP {maskIp(s.ipAddress)}
+                          </p>
+                        </div>
+                        {!isCurrent && (
+                          <PButton
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => void handleRevokeSession(s.token)}
+                            loading={isRevoking}
+                            loadingText="Signing out…"
+                            disabled={isRevoking}
+                          >
+                            Sign out
+                          </PButton>
+                        )}
+                      </li>
+                    );
+                  })}
+              </ul>
+            )}
+          </section>
+        </ProfileSubPanel>
+
+        <ProfileSubPanel value="account" {...panel} dashboard={dashboard}>
+          {/* ---- Leave workspace lives with the company, in Settings ---- */}
+          {dashboard && user.role === "CUSTOMER" && (
+            <section className={T.card}>
+              <h2 className={T.h2}>Leave your workspace</h2>
+              <p className={T.desc}>
+                Leaving removes you from your company but keeps this account. It&apos;s managed with
+                your other company access.
+              </p>
+              <div className="mt-3">
+                <V2ButtonLink href="/customer/settings?tab=access">
+                  Open workspace access
+                </V2ButtonLink>
+              </div>
+            </section>
+          )}
+
+          {/* ---- Delete account ---- */}
+          {canSelfDelete && (
+            <section
+              className={
+                dashboard
+                  ? "rounded-2xl border border-[var(--av2-error)]/40 bg-[var(--av2-surface)] p-6"
+                  : "rounded-2xl border border-red-200 bg-red-50/50 p-6 dark:border-red-900/40 dark:bg-red-950/20"
+              }
+            >
+              <h2
+                className={
+                  dashboard
+                    ? "text-xl leading-7 font-semibold text-[var(--av2-error-text)]"
+                    : "text-base font-semibold text-red-700 dark:text-red-300"
+                }
+              >
+                Delete account
+              </h2>
+              <p
+                className={
+                  dashboard
+                    ? "mt-0.5 text-sm text-[var(--av2-text-2)]"
+                    : "mt-0.5 text-xs text-red-700/80 dark:text-red-300/80"
+                }
+              >
+                Permanently anonymize your account. Tickets and ledger entries you&apos;re attached
+                to stay for our financial records, but your name, email, and login credentials are
+                removed. This cannot be undone.
+              </p>
+              <div className="mt-3">
+                <PButton variant="danger" onClick={() => setDeleteOpen(true)}>
+                  Delete my account…
+                </PButton>
+              </div>
+            </section>
+          )}
+
+          {/* ---- Delete modal ---- */}
+          <Modal
+            open={deleteOpen}
             onClose={() => {
               if (deleting) return;
               setDeleteOpen(false);
               setDeleteEmail("");
               setDeleteError(null);
             }}
-          />
-          <div className="space-y-3 px-6 pb-4 text-sm text-[var(--bb-text-secondary)]">
-            <p>
-              Type your email <strong>{user.email}</strong> to confirm. Your auth credentials will
-              be revoked and your identity will be anonymized immediately.
-            </p>
-            <PInput
-              type="email"
-              value={deleteEmail}
-              onChange={(e) => setDeleteEmail(e.target.value)}
-              placeholder={user.email}
-              autoComplete="off"
-              aria-label="Type your email to confirm deletion"
-            />
-            {deleteError && <PAlert variant="error">{deleteError}</PAlert>}
-          </div>
-          <ModalFooter>
-            <PButton
-              variant="ghost"
-              disabled={deleting}
-              onClick={() => {
+            size="md"
+          >
+            <ModalHeader
+              title="Delete your account?"
+              onClose={() => {
+                if (deleting) return;
                 setDeleteOpen(false);
                 setDeleteEmail("");
                 setDeleteError(null);
               }}
-            >
-              Cancel
-            </PButton>
-            <PButton
-              variant="danger"
-              onClick={() => void handleDelete()}
-              loading={deleting}
-              loadingText="Deleting…"
-              disabled={deleting || deleteEmail.trim().toLowerCase() !== user.email.toLowerCase()}
-            >
-              Delete account
-            </PButton>
-          </ModalFooter>
-        </Modal>
+            />
+            <div className="space-y-3 px-6 pb-4 text-sm text-[var(--bb-text-secondary)]">
+              <p>
+                Type your email <strong>{user.email}</strong> to confirm. Your auth credentials will
+                be revoked and your identity will be anonymized immediately.
+              </p>
+              <PInput
+                type="email"
+                value={deleteEmail}
+                onChange={(e) => setDeleteEmail(e.target.value)}
+                placeholder={user.email}
+                autoComplete="off"
+                aria-label="Type your email to confirm deletion"
+              />
+              {deleteError && <PAlert variant="error">{deleteError}</PAlert>}
+            </div>
+            <ModalFooter>
+              <PButton
+                variant="ghost"
+                disabled={deleting}
+                onClick={() => {
+                  setDeleteOpen(false);
+                  setDeleteEmail("");
+                  setDeleteError(null);
+                }}
+              >
+                Cancel
+              </PButton>
+              <PButton
+                variant="danger"
+                onClick={() => void handleDelete()}
+                loading={deleting}
+                loadingText="Deleting…"
+                disabled={deleting || deleteEmail.trim().toLowerCase() !== user.email.toLowerCase()}
+              >
+                Delete account
+              </PButton>
+            </ModalFooter>
+          </Modal>
+        </ProfileSubPanel>
       </ProfilePanel>
     </ProfileShell>
   );

@@ -188,7 +188,7 @@ export async function POST(req: NextRequest) {
 
         const event = await createConsultationEvent(settings, {
           calendarId: settings.googleCalendarId ?? "primary",
-          summary: `Brandbite consultation — ${parsed.data.description.slice(0, 60)}`,
+          summary: `brandbite consultation — ${parsed.data.description.slice(0, 60)}`,
           description:
             `Consultation request from ${user.email}.\n\n` +
             `Booking reference: ${created.id}\n\n` +

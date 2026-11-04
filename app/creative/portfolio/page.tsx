@@ -2,19 +2,35 @@
 // @file: app/creative/portfolio/page.tsx
 // @purpose: Auto-populated portfolio for the signed-in creative. Displays
 //           every completed ticket with its final-revision thumbnails, with
-//           a category chip bar and search input.
-// @version: v1.0.0
-// @status: active
-// @lastUpdate: 2026-04-20
+//           a category filter and search input.
 // -----------------------------------------------------------------------------
 
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import { LoadingState } from "@/components/ui/loading-state";
-import { FormInput } from "@/components/ui/form-field";
+
+import { IconArrowUpRight, IconDocument } from "@/components/admin/v2/icons";
+import {
+  Badge,
+  buttonClass,
+  Callout,
+  Card,
+  DASH,
+  EmptyState,
+  FilterChips,
+  fmt,
+  IconTile,
+  PageHeader,
+  plural,
+  SearchInput,
+  Select,
+  Skeleton,
+  Table,
+  Td,
+  Th,
+} from "@/components/admin/v2/ui";
+import { formatDate, ListFooter, pageOf } from "@/components/dashboard/money/money-ui";
 
 type PortfolioItem = {
   ticketId: string;
@@ -43,19 +59,15 @@ type PortfolioResponse = {
   items: PortfolioItem[];
 };
 
-const ALL_CATEGORY = "__ALL__";
+type ViewMode = "grid" | "list";
 
-function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  } catch {
-    return iso;
-  }
-}
+const ALL_CATEGORY = "__ALL__";
+const PAGE_SIZE = 8;
+
+const HEADER = {
+  title: "Your completed work",
+  description: "Approved work is collected here automatically.",
+};
 
 export default function CreativePortfolioPage() {
   const [data, setData] = useState<PortfolioResponse | null>(null);
@@ -63,6 +75,8 @@ export default function CreativePortfolioPage() {
   const [error, setError] = useState<string | null>(null);
   const [category, setCategory] = useState<string>(ALL_CATEGORY);
   const [search, setSearch] = useState("");
+  const [view, setView] = useState<ViewMode>("grid");
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     let cancelled = false;
@@ -116,108 +130,132 @@ export default function CreativePortfolioPage() {
     });
   }, [data, category, search]);
 
+  const paged = pageOf(filteredItems, page, PAGE_SIZE);
+
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-6xl">
-        <LoadingState />
-      </div>
+      <>
+        <PageHeader {...HEADER} />
+        <div aria-busy="true" aria-label="Loading portfolio" className="space-y-6">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-72" />
+        </div>
+      </>
     );
   }
 
   if (error) {
     return (
-      <div className="mx-auto max-w-6xl">
-        <InlineAlert variant="error">{error}</InlineAlert>
-      </div>
+      <>
+        <PageHeader {...HEADER} />
+        <Callout tone="error" title="We couldn't load your portfolio">
+          {error}
+        </Callout>
+      </>
     );
   }
 
   if (!data || data.totalCount === 0) {
     return (
-      <div className="mx-auto max-w-6xl space-y-4">
-        <header>
-          <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--bb-text-tertiary)] uppercase">
-            Portfolio
-          </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--bb-secondary)]">
-            Your completed work
-          </h1>
-        </header>
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-6 py-10 text-center">
-          <p className="text-sm text-[var(--bb-text-muted)]">
-            You haven&apos;t completed any tickets yet. Once a ticket is approved and marked done,
-            it will appear here automatically.
-          </p>
-        </div>
-      </div>
+      <>
+        <PageHeader {...HEADER} />
+        <Card>
+          <EmptyState
+            icon={<IconDocument />}
+            title="Nothing here yet"
+            description="You haven't completed any tickets yet. Once a ticket is approved and marked done, it will appear here automatically."
+          />
+        </Card>
+      </>
     );
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      {/* Header */}
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--bb-text-tertiary)] uppercase">
-            Portfolio
-          </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--bb-secondary)]">
-            Your completed work
-          </h1>
-          <p className="mt-1 text-sm text-[var(--bb-text-muted)]">
-            {data.totalCount} completed ticket{data.totalCount === 1 ? "" : "s"} — auto-populated
-            from every approved revision.
-          </p>
-        </div>
+    <>
+      <PageHeader
+        {...HEADER}
+        meta={
+          <>
+            {fmt(data.totalCount)} completed {plural(data.totalCount, "ticket", "tickets")}
+          </>
+        }
+      />
 
-        <div className="w-full max-w-xs">
-          <FormInput
-            placeholder="Search title, company, category…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            size="sm"
-          />
-        </div>
-      </header>
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <SearchInput
+          className="min-w-[240px] flex-[2]"
+          value={search}
+          onChange={(v) => {
+            setSearch(v);
+            setPage(1);
+          }}
+          placeholder="Search title, company, category…"
+          label="Search your completed work"
+        />
+        {data.categories.length > 0 ? (
+          <div className="min-w-[200px] flex-1">
+            <Select
+              aria-label="Filter by category"
+              value={category}
+              onChange={(e) => {
+                setCategory(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value={ALL_CATEGORY}>All categories</option>
+              {data.categories.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </Select>
+          </div>
+        ) : null}
+        <FilterChips
+          label="View"
+          options={[
+            { value: "grid" as ViewMode, label: "Grid" },
+            { value: "list" as ViewMode, label: "List" },
+          ]}
+          value={view}
+          onChange={setView}
+        />
+      </div>
 
-      {/* Category filter */}
-      {data.categories.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <CategoryChip
-            label="All"
-            active={category === ALL_CATEGORY}
-            onClick={() => setCategory(ALL_CATEGORY)}
-          />
-          {data.categories.map((c) => (
-            <CategoryChip
-              key={c}
-              label={c}
-              active={category === c}
-              onClick={() => setCategory(c)}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Grid */}
       {filteredItems.length === 0 ? (
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-6 py-10 text-center">
-          <p className="text-sm text-[var(--bb-text-muted)]">
-            No work matches this filter. Try clearing the search or picking a different category.
-          </p>
-        </div>
+        <Card>
+          <EmptyState
+            title="No work matches this filter"
+            description="Try clearing the search or picking a different category."
+          />
+        </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredItems.map((item) => (
-            <PortfolioCard key={item.ticketId} item={item} />
-          ))}
-        </div>
+        <>
+          {view === "grid" ? (
+            <div className="grid gap-6 xl:grid-cols-2">
+              {paged.rows.map((item) => (
+                <PortfolioCard key={item.ticketId} item={item} />
+              ))}
+              <AboutPortfolio />
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <Card padding="none">
+                <PortfolioTable items={paged.rows} />
+              </Card>
+              <AboutPortfolio />
+            </div>
+          )}
+          <div className="mt-2 [&>div]:border-t-0 [&>div]:px-0">
+            <ListFooter {...paged} onPage={setPage} />
+          </div>
+        </>
       )}
-    </div>
+    </>
   );
 }
 
@@ -225,27 +263,22 @@ export default function CreativePortfolioPage() {
 // Subcomponents
 // ---------------------------------------------------------------------------
 
-function CategoryChip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
+function AboutPortfolio() {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full border px-3 py-1 text-[11px] font-semibold tracking-wide transition-colors ${
-        active
-          ? "border-[var(--bb-primary)] bg-[var(--bb-primary)] text-white"
-          : "border-[var(--bb-border)] bg-[var(--bb-bg-page)] text-[var(--bb-text-secondary)] hover:bg-[var(--bb-bg-warm)]"
-      }`}
-    >
-      {label}
-    </button>
+    <Card>
+      <div className="flex gap-4">
+        <IconTile tone="peach">
+          <IconDocument />
+        </IconTile>
+        <div className="min-w-0">
+          <h2 className="text-xl leading-7 font-semibold">Built from approved work</h2>
+          <p className="mt-1 text-base text-[var(--av2-text-2)]">
+            Every ticket that is approved and marked done appears here automatically, with the
+            images from its final revision.
+          </p>
+        </div>
+      </div>
+    </Card>
   );
 }
 
@@ -256,10 +289,11 @@ function PortfolioCard({ item }: { item: PortfolioItem }) {
   return (
     <Link
       href={`/creative/tickets/${item.ticketId}`}
-      className="group flex h-full flex-col overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] shadow-sm transition-all hover:border-[var(--bb-primary)] hover:shadow-md"
+      aria-label={`Open job: ${item.title}`}
+      className="group flex h-full flex-col gap-5 rounded-2xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-6 transition-colors hover:border-[var(--av2-accent)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:ring-offset-1 focus-visible:outline-none sm:flex-row"
     >
       {/* Cover image */}
-      <div className="relative aspect-[4/3] w-full overflow-hidden bg-[var(--bb-bg-warm)]">
+      <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden rounded-xl bg-[var(--av2-bg)] sm:w-[280px]">
         {cover ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -269,43 +303,84 @@ function PortfolioCard({ item }: { item: PortfolioItem }) {
             loading="lazy"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-[11px] text-[var(--bb-text-muted)]">
+          <div className="flex h-full w-full items-center justify-center text-sm text-[var(--av2-text-2)]">
             No preview
           </div>
         )}
 
         {extras.length > 0 && (
-          <div className="absolute right-2 bottom-2 flex gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
-            +{extras.length} more
+          <div className="absolute right-2 bottom-2">
+            <Badge>+{extras.length} more</Badge>
           </div>
         )}
       </div>
 
       {/* Meta */}
-      <div className="flex flex-1 flex-col gap-1 px-4 py-3">
-        <div className="flex items-center justify-between gap-2 text-[10px] font-semibold tracking-[0.15em] text-[var(--bb-text-tertiary)] uppercase">
-          <span>{item.code}</span>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm text-[var(--av2-text-2)]">
+          <span className="font-medium">{item.code}</span>
           <span>{formatDate(item.completedAt)}</span>
         </div>
-        <h3 className="line-clamp-2 text-sm font-semibold text-[var(--bb-secondary)]">
-          {item.title}
-        </h3>
-        <p className="text-[11px] text-[var(--bb-text-muted)]">
-          {item.jobType?.name ?? "—"}
-          {item.jobType?.category && (
-            <>
-              {" · "}
-              <span>{item.jobType.category}</span>
-            </>
-          )}
+        <h2 className="mt-1 line-clamp-2 text-xl leading-7 font-semibold">{item.title}</h2>
+        <p className="mt-1 text-sm text-[var(--av2-text-2)]">
+          {item.jobType?.name ?? DASH}
+          {item.jobType?.category ? ` · ${item.jobType.category}` : null}
         </p>
-        {item.companyName && (
-          <p className="mt-auto pt-2 text-[11px] text-[var(--bb-text-muted)]">
-            for <span className="font-semibold">{item.companyName}</span>
-            {item.projectName && ` — ${item.projectName}`}
+        {item.companyName ? (
+          <p className="mt-1 text-sm">
+            {item.companyName}
+            {item.projectName ? ` · ${item.projectName}` : null}
           </p>
-        )}
+        ) : null}
+        <div className="mt-3">
+          <Badge tone="green" dot>
+            Done
+          </Badge>
+        </div>
+        <span className={`${buttonClass("primary")} mt-auto self-start max-sm:mt-4 sm:mt-4`}>
+          Open job
+          <IconArrowUpRight />
+        </span>
       </div>
     </Link>
+  );
+}
+
+function PortfolioTable({ items }: { items: PortfolioItem[] }) {
+  return (
+    <Table label="Your completed work">
+      <thead>
+        <tr>
+          <Th className="max-sm:hidden">ID</Th>
+          <Th>Job</Th>
+          <Th className="max-md:hidden">Service</Th>
+          <Th className="max-lg:hidden">Company</Th>
+          <Th>Completed</Th>
+        </tr>
+      </thead>
+      <tbody>
+        {items.map((item) => (
+          <tr key={item.ticketId} className="border-b border-[var(--av2-border)] last:border-b-0">
+            <Td className="whitespace-nowrap text-[var(--av2-text-2)] max-sm:hidden">
+              {item.code}
+            </Td>
+            <Td>
+              <Link
+                href={`/creative/tickets/${item.ticketId}`}
+                className="font-medium hover:underline"
+              >
+                {item.title}
+              </Link>
+            </Td>
+            <Td className="max-md:hidden">{item.jobType?.name ?? DASH}</Td>
+            <Td className="max-lg:hidden">
+              {item.companyName ?? DASH}
+              {item.projectName ? ` · ${item.projectName}` : null}
+            </Td>
+            <Td className="whitespace-nowrap">{formatDate(item.completedAt)}</Td>
+          </tr>
+        ))}
+      </tbody>
+    </Table>
   );
 }

@@ -64,12 +64,12 @@ export function TalentOnboardedEmailTemplate({
 
   return (
     <BaseLayout
-      previewText="Welcome to Brandbite. Your sign-in link is on its way separately."
+      previewText="Welcome to brandbite. Your sign-in link is on its way separately."
       hero={
         <HeroBand>
           <Heading>Welcome to the team 🎉</Heading>
           <Paragraph>
-            <strong>{greeting}</strong> You&apos;re officially a Brandbite creative.
+            <strong>{greeting}</strong> You&apos;re officially a brandbite creative.
           </Paragraph>
         </HeroBand>
       }
@@ -102,7 +102,7 @@ export function TalentOnboardedEmailTemplate({
       </Paragraph>
 
       <Callout tone="info">
-        Watch for a separate <strong>&ldquo;Sign in to Brandbite&rdquo;</strong> email landing in
+        Watch for a separate <strong>&ldquo;Sign in to brandbite&rdquo;</strong> email landing in
         your inbox in the next minute or two — that&apos;s your magic-link to get into the
         dashboard. One click and you&apos;re in.
       </Callout>
@@ -113,7 +113,7 @@ export function TalentOnboardedEmailTemplate({
         in.
       </Paragraph>
 
-      <Signoff preamble="Looking forward to seeing what you build." from="Alper, Brandbite" />
+      <Signoff preamble="Looking forward to seeing what you build." from="Alper, brandbite" />
     </BaseLayout>
   );
 }
@@ -123,7 +123,7 @@ export async function renderTalentOnboardedEmail(
 ): Promise<{ subject: string; html: string }> {
   const html = await render(<TalentOnboardedEmailTemplate {...props} />);
   return {
-    subject: "Welcome to Brandbite — you're in",
+    subject: "Welcome to brandbite — you're in",
     html,
   };
 }

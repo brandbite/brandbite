@@ -4,7 +4,7 @@
 //           Server component: questions come from the central Faq table
 //           (edited at /admin/faq), rendered into the Figma design. The
 //           portal FAQ surfaces (/customer/faq, /creative/faq) still use
-//           FaqBrowser and are unaffected.
+//           FaqExplorer and are unaffected.
 // @version: v2.0.0
 // @status: active
 // @lastUpdate: 2026-07-13
@@ -21,7 +21,7 @@ import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
   title: "FAQ",
-  description: "Everything you need to know about Brandbite. No jargon, no tiny-print drama.",
+  description: "Everything you need to know about brandbite. No jargon, no tiny-print drama.",
 };
 
 // Render per-request: the FAQ list comes from the database, which isn't
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
 // sync for the portal surfaces).
 export const dynamic = "force-dynamic";
 
-const displayFont = "font-[family-name:var(--font-inter)]";
+const displayFont = "font-[family-name:var(--font-jakarta)]";
 
 export default async function FaqPage() {
   // Same query as /api/faq: active rows, grouped by category then manual
@@ -72,7 +72,7 @@ export default async function FaqPage() {
               </span>
             </h1>
             <p className="text-base leading-6 whitespace-pre-line text-[#2B2D33] max-[767px]:text-center">
-              {"Everything you need to know\nabout Brandbite.\n\nNo jargon, no tiny-print drama."}
+              {"Everything you need to know\nabout brandbite.\n\nNo jargon, no tiny-print drama."}
             </p>
           </div>
           <div className="absolute top-[93px] left-[313.5px] h-[625px] w-[713px] max-[767px]:static max-[767px]:order-3 max-[767px]:mt-10 max-[767px]:h-auto max-[767px]:w-full max-[767px]:max-w-[402px]">

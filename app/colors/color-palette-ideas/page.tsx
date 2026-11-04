@@ -18,7 +18,7 @@ export default async function PaletteIdeasPage() {
       title="Good palettes."
       accent="Great possibilities."
       blurb="Curated color combinations for every mood, market and moment."
-      ctaBlurb="Turn curated palettes into real brand assets with Brandbite."
+      ctaBlurb="Turn curated palettes into real brand assets with brandbite."
     >
       <PaletteIdeasView ideas={ideas} />
     </StudioShell>

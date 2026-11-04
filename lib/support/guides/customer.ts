@@ -19,10 +19,21 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
   {
     slug: "getting-around",
     title: "Getting around your dashboard",
-    summary: "What each part of the sidebar is for and where to find help.",
+    summary: "What the sidebar and top bar are for, and where to find help.",
     category: "Getting started",
     routes: ["/customer/support"],
-    keywords: ["navigation", "sidebar", "menu", "start", "help"],
+    keywords: [
+      "navigation",
+      "sidebar",
+      "menu",
+      "start",
+      "help",
+      "search",
+      "top bar",
+      "account menu",
+      "sign out",
+      "theme",
+    ],
     related: ["how-requests-work", "roles-and-permissions"],
     sections: [
       {
@@ -56,23 +67,26 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         ],
       },
       {
-        heading: "The bottom of the sidebar",
+        heading: "The top bar",
         blocks: [
           {
             type: "list",
             items: [
               {
-                term: "Bell",
-                text: "your notifications. The number shows how many are unread.",
+                term: "Search workspace",
+                text: "jumps to any page in your dashboard. Click it, or press **Ctrl K** (**⌘K** on a Mac).",
               },
               {
                 term: "Help",
                 text: "opens the Support guide for the page you are on, or this Support home if the page has no guide yet.",
               },
-              { term: "Sign out", text: "ends your session on this device." },
               {
-                term: "Theme",
-                text: "switches the dashboard between light, dark and system.",
+                term: "Bell",
+                text: "your notifications. The number shows how many are unread.",
+              },
+              {
+                term: "Account menu",
+                text: "click your avatar for **Profile**, **Settings**, **Theme** (light, dark or system) and **Sign out**. The same menu is at the bottom of the sidebar.",
               },
             ],
           },
@@ -83,7 +97,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Use the **feedback** button in the bottom-right corner of any page and pick **I'm not sure how this works**. Our team reads every message and the page you were on is attached automatically.",
+            text: "On the Support page you can search these guides or browse them by topic. If that doesn't help, use the **feedback** button in the bottom-right corner of any page and pick **I'm not sure how this works**. Our team reads every message and the page you were on is attached automatically.",
           },
         ],
       },
@@ -92,7 +106,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
   {
     slug: "how-requests-work",
     title: "How requests and tokens work",
-    summary: "The life of a request from To do to Done, and when tokens are spent or refunded.",
+    summary: "The life of a request from Backlog to Done, and when tokens are spent or refunded.",
     category: "Getting started",
     routes: [],
     keywords: ["status", "workflow", "lifecycle", "ticket", "cost", "charge", "refund", "backlog"],
@@ -109,8 +123,8 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             type: "list",
             items: [
               {
-                term: "To do",
-                text: "your request is waiting for a creative. While it is here you can still edit it, add brief files, or cancel it for a full refund. The Overview page calls this stage **Backlog**.",
+                term: "Backlog",
+                text: "your request is waiting for a creative. While it is here you can still edit it, add brief files, or cancel it for a full refund.",
               },
               {
                 term: "In progress",
@@ -137,7 +151,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
               "Tokens are deducted **when you create the request**: the service's token cost, multiplied by the quantity if the service has one.",
               "Approving a request costs nothing extra. It releases payment to your creative.",
               "Asking for changes is free. You can send work back as many times as you need.",
-              "If you change the service of a request while it is still in **To do**, the difference is charged or refunded automatically.",
+              "If you change the service of a request while it is still in **Backlog**, the difference is charged or refunded automatically.",
             ],
           },
         ],
@@ -147,7 +161,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "A request can be cancelled for a **full refund** while it is in **To do** and no creative has been assigned yet. Only company Owners and Project managers can cancel. Once a creative has started, cancelling is no longer possible from the dashboard, so contact us through the feedback button instead.",
+            text: "A request can be cancelled for a **full refund** while it is in **Backlog** and no creative has been assigned yet. Only company Owners and Project managers can cancel. Once a creative has started, cancelling is no longer possible from the dashboard, so contact us through the feedback button instead.",
           },
         ],
       },
@@ -188,7 +202,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
               },
               {
                 term: "Member",
-                text: "creates requests, edits them while in To do, asks for changes and works on moodboards. Cannot approve requests as Done, cancel them, or manage projects.",
+                text: "creates requests, edits them while in Backlog, asks for changes and works on moodboards. Cannot approve requests as Done, cancel them, or manage projects.",
               },
               {
                 term: "Billing manager",
@@ -198,7 +212,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           },
           {
             type: "tip",
-            text: 'Your own role is shown on the **Overview** page ("You are browsing as …") and in **Settings** under **Company role**.',
+            text: 'Your own role is shown on the **Overview** page ("You are browsing as …") and in **Settings → Workspace access** under **Company role**.',
           },
         ],
       },
@@ -218,7 +232,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
               },
               {
                 term: "Cancel a request for a refund",
-                text: "Owner, Project manager (only in To do, before a creative is assigned).",
+                text: "Owner, Project manager (only in Backlog, before a creative is assigned).",
               },
               {
                 term: "Create, rename and delete projects; edit a project's brand guide",
@@ -271,27 +285,31 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             items: [
               {
                 term: "Token balance",
-                text: "tokens available right now, with credits and debits. **View ledger** opens the Tokens page.",
+                text: "tokens available right now. **View ledger** opens the Tokens page.",
               },
               {
-                term: "Open tickets",
-                text: "how many requests are in Backlog (To do), In progress and In review. **Open board** takes you to the Board.",
+                term: "Open requests",
+                text: "how many requests aren't Done yet. **Open board** takes you to the Board.",
               },
               {
                 term: "Completed",
                 text: "requests marked Done and your completion rate.",
               },
               {
-                term: "Ticket pipeline",
-                text: "a chart of where your requests are. It appears once you have at least one request.",
+                term: "Token activity and Workflow",
+                text: "your credits and debits, and how many requests are in each status.",
               },
               {
-                term: "Upcoming deadlines",
-                text: "the five most urgent open requests that have a due date. Red means overdue, amber means due within three days. Click one to open it.",
+                term: "Needs your review",
+                text: "appears when work is In review. **Review request** opens the first one.",
               },
               {
-                term: "Company and Plan & billing",
-                text: "your company details, your plan's monthly tokens and price. **Open settings** goes to Settings.",
+                term: "Upcoming requests",
+                text: "the five most urgent open requests that have a due date. Overdue ones are red. Click a title to open it.",
+              },
+              {
+                term: "Company and Plan",
+                text: "your member, project and request counts, and your plan's monthly tokens and price. If you can change the plan, **Manage plan** goes to Settings.",
               },
             ],
           },
@@ -306,8 +324,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
   {
     slug: "board",
     title: "Using the Board",
-    summary:
-      "See every request by status, filter by project, search, and approve work by dragging.",
+    summary: "See every request by status, filter them, search, and approve work by dragging.",
     category: "Workspace",
     routes: ["/customer/board"],
     keywords: ["kanban", "columns", "drag", "drop", "search", "filter", "share", "shortcut"],
@@ -318,15 +335,11 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "The Board shows your requests in four columns: **To do**, **In progress**, **In review** and **Done**. Inside each column, cards are sorted by priority (Urgent first), then oldest first. You can't reorder cards by hand.",
+            text: "The Board shows all your requests in four columns: **Backlog**, **In progress**, **In review** and **Done**. Inside each column, cards are sorted by priority (Urgent first), then oldest first. You can't reorder cards by hand.",
           },
           {
             type: "p",
-            text: "Each card shows the title, a short description, a thumbnail, the due date (red when overdue), the ticket code, the priority icon and a green **Assigned** badge once a creative has picked it up.",
-          },
-          {
-            type: "warning",
-            text: "The Board shows your **50 most recent** requests. If you have more, use the **Table** view to see all of them.",
+            text: "Each card shows the ticket code, the priority, the title, a short description, a thumbnail, the due date (red when overdue) and a green **Assigned** badge once a creative has picked it up.",
           },
         ],
       },
@@ -337,24 +350,28 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             type: "list",
             items: [
               {
-                term: "Search board",
+                term: "Search requests",
                 text: "filters cards by ticket code, title or description. Press **/** anywhere on the Board to jump to the search box.",
               },
               {
-                term: "Projects",
-                text: "click a project in the left panel to show only its requests. Click it again, or **All projects**, to clear the filter.",
+                term: "All projects",
+                text: "pick a project in this dropdown to show only its requests. The **…** button beside it holds the project actions: see **Projects and brand guides**.",
+              },
+              {
+                term: "All priorities",
+                text: "shows only one priority.",
               },
               {
                 term: "Filter",
-                text: "opens a project dropdown. **Clear** removes the filter.",
+                text: "opens more options, such as **Assignment** (assigned or unassigned). **Clear filters** removes everything you've set.",
               },
               {
                 term: "Share",
                 text: "copies the Board's link to your clipboard.",
               },
               {
-                term: "Kanban / Table",
-                text: "switches between the Board and a sortable list of all requests.",
+                term: "Kanban / List",
+                text: "switches between the Board and **My requests**, a sortable list of all requests.",
               },
             ],
           },
@@ -365,7 +382,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Click a card to open it in a full-screen window. There you can read the brief, look at every version the creative sent, add pin notes on images, download files and, while it is In review, approve it or ask for changes.",
+            text: "Click a card to open it in a large window with **Current version**, **Brief & files**, **Versions** and **Comments** tabs. There you can look at every version the creative sent, add pin notes on images, download files and, while it is In review, approve it or request a revision. **Open full page** takes you to the request page. When work is waiting, **Needs your review** at the top of the Board has a **Review request** button.",
           },
         ],
       },
@@ -380,7 +397,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             type: "list",
             items: [
               "Drop on **Done** to approve. A window asks you to confirm.",
-              "Drop on **In progress** to ask for changes. A window asks for a message for your creative.",
+              "Drop on **In progress** to request a revision. A window asks for a message for your creative.",
             ],
           },
           {
@@ -394,7 +411,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Use **+ New ticket** at the top or **+ Create** at the bottom of the To do column. The form is the same as on the New request page and the request lands in **To do**.",
+            text: "Use **New request** at the top of the Board. The form is the same as on the new request page and the request lands in **Backlog**.",
           },
         ],
       },
@@ -426,12 +443,12 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           {
             type: "steps",
             items: [
-              "Click **+ New request** on Overview, **+ New ticket** on the Board, or **Create ticket** on a service in **Services**.",
+              "Click **+ New request** on Overview or **My requests**, **New request** on the Board, or **Create request** on a service in **Services**.",
               "Write a **Title**. This is the line your creative sees on the board.",
               "Describe what you need in the **Brief**: links, context and requirements.",
               "Pick a **Job type** with **Choose a service type…**. Search or browse by category, click a service, then press **Select**.",
               "Optionally set **Priority**, **Due date**, **Project**, attach files or a moodboard.",
-              "Check the **Cost** line, then click **Create ticket**.",
+              "Check the **Cost summary**, then click **Create request**.",
             ],
           },
         ],
@@ -480,7 +497,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Under the job type you see **Cost: N tokens** and **Remaining after: N tokens**. The cost is deducted as soon as you click **Create ticket**.",
+            text: "**Cost summary** shows your **Current balance**, the **Cost** and what's **Remaining after**. The cost is deducted as soon as you click **Create request**.",
           },
           {
             type: "p",
@@ -533,11 +550,11 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "When your creative sends a version, the request moves to **In review** and the person who created it gets a notification. Open it from the Board, the Table, the notification or the email.",
+            text: "When your creative sends a version, the request moves to **In review** and the person who created it gets a notification. Open it from the Board, **My requests**, the notification or the email.",
           },
           {
             type: "p",
-            text: "Every version is kept. The newest is marked **Current** and older ones are under **Previous versions**. With two or more versions, **Compare** shows them side by side.",
+            text: "Every version is kept. **Current version** shows the newest and the **Versions** tab lists them all. With two or more versions, **Compare versions** on the full request page shows them side by side.",
           },
         ],
       },
@@ -565,7 +582,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           {
             type: "steps",
             items: [
-              "While the request is **In review**, click **Request revision** (Board) or **Request changes** (request page). You can also drag the card to **In progress**.",
+              "While the request is **In review**, click **Request revision**, or drag the card to **In progress** on the Board.",
               "Write a message for your creative. It's required.",
               "Click **Send back to creative**. The request moves back to **In progress**.",
             ],
@@ -582,9 +599,9 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           {
             type: "steps",
             items: [
-              "Click **Mark as done**, or drag the card to **Done** on the Board.",
+              "Click **Approve & complete**, or drag the card to **Done** on the Board.",
               "Check the final files in the window. You can download them from here.",
-              "Confirm. Your creative is paid for the job and the request moves to **Done**.",
+              "Confirm in the window. Your creative is paid for the job and the request moves to **Done**.",
               "Rate the request on Quality, Communication and Speed, or **Skip**. Notes in the rating are for our team, not shared with the creative.",
             ],
           },
@@ -601,7 +618,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             type: "list",
             items: [
               "Every image and file in the viewer has its own **Download** button.",
-              "**Download all** zips every file in a version (shown when it has two or more files).",
+              "**Download all** zips every file in a version or brief (shown when there are two or more files).",
               "On a Done request, the Board window has **Download final work**.",
             ],
           },
@@ -614,20 +631,20 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             type: "list",
             items: [
               {
-                term: "Edit",
-                text: "change the title, brief, priority, project, job type or due date while the request is in **To do**.",
+                term: "Edit request",
+                text: "change the title, brief, priority, project, job type or due date while the request is in **Backlog**.",
               },
               {
                 term: "Add files",
-                text: "add brief attachments while the request is in **To do**.",
+                text: "add brief attachments on the **Brief & files** tab while the request is in **Backlog**.",
               },
               {
                 term: "Cancel & refund",
-                text: "Owners and Project managers can cancel a request in **To do** that no creative has picked up yet. The full token cost is returned. This can't be undone.",
+                text: "Owners and Project managers can cancel a request in **Backlog** that no creative has picked up yet. The full token cost is returned. This can't be undone.",
               },
               {
                 term: "Comments",
-                text: "on the request page you can leave comments for your team and the creative. Comments can't be edited or deleted.",
+                text: "on the **Comments** tab you can leave comments for your team and the creative. Comments can't be edited or deleted.",
               },
             ],
           },
@@ -641,7 +658,16 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
     summary: "A sortable, filterable list of every request, with paging.",
     category: "Workspace",
     routes: ["/customer/tickets"],
-    keywords: ["table", "list", "my tickets", "sort", "filter", "search", "pagination"],
+    keywords: [
+      "table",
+      "list",
+      "my requests",
+      "my tickets",
+      "sort",
+      "filter",
+      "search",
+      "pagination",
+    ],
     related: ["board", "review-and-approve"],
     sections: [
       {
@@ -649,7 +675,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Switch to **Table** at the top of the Board, or open **My tickets**. Unlike the Board, the table includes every request, 50 per page.",
+            text: "Switch to **List** at the top of the Board to open **My requests**. It lists every request, 50 per page.",
           },
           {
             type: "list",
@@ -660,7 +686,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
               },
               {
                 term: "Filters",
-                text: "Status, Project and Priority.",
+                text: "the **Status** chips at the top, plus **Project** and **Priority** dropdowns.",
               },
               {
                 term: "Sorting",
@@ -695,14 +721,14 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           {
             type: "steps",
             items: [
-              "On the Board, click **+** next to **Projects** in the left panel.",
+              "On the Board, click the **…** button next to the project filter and choose **New project**.",
               "Enter a **Project name** (at least two characters) and click **Create project**. A short code is generated from the name.",
-              "Pick the project when you create a request, then click it on the Board to see only its requests.",
+              "Pick the project when you create a request, then choose it in the Board's project filter to see only its requests.",
             ],
           },
           {
             type: "p",
-            text: "Only Owners and Project managers can create, rename or delete projects.",
+            text: "Only Owners and Project managers can create, rename or delete projects, so only they see the **…** button.",
           },
         ],
       },
@@ -711,7 +737,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Hover a project in the Board's left panel, open the **⋯** menu and choose **Brand guide**. Fill it once and it is shown to creatives on every request in that project:",
+            text: "Choose the project in the Board's project filter, open the **…** menu and choose **Brand guide**. Fill it once, click **Save brand guide**, and it is shown to creatives on every request in that project:",
           },
           {
             type: "list",
@@ -732,7 +758,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Use **Rename** or **Delete project** in the same **⋯** menu.",
+            text: "With the project chosen in the filter, use **Rename** or **Delete project** in the same **…** menu.",
           },
           {
             type: "warning",
@@ -773,6 +799,10 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           {
             type: "p",
             text: "Every moodboard is visible to everyone in your company. Owners, Project managers and Members can edit them.",
+          },
+          {
+            type: "p",
+            text: "The Moodboards page shows a preview of each board. Use **Search moodboards** and the sort menu to find one, then click it to open it.",
           },
         ],
       },
@@ -865,7 +895,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           {
             type: "steps",
             items: [
-              "Click a tool card to open it.",
+              "Click **Open tool** on a tool card.",
               "Fill in the fields and press the tool's button.",
               "Tokens are taken from your company balance when you press it. If the tool fails, they are refunded automatically.",
             ],
@@ -917,7 +947,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             type: "list",
             items: [
               "**Download** results straight away. They are not saved to your requests or files.",
-              "**Recent Generations** lists your last 10 uses with their cost.",
+              "**Recent Generations** lists your uses with their status and token cost. Filter by tool or status, and use the page buttons to see older ones.",
               "Each tool can be used a limited number of times per hour per company. If you hit the limit, wait a little and try again.",
             ],
           },
@@ -943,11 +973,11 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Services lists every type of job you can request, grouped by category. Click a category to filter. Click it again to show everything.",
+            text: "Services lists every type of job you can request. Choose a category to see its services, or use **Search all services** to look through all of them.",
           },
           {
             type: "p",
-            text: "Each service shows its description, its cost in tokens and, where set, an estimated time in hours.",
+            text: "Each row shows the cost in tokens and, where set, the estimated effort, which isn't a delivery time. Click a row to see its details and your company balance in the panel.",
           },
         ],
       },
@@ -956,7 +986,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Click **Create ticket** on a service. The new request form opens with that service already selected. Nothing is charged until you create the request.",
+            text: "Select a service and click **Create request** in its panel. The new request form opens with that service already selected. Nothing is charged until you create the request.",
           },
         ],
       },
@@ -979,12 +1009,12 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             items: [
               { term: "Current balance", text: "what you can spend right now." },
               {
-                term: "Total credits",
-                text: "tokens added by plan renewals, top-ups and adjustments.",
+                term: "Credits",
+                text: "tokens added by plan renewals, top-ups and adjustments, within your 50 most recent movements.",
               },
               {
-                term: "Total debits",
-                text: "tokens used by requests, AI tools and consultations.",
+                term: "Debits",
+                text: "tokens used by requests, AI tools and consultations, within your 50 most recent movements.",
               },
             ],
           },
@@ -999,27 +1029,27 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "The ledger shows your 50 most recent movements with the date, amount, reason, ticket code and your balance before and after. Use **All / Credits / Debits** to filter. Common reasons:",
+            text: "The ledger shows your 50 most recent movements with the date, amount and reason. Use **All / Credits / Debits** or **Search ledger** to narrow it, and click a row for the ticket code and your balance before and after. Common reasons:",
           },
           {
             type: "list",
             items: [
-              { term: "JOB_REQUEST_CREATED", text: "a request was created." },
-              { term: "REFUND", text: "a request was cancelled." },
+              { term: "Job request created", text: "a request was created." },
+              { term: "Refund", text: "a request was cancelled." },
               {
-                term: "AI_GENERATION / AI_REFUND",
+                term: "AI generation / AI refund",
                 text: "an AI tool was used, or refunded after a failure.",
               },
               {
-                term: "CONSULTATION_BOOKING / CONSULTATION_REFUND",
+                term: "Consultation booking / Consultation refund",
                 text: "a consultation was booked, or cancelled by our team.",
               },
-              { term: "TOKEN_TOPUP", text: "you bought a top-up." },
+              { term: "Token top-up", text: "you bought a top-up." },
               {
-                term: "SUBSCRIPTION_INITIAL_CREDIT / SUBSCRIPTION_RENEWAL",
+                term: "Subscription initial credit / Subscription renewal",
                 text: "tokens from your plan.",
               },
-              { term: "ADMIN_ADJUSTMENT", text: "a manual change by our team." },
+              { term: "Adjustment", text: "a manual change by our team." },
             ],
           },
         ],
@@ -1051,7 +1081,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Only **Owners** and **Billing managers** can start a subscription, change the plan or buy tokens. Everyone else sees the plan in **Settings → Subscription plan** with a **Limited access** note.",
+            text: "Only **Owners** and **Billing managers** can start a subscription, change the plan or buy tokens. Everyone else sees the plan in **Settings → Plan & billing** with a **Limited access** note.",
           },
         ],
       },
@@ -1060,7 +1090,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "If your company doesn't have a subscription yet, click **Start subscription** in **Settings → Subscription plan** and pay through Stripe. Your plan's monthly tokens are added as soon as the payment succeeds.",
+            text: "If your company doesn't have a subscription yet, click **Start subscription** in **Settings → Plan & billing** and pay through Stripe. Your plan's monthly tokens are added as soon as the payment succeeds.",
           },
           {
             type: "p",
@@ -1074,8 +1104,8 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           {
             type: "steps",
             items: [
-              "Go to **Settings** and find **Switch to a different plan**.",
-              "Each plan is marked **Upgrade** or **Downgrade** with its monthly tokens and price. Click **Preview & switch**.",
+              "Go to **Settings → Plan & billing** and find **Switch to a different plan**.",
+              "Each plan is marked **Upgrade** or **Downgrade** with its monthly tokens and price. Click **Preview change**.",
               "Check the preview of your next Stripe invoice, including the prorated amount.",
               "Click **Confirm switch**.",
             ],
@@ -1092,8 +1122,8 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           {
             type: "steps",
             items: [
-              "In **Settings**, find **Need more tokens now?**.",
-              "Click **Buy** on a pack. You are taken to Stripe to pay.",
+              "In **Settings → Plan & billing**, find **Need more tokens now?**.",
+              "Click **Buy tokens** on a pack. You are taken to Stripe to pay.",
               "The tokens are added to your balance as soon as the payment succeeds.",
             ],
           },
@@ -1108,7 +1138,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
   {
     slug: "consultation",
     title: "Booking a consultation",
-    summary: "Book a video call with the Brandbite team, what it costs and how scheduling works.",
+    summary: "Book a video call with the brandbite team, what it costs and how scheduling works.",
     category: "Billing",
     routes: ["/customer/consultation"],
     keywords: ["call", "meeting", "video", "book", "schedule", "meet"],
@@ -1121,7 +1151,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             type: "steps",
             items: [
               "Describe what you want to discuss (at least 10 characters). The **Quick start** buttons add starter text.",
-              "Optionally pick a preferred date and a 30-minute time slot, and check the timezone.",
+              "Optionally pick a preferred date and a 30-minute time slot (**Suggest a time** picks one for you), and check the timezone.",
               "Click **Submit request**. The cost shown on the button is deducted straight away.",
             ],
           },
@@ -1139,7 +1169,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             items: [
               "Bookings need at least 24 hours' notice and can be up to 30 days ahead, during the team's working days and hours shown under the time picker. Times that are already booked may be greyed out.",
               "When we schedule your call you get an email with the time (in your timezone) and the video link. Sometimes a slot you picked is confirmed straight away.",
-              "Your requests are listed under **Your consultations** with their status: Awaiting scheduling, Scheduled, Completed or Canceled. Scheduled calls have a **Join call** link.",
+              "Your requests are listed under **Your consultations**, on the **Upcoming** and **All** tabs, with their status: Awaiting scheduling, Scheduled, Completed or Canceled. You can search them or filter by status. Scheduled calls have a **Join call** link.",
             ],
           },
         ],
@@ -1183,12 +1213,30 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
     related: ["notifications", "settings"],
     sections: [
       {
+        heading: "The tabs",
+        blocks: [
+          {
+            type: "list",
+            items: [
+              { term: "Personal details", text: "your name, avatar, email and timezone." },
+              { term: "Notifications", text: "what you're notified about, in-app and by email." },
+              { term: "Security", text: "two-factor authentication." },
+              { term: "Sessions", text: "the browsers you're signed in on." },
+              {
+                term: "Account management",
+                text: "a link to leave your workspace, and **Delete my account**. See **Settings**.",
+              },
+            ],
+          },
+        ],
+      },
+      {
         heading: "Name and avatar",
         blocks: [
           {
             type: "list",
             items: [
-              "Your name appears on requests, comments and emails. Change it and click **Save name**.",
+              "Your name appears on requests, comments and emails. Change it under **Full name** and click **Save name**.",
               "**Upload avatar** accepts PNG, JPEG, WebP or GIF up to 2 MB. Square images look best.",
             ],
           },
@@ -1225,7 +1273,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           {
             type: "steps",
             items: [
-              "Enter your current password and click **Set up**.",
+              "Click **Set up two-factor**, enter your current password and click **Continue**.",
               "Scan the QR code with an authenticator app, or paste the secret manually.",
               "Enter the code from the app and click **Confirm and enable**.",
               "Save the backup codes somewhere safe. They are shown **only once** and each works once.",
@@ -1289,7 +1337,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Click the bell at the bottom of the sidebar to see your latest 20 notifications. Unread ones are bold. Click one to open its request, or **Mark all as read**.",
+            text: "Click the bell in the top bar to see your latest 20 notifications. Unread ones are bold. Click one to open its request, or **Mark all as read**.",
           },
         ],
       },
@@ -1298,7 +1346,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "In **Settings → Notification preferences** (or on your **Profile**), switch each type on or off for **In-app** and **Email**. Changes save instantly and apply to future notifications. Sign-in and security emails are always sent.",
+            text: "In **Settings → Notifications** (or the **Notifications** tab of your **Profile**), switch each type on or off for **In-app** and **Email**. Changes save instantly and apply to future notifications. Sign-in and security emails are always sent.",
           },
         ],
       },
@@ -1328,7 +1376,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           {
             type: "steps",
             items: [
-              "Under **Invite a new member**, enter their email address.",
+              "Under **Invite member**, enter their email address.",
               "Choose a role: **Member**, **Project manager** or **Billing**.",
               "Click **Send invite**. They get an email with an **Accept Invite** button.",
             ],
@@ -1348,7 +1396,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Invites that haven't been accepted are listed under **Pending invites**, marked **Expired** when they have run out. There's no resend button: click **Cancel**, then invite the person again.",
+            text: "Invites that haven't been accepted are on the **Pending invitations** tab, marked **Expired** when they have run out. There's no resend button: click **Cancel invite** and confirm, then invite the person again.",
           },
         ],
       },
@@ -1357,7 +1405,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Pick a new role in the dropdown on someone's card. The change applies **immediately**, with no confirmation.",
+            text: "Click someone's row to open their panel, pick a new role and click **Save changes**. Nothing changes until you save.",
           },
           {
             type: "list",
@@ -1373,7 +1421,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Click **Remove** on their card and confirm. They lose access straight away. To bring them back, invite them again. The last Owner can't be removed.",
+            text: "Click their row and, in the panel, click **Remove member** and confirm. They lose access straight away. To bring them back, invite them again. The last Owner can't be removed. To remove yourself, use **Leave workspace** in Settings.",
           },
         ],
       },
@@ -1382,33 +1430,23 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
   {
     slug: "settings",
     title: "Settings",
-    summary:
-      "Your account, company details, plan, notification preferences, and leaving or deleting.",
+    summary: "Your company details, plan, notification preferences, and leaving or deleting.",
     category: "Account",
     routes: ["/customer/settings"],
     keywords: ["company", "website", "account", "leave", "delete account", "danger zone"],
     related: ["plans-and-top-ups", "notifications", "members"],
     sections: [
       {
-        heading: "Account and company",
+        heading: "Company",
         blocks: [
           {
-            type: "list",
-            items: [
-              {
-                term: "Account",
-                text: "click **Edit** to change your name. Your email, role and **Company role** are shown here.",
-              },
-              {
-                term: "Company",
-                text: "Owners and Project managers can click **Edit** to change the company **Name** and **Website**. You also see the number of members, projects and tickets.",
-              },
-            ],
+            type: "p",
+            text: "Your company's name and its member, project and request counts are at the top of every tab. Owners and Project managers can click **Edit company** to change the **Name** and **Website** on the **Company** tab.",
           },
         ],
       },
       {
-        heading: "Subscription plan",
+        heading: "Plan & billing",
         blocks: [
           {
             type: "p",
@@ -1417,7 +1455,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         ],
       },
       {
-        heading: "Notification preferences",
+        heading: "Notifications",
         blocks: [
           {
             type: "p",
@@ -1426,11 +1464,29 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         ],
       },
       {
+        heading: "Workspace access",
+        blocks: [
+          {
+            type: "list",
+            items: [
+              {
+                term: "Your account",
+                text: "click **Edit** to change your name. Your email, role and **Company role** are shown here.",
+              },
+              {
+                term: "Company members",
+                text: "Owners and Project managers can click **Manage members** to go to the Members page.",
+              },
+            ],
+          },
+        ],
+      },
+      {
         heading: "Leaving the company",
         blocks: [
           {
             type: "p",
-            text: "**Leave workspace** removes you from the company but keeps your account. You lose access to its projects and requests until someone invites you again.",
+            text: "**Leave workspace**, on the **Workspace access** tab, removes you from the company but keeps your account. You lose access to its projects and requests until someone invites you again.",
           },
           {
             type: "p",
@@ -1443,7 +1499,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "warning",
-            text: "**Delete my account** is permanent. Type your email to confirm. You are signed out and your personal details are removed. Requests and token history stay with your company, without your name. If you're the only Owner and others are still in the company, make someone else an Owner first.",
+            text: "**Delete my account**, on the **Workspace access** tab, is permanent. Type your email to confirm. You are signed out and your personal details are removed. Requests and token history stay with your company, without your name. If you're the only Owner and others are still in the company, make someone else an Owner first.",
           },
         ],
       },

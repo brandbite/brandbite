@@ -11,8 +11,6 @@ import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { FeedbackWidget } from "@/components/feedback/feedback-widget";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-// Dashboard typeface, self-hosted; --font-jakarta is set in globals.css.
-import "@fontsource-variable/plus-jakarta-sans";
 
 // All customer routes are auth-gated dashboards. Skip SSG so the build
 // never pulls heavy client-only deps (DOMPurify/jsdom) into server bundles.

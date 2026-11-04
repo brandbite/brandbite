@@ -59,7 +59,7 @@ export function HomeFooter({ variant = "home" }: { variant?: "home" | "coming-so
     >
       {/* Top row — mascot + logo, main links, socials */}
       <div className="flex w-full flex-row items-center justify-between max-[767px]:flex-col max-[767px]:gap-5">
-        <Link href="/" className="flex shrink-0 flex-row items-center" aria-label="Brandbite home">
+        <Link href="/" className="flex shrink-0 flex-row items-center" aria-label="brandbite home">
           {/* BB peeking over the wordmark — the 49×66 box crops a 49×84 render */}
           <span className="relative block h-[66px] w-[49px] shrink-0 overflow-hidden">
             <Image
@@ -70,7 +70,7 @@ export function HomeFooter({ variant = "home" }: { variant?: "home" | "coming-so
               className="absolute top-[-6px] left-0 h-[84px] w-[49px] max-w-none"
             />
           </span>
-          <Image src="/brandbite-logo.svg" alt="Brandbite" width={210} height={44} />
+          <Image src="/brandbite-logo.svg" alt="brandbite" width={210} height={44} />
         </Link>
 
         <nav

@@ -84,10 +84,10 @@ export default function DebugDemoUserPage() {
               Debug
             </p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--bb-secondary)]">
-              Browse Brandbite as…
+              Browse brandbite as…
             </h1>
             <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-              Pick a persona to explore Brandbite from different perspectives. This will set a{" "}
+              Pick a persona to explore brandbite from different perspectives. This will set a{" "}
               <code className="rounded bg-[var(--bb-bg-card)] px-1 py-0.5 text-[11px]">
                 bb-demo-user
               </code>{" "}

@@ -14,9 +14,8 @@ import Link from "next/link";
 import { HomeFooter } from "@/components/marketing/home-footer";
 import { HomeHeader } from "@/components/marketing/home-header";
 
-// Inter, not the global Josefin heading font — the design sets all display
-// type in Inter ExtraBold.
-const displayFont = "font-[family-name:var(--font-inter)]";
+// The design sets all display type in ExtraBold.
+const displayFont = "font-[family-name:var(--font-jakarta)]";
 
 const STEPS = [
   {
@@ -186,7 +185,7 @@ export default function HomePage() {
               <span className="text-[#8D5BFF]">No stale pixels.</span>
             </h2>
             <p className="text-sm leading-5 text-[#B8BAC2]">
-              A quick look at what brands ship with Brandbite.
+              A quick look at what brands ship with brandbite.
             </p>
           </div>
           <div className="flex h-[250px] w-[800px] flex-row items-center max-[1139px]:h-auto max-[1139px]:w-auto max-[1139px]:flex-wrap max-[1139px]:justify-center">
@@ -194,7 +193,7 @@ export default function HomePage() {
               <div key={src} className="relative h-[250px] w-[200px] shrink-0 overflow-hidden">
                 <Image
                   src={src}
-                  alt="Brandbite client work sample"
+                  alt="brandbite client work sample"
                   fill
                   sizes="200px"
                   className="object-cover"
@@ -211,7 +210,7 @@ export default function HomePage() {
             <h2
               className={`${displayFont} text-4xl leading-9 font-extrabold whitespace-pre-line text-[#2B2D33]`}
             >
-              {"Why\nBrandbite?"}
+              {"Why\nbrandbite?"}
             </h2>
             <div className="h-[100px] w-[214px] bg-[url('/home/why-doodle.png')] bg-cover bg-center bg-no-repeat" />
           </div>
@@ -240,7 +239,7 @@ export default function HomePage() {
               Ready to feed your brand better creative?
             </h2>
             <p className="text-sm leading-5 text-[#5E616E]">
-              Send your first request and let Brandbite turn it into something worth shipping.
+              Send your first request and let brandbite turn it into something worth shipping.
             </p>
             <Link
               href="/meet"

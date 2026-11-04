@@ -9,7 +9,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Documentation",
-  description: "Guides and reference for using Brandbite as a customer or creative.",
+  description: "Guides and reference for using brandbite as a customer or creative.",
 };
 
 export default function DocumentationLayout({ children }: { children: React.ReactNode }) {

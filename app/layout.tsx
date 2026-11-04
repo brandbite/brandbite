@@ -9,11 +9,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
-// Self-hosted variable fonts (all subsets, split by unicode-range so browsers
-// fetch only what a page uses). The --font-* variables live in globals.css.
-import "@fontsource-variable/inter";
-import "@fontsource-variable/josefin-sans";
-import "@fontsource-variable/caveat";
+// Self-hosted variable font (all subsets, split by unicode-range so browsers
+// fetch only what a page uses). --font-jakarta lives in globals.css.
+import "@fontsource-variable/plus-jakarta-sans";
 import DemoPersonaBanner from "../components/demo-persona-banner";
 import { ToastProvider } from "@/components/ui/toast-provider";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -27,24 +25,24 @@ const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 export const metadata: Metadata = {
   title: {
-    default: "Brandbite",
-    template: "%s | Brandbite",
+    default: "brandbite",
+    template: "%s | brandbite",
   },
   description:
     "Creative-as-a-service platform. Submit requests, track progress, and manage your creative pipeline.",
   metadataBase: new URL(appUrl),
   openGraph: {
-    title: "Brandbite",
+    title: "brandbite",
     description:
       "Creative-as-a-service platform. Submit requests, track progress, and manage your creative pipeline.",
     url: appUrl,
-    siteName: "Brandbite",
+    siteName: "brandbite",
     type: "website",
     locale: "en_US",
   },
   twitter: {
     card: "summary",
-    title: "Brandbite",
+    title: "brandbite",
     description:
       "Creative-as-a-service platform. Submit requests, track progress, and manage your creative pipeline.",
   },

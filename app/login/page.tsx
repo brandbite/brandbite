@@ -701,7 +701,7 @@ export default function LoginPage() {
 
       {/* Switch mode */}
       <p className="mt-4 text-center text-sm text-[#2B2D33]">
-        {isSignup ? "Already have an account? " : "New to Brandbite? "}
+        {isSignup ? "Already have an account? " : "New to brandbite? "}
         <button
           type="button"
           onClick={() => switchMode(isSignup ? "signin" : "signup")}

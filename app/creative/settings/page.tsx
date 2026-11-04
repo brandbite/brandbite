@@ -1,109 +1,72 @@
 // -----------------------------------------------------------------------------
 // @file: app/creative/settings/page.tsx
-// @purpose: Creative settings page with skills & notification preferences
+// @purpose: Creative settings: skills, availability, payout tiers, notification
+//           preferences and account deletion, one tab each.
 // -----------------------------------------------------------------------------
 
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import { Card, CardTitle, PageHeader, Skeleton, Tabs } from "@/components/admin/v2/ui";
+import { KeptTabPanel, useTabFromUrl } from "@/components/dashboard/account/account-ui";
+import {
+  AvailabilityPanel,
+  AvailabilityStrip,
+  useCreativeAvailability,
+} from "@/components/dashboard/account/availability";
+import { DeleteAccountCard } from "@/components/dashboard/account/delete-account";
+import {
+  NotificationPreferencesBody,
+  useNotificationPreferences,
+} from "@/components/dashboard/account/notification-matrix";
+import {
+  CurrentPayoutCard,
+  PayoutTiersCard,
+  type PayoutData,
+} from "@/components/dashboard/account/payout-tiers";
+import {
+  SelectionSummary,
+  SkillsPicker,
+  type SkillJobType,
+} from "@/components/dashboard/account/skills-picker";
 import { useToast } from "@/components/ui/toast-provider";
-import { LoadingState } from "@/components/ui/loading-state";
-import { PauseControl } from "@/components/creative/pause-control";
-import { Button } from "@/components/ui/button";
-import { FormInput } from "@/components/ui/form-field";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import { Modal, ModalFooter, ModalHeader } from "@/components/ui/modal";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+type SettingsTab = "skills" | "availability" | "payout" | "notifications" | "account";
 
-type PreferenceEntry = {
-  type: string;
-  enabled: boolean;
-};
-
-type SkillJobType = {
-  id: string;
-  name: string;
-  description: string | null;
-};
-
-type PayoutTier = {
-  id: string;
-  name: string;
-  description: string | null;
-  minCompletedTickets: number;
-  timeWindowDays: number;
-  payoutPercent: number;
-  completedInWindow: number;
-  qualified: boolean;
-};
-
-const CREATIVE_PREFS: {
-  type: string;
-  label: string;
-  description: string;
-}[] = [
-  {
-    type: "FEEDBACK_SUBMITTED",
-    label: "Customer submitted feedback",
-    description: "Get notified when a customer submits revision notes on your work",
-  },
-  {
-    type: "TICKET_ASSIGNED",
-    label: "New ticket assigned",
-    description: "Get notified when a new ticket is assigned to you",
-  },
-  {
-    type: "TICKET_STATUS_CHANGED",
-    label: "Ticket status changed",
-    description: "Get notified when a ticket's status is updated",
-  },
-  {
-    type: "TICKET_COMPLETED",
-    label: "Ticket completed",
-    description: "Get notified when a ticket is marked as done",
-  },
-  {
-    type: "WITHDRAWAL_UPDATED",
-    label: "Withdrawal updates",
-    description: "Get notified when a withdrawal you requested is approved, rejected or paid",
-  },
+const TABS: readonly SettingsTab[] = [
+  "skills",
+  "availability",
+  "payout",
+  "notifications",
+  "account",
 ];
-
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
+const TAB_PREFIX = "creative-settings";
 
 export default function CreativeSettingsPage() {
   const { showToast } = useToast();
+  const [tab, setTab] = useState<SettingsTab>("skills");
+  useTabFromUrl<SettingsTab>(TABS, setTab);
+
   const [loading, setLoading] = useState(true);
-  const [preferences, setPreferences] = useState<PreferenceEntry[]>([]);
-  const [togglingType, setTogglingType] = useState<string | null>(null);
+  const notifications = useNotificationPreferences();
+  const availability = useCreativeAvailability();
 
   // Skills state
   const [jobTypes, setJobTypes] = useState<SkillJobType[]>([]);
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
+  const [skillsLoadFailed, setSkillsLoadFailed] = useState(false);
   const [savingSkills, setSavingSkills] = useState(false);
+  const [selectedOnly, setSelectedOnly] = useState(false);
   const skillSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Payout tiers state
-  const [payoutTiers, setPayoutTiers] = useState<PayoutTier[]>([]);
-  const [currentPayoutPercent, setCurrentPayoutPercent] = useState<number>(60);
-  const [currentTierName, setCurrentTierName] = useState<string | null>(null);
-  const [basePayoutPercent, setBasePayoutPercent] = useState<number>(60);
+  // Payout tiers. Null until the API has answered: a rate is never guessed.
+  const [payout, setPayout] = useState<PayoutData | null>(null);
+  const [payoutFailed, setPayoutFailed] = useState(false);
 
-  // Danger zone — account deletion (GDPR right-to-erasure). We fetch the
-  // session email once so the confirm modal can show "Type <your email>"
-  // and so we can validate the echo client-side before firing the DELETE.
+  // Session email for the delete confirmation. Null disables the action.
   const [accountEmail, setAccountEmail] = useState<string | null>(null);
-  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
-  const [deleteConfirmEmail, setDeleteConfirmEmail] = useState("");
-  const [deletingAccount, setDeletingAccount] = useState(false);
-  const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null);
 
-  // Fetch session email once for the Danger zone confirm modal.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -113,7 +76,7 @@ export default function CreativeSettingsPage() {
         const json = (await res.json()) as { user?: { email?: string } | null };
         if (!cancelled && json?.user?.email) setAccountEmail(json.user.email);
       } catch {
-        // Best-effort — Danger zone disables itself without an email.
+        // Best-effort: delete stays disabled without an email.
       }
     })();
     return () => {
@@ -121,32 +84,39 @@ export default function CreativeSettingsPage() {
     };
   }, []);
 
-  // Load preferences + skills
+  // Load skills + payout tiers
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [prefsRes, skillsRes, tierRes] = await Promise.all([
-          fetch("/api/notifications/preferences"),
+        const [skillsRes, tierRes] = await Promise.all([
           fetch("/api/creative/skills"),
           fetch("/api/creative/payout-tier"),
         ]);
-        const prefsJson = await prefsRes.json().catch(() => null);
         const skillsJson = await skillsRes.json().catch(() => null);
         const tierJson = await tierRes.json().catch(() => null);
 
         if (!cancelled) {
-          if (prefsJson?.preferences) setPreferences(prefsJson.preferences);
-          if (skillsJson?.jobTypes) setJobTypes(skillsJson.jobTypes);
+          if (skillsRes.ok && skillsJson?.jobTypes) setJobTypes(skillsJson.jobTypes);
+          else setSkillsLoadFailed(true);
           if (skillsJson?.selectedJobTypeIds) setSelectedSkillIds(skillsJson.selectedJobTypeIds);
-          if (tierJson?.tiers) {
-            setPayoutTiers(tierJson.tiers);
-            setCurrentPayoutPercent(tierJson.currentPayoutPercent ?? 60);
-            setCurrentTierName(tierJson.currentTierName ?? null);
-            setBasePayoutPercent(tierJson.basePayoutPercent ?? 60);
+
+          if (tierRes.ok && tierJson?.tiers) {
+            setPayout({
+              tiers: tierJson.tiers,
+              currentPayoutPercent: tierJson.currentPayoutPercent,
+              currentTierName: tierJson.currentTierName ?? null,
+              basePayoutPercent: tierJson.basePayoutPercent,
+            });
+          } else {
+            setPayoutFailed(true);
           }
         }
       } catch {
+        if (!cancelled) {
+          setSkillsLoadFailed(true);
+          setPayoutFailed(true);
+        }
         showToast({ type: "error", title: "Failed to load settings" });
       } finally {
         if (!cancelled) setLoading(false);
@@ -196,373 +166,93 @@ export default function CreativeSettingsPage() {
     [saveSkills],
   );
 
-  // Danger zone — GDPR right-to-erasure. Matches /api/customer/account
-  // flow: confirm-email safeguard, hard reload to /login on success so no
-  // stale client state survives.
-  const handleDeleteAccount = useCallback(async () => {
-    if (!accountEmail) return;
-    setDeletingAccount(true);
-    setDeleteAccountError(null);
-    try {
-      const res = await fetch("/api/creative/account", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirmEmail: deleteConfirmEmail }),
-      });
-      const json = await res.json().catch(() => null);
-      if (!res.ok) {
-        throw new Error(json?.error || "Failed to delete account.");
-      }
-      window.location.href = "/login?deleted=1";
-    } catch (err) {
-      setDeleteAccountError(err instanceof Error ? err.message : "Failed to delete account.");
-    } finally {
-      setDeletingAccount(false);
-    }
-  }, [accountEmail, deleteConfirmEmail]);
-
-  // Toggle preference
-  const handleToggle = useCallback(
-    async (type: string, currentEnabled: boolean) => {
-      setTogglingType(type);
-      const newEnabled = !currentEnabled;
-
-      // Optimistic update
-      setPreferences((prev) =>
-        prev.map((p) => (p.type === type ? { ...p, enabled: newEnabled } : p)),
-      );
-
-      try {
-        const res = await fetch("/api/notifications/preferences", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type, enabled: newEnabled }),
-        });
-        if (!res.ok) throw new Error();
-      } catch {
-        // Revert on failure
-        setPreferences((prev) =>
-          prev.map((p) => (p.type === type ? { ...p, enabled: currentEnabled } : p)),
-        );
-        showToast({ type: "error", title: "Failed to update preference" });
-      } finally {
-        setTogglingType(null);
-      }
-    },
-    [showToast],
-  );
-
-  if (loading) {
-    return <LoadingState message="Loading settings..." />;
-  }
-
-  // Build a lookup for the creative-relevant types
-  const prefMap = new Map(preferences.map((p) => [p.type, p.enabled]));
-  const skillSet = new Set(selectedSkillIds);
+  const panel = { idPrefix: TAB_PREFIX, active: tab };
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <div className="mb-6">
-        <h1 className="text-lg font-semibold text-[var(--bb-secondary)]">Settings</h1>
-        <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-          Manage your creative account preferences
-        </p>
-      </div>
+    <>
+      <PageHeader
+        title="Creative settings"
+        description="Manage your creative account preferences."
+      />
 
-      {/* Availability / Pause control */}
-      <PauseControl />
+      <Tabs<SettingsTab>
+        label="Settings sections"
+        idPrefix={TAB_PREFIX}
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          { value: "skills", label: "Skills & expertise" },
+          { value: "availability", label: "Availability" },
+          { value: "payout", label: "Payout tiers" },
+          { value: "notifications", label: "Notifications" },
+          { value: "account", label: "Account management" },
+        ]}
+      />
 
-      {/* Skills & expertise */}
-      <div className="mb-4 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">
-              Skills &amp; expertise
-            </h2>
-            <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
-              Select the job types you can handle. You will only be auto-assigned tickets that match
-              your skills.
-            </p>
+      <div className="mt-6 space-y-6">
+        {tab !== "availability" && (
+          <AvailabilityStrip availability={availability} onManage={() => setTab("availability")} />
+        )}
+
+        {loading ? (
+          <div aria-busy="true" aria-label="Loading settings" className="space-y-6">
+            <Skeleton className="h-96 rounded-2xl" />
           </div>
-          {savingSkills && (
-            <span className="text-[10px] text-[var(--bb-text-tertiary)]">Saving...</span>
-          )}
-        </div>
-
-        <div className="mt-4 space-y-1">
-          {jobTypes.length === 0 && (
-            <p className="px-3 py-3 text-xs text-[var(--bb-text-tertiary)]">
-              No job types available yet.
-            </p>
-          )}
-          {jobTypes.map((jt) => {
-            const checked = skillSet.has(jt.id);
-            return (
-              <label
-                key={jt.id}
-                className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-[var(--bb-bg-card)]/50"
-              >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => handleSkillToggle(jt.id)}
-                  className="h-4 w-4 shrink-0 rounded border-[var(--bb-border-input)] text-[var(--bb-primary)] accent-[var(--bb-primary)] focus:ring-[var(--bb-primary)]"
-                />
+        ) : (
+          <>
+            <KeptTabPanel value="skills" {...panel}>
+              <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,400px)]">
                 <div className="min-w-0">
-                  <p className="text-xs font-medium text-[var(--bb-secondary)]">{jt.name}</p>
-                  {jt.description && (
-                    <p className="mt-0.5 text-[10px] text-[var(--bb-text-tertiary)]">
-                      {jt.description}
-                    </p>
-                  )}
-                </div>
-              </label>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Payout tiers */}
-      <div className="mb-4 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">Payout tiers</h2>
-            <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
-              Complete more tickets to unlock higher payout rates. Your current rate is{" "}
-              <span className="font-semibold text-[var(--bb-secondary)]">
-                {currentPayoutPercent}%
-              </span>
-              {currentTierName && (
-                <span>
-                  {" "}
-                  (<span className="font-medium text-[#8B5CF6]">{currentTierName}</span>)
-                </span>
-              )}
-              .
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-4 space-y-2">
-          {/* Base rate */}
-          <div
-            className={`flex items-center justify-between rounded-xl px-3 py-3 transition-colors ${
-              !currentTierName
-                ? "border border-[#8B5CF6]/30 bg-purple-50 dark:bg-purple-950/30"
-                : "bg-[var(--bb-bg-card)]/50"
-            }`}
-          >
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-[var(--bb-secondary)]">Base Rate</p>
-              <p className="mt-0.5 text-[10px] text-[var(--bb-text-tertiary)]">
-                Default payout for all creatives
-              </p>
-            </div>
-            <span
-              className={`text-sm font-bold ${
-                !currentTierName ? "text-[#8B5CF6]" : "text-[var(--bb-text-tertiary)]"
-              }`}
-            >
-              {basePayoutPercent}%
-            </span>
-          </div>
-
-          {payoutTiers.map((tier) => {
-            const progress = Math.min(
-              Math.round((tier.completedInWindow / tier.minCompletedTickets) * 100),
-              100,
-            );
-            const windowLabel =
-              tier.timeWindowDays % 365 === 0
-                ? `${tier.timeWindowDays / 365} year${tier.timeWindowDays / 365 > 1 ? "s" : ""}`
-                : tier.timeWindowDays % 30 === 0
-                  ? `${tier.timeWindowDays / 30} month${tier.timeWindowDays / 30 > 1 ? "s" : ""}`
-                  : `${tier.timeWindowDays} days`;
-
-            return (
-              <div
-                key={tier.id}
-                className={`rounded-xl px-3 py-3 transition-colors ${
-                  tier.qualified
-                    ? "border border-[#8B5CF6]/30 bg-purple-50 dark:bg-purple-950/30"
-                    : "bg-[var(--bb-bg-card)]/50"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs font-medium text-[var(--bb-secondary)]">{tier.name}</p>
-                      {tier.qualified && (
-                        <span className="inline-flex rounded-full bg-[#8B5CF6] px-2 py-0.5 text-[9px] font-semibold text-white">
-                          Active
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-0.5 text-[10px] text-[var(--bb-text-tertiary)]">
-                      {tier.minCompletedTickets} tickets in {windowLabel}
-                    </p>
-                  </div>
-                  <span
-                    className={`text-sm font-bold ${
-                      tier.qualified ? "text-[#8B5CF6]" : "text-[var(--bb-text-tertiary)]"
-                    }`}
-                  >
-                    {tier.payoutPercent}%
-                  </span>
-                </div>
-
-                {/* Progress bar */}
-                {!tier.qualified && (
-                  <div className="mt-2">
-                    <div className="h-1.5 w-full rounded-full bg-[var(--bb-border)]">
-                      <div
-                        className="h-full rounded-full bg-[#8B5CF6] transition-all"
-                        style={{ width: `${progress}%` }}
-                      />
-                    </div>
-                    <p className="mt-1 text-[10px] text-[var(--bb-text-tertiary)]">
-                      {tier.completedInWindow} / {tier.minCompletedTickets} tickets completed
-                    </p>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-
-          {payoutTiers.length === 0 && (
-            <p className="px-3 py-3 text-xs text-[var(--bb-text-tertiary)]">
-              No payout tiers configured yet.
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* Notification preferences */}
-      <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-        <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">
-          Notification preferences
-        </h2>
-        <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
-          Choose which events you want to be notified about
-        </p>
-
-        <div className="mt-4 space-y-1">
-          {CREATIVE_PREFS.map((pref) => {
-            const enabled = prefMap.get(pref.type) ?? true;
-            const isToggling = togglingType === pref.type;
-
-            return (
-              <div
-                key={pref.type}
-                className="flex items-center justify-between rounded-xl px-3 py-3 transition-colors hover:bg-[var(--bb-bg-card)]/50"
-              >
-                <div className="mr-4 min-w-0">
-                  <p className="text-xs font-medium text-[var(--bb-secondary)]">{pref.label}</p>
-                  <p className="mt-0.5 text-[10px] text-[var(--bb-text-tertiary)]">
-                    {pref.description}
-                  </p>
-                </div>
-
-                {/* Toggle switch */}
-                <button
-                  type="button"
-                  role="switch"
-                  aria-label={pref.label}
-                  aria-checked={enabled}
-                  disabled={isToggling}
-                  onClick={() => handleToggle(pref.type, enabled)}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2 disabled:opacity-50 ${
-                    enabled ? "bg-[var(--bb-primary)]" : "bg-[var(--bb-border-input)]"
-                  }`}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-4 w-4 translate-y-0.5 rounded-full bg-[var(--bb-bg-page)] shadow-sm transition-transform duration-200 ${
-                      enabled ? "translate-x-[18px]" : "translate-x-0.5"
-                    }`}
+                  <SkillsPicker
+                    skills={jobTypes}
+                    selectedIds={selectedSkillIds}
+                    onToggle={handleSkillToggle}
+                    saving={savingSkills}
+                    loadFailed={skillsLoadFailed}
+                    selectedOnly={selectedOnly}
+                    onSelectedOnly={setSelectedOnly}
                   />
-                </button>
+                </div>
+                <div className="min-w-0 space-y-6">
+                  <SelectionSummary
+                    skills={jobTypes}
+                    selectedIds={selectedSkillIds}
+                    onShowSelected={() => setSelectedOnly(true)}
+                  />
+                  <CurrentPayoutCard data={payout} onViewTiers={() => setTab("payout")} />
+                </div>
               </div>
-            );
-          })}
-        </div>
-      </div>
+            </KeptTabPanel>
 
-      {/* Danger zone — account deletion (GDPR right-to-erasure). */}
-      <div className="mt-6 rounded-2xl border border-red-200 bg-red-50/40 px-5 py-5 shadow-sm">
-        <h2 className="text-sm font-semibold text-[var(--bb-danger-text)]">Danger zone</h2>
-        <p className="mt-1 text-[11px] text-[var(--bb-text-tertiary)]">
-          Delete your Brandbite account permanently. Completed tickets, ratings, and ledger entries
-          are retained in anonymized form for audit purposes; your email is freed up for future
-          sign-ups.
-        </p>
-        <div className="mt-3">
-          <Button
-            variant="ghost"
-            disabled={!accountEmail}
-            onClick={() => {
-              setDeleteConfirmEmail("");
-              setDeleteAccountError(null);
-              setDeleteAccountOpen(true);
-            }}
-            className="!border !border-red-300 !text-red-700 hover:!bg-red-50"
-          >
-            Delete my account
-          </Button>
-        </div>
-      </div>
+            <KeptTabPanel value="availability" {...panel}>
+              <AvailabilityPanel availability={availability} />
+            </KeptTabPanel>
 
-      {/* Delete account confirm modal — requires the user to type their
-          own email as a "yes I meant it" safeguard. */}
-      <Modal open={deleteAccountOpen} onClose={() => setDeleteAccountOpen(false)} size="md">
-        <ModalHeader title="Delete your account?" onClose={() => setDeleteAccountOpen(false)} />
-        <div className="space-y-3 px-6 pb-4 text-sm text-[var(--bb-text-secondary)]">
-          <p>
-            This is permanent. Your sign-in credentials are removed immediately. Historical tickets,
-            ratings, and ledger entries are kept but <strong>anonymized</strong>.
-          </p>
-          <p>
-            To confirm, type your account email: <strong>{accountEmail ?? ""}</strong>
-          </p>
-          <FormInput
-            type="email"
-            value={deleteConfirmEmail}
-            onChange={(e) => setDeleteConfirmEmail(e.target.value)}
-            placeholder="Type your email to confirm"
-            disabled={deletingAccount}
-            // Don't let password managers autofill this — the user must
-            // physically type their email as a "yes I meant it" safeguard.
-            autoComplete="off"
-          />
-          {deleteAccountError && (
-            <InlineAlert variant="error" size="sm">
-              {deleteAccountError}
-            </InlineAlert>
-          )}
-        </div>
-        <ModalFooter>
-          <Button
-            variant="ghost"
-            onClick={() => setDeleteAccountOpen(false)}
-            disabled={deletingAccount}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleDeleteAccount}
-            loading={deletingAccount}
-            loadingText="Deleting…"
-            disabled={
-              deletingAccount ||
-              !accountEmail ||
-              deleteConfirmEmail.trim().toLowerCase() !== (accountEmail ?? "").toLowerCase()
-            }
-            className="!bg-red-600 hover:!bg-red-700"
-          >
-            Delete my account
-          </Button>
-        </ModalFooter>
-      </Modal>
-    </div>
+            <KeptTabPanel value="payout" {...panel}>
+              <PayoutTiersCard data={payout} error={payoutFailed} />
+            </KeptTabPanel>
+
+            <KeptTabPanel value="notifications" {...panel}>
+              <Card>
+                <CardTitle description="Pick which events show up in your inbox and which also email you. Changes save instantly, and these are the same choices as under Profile.">
+                  Notification preferences
+                </CardTitle>
+                <div className="mt-4">
+                  <NotificationPreferencesBody role="DESIGNER" state={notifications} />
+                </div>
+              </Card>
+            </KeptTabPanel>
+
+            <KeptTabPanel value="account" {...panel}>
+              <DeleteAccountCard
+                endpoint="/api/creative/account"
+                email={accountEmail}
+                description="Delete your brandbite account permanently. Completed tickets, ratings, and ledger entries are retained in anonymized form for audit purposes; your email is freed up for future sign-ups."
+              />
+            </KeptTabPanel>
+          </>
+        )}
+      </div>
+    </>
   );
 }

@@ -70,12 +70,12 @@ export function ConsultationUpdateEmailTemplate(props: ConsultationUpdateEmailPr
   if (kind === "canceled") {
     return (
       <BaseLayout
-        previewText="Your Brandbite consultation was cancelled."
+        previewText="Your brandbite consultation was cancelled."
         hero={
           <HeroBand>
             <Heading>Your consultation was cancelled</Heading>
             <Paragraph>
-              <strong>{greeting}</strong> We&apos;ve cancelled your consultation with the Brandbite
+              <strong>{greeting}</strong> We&apos;ve cancelled your consultation with the brandbite
               team.
             </Paragraph>
           </HeroBand>
@@ -107,8 +107,8 @@ export function ConsultationUpdateEmailTemplate(props: ConsultationUpdateEmailPr
           <Paragraph>
             <strong>{greeting}</strong>{" "}
             {kind === "rescheduled"
-              ? "We've updated the details of your consultation with the Brandbite team."
-              : "Your consultation with the Brandbite team is confirmed."}
+              ? "We've updated the details of your consultation with the brandbite team."
+              : "Your consultation with the brandbite team is confirmed."}
           </Paragraph>
         </HeroBand>
       }
@@ -140,10 +140,10 @@ export async function renderConsultationUpdateEmail(
   const html = await render(<ConsultationUpdateEmailTemplate {...props} />);
   const subject =
     props.kind === "canceled"
-      ? "Your Brandbite consultation was cancelled"
+      ? "Your brandbite consultation was cancelled"
       : props.kind === "rescheduled"
-        ? "Your Brandbite consultation has a new time"
-        : "Your Brandbite consultation is booked";
+        ? "Your brandbite consultation has a new time"
+        : "Your brandbite consultation is booked";
   return { subject, html };
 }
 

@@ -166,7 +166,7 @@ export default function NewsArticlePage() {
                 Stay up to date
               </h2>
               <p className="mt-3 text-[var(--bb-text-secondary)]">
-                Read more news and updates from the Brandbite team.
+                Read more news and updates from the brandbite team.
               </p>
               <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
                 <Link

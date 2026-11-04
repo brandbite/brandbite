@@ -33,7 +33,7 @@ export function BrandLogo({ width = 140, className = "", priority }: BrandLogoPr
     <>
       <Image
         src="/brandbite-logo.svg"
-        alt="Brandbite"
+        alt="brandbite"
         width={width}
         height={height}
         priority={priority}
@@ -41,7 +41,7 @@ export function BrandLogo({ width = 140, className = "", priority }: BrandLogoPr
       />
       <Image
         src="/brandbite-logo-negative.svg"
-        alt="Brandbite"
+        alt="brandbite"
         width={width}
         height={height}
         priority={priority}
@@ -62,7 +62,7 @@ export function BrandMark({ size = 32, className = "", priority }: BrandMarkProp
     <>
       <Image
         src="/b-icon.svg"
-        alt="Brandbite"
+        alt="brandbite"
         width={size}
         height={size}
         priority={priority}
@@ -70,7 +70,7 @@ export function BrandMark({ size = 32, className = "", priority }: BrandMarkProp
       />
       <Image
         src="/b-icon-negative.svg"
-        alt="Brandbite"
+        alt="brandbite"
         width={size}
         height={size}
         priority={priority}

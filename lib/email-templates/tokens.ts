@@ -46,9 +46,9 @@ export const brand = {
  * ------------------------------------------------------------------------- */
 
 export const fonts = {
-  body: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+  body: '"Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
   heading:
-    '"Josefin Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+    '"Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
 } as const;
 
 /* ---------------------------------------------------------------------------
@@ -79,7 +79,7 @@ export const SECTION_GAP = "24px";
 
 import { COMPANY_ADDRESS, COMPANY_LEGAL_NAME, CONTACT_EMAIL } from "../brand";
 
-export const BRAND_NAME = "Brandbite";
+export const BRAND_NAME = "brandbite";
 /** Registered legal entity — shown next to the postal address in the footer. */
 export const BRAND_LEGAL_NAME = COMPANY_LEGAL_NAME;
 export const BRAND_TAGLINE = "All your designs, one subscription.";

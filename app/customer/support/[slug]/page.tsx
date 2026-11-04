@@ -6,7 +6,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { SupportGuideView } from "@/components/support/support-ui";
+import { GuideView } from "@/components/dashboard/help/guide-view";
 import { getGuide } from "@/lib/support";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -22,5 +22,5 @@ export default async function CustomerSupportGuidePage({ params }: Props) {
   const guide = getGuide("customer", slug);
   if (!guide) notFound();
 
-  return <SupportGuideView role="customer" guide={guide} />;
+  return <GuideView role="customer" guide={guide} />;
 }

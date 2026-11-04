@@ -68,7 +68,7 @@ export async function GET() {
       qrDataUrl,
       // Also useful for the "type manually" fallback if the user can't scan.
       label: user.email,
-      issuer: "Brandbite",
+      issuer: "brandbite",
     });
   } catch (error: unknown) {
     if ((error as { code?: string })?.code === "UNAUTHENTICATED") {

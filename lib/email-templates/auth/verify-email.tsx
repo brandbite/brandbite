@@ -25,10 +25,10 @@ export type VerifyEmailProps = {
 };
 
 export function VerifyEmailTemplate({ name, url }: VerifyEmailProps) {
-  const greeting = name ? `Welcome, ${name}` : "Welcome to Brandbite";
+  const greeting = name ? `Welcome, ${name}` : "Welcome to brandbite";
 
   return (
-    <BaseLayout previewText="Confirm your email to finish setting up your Brandbite account.">
+    <BaseLayout previewText="Confirm your email to finish setting up your brandbite account.">
       <Heading>{greeting}</Heading>
       <Paragraph>
         Thanks for signing up. Confirm your email address to finish setting up your account. You
@@ -44,7 +44,7 @@ export function VerifyEmailTemplate({ name, url }: VerifyEmailProps) {
       </SmallText>
 
       <SmallText>
-        This link expires in 24 hours. If you didn&apos;t create a Brandbite account, you can safely
+        This link expires in 24 hours. If you didn&apos;t create a brandbite account, you can safely
         ignore this email.
       </SmallText>
     </BaseLayout>
@@ -61,7 +61,7 @@ export async function renderVerifyEmail(props: VerifyEmailProps): Promise<{
 }> {
   const html = await render(<VerifyEmailTemplate {...props} />);
   return {
-    subject: "Verify your Brandbite email",
+    subject: "Verify your brandbite email",
     html,
   };
 }

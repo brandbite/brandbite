@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     "How Brandbite collects, uses, and protects your information. Privacy, kept clear and simple.",
 };
 
-const displayFont = "font-[family-name:var(--font-inter)]";
+const displayFont = "font-[family-name:var(--font-jakarta)]";
 
 const RULES: { id?: string; icon: string; title: string; body: string }[] = [
   {
