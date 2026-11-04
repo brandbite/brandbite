@@ -42,6 +42,11 @@ const PUBLIC_PATHS = [
   // Public contact-form submit (anonymous POST; Turnstile + rate limits
   // inside the route). Without this the proxy 307s the POST to /login.
   "/api/contact",
+  // Public 30-minute booking. The routes enforce rate limits, Turnstile and the
+  // manage-link secret themselves.
+  "/meet",
+  "/meetings",
+  "/api/meetings",
   "/documentation", // marketing pages
   "/news", // marketing pages
   "/privacy", // legal — must be readable without auth (GDPR, Stripe)

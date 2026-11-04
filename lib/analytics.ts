@@ -31,6 +31,7 @@ const UNTRACKED_PREFIXES = [
   "/reset-password",
   "/verify-email",
   "/talent/schedule",
+  "/meetings",
   "/api",
 ];
 

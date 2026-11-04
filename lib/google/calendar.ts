@@ -193,6 +193,46 @@ export function extractMeetLink(event: GoogleCalendarEvent): string | null {
 
 export type FreeBusyInterval = { start: string; end: string };
 
+/**
+ * Busy intervals across several calendars. Unlike queryFreeBusy, this throws if any
+ * calendar can't be read, so a public booking page never offers a time just because
+ * it couldn't see the calendar.
+ */
+export async function queryBusyStrict(
+  settings: ConsultationSettings,
+  calendarIds: string[],
+  timeMinIso: string,
+  timeMaxIso: string,
+): Promise<FreeBusyInterval[]> {
+  const ensured = await ensureFreshAccessToken(settings);
+  if ("error" in ensured) throw new Error(ensured.error);
+
+  type Response = {
+    calendars?: Record<
+      string,
+      { busy?: FreeBusyInterval[]; errors?: { domain: string; reason: string }[] }
+    >;
+  };
+  const json = await googleFetch<Response>(ensured.accessToken, "/freeBusy", {
+    method: "POST",
+    body: JSON.stringify({
+      timeMin: timeMinIso,
+      timeMax: timeMaxIso,
+      items: calendarIds.map((id) => ({ id })),
+    }),
+  });
+
+  return calendarIds.flatMap((id) => {
+    const calendar = json.calendars?.[id];
+    if (!calendar || calendar.errors?.length) {
+      throw new Error(
+        `Calendar ${id} couldn't be read: ${calendar?.errors?.[0]?.reason ?? "no response"}`,
+      );
+    }
+    return calendar.busy ?? [];
+  });
+}
+
 /** Query freebusy on the configured calendar and return busy intervals
  *  within [timeMinIso, timeMaxIso]. Used to grey out unavailable slots
  *  on the customer consultation picker. */
