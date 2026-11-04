@@ -2026,11 +2026,16 @@ model SavedPalette {
   id   String @id @default(cuid())
   name String
 
-  /// Ordered list of hex strings, e.g. ["#f15b2b","#424143"]. JSON keeps the
-  /// store tool-agnostic (wheel/generator/extractor all emit hex arrays).
+  /// Ordered colors: [{ id, hex, locked }]. Rows saved before Color Studio hold
+  /// plain hex strings; lib/colors/saved-palette-row.ts reads both forms.
   colors Json
 
-  /// Which tool produced it: "WHEEL" | "GENERATOR" | "EXTRACTOR".
+  /// Design roles: { background?, text?, primary?, accent?, surface? } -> color id.
+  roles Json?
+
+  tags String[] @default([])
+
+  /// Which tool produced it: a StudioSource, or legacy "WHEEL" | "GENERATOR" | "EXTRACTOR".
   source String?
 
   createdById String

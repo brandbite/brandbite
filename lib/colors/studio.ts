@@ -5,6 +5,9 @@
 //           No React, DOM or storage access.
 // -----------------------------------------------------------------------------
 
+import { contrastRatio, readableTextOn, relativeLuminance } from "./contrast";
+import { hexToHsl, hexToRgb } from "./convert";
+import { formatHex } from "./format";
 import type { Hex } from "./types";
 
 export const COLOR_ROLES = ["background", "text", "primary", "accent", "surface"] as const;
@@ -137,6 +140,53 @@ export function moveStudioColor(
   const colors = [...palette.colors];
   [colors[from], colors[to]] = [colors[to], colors[from]];
   return { ...palette, colors, updatedAt: now.toISOString() };
+}
+
+export interface ResolvedPaletteColors extends Record<ColorRole, Hex> {
+  /** Text color with the best contrast on the primary color. */
+  onPrimary: Hex;
+}
+
+/**
+ * Colors for a UI preview: assigned roles first, then sensible fallbacks from the
+ * palette. Text fallback picks the palette's darkest color only if it is readable
+ * on the background. A primary color is never assumed to suit white text.
+ */
+export function resolvePaletteColors(palette: StudioPalette): ResolvedPaletteColors {
+  const assigned = (role: ColorRole) =>
+    palette.colors.find((c) => c.id === palette.roles[role])?.hex;
+  const hexes = palette.colors.map((c) => c.hex);
+  const byLuminance = [...hexes].sort(
+    (a, b) => relativeLuminance(hexToRgb(a)) - relativeLuminance(hexToRgb(b)),
+  );
+  const darkest = byLuminance[0];
+  const lightest = byLuminance[byLuminance.length - 1];
+  const mostSaturated = [...hexes].sort((a, b) => hexToHsl(b).s - hexToHsl(a).s)[0];
+
+  const background = assigned("background") ?? lightest;
+  const text =
+    assigned("text") ??
+    (contrastRatio(darkest, background) >= 4.5 ? darkest : readableTextOn(background));
+  const primary = assigned("primary") ?? darkest;
+
+  return {
+    background,
+    text,
+    primary,
+    accent: assigned("accent") ?? mostSaturated,
+    surface: assigned("surface") ?? "#ffffff",
+    onPrimary: readableTextOn(primary),
+  };
+}
+
+/** CSS custom properties: every color by position, then any assigned roles. */
+export function studioPaletteToCss(palette: StudioPalette): string {
+  const lines = palette.colors.map((c, i) => `  --color-${i + 1}: ${formatHex(c.hex)};`);
+  for (const role of COLOR_ROLES) {
+    const color = palette.colors.find((c) => c.id === palette.roles[role]);
+    if (color) lines.push(`  --color-${role}: ${formatHex(color.hex)};`);
+  }
+  return `:root {\n${lines.join("\n")}\n}`;
 }
 
 /** Assign a role to a color, or clear it with null. Unknown color ids are ignored. */

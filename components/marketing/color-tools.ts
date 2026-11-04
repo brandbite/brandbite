@@ -27,8 +27,8 @@ export const STUDIO_NAV: StudioNavItem[] = [
 /** Tools under the "More tools" menu. The menu is hidden while this is empty. */
 export const STUDIO_MORE_TOOLS: StudioNavItem[] = [];
 
-/** The "Saved" shortcut. Hidden until the page ships. */
-export const STUDIO_SAVED_LINK: StudioNavItem | null = null;
+/** The "Saved" shortcut, shown on every Color Studio page. */
+export const STUDIO_SAVED_LINK: StudioNavItem | null = { href: "/colors/saved", label: "Saved" };
 
 export const COLOR_TOOLS: ColorTool[] = [
   {

@@ -124,7 +124,8 @@ export function serializeWorkspace(state: WorkspaceState): string {
   });
 }
 
-function isStudioPalette(value: unknown): value is StudioPalette {
+/** Light shape check for palettes this app wrote to browser storage itself. */
+export function isStudioPalette(value: unknown): value is StudioPalette {
   if (typeof value !== "object" || value === null) return false;
   const palette = value as Partial<StudioPalette>;
   return (

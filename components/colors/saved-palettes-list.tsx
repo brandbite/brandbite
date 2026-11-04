@@ -8,12 +8,12 @@
 
 import { useEffect, useState } from "react";
 import { authClient } from "@/lib/auth-client";
-import type { SavedPaletteDTO } from "@/lib/colors";
+import type { StudioPalette } from "@/lib/colors";
 import { readableTextOn } from "@/lib/colors";
 
 export function SavedPalettesList({ refreshKey = 0 }: { refreshKey?: number }) {
   const { data: session } = authClient.useSession();
-  const [palettes, setPalettes] = useState<SavedPaletteDTO[]>([]);
+  const [palettes, setPalettes] = useState<StudioPalette[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -57,12 +57,12 @@ export function SavedPalettesList({ refreshKey = 0 }: { refreshKey?: number }) {
               className="overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)]"
             >
               <div className="flex h-16">
-                {p.colors.map((hex, i) => (
+                {p.colors.map((c) => (
                   <div
-                    key={i}
+                    key={c.id}
                     className="flex flex-1 items-center justify-center"
-                    style={{ backgroundColor: hex, color: readableTextOn(hex) }}
-                    title={hex}
+                    style={{ backgroundColor: c.hex, color: readableTextOn(c.hex) }}
+                    title={c.hex}
                   />
                 ))}
               </div>
@@ -71,7 +71,7 @@ export function SavedPalettesList({ refreshKey = 0 }: { refreshKey?: number }) {
                   {p.name}
                 </span>
                 <span className="ml-2 shrink-0 text-[10px] tracking-wide text-[var(--bb-text-muted)] uppercase">
-                  {p.source ?? ""}
+                  {p.sourceTool}
                 </span>
               </div>
             </li>

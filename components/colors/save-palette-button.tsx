@@ -9,12 +9,18 @@
 
 import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
-import type { Palette, PaletteSource } from "@/lib/colors";
-import { formatHex } from "@/lib/colors";
+import type { Palette, PaletteSource, StudioSource } from "@/lib/colors";
+import { createStudioPalette } from "@/lib/colors";
 import { Button } from "@/components/ui/button";
 import { Modal, ModalHeader, ModalFooter } from "@/components/ui/modal";
 import { FormInput } from "@/components/ui/form-field";
 import { useToast } from "@/components/ui/toast-provider";
+
+const STUDIO_SOURCE: Record<PaletteSource, StudioSource> = {
+  WHEEL: "wheel",
+  GENERATOR: "generator",
+  EXTRACTOR: "image",
+};
 
 export function SavePaletteButton({
   palette,
@@ -42,9 +48,11 @@ export function SavePaletteButton({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: trimmed,
-          colors: palette.map((c) => formatHex(c.hex)),
-          source,
+          palette: createStudioPalette({
+            name: trimmed,
+            hexes: palette.map((c) => c.hex),
+            sourceTool: STUDIO_SOURCE[source],
+          }),
         }),
       });
       if (!res.ok) {

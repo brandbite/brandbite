@@ -52,7 +52,7 @@ describe("ToolNav", () => {
   });
 
   it("hides More tools and Saved until they exist", () => {
-    render(<ToolNav />);
+    render(<ToolNav moreTools={[]} saved={null} />);
     expect(screen.queryByRole("button", { name: /more tools/i })).toBeNull();
     expect(screen.queryByRole("link", { name: /saved/i })).toBeNull();
   });

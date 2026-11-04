@@ -1,116 +1,79 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/colors/palettes/route.ts
-// @purpose: Save / list a signed-in user's color palettes from the /colors tools.
-//           Any authenticated role may use it (NOT company-scoped, unlike
-//           moodboards) — ownership is by createdById. Gated by the proxy's
-//           session-cookie check plus getCurrentUserOrThrow here.
+// @purpose: List and create a signed-in user's Color Studio palettes. Any
+//           authenticated role may use it (NOT company-scoped, unlike moodboards);
+//           ownership is by createdById. Gated by the proxy's session-cookie check
+//           plus getCurrentUserOrThrow here. Guests keep palettes in their browser
+//           and never call this route.
 // -----------------------------------------------------------------------------
 
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { z } from "zod";
+
 import { getCurrentUserOrThrow } from "@/lib/auth";
-import { normalizeHex } from "@/lib/colors";
+import { MAX_SAVED_PALETTES, studioPaletteSchema } from "@/lib/colors/palette-schema";
+import { savedPaletteFromRow, savedPaletteToRowData } from "@/lib/colors/saved-palette-row";
+import type { StudioPalette } from "@/lib/colors";
+import { prisma } from "@/lib/prisma";
+import { parseBody } from "@/lib/schemas/helpers";
 
-const VALID_SOURCES = new Set(["WHEEL", "GENERATOR", "EXTRACTOR"]);
+const createSchema = z.union([
+  z.object({ palette: studioPaletteSchema }),
+  z.object({ palettes: z.array(studioPaletteSchema).min(1).max(MAX_SAVED_PALETTES) }),
+]);
 
-// ---------------------------------------------------------------------------
-// GET — list the current user's saved palettes (newest first)
-// ---------------------------------------------------------------------------
+function toErrorResponse(err: unknown, method: string) {
+  if ((err as { code?: string })?.code === "UNAUTHENTICATED") {
+    return NextResponse.json({ error: "UNAUTHENTICATED" }, { status: 401 });
+  }
+  console.error(`[colors/palettes] ${method} error:`, err);
+  return NextResponse.json({ error: "INTERNAL_ERROR" }, { status: 500 });
+}
+
 export async function GET() {
   try {
     const user = await getCurrentUserOrThrow();
-
-    const palettes = await prisma.savedPalette.findMany({
+    const rows = await prisma.savedPalette.findMany({
       where: { createdById: user.id },
-      orderBy: { createdAt: "desc" },
-      select: { id: true, name: true, colors: true, source: true, createdAt: true },
+      orderBy: { updatedAt: "desc" },
     });
-
-    return NextResponse.json({
-      palettes: palettes.map((p) => ({
-        id: p.id,
-        name: p.name,
-        colors: Array.isArray(p.colors) ? (p.colors as string[]) : [],
-        source: p.source,
-        createdAt: p.createdAt.toISOString(),
-      })),
-    });
-  } catch (err: any) {
-    if (err?.code === "UNAUTHENTICATED") {
-      return NextResponse.json({ error: "UNAUTHENTICATED" }, { status: 401 });
-    }
-    console.error("[colors/palettes] GET error:", err);
-    return NextResponse.json({ error: "INTERNAL_ERROR" }, { status: 500 });
+    const palettes = rows.map(savedPaletteFromRow).filter((p): p is StudioPalette => p !== null);
+    return NextResponse.json({ palettes });
+  } catch (err) {
+    return toErrorResponse(err, "GET");
   }
 }
 
-// ---------------------------------------------------------------------------
-// POST — create a palette { name, colors: string[], source? }
-// ---------------------------------------------------------------------------
+/** Create one palette ({ palette }) or several at once ({ palettes }). */
 export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
-    const body = (await req.json().catch(() => null)) as {
-      name?: unknown;
-      colors?: unknown;
-      source?: unknown;
-    } | null;
 
-    const name = typeof body?.name === "string" ? body.name.trim() : "";
-    if (!name || name.length > 80) {
+    const parsed = await parseBody(req, createSchema);
+    if (!parsed.success) return parsed.response;
+    const incoming = "palette" in parsed.data ? [parsed.data.palette] : parsed.data.palettes;
+
+    const existing = await prisma.savedPalette.count({ where: { createdById: user.id } });
+    if (existing + incoming.length > MAX_SAVED_PALETTES) {
       return NextResponse.json(
-        { error: "Name is required and must be 80 characters or fewer." },
-        { status: 400 },
+        { error: `You can save up to ${MAX_SAVED_PALETTES} palettes.`, code: "LIMIT_REACHED" },
+        { status: 409 },
       );
     }
 
-    if (!Array.isArray(body?.colors) || body.colors.length < 1 || body.colors.length > 12) {
-      return NextResponse.json(
-        { error: "A palette must have between 1 and 12 colors." },
-        { status: 400 },
-      );
-    }
-
-    // Normalize + reject any invalid hex.
-    const colors: string[] = [];
-    for (const raw of body.colors) {
-      const hex = typeof raw === "string" ? normalizeHex(raw) : null;
-      if (!hex) {
-        return NextResponse.json(
-          { error: "All colors must be valid hex values." },
-          { status: 400 },
-        );
-      }
-      colors.push(hex);
-    }
-
-    const source =
-      typeof body?.source === "string" && VALID_SOURCES.has(body.source) ? body.source : null;
-
-    const created = await prisma.savedPalette.create({
-      data: { name, colors, source, createdById: user.id },
-      select: { id: true, name: true, colors: true, source: true, createdAt: true },
+    const rows = await prisma.savedPalette.createManyAndReturn({
+      data: incoming.map((palette) => ({
+        ...savedPaletteToRowData(palette),
+        createdById: user.id,
+      })),
     });
-
     return NextResponse.json(
-      {
-        palette: {
-          id: created.id,
-          name: created.name,
-          colors: Array.isArray(created.colors) ? (created.colors as string[]) : [],
-          source: created.source,
-          createdAt: created.createdAt.toISOString(),
-        },
-      },
+      { palettes: rows.map(savedPaletteFromRow).filter((p): p is StudioPalette => p !== null) },
       { status: 201 },
     );
-  } catch (err: any) {
-    if (err?.code === "UNAUTHENTICATED") {
-      return NextResponse.json({ error: "UNAUTHENTICATED" }, { status: 401 });
-    }
-    console.error("[colors/palettes] POST error:", err);
-    return NextResponse.json({ error: "INTERNAL_ERROR" }, { status: 500 });
+  } catch (err) {
+    return toErrorResponse(err, "POST");
   }
 }
