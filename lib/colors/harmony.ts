@@ -71,6 +71,34 @@ export function harmony(kind: HarmonyKind, base: HSL): Palette {
   }
 }
 
+/**
+ * A harmony with exactly `size` colors, all on the hues the rule allows. Rules
+ * with a fixed hue count repeat those hues at other lightness values; analogous
+ * narrows its angle so large palettes stay within ±60° of the base.
+ */
+export function harmonyOfSize(kind: HarmonyKind, base: HSL, size: number): Palette {
+  const n = Math.max(1, Math.floor(size));
+
+  if (kind === "analogous") {
+    // Even sizes have one more step on one side of the base; size by that side.
+    const angle = Math.min(30, 60 / Math.ceil((n - 1) / 2));
+    return analogous(base, angle, n).slice(0, n);
+  }
+  if (kind === "monochromatic") return monochromatic(base, n).slice(0, n);
+
+  const core = harmony(kind, base);
+  return Array.from({ length: n }, (_, i) => {
+    const source = core[i % core.length];
+    if (i < core.length) return source;
+    const round = Math.floor(i / core.length);
+    const offset = 12 * Math.ceil(round / 2) * (round % 2 === 1 ? 1 : -1);
+    return paletteColorFromHsl({
+      ...source.hsl,
+      l: Math.max(10, Math.min(90, source.hsl.l + offset)),
+    });
+  });
+}
+
 export const HARMONY_LABELS: Record<HarmonyKind, string> = {
   complementary: "Complementary",
   analogous: "Analogous",

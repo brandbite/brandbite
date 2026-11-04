@@ -111,6 +111,13 @@ export function tailwindScaleToConfig(name: string, shades: TailwindShade[]): st
   return `colors: {\n    '${key}': {\n${lines.join("\n")}\n    },\n  },`;
 }
 
+/** Format the scale as a Tailwind v4 CSS-first `@theme` block. */
+export function tailwindScaleToThemeV4(name: string, shades: TailwindShade[]): string {
+  const key = toColorKey(name);
+  const lines = shades.map((s) => `  --color-${key}-${s.stop}: ${s.hex};`);
+  return `@theme {\n${lines.join("\n")}\n}`;
+}
+
 /** Format the scale as CSS custom properties. */
 export function tailwindScaleToCssVars(name: string, shades: TailwindShade[]): string {
   const key = toColorKey(name);

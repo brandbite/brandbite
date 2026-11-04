@@ -63,6 +63,17 @@ export function normalizeHex(input: string): Hex | null {
   return `#${rgbHex}`;
 }
 
+/**
+ * Strict input parser for Color Studio: accepts only opaque #RGB and #RRGGBB
+ * (with or without '#'). Unlike normalizeHex, alpha forms are rejected rather
+ * than silently dropped. Returns null when the input is not accepted.
+ */
+export function parseOpaqueHex(input: string): Hex | null {
+  if (typeof input !== "string") return null;
+  const trimmed = input.trim();
+  return /^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(trimmed) ? normalizeHex(trimmed) : null;
+}
+
 export function hexToRgb(hex: string): RGB {
   const normalized = normalizeHex(hex);
   if (!normalized) return { r: 0, g: 0, b: 0 };

@@ -5,8 +5,8 @@
 // -----------------------------------------------------------------------------
 
 import { paletteColorFromHsl } from "./convert";
-import { harmony } from "./harmony";
-import type { HarmonyKind, HSL, Palette } from "./types";
+import { harmony, harmonyOfSize } from "./harmony";
+import type { HarmonyKind, HSL, Palette, PaletteColor } from "./types";
 
 const HARMONIES: HarmonyKind[] = [
   "analogous",
@@ -16,13 +16,44 @@ const HARMONIES: HarmonyKind[] = [
   "monochromatic",
 ];
 
-function randomHsl(): HSL {
+function randomHsl(random: () => number = Math.random): HSL {
   return {
-    h: Math.floor(Math.random() * 360),
+    h: Math.floor(random() * 360),
     // Keep saturation/lightness in a pleasant mid-range so palettes read well.
-    s: 55 + Math.floor(Math.random() * 35), // 55–90
-    l: 45 + Math.floor(Math.random() * 25), // 45–70
+    s: 55 + Math.floor(random() * 35), // 55–90
+    l: 45 + Math.floor(random() * 25), // 45–70
   };
+}
+
+function nearlySameColor(a: PaletteColor, b: PaletteColor): boolean {
+  return (
+    Math.abs(a.rgb.r - b.rgb.r) <= 1 &&
+    Math.abs(a.rgb.g - b.rgb.g) <= 1 &&
+    Math.abs(a.rgb.b - b.rgb.b) <= 1
+  );
+}
+
+/**
+ * Regenerate unlocked slots under an explicit harmony rule. Locked colors keep
+ * their slots, and the first locked color anchors the rule; with no locks the
+ * base hue is random. With several locks only the first anchors, so the others
+ * may sit outside the rule.
+ */
+export function regenerateWithHarmony(
+  current: Palette,
+  kind: HarmonyKind,
+  random: () => number = Math.random,
+): Palette {
+  const locked = current.filter((c) => c.locked);
+  if (locked.length === current.length) return current;
+
+  const base = locked[0]?.hsl ?? randomHsl(random);
+  const generated = harmonyOfSize(kind, base, current.length + locked.length);
+  const distinct = generated.filter((c) => !locked.some((l) => nearlySameColor(c, l)));
+  const pool = distinct.length > 0 ? distinct : generated;
+
+  let next = 0;
+  return current.map((c) => (c.locked ? c : { ...pool[next++ % pool.length], locked: false }));
 }
 
 /** Pick a random harmony kind. */

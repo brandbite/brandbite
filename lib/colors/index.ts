@@ -11,3 +11,4 @@ export * from "./format";
 export * from "./extract";
 export * from "./random";
 export * from "./tailwind";
+export * from "./studio";
