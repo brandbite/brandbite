@@ -120,7 +120,7 @@ describe("MeetingBooking", () => {
     render(<MeetingBooking />);
     expect(await screen.findByRole("link", { name: "Privacy Policy" })).toHaveAttribute(
       "href",
-      "/privacy",
+      "/privacy#meetings",
     );
   });
 

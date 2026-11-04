@@ -650,7 +650,7 @@ export function MeetingBooking() {
 
             <p className="mt-3 text-sm leading-5 text-[var(--meet-muted)]">
               We&apos;ll use your details to arrange this call. Read our{" "}
-              <Link href="/privacy" className="underline">
+              <Link href="/privacy#meetings" className="underline">
                 Privacy Policy
               </Link>
               .
