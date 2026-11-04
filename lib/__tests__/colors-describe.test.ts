@@ -5,6 +5,7 @@ import {
   COLOR_FAMILY_SLUGS,
   contrastRatio,
   describeColor,
+  harmonyOfSize,
   normalizeHex,
   suggestPairings,
   suggestPaletteName,
@@ -56,17 +57,55 @@ describe("describeColor", () => {
 describe("suggestPaletteName", () => {
   const OCEAN = ["#0a2a43", "#17567a", "#123a7a"];
 
-  it("names a palette from its colors, the same way every time", () => {
-    const name = suggestPaletteName(OCEAN);
-    expect(name).toMatch(/^Deep (Ocean|Harbor|Horizon)$/);
-    expect(suggestPaletteName(OCEAN)).toBe(name);
+  /** Palettes like the generator's: every harmony, across hues and lightness. */
+  function generatedPalettes(count: number): string[][] {
+    let state = 0.137;
+    const random = () => {
+      state = (state * 9301 + 0.49297) % 1;
+      return state;
+    };
+    const kinds = ["analogous", "complementary", "triadic", "tetradic", "monochromatic"] as const;
+    return Array.from({ length: count }, (_, i) => {
+      const base = {
+        h: Math.floor(random() * 360),
+        s: 55 + Math.floor(random() * 35),
+        l: 45 + Math.floor(random() * 25),
+      };
+      return harmonyOfSize(kinds[i % kinds.length], base, 5).map((c) => c.hex);
+    });
+  }
+
+  it("gives the same name for the same colors", () => {
+    expect(suggestPaletteName(OCEAN)).toBe(suggestPaletteName(OCEAN));
   });
 
-  it("reflects a different palette", () => {
+  it("uses words from the palette's main color family", () => {
+    const blueWords = /Ocean|Harbor|Horizon|Cobalt|Denim|Glacier|Skyline|Sapphire/;
+    expect(suggestPaletteName(OCEAN)).toMatch(blueWords);
     expect(suggestPaletteName(["#ff6426", "#ff8a3d", "#ffb26b"])).toMatch(
-      /(Sunset|Amber|Terracotta)$/,
+      /Sunset|Amber|Terracotta|Tangerine|Apricot|Marigold|Papaya|Copper/,
     );
-    expect(suggestPaletteName(["#ffe5ec", "#fff0f3", "#ffd6e0"])).toMatch(/^Soft /);
+  });
+
+  it("rarely repeats a name across generated palettes", () => {
+    const names = generatedPalettes(300).map((hexes) => suggestPaletteName(hexes));
+    expect(new Set(names).size).toBeGreaterThan(names.length * 0.7);
+  });
+
+  it("doesn't lean on one opening word", () => {
+    const counts = new Map<string, number>();
+    const names = generatedPalettes(300).map((hexes) => suggestPaletteName(hexes));
+    for (const name of names) {
+      const word = name.split(" ")[0];
+      counts.set(word, (counts.get(word) ?? 0) + 1);
+    }
+    expect(Math.max(...counts.values())).toBeLessThan(names.length * 0.1);
+  });
+
+  it("separates clearly different palettes", () => {
+    expect(suggestPaletteName(["#173b59", "#41c2d0", "#c9f1ed", "#ff6426", "#f6e5d5"])).not.toBe(
+      suggestPaletteName(["#b8124e", "#ff5f6d", "#ffa58c", "#ffc85c", "#ffe8c0"]),
+    );
   });
 
   it("avoids names already taken, ignoring case", () => {
@@ -77,6 +116,12 @@ describe("suggestPaletteName", () => {
 
   it("handles an empty palette", () => {
     expect(suggestPaletteName([])).toBe("New Palette");
+  });
+
+  it("stays within the palette name limit", () => {
+    for (const hexes of generatedPalettes(100)) {
+      expect(suggestPaletteName(hexes).length).toBeLessThanOrEqual(80);
+    }
   });
 });
 
