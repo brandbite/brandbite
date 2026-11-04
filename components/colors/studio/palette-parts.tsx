@@ -7,7 +7,7 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode, type SelectHTMLAttributes } from "react";
 
 import { Modal, ModalFooter, ModalHeader } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast-provider";
@@ -21,7 +21,7 @@ import {
   type StudioSource,
 } from "@/lib/colors";
 
-import { CheckIcon, CopyIcon } from "./icons";
+import { CheckIcon, ChevronDownIcon, CopyIcon } from "./icons";
 import { StudioButton } from "./studio-button";
 import type { useSavedPalettes } from "./use-saved-palettes";
 import { useStudioCopy } from "./use-studio-copy";
@@ -31,7 +31,7 @@ type SavedPalettesStore = ReturnType<typeof useSavedPalettes>;
 export const STUDIO_FIELD =
   "h-12 rounded-[10px] border border-[var(--cs-border)] bg-[var(--cs-surface)] px-3 text-sm leading-5";
 
-const ROLE_LABELS: Record<ColorRole, string> = {
+export const ROLE_LABELS: Record<ColorRole, string> = {
   background: "Background",
   text: "Text",
   primary: "Primary",
@@ -263,6 +263,74 @@ export function CopyRow({ label, value }: { label: string; value: string }) {
       >
         {isCopied("value") ? <CheckIcon /> : <CopyIcon />}
       </button>
+    </div>
+  );
+}
+
+/** A native select, styled with a chevron and an optional mark before the value. */
+export function StudioSelect({
+  leading,
+  className = "",
+  children,
+  ...rest
+}: { leading?: ReactNode } & SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <span className="relative mt-1 block">
+      {leading ? (
+        <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2">
+          {leading}
+        </span>
+      ) : null}
+      <select
+        {...rest}
+        className={`${STUDIO_FIELD} block w-full min-w-0 appearance-none pr-10 ${
+          leading ? "pl-11" : ""
+        } ${className}`}
+      >
+        {children}
+      </select>
+      <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-[var(--cs-muted)]">
+        <ChevronDownIcon />
+      </span>
+    </span>
+  );
+}
+
+/** A small group of mutually exclusive buttons, each with an icon. */
+export function IconToggle<T extends string>({
+  label,
+  value,
+  options,
+  activeClassName,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: { value: T; label: string; icon: ReactNode }[];
+  activeClassName: string;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <div role="group" aria-label={label} className="flex gap-1">
+      {options.map((option) => {
+        const active = option.value === value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(option.value)}
+            className={`inline-flex h-11 items-center gap-2 rounded-[10px] border px-3 text-sm leading-5 font-semibold transition-colors ${
+              active
+                ? activeClassName
+                : "border-[var(--cs-border)] bg-[var(--cs-surface)] hover:border-[var(--cs-text)]"
+            }`}
+          >
+            {option.icon}
+            {option.label}
+          </button>
+        );
+      })}
     </div>
   );
 }

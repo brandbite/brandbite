@@ -23,6 +23,8 @@ type ModalProps = {
   className?: string;
   /** Raise above a base modal so confirmation dialogs stack on top. */
   elevated?: boolean;
+  /** Id of the title, for a dialog with its own header instead of ModalHeader. */
+  labelledBy?: string;
 };
 
 const SIZE_CLASSES: Record<ModalSize, string> = {
@@ -45,6 +47,7 @@ export function Modal({
   children,
   className = "",
   elevated = false,
+  labelledBy,
 }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
@@ -115,7 +118,7 @@ export function Modal({
     <div
       role="dialog"
       aria-modal="true"
-      aria-labelledby={labelId}
+      aria-labelledby={labelledBy ?? labelId}
       className={`fixed inset-0 ${elevated ? "z-[60]" : "z-50"} flex items-center justify-center bg-black/30 px-4 py-8`}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();

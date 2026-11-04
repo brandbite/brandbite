@@ -16,7 +16,17 @@ import {
   type StudioPalette,
 } from "@/lib/colors";
 
-export function PalettePreview({ palette }: { palette: StudioPalette }) {
+export function PalettePreview({
+  palette,
+  device = "desktop",
+  bare = false,
+}: {
+  palette: StudioPalette;
+  device?: "desktop" | "mobile";
+  /** Leave out the dots and the contrast caption, for a page that shows its own. */
+  bare?: boolean;
+}) {
+  const mobile = device === "mobile";
   const colors = resolvePaletteColors(palette);
   const textRatio = contrastRatio(colors.text, colors.background);
 
@@ -32,7 +42,9 @@ export function PalettePreview({ palette }: { palette: StudioPalette }) {
       <div
         role="img"
         aria-label={`Sample landing page using the ${palette.name} palette`}
-        className="overflow-hidden rounded-2xl border border-[var(--cs-border)] p-5"
+        className={`overflow-hidden rounded-2xl border border-[var(--cs-border)] p-5 ${
+          mobile ? "mx-auto max-w-[300px]" : ""
+        }`}
         style={{ backgroundColor: colors.background, color: colors.text }}
       >
         <div className="flex items-center justify-between gap-3 text-xs leading-4">
@@ -43,10 +55,16 @@ export function PalettePreview({ palette }: { palette: StudioPalette }) {
             />
             Acme Studio
           </span>
-          <span className="flex items-center gap-3 font-medium max-[479px]:hidden">
-            <span>Home</span>
-            <span>Features</span>
-            <span>Pricing</span>
+          <span
+            className={`flex items-center gap-3 font-medium ${mobile ? "" : "max-[479px]:hidden"}`}
+          >
+            {mobile ? null : (
+              <>
+                <span>Home</span>
+                <span>Features</span>
+                <span>Pricing</span>
+              </>
+            )}
             <span
               className="rounded-md px-2.5 py-1 font-semibold"
               style={{ backgroundColor: colors.accent, color: readableTextOn(colors.accent) }}
@@ -56,7 +74,11 @@ export function PalettePreview({ palette }: { palette: StudioPalette }) {
           </span>
         </div>
 
-        <div className="mt-6 grid grid-cols-2 items-center gap-4 max-[479px]:grid-cols-1">
+        <div
+          className={`mt-6 grid items-center gap-4 ${
+            mobile ? "grid-cols-1" : "grid-cols-2 max-[479px]:grid-cols-1"
+          }`}
+        >
           <div className="min-w-0">
             <p className="text-2xl leading-7 font-bold">
               Design ideas that <span style={{ color: colors.accent }}>take shape.</span>
@@ -70,15 +92,17 @@ export function PalettePreview({ palette }: { palette: StudioPalette }) {
             >
               Start for free
             </span>
-            <span className="mt-4 flex gap-1.5">
-              {dots.map((dot) => (
-                <span
-                  key={dot.id}
-                  className="h-2 w-2 rounded-full"
-                  style={{ backgroundColor: dot.hex }}
-                />
-              ))}
-            </span>
+            {bare ? null : (
+              <span className="mt-4 flex gap-1.5">
+                {dots.map((dot) => (
+                  <span
+                    key={dot.id}
+                    className="h-2 w-2 rounded-full"
+                    style={{ backgroundColor: dot.hex }}
+                  />
+                ))}
+              </span>
+            )}
           </div>
           <svg
             aria-hidden="true"
@@ -100,10 +124,12 @@ export function PalettePreview({ palette }: { palette: StudioPalette }) {
           </svg>
         </div>
       </div>
-      <p className="mt-2 text-sm leading-5 text-[var(--cs-muted)]">
-        Text on background: {formatContrastRatio(textRatio)}
-        {textRatio < 4.5 ? " (below AA for normal text)" : ""}
-      </p>
+      {bare ? null : (
+        <p className="mt-2 text-sm leading-5 text-[var(--cs-muted)]">
+          Text on background: {formatContrastRatio(textRatio)}
+          {textRatio < 4.5 ? " (below AA for normal text)" : ""}
+        </p>
+      )}
     </div>
   );
 }
