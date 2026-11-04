@@ -210,7 +210,7 @@ export const CUSTOMER_NAV: NavConfig = {
 };
 
 // ---------------------------------------------------------------------------
-// Creative — small enough to stay in a single section
+// Creative
 // ---------------------------------------------------------------------------
 
 export const CREATIVE_NAV: NavConfig = {
@@ -219,7 +219,7 @@ export const CREATIVE_NAV: NavConfig = {
   homeHref: "/creative/board",
   sections: [
     {
-      label: null,
+      label: "Workspace",
       items: [
         { href: "/creative", label: "Overview", icon: IconOverview },
         {
@@ -230,6 +230,11 @@ export const CREATIVE_NAV: NavConfig = {
         },
         { href: "/creative/portfolio", label: "Portfolio", icon: IconPortfolio },
         { href: "/colors", label: "Color Studio", icon: IconColorStudio },
+      ],
+    },
+    {
+      label: "Earnings",
+      items: [
         { href: "/creative/balance", label: "Balance", icon: IconBalance },
         { href: "/creative/withdrawals", label: "Withdrawals", icon: IconWithdrawals },
       ],

@@ -1,16 +1,18 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/layout.tsx
-// @purpose: Customer shell — shared nav + page wrapper for all customer routes.
-//           Redirects to /onboarding wizard if company setup is incomplete.
+// @purpose: Customer shell on the dashboard design language. Redirects to the
+//           /onboarding wizard if company setup is incomplete.
 // -----------------------------------------------------------------------------
 
 import { redirect } from "next/navigation";
-import { AppSidebar } from "@/components/navigation/app-sidebar";
 import { SessionTimeoutWarning } from "@/components/auth/session-timeout-warning";
 import { GuestPalettesNotice } from "@/components/colors/studio/guest-palettes-notice";
+import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { FeedbackWidget } from "@/components/feedback/feedback-widget";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+// Dashboard typeface, self-hosted; --font-jakarta is set in globals.css.
+import "@fontsource-variable/plus-jakarta-sans";
 
 // All customer routes are auth-gated dashboards. Skip SSG so the build
 // never pulls heavy client-only deps (DOMPurify/jsdom) into server bundles.
@@ -40,19 +42,15 @@ export default async function CustomerLayout({ children }: { children: React.Rea
     // Other errors: silently continue to render the page
   }
 
-  // Normal customer layout with sidebar
   return (
-    <div className="min-h-screen bg-[var(--bb-bg-card)] text-[var(--bb-secondary)]">
+    <div className="bb-admin-v2 min-h-screen bg-[var(--av2-bg)]">
       {/* WCAG 2.2.1 — warn before the BetterAuth session expires. No-op
           in demo mode (the /api/session response's expiresAt is null). */}
       <SessionTimeoutWarning />
-      <AppSidebar role="customer" />
-      <div className="md:pl-[var(--bb-sidebar-w,240px)] md:transition-[padding] md:duration-200">
-        <main id="main-content" className="px-4 py-6 md:px-6 md:py-8 lg:px-8 lg:py-10">
-          <GuestPalettesNotice />
-          {children}
-        </main>
-      </div>
+      <DashboardShell role="customer">
+        <GuestPalettesNotice />
+        {children}
+      </DashboardShell>
       {/* Floating feedback pill — bottom-right of every customer page.
           Hidden in demo mode (see component header). */}
       <FeedbackWidget />

@@ -4,7 +4,7 @@
 //           brand lockup, collapsible section groups (persisted), withdrawal
 //           badge, pinned Settings + user row + collapse toggle in the
 //           footer. Collapses to a 64px icon rail; slides in as a drawer
-//           below md. Customer / creative portals keep AppSidebar.
+//           below md. Customer and creative use DashboardShell.
 // -----------------------------------------------------------------------------
 
 "use client";

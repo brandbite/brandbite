@@ -260,9 +260,9 @@ h6 {
   font-family: var(--font-josefin), "Josefin Sans", sans-serif;
 }
 
-/* ── Admin design language v1 (Brandbite_Tasarim_Dili, Nov 2026) ──────────
-   Scoped to `.bb-admin-v2` so admin pages can migrate one at a time without
-   restyling the customer / creative portals. Light values are the guide's
+/* ── Dashboard design language v1 (Brandbite_Tasarim_Dili, Nov 2026) ──────
+   Used by the admin, customer and creative dashboards, and kept out of the
+   marketing site by the `.bb-admin-v2` scope. Light values are the guide's
    hex standards; dark values are tuned equivalents for the theme switcher. */
 .bb-admin-v2 {
   --av2-accent: #ff5b2a; /* brand accent: borders, dots, icon glyphs */
@@ -324,13 +324,12 @@ h6 {
   --av2-track: #27272a;
 }
 
-/* Legacy-token bridge: shared components rendered inside the admin
+/* Legacy-token bridge: shared components and pages not yet redesigned
    (Modal, ConfirmDialog, CMS uploads, rich-text editor, ProfileForm,
    notification bell, typed-phrase / MFA modals) still read --bb-* tokens.
-   Re-point those tokens at the v2 palette inside the admin scope only, so
-   those components match without forking them; customer and creative
-   portals keep the original values. Status tokens (danger / warning /
-   success / info) are intentionally left alone. */
+   Re-point those tokens at the v2 palette inside the dashboards, so they
+   match without forking them. Status tokens (danger / warning / success /
+   info) are intentionally left alone. */
 .bb-admin-v2 {
   --bb-primary: var(--av2-accent-strong);
   --bb-primary-light: var(--av2-selected);

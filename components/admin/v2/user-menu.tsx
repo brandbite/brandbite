@@ -34,12 +34,16 @@ export function UserMenu({
   trigger,
   triggerClassName,
   triggerLabel,
+  profileHref = "/admin/profile",
+  settingsHref = "/admin/settings",
 }: {
   user: AdminSessionUser | null;
   placement: "down" | "up";
   trigger: ReactNode;
   triggerClassName: string;
   triggerLabel: string;
+  profileHref?: string;
+  settingsHref?: string;
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -117,7 +121,7 @@ export function UserMenu({
           <div className="py-1">
             <Link
               role="menuitem"
-              href="/admin/profile"
+              href={profileHref}
               className={itemClass}
               onClick={() => setOpen(false)}
             >
@@ -125,7 +129,7 @@ export function UserMenu({
             </Link>
             <Link
               role="menuitem"
-              href="/admin/settings"
+              href={settingsHref}
               className={itemClass}
               onClick={() => setOpen(false)}
             >
