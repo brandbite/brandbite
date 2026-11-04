@@ -109,7 +109,7 @@ export default function HomePage() {
             <div className="flex h-10 flex-row items-center gap-7 max-[767px]:h-auto max-[767px]:flex-col max-[767px]:items-start max-[767px]:gap-4">
               <Link
                 href="/#how-it-works"
-                className="font-brand flex h-10 w-[170px] flex-row items-center justify-center gap-2.5 rounded-[10px] bg-[#1F2024] px-5 py-2.5 text-center text-xl leading-none font-bold whitespace-nowrap text-white transition-colors hover:bg-[#FF6426]"
+                className="font-brand flex h-10 w-[170px] flex-row items-center justify-center gap-2.5 rounded-[10px] bg-[#1F2024] px-5 py-2.5 text-center text-base leading-none font-bold whitespace-nowrap text-white transition-colors hover:bg-[#FF6426]"
               >
                 How it works?
               </Link>
@@ -117,7 +117,7 @@ export default function HomePage() {
                 href="/meet"
                 className="flex flex-row items-center gap-[9px] transition-opacity hover:opacity-75"
               >
-                <span className="text-xl leading-[30px] font-bold whitespace-nowrap text-[#2B2D33]">
+                <span className="text-base leading-6 font-bold whitespace-nowrap text-[#2B2D33]">
                   Explore Plans
                 </span>
                 <Image
@@ -245,7 +245,7 @@ export default function HomePage() {
               href="/meet"
               className="flex flex-row items-center gap-[9px] transition-opacity hover:opacity-85"
             >
-              <span className="text-xl leading-[30px] font-bold whitespace-nowrap text-white">
+              <span className="text-base leading-6 font-bold whitespace-nowrap text-white">
                 Get Started
               </span>
               <Image

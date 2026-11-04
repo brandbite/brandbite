@@ -25,7 +25,7 @@ export function ReadyBand() {
           href="/meet"
           className="flex flex-row items-center gap-[9px] transition-opacity hover:opacity-85"
         >
-          <span className="text-xl leading-8 font-bold whitespace-nowrap text-white">
+          <span className="text-base leading-6 font-bold whitespace-nowrap text-white">
             Get Started
           </span>
           <Image src="/home/arrow-chat.svg" alt="" width={24} height={24} />

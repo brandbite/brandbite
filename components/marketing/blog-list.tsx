@@ -136,7 +136,7 @@ export function BlogList({ posts }: { posts: BlogCard[] }) {
                 href={`/blog/${featured.slug}`}
                 className="flex flex-row items-center gap-[9px] transition-opacity hover:opacity-85"
               >
-                <span className="text-xl leading-8 font-bold whitespace-nowrap text-white">
+                <span className="text-base leading-6 font-bold whitespace-nowrap text-white">
                   Read More
                 </span>
                 <Image src="/home/arrow-chat.svg" alt="" width={24} height={24} />
@@ -230,7 +230,7 @@ export function BlogList({ posts }: { posts: BlogCard[] }) {
           <button
             type="button"
             onClick={() => setVisible((v) => v + PAGE_SIZE)}
-            className="font-brand cursor-pointer rounded-[10px] border-none bg-[#2B2D33] p-5 text-xl leading-none font-bold text-white transition-colors hover:bg-[#FF6426]"
+            className="font-brand cursor-pointer rounded-[10px] border-none bg-[#2B2D33] p-5 text-base leading-none font-bold text-white transition-colors hover:bg-[#FF6426]"
           >
             Read More
           </button>
