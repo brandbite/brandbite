@@ -95,7 +95,7 @@ export function CompactCTA({
           Good colors. <span className="text-[var(--cs-soft-text)]">Better creative.</span>
         </h2>
         <p className="mt-2 text-base leading-6">{blurb}</p>
-        <Link href="/coming-soon" className={`mt-4 ${studioButtonClasses("primary")}`}>
+        <Link href="/meet" className={`mt-4 ${studioButtonClasses("primary")}`}>
           Meet brandbite
           <ArrowRightIcon />
         </Link>
