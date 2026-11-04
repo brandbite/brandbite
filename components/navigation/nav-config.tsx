@@ -87,6 +87,7 @@ export const ADMIN_NAV: NavConfig = {
           highlightOnPaths: ["/admin/tickets"],
         },
         { href: "/admin/consultations", label: "Consultations", icon: IconConsultations },
+        { href: "/admin/meetings", label: "Meetings", icon: IconConsultations },
       ],
     },
     {

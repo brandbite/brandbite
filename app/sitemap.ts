@@ -22,7 +22,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.8,
     },
     // Public marketing pages (2026 redesign)
-    ...["/faq", "/contact", "/coming-soon", "/about", "/terms", "/privacy", "/blog"].map(
+    ...["/faq", "/contact", "/coming-soon", "/about", "/terms", "/privacy", "/blog", "/meet"].map(
       (path) => ({
         url: `${baseUrl}${path}`,
         lastModified: new Date(),
