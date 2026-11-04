@@ -2245,6 +2245,46 @@ model ConsultationSettings {
   updatedBy   UserAccount? @relation("ConsultationSettingsUpdatedBy", fields: [updatedById], references: [id])
 }
 
+enum MeetingStatus {
+  CONFIRMED
+  CANCELED
+}
+
+// A 30-minute call booked from the public /meet page. Visitors have no account,
+// so unlike Consultation this has no company, user or token cost.
+model Meeting {
+  id String @id @default(cuid())
+
+  name    String
+  email   String
+  company String?
+  note    String?
+
+  /// Visitor's IANA time zone, used when emailing them the time.
+  timezone String?
+
+  startsAt DateTime
+  endsAt   DateTime
+  status   MeetingStatus @default(CONFIRMED)
+
+  /// Equals startsAt while confirmed and is null once canceled. The unique index
+  /// is what stops two visitors from booking the same time.
+  activeSlot DateTime? @unique
+
+  /// SHA-256 of the secret in the visitor's manage link. The secret isn't stored.
+  manageTokenHash String @unique
+
+  googleEventId String?
+  videoLink     String?
+
+  ipAddress String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([startsAt])
+}
+
 // -----------------------------------------------------------------------------
 // Admin action audit log (Security Precaution Plan — L1)
 //
