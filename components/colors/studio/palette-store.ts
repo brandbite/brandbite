@@ -101,6 +101,15 @@ export const localPaletteStore: PaletteStore & { clear(): void } = {
   },
 };
 
+/** Copies browser palettes to the account, clearing them only after that succeeds. */
+export async function moveLocalPalettesToAccount(): Promise<StudioPalette[]> {
+  const local = await localPaletteStore.list();
+  if (local.length === 0) return [];
+  const created = await accountPaletteStore.createMany(local);
+  localPaletteStore.clear();
+  return created;
+}
+
 // -----------------------------------------------------------------------------
 // Account
 // -----------------------------------------------------------------------------

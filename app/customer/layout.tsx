@@ -7,6 +7,7 @@
 import { redirect } from "next/navigation";
 import { AppSidebar } from "@/components/navigation/app-sidebar";
 import { SessionTimeoutWarning } from "@/components/auth/session-timeout-warning";
+import { GuestPalettesNotice } from "@/components/colors/studio/guest-palettes-notice";
 import { FeedbackWidget } from "@/components/feedback/feedback-widget";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -48,6 +49,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
       <AppSidebar role="customer" />
       <div className="md:pl-[var(--bb-sidebar-w,240px)] md:transition-[padding] md:duration-200">
         <main id="main-content" className="px-4 py-6 md:px-6 md:py-8 lg:px-8 lg:py-10">
+          <GuestPalettesNotice />
           {children}
         </main>
       </div>

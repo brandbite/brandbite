@@ -37,7 +37,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             items: [
               {
                 term: "Workspace",
-                text: "your day-to-day work: **Overview**, the **Board** with all your requests, **Moodboards** and **AI Tools**.",
+                text: "your day-to-day work: **Overview**, the **Board** with all your requests, **Moodboards**, **AI Tools** and **Color Studio**. Color Studio opens our public color tools; use **Go to dashboard** at the top of the page to come back.",
               },
               {
                 term: "Billing",
