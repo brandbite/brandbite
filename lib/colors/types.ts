@@ -33,6 +33,3 @@ export interface PaletteColor {
 }
 
 export type Palette = PaletteColor[];
-
-/** Which tool produced a palette, as named by the pre-Color Studio tool pages. */
-export type PaletteSource = "WHEEL" | "GENERATOR" | "EXTRACTOR";

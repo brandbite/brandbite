@@ -1,55 +1,41 @@
 // -----------------------------------------------------------------------------
 // @file: app/colors/color-meanings/[slug]/page.tsx
-// @purpose: Encyclopedia detail — psychology/meaning, HEX/RGB/HSL, associations,
-//           and sample palettes for one color. Client-side 404 like the other
-//           CMS detail pages.
+// @purpose: Per-color page: the long-form meaning next to the same detail panel
+//           the hub uses. Client-side 404 like the other CMS detail pages.
 // -----------------------------------------------------------------------------
 
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ColorToolShell } from "@/components/marketing/color-tool-shell";
-import { CMS_ALLOWED_ATTR, CMS_ALLOWED_TAGS, SafeHtml } from "@/components/ui/safe-html";
-import { useClipboard } from "@/components/hooks/use-clipboard";
-import { formatHex, formatHsl, formatRgb, hexToHsl, hexToRgb, readableTextOn } from "@/lib/colors";
+import { useEffect, useState } from "react";
 
-type MeaningDetail = {
-  id: string;
-  name: string;
-  slug: string;
-  hex: string;
-  summary: string | null;
-  meaning: string | null;
-  associations: string[];
-  samplePalettes: string[][];
-};
+import { MeaningPanel, type MeaningDetail } from "@/components/colors/studio/color-meanings-view";
+import { studioButtonClasses } from "@/components/colors/studio/studio-button";
+import { StudioShell, WorkspacePanel } from "@/components/colors/studio/studio-shell";
+import { CMS_ALLOWED_ATTR, CMS_ALLOWED_TAGS, SafeHtml } from "@/components/ui/safe-html";
 
 export default function ColorMeaningDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const [meaning, setMeaning] = useState<MeaningDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
-  const { copy, isCopied } = useClipboard();
+  const [status, setStatus] = useState<"loading" | "ready" | "missing">("loading");
 
   useEffect(() => {
     if (!slug) return;
     let cancelled = false;
-    setLoading(true);
     (async () => {
       try {
         const res = await fetch(`/api/color-meanings/${slug}`);
-        if (res.status === 404) {
-          if (!cancelled) setNotFound(true);
-          return;
-        }
         const json = await res.json().catch(() => null);
-        if (!cancelled && res.ok && json?.meaning) setMeaning(json.meaning);
+        if (cancelled) return;
+        if (res.ok && json?.meaning) {
+          setMeaning(json.meaning);
+          setStatus("ready");
+        } else {
+          setStatus("missing");
+        }
       } catch {
-        if (!cancelled) setNotFound(true);
-      } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setStatus("missing");
       }
     })();
     return () => {
@@ -57,130 +43,56 @@ export default function ColorMeaningDetailPage() {
     };
   }, [slug]);
 
-  const hex = meaning ? formatHex(meaning.hex) : "#000000";
-  const rows = meaning
-    ? [
-        { label: "HEX", value: hex },
-        { label: "RGB", value: formatRgb(hexToRgb(hex)) },
-        { label: "HSL", value: formatHsl(hexToHsl(hex)) },
-      ]
-    : [];
-
   return (
-    <ColorToolShell
-      currentHref="/colors/color-meanings"
-      title={"The story behind"}
+    <StudioShell
+      title="The story behind"
       accent={meaning ? `${meaning.name.toLowerCase()}.` : "every shade."}
-      blurb="Psychology, symbolism, and sample palettes for this color."
+      blurb="Associations, symbolism, and sample palettes for this color."
+      breadcrumb={meaning?.name ?? "Color meanings"}
     >
-      <div className="mx-auto max-w-4xl">
-        <div className="mb-6">
-          <Link
-            href="/colors/color-meanings"
-            className="text-sm font-medium text-[var(--bb-text-secondary)] hover:text-[var(--bb-primary)]"
+      <WorkspacePanel>
+        {status === "loading" ? (
+          <p
+            aria-busy="true"
+            className="py-16 text-center text-sm leading-5 text-[var(--cs-muted)]"
           >
-            ← All colors
-          </Link>
-        </div>
-
-        {loading ? (
-          <p className="py-16 text-center text-sm text-[var(--bb-text-tertiary)]">Loading…</p>
-        ) : notFound || !meaning ? (
-          <div className="rounded-2xl border border-dashed border-[var(--bb-border)] bg-[var(--bb-bg-warm)] px-6 py-16 text-center">
-            <p className="text-sm text-[var(--bb-text-tertiary)]">This color page wasn’t found.</p>
+            Loading…
+          </p>
+        ) : status === "missing" || !meaning ? (
+          <div className="py-16 text-center">
+            <p className="text-base leading-6 font-medium">This color page wasn&apos;t found.</p>
             <Link
               href="/colors/color-meanings"
-              className="mt-3 inline-block text-sm font-medium text-[var(--bb-primary)]"
+              className={`mt-4 ${studioButtonClasses("secondary")}`}
             >
-              Back to Color Meanings
+              Back to Color meanings
             </Link>
           </div>
         ) : (
-          <article className="space-y-8">
-            {/* Hero swatch + values */}
-            <div
-              className="flex flex-col justify-end rounded-3xl p-6 shadow-sm md:h-56"
-              style={{ backgroundColor: hex, color: readableTextOn(hex) }}
-            >
-              <h2 className="font-brand text-4xl font-bold">{meaning.name}</h2>
-              {meaning.summary ? (
-                <p className="mt-1 max-w-xl opacity-90">{meaning.summary}</p>
-              ) : null}
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {rows.map((row) => (
-                <button
-                  key={row.label}
-                  type="button"
-                  onClick={() => void copy(row.value, row.label)}
-                  className="rounded-full border border-[var(--bb-border)] bg-[var(--bb-bg-card)] px-3 py-1.5 font-mono text-xs text-[var(--bb-secondary)] transition-colors hover:border-[var(--bb-primary)]"
-                >
-                  <span className="mr-1.5 font-sans font-semibold text-[var(--bb-text-tertiary)]">
-                    {row.label}
-                  </span>
-                  {isCopied(row.label) ? "Copied!" : row.value}
-                </button>
-              ))}
-            </div>
-
-            {meaning.associations.length > 0 ? (
-              <section>
-                <h2 className="mb-2 text-lg font-semibold">Associations</h2>
-                <div className="flex flex-wrap gap-2">
-                  {meaning.associations.map((a) => (
-                    <span
-                      key={a}
-                      className="rounded-full bg-[var(--bb-bg-warm)] px-3 py-1 text-sm text-[var(--bb-text-secondary)]"
-                    >
-                      {a}
-                    </span>
-                  ))}
-                </div>
-              </section>
-            ) : null}
-
-            {meaning.meaning ? (
-              <section>
-                <h2 className="mb-2 text-lg font-semibold">Meaning &amp; psychology</h2>
+          <div className="grid grid-cols-[minmax(0,7fr)_minmax(0,5fr)] items-start gap-8 max-[1023px]:grid-cols-1">
+            <article className="min-w-0">
+              <Link
+                href="/colors/color-meanings"
+                className="text-sm leading-5 font-medium text-[var(--cs-brand-strong)] underline"
+              >
+                All colors
+              </Link>
+              <h2 className="mt-4 text-2xl leading-8 font-semibold">Meaning and psychology</h2>
+              {meaning.meaning ? (
                 <SafeHtml
                   html={meaning.meaning}
                   allowedTags={CMS_ALLOWED_TAGS}
                   allowedAttrs={CMS_ALLOWED_ATTR}
-                  className="prose max-w-none text-[var(--bb-text-secondary)]"
+                  className="prose mt-4 max-w-none"
                 />
-              </section>
-            ) : null}
-
-            {meaning.samplePalettes.length > 0 ? (
-              <section>
-                <h2 className="mb-3 text-lg font-semibold">Sample palettes</h2>
-                <div className="space-y-3">
-                  {meaning.samplePalettes.map((palette, pi) => (
-                    <div
-                      key={pi}
-                      className="flex h-14 overflow-hidden rounded-xl border border-[var(--bb-border)]"
-                    >
-                      {palette.map((c, ci) => (
-                        <button
-                          key={`${pi}-${ci}`}
-                          type="button"
-                          title={`Copy ${formatHex(c)}`}
-                          onClick={() => void copy(formatHex(c), `sp-${pi}-${ci}`)}
-                          className="flex flex-1 items-center justify-center text-xs font-semibold"
-                          style={{ backgroundColor: c, color: readableTextOn(c) }}
-                        >
-                          {isCopied(`sp-${pi}-${ci}`) ? "✓" : ""}
-                        </button>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              </section>
-            ) : null}
-          </article>
+              ) : (
+                <p className="mt-4 text-base leading-6">{meaning.summary}</p>
+              )}
+            </article>
+            <MeaningPanel meaning={meaning} detail={meaning} showReadMore={false} />
+          </div>
         )}
-      </div>
-    </ColorToolShell>
+      </WorkspacePanel>
+    </StudioShell>
   );
 }

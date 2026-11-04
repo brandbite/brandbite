@@ -27,6 +27,7 @@ export function PageIntro({
   accent,
   blurb,
   breadcrumb,
+  aside,
 }: {
   /** Dark part of the headline. */
   title: string;
@@ -35,27 +36,32 @@ export function PageIntro({
   blurb: string;
   /** Current page name, for pages reached from another Color Studio page. */
   breadcrumb?: string;
+  /** Decorative art beside the headline. Hidden on small screens. */
+  aside?: ReactNode;
 }) {
   return (
-    <div className="pt-4 pb-8">
-      <div className="mb-4 flex flex-wrap items-center gap-2 text-sm leading-5">
-        <span className="rounded-full bg-[var(--cs-soft)] px-3 py-1 font-semibold text-[var(--cs-soft-text)]">
-          COLOR STUDIO
-        </span>
-        {breadcrumb ? (
-          <>
-            <span className="text-[var(--cs-muted)]">
-              <ChevronRightIcon />
-            </span>
-            <span className="font-medium">{breadcrumb}</span>
-          </>
-        ) : null}
+    <div className="flex items-center justify-between gap-8 pt-4 pb-8">
+      <div className="min-w-0">
+        <div className="mb-4 flex flex-wrap items-center gap-2 text-sm leading-5">
+          <span className="rounded-full bg-[var(--cs-soft)] px-3 py-1 font-semibold text-[var(--cs-soft-text)]">
+            COLOR STUDIO
+          </span>
+          {breadcrumb ? (
+            <>
+              <span className="text-[var(--cs-muted)]">
+                <ChevronRightIcon />
+              </span>
+              <span className="font-medium">{breadcrumb}</span>
+            </>
+          ) : null}
+        </div>
+        <h1 className="text-[48px] leading-[56px] font-bold max-[767px]:text-[32px] max-[767px]:leading-10">
+          {title}
+          {accent ? <span className="text-[var(--cs-brand-strong)]"> {accent}</span> : null}
+        </h1>
+        <p className="mt-2 text-base leading-6 text-[var(--cs-muted)]">{blurb}</p>
       </div>
-      <h1 className="text-[48px] leading-[56px] font-bold max-[767px]:text-[32px] max-[767px]:leading-10">
-        {title}
-        {accent ? <span className="text-[var(--cs-brand-strong)]"> {accent}</span> : null}
-      </h1>
-      <p className="mt-2 text-base leading-6 text-[var(--cs-muted)]">{blurb}</p>
+      {aside ? <div className="shrink-0 max-[767px]:hidden">{aside}</div> : null}
     </div>
   );
 }
@@ -111,6 +117,7 @@ export function StudioShell({
   blurb,
   breadcrumb,
   ctaBlurb,
+  aside,
   children,
 }: {
   title: string;
@@ -118,6 +125,7 @@ export function StudioShell({
   blurb: string;
   breadcrumb?: string;
   ctaBlurb?: string;
+  aside?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -126,7 +134,13 @@ export function StudioShell({
         <HomeHeader />
         <div className={`pt-6 ${CONTENT_GUTTER}`}>
           <ToolNav />
-          <PageIntro title={title} accent={accent} blurb={blurb} breadcrumb={breadcrumb} />
+          <PageIntro
+            title={title}
+            accent={accent}
+            blurb={blurb}
+            breadcrumb={breadcrumb}
+            aside={aside}
+          />
           <div className="flex flex-col gap-6">{children}</div>
           <CompactCTA blurb={ctaBlurb} />
         </div>

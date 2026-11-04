@@ -12,18 +12,16 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { useToast } from "@/components/ui/toast-provider";
 import {
-  COLOR_ROLES,
   duplicateStudioPalette,
   formatHex,
-  setStudioRole,
   studioPaletteToCss,
-  type ColorRole,
   type StudioPalette,
   type StudioSource,
 } from "@/lib/colors";
 
 import { CheckIcon, CloseIcon, CopyIcon, EditIcon } from "./icons";
 import { usePaletteOpener } from "./open-palette";
+import { RoleFields } from "./palette-parts";
 import { PalettePreview } from "./palette-preview";
 import { StudioButton, studioButtonClasses } from "./studio-button";
 import { useSavedPalettes } from "./use-saved-palettes";
@@ -38,14 +36,6 @@ const SOURCE_LABELS: Record<StudioSource, string> = {
   contrast: "Contrast checker",
   image: "Image to palette",
   shared: "Shared palette",
-};
-
-const ROLE_LABELS: Record<ColorRole, string> = {
-  background: "Background",
-  text: "Text",
-  primary: "Primary",
-  accent: "Accent",
-  surface: "Surface",
 };
 
 type SortKey = "updated" | "oldest" | "name";
@@ -300,26 +290,8 @@ function PaletteDetail({
         </ul>
 
         <h3 className="mt-6 text-lg leading-[26px] font-semibold">Color roles</h3>
-        <div className="mt-3 grid grid-cols-2 gap-3 max-[479px]:grid-cols-1">
-          {COLOR_ROLES.map((role) => (
-            <label key={role} className="text-sm leading-5 font-medium">
-              {ROLE_LABELS[role]}
-              <select
-                value={palette.roles[role] ?? ""}
-                onChange={(event) =>
-                  void onSave(setStudioRole(palette, role, event.target.value || null))
-                }
-                className={`${FIELD} mt-1 block w-full font-mono`}
-              >
-                <option value="">Not set</option>
-                {palette.colors.map((color) => (
-                  <option key={color.id} value={color.id}>
-                    {formatHex(color.hex)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ))}
+        <div className="mt-3">
+          <RoleFields palette={palette} onChange={(next) => void onSave(next)} />
         </div>
 
         <div className="mt-6 flex flex-wrap gap-2">
