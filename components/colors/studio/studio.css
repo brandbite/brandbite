@@ -6,8 +6,9 @@
   --cs-muted: #6c6d75;
   --cs-border: #e3e0dc;
   --cs-brand: #ff6426;
+  --cs-brand-hover: #ff7f4d;
+  /* Small orange text only. #ff6426 is too light to read at link size. */
   --cs-brand-strong: #c2410c;
-  --cs-brand-strong-hover: #9a3412;
   --cs-soft: #ece4ff;
   --cs-soft-text: #4c1d95;
   --cs-danger: #b42318;

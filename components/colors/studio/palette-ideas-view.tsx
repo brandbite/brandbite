@@ -148,7 +148,7 @@ export function PaletteIdeasView() {
             onClick={() => setActiveTag(tag)}
             className={`h-11 rounded-full px-4 text-sm leading-5 font-medium transition-colors ${
               activeTag === tag
-                ? "bg-[var(--cs-brand-strong)] text-white"
+                ? "bg-[var(--cs-brand)] text-[var(--cs-text)]"
                 : "border border-[var(--cs-border)] hover:border-[var(--cs-text)]"
             }`}
           >
