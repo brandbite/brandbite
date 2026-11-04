@@ -12,6 +12,24 @@ export type ColorTool = {
   icon: string;
 };
 
+export type StudioNavItem = { href: string; label: string };
+
+/** Color Studio tool menu. URLs stay as they were; only the labels are shorter. */
+export const STUDIO_NAV: StudioNavItem[] = [
+  { href: "/colors", label: "Overview" },
+  { href: "/colors/tailwind-color-generator", label: "Tailwind shades" },
+  { href: "/colors/color-palette-generator", label: "Palette generator" },
+  { href: "/colors/color-wheel", label: "Color wheel" },
+  { href: "/colors/color-palette-ideas", label: "Palette ideas" },
+  { href: "/colors/color-meanings", label: "Color meanings" },
+];
+
+/** Tools under the "More tools" menu. The menu is hidden while this is empty. */
+export const STUDIO_MORE_TOOLS: StudioNavItem[] = [];
+
+/** The "Saved" shortcut. Hidden until the page ships. */
+export const STUDIO_SAVED_LINK: StudioNavItem | null = null;
+
 export const COLOR_TOOLS: ColorTool[] = [
   {
     href: "/colors/tailwind-color-generator",
