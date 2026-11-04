@@ -14,11 +14,11 @@ import Link from "next/link";
 import { useState } from "react";
 
 // Pages that exist in the new design go to their real routes; everything
-// still being redesigned points at /coming-soon until its page ships.
+// still being redesigned points at /meet until its page ships.
 const NAV_LINKS = [
   { label: "How it works?", href: "/#how-it-works" },
-  { label: "Pricing", href: "/coming-soon" },
-  { label: "Showcase", href: "/coming-soon" },
+  { label: "Pricing", href: "/meet" },
+  { label: "Showcase", href: "/meet" },
   { label: "FAQs", href: "/faq" },
   { label: "Blog", href: "/blog" },
 ];
