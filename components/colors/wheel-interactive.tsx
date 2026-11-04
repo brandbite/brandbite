@@ -93,6 +93,9 @@ export function WheelInteractive({
       role="slider"
       tabIndex={0}
       aria-label="Color wheel: hue and saturation"
+      aria-valuemin={0}
+      aria-valuemax={360}
+      aria-valuenow={Math.round(hue)}
       aria-valuetext={`Hue ${Math.round(hue)} degrees, saturation ${Math.round(saturation)} percent`}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
