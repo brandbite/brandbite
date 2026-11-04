@@ -19,10 +19,10 @@ import { ReadyBand } from "@/components/marketing/ready-band";
 export const metadata: Metadata = {
   title: "About",
   description:
-    "Brandbite is a team of experienced creative problem solvers making high quality work easier to access. A team with a big bite.",
+    "brandbite is a team of experienced creative problem solvers making high quality work easier to access. A team with a big bite.",
 };
 
-const displayFont = "font-[family-name:var(--font-inter)]";
+const displayFont = "font-[family-name:var(--font-jakarta)]";
 
 const VALUES = [
   { icon: "/home/about-clarity.png", label: "Clarity", size: 110 },
@@ -31,7 +31,7 @@ const VALUES = [
 ];
 
 const PARAGRAPHS = [
-  "Brandbite grew out of years spent shaping brands, products and campaigns across industries, markets and time zones, from early-stage ideas to global projects. That experience taught us that great creative work takes more than talent. It takes the right people, clear thinking and a way of working that keeps good ideas moving.",
+  "brandbite grew out of years spent shaping brands, products and campaigns across industries, markets and time zones, from early-stage ideas to global projects. That experience taught us that great creative work takes more than talent. It takes the right people, clear thinking and a way of working that keeps good ideas moving.",
   "That’s why we brought together experienced creative problem solvers to make high quality work easier to access. No bloated teams, endless calls or lengthy freelancer searches. Just the right expertise for every request, a process that stays on track and creative work with enough bite to make an impact.",
 ];
 

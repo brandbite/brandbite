@@ -456,7 +456,7 @@ export default function AdminSettingsPage() {
     <div>
       <PageHeader
         title="Settings"
-        description="Global configuration for the Brandbite platform. Each setting saves on its own and takes effect immediately."
+        description="Global configuration for the brandbite platform. Each setting saves on its own and takes effect immediately."
       />
 
       {error && (

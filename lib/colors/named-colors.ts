@@ -49,7 +49,7 @@ export const NAMED_COLORS: NamedColor[] = named([
   ["Pumpkin", "#ff7518"],
   ["Persimmon", "#ec5800"],
   ["Amber", "#ffbf00"],
-  ["Brandbite Orange", "#ff6426"],
+  ["brandbite Orange", "#ff6426"],
   // Yellows
   ["Yellow", "#ffff00"],
   ["Gold", "#ffd700"],

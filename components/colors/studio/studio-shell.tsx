@@ -84,7 +84,7 @@ export function WorkspacePanel({
 }
 
 export function CompactCTA({
-  blurb = "Turn your palette into something real with Brandbite.",
+  blurb = "Turn your palette into something real with brandbite.",
 }: {
   blurb?: string;
 }) {

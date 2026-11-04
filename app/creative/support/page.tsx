@@ -6,10 +6,10 @@
 
 import type { Metadata } from "next";
 
-import { SupportHub } from "@/components/support/support-hub";
+import { SupportCenter } from "@/components/dashboard/help/support-center";
 
 export const metadata: Metadata = { title: "Support" };
 
 export default function CreativeSupportPage() {
-  return <SupportHub role="creative" />;
+  return <SupportCenter role="creative" />;
 }

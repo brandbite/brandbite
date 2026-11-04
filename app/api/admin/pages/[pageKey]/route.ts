@@ -67,7 +67,7 @@ const ALLOWED_PAGE_KEYS = new Set([
 // and hasn't typed a title yet. Keeps the /privacy etc. URLs from rendering
 // with an empty <h1> if someone clicks Save with only a body filled in.
 const DEFAULT_TITLES: Record<string, string> = {
-  about: "About Brandbite",
+  about: "About brandbite",
   contact: "Contact",
   documentation: "Documentation",
   privacy: "Privacy Policy",

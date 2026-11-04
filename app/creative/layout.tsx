@@ -7,8 +7,6 @@ import { SessionTimeoutWarning } from "@/components/auth/session-timeout-warning
 import { GuestPalettesNotice } from "@/components/colors/studio/guest-palettes-notice";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { FeedbackWidget } from "@/components/feedback/feedback-widget";
-// Dashboard typeface, self-hosted; --font-jakarta is set in globals.css.
-import "@fontsource-variable/plus-jakarta-sans";
 
 export const dynamic = "force-dynamic";
 

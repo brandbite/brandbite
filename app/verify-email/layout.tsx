@@ -7,7 +7,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Verify your email",
-  description: "Confirm your email to finish setting up your Brandbite account.",
+  description: "Confirm your email to finish setting up your brandbite account.",
 };
 
 export default function VerifyEmailLayout({ children }: { children: React.ReactNode }) {

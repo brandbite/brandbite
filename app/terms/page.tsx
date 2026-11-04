@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   description: "Brandbite's terms of service. Clear terms. No fine print panic.",
 };
 
-const displayFont = "font-[family-name:var(--font-inter)]";
+const displayFont = "font-[family-name:var(--font-jakarta)]";
 
 const RULES = [
   {

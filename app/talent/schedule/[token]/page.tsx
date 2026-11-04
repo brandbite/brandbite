@@ -477,7 +477,7 @@ function ProposedView({
       <header>
         <h1 className="text-2xl font-bold text-[var(--bb-secondary)]">Got it, {candidateName}</h1>
         <p className="mt-2 text-sm text-[var(--bb-text-secondary)]">
-          We&apos;ve sent your proposed time to the Brandbite team:
+          We&apos;ve sent your proposed time to the brandbite team:
         </p>
       </header>
       <div className="rounded-xl border border-[var(--bb-border)] bg-white p-5">

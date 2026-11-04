@@ -9,32 +9,55 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
+import {
+  Badge,
+  Button,
+  Callout,
+  Card,
+  DASH,
+  EmptyState,
+  Eyebrow,
+  KeyValueList,
+  Skeleton,
+  TabPanel,
+  Tabs,
+} from "@/components/admin/v2/ui";
+import { DeliveryForm } from "@/components/dashboard/tickets/delivery-form";
+import {
+  BackLink,
+  CollapsedVersion,
+  CommentsPanel,
+  CurrentVersionCard,
+  DetailColumns,
+  DetailSkeleton,
+  DownloadFilesButton,
+  DueDate,
+  FilePreviews,
+  PriorityBadge,
+  StatusBadge,
+  TicketHeader,
+  TicketTitle,
+  tokenCount,
+  VersionsHeading,
+  type TicketComment,
+  type TicketVersion,
+} from "@/components/dashboard/tickets/shared";
+import {
+  TimeEntriesPanel,
+  TimeStrip,
+  useTimeTracking,
+} from "@/components/dashboard/tickets/time-tracking";
 import { buildTicketCode } from "@/lib/ticket-code";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { FormTextarea } from "@/components/ui/form-field";
 import { SafeHtml } from "@/components/ui/safe-html";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import { EmptyState } from "@/components/ui/empty-state";
-import {
-  priorityBadgeVariant,
-  statusBadgeVariant,
-  STATUS_LABELS,
-  PRIORITY_LABELS,
-  formatPriorityLabel,
-  formatBoardDate,
-  formatDateTime,
-} from "@/lib/board";
-import {
-  RevisionImageGrid,
-  BriefThumbnailRow,
-  DownloadAllButton,
-  type AssetEntry,
-} from "@/components/ui/revision-image";
-import { formatBytes } from "@/lib/upload-helpers";
+import { useToast } from "@/components/ui/toast-provider";
+import { formatBoardDate } from "@/lib/board";
+import type { AssetEntry } from "@/components/ui/revision-image";
 import { RevisionCompare } from "@/components/ui/revision-compare";
-import { TimeTrackingPanel } from "@/components/creative/time-tracking-panel";
+
+type JobTab = "delivery" | "brief" | "time" | "comments";
+
+const TAB_PREFIX = "job-detail";
 
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -99,18 +122,6 @@ type ViewState =
   | { status: "error"; message: string }
   | { status: "ready"; data: TicketDetailResponse };
 
-type TicketComment = {
-  id: string;
-  body: string;
-  createdAt: string;
-  author: {
-    id: string;
-    name: string | null;
-    email: string;
-    role: string;
-  };
-};
-
 type RevisionAsset = {
   id: string;
   url: string | null;
@@ -135,13 +146,17 @@ type TicketRevisionItem = {
 
 export default function CreativeTicketDetailPage() {
   const params = useParams<{ ticketId: string }>();
-  const router = useRouter();
   const searchParams = useSearchParams();
+  const { showToast } = useToast();
   const fromBoard = searchParams.get("from") === "board";
 
   const ticketIdFromParams = typeof params?.ticketId === "string" ? params.ticketId : "";
 
   const [state, setState] = useState<ViewState>({ status: "loading" });
+  const [refreshCounter, setRefreshCounter] = useState(0);
+  const [tab, setTab] = useState<JobTab>("delivery");
+  const [statusBusy, setStatusBusy] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
 
   const [comments, setComments] = useState<TicketComment[] | null>(null);
   const [commentsLoading, setCommentsLoading] = useState(false);
@@ -211,7 +226,7 @@ export default function CreativeTicketDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [ticketIdFromParams]);
+  }, [ticketIdFromParams, refreshCounter]);
 
   const ticketIdFromData = state.status === "ready" ? state.data.ticket.id : null;
 
@@ -309,7 +324,7 @@ export default function CreativeTicketDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [ticketIdFromData]);
+  }, [ticketIdFromData, refreshCounter]);
 
   // ---------------------------------------------------------------------------
   // Brief assets load (BRIEF_INPUT attachments from customer)
@@ -368,6 +383,33 @@ export default function CreativeTicketDetailPage() {
     });
   }, [ticket]);
 
+  // Start work / Pull back: the same PATCH the table and board use. The server
+  // applies the shared transition rules.
+  const moveStatus = async (status: TicketStatus) => {
+    if (!ticketIdFromData) return;
+    setStatusBusy(true);
+    setStatusError(null);
+    try {
+      const res = await fetch("/api/creative/tickets", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: ticketIdFromData, status }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setStatusError(json?.error || `Request failed with status ${res.status}`);
+        return;
+      }
+      showToast({ type: "success", title: "Job status updated." });
+      setRefreshCounter((c) => c + 1);
+    } catch (err) {
+      console.error("Creative ticket status error:", err);
+      setStatusError("Failed to update this job. Please try again.");
+    } finally {
+      setStatusBusy(false);
+    }
+  };
+
   const handleSubmitComment = async () => {
     if (!ticketIdFromData) return;
     const trimmed = newComment.trim();
@@ -406,504 +448,391 @@ export default function CreativeTicketDetailPage() {
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
+  const tracking = useTimeTracking(ticketIdFromData, ticket?.jobType?.estimatedHours ?? null);
+
   if (state.status === "loading") {
-    return <TicketDetailSkeleton />;
+    return <DetailSkeleton label="Loading job" />;
   }
+
+  const backHref = fromBoard ? "/creative/board" : "/creative/tickets";
+  const backLabel = fromBoard ? "Back to board" : "Back to jobs";
+
+  if (error || !ticket) {
+    return (
+      <>
+        <BackLink href={backHref}>{backLabel}</BackLink>
+        {error ? (
+          <Callout tone="error" title="We couldn't load this job">
+            {error}
+          </Callout>
+        ) : (
+          <Callout tone="warning" title="Job could not be loaded" />
+        )}
+      </>
+    );
+  }
+
+  const newestFirst: TicketVersion[] = revisions ? [...revisions].reverse() : [];
+  const latest = newestFirst[0] ?? null;
+  const changesRequested = !!latest?.feedbackMessage && ticket.status !== "DONE";
+  const pinMode = ticket.status === "IN_PROGRESS" ? "resolve" : "view";
+  const zipFor = (version: number) => `${ticketCode || ticket.id}-v${version}`;
+  const project = ticket.project;
+  const hasBrandGuide =
+    !!project &&
+    !!(project.brandLogoUrl || project.brandColors || project.brandFonts || project.brandVoice);
+
+  const versionCopy = {
+    feedbackLabel: "Customer feedback",
+    noteLabel: "Your note",
+    sentLine: (rev: TicketVersion) =>
+      rev.submittedAt ? (
+        <>
+          You sent this version for review on{" "}
+          <span className="font-semibold text-[var(--av2-text)]">
+            {formatBoardDate(rev.submittedAt)}
+          </span>
+          .
+        </>
+      ) : null,
+  };
+
+  const tabs: { value: JobTab; label: string }[] = [
+    { value: "delivery", label: "Delivery & feedback" },
+    {
+      value: "brief",
+      label: briefAssets.length > 0 ? `Brief & files (${briefAssets.length})` : "Brief & files",
+    },
+    { value: "time", label: "Time tracking" },
+    { value: "comments", label: comments ? `Comments (${comments.length})` : "Comments" },
+  ];
 
   return (
     <>
-      {/* Page header */}
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push(fromBoard ? "/creative/board" : "/creative/tickets")}
-            className="mb-2"
-          >
-            ← {fromBoard ? "Back to board" : "Back to tickets"}
-          </Button>
+      <BackLink href={backHref}>{backLabel}</BackLink>
 
-          <h1 className="text-2xl font-semibold tracking-tight">{ticket?.title ?? "Ticket"}</h1>
-          {ticketCode && (
-            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-              Ticket code:{" "}
-              <span className="font-medium text-[var(--bb-secondary)]">{ticketCode}</span>
-            </p>
-          )}
-          {company && (
-            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-              Customer:{" "}
-              <span className="font-medium text-[var(--bb-secondary)]">{company.name}</span> (
-              {company.slug})
-            </p>
-          )}
-        </div>
+      <TicketHeader
+        code={ticketCode}
+        title={<TicketTitle>{ticket.title}</TicketTitle>}
+        meta={
+          company ? (
+            <>
+              Customer <span className="font-medium text-[var(--av2-text)]">{company.name}</span>
+            </>
+          ) : null
+        }
+        badges={
+          <>
+            <StatusBadge status={ticket.status} />
+            <PriorityBadge priority={ticket.priority} />
+            {changesRequested ? <Badge tone="peach">Changes requested</Badge> : null}
+          </>
+        }
+        actions={
+          ticket.status === "TODO" ? (
+            <Button onClick={() => moveStatus("IN_PROGRESS")} disabled={statusBusy}>
+              {statusBusy ? "Starting…" : "Start work"}
+            </Button>
+          ) : ticket.status === "IN_REVIEW" ? (
+            <Button onClick={() => moveStatus("IN_PROGRESS")} disabled={statusBusy}>
+              {statusBusy ? "Moving…" : "Pull back to In progress"}
+            </Button>
+          ) : null
+        }
+      />
 
-        {ticket && (
-          <div className="flex flex-col items-end gap-2">
-            <Badge variant={statusBadgeVariant(ticket.status)}>
-              {STATUS_LABELS[ticket.status]}
-            </Badge>
-            <Badge variant={priorityBadgeVariant(ticket.priority)}>
-              {formatPriorityLabel(ticket.priority)}
-            </Badge>
-          </div>
-        )}
-      </div>
+      <div className="space-y-6">
+        {statusError ? (
+          <Callout tone="error" title="Status update failed">
+            {statusError}
+          </Callout>
+        ) : null}
 
-      {/* Error state */}
-      {error && (
-        <InlineAlert variant="error" title="Something went wrong" className="mb-4">
-          {error}
-        </InlineAlert>
-      )}
+        {ticket.status === "DONE" && ticket.completedAt ? (
+          <Callout tone="success" title="Approved">
+            {ticket.completedBy?.name || ticket.completedBy?.email || "Customer"} approved this work
+            on {formatBoardDate(ticket.completedAt)}.
+          </Callout>
+        ) : null}
 
-      {!error && ticket && (
-        <div className="grid gap-4 md:grid-cols-3">
-          {/* Left: brief + job/meta + revisions */}
-          <section className="space-y-4 md:col-span-2">
-            {/* Approval banner — DONE */}
-            {ticket.status === "DONE" && ticket.completedAt && (
-              <div className="flex items-center gap-3 rounded-xl border border-[var(--bb-success-border)] bg-[var(--bb-success-bg)] px-4 py-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#32b37b] text-white">
-                  &#10003;
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-[var(--bb-secondary)]">Approved</p>
-                  <p className="mt-0.5 text-xs text-[var(--bb-text-tertiary)]">
-                    {ticket.completedBy?.name || ticket.completedBy?.email || "Customer"} approved
-                    this work on {formatBoardDate(ticket.completedAt)}
-                  </p>
-                </div>
-              </div>
-            )}
+        <TimeStrip tracking={tracking} />
 
-            {/* Brief */}
-            <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
-              <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">Brief</h2>
-              {ticket.description ? (
-                <SafeHtml
-                  html={ticket.description}
-                  className="mt-2 text-sm text-[var(--bb-text-secondary)]"
+        <Tabs
+          label="Job sections"
+          idPrefix={TAB_PREFIX}
+          tabs={tabs}
+          value={tab}
+          onChange={setTab}
+        />
+
+        <DetailColumns
+          rail={
+            <>
+              <Card>
+                <h2 className="mb-4 text-xl leading-7 font-semibold">Job summary</h2>
+                <KeyValueList
+                  rows={[
+                    { label: "Project", value: project?.name || DASH },
+                    { label: "Project code", value: project?.code || DASH },
+                    { label: "Job type", value: ticket.jobType?.name || DASH },
+                    {
+                      label: "Payout",
+                      value:
+                        ticket.effectivePayout != null ? tokenCount(ticket.effectivePayout) : DASH,
+                    },
+                    ...(ticket.effectivePayout != null && ticket.payoutPercent != null
+                      ? [
+                          {
+                            label: "Rate",
+                            value: ticket.jobType
+                              ? `${ticket.payoutPercent}% of ${ticket.jobType.tokenCost * ticket.quantity}`
+                              : `${ticket.payoutPercent}%`,
+                          },
+                        ]
+                      : []),
+                    ...(ticket.quantity > 1
+                      ? [{ label: "Quantity", value: `×${ticket.quantity}` }]
+                      : []),
+                    {
+                      label: "Requester",
+                      value: ticket.createdBy?.name || ticket.createdBy?.email || DASH,
+                    },
+                    {
+                      label: "Assignee",
+                      value: ticket.creative?.name || ticket.creative?.email || DASH,
+                    },
+                    {
+                      label: "Due date",
+                      value: <DueDate iso={ticket.dueDate} done={ticket.status === "DONE"} />,
+                    },
+                    { label: "Created", value: formatBoardDate(ticket.createdAt) },
+                    { label: "Updated", value: formatBoardDate(ticket.updatedAt) },
+                  ]}
                 />
-              ) : (
-                <p className="mt-2 text-xs text-[var(--bb-text-tertiary)]">
-                  No description was provided for this ticket.
-                </p>
-              )}
-            </div>
+              </Card>
 
-            {/* Meta */}
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-3 shadow-sm">
-                <h3 className="text-xs font-semibold tracking-[0.18em] text-[var(--bb-text-muted)] uppercase">
-                  Project & job
-                </h3>
-                <div className="mt-2 space-y-1 text-xs text-[var(--bb-text-secondary)]">
-                  <p>
-                    Project:{" "}
-                    <span className="font-semibold text-[var(--bb-secondary)]">
-                      {ticket.project?.name || "—"}
-                    </span>
-                  </p>
-                  <p>
-                    Project code:{" "}
-                    <span className="font-semibold text-[var(--bb-secondary)]">
-                      {ticket.project?.code || "—"}
-                    </span>
-                  </p>
-                  <p>
-                    Job type:{" "}
-                    <span className="font-semibold text-[var(--bb-secondary)]">
-                      {ticket.jobType?.name || "—"}
-                    </span>
-                  </p>
-                  <p>
-                    Creative payout:{" "}
-                    <span className="font-semibold text-[var(--bb-secondary)]">
-                      {ticket.effectivePayout != null
-                        ? ticket.payoutPercent != null
-                          ? `${ticket.effectivePayout} tokens (${ticket.payoutPercent}% of ${ticket.jobType ? ticket.jobType.tokenCost * ticket.quantity : "—"})`
-                          : `${ticket.effectivePayout} tokens`
-                        : "—"}
-                    </span>
-                  </p>
-                  {ticket.quantity > 1 && (
-                    <p>
-                      Quantity:{" "}
-                      <span className="font-semibold text-[var(--bb-secondary)]">
-                        ×{ticket.quantity}
-                      </span>
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Brand guide — pulled from the project so creatives see the
-                  customer's brand without hunting. Only rendered when at
-                  least one field is set. */}
-              {ticket.project &&
-                (ticket.project.brandLogoUrl ||
-                  ticket.project.brandColors ||
-                  ticket.project.brandFonts ||
-                  ticket.project.brandVoice) && (
-                  <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-3 shadow-sm">
-                    <h3 className="text-xs font-semibold tracking-[0.18em] text-[var(--bb-text-muted)] uppercase">
-                      Brand guide
-                    </h3>
-                    <div className="mt-2 space-y-2 text-xs text-[var(--bb-text-secondary)]">
-                      {ticket.project.brandLogoUrl && (
-                        <div>
-                          <p className="text-[11px] text-[var(--bb-text-tertiary)]">Logo</p>
-                          <a
-                            href={ticket.project.brandLogoUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="break-all text-[var(--bb-primary)] hover:underline"
-                          >
-                            {ticket.project.brandLogoUrl}
-                          </a>
-                        </div>
-                      )}
-                      {ticket.project.brandColors && (
-                        <div>
-                          <p className="text-[11px] text-[var(--bb-text-tertiary)]">Colors</p>
-                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                            {ticket.project.brandColors
-                              .split(",")
-                              .map((c) => c.trim())
-                              .filter(Boolean)
-                              .map((c) => (
-                                <span
-                                  key={c}
-                                  className="flex items-center gap-1 rounded-full border border-[var(--bb-border-subtle)] bg-white px-2 py-0.5 font-mono text-[10px]"
-                                >
-                                  <span
-                                    className="h-3 w-3 rounded-full border border-[var(--bb-border-subtle)]"
-                                    style={{ backgroundColor: c }}
-                                    aria-hidden="true"
-                                  />
-                                  {c}
-                                </span>
-                              ))}
-                          </div>
-                        </div>
-                      )}
-                      {ticket.project.brandFonts && (
-                        <div>
-                          <p className="text-[11px] text-[var(--bb-text-tertiary)]">Fonts</p>
-                          <p className="font-semibold text-[var(--bb-secondary)]">
-                            {ticket.project.brandFonts}
-                          </p>
-                        </div>
-                      )}
-                      {ticket.project.brandVoice && (
-                        <div>
-                          <p className="text-[11px] text-[var(--bb-text-tertiary)]">Voice / tone</p>
-                          <p className="whitespace-pre-wrap">{ticket.project.brandVoice}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-              <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-3 shadow-sm">
-                <h3 className="text-xs font-semibold tracking-[0.18em] text-[var(--bb-text-muted)] uppercase">
-                  Dates
-                </h3>
-                <div className="mt-2 space-y-1 text-xs text-[var(--bb-text-secondary)]">
-                  <p>
-                    Created:{" "}
-                    <span className="font-semibold text-[var(--bb-secondary)]">
-                      {formatDateTime(ticket.createdAt)}
-                    </span>
-                  </p>
-                  <p>
-                    Last updated:{" "}
-                    <span className="font-semibold text-[var(--bb-secondary)]">
-                      {formatDateTime(ticket.updatedAt)}
-                    </span>
-                  </p>
-                  <p>
-                    Due date:{" "}
-                    <span className="font-semibold text-[var(--bb-secondary)]">
-                      {formatBoardDate(ticket.dueDate)}
-                    </span>
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Brief attachments */}
-            {!briefAssetsLoading && briefAssets.length > 0 && (
-              <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
-                <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">
-                  Brief attachments
-                </h2>
-                <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-                  Reference files provided by the customer.
-                </p>
-                <BriefThumbnailRow assets={briefAssets} />
-              </div>
-            )}
-
-            {/* Time tracking */}
-            {data && (
-              <TimeTrackingPanel
-                ticketId={data.ticket.id}
-                estimatedHours={data.ticket.jobType?.estimatedHours ?? null}
-              />
-            )}
-
-            {/* Revision history */}
-            <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">
-                  Revision history
-                </h2>
-                {revisions && revisions.length >= 2 && (
-                  <button
-                    type="button"
-                    onClick={() => setShowCompare(true)}
-                    className="inline-flex items-center gap-1 rounded-full border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-2.5 py-1 text-[11px] font-medium text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-primary)] hover:bg-[var(--bb-primary-light)] hover:text-[var(--bb-primary)]"
-                  >
-                    &#8596; Compare
-                  </button>
-                )}
-              </div>
-
-              {revisionsLoading && (
-                <p className="mt-2 text-xs text-[var(--bb-text-tertiary)]">
-                  Loading revision history…
-                </p>
-              )}
-
-              {!revisionsLoading && revisionsError && (
-                <InlineAlert variant="error" size="sm" className="mt-2">
-                  {revisionsError}
-                </InlineAlert>
-              )}
-
-              {!revisionsLoading && !revisionsError && (!revisions || revisions.length === 0) && (
-                <div className="mt-2">
-                  <EmptyState
-                    title="No revisions yet."
-                    description="Revisions will appear here once this ticket has been submitted for review."
-                  />
-                </div>
-              )}
-
-              {!revisionsLoading && !revisionsError && revisions && revisions.length > 0 && (
-                <div className="mt-3 space-y-3">
-                  {[...revisions].reverse().map((rev, idx) => {
-                    const isLatest = idx === 0;
-                    const totalOpen = rev.assets.reduce((sum, a) => sum + (a.openPins ?? 0), 0);
-                    const totalResolved = rev.assets.reduce(
-                      (sum, a) => sum + (a.resolvedPins ?? 0),
-                      0,
-                    );
-                    const totalBytes = rev.assets.reduce((sum, a) => sum + (a.bytes ?? 0), 0);
-                    const assetEntries: AssetEntry[] = rev.assets.map((a) => ({
-                      id: a.id,
-                      url: a.url,
-                      originalName: a.originalName,
-                      pinCount: a.pinCount,
-                    }));
-
-                    return (
-                      <div
-                        key={rev.version}
-                        className={`rounded-xl px-3 py-3 text-xs ${
-                          isLatest
-                            ? "border border-[var(--bb-primary)]/20 bg-[var(--bb-primary)]/[0.03]"
-                            : "bg-[var(--bb-bg-card)]"
-                        }`}
-                      >
-                        {/* Revision header */}
-                        <div className="flex items-center gap-2">
-                          <p className="text-xs font-semibold text-[var(--bb-secondary)]">
-                            Version v{rev.version}
-                          </p>
-                          {isLatest && (
-                            <span className="rounded-full bg-[var(--bb-primary)] px-2 py-0.5 text-[9px] font-bold tracking-wider text-white uppercase">
-                              Current
-                            </span>
-                          )}
-                          {rev.assets.length > 0 && (
-                            <span className="text-[var(--bb-text-tertiary)]">
-                              · {rev.assets.length} file{rev.assets.length !== 1 ? "s" : ""}
-                              {totalBytes > 0 && ` · ${formatBytes(totalBytes)}`}
-                            </span>
-                          )}
-                          {(totalOpen > 0 || totalResolved > 0) && (
-                            <span className="flex items-center gap-1.5 text-[var(--bb-text-tertiary)]">
-                              ·
-                              {totalOpen > 0 && (
-                                <span className="flex items-center gap-0.5">
-                                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--bb-primary)]" />
-                                  {totalOpen} open
-                                </span>
-                              )}
-                              {totalResolved > 0 && (
-                                <span className="flex items-center gap-0.5">
-                                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#32b37b]" />
-                                  {totalResolved} resolved
-                                </span>
-                              )}
-                            </span>
-                          )}
-                        </div>
-
-                        {rev.submittedAt && (
-                          <p className="mt-1 text-[var(--bb-text-secondary)]">
-                            You sent this version for review on{" "}
-                            <span className="font-semibold text-[var(--bb-secondary)]">
-                              {formatBoardDate(rev.submittedAt)}
-                            </span>
-                            .
-                          </p>
-                        )}
-                        {rev.feedbackAt && (
-                          <p className="text-[var(--bb-text-secondary)]">
-                            Customer requested changes on{" "}
-                            <span className="font-semibold text-[var(--bb-secondary)]">
-                              {formatBoardDate(rev.feedbackAt)}
-                            </span>
-                            .
-                          </p>
-                        )}
-
-                        {rev.creativeMessage && (
-                          <p className="mt-1 text-[var(--bb-secondary)]">
-                            <span className="font-semibold">Your note:</span>{" "}
-                            <span className="italic">&ldquo;{rev.creativeMessage}&rdquo;</span>
-                          </p>
-                        )}
-
-                        {rev.feedbackMessage && (
-                          <p className="mt-1 text-[var(--bb-text-secondary)]">
-                            <span className="font-semibold">Customer feedback:</span>{" "}
-                            <span className="italic">&ldquo;{rev.feedbackMessage}&rdquo;</span>
-                          </p>
-                        )}
-
-                        {/* Asset thumbnails */}
-                        {assetEntries.length > 0 && (
-                          <RevisionImageGrid
-                            assets={assetEntries}
-                            pinMode={ticket.status === "IN_PROGRESS" ? "resolve" : "view"}
-                            ticketId={ticket.id}
-                          />
-                        )}
-
-                        {/* Download all button */}
-                        {assetEntries.length >= 2 && (
-                          <div className="mt-2">
-                            <DownloadAllButton
-                              assets={assetEntries}
-                              zipFilename={`${ticketCode || ticket.id}-v${rev.version}`}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </section>
-
-          {/* Right: comments + people */}
-          <section className="space-y-4">
-            <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-3 shadow-sm">
-              <h3 className="text-xs font-semibold tracking-[0.18em] text-[var(--bb-text-muted)] uppercase">
-                Comments
-              </h3>
-
-              {commentsError && (
-                <InlineAlert variant="error" size="sm" className="mt-2">
-                  {commentsError}
-                </InlineAlert>
-              )}
-
-              <div className="mt-2 max-h-60 space-y-2 overflow-y-auto pr-1">
-                {commentsLoading && (
-                  <p className="text-xs text-[var(--bb-text-tertiary)]">Loading comments…</p>
-                )}
-                {!commentsLoading && !commentsError && (comments?.length ?? 0) === 0 && (
-                  <EmptyState
-                    title="No comments yet."
-                    description="Use the form below to coordinate with the customer or Brandbite team."
-                  />
-                )}
-                {!commentsLoading &&
-                  !commentsError &&
-                  (comments?.length ?? 0) > 0 &&
-                  comments!.map((c) => (
-                    <div key={c.id} className="rounded-lg bg-[var(--bb-bg-card)] px-3 py-2 text-xs">
-                      <div className="mb-1 flex items-center justify-between">
-                        <span className="font-semibold text-[var(--bb-secondary)]">
-                          {c.author.name || c.author.email}
-                        </span>
-                        <span className="text-xs text-[var(--bb-text-tertiary)]">
-                          {formatDateTime(c.createdAt)}
-                        </span>
-                      </div>
-                      <p className="whitespace-pre-wrap text-[var(--bb-secondary)]">{c.body}</p>
-                    </div>
-                  ))}
-              </div>
-
-              <div className="mt-3 border-t border-[var(--bb-border-subtle)] pt-3">
-                <label className="mb-1 block text-xs font-medium text-[var(--bb-secondary)]">
-                  Add a comment
-                </label>
-                <FormTextarea
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  rows={3}
-                  placeholder="Share updates, questions, or next steps with the customer."
-                />
-                <div className="mt-2 flex items-center justify-between">
-                  <p className="text-xs text-[var(--bb-text-tertiary)]">
-                    Comments are visible to the customer and Brandbite admins.
-                  </p>
+              <Card>
+                <h2 className="mb-2 text-xl leading-7 font-semibold">Quick links</h2>
+                <div className="flex flex-col items-stretch">
                   <Button
-                    size="sm"
-                    disabled={!newComment.trim() || !ticketIdFromData}
-                    loading={submittingComment}
-                    loadingText="Sending…"
-                    onClick={handleSubmitComment}
+                    variant="ghost"
+                    className="!justify-start"
+                    onClick={() => setTab("brief")}
                   >
-                    Add comment
+                    View brief
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="!justify-start"
+                    onClick={() => setTab("brief")}
+                  >
+                    Reference files ({briefAssets.length})
                   </Button>
                 </div>
-              </div>
-            </div>
+              </Card>
+            </>
+          }
+        >
+          {tab === "delivery" ? (
+            <TabPanel idPrefix={TAB_PREFIX} value="delivery">
+              <div className="space-y-4">
+                {revisionsError ? (
+                  <Callout tone="error" title="We couldn't load your versions">
+                    {revisionsError}
+                  </Callout>
+                ) : revisions === null || (revisionsLoading && newestFirst.length === 0) ? (
+                  <Skeleton className="h-64" />
+                ) : latest ? (
+                  <>
+                    <CurrentVersionCard
+                      version={latest}
+                      pinMode={pinMode}
+                      ticketId={ticket.id}
+                      zipFilename={zipFor(latest.version)}
+                      copy={versionCopy}
+                    />
+                    {newestFirst.length > 1 ? (
+                      <>
+                        <VersionsHeading
+                          title="Previous versions"
+                          count={newestFirst.length}
+                          onCompare={() => setShowCompare(true)}
+                        />
+                        {newestFirst.slice(1).map((rev) => (
+                          <CollapsedVersion
+                            key={rev.version}
+                            version={rev}
+                            pinMode={pinMode}
+                            ticketId={ticket.id}
+                            zipFilename={zipFor(rev.version)}
+                            copy={versionCopy}
+                          />
+                        ))}
+                      </>
+                    ) : null}
+                  </>
+                ) : (
+                  <Card>
+                    <EmptyState
+                      title="No versions yet"
+                      description="Versions appear here once you've sent this job for review."
+                    />
+                  </Card>
+                )}
 
-            <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-3 shadow-sm">
-              <h3 className="text-xs font-semibold tracking-[0.18em] text-[var(--bb-text-muted)] uppercase">
-                People
-              </h3>
-              <div className="mt-2 space-y-2 text-xs text-[var(--bb-text-secondary)]">
-                <div>
-                  <p className="font-semibold text-[var(--bb-secondary)]">Customer requester</p>
-                  <p>{ticket.createdBy?.name || ticket.createdBy?.email || "—"}</p>
-                </div>
-                <div>
-                  <p className="mt-2 font-semibold text-[var(--bb-secondary)]">Creative</p>
-                  <p>{ticket.creative?.name || ticket.creative?.email || "—"}</p>
-                </div>
+                {ticket.status === "IN_PROGRESS" ? (
+                  <DeliveryForm
+                    ticketId={ticket.id}
+                    onSent={() => setRefreshCounter((c) => c + 1)}
+                  />
+                ) : ticket.status === "TODO" ? (
+                  <Callout tone="info" title="Start work to send a version">
+                    You can upload files and send them for review once this job is In progress.
+                  </Callout>
+                ) : ticket.status === "IN_REVIEW" ? (
+                  <Callout tone="info" title="This version is with the customer">
+                    They can approve it or request a revision. Pull it back if you need to change
+                    something first.
+                  </Callout>
+                ) : null}
               </div>
-            </div>
-          </section>
-        </div>
-      )}
+            </TabPanel>
+          ) : null}
 
-      {!error && !ticket && (
-        <InlineAlert variant="warning">Ticket could not be loaded.</InlineAlert>
-      )}
+          {tab === "brief" ? (
+            <TabPanel idPrefix={TAB_PREFIX} value="brief">
+              <div className="space-y-4">
+                <Card>
+                  <h2 className="text-xl leading-7 font-semibold">Brief</h2>
+                  {ticket.description ? (
+                    <SafeHtml html={ticket.description} className="mt-2 text-base" />
+                  ) : (
+                    <p className="mt-2 text-sm text-[var(--av2-text-2)]">
+                      No description was provided for this job.
+                    </p>
+                  )}
+
+                  <div className="mt-6 border-t border-[var(--av2-border)] pt-5">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                      <Eyebrow>
+                        Reference files{briefAssets.length > 0 ? ` (${briefAssets.length})` : ""}
+                      </Eyebrow>
+                      <DownloadFilesButton
+                        assets={briefAssets}
+                        zipFilename={`${ticketCode || ticket.id}-brief`}
+                      />
+                    </div>
+                    {briefAssetsLoading ? (
+                      <Skeleton className="h-44" />
+                    ) : briefAssets.length > 0 ? (
+                      <FilePreviews assets={briefAssets} />
+                    ) : (
+                      <p className="text-sm text-[var(--av2-text-2)]">
+                        The customer didn&apos;t attach any reference files.
+                      </p>
+                    )}
+                  </div>
+                </Card>
+
+                {/* Brand guide: pulled from the project so creatives see the
+                    customer's brand without hunting. */}
+                {project && hasBrandGuide ? (
+                  <Card>
+                    <h2 className="mb-4 text-xl leading-7 font-semibold">Brand guide</h2>
+                    <KeyValueList
+                      rows={[
+                        ...(project.brandLogoUrl
+                          ? [
+                              {
+                                label: "Logo",
+                                value: (
+                                  <a
+                                    href={project.brandLogoUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="break-all text-[var(--av2-link)] hover:underline"
+                                  >
+                                    {project.brandLogoUrl}
+                                  </a>
+                                ),
+                              },
+                            ]
+                          : []),
+                        ...(project.brandColors
+                          ? [
+                              {
+                                label: "Colors",
+                                value: (
+                                  <span className="flex flex-wrap gap-1.5">
+                                    {project.brandColors
+                                      .split(",")
+                                      .map((c) => c.trim())
+                                      .filter(Boolean)
+                                      .map((c) => (
+                                        <span
+                                          key={c}
+                                          className="inline-flex items-center gap-1.5 rounded-full border border-[var(--av2-border)] px-2 py-0.5 font-mono text-xs font-normal"
+                                        >
+                                          <span
+                                            aria-hidden
+                                            className="h-3 w-3 rounded-full border border-[var(--av2-border)]"
+                                            style={{ backgroundColor: c }}
+                                          />
+                                          {c}
+                                        </span>
+                                      ))}
+                                  </span>
+                                ),
+                              },
+                            ]
+                          : []),
+                        ...(project.brandFonts
+                          ? [{ label: "Fonts", value: project.brandFonts }]
+                          : []),
+                        ...(project.brandVoice
+                          ? [
+                              {
+                                label: "Voice / tone",
+                                value: (
+                                  <span className="font-normal whitespace-pre-wrap">
+                                    {project.brandVoice}
+                                  </span>
+                                ),
+                              },
+                            ]
+                          : []),
+                      ]}
+                    />
+                  </Card>
+                ) : null}
+              </div>
+            </TabPanel>
+          ) : null}
+
+          {tab === "time" ? (
+            <TabPanel idPrefix={TAB_PREFIX} value="time">
+              <TimeEntriesPanel tracking={tracking} />
+            </TabPanel>
+          ) : null}
+
+          {tab === "comments" ? (
+            <TabPanel idPrefix={TAB_PREFIX} value="comments">
+              <CommentsPanel
+                comments={comments}
+                loading={commentsLoading}
+                error={commentsError}
+                value={newComment}
+                onChange={setNewComment}
+                onSubmit={handleSubmitComment}
+                submitting={submittingComment}
+                placeholder="Share updates, questions, or next steps with the customer."
+                visibilityNote="Comments are visible to the customer and brandbite admins."
+                emptyDescription="Use the form below to coordinate with the customer or brandbite team."
+              />
+            </TabPanel>
+          ) : null}
+        </DetailColumns>
+      </div>
 
       {/* Revision comparison overlay */}
       {showCompare && revisions && revisions.length >= 2 && (
@@ -921,30 +850,6 @@ export default function CreativeTicketDetailPage() {
           onClose={() => setShowCompare(false)}
         />
       )}
-    </>
-  );
-}
-
-function TicketDetailSkeleton() {
-  return (
-    <>
-      <div className="mb-4 h-6 w-64 animate-pulse rounded bg-[var(--bb-border)]" />
-      <div className="mb-2 h-3 w-40 animate-pulse rounded bg-[var(--bb-border)]" />
-      <div className="mb-6 h-3 w-32 animate-pulse rounded bg-[var(--bb-border)]" />
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="space-y-4 md:col-span-2">
-          <div className="h-32 animate-pulse rounded-2xl bg-[var(--bb-bg-page)]" />
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="h-32 animate-pulse rounded-2xl bg-[var(--bb-bg-page)]" />
-            <div className="h-32 animate-pulse rounded-2xl bg-[var(--bb-bg-page)]" />
-          </div>
-          <div className="h-40 animate-pulse rounded-2xl bg-[var(--bb-bg-page)]" />
-        </div>
-        <div className="space-y-4">
-          <div className="h-40 animate-pulse rounded-2xl bg-[var(--bb-bg-page)]" />
-          <div className="h-32 animate-pulse rounded-2xl bg-[var(--bb-bg-page)]" />
-        </div>
-      </div>
     </>
   );
 }

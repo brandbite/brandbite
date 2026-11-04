@@ -857,7 +857,7 @@ export default function AdminConsultationSettingsPage() {
                       <div className="mt-3 space-y-3">
                         <p className="text-sm text-[var(--av2-text-2)]">
                           Connect the team Gmail to auto-schedule bookings. When a customer submits:
-                          Brandbite creates a calendar event with a Google Meet link, invites the
+                          brandbite creates a calendar event with a Google Meet link, invites the
                           customer, and the event lands on your team calendar automatically.
                         </p>
                         <a
@@ -868,7 +868,7 @@ export default function AdminConsultationSettingsPage() {
                         </a>
                         <p className="text-xs text-[var(--av2-text-2)]">
                           You&apos;ll be redirected to Google to grant calendar.events and
-                          calendar.freebusy scopes. Brandbite stores the refresh token and uses it
+                          calendar.freebusy scopes. brandbite stores the refresh token and uses it
                           on your behalf.
                         </p>
                       </div>

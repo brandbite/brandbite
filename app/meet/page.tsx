@@ -16,9 +16,9 @@ import { MeetingBooking, VideoIcon } from "@/components/marketing/meeting-bookin
 import "@/components/marketing/meet.css";
 
 export const metadata: Metadata = {
-  title: "Meet Brandbite",
+  title: "Meet brandbite",
   description:
-    "Book a free 30-minute video call to talk through your brand and see how Brandbite can help.",
+    "Book a free 30-minute video call to talk through your brand and see how brandbite can help.",
 };
 
 const GUTTER = "px-14 max-[1179px]:px-8 max-[767px]:px-4";

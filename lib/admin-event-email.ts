@@ -138,7 +138,7 @@ function shell(title: string, body: string): string {
     body,
     "</div>",
     '<div style="background:#faf9f7;padding:14px 24px;border-radius:0 0 12px 12px;border:1px solid #e3e1dc;border-top:none;">',
-    '<p style="margin:0;font-size:11px;color:#9a9892;">Sent automatically because you\'re a Brandbite SITE_OWNER. Mute everything via /admin/settings → ADMIN_EVENT_EMAILS_ENABLED.</p>',
+    '<p style="margin:0;font-size:11px;color:#9a9892;">Sent automatically because you\'re a brandbite SITE_OWNER. Mute everything via /admin/settings → ADMIN_EVENT_EMAILS_ENABLED.</p>',
     "</div></div>",
   ].join("");
 }
@@ -170,7 +170,7 @@ function render(event: AdminEvent): Rendered {
         PRAISE: "Praise",
         QUESTION: "Question",
       }[event.type];
-      const subject = `[Brandbite] New ${typeLabel.toLowerCase()} from ${event.submitterEmail}`;
+      const subject = `[brandbite] New ${typeLabel.toLowerCase()} from ${event.submitterEmail}`;
       const body = [
         `<p style="font-size:13px;color:#424143;margin:0 0 6px;"><strong>${typeLabel}</strong> from ${escapeHtml(event.submitterEmail)} (${escapeHtml(event.submitterRole)})</p>`,
         event.subject
@@ -186,7 +186,7 @@ function render(event: AdminEvent): Rendered {
     }
 
     case "NEW_TICKET": {
-      const subject = `[Brandbite] New ticket: ${event.title}`;
+      const subject = `[brandbite] New ticket: ${event.title}`;
       const body = [
         `<p style="font-size:13px;color:#424143;margin:0 0 6px;"><strong>${escapeHtml(event.companyName)}</strong> opened a new task.</p>`,
         `<p style="font-size:14px;color:#1f2126;margin:8px 0 4px;font-weight:600;">${escapeHtml(event.title)}</p>`,
@@ -197,7 +197,7 @@ function render(event: AdminEvent): Rendered {
     }
 
     case "NEW_COMPANY": {
-      const subject = `[Brandbite] New company signed up: ${event.companyName}`;
+      const subject = `[brandbite] New company signed up: ${event.companyName}`;
       const body = [
         `<p style="font-size:13px;color:#424143;margin:0 0 6px;">A new customer just finished onboarding.</p>`,
         `<p style="font-size:14px;color:#1f2126;margin:8px 0 4px;font-weight:600;">${escapeHtml(event.companyName)}</p>`,
@@ -208,7 +208,7 @@ function render(event: AdminEvent): Rendered {
     }
 
     case "NEW_PAYMENT": {
-      const subject = `[Brandbite] Payment received: ${event.amountFormatted}`;
+      const subject = `[brandbite] Payment received: ${event.amountFormatted}`;
       const body = [
         `<p style="font-size:13px;color:#424143;margin:0 0 6px;"><strong>${escapeHtml(event.companyName)}</strong> just paid.</p>`,
         `<p style="font-size:14px;color:#1f2126;margin:8px 0 4px;font-weight:600;">${escapeHtml(event.amountFormatted)}${event.planName ? ` · ${escapeHtml(event.planName)}` : ""}</p>`,
@@ -221,7 +221,7 @@ function render(event: AdminEvent): Rendered {
     }
 
     case "NEW_TALENT_APPLICATION": {
-      const subject = `[Brandbite] New talent application from ${event.candidateName}`;
+      const subject = `[brandbite] New talent application from ${event.candidateName}`;
       const body = [
         `<p style="font-size:13px;color:#424143;margin:0 0 6px;">A new candidate applied at /talent.</p>`,
         `<p style="font-size:14px;color:#1f2126;margin:8px 0 4px;font-weight:600;">${escapeHtml(event.candidateName)}</p>`,
@@ -232,7 +232,7 @@ function render(event: AdminEvent): Rendered {
     }
 
     case "NEW_WITHDRAWAL_REQUEST": {
-      const subject = `[Brandbite] Withdrawal request: ${event.amountTokens.toLocaleString()} tokens`;
+      const subject = `[brandbite] Withdrawal request: ${event.amountTokens.toLocaleString()} tokens`;
       const body = [
         `<p style="font-size:13px;color:#424143;margin:0 0 6px;"><strong>${escapeHtml(event.creativeEmail)}</strong> requested a payout.</p>`,
         `<p style="font-size:14px;color:#1f2126;margin:8px 0 4px;font-weight:600;">${event.amountTokens.toLocaleString()} tokens</p>`,
@@ -242,7 +242,7 @@ function render(event: AdminEvent): Rendered {
     }
 
     case "NEW_CONTACT_MESSAGE": {
-      const subject = `[Brandbite] New contact message from ${event.name}`;
+      const subject = `[brandbite] New contact message from ${event.name}`;
       const metaLine = [event.email, event.company, event.topic]
         .filter(Boolean)
         .map((v) => escapeHtml(v as string))
@@ -259,7 +259,7 @@ function render(event: AdminEvent): Rendered {
     }
 
     case "GOOGLE_CALENDAR_DISCONNECTED": {
-      const subject = `[Brandbite] Google Calendar connection BROKEN — bookings can't be scheduled`;
+      const subject = `[brandbite] Google Calendar connection BROKEN — bookings can't be scheduled`;
       const body = [
         `<p style="font-size:13px;color:#424143;margin:0 0 6px;">Google permanently rejected the stored refresh token (revoked, expired, or the account password was reset). Until someone reconnects, consultation bookings and talent interview bookings cannot create calendar events.</p>`,
         event.googleAccountEmail

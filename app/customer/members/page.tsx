@@ -1,21 +1,44 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/members/page.tsx
-// @purpose: Customer-facing company members & roles overview + invite form + pending invites
-// @version: v1.5.0
-// @status: active
-// @lastUpdate: 2025-11-17
+// @purpose: Customer-facing company members & roles: invite form, member list with
+//           a selected-member role panel, and pending invites.
 // -----------------------------------------------------------------------------
 
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import type { CompanyRole as CompanyRoleString } from "@/lib/permissions/companyRoles";
-import { EmptyState } from "@/components/ui/empty-state";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import { useToast } from "@/components/ui/toast-provider";
-import { Button } from "@/components/ui/button";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
+import { IconUsers } from "@/components/admin/v2/icons";
+import {
+  Avatar,
+  Badge,
+  Button,
+  Callout,
+  Card,
+  DetailPanel,
+  EmptyState,
+  Field,
+  IconTile,
+  PageHeader,
+  PanelSection,
+  SearchInput,
+  Select,
+  Skeleton,
+  SplitView,
+  Table,
+  TableFooter,
+  Tabs,
+  TabPanel,
+  Td,
+  TextInput,
+  Th,
+  Tr,
+} from "@/components/admin/v2/ui";
+import { ListPager } from "@/components/dashboard/account/account-ui";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { FormInput, FormSelect } from "@/components/ui/form-field";
+import { useToast } from "@/components/ui/toast-provider";
+import type { CompanyRole as CompanyRoleString } from "@/lib/permissions/companyRoles";
 
 type CompanyMembersResponse = {
   company: {
@@ -24,14 +47,7 @@ type CompanyMembersResponse = {
     slug: string;
   };
   currentUserId: string;
-  members: {
-    id: string;
-    userId: string;
-    name: string | null;
-    email: string;
-    roleInCompany: CompanyRoleString;
-    joinedAt: string;
-  }[];
+  members: Member[];
   pendingInvites: {
     id: string;
     email: string;
@@ -45,10 +61,36 @@ type CompanyMembersResponse = {
   }[];
 };
 
+type Member = {
+  id: string;
+  userId: string;
+  name: string | null;
+  email: string;
+  roleInCompany: CompanyRoleString;
+  joinedAt: string;
+};
+
 type ViewState =
   | { status: "loading" }
   | { status: "error"; message: string }
   | { status: "ready"; data: CompanyMembersResponse };
+
+type MembersTab = "members" | "invites";
+
+const PAGE_SIZE = 10;
+const ALL_ROLES = "ALL";
+const TAB_PREFIX = "members";
+
+/** What each role can do, from lib/permissions/companyRoles. */
+const ROLE_DESCRIPTIONS: Record<CompanyRoleString, string> = {
+  OWNER:
+    "Full access: members and invites, the company profile, projects, tags, requests, and the plan and billing.",
+  PM: "Manages members and invites, the company profile, projects and tags, and creates and edits requests. Can't manage the plan or billing.",
+  BILLING:
+    "Manages the plan, billing and token top-ups. Can see requests but can't create, edit or move them.",
+  MEMBER:
+    "Creates and edits requests and moves them on the board. Can't manage members, the company profile or billing.",
+};
 
 export default function CustomerMembersPage() {
   const { showToast } = useToast();
@@ -76,6 +118,15 @@ export default function CustomerMembersPage() {
     id: string;
     name: string;
   } | null>(null);
+
+  // List state
+  const [tab, setTab] = useState<MembersTab>("members");
+  const [query, setQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState<string>(ALL_ROLES);
+  const [page, setPage] = useState(1);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [draftRole, setDraftRole] = useState<CompanyRoleString | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -129,8 +180,8 @@ export default function CustomerMembersPage() {
 
   const data = state.status === "ready" ? state.data : null;
   const company = data?.company ?? null;
-  const members = data?.members ?? [];
-  const pendingInvites = data?.pendingInvites ?? [];
+  const members = useMemo(() => data?.members ?? [], [data]);
+  const pendingInvites = useMemo(() => data?.pendingInvites ?? [], [data]);
   const currentUserId = data?.currentUserId ?? "";
 
   const currentMember = useMemo(
@@ -138,8 +189,8 @@ export default function CustomerMembersPage() {
     [members, currentUserId],
   );
   const currentUserRole = currentMember?.roleInCompany ?? null;
-
-  const canManageMembersUI = currentUserRole === "OWNER" || currentUserRole === "PM";
+  const isActorOwner = currentUserRole === "OWNER";
+  const canManageMembersUI = isActorOwner || currentUserRole === "PM";
 
   const sortedMembers = useMemo(() => {
     if (!members.length) return [];
@@ -154,6 +205,63 @@ export default function CustomerMembersPage() {
     if (!pendingInvites.length) return [];
     return [...pendingInvites].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   }, [pendingInvites]);
+
+  const filteredMembers = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return sortedMembers.filter((m) => {
+      if (roleFilter !== ALL_ROLES && m.roleInCompany !== roleFilter) return false;
+      if (!q) return true;
+      return m.email.toLowerCase().includes(q) || (m.name ?? "").toLowerCase().includes(q);
+    });
+  }, [sortedMembers, query, roleFilter]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredMembers.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount);
+  const pageStart = (safePage - 1) * PAGE_SIZE;
+  const visibleMembers = filteredMembers.slice(pageStart, pageStart + PAGE_SIZE);
+
+  const selected = members.find((m) => m.id === selectedId) ?? null;
+  const selectedIsYou = selected?.userId === currentUserId;
+  const canEditSelected =
+    !!selected && canManageMembersUI && (selected.roleInCompany !== "OWNER" || isActorOwner);
+  const roleValue = draftRole ?? selected?.roleInCompany ?? "MEMBER";
+  const roleDirty = !!selected && draftRole !== null && draftRole !== selected.roleInCompany;
+  const selectionFiltered = !!selected && !filteredMembers.some((m) => m.id === selected.id);
+  const filtering = query.trim() !== "" || roleFilter !== ALL_ROLES;
+
+  const confirmDiscard = useUnsavedChanges(roleDirty, "Member role");
+
+  // A filter change always starts again from the first page.
+  useEffect(() => setPage(1), [query, roleFilter]);
+
+  const selectMember = async (id: string) => {
+    if (id === selectedId) return;
+    if (!(await confirmDiscard())) return;
+    setSelectedId(id);
+    setDraftRole(null);
+    setMemberActionError(null);
+    // The panel stacks under the list on small screens.
+    requestAnimationFrame(() => panelRef.current?.scrollIntoView?.({ block: "nearest" }));
+  };
+
+  const closePanel = async () => {
+    if (!(await confirmDiscard())) return;
+    setSelectedId(null);
+    setDraftRole(null);
+  };
+
+  const switchTab = async (next: MembersTab) => {
+    if (next === tab) return;
+    // The role panel lives on the members tab.
+    if (!(await confirmDiscard())) return;
+    setDraftRole(null);
+    setTab(next);
+  };
+
+  const clearFilters = () => {
+    setQuery("");
+    setRoleFilter(ALL_ROLES);
+  };
 
   // ---------------------------------------------------------------------------
   // Invite form handler
@@ -275,6 +383,7 @@ export default function CustomerMembersPage() {
       }
 
       showToast({ type: "success", title: "Member role updated." });
+      setDraftRole(null);
       await refreshMembers();
     } catch (error) {
       console.error("Member role update error:", error);
@@ -309,6 +418,10 @@ export default function CustomerMembersPage() {
       }
 
       showToast({ type: "success", title: "Member removed." });
+      if (selectedId === memberId) {
+        setSelectedId(null);
+        setDraftRole(null);
+      }
       await refreshMembers();
     } catch (error) {
       console.error("Member removal error:", error);
@@ -346,308 +459,422 @@ export default function CustomerMembersPage() {
     }
   };
 
-  // Skeleton early return (HOOK'lardan sonra)
-  if (state.status === "loading") {
-    return <CustomerMembersSkeleton />;
-  }
-
   const error = state.status === "error" ? state.message : null;
   const isPermissionError =
     !!error && error.toLowerCase().includes("only company owners or project managers");
 
+  const isUpdating = !!selected && updatingMemberId === selected.id;
+  const isRemoving = !!selected && removingMemberId === selected.id;
+
+  // PMs can't grant OWNER (the API refuses it too), so don't offer it.
+  const roleOptions: CompanyRoleString[] = isActorOwner
+    ? ["OWNER", "PM", "MEMBER", "BILLING"]
+    : ["PM", "MEMBER", "BILLING"];
+
+  const panel =
+    tab !== "members" ? undefined : selected ? (
+      <div ref={panelRef} className="scroll-mt-24">
+        <DetailPanel
+          title={selected.name || selected.email}
+          footer={
+            canEditSelected ? (
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="primary"
+                  className="flex-1"
+                  disabled={!roleDirty || isUpdating || isRemoving}
+                  aria-busy={isUpdating || undefined}
+                  onClick={() => {
+                    if (draftRole) void handleMemberRoleChange(selected.id, draftRole);
+                  }}
+                >
+                  {isUpdating ? "Saving…" : "Save changes"}
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (roleDirty) setDraftRole(null);
+                    else void closePanel();
+                  }}
+                  disabled={isUpdating}
+                >
+                  {roleDirty ? "Cancel" : "Close"}
+                </Button>
+              </div>
+            ) : (
+              <Button onClick={() => void closePanel()}>Close</Button>
+            )
+          }
+        >
+          <PanelSection>
+            <p className="text-sm break-words text-[var(--av2-text-2)]">
+              {selected.email}
+              {selectedIsYou ? " (You)" : ""}
+            </p>
+            <p className="mt-1 text-sm text-[var(--av2-text-2)]">
+              Joined {formatDate(selected.joinedAt)}
+            </p>
+          </PanelSection>
+
+          <PanelSection title="Role">
+            {canEditSelected ? (
+              <>
+                <Select
+                  aria-label={`Role for ${selected.name || selected.email}`}
+                  value={roleValue}
+                  disabled={isUpdating || isRemoving}
+                  onChange={(e) => setDraftRole(e.target.value as CompanyRoleString)}
+                >
+                  {roleOptions.map((role) => (
+                    <option key={role} value={role}>
+                      {formatCompanyRole(role)}
+                    </option>
+                  ))}
+                </Select>
+                <p className="mt-1.5 text-xs text-[var(--av2-text-2)]">
+                  Role changes apply after you save.
+                </p>
+              </>
+            ) : (
+              <>
+                <Badge>{formatCompanyRole(selected.roleInCompany)}</Badge>
+                <p className="mt-2 text-sm text-[var(--av2-text-2)]">
+                  Only an owner can change an owner&apos;s role.
+                </p>
+              </>
+            )}
+          </PanelSection>
+
+          <PanelSection title="Role description">
+            <p className="text-sm text-[var(--av2-text-2)]">{ROLE_DESCRIPTIONS[roleValue]}</p>
+          </PanelSection>
+
+          {memberActionError && (
+            <PanelSection>
+              <Callout tone="error" title="That didn't work">
+                {memberActionError}
+              </Callout>
+            </PanelSection>
+          )}
+
+          {canEditSelected && !selectedIsYou && (
+            <PanelSection title="Remove from workspace">
+              <p className="mb-3 text-sm text-[var(--av2-text-2)]">
+                They lose access straight away. To bring them back, invite them again.
+              </p>
+              <Button
+                variant="danger"
+                disabled={isRemoving || isUpdating}
+                onClick={() =>
+                  setMemberToRemove({
+                    id: selected.id,
+                    name: selected.name || selected.email,
+                  })
+                }
+              >
+                {isRemoving ? "Removing…" : "Remove member"}
+              </Button>
+            </PanelSection>
+          )}
+        </DetailPanel>
+      </div>
+    ) : (
+      <div className="hidden xl:block">
+        <Card>
+          <p className="text-base font-semibold">Select a member</p>
+          <p className="mt-1 text-sm text-[var(--av2-text-2)]">
+            Choose someone from the list to see what their role allows and change it.
+          </p>
+        </Card>
+      </div>
+    );
+
   return (
     <>
-      {/* Page header */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Company members</h1>
-          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-            See who is part of your Brandbite workspace and what they can do.
-          </p>
-          {company && (
-            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-              Company:{" "}
-              <span className="font-medium text-[var(--bb-secondary)]">{company.name}</span> (
+      <PageHeader
+        title="Company members"
+        description="See who is part of your brandbite workspace and what they can do."
+        meta={
+          company ? (
+            <>
+              <span className="font-medium text-[var(--av2-text)]">{company.name}</span> (
               {company.slug})
-            </p>
-          )}
-          {currentUserRole && (
-            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-              You are browsing as{" "}
-              <span className="font-medium text-[var(--bb-secondary)]">
-                {formatCompanyRole(currentUserRole)}
-              </span>
-              .
-            </p>
-          )}
-        </div>
-      </div>
+              {currentUserRole && (
+                <>
+                  {" · "}You are browsing as{" "}
+                  <span className="font-medium text-[var(--av2-text)]">
+                    {formatCompanyRole(currentUserRole)}
+                  </span>
+                </>
+              )}
+            </>
+          ) : null
+        }
+      />
 
-      {/* Error state */}
-      {error && (
-        <InlineAlert
-          variant="error"
+      {state.status === "loading" ? (
+        <CustomerMembersSkeleton />
+      ) : error ? (
+        <Callout
+          tone="error"
           title={isPermissionError ? "You don't have access to manage members" : "Error"}
-          className="mb-4"
         >
-          <p>{error}</p>
-          {isPermissionError && (
-            <p className="mt-2 text-xs text-[var(--bb-text-secondary)]">
-              Only company owners and project managers can view and manage the members list and
-              invites for this workspace.
-            </p>
-          )}
-        </InlineAlert>
-      )}
+          {error}
+        </Callout>
+      ) : (
+        <div className="space-y-6">
+          {/* Member action errors reach the panel; without one open, show them here. */}
+          {memberActionError && !selected && <Callout tone="warning">{memberActionError}</Callout>}
 
-      {/* Member action errors */}
-      {memberActionError && !error && (
-        <InlineAlert variant="warning" className="mb-4">
-          {memberActionError}
-        </InlineAlert>
-      )}
+          <Card>
+            <div className="flex items-start gap-4">
+              <IconTile tone="peach" size={44}>
+                <IconUsers />
+              </IconTile>
+              <div className="min-w-0">
+                <h2 className="text-xl leading-7 font-semibold">Invite member</h2>
+                <p className="mt-0.5 text-sm text-[var(--av2-text-2)]">
+                  Send an invite to someone on your team. They will join with the selected role once
+                  they accept the invitation.
+                </p>
+              </div>
+            </div>
 
-      {/* Invite + lists only if we have data (no error) */}
-      {!error && (
-        <>
-          {/* Invite form */}
-          <section className="mt-4 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">
-              Invite a new member
-            </h2>
-            <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
-              Send an invite to someone on your team. They will join with the selected role once
-              they accept the invitation.
-            </p>
-
-            {inviteError && (
-              <InlineAlert variant="error" size="sm" className="mt-3">
-                {inviteError}
-              </InlineAlert>
-            )}
-
-            {inviteSuccess && (
-              <InlineAlert variant="success" size="sm" className="mt-3">
-                {inviteSuccess}
-              </InlineAlert>
-            )}
-
-            {cancelError && (
-              <InlineAlert variant="warning" size="sm" className="mt-3">
-                {cancelError}
-              </InlineAlert>
+            {(inviteError || inviteSuccess || cancelError) && (
+              <div className="mt-4 space-y-2">
+                {inviteError && <Callout tone="error">{inviteError}</Callout>}
+                {inviteSuccess && <Callout tone="success">{inviteSuccess}</Callout>}
+                {cancelError && <Callout tone="warning">{cancelError}</Callout>}
+              </div>
             )}
 
             <form
               onSubmit={handleInviteSubmit}
-              className="mt-3 flex flex-col gap-3 md:flex-row md:items-end"
+              className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,220px)_auto] md:items-end"
             >
-              <div className="flex-1">
-                <label className="text-[11px] font-medium text-[var(--bb-text-secondary)]">
-                  Email
-                </label>
-                <FormInput
+              <Field label="Email" htmlFor="invite-email">
+                <TextInput
+                  id="invite-email"
                   type="email"
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
-                  className="mt-1"
                   placeholder="creative@yourcompany.com"
                   required
                 />
-              </div>
-
-              <div className="w-full md:w-44">
-                <label className="text-[11px] font-medium text-[var(--bb-text-secondary)]">
-                  Role
-                </label>
-                <FormSelect
-                  className="mt-1"
+              </Field>
+              <Field label="Role" htmlFor="invite-role">
+                <Select
+                  id="invite-role"
                   value={inviteRole}
                   onChange={(e) => setInviteRole(e.target.value as CompanyRoleString)}
                 >
                   <option value="MEMBER">Member</option>
                   <option value="PM">Project manager</option>
                   <option value="BILLING">Billing</option>
-                </FormSelect>
-              </div>
-
-              <div className="flex w-full md:w-auto">
-                <Button
-                  type="submit"
-                  loading={inviteStatus === "submitting"}
-                  loadingText="Sending…"
-                  className="mt-2 w-full md:mt-[22px]"
-                >
-                  Send invite
-                </Button>
-              </div>
+                </Select>
+              </Field>
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={inviteStatus === "submitting"}
+                aria-busy={inviteStatus === "submitting" || undefined}
+              >
+                {inviteStatus === "submitting" ? "Sending…" : "Send invite"}
+              </Button>
             </form>
-          </section>
+          </Card>
 
-          {/* Pending invites */}
-          <section className="mt-6">
-            <h2 className="mb-2 text-sm font-semibold text-[var(--bb-secondary)]">
-              Pending invites
-            </h2>
-            <p className="mb-3 text-xs text-[var(--bb-text-secondary)]">
-              These people have been invited but have not joined yet.
-            </p>
+          <Tabs<MembersTab>
+            label="Members and invitations"
+            idPrefix={TAB_PREFIX}
+            value={tab}
+            onChange={(next) => void switchTab(next)}
+            tabs={[
+              {
+                value: "members",
+                label: (
+                  <span className="inline-flex items-center gap-2">
+                    Members{" "}
+                    <Badge tone={tab === "members" ? "peach" : "neutral"}>{members.length}</Badge>
+                  </span>
+                ),
+              },
+              {
+                value: "invites",
+                label: (
+                  <span className="inline-flex items-center gap-2">
+                    Pending invitations{" "}
+                    <Badge tone={tab === "invites" ? "peach" : "neutral"}>
+                      {sortedInvites.length}
+                    </Badge>
+                  </span>
+                ),
+              },
+            ]}
+          />
 
-            {sortedInvites.length === 0 ? (
-              <EmptyState
-                title="No pending invites."
-                description="When you invite someone, they will appear here until they join."
-              />
-            ) : (
-              <div className="grid gap-3 md:grid-cols-2">
-                {sortedInvites.map((invite) => {
-                  const isCanceling = cancelingId === invite.id;
-                  return (
-                    <article
-                      key={invite.id}
-                      className="flex items-center justify-between rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-3 text-sm shadow-sm"
+          {tab === "members" ? (
+            <TabPanel idPrefix={TAB_PREFIX} value="members">
+              <SplitView panel={panel}>
+                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,220px)]">
+                  <SearchInput
+                    value={query}
+                    onChange={setQuery}
+                    placeholder="Search members"
+                    label="Search members"
+                  />
+                  <Select
+                    aria-label="Filter by role"
+                    value={roleFilter}
+                    onChange={(e) => setRoleFilter(e.target.value)}
+                  >
+                    <option value={ALL_ROLES}>All roles</option>
+                    <option value="OWNER">Owner</option>
+                    <option value="PM">Project manager</option>
+                    <option value="BILLING">Billing</option>
+                    <option value="MEMBER">Member</option>
+                  </Select>
+                </div>
+
+                {selectionFiltered && selected && (
+                  <div className="mt-3">
+                    <Callout
+                      tone={roleDirty ? "warning" : "info"}
+                      title={`${selected.name || selected.email} is hidden by this filter`}
+                      action={<Button onClick={clearFilters}>Clear filters</Button>}
                     >
-                      <div>
-                        <p className="flex items-center gap-2 font-semibold text-[var(--bb-secondary)]">
-                          {invite.email}
-                          {invite.expired && (
-                            <span className="rounded-full bg-[var(--bb-danger-bg)] px-2 py-0.5 text-[10px] font-semibold text-[var(--bb-danger-text)]">
-                              Expired
-                            </span>
-                          )}
-                        </p>
-                        <p className="text-[11px] text-[var(--bb-text-secondary)]">
-                          {formatCompanyRole(invite.roleInCompany)} • invited{" "}
-                          {new Date(invite.createdAt).toLocaleDateString(undefined, {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
+                      {roleDirty
+                        ? "Your unsaved role change is still open in the panel. Save or cancel it there."
+                        : "They stay selected in the panel until you choose someone else."}
+                    </Callout>
+                  </div>
+                )}
+
+                <Card padding="none" className="mt-4">
+                  {sortedMembers.length === 0 ? (
+                    <EmptyState title="No members found for this company yet." />
+                  ) : filteredMembers.length === 0 ? (
+                    <EmptyState
+                      title="No members match these filters."
+                      description="Try another name, email or role."
+                      action={<Button onClick={clearFilters}>Clear filters</Button>}
+                    />
+                  ) : (
+                    <>
+                      <Table label="Company members">
+                        <thead>
+                          <tr>
+                            <Th>Member</Th>
+                            <Th className="hidden sm:table-cell">Role</Th>
+                            <Th className="hidden md:table-cell">Joined</Th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {visibleMembers.map((member) => {
+                            const isYou = member.userId === currentUserId;
+                            const name = member.name || "Unnamed member";
+                            return (
+                              <Tr
+                                key={member.id}
+                                selected={member.id === selectedId}
+                                onSelect={() => void selectMember(member.id)}
+                                label={`Select ${name}, ${formatCompanyRole(member.roleInCompany)}`}
+                              >
+                                <Td>
+                                  <div className="flex items-center gap-3">
+                                    <Avatar name={member.name ?? member.email} size={40} />
+                                    <div className="min-w-0">
+                                      <p className="font-semibold break-words">
+                                        {name}
+                                        {isYou && (
+                                          <span className="ml-1 font-medium text-[var(--av2-link)]">
+                                            (You)
+                                          </span>
+                                        )}
+                                      </p>
+                                      <p className="break-all text-[var(--av2-text-2)]">
+                                        {member.email}
+                                      </p>
+                                      <div className="mt-1 sm:hidden">
+                                        <Badge>{formatCompanyRole(member.roleInCompany)}</Badge>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </Td>
+                                <Td className="hidden sm:table-cell">
+                                  <Badge>{formatCompanyRole(member.roleInCompany)}</Badge>
+                                </Td>
+                                <Td className="hidden whitespace-nowrap md:table-cell">
+                                  {formatDate(member.joinedAt)}
+                                </Td>
+                              </Tr>
+                            );
                           })}
-                          {invite.expiresAt && !invite.expired && (
-                            <>
-                              {" • expires "}
-                              {new Date(invite.expiresAt).toLocaleDateString(undefined, {
-                                month: "short",
-                                day: "numeric",
-                              })}
-                            </>
-                          )}
-                        </p>
-                        {invite.invitedByEmail && (
-                          <p className="mt-1 text-[11px] text-[var(--bb-text-tertiary)]">
-                            Invited by {invite.invitedByName || invite.invitedByEmail}
-                          </p>
-                        )}
-                      </div>
-                      <Button
-                        type="button"
-                        variant="danger"
-                        size="sm"
-                        loading={isCanceling}
-                        loadingText="Cancelling…"
-                        onClick={() => setInviteToCancel(invite.id)}
-                      >
-                        Cancel
-                      </Button>
-                    </article>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
-          {/* Members list */}
-          <section className="mt-8 grid gap-4 md:grid-cols-2">
-            {sortedMembers.map((member) => {
-              const isYou = member.userId === currentUserId;
-              const isTargetOwner = member.roleInCompany === "OWNER";
-              const isActorOwner = currentUserRole === "OWNER";
-
-              const canEditThisMember = canManageMembersUI && (!isTargetOwner || isActorOwner);
-              const canRemoveThisMember = canEditThisMember;
-
-              const isUpdating = updatingMemberId === member.id;
-              const isRemoving = removingMemberId === member.id;
-
-              return (
-                <article
-                  key={member.id}
-                  className="flex flex-col rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-3 shadow-sm"
-                >
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--bb-primary)]/10 text-sm font-semibold text-[var(--bb-primary)]">
-                        {initialsForName(member.name ?? member.email)}
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-[var(--bb-secondary)]">
-                          {member.name || "Unnamed member"}
-                          {isYou && (
-                            <span className="ml-1 text-[11px] font-medium text-[var(--bb-primary)]">
-                              (You)
-                            </span>
-                          )}
-                        </p>
-                        <p className="text-xs text-[var(--bb-text-secondary)]">{member.email}</p>
-                      </div>
-                    </div>
-
-                    {canEditThisMember ? (
-                      <select
-                        className="rounded-full border border-[var(--bb-border)] bg-[var(--bb-bg-card)] px-2 py-0.5 text-[11px] font-medium text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]/40"
-                        value={member.roleInCompany}
-                        disabled={isUpdating || isRemoving}
-                        onChange={(e) =>
-                          handleMemberRoleChange(member.id, e.target.value as CompanyRoleString)
-                        }
-                      >
-                        <option value="OWNER">Owner</option>
-                        <option value="PM">Project manager</option>
-                        <option value="MEMBER">Member</option>
-                        <option value="BILLING">Billing</option>
-                      </select>
-                    ) : (
-                      <span className="rounded-full bg-[var(--bb-bg-card)] px-2 py-0.5 text-[11px] font-medium text-[var(--bb-text-secondary)]">
-                        {formatCompanyRole(member.roleInCompany)}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="mt-1 flex items-center justify-between gap-2">
-                    <p className="text-xs text-[var(--bb-text-tertiary)]">
-                      Joined{" "}
-                      {new Date(member.joinedAt).toLocaleDateString(undefined, {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </p>
-
-                    {canRemoveThisMember && !isYou && (
-                      <button
-                        type="button"
-                        disabled={isRemoving || isUpdating}
-                        onClick={() =>
-                          setMemberToRemove({
-                            id: member.id,
-                            name: member.name || member.email,
-                          })
-                        }
-                        className="text-[11px] font-medium text-[var(--bb-danger-text)] hover:text-[var(--bb-danger-text)]"
-                      >
-                        {isRemoving ? "Removing…" : "Remove"}
-                      </button>
-                    )}
-                  </div>
-                </article>
-              );
-            })}
-
-            {sortedMembers.length === 0 && !error && (
-              <EmptyState title="No members found for this company yet." />
-            )}
-          </section>
-        </>
+                        </tbody>
+                      </Table>
+                      <TableFooter>
+                        <span>
+                          Showing {visibleMembers.length} of {filteredMembers.length}
+                          {filtering ? ` (${sortedMembers.length} total)` : ""}
+                        </span>
+                        <ListPager page={safePage} pageCount={pageCount} onPage={setPage} />
+                      </TableFooter>
+                    </>
+                  )}
+                </Card>
+              </SplitView>
+            </TabPanel>
+          ) : (
+            <TabPanel idPrefix={TAB_PREFIX} value="invites">
+              <Card padding="none">
+                {sortedInvites.length === 0 ? (
+                  <EmptyState
+                    title="No pending invites."
+                    description="When you invite someone, they will appear here until they join."
+                  />
+                ) : (
+                  <ul className="divide-y divide-[var(--av2-border)]">
+                    {sortedInvites.map((invite) => {
+                      const isCanceling = cancelingId === invite.id;
+                      return (
+                        <li
+                          key={invite.id}
+                          className="flex flex-wrap items-center justify-between gap-3 px-6 py-4"
+                        >
+                          <div className="min-w-0">
+                            <p className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+                              <span className="min-w-0 break-all">{invite.email}</span>
+                              {invite.expired && <Badge tone="red">Expired</Badge>}
+                            </p>
+                            <p className="mt-0.5 text-sm text-[var(--av2-text-2)]">
+                              {formatCompanyRole(invite.roleInCompany)} · invited{" "}
+                              {formatDate(invite.createdAt)}
+                              {invite.expiresAt && !invite.expired && (
+                                <> · expires {formatDate(invite.expiresAt)}</>
+                              )}
+                            </p>
+                            {invite.invitedByEmail && (
+                              <p className="mt-0.5 text-sm text-[var(--av2-text-2)]">
+                                Invited by {invite.invitedByName || invite.invitedByEmail}
+                              </p>
+                            )}
+                          </div>
+                          <Button
+                            variant="danger"
+                            disabled={isCanceling}
+                            aria-busy={isCanceling || undefined}
+                            onClick={() => setInviteToCancel(invite.id)}
+                          >
+                            {isCanceling ? "Cancelling…" : "Cancel invite"}
+                          </Button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </Card>
+            </TabPanel>
+          )}
+        </div>
       )}
 
       {/* Cancel invite confirmation */}
@@ -678,7 +905,7 @@ export default function CustomerMembersPage() {
         title="Remove member"
         description={
           memberToRemove
-            ? `${memberToRemove.name} will lose access to this workspace. This can't be undone.`
+            ? `${memberToRemove.name} will lose access to this workspace. You can invite them again later.`
             : ""
         }
         confirmLabel="Remove"
@@ -690,31 +917,20 @@ export default function CustomerMembersPage() {
 
 function CustomerMembersSkeleton() {
   return (
-    <>
-      <div className="mb-4 h-5 w-40 rounded bg-[var(--bb-border)]" />
-      <div className="mb-2 h-3 w-72 rounded bg-[var(--bb-border)]" />
-      <div className="h-3 w-48 rounded bg-[var(--bb-border)]" />
-
-      <div className="mt-6 grid gap-4 md:grid-cols-2">
-        {Array.from({ length: 4 }).map((_, idx) => (
-          <div
-            key={idx}
-            className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-3"
-          >
-            <div className="mb-3 flex items-center gap-3">
-              <div className="h-9 w-9 rounded-full bg-[var(--bb-bg-card)]" />
-              <div className="flex-1 space-y-2">
-                <div className="h-3 w-32 rounded bg-[var(--bb-bg-card)]" />
-                <div className="h-3 w-40 rounded bg-[var(--bb-bg-card)]" />
-              </div>
-              <div className="h-5 w-16 rounded-full bg-[var(--bb-bg-card)]" />
-            </div>
-            <div className="h-3 w-28 rounded bg-[var(--bb-bg-card)]" />
-          </div>
-        ))}
-      </div>
-    </>
+    <div aria-busy="true" aria-label="Loading company members" className="space-y-6">
+      <Skeleton className="h-44 rounded-2xl" />
+      <Skeleton className="h-9 w-80" />
+      <Skeleton className="h-72 rounded-2xl" />
+    </div>
   );
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function roleWeight(role: CompanyRoleString): number {
@@ -744,15 +960,4 @@ function formatCompanyRole(role: CompanyRoleString): string {
     default:
       return role;
   }
-}
-
-function initialsForName(nameOrEmail: string): string {
-  const namePart = nameOrEmail.split("@")[0];
-  const parts = namePart.trim().split(/\s+/);
-
-  if (parts.length === 1) {
-    return parts[0].slice(0, 2).toUpperCase();
-  }
-
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }

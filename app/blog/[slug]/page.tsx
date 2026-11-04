@@ -23,7 +23,7 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-const displayFont = "font-[family-name:var(--font-inter)]";
+const displayFont = "font-[family-name:var(--font-jakarta)]";
 
 async function getPost(slug: string) {
   return prisma.blogPost.findFirst({
@@ -169,7 +169,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
             html={post.body ?? ""}
             allowedTags={CMS_ALLOWED_TAGS}
             allowedAttrs={CMS_ALLOWED_ATTR}
-            className="prose prose-lg prose-headings:font-[family-name:var(--font-inter)] prose-headings:font-extrabold prose-headings:text-[#2B2D33] prose-a:text-[#FF6426] max-w-none text-base leading-6 text-[#2B2D33]"
+            className="prose prose-lg prose-headings:font-[family-name:var(--font-jakarta)] prose-headings:font-extrabold prose-headings:text-[#2B2D33] prose-a:text-[#FF6426] max-w-none text-base leading-6 text-[#2B2D33]"
           />
         </section>
 

@@ -19,10 +19,21 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
   {
     slug: "getting-around",
     title: "Getting around your dashboard",
-    summary: "What each part of the sidebar is for and where to find help.",
+    summary: "What the sidebar and top bar are for, and where to find help.",
     category: "Getting started",
     routes: ["/creative/support"],
-    keywords: ["navigation", "sidebar", "menu", "start", "help"],
+    keywords: [
+      "navigation",
+      "sidebar",
+      "menu",
+      "start",
+      "help",
+      "search",
+      "top bar",
+      "account menu",
+      "sign out",
+      "theme",
+    ],
     related: ["how-work-works", "getting-assigned"],
     sections: [
       {
@@ -30,20 +41,19 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Everything in your dashboard is reached from the sidebar on the left:",
+            text: "Everything in your dashboard is reached from the sidebar on the left. It is grouped into three sections:",
           },
           {
             type: "list",
             items: [
-              { term: "Overview", text: "a summary of your work, earnings and deadlines." },
-              { term: "Board", text: "the jobs assigned to you, by status." },
-              { term: "Portfolio", text: "every job you've completed, collected automatically." },
               {
-                term: "Color Studio",
-                text: "our public color tools. Use **Go to dashboard** at the top of the page to come back.",
+                term: "Workspace",
+                text: "your day-to-day work: **Overview**, the **Board** with the jobs assigned to you, your **Portfolio** of completed jobs, and **Color Studio**. Color Studio opens our public color tools; use **Go to dashboard** at the top of the page to come back.",
               },
-              { term: "Balance", text: "the tokens you've earned and how they moved." },
-              { term: "Withdrawals", text: "requesting payouts from your balance." },
+              {
+                term: "Earnings",
+                text: "your **Balance** of earned tokens, and **Withdrawals** for requesting payouts.",
+              },
               {
                 term: "Account",
                 text: "your **Profile**, **Settings**, the **FAQ** and this **Support** section.",
@@ -57,23 +67,26 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
         ],
       },
       {
-        heading: "The bottom of the sidebar",
+        heading: "The top bar",
         blocks: [
           {
             type: "list",
             items: [
               {
-                term: "Bell",
-                text: "your notifications. The number shows how many are unread.",
+                term: "Search workspace",
+                text: "jumps to any page in your dashboard. Click it, or press **Ctrl K** (**⌘K** on a Mac).",
               },
               {
                 term: "Help",
                 text: "opens the Support guide for the page you are on, or this Support home if the page has no guide yet.",
               },
-              { term: "Sign out", text: "ends your session on this device." },
               {
-                term: "Theme",
-                text: "switches the dashboard between light, dark and system.",
+                term: "Bell",
+                text: "your notifications. The number shows how many are unread.",
+              },
+              {
+                term: "Account menu",
+                text: "click your avatar for **Profile**, **Settings**, **Theme** (light, dark or system) and **Sign out**. The same menu is at the bottom of the sidebar.",
               },
             ],
           },
@@ -84,7 +97,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Use the **feedback** button in the bottom-right corner of any page and pick **I'm not sure how this works**. Our team reads every message and the page you were on is attached automatically.",
+            text: "On the Support page you can search these guides or browse them by topic. If that doesn't help, use the **feedback** button in the bottom-right corner of any page and pick **I'm not sure how this works**. Our team reads every message and the page you were on is attached automatically.",
           },
         ],
       },
@@ -107,8 +120,8 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
             type: "list",
             items: [
               {
-                term: "To do",
-                text: "the job has been assigned to you and is waiting to be started. The Overview page calls this **Backlog**.",
+                term: "Backlog",
+                text: "the job has been assigned to you and is waiting to be started.",
               },
               {
                 term: "In progress",
@@ -132,9 +145,9 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
           {
             type: "steps",
             items: [
-              "A job is assigned to you and appears in **To do**. You get a **New ticket assigned** notification.",
-              "Read the brief, then drag it to **In progress** to start.",
-              "When a version is ready, use **Upload work** to send it. The job moves to **In review**.",
+              "A job is assigned to you and appears in **Backlog**. You get a **New ticket assigned** notification.",
+              "Read the brief, then drag it to **In progress**, or click **Start work** on the job page.",
+              "When a version is ready, send it with **Upload work** on the Board or **Send for review** on the job page. The job moves to **In review**.",
               "The customer either asks for changes, which sends the job back to **In progress** with their feedback, or approves it.",
               "When they approve, the job moves to **Done** and your payout is added to your balance straight away.",
             ],
@@ -174,7 +187,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
             items: [
               "have the job's type ticked under **Settings → Skills & expertise**,",
               "are not paused, and",
-              "have fewer open jobs (To do, In progress and In review) than their **Concurrent task cap**, if they set one.",
+              "have fewer open jobs (Backlog, In progress and In review) than their **Concurrent task cap**, if they set one.",
             ],
           },
           {
@@ -183,7 +196,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
           },
           {
             type: "p",
-            text: "There's no accept or decline step: assigned jobs appear on your Board in **To do**.",
+            text: "There's no accept or decline step: assigned jobs appear on your Board in **Backlog**.",
           },
         ],
       },
@@ -235,23 +248,31 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
             items: [
               {
                 term: "Token balance",
-                text: "the tokens you've earned and your last balance change. **View balance** opens Balance.",
+                text: "the tokens you've earned and your last activity. **View balance** opens Balance.",
               },
               {
-                term: "Active tickets",
-                text: "how many jobs are in Backlog (To do), In progress and In review. **Open board** goes to the Board.",
+                term: "Active jobs",
+                text: "how many jobs are in Backlog, In progress and In review. **Open board** goes to the Board.",
               },
               {
-                term: "Earnings",
-                text: "tokens available to withdraw, pending and total requested. **Request payout** opens Withdrawals.",
+                term: "Available to request",
+                text: "tokens you can withdraw now, with what's held and requested. **Request payout** opens Withdrawals.",
               },
               {
-                term: "Payout rate",
+                term: "Current payout rate",
                 text: "your current payout percentage, your tier, and how close you are to the next one. **View tiers** opens Settings.",
               },
               {
-                term: "Upcoming deadlines",
-                text: "up to five unfinished jobs with due dates, most urgent first. Click one to open it.",
+                term: "Workflow and Priority breakdown",
+                text: "all your jobs by status and by priority.",
+              },
+              {
+                term: "Your next jobs",
+                text: "up to five unfinished jobs with due dates, soonest first. Filter by status, or click a title to open it.",
+              },
+              {
+                term: "Load score",
+                text: "how heavy your open jobs are, weighted by priority and token cost.",
               },
               {
                 term: "Recent withdrawals",
@@ -261,7 +282,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
           },
           {
             type: "tip",
-            text: "If you haven't picked any skills yet, the page starts with a **Welcome to Brandbite!** checklist. Select your skills first so jobs can be assigned to you.",
+            text: "If you haven't picked any skills yet, the page starts with a **Welcome to brandbite!** checklist. Select your skills first so jobs can be assigned to you.",
           },
         ],
       },
@@ -292,7 +313,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Your jobs are shown in **To do**, **In progress**, **In review** and **Done**. Each card shows the title, description, due date, the ticket code, the version number, the priority, the payout and the customer.",
+            text: "Your jobs are shown in **Backlog**, **In progress**, **In review** and **Done**. Each card shows the ticket code, the priority, the title, the customer, a short description, the version number, the payout and the due date.",
           },
           {
             type: "p",
@@ -306,7 +327,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
           {
             type: "list",
             items: [
-              "**To do → In progress** to start a job.",
+              "**Backlog → In progress** to start a job.",
               "**In progress → In review** opens **Upload work** so you can send a version. The job only moves once you send it.",
               "**In review → In progress** to pull a version back if you need to change something before the customer reviews it.",
             ],
@@ -332,12 +353,12 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
                 text: "filters by ticket code, title, description, customer, project or job type. Press **/** to jump to it.",
               },
               {
-                term: "Projects",
-                text: "click a project in the left panel to show only its jobs. Click it again to clear the filter.",
+                term: "All projects",
+                text: "pick a project in this dropdown to show only its jobs.",
               },
               {
                 term: "Kanban / Table",
-                text: "switches to a sortable list of all your jobs.",
+                text: "switches to **My jobs**, a sortable list of all your jobs.",
               },
             ],
           },
@@ -348,7 +369,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Click **Select**, then click cards (or **Select all** in a column). The bar at the bottom lets you **Start working** on all of them at once. Press **Esc** or **Cancel** to stop selecting.",
+            text: "Click **Select**, then click cards (or **Select all** in a column). Depending on what you picked, the bar at the bottom lets you **Start working** on them or **Move to Backlog**. Press **Esc** or **Cancel** to stop selecting.",
           },
         ],
       },
@@ -357,11 +378,11 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Click a card to open it. You'll see the description, the brief attachments, every version you've sent with the customer's feedback, and the job's details and dates. **Upload work** (In progress) and **Pull back to In progress** (In review) are at the bottom.",
+            text: "Click a card or **Open job** to open it. The tabs show the **Current version**, the **Brief & files**, all **Versions** with the customer's feedback, and **Comments**. The job's details and dates are on the side. **Upload work** (In progress) and **Pull back to In progress** (In review) are at the bottom.",
           },
           {
             type: "tip",
-            text: "The brand guide, time tracking and comments are on the full job page. Open it from the Table view or from a notification.",
+            text: "The brand guide and time tracking are on the full job page. Use **Open full page** in the job window.",
           },
         ],
       },
@@ -370,26 +391,40 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
   {
     slug: "deliver-work",
     title: "Sending work for review",
-    summary: "Upload your files and send a version to the customer.",
+    summary:
+      "Upload your files and send a version to the customer, from the Board or the job page.",
     category: "Work",
     routes: [],
     keywords: ["upload", "deliver", "submit", "version", "revision", "files", "review", "send"],
     related: ["handle-feedback", "board"],
     sections: [
       {
-        heading: "Step by step",
+        heading: "From the Board",
         blocks: [
           {
             type: "steps",
             items: [
-              "On the Board, open a job that's **In progress** and click **Upload work**, or drag its card to **In review**.",
-              "Drag your files onto the box, or browse for them.",
+              "Open a job that's **In progress** and click **Upload work**, or drag its card to **In review**.",
+              "Drag your files onto the box, or click **Browse files**.",
               "Click **Upload & send for review**. Keep the window open until the upload finishes.",
+            ],
+          },
+        ],
+      },
+      {
+        heading: "From the job page",
+        blocks: [
+          {
+            type: "steps",
+            items: [
+              "Open a job that's **In progress**. **Upload new version** is on the **Delivery & feedback** tab.",
+              "Add at least one file by dragging it onto the box or clicking **Browse files**.",
+              "Click **Send for review**.",
             ],
           },
           {
             type: "p",
-            text: "The job moves to **In review**, a new version is added, and the customer is notified.",
+            text: "Either way, the job moves to **In review**, a new version is added, and the customer is notified.",
           },
         ],
       },
@@ -418,7 +453,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "While the job is **In review**, open it on the Board and click **Pull back to In progress**, or drag it back. You can then send a new version.",
+            text: "While the job is **In review**, click **Pull back to In progress** on the job page or in the Board's job window, or drag it back on the Board. You can then send a new version.",
           },
         ],
       },
@@ -446,7 +481,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "When the customer asks for changes, the job goes back to **In progress** and its card shows **Changes requested** with their feedback. The full feedback is under the version in the job window.",
+            text: "When the customer asks for changes, the job goes back to **In progress** and its card shows **Changes requested** with their feedback. The full feedback is shown with the version when you open the job.",
           },
           {
             type: "p",
@@ -463,7 +498,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
               "Open the job and click an image in the version with notes.",
               "Each numbered pin marks a spot the customer wants changed. Its note is listed on the right under **Creative review**.",
               "When you've handled one, click **Mark as resolved**. The customer is notified.",
-              "When every note is resolved, send your next version with **Upload work**.",
+              "When you're ready, send your next version with **Upload work** on the Board or **Send for review** on the job page.",
             ],
           },
           {
@@ -477,7 +512,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
   {
     slug: "ticket-details",
     title: "The job page",
-    summary: "Brief, brand guide, files, version history, time tracking and comments for one job.",
+    summary: "Delivery, brief, brand guide, time tracking and comments for one job.",
     category: "Work",
     routes: ["/creative/tickets/[ticketId]"],
     keywords: ["brief", "brand guide", "time tracking", "timer", "comments", "compare", "versions"],
@@ -489,28 +524,43 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
           {
             type: "list",
             items: [
-              { term: "Brief", text: "what the customer asked for." },
               {
-                term: "Project & job",
-                text: "the project, job type, quantity and the payout for this job.",
+                term: "Delivery & feedback",
+                text: "every version you've sent, newest first, with the customer's feedback and pin notes. With two or more versions, **Compare versions** shows them side by side.",
               },
               {
-                term: "Brand guide",
-                text: "the customer's logo, colours, fonts and tone of voice, when they've set them for the project.",
+                term: "Brief & files",
+                text: "what the customer asked for, their reference files and, when they've set it for the project, the **Brand guide**.",
               },
+              { term: "Time tracking", text: "your time entries for this job." },
+              { term: "Comments", text: "your conversation with the customer." },
               {
-                term: "Brief attachments",
-                text: "reference files from the customer.",
-              },
-              {
-                term: "Revision history",
-                text: "every version you've sent, newest first, with the customer's feedback and pin counts. With two or more versions, **Compare** shows them side by side.",
+                term: "Job summary",
+                text: "the project, job type, payout, people and dates, always on the side.",
               },
             ],
           },
+        ],
+      },
+      {
+        heading: "Moving the job",
+        blocks: [
           {
-            type: "p",
-            text: "Uploading and changing status happen on the Board.",
+            type: "list",
+            items: [
+              {
+                term: "Start work",
+                text: "at the top of the page while the job is in Backlog. It moves the job to **In progress**.",
+              },
+              {
+                term: "Upload new version",
+                text: "on the **Delivery & feedback** tab while the job is In progress. **Send for review** needs at least one file (up to 10).",
+              },
+              {
+                term: "Pull back to In progress",
+                text: "at the top of the page while the job is In review.",
+              },
+            ],
           },
         ],
       },
@@ -520,9 +570,9 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
           {
             type: "list",
             items: [
-              "Click **Start timer** when you begin and **Stop** when you finish. Your logged time and the estimate are shown at the top.",
+              "**Start timer** and **Stop timer** are at the top of the page, with your logged time and the estimate.",
               "Only one timer runs at a time. Starting one on another job stops this one.",
-              "**Delete** removes an entry after you confirm. This can't be undone.",
+              "On the **Time tracking** tab, **Delete** removes an entry after you confirm. This can't be undone.",
             ],
           },
         ],
@@ -532,7 +582,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Use **Add a comment** to talk to the customer and the Brandbite team (up to 2000 characters). Comments can't be edited or deleted.",
+            text: "Use the **Comments** tab to talk to the customer and the brandbite team (up to 2000 characters). Comments can't be edited or deleted.",
           },
         ],
       },
@@ -541,10 +591,10 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
   {
     slug: "tickets-table",
     title: "The jobs table",
-    summary: "A sortable list of all your jobs with status and project filters.",
+    summary: "A sortable list of all your jobs with status and project filters and search.",
     category: "Work",
     routes: ["/creative/tickets"],
-    keywords: ["table", "list", "my tickets", "sort", "filter"],
+    keywords: ["table", "list", "my jobs", "my tickets", "sort", "filter", "search"],
     related: ["board", "ticket-details"],
     sections: [
       {
@@ -552,19 +602,19 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Switch to **Table** on the Board, or open **My tickets**. The cards at the top count your jobs per status.",
+            text: "Switch to **Table** on the Board to open **My jobs**. The cards at the top count your jobs per status: click one to filter by it.",
           },
           {
             type: "list",
             items: [
-              "Filter by **Status** and **Project**.",
+              "Search by job, project or customer, and filter by **Project**.",
               "Sort by Status, Priority or Due. Due dates are red when overdue and amber within three days.",
-              "Click a row to open the job page.",
+              "Click a row or **Open job** to open the job page.",
             ],
           },
           {
             type: "p",
-            text: "The status dropdown offers only the moves you can make from the job's current status. To send a version for review, use **Upload work** on the Board so your files go with it.",
+            text: "The status dropdown offers only the moves you can make from the job's current status, including moving a job from In progress back to Backlog. To send a version for review, open the job so your files go with it.",
           },
         ],
       },
@@ -601,7 +651,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
           },
           {
             type: "p",
-            text: "Everyone starts on the **Base Rate** of 60%.",
+            text: "Everyone starts on the **Base rate** of 60%.",
           },
           {
             type: "p",
@@ -618,7 +668,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
           },
           {
             type: "p",
-            text: "See your rate and progress in **Settings → Payout tiers** and on the **Payout rate** card on Overview.",
+            text: "See your rate and progress in **Settings → Payout tiers** and on the **Current payout rate** card on Overview.",
           },
         ],
       },
@@ -640,7 +690,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
             type: "list",
             items: [
               {
-                term: "Available balance",
+                term: "Token balance",
                 text: "everything you've earned minus what's been paid out to you.",
               },
               { term: "Total credits", text: "tokens you've earned." },
@@ -649,22 +699,22 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
           },
           {
             type: "p",
-            text: "Tokens in withdrawal requests that haven't been paid yet are still included in **Available balance**. The Withdrawals page shows how much you can request right now.",
+            text: "Tokens in withdrawal requests that haven't been paid yet are still included in **Token balance**. **Available to request** on the Withdrawals page shows how much you can request right now.",
           },
         ],
       },
       {
-        heading: "Token activity",
+        heading: "Recent token activity",
         blocks: [
           {
             type: "p",
-            text: "The table shows your 50 most recent movements with their date, amount and balance afterwards. The reasons you'll see:",
+            text: "The table shows your 50 most recent movements with their date, amount, reason, notes and balance afterwards. Use **All / Credits / Debits** or **Search activity** to narrow it. The reasons you'll see:",
           },
           {
             type: "list",
             items: [
-              { term: "JOB_PAYMENT", text: "your payout for an approved job." },
-              { term: "WITHDRAWAL_PAID", text: "a withdrawal was paid out to you." },
+              { term: "Job payment", text: "your payout for an approved job." },
+              { term: "Withdrawal paid", text: "a withdrawal was paid out to you." },
             ],
           },
           {
@@ -708,7 +758,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
             type: "list",
             items: [
               "There's a **minimum** amount, shown above the field (20 tokens unless our team has changed it).",
-              "You can request up to your balance, minus anything already held by Pending or Approved requests.",
+              "You can request up to **Available to request**: your balance, minus anything already held by Pending or Approved requests.",
             ],
           },
         ],
@@ -729,14 +779,14 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
               },
               {
                 term: "Paid",
-                text: "paid out. The tokens are now taken from your balance (**WITHDRAWAL_PAID**).",
+                text: "paid out. The tokens are now taken from your balance (**Withdrawal paid**).",
               },
               { term: "Rejected", text: "not approved. The held tokens are released." },
             ],
           },
           {
             type: "p",
-            text: "You get a notification (and an email) when a request is approved, rejected or paid. You can turn these off under **Withdrawal updates** in Settings or your Profile. For questions about a payout, use the feedback button.",
+            text: "You get a notification (and an email) when a request is approved, rejected or paid. You can turn these off under **Withdrawal updates** in **Settings → Notifications** or your Profile. For questions about a payout, use the feedback button.",
           },
         ],
       },
@@ -770,9 +820,9 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
           {
             type: "list",
             items: [
-              "Each card shows up to four images from the final version. Non-image files show **No preview**.",
-              "Search by title, customer, project or category, or filter by category.",
-              "Click a card to open the job.",
+              "Each job shows the first image from its final version, with **+N more** when there are others. Non-image files show **No preview**.",
+              "Search by title, company, project or category, filter by category, and switch between **Grid** and **List**.",
+              "Click a job to open it.",
             ],
           },
           {
@@ -809,6 +859,26 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
     ],
     related: ["getting-assigned", "settings"],
     sections: [
+      {
+        heading: "The tabs",
+        blocks: [
+          {
+            type: "list",
+            items: [
+              { term: "Personal details", text: "your name, avatar, email and timezone." },
+              { term: "Workload", text: "your working hours and open-job cap." },
+              { term: "Notifications", text: "what you're notified about, in-app and by email." },
+              { term: "Security", text: "two-factor authentication." },
+              { term: "Sessions", text: "the browsers you're signed in on." },
+              { term: "Account management", text: "**Delete my account**. See **Settings**." },
+            ],
+          },
+          {
+            type: "p",
+            text: "Until you've added your name, working hours and skills, the **Setup checklist** beside the tabs shows what's left.",
+          },
+        ],
+      },
       {
         heading: "Identity and timezone",
         blocks: [
@@ -860,7 +930,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
           {
             type: "steps",
             items: [
-              "Enter your current password and click **Set up**.",
+              "Click **Set up two-factor**, enter your current password and click **Continue**.",
               "Scan the QR code with an authenticator app, or paste the secret.",
               "Enter the code and click **Confirm and enable**.",
               "Save your backup codes. They're shown **only once**.",
@@ -890,27 +960,27 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
     slug: "settings",
     title: "Settings",
     summary:
-      "Availability, skills, payout tiers, notification preferences and deleting your account.",
+      "Skills, availability, payout tiers, notification preferences and deleting your account.",
     category: "Account",
     routes: ["/creative/settings"],
     keywords: ["availability", "pause", "skills", "job types", "payout tiers", "delete account"],
     related: ["getting-assigned", "earnings", "profile"],
     sections: [
       {
-        heading: "Availability",
-        blocks: [
-          {
-            type: "p",
-            text: "Pause new assignments for **1 hour**, **7 days** or **Until I resume**, then click **Pause working**. Your current jobs aren't affected. Click **Continue working** to come back.",
-          },
-        ],
-      },
-      {
         heading: "Skills & expertise",
         blocks: [
           {
             type: "p",
-            text: "Tick the job types you can handle. Each change saves right away. You're only auto-assigned jobs that match your skills.",
+            text: "Tick the job types you can handle. Use the search, the category filter and **Selected only** to find them. Each change saves right away. You're only auto-assigned jobs that match your skills.",
+          },
+        ],
+      },
+      {
+        heading: "Availability",
+        blocks: [
+          {
+            type: "p",
+            text: "On the **Availability** tab, pause new assignments for **1 hour**, **7 days** or **Until I resume**, then click **Pause working**. Your current jobs aren't affected. Click **Continue working** to come back: it's also at the top of the other tabs while you're paused.",
           },
         ],
       },
@@ -919,16 +989,16 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Shows your current rate, every tier with what it needs, and your progress. Tiers you qualify for are marked **Active**.",
+            text: "Shows your current rate, the base rate, every tier with what it needs, and your progress. Tiers you qualify for are marked **Active**.",
           },
         ],
       },
       {
-        heading: "Notification preferences",
+        heading: "Notifications",
         blocks: [
           {
             type: "p",
-            text: "Turn in-app notifications on or off for customer feedback, new assignments, status changes and completed jobs. For email notifications, use your **Profile**.",
+            text: "Turn each notification type on or off for **In-app** and **Email**. Changes save instantly, and they're the same choices as under your **Profile**.",
           },
         ],
       },
@@ -937,7 +1007,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "warning",
-            text: "**Delete my account** is permanent. Type your email to confirm. You can't delete while you still have open jobs or a withdrawal that hasn't been paid, so finish those first (or ask us to reassign a job). Withdraw any remaining balance before you go: there's no way back afterwards.",
+            text: "**Delete my account**, on the **Account management** tab, is permanent. Type your email to confirm. You can't delete while you still have open jobs or a withdrawal that hasn't been paid, so finish those first (or ask us to reassign a job). Withdraw any remaining balance before you go: there's no way back afterwards.",
           },
         ],
       },

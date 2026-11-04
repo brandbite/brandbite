@@ -151,7 +151,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
           >
             <IconMenu width={20} height={20} />
           </button>
-          <Link href="/admin" aria-label="Brandbite admin home" className="md:hidden">
+          <Link href="/admin" aria-label="brandbite admin home" className="md:hidden">
             <BrandLogo width={110} priority className="h-6 w-auto" />
           </Link>
 

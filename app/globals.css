@@ -2,14 +2,15 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+@theme inline {
+  --font-sans: var(--font-jakarta);
+}
+
 :root {
   /* ── Fonts ─────────────────────────────────────────────────────────────── */
-  /* Self-hosted via @fontsource-variable (imported in app/layout.tsx and
-     app/admin/layout.tsx). next/font/google fetched these from Google at
+  /* The one typeface, everywhere. Self-hosted via @fontsource-variable
+     (imported in app/layout.tsx). next/font/google fetched fonts from Google at
      build time and the fetch failed intermittently, breaking deploys. */
-  --font-inter: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-josefin: "Josefin Sans Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-caveat: "Caveat Variable", cursive;
   --font-jakarta: "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, sans-serif;
 
   /* ── Brand ─────────────────────────────────────────────────────────────── */
@@ -143,7 +144,7 @@ body {
 
 body {
   font-family:
-    var(--font-inter),
+    var(--font-jakarta),
     system-ui,
     -apple-system,
     BlinkMacSystemFont,
@@ -250,14 +251,13 @@ body {
   }
 }
 
-/* Heading font — Josefin Sans for branding/display elements */
 h1,
 h2,
 h3,
 h4,
 h5,
 h6 {
-  font-family: var(--font-josefin), "Josefin Sans", sans-serif;
+  font-family: var(--font-jakarta), "Plus Jakarta Sans", sans-serif;
 }
 
 /* ── Dashboard design language v1 (Brandbite_Tasarim_Dili, Nov 2026) ──────
@@ -349,9 +349,9 @@ h6 {
   font-family: inherit;
 }
 
-/* Utility class for Josefin Sans on non-heading elements (e.g. logo, brand text) */
+/* Brand text on non-heading elements (e.g. marketing nav and buttons) */
 .font-brand {
-  font-family: var(--font-josefin), "Josefin Sans", sans-serif;
+  font-family: var(--font-jakarta), "Plus Jakarta Sans", sans-serif;
 }
 
 /* Modal enter animation */

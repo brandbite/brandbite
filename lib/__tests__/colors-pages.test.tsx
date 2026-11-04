@@ -176,7 +176,7 @@ describe("color family page", () => {
 
   it("keeps the brand in the title", async () => {
     const meta = await meaningMetadata(params({ slug: "orange" }));
-    expect(meta.title).toEqual({ absolute: "Orange Color Meaning | Brandbite" });
+    expect(meta.title).toEqual({ absolute: "Orange Color Meaning | brandbite" });
   });
 
   it("answers 404 for an unknown color", async () => {

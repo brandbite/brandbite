@@ -101,7 +101,7 @@ export function TalentProposedTimeNotificationEmailTemplate({
 
       <Signoff
         preamble="Replying to this email goes nowhere — use the admin panel to act."
-        from="Brandbite ops"
+        from="brandbite ops"
       />
     </BaseLayout>
   );

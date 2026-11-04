@@ -128,8 +128,8 @@ export const DEFAULT_SHOWCASE_DATA: ShowcaseData = {
  *  the public site since launch, with the same "Explore Pricing" CTA
  *  pointing back at the pricing anchor on the same page. */
 export const DEFAULT_FEATURE_GRID_DATA: FeatureGridData = {
-  title: "Why Brandbite",
-  subtitle: "Why brands choose Brandbite over freelancers.",
+  title: "Why brandbite",
+  subtitle: "Why brands choose brandbite over freelancers.",
   items: [
     { title: "Fast turnaround (1 to 2 days per request)" },
     { title: "Direct Slack communication" },

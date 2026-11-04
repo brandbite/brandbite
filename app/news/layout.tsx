@@ -7,7 +7,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "News",
-  description: "Company announcements, product updates, and industry news from Brandbite.",
+  description: "Company announcements, product updates, and industry news from brandbite.",
 };
 
 export default function NewsLayout({ children }: { children: React.ReactNode }) {

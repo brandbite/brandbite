@@ -44,6 +44,7 @@ import { IconCatalog, IconMoodboards } from "@/components/navigation/nav-icons";
 import { isDueDateOverdue } from "@/lib/board";
 import {
   canCreateTickets,
+  canEditTickets,
   canManagePlan,
   normalizeCompanyRole,
   type CompanyRole,
@@ -361,7 +362,7 @@ export default function CustomerOverviewPage() {
                   </IconTile>
                   <div className="min-w-0">
                     <h2 className="text-xl leading-7 font-semibold">Token activity</h2>
-                    <p className="text-sm text-[var(--av2-text-2)]">All-time ledger totals</p>
+                    <p className="text-sm text-[var(--av2-text-2)]">Latest 50 ledger movements</p>
                   </div>
                 </div>
                 <dl className="flex flex-wrap gap-x-8 gap-y-3">
@@ -419,7 +420,7 @@ export default function CustomerOverviewPage() {
             </Card>
           </div>
 
-          {toReview.length > 0 ? (
+          {toReview.length > 0 && canEditTickets(companyRole) ? (
             <section className="flex flex-wrap items-center gap-4 rounded-2xl border border-[var(--av2-attention-border)] bg-gradient-to-r from-[var(--av2-attention-from)] to-[var(--av2-attention-to)] p-6">
               <IconTile tone="peach" round>
                 <IconClock />

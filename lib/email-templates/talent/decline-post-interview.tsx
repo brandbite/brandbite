@@ -50,7 +50,7 @@ export function TalentDeclinePostInterviewEmailTemplate({
 
   return (
     <BaseLayout
-      previewText="An update on your Brandbite application after the interview."
+      previewText="An update on your brandbite application after the interview."
       hero={
         <HeroBand>
           <Heading>An update after our chat</Heading>
@@ -85,7 +85,7 @@ export function TalentDeclinePostInterviewEmailTemplate({
 
       <Signoff
         preamble="Thanks again for your time. The conversation will stay with us — best of luck with the next thing you build."
-        from="Alper, Brandbite"
+        from="Alper, brandbite"
       />
     </BaseLayout>
   );
@@ -96,7 +96,7 @@ export async function renderTalentDeclinePostInterviewEmail(
 ): Promise<{ subject: string; html: string }> {
   const html = await render(<TalentDeclinePostInterviewEmailTemplate {...props} />);
   return {
-    subject: "An update after our chat at Brandbite",
+    subject: "An update after our chat at brandbite",
     html,
   };
 }

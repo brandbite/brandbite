@@ -2,7 +2,7 @@
 // @file: components/marketing/faq-accordion.tsx
 // @purpose: Numbered single-open accordion for the public /faq page (2026
 //           redesign). Content comes from the Faq table via the server page;
-//           the portal FAQ surfaces keep using components/faq/faq-browser.
+//           the portal FAQ surfaces keep using components/dashboard/help/faq-explorer.
 // @version: v1.0.0
 // @status: active
 // @lastUpdate: 2026-07-13

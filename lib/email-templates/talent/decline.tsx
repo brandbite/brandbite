@@ -38,12 +38,12 @@ export function TalentDeclineEmailTemplate({
 
   return (
     <BaseLayout
-      previewText="An update on your Brandbite application."
+      previewText="An update on your brandbite application."
       hero={
         <HeroBand>
           <Heading>An update on your application</Heading>
           <Paragraph>
-            <strong>{greeting}</strong> Thanks for taking the time to apply to Brandbite.
+            <strong>{greeting}</strong> Thanks for taking the time to apply to brandbite.
           </Paragraph>
         </HeroBand>
       }
@@ -72,7 +72,7 @@ export function TalentDeclineEmailTemplate({
         won&apos;t hold a previous decision against a new application.
       </Paragraph>
 
-      <Signoff preamble="Wishing you the best with the next thing." from="Alper, Brandbite" />
+      <Signoff preamble="Wishing you the best with the next thing." from="Alper, brandbite" />
     </BaseLayout>
   );
 }
@@ -82,7 +82,7 @@ export async function renderTalentDeclineEmail(
 ): Promise<{ subject: string; html: string }> {
   const html = await render(<TalentDeclineEmailTemplate {...props} />);
   return {
-    subject: "An update on your Brandbite application",
+    subject: "An update on your brandbite application",
     html,
   };
 }

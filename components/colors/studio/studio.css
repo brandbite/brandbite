@@ -18,12 +18,7 @@
 
   background-color: var(--cs-background);
   color: var(--cs-text);
-  font-family: var(--font-inter);
-}
-
-/* The site's global heading rule uses the brand display font. */
-.color-studio :is(h1, h2, h3, h4) {
-  font-family: var(--font-inter);
+  font-family: var(--font-jakarta);
 }
 
 .color-studio :focus-visible {

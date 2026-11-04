@@ -1,27 +1,61 @@
 // -----------------------------------------------------------------------------
 // @file: app/creative/page.tsx
-// @purpose: Creative-facing overview dashboard (tokens + tickets + withdrawals)
-// @version: v2.0.0
-// @status: active
-// @lastUpdate: 2025-11-25
+// @purpose: Creative-facing overview dashboard (tokens + jobs + withdrawals)
 // -----------------------------------------------------------------------------
 
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { buildTicketCode } from "@/lib/ticket-code";
-import { isDueDateOverdue, isDueDateSoon, formatDueDateCountdown } from "@/lib/board";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import { LoadingState } from "@/components/ui/loading-state";
+
+import {
+  IconArrowUpRight,
+  IconCoins,
+  IconDocument,
+  IconTicket,
+  IconWallet,
+} from "@/components/admin/v2/icons";
+import {
+  Badge,
+  ButtonLink,
+  Callout,
+  Card,
+  CardTitle,
+  DASH,
+  EmptyState,
+  FilterChips,
+  fmt,
+  IconTile,
+  PageHeader,
+  plural,
+  PRIORITY,
+  Skeleton,
+  StatusDot,
+  Table,
+  Td,
+  TextLink,
+  Th,
+  TICKET_STATUS,
+} from "@/components/admin/v2/ui";
 import { PauseBanner } from "@/components/creative/pause-banner";
-import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from "recharts";
+import {
+  formatDate,
+  formatTokens,
+  MiniStat,
+  MoneyStat,
+  TokenFigure,
+  WithdrawalBadge,
+  type WithdrawalStatus,
+} from "@/components/dashboard/money/money-ui";
+import { formatDueDateCountdown, isDueDateOverdue, isDueDateSoon } from "@/lib/board";
+import { buildTicketCode } from "@/lib/ticket-code";
+
+const NEXT_JOBS_LIMIT = 5;
 
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 
 type LedgerDirection = "CREDIT" | "DEBIT";
-type WithdrawalStatus = "PENDING" | "APPROVED" | "REJECTED" | "PAID";
 
 type CreativeBalanceResponse = {
   user: {
@@ -96,6 +130,8 @@ type CreativeWithdrawal = {
 type CreativeWithdrawalsResponse = {
   stats: {
     availableBalance: number;
+    reservedTokens: number;
+    spendableBalance: number;
     totalRequested: number;
     pendingCount: number;
     withdrawalsCount: number;
@@ -132,62 +168,58 @@ type DashboardState =
   | { status: "error"; message: string }
   | { status: "ready"; data: CreativeDashboardData };
 
-function formatDate(iso: string | null | undefined): string {
-  if (!iso) return "\u2014";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "\u2014";
-  return d.toLocaleDateString();
-}
-
-function withdrawalStatusLabel(status: WithdrawalStatus): string {
-  switch (status) {
-    case "PENDING":
-      return "Pending";
-    case "APPROVED":
-      return "Approved";
-    case "REJECTED":
-      return "Rejected";
-    case "PAID":
-      return "Paid";
-  }
-}
-
-/* Status accent colors for chart bars */
-const STATUS_COLORS: Record<TicketStatus, string> = {
-  TODO: "#9CA3AF",
-  IN_PROGRESS: "#3B82F6",
-  IN_REVIEW: "#F15B2B",
-  DONE: "#22C55E",
-};
-
-const STATUS_LABELS: Record<TicketStatus, string> = {
-  TODO: "Backlog",
-  IN_PROGRESS: "In progress",
-  IN_REVIEW: "In review",
-  DONE: "Done",
-};
+type NextJobsFilter = "ALL" | Exclude<TicketStatus, "DONE">;
 
 const STATUS_ORDER: TicketStatus[] = ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"];
-
-/* Priority accent colors */
-const PRIORITY_COLORS: Record<TicketPriority, string> = {
-  URGENT: "#EF4444",
-  HIGH: "#F59E0B",
-  MEDIUM: "#3B82F6",
-  LOW: "#9CA3AF",
-};
-
-const PRIORITY_LABELS: Record<TicketPriority, string> = {
-  URGENT: "Urgent",
-  HIGH: "High",
-  MEDIUM: "Medium",
-  LOW: "Low",
-};
-
+const OPEN_STATUSES: Exclude<TicketStatus, "DONE">[] = ["TODO", "IN_PROGRESS", "IN_REVIEW"];
 const PRIORITY_ORDER: TicketPriority[] = ["URGENT", "HIGH", "MEDIUM", "LOW"];
+
+/** Bands from the existing load score copy: below 50, 50-80, above 80. */
+function loadBand(score: number): { label: string; color: string } {
+  if (score > 80) return { label: "Heavy", color: "var(--av2-fill-red)" };
+  if (score >= 50) return { label: "Moderate", color: "var(--av2-fill-amber)" };
+  return { label: "Light", color: "var(--av2-fill-green)" };
+}
+
+function CountTile({ label, value }: { label: React.ReactNode; value: number | null | undefined }) {
+  return (
+    <div className="min-w-0 rounded-xl border border-[var(--av2-border)] p-3">
+      <dt>{label}</dt>
+      <dd className="mt-1 text-xl leading-7 font-bold tabular-nums">{fmt(value)}</dd>
+    </div>
+  );
+}
+
+function SetupStep({
+  step,
+  active = false,
+  children,
+}: {
+  step: number;
+  active?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <li className="flex items-start gap-3">
+      <span
+        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+          active
+            ? "bg-[var(--av2-accent-strong)] text-white"
+            : "bg-[var(--av2-surface)] text-[var(--av2-text-2)] ring-1 ring-[var(--av2-border)]"
+        }`}
+      >
+        {step}
+      </span>
+      <span>{children}</span>
+    </li>
+  );
+}
+
+const SETUP_LINK = "font-medium text-[var(--av2-link)] hover:underline";
 
 export default function CreativeDashboardPage() {
   const [state, setState] = useState<DashboardState>({ status: "loading" });
+  const [jobsFilter, setJobsFilter] = useState<NextJobsFilter>("ALL");
 
   useEffect(() => {
     let cancelled = false;
@@ -267,609 +299,478 @@ export default function CreativeDashboardPage() {
     };
   }, []);
 
-  const isLoading = state.status === "loading";
-  const isError = state.status === "error";
   const data = state.status === "ready" ? state.data : null;
 
-  const balanceData = data?.balance ?? null;
-  const ticketsData = data?.tickets ?? null;
-  const withdrawalsData = data?.withdrawals ?? null;
+  const user = data?.balance.user ?? null;
+  const tokenBalance = data?.balance.balance ?? null;
+  const lastLedgerEntry = data?.balance.ledger[0] ?? null;
 
-  const user = balanceData?.user ?? null;
-
-  const tokenBalance = balanceData?.balance ?? null;
-  const lastLedgerEntry =
-    balanceData && balanceData.ledger.length > 0 ? balanceData.ledger[0] : null;
-
-  const ticketStats = ticketsData?.stats ?? null;
+  const ticketStats = data?.tickets.stats ?? null;
   const totalTickets = ticketStats?.total ?? 0;
   const doneTickets = ticketStats?.byStatus.DONE ?? 0;
-
   const openTickets =
     ticketStats?.openTotal != null
       ? ticketStats.openTotal
       : totalTickets > 0
         ? totalTickets - doneTickets
         : 0;
+  const loadScore = ticketStats?.loadScore ?? null;
 
-  const loadScore = ticketStats?.loadScore ?? 0;
-  const priorityStats = ticketStats?.byPriority ?? null;
-
-  const creativeTickets = ticketsData?.tickets ?? [];
-  const upcomingTickets = useMemo(
+  const creativeTickets = useMemo(() => data?.tickets.tickets ?? [], [data]);
+  const dueJobs = useMemo(
     () =>
       creativeTickets
         .filter((t) => t.dueDate != null && t.status !== "DONE")
-        .sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime())
-        .slice(0, 5),
+        .sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime()),
     [creativeTickets],
   );
+  const nextJobs = dueJobs
+    .filter((t) => jobsFilter === "ALL" || t.status === jobsFilter)
+    .slice(0, NEXT_JOBS_LIMIT);
 
-  const payoutTierData = data?.payoutTier ?? null;
-  const skillCount = data?.skillCount ?? null;
+  const payoutTier = data?.payoutTier ?? null;
+  const nextTier = payoutTier?.tiers.find((t) => !t.qualified) ?? null;
+  const nextTierProgress =
+    nextTier && nextTier.minCompletedTickets > 0
+      ? Math.min(Math.round((nextTier.completedInWindow / nextTier.minCompletedTickets) * 100), 100)
+      : 0;
 
-  const withdrawalsStats = withdrawalsData?.stats ?? null;
-  const latestWithdrawal =
-    withdrawalsData && withdrawalsData.withdrawals.length > 0
-      ? withdrawalsData.withdrawals[0]
-      : null;
+  const withdrawalStats = data?.withdrawals.stats ?? null;
+  const recentWithdrawals = data?.withdrawals.withdrawals.slice(0, 3) ?? [];
 
-  /* Chart data for ticket pipeline (stacked bar) */
-  const statusChartData = ticketStats
-    ? STATUS_ORDER.map((s) => ({
-        name: STATUS_LABELS[s],
-        count: ticketStats.byStatus[s] ?? 0,
-        fill: STATUS_COLORS[s],
-      }))
-    : [];
-
-  /* Priority chart data */
-  const priorityChartData = priorityStats
-    ? PRIORITY_ORDER.map((p) => ({
-        name: PRIORITY_LABELS[p],
-        count: priorityStats[p] ?? 0,
-        fill: PRIORITY_COLORS[p],
-      }))
-    : [];
-
-  /* Load score color */
-  const loadScoreColor = loadScore >= 80 ? "#EF4444" : loadScore >= 50 ? "#F59E0B" : "#22C55E";
+  const band = loadScore != null ? loadBand(loadScore) : null;
+  const gaugeValue = Math.min(Math.max(loadScore ?? 0, 0), 100);
 
   return (
     <>
-      {/* Header */}
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold tracking-[0.18em] text-[var(--bb-text-muted)] uppercase">
-            Creative workspace
-          </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Overview</h1>
-          {user && (
-            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
+      <PageHeader
+        title="Overview"
+        meta={
+          user ? (
+            <>
               Signed in as{" "}
-              <span className="font-medium text-[var(--bb-secondary)]">
-                {user.name || user.email}
-              </span>
-              .
-            </p>
-          )}
-        </div>
-        {isLoading && <LoadingState display="inline" message="Loading overview..." />}
-      </div>
+              <span className="font-medium text-[var(--av2-text)]">{user.name || user.email}</span>
+            </>
+          ) : null
+        }
+      />
 
-      {/* Pause banner */}
       <PauseBanner />
 
-      {/* Welcome / setup guide for new creatives */}
-      {skillCount === 0 && !isLoading && !isError && (
-        <div className="mb-4 rounded-2xl border border-[var(--bb-primary)]/30 bg-[var(--bb-primary)]/5 p-5">
-          <h2 className="text-base font-semibold text-[var(--bb-secondary)]">
-            Welcome to Brandbite!
-          </h2>
-          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-            Set up your profile to start receiving ticket assignments:
-          </p>
-          <ol className="mt-3 space-y-2 text-sm text-[var(--bb-text-secondary)]">
-            <li className="flex items-start gap-2">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--bb-primary)] text-xs font-bold text-white">
-                1
-              </span>
-              <span>
-                <Link
-                  href="/creative/settings"
-                  className="font-medium text-[var(--bb-primary)] hover:underline"
-                >
-                  Select your skills
-                </Link>{" "}
-                so we can match you with the right tickets
-              </span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--bb-bg-page)] text-xs font-bold text-[var(--bb-text-muted)] ring-1 ring-[var(--bb-border)]">
-                2
-              </span>
-              <span>
-                Wait for ticket assignments to appear on your{" "}
-                <Link
-                  href="/creative/board"
-                  className="font-medium text-[var(--bb-primary)] hover:underline"
-                >
-                  board
-                </Link>
-              </span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--bb-bg-page)] text-xs font-bold text-[var(--bb-text-muted)] ring-1 ring-[var(--bb-border)]">
-                3
-              </span>
-              <span>
-                Complete tickets, earn tokens, and request{" "}
-                <Link
-                  href="/creative/withdrawals"
-                  className="font-medium text-[var(--bb-primary)] hover:underline"
-                >
-                  withdrawals
-                </Link>
-              </span>
-            </li>
-          </ol>
-        </div>
-      )}
-
-      {/* Error */}
-      {isError && (
-        <InlineAlert variant="error" title="Something went wrong" className="mb-4">
+      {state.status === "error" ? (
+        <Callout tone="error" title="We couldn't load your overview">
           {state.message}
-        </InlineAlert>
-      )}
-
-      {/* Content */}
-      {!isError && (
-        <div className="space-y-4">
-          {/* Row 1: Hero stat cards */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {/* Token balance card */}
-            <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-[#F15B2B] to-[#f6a07a]" />
-              <div className="flex items-center justify-between">
-                <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
-                  Token balance
-                </p>
-                <Link
-                  href="/creative/balance"
-                  className="text-[11px] font-medium text-[var(--bb-primary)] hover:underline"
-                >
-                  View balance
-                </Link>
-              </div>
-              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">
-                {tokenBalance != null ? tokenBalance.toLocaleString() : "\u2014"}
+        </Callout>
+      ) : state.status === "loading" ? (
+        <div aria-busy="true" aria-label="Loading overview" className="space-y-6">
+          <div className="grid gap-6 lg:grid-cols-2 2xl:grid-cols-4">
+            <Skeleton className="h-48" />
+            <Skeleton className="h-48" />
+            <Skeleton className="h-48" />
+            <Skeleton className="h-48" />
+          </div>
+          <Skeleton className="h-32" />
+          <Skeleton className="h-64" />
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {/* Welcome / setup guide for new creatives */}
+          {data?.skillCount === 0 ? (
+            <section className="rounded-2xl border border-[var(--av2-attention-border)] bg-gradient-to-r from-[var(--av2-attention-from)] to-[var(--av2-attention-to)] p-6">
+              <h2 className="text-xl leading-7 font-semibold">Welcome to brandbite!</h2>
+              <p className="mt-1 text-base text-[var(--av2-text-2)]">
+                Set up your profile to start receiving ticket assignments:
               </p>
-              <p className="text-[11px] text-[var(--bb-text-tertiary)]">tokens earned</p>
+              <ol className="mt-4 space-y-3 text-sm">
+                <SetupStep step={1} active>
+                  <Link href="/creative/settings" className={SETUP_LINK}>
+                    Select your skills
+                  </Link>{" "}
+                  so we can match you with the right tickets
+                </SetupStep>
+                <SetupStep step={2}>
+                  Wait for ticket assignments to appear on your{" "}
+                  <Link href="/creative/board" className={SETUP_LINK}>
+                    board
+                  </Link>
+                </SetupStep>
+                <SetupStep step={3}>
+                  Complete tickets, earn tokens, and request{" "}
+                  <Link href="/creative/withdrawals" className={SETUP_LINK}>
+                    withdrawals
+                  </Link>
+                </SetupStep>
+              </ol>
+            </section>
+          ) : null}
 
-              {/* Last activity */}
-              {lastLedgerEntry && (
-                <div className="mt-4 rounded-xl bg-[var(--bb-bg-card)] px-3 py-2.5 text-[11px] text-[var(--bb-text-secondary)]">
-                  <p className="font-medium text-[var(--bb-secondary)]">Last activity</p>
-                  <p className="mt-1">
+          {/* Headline numbers */}
+          <div className="grid gap-6 lg:grid-cols-2 2xl:grid-cols-4">
+            <MoneyStat
+              icon={<IconCoins />}
+              tone="green"
+              label="Token balance"
+              action={
+                <TextLink href="/creative/balance" arrow={false}>
+                  View balance
+                </TextLink>
+              }
+              value={<TokenFigure value={tokenBalance} />}
+            >
+              {lastLedgerEntry ? (
+                <div className="rounded-xl bg-[var(--av2-bg)] px-3 py-3 text-sm">
+                  <p className="font-medium">Last activity</p>
+                  <p className="mt-1 text-[var(--av2-text-2)]">
                     {lastLedgerEntry.direction === "CREDIT" ? "Credited" : "Debited"}{" "}
-                    <span className="font-semibold">{lastLedgerEntry.amount} tokens</span> on{" "}
+                    {formatTokens(lastLedgerEntry.amount)} on{" "}
                     {formatDate(lastLedgerEntry.createdAt)}.
                   </p>
                 </div>
-              )}
-            </section>
+              ) : null}
+            </MoneyStat>
 
-            {/* Active tickets card */}
-            <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-[#3B82F6] to-[#93C5FD]" />
-              <div className="flex items-center justify-between">
-                <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
-                  Active tickets
-                </p>
-                <Link
-                  href="/creative/board"
-                  className="text-[11px] font-medium text-[var(--bb-primary)] hover:underline"
-                >
+            <MoneyStat
+              icon={<IconTicket />}
+              tone="lavender"
+              label="Active jobs"
+              action={
+                <TextLink href="/creative/board" arrow={false}>
                   Open board
-                </Link>
-              </div>
-              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">{openTickets}</p>
-              <p className="text-[11px] text-[var(--bb-text-tertiary)]">of {totalTickets} total</p>
-
-              {/* Status breakdown dots */}
-              {ticketStats && (
-                <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1">
-                  {STATUS_ORDER.filter((s) => s !== "DONE").map((s) => (
-                    <div key={s} className="flex items-center gap-1.5 text-[11px]">
-                      <span
-                        className="inline-block h-2 w-2 rounded-full"
-                        style={{ backgroundColor: STATUS_COLORS[s] }}
-                      />
-                      <span className="text-[var(--bb-text-tertiary)]">{STATUS_LABELS[s]}</span>
-                      <span className="font-semibold text-[var(--bb-secondary)]">
-                        {ticketStats.byStatus[s] ?? 0}
-                      </span>
+                </TextLink>
+              }
+              value={
+                <>
+                  {fmt(openTickets)}{" "}
+                  <span className="text-xl font-medium text-[var(--av2-text-2)]">
+                    of {fmt(totalTickets)}
+                  </span>
+                </>
+              }
+            >
+              {ticketStats ? (
+                <dl className="space-y-2 rounded-xl bg-[var(--av2-bg)] px-3 py-3">
+                  {OPEN_STATUSES.map((s) => (
+                    <div key={s} className="flex items-center justify-between gap-3">
+                      <dt>
+                        <StatusDot tone={TICKET_STATUS[s].tone} label={TICKET_STATUS[s].label} />
+                      </dt>
+                      <dd className="text-sm font-bold tabular-nums">
+                        {fmt(ticketStats.byStatus[s] ?? 0)}
+                      </dd>
                     </div>
                   ))}
-                </div>
-              )}
-            </section>
+                </dl>
+              ) : null}
+            </MoneyStat>
 
-            {/* Earnings / Withdrawals card */}
-            <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-[#22C55E] to-[#86EFAC]" />
-              <div className="flex items-center justify-between">
-                <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
-                  Earnings
-                </p>
-                <Link
-                  href="/creative/withdrawals"
-                  className="text-[11px] font-medium text-[var(--bb-primary)] hover:underline"
-                >
+            <MoneyStat
+              icon={<IconWallet />}
+              tone="peach"
+              label="Available to request"
+              action={
+                <TextLink href="/creative/withdrawals" arrow={false}>
                   Request payout
-                </Link>
+                </TextLink>
+              }
+              value={<TokenFigure value={withdrawalStats?.spendableBalance} />}
+            >
+              <div className="grid grid-cols-2 gap-2">
+                <MiniStat value={fmt(withdrawalStats?.reservedTokens)} label="Held for requests" />
+                <MiniStat value={fmt(withdrawalStats?.pendingCount)} label="Pending" />
+                <MiniStat value={fmt(withdrawalStats?.totalRequested)} label="Total requested" />
+                <MiniStat
+                  value={fmt(withdrawalStats?.withdrawalsCount)}
+                  label="Requests all time"
+                />
               </div>
-              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">
-                {withdrawalsStats?.availableBalance ?? 0}
-              </p>
-              <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-                tokens available for withdrawal
-              </p>
+            </MoneyStat>
 
-              {withdrawalsStats && (
-                <div className="mt-4 flex gap-3">
-                  <div className="flex-1 rounded-xl bg-[var(--bb-bg-card)] px-3 py-2 text-center">
-                    <p className="text-sm font-bold text-[var(--bb-secondary)]">
-                      {withdrawalsStats.pendingCount}
-                    </p>
-                    <p className="text-[10px] text-[var(--bb-text-tertiary)]">Pending</p>
-                  </div>
-                  <div className="flex-1 rounded-xl bg-[var(--bb-bg-card)] px-3 py-2 text-center">
-                    <p className="text-sm font-bold text-[var(--bb-secondary)]">
-                      {withdrawalsStats.totalRequested}
-                    </p>
-                    <p className="text-[10px] text-[var(--bb-text-tertiary)]">Total requested</p>
-                  </div>
-                  <div className="flex-1 rounded-xl bg-[var(--bb-bg-card)] px-3 py-2 text-center">
-                    <p className="text-sm font-bold text-[var(--bb-secondary)]">
-                      {withdrawalsStats.withdrawalsCount}
-                    </p>
-                    <p className="text-[10px] text-[var(--bb-text-tertiary)]">All time</p>
-                  </div>
-                </div>
-              )}
-            </section>
-
-            {/* Payout rate card */}
-            <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-[#8B5CF6] to-[#C4B5FD]" />
-              <div className="flex items-center justify-between">
-                <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
-                  Payout rate
-                </p>
-                <Link
-                  href="/creative/settings"
-                  className="text-[11px] font-medium text-[var(--bb-primary)] hover:underline"
-                >
+            <MoneyStat
+              icon={<IconDocument />}
+              tone="green"
+              label="Current payout rate"
+              action={
+                <TextLink href="/creative/settings?tab=payout" arrow={false}>
                   View tiers
-                </Link>
-              </div>
-              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">
-                {payoutTierData ? `${payoutTierData.currentPayoutPercent}%` : "\u2014"}
-              </p>
-              <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-                {payoutTierData?.currentTierName ?? "Base rate"}
-              </p>
-
-              {/* Next tier progress */}
-              {payoutTierData &&
-                payoutTierData.tiers.length > 0 &&
-                (() => {
-                  const nextTier = payoutTierData.tiers.find((t) => !t.qualified);
-                  if (!nextTier)
-                    return (
-                      <div className="mt-4 rounded-xl bg-[var(--bb-bg-card)] px-3 py-2.5 text-[11px] text-[var(--bb-text-secondary)]">
-                        <p className="font-medium text-[#8B5CF6]">Max tier reached</p>
-                      </div>
-                    );
-                  const progress = Math.min(
-                    Math.round((nextTier.completedInWindow / nextTier.minCompletedTickets) * 100),
-                    100,
-                  );
-                  return (
-                    <div className="mt-4 rounded-xl bg-[var(--bb-bg-card)] px-3 py-2.5">
-                      <p className="text-[10px] font-medium text-[var(--bb-text-secondary)]">
+                </TextLink>
+              }
+              value={payoutTier ? `${payoutTier.currentPayoutPercent}%` : DASH}
+              hint={payoutTier ? (payoutTier.currentTierName ?? "Base rate") : undefined}
+            >
+              {payoutTier && payoutTier.tiers.length > 0 ? (
+                <div className="rounded-xl bg-[var(--av2-bg)] px-3 py-3 text-sm">
+                  {nextTier ? (
+                    <>
+                      <p className="font-medium">
                         Next: {nextTier.name} ({nextTier.payoutPercent}%)
                       </p>
-                      <div className="mt-1.5 h-1.5 w-full rounded-full bg-[var(--bb-border)]">
-                        <div
-                          className="h-full rounded-full bg-[#8B5CF6] transition-all"
-                          style={{ width: `${progress}%` }}
+                      <span
+                        role="progressbar"
+                        aria-label={`Progress to ${nextTier.name}`}
+                        aria-valuenow={nextTierProgress}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        className="mt-2 block h-2 w-full overflow-hidden rounded-full bg-[var(--av2-track)]"
+                      >
+                        <span
+                          className="block h-full rounded-full bg-[var(--av2-fill-lavender)]"
+                          style={{ width: `${nextTierProgress}%` }}
                         />
-                      </div>
-                      <p className="mt-1 text-[10px] text-[var(--bb-text-tertiary)]">
-                        {nextTier.completedInWindow}/{nextTier.minCompletedTickets} tickets
+                      </span>
+                      <p className="mt-2 text-xs text-[var(--av2-text-2)] tabular-nums">
+                        {fmt(nextTier.completedInWindow)}/{fmt(nextTier.minCompletedTickets)}{" "}
+                        tickets
                       </p>
-                    </div>
-                  );
-                })()}
-            </section>
+                    </>
+                  ) : (
+                    <p className="font-medium">Max tier reached</p>
+                  )}
+                </div>
+              ) : null}
+            </MoneyStat>
           </div>
 
-          {/* Row 2: Workload charts */}
-          {ticketStats && totalTickets > 0 && (
-            <div className="grid gap-4 md:grid-cols-2">
-              {/* Status distribution chart */}
-              <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-                <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
-                  Ticket pipeline
-                </h2>
-                <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
-                  Distribution by workflow stage
-                </p>
-                <div className="mt-4 h-44">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={statusChartData}
-                      margin={{ top: 4, right: 0, bottom: 0, left: -20 }}
-                    >
-                      <XAxis
-                        dataKey="name"
-                        tick={{ fontSize: 11, fill: "var(--bb-text-tertiary)" }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        allowDecimals={false}
-                        tick={{ fontSize: 11, fill: "var(--bb-text-tertiary)" }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          borderRadius: 12,
-                          border: "1px solid var(--bb-border)",
-                          fontSize: 12,
-                        }}
-                      />
-                      <Bar dataKey="count" radius={[6, 6, 0, 0]} maxBarSize={48}>
-                        {statusChartData.map((entry, i) => (
-                          <Cell key={i} fill={entry.fill} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </section>
-
-              {/* Priority distribution chart */}
-              <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-                <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
+          {/* Workload breakdowns */}
+          {ticketStats && totalTickets > 0 ? (
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Card>
+                <CardTitle description="All your jobs by workflow stage.">Workflow</CardTitle>
+                <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {STATUS_ORDER.map((s) => (
+                    <CountTile
+                      key={s}
+                      label={
+                        <StatusDot tone={TICKET_STATUS[s].tone} label={TICKET_STATUS[s].label} />
+                      }
+                      value={ticketStats.byStatus[s] ?? 0}
+                    />
+                  ))}
+                </dl>
+              </Card>
+              <Card>
+                <CardTitle description="All your jobs by priority, including done ones.">
                   Priority breakdown
-                </h2>
-                <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
-                  Open tickets by priority level
-                </p>
-                <div className="mt-4 h-44">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={priorityChartData}
-                      margin={{ top: 4, right: 0, bottom: 0, left: -20 }}
-                    >
-                      <XAxis
-                        dataKey="name"
-                        tick={{ fontSize: 11, fill: "var(--bb-text-tertiary)" }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        allowDecimals={false}
-                        tick={{ fontSize: 11, fill: "var(--bb-text-tertiary)" }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          borderRadius: 12,
-                          border: "1px solid var(--bb-border)",
-                          fontSize: 12,
-                        }}
-                      />
-                      <Bar dataKey="count" radius={[6, 6, 0, 0]} maxBarSize={48}>
-                        {priorityChartData.map((entry, i) => (
-                          <Cell key={i} fill={entry.fill} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </section>
+                </CardTitle>
+                <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {PRIORITY_ORDER.map((p) => (
+                    <CountTile
+                      key={p}
+                      label={<StatusDot tone={PRIORITY[p].tone} label={PRIORITY[p].label} />}
+                      value={ticketStats.byPriority[p] ?? 0}
+                    />
+                  ))}
+                </dl>
+              </Card>
             </div>
-          )}
+          ) : null}
 
-          {/* Row 2.5: Upcoming deadlines */}
-          {creativeTickets.length > 0 && (
-            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
-                Upcoming deadlines
-              </h2>
-              <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
-                Your assigned tickets with due dates, sorted by urgency
-              </p>
-              {upcomingTickets.length === 0 ? (
-                <p className="mt-4 text-[11px] text-[var(--bb-text-tertiary)]">
-                  No upcoming deadlines.
-                </p>
-              ) : (
-                <div className="mt-4 divide-y divide-[var(--bb-border-subtle)]">
-                  {upcomingTickets.map((t) => {
-                    const countdown = formatDueDateCountdown(t.dueDate);
-                    const overdue = isDueDateOverdue(t.dueDate);
-                    const soon = isDueDateSoon(t.dueDate);
-                    const code = buildTicketCode({
-                      projectCode: t.project?.code,
-                      companyTicketNumber: t.companyTicketNumber,
-                      ticketId: t.id,
-                    });
-                    return (
-                      <Link
-                        key={t.id}
-                        href={`/creative/tickets/${t.id}`}
-                        className="flex items-center justify-between py-2.5 transition-opacity first:pt-0 last:pb-0 hover:opacity-80"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-medium text-[var(--bb-secondary)]">
-                            {code && (
-                              <span className="mr-1.5 text-[var(--bb-text-tertiary)]">{code}</span>
-                            )}
-                            {t.title}
-                          </p>
-                          {t.company && (
-                            <p className="mt-0.5 truncate text-[10px] text-[var(--bb-text-tertiary)]">
-                              {t.company.name}
-                            </p>
-                          )}
-                        </div>
-                        {countdown && (
-                          <span
-                            className={`ml-4 shrink-0 text-[11px] font-medium ${
-                              overdue
-                                ? "text-[var(--bb-danger-text)]"
-                                : soon
-                                  ? "text-[var(--bb-warning-text)]"
-                                  : "text-[var(--bb-text-tertiary)]"
-                            }`}
-                          >
-                            {countdown.label}
-                          </span>
-                        )}
-                      </Link>
-                    );
-                  })}
+          {/* Upcoming deadlines */}
+          {creativeTickets.length > 0 ? (
+            <Card padding="none">
+              <div className="flex flex-wrap items-start justify-between gap-4 px-6 pt-6">
+                <div className="flex min-w-[240px] flex-1 items-center gap-4">
+                  <IconTile tone="peach" round>
+                    <IconDocument />
+                  </IconTile>
+                  <div className="min-w-0">
+                    <h2 className="text-xl leading-7 font-semibold">Your next jobs</h2>
+                    <p className="text-sm text-[var(--av2-text-2)]">
+                      Your assigned jobs with due dates, soonest first.
+                    </p>
+                  </div>
                 </div>
+                <ButtonLink href="/creative/board" variant="primary">
+                  Open board
+                  <IconArrowUpRight />
+                </ButtonLink>
+              </div>
+
+              {dueJobs.length === 0 ? (
+                <EmptyState title="No upcoming deadlines." />
+              ) : (
+                <>
+                  <div className="px-6 pt-4 pb-4">
+                    <FilterChips
+                      label="Filter next jobs by status"
+                      options={[
+                        { value: "ALL" as NextJobsFilter, label: "All", count: dueJobs.length },
+                        ...OPEN_STATUSES.map((s) => ({
+                          value: s as NextJobsFilter,
+                          label: TICKET_STATUS[s].label,
+                          count: dueJobs.filter((t) => t.status === s).length,
+                        })),
+                      ]}
+                      value={jobsFilter}
+                      onChange={setJobsFilter}
+                    />
+                  </div>
+                  {nextJobs.length === 0 ? (
+                    <EmptyState title="No jobs with a due date in this status." />
+                  ) : (
+                    <Table label="Your next jobs">
+                      <thead>
+                        <tr>
+                          <Th className="max-sm:hidden">ID</Th>
+                          <Th>Job</Th>
+                          <Th className="max-md:hidden">Status</Th>
+                          <Th className="max-md:hidden">Priority</Th>
+                          <Th>Due date</Th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {nextJobs.map((t) => {
+                          const countdown = formatDueDateCountdown(t.dueDate);
+                          const overdue = isDueDateOverdue(t.dueDate);
+                          const soon = isDueDateSoon(t.dueDate);
+                          const status = TICKET_STATUS[t.status];
+                          const priority = PRIORITY[t.priority];
+                          return (
+                            <tr
+                              key={t.id}
+                              className="border-b border-[var(--av2-border)] last:border-b-0"
+                            >
+                              <Td className="whitespace-nowrap text-[var(--av2-text-2)] max-sm:hidden">
+                                {buildTicketCode({
+                                  projectCode: t.project?.code,
+                                  companyTicketNumber: t.companyTicketNumber,
+                                  ticketId: t.id,
+                                })}
+                              </Td>
+                              <Td>
+                                <Link
+                                  href={`/creative/tickets/${t.id}`}
+                                  className="font-medium hover:underline"
+                                >
+                                  {t.title}
+                                </Link>
+                                {t.company ? (
+                                  <p className="mt-0.5 text-xs text-[var(--av2-text-2)]">
+                                    {t.company.name}
+                                  </p>
+                                ) : null}
+                                <div className="mt-1 flex flex-wrap gap-1 md:hidden">
+                                  <Badge tone={status.tone} dot>
+                                    {status.label}
+                                  </Badge>
+                                  <Badge tone={priority.tone}>{priority.label}</Badge>
+                                </div>
+                              </Td>
+                              <Td className="max-md:hidden">
+                                <Badge tone={status.tone} dot>
+                                  {status.label}
+                                </Badge>
+                              </Td>
+                              <Td className="max-md:hidden">
+                                <Badge tone={priority.tone}>{priority.label}</Badge>
+                              </Td>
+                              <Td>
+                                <p className="whitespace-nowrap">{formatDate(t.dueDate)}</p>
+                                {countdown ? (
+                                  overdue ? (
+                                    <Badge tone="red" className="mt-1">
+                                      {countdown.label}
+                                    </Badge>
+                                  ) : soon ? (
+                                    <Badge tone="amber" className="mt-1">
+                                      {countdown.label}
+                                    </Badge>
+                                  ) : (
+                                    <p className="mt-0.5 text-xs text-[var(--av2-text-2)]">
+                                      {countdown.label}
+                                    </p>
+                                  )
+                                ) : null}
+                              </Td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </Table>
+                  )}
+                </>
               )}
-            </section>
-          )}
+            </Card>
+          ) : null}
 
-          {/* Row 3: Load score + Latest withdrawal */}
-          <div className="grid gap-4 md:grid-cols-2">
-            {/* Load score card */}
-            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
-                Load score
-              </h2>
-              <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
-                Your current workload capacity indicator. Based on your active tickets vs. maximum
-                capacity. Below 50 is light, 50-80 is moderate, above 80 is heavy.
-              </p>
-
-              <div className="mt-4 flex items-center gap-4">
-                {/* Circular gauge */}
-                <div className="relative flex h-20 w-20 flex-shrink-0 items-center justify-center">
-                  <svg className="h-full w-full -rotate-90" viewBox="0 0 36 36">
+          {/* Load score + recent withdrawals */}
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Card>
+              <CardTitle>Load score</CardTitle>
+              <div className="mt-4 flex flex-wrap items-center gap-6">
+                <div className="relative flex h-28 w-28 shrink-0 items-center justify-center">
+                  <svg
+                    role="img"
+                    aria-label={`Load score ${fmt(loadScore)}${band ? `, ${band.label}` : ""}`}
+                    className="h-full w-full -rotate-90"
+                    viewBox="0 0 36 36"
+                  >
                     <circle
                       cx="18"
                       cy="18"
                       r="15.9155"
                       fill="none"
-                      stroke="var(--bb-bg-card)"
+                      stroke="var(--av2-track)"
                       strokeWidth="3"
                     />
-                    <circle
-                      cx="18"
-                      cy="18"
-                      r="15.9155"
-                      fill="none"
-                      stroke={loadScoreColor}
-                      strokeWidth="3"
-                      strokeDasharray={`${Math.min(loadScore, 100)} ${
-                        100 - Math.min(loadScore, 100)
-                      }`}
-                      strokeLinecap="round"
-                    />
+                    {band ? (
+                      <circle
+                        cx="18"
+                        cy="18"
+                        r="15.9155"
+                        fill="none"
+                        stroke={band.color}
+                        strokeWidth="3"
+                        strokeDasharray={`${gaugeValue} ${100 - gaugeValue}`}
+                        strokeLinecap="round"
+                      />
+                    ) : null}
                   </svg>
-                  <span className="absolute text-lg font-bold text-[var(--bb-secondary)]">
-                    {loadScore}
+                  <span aria-hidden className="absolute text-2xl leading-8 font-bold tabular-nums">
+                    {fmt(loadScore)}
                   </span>
                 </div>
-
-                {/* Status breakdown list */}
-                {ticketStats && (
-                  <div className="flex-1 space-y-1.5">
-                    {STATUS_ORDER.map((s) => (
-                      <div key={s} className="flex items-center justify-between text-[11px]">
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className="inline-block h-2 w-2 rounded-full"
-                            style={{ backgroundColor: STATUS_COLORS[s] }}
-                          />
-                          <span className="text-[var(--bb-text-tertiary)]">{STATUS_LABELS[s]}</span>
-                        </div>
-                        <span className="font-semibold text-[var(--bb-secondary)]">
-                          {ticketStats.byStatus[s] ?? 0}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <div className="min-w-[200px] flex-1">
+                  {band ? <p className="text-xl leading-7 font-semibold">{band.label}</p> : null}
+                  <p className="mt-1 text-sm text-[var(--av2-text-2)]">
+                    Weighted from the priority and token cost of your open jobs. Below 50 is light,
+                    50-80 is moderate, above 80 is heavy.
+                  </p>
+                </div>
               </div>
-            </section>
+            </Card>
 
-            {/* Recent withdrawal card */}
-            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
-                  Recent withdrawals
-                </h2>
-                <Link
-                  href="/creative/withdrawals"
-                  className="text-[11px] font-medium text-[var(--bb-primary)] hover:underline"
-                >
-                  View all
-                </Link>
-              </div>
-              <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
-                Your latest payout requests.
-              </p>
-
-              {latestWithdrawal ? (
-                <div className="mt-4 space-y-2">
-                  {withdrawalsData!.withdrawals.slice(0, 3).map((w) => (
-                    <div
+            <Card>
+              <CardTitle
+                description="Your latest payout requests."
+                action={
+                  <TextLink href="/creative/withdrawals" arrow={false}>
+                    View all
+                  </TextLink>
+                }
+              >
+                Recent withdrawals
+              </CardTitle>
+              {recentWithdrawals.length > 0 ? (
+                <ul className="mt-4 space-y-2">
+                  {recentWithdrawals.map((w) => (
+                    <li
                       key={w.id}
-                      className="flex items-center justify-between rounded-xl bg-[var(--bb-bg-card)] px-3 py-2.5"
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[var(--av2-bg)] px-4 py-3"
                     >
-                      <div>
-                        <p className="text-xs font-semibold text-[var(--bb-secondary)]">
-                          {w.amountTokens} tokens
-                        </p>
-                        <p className="text-[10px] text-[var(--bb-text-tertiary)]">
+                      <div className="min-w-0">
+                        <p className="font-semibold tabular-nums">{formatTokens(w.amountTokens)}</p>
+                        <p className="text-sm text-[var(--av2-text-2)]">
                           {formatDate(w.createdAt)}
                         </p>
                       </div>
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
-                          w.status === "PAID"
-                            ? "bg-[var(--bb-success-bg)] text-[var(--bb-success-text)]"
-                            : w.status === "APPROVED"
-                              ? "bg-[var(--bb-info-bg)] text-[var(--bb-info-text)]"
-                              : w.status === "REJECTED"
-                                ? "bg-[var(--bb-danger-bg)] text-[var(--bb-danger-text)]"
-                                : "bg-[var(--bb-warning-bg)] text-[var(--bb-warning-text)]"
-                        }`}
-                      >
-                        {withdrawalStatusLabel(w.status)}
-                      </span>
-                    </div>
+                      <WithdrawalBadge status={w.status} />
+                    </li>
                   ))}
-                </div>
+                </ul>
               ) : (
-                <p className="mt-4 text-[11px] text-[var(--bb-text-tertiary)]">
-                  No withdrawal requests yet.
-                </p>
+                <p className="mt-4 text-sm text-[var(--av2-text-2)]">No withdrawal requests yet.</p>
               )}
-            </section>
+            </Card>
           </div>
         </div>
       )}

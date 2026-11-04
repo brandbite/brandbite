@@ -12,7 +12,7 @@ describe("generateAbbreviation", () => {
   });
 
   it("generates from a single short word", () => {
-    expect(generateAbbreviation("Brandbite")).toBe("BRA");
+    expect(generateAbbreviation("brandbite")).toBe("BRA");
   });
 
   it("generates from two words (2 letters + 1 letter)", () => {

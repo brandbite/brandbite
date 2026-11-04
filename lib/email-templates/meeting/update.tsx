@@ -28,9 +28,9 @@ export type MeetingEmailProps = {
 };
 
 const TITLES: Record<MeetingEmailKind, { visitor: string; host: string }> = {
-  confirmed: { visitor: "Your call with Brandbite is booked", host: "New meeting booked" },
-  rescheduled: { visitor: "Your call with Brandbite has a new time", host: "Meeting rescheduled" },
-  canceled: { visitor: "Your call with Brandbite was canceled", host: "Meeting canceled" },
+  confirmed: { visitor: "Your call with brandbite is booked", host: "New meeting booked" },
+  rescheduled: { visitor: "Your call with brandbite has a new time", host: "Meeting rescheduled" },
+  canceled: { visitor: "Your call with brandbite was canceled", host: "Meeting canceled" },
 };
 
 export function MeetingEmailTemplate(props: MeetingEmailProps) {

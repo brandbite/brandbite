@@ -145,7 +145,7 @@ export function DashboardShell({ role, children }: { role: DashboardRole; childr
             collapsed ? "md:justify-center md:px-2" : "",
           ].join(" ")}
         >
-          <Link href={nav.homeHref} aria-label="Brandbite home" className={`rounded ${FOCUS}`}>
+          <Link href={nav.homeHref} aria-label="brandbite home" className={`rounded ${FOCUS}`}>
             {collapsed ? (
               <span className="hidden md:block">
                 <BrandMark size={32} priority className="h-7 w-7" />
@@ -251,7 +251,7 @@ export function DashboardShell({ role, children }: { role: DashboardRole; childr
           >
             <IconMenu width={20} height={20} />
           </button>
-          <Link href={nav.homeHref} aria-label="Brandbite home" className="md:hidden">
+          <Link href={nav.homeHref} aria-label="brandbite home" className="md:hidden">
             <BrandLogo width={110} priority className="h-6 w-auto" />
           </Link>
 

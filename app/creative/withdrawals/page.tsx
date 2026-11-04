@@ -1,24 +1,48 @@
 // -----------------------------------------------------------------------------
 // @file: app/creative/withdrawals/page.tsx
-// @purpose: Creative-facing withdrawals overview and request form
-// @version: v1.2.1
-// @status: active
-// @lastUpdate: 2025-11-15
+// @purpose: Creative-facing withdrawals overview and request form. Balance, held
+//           and requestable amounts are separate figures; approval is not payment.
 // -----------------------------------------------------------------------------
 
 "use client";
 
-import { useEffect, useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { DataTable, THead, TH, TD } from "@/components/ui/data-table";
-import { EmptyState } from "@/components/ui/empty-state";
-import { FormInput } from "@/components/ui/form-field";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import { LoadingState } from "@/components/ui/loading-state";
+import { useEffect, useMemo, useState } from "react";
+
+import { IconAlertCircle, IconClock, IconCoins, IconWallet } from "@/components/admin/v2/icons";
+import {
+  Button,
+  Callout,
+  Card,
+  CardTitle,
+  DASH,
+  EmptyState,
+  Field,
+  FilterChips,
+  fmt,
+  PageHeader,
+  Skeleton,
+  Table,
+  Td,
+  TextInput,
+  Th,
+} from "@/components/admin/v2/ui";
+import {
+  formatDateTime,
+  formatTokens,
+  ListFooter,
+  MoneyStat,
+  pageOf,
+  TokenFigure,
+  WITHDRAWAL_STATUS,
+  WithdrawalBadge,
+  type WithdrawalStatus,
+} from "@/components/dashboard/money/money-ui";
 import { useToast } from "@/components/ui/toast-provider";
 
-type WithdrawalStatus = "PENDING" | "APPROVED" | "REJECTED" | "PAID";
+const PAGE_SIZE = 10;
+const STATUS_ORDER: WithdrawalStatus[] = ["PENDING", "APPROVED", "PAID", "REJECTED"];
+
+type StatusFilter = "ALL" | WithdrawalStatus;
 
 type CreativeWithdrawal = {
   id: string;
@@ -51,6 +75,9 @@ export default function CreativeWithdrawalsPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
+
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+  const [page, setPage] = useState(1);
 
   const load = async () => {
     setLoading(true);
@@ -97,33 +124,19 @@ export default function CreativeWithdrawalsPage() {
     };
   }, []);
 
-  const withdrawals = data?.withdrawals ?? [];
+  const withdrawals = useMemo(() => data?.withdrawals ?? [], [data]);
   const stats = data?.stats;
 
-  const formatDateTime = (iso: string | null) => {
-    if (!iso) return "—";
-    const d = new Date(iso);
-    return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    })}`;
-  };
+  const filtered = useMemo(
+    () =>
+      statusFilter === "ALL" ? withdrawals : withdrawals.filter((w) => w.status === statusFilter),
+    [withdrawals, statusFilter],
+  );
+  const paged = pageOf(filtered, page, PAGE_SIZE);
 
-  const renderStatusBadge = (status: WithdrawalStatus) => {
-    const variantMap: Record<WithdrawalStatus, "warning" | "success" | "danger" | "info"> = {
-      PENDING: "warning",
-      APPROVED: "success",
-      REJECTED: "danger",
-      PAID: "info",
-    };
-    const labelMap: Record<WithdrawalStatus, string> = {
-      PENDING: "Pending",
-      APPROVED: "Approved",
-      REJECTED: "Rejected",
-      PAID: "Paid",
-    };
-    return <Badge variant={variantMap[status]}>{labelMap[status]}</Badge>;
-  };
+  // Nothing the server would accept: the amount can't reach the current minimum.
+  const minimum = stats?.minWithdrawalTokens ?? 0;
+  const blocked = stats != null && stats.spendableBalance < Math.max(minimum, 1);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -188,169 +201,241 @@ export default function CreativeWithdrawalsPage() {
     }
   };
 
+  const figure = (value: number | undefined) => (stats ? <TokenFigure value={value} /> : DASH);
+
   return (
-    <div className="max-w-5xl">
-      {/* Page header */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">My withdrawals</h1>
-          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-            Request payouts from your token balance and track their status.
-          </p>
-        </div>
-      </div>
+    <>
+      <PageHeader
+        title="My withdrawals"
+        description="Request payouts from your token balance and track their status."
+      />
 
-      {/* Error */}
-      {error && (
-        <InlineAlert variant="error" title="Error" className="mb-4">
-          {error}
-        </InlineAlert>
-      )}
+      <div className="space-y-6">
+        {error ? (
+          <Callout tone="error" title="We couldn't load your withdrawals">
+            {error}
+          </Callout>
+        ) : null}
 
-      {/* Summary + form — stacks below lg so neither column gets squeezed
-          next to the fixed sidebar. */}
-      <section className="mb-6 grid gap-4 xl:grid-cols-[2fr_3fr]">
-        {/* Summary cards */}
-        <div className="space-y-3">
-          <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-            <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
-              Available balance
-            </p>
-            <p className="mt-2 text-3xl font-semibold text-[var(--bb-primary)]">
-              {loading ? "—" : stats ? stats.availableBalance : 0}
-              <span className="ml-1 text-base font-normal text-[var(--bb-text-secondary)]">
-                tokens
-              </span>
-            </p>
-            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-              {stats && stats.reservedTokens > 0
-                ? `${stats.spendableBalance} available to withdraw now — ${stats.reservedTokens} tokens are held by pending requests.`
-                : "This is your current token balance before new withdrawals."}
-            </p>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-2">
-            <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-              <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
-                Total requested
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
-                {loading ? "—" : stats ? stats.totalRequested : 0}
-              </p>
-              <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-                Sum of all your withdrawal requests.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-              <p className="text-xs font-medium tracking-[0.12em] text-[var(--bb-text-tertiary)] uppercase">
-                Pending requests
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-[var(--bb-secondary)]">
-                {loading ? "—" : stats ? stats.pendingCount : 0}
-              </p>
-              <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-                Waiting for approval from admin.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Request form */}
-        <div className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm">
-          <h2 className="text-sm font-semibold tracking-tight">Request a withdrawal</h2>
-          <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
-            Enter the amount of tokens you would like to withdraw.
-            {stats?.minWithdrawalTokens
-              ? ` Minimum: ${stats.minWithdrawalTokens} tokens.`
-              : " Minimum withdrawal amount applies."}
-          </p>
-
-          {submitError && (
-            <InlineAlert variant="error" size="sm" className="mt-3">
-              {submitError}
-            </InlineAlert>
-          )}
-
-          {submitSuccess && (
-            <InlineAlert variant="success" size="sm" className="mt-3">
-              {submitSuccess}
-            </InlineAlert>
-          )}
-
-          <form className="mt-4 space-y-3" onSubmit={handleSubmit}>
-            <div className="flex flex-col gap-1">
-              <label htmlFor="amount" className="text-xs font-medium text-[var(--bb-secondary)]">
-                Amount (tokens)
-              </label>
-              <FormInput
-                id="amount"
-                type="number"
-                min={1}
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="e.g. 50"
+        <div className="grid items-start gap-6 2xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+          <div className="grid gap-6 sm:grid-cols-6">
+            <div className="min-w-0 sm:col-span-6 lg:col-span-2 [&>section]:h-full">
+              <MoneyStat
+                icon={<IconCoins />}
+                tone="peach"
+                label="Token balance"
+                value={figure(stats?.availableBalance)}
+                hint="Your full balance, including tokens held for requests."
               />
-              <p className="text-xs text-[var(--bb-text-tertiary)]">
-                You can only request up to your available balance.
-              </p>
+            </div>
+            <div className="min-w-0 sm:col-span-3 lg:col-span-2 [&>section]:h-full">
+              <MoneyStat
+                icon={<IconClock />}
+                tone="lavender"
+                label="Held for existing requests"
+                value={figure(stats?.reservedTokens)}
+                hint="Pending and approved requests that aren't paid yet."
+              />
+            </div>
+            <div className="min-w-0 sm:col-span-3 lg:col-span-2 [&>section]:h-full">
+              <MoneyStat
+                icon={<IconWallet />}
+                tone="green"
+                label="Available to request"
+                value={figure(stats?.spendableBalance)}
+                hint="Your balance minus the tokens held."
+              />
+            </div>
+            <div className="min-w-0 sm:col-span-3 [&>section]:h-full">
+              <MoneyStat
+                label="Pending approval"
+                value={fmt(stats?.pendingCount)}
+                hint="Requests waiting for approval from admin."
+              />
+            </div>
+            <div className="min-w-0 sm:col-span-3 [&>section]:h-full">
+              <MoneyStat
+                label="Total requested"
+                value={figure(stats?.totalRequested)}
+                hint="Sum of all your withdrawal requests."
+              />
+            </div>
+          </div>
+
+          <Card>
+            <CardTitle
+              description={
+                <>
+                  Enter the amount of tokens you would like to withdraw.
+                  {stats?.minWithdrawalTokens
+                    ? ` Minimum: ${formatTokens(stats.minWithdrawalTokens)}.`
+                    : " Minimum withdrawal amount applies."}
+                </>
+              }
+            >
+              Request a withdrawal
+            </CardTitle>
+
+            <div className="mt-4 space-y-3 empty:hidden">
+              {submitError ? <Callout tone="error">{submitError}</Callout> : null}
+              {submitSuccess ? (
+                <div role="status">
+                  <Callout tone="success">{submitSuccess}</Callout>
+                </div>
+              ) : null}
             </div>
 
-            <Button type="submit" loading={submitting} loadingText="Submitting…">
-              Submit withdrawal request
-            </Button>
-          </form>
-        </div>
-      </section>
+            <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
+              <Field
+                label="Amount (tokens)"
+                htmlFor="amount"
+                hint={
+                  stats
+                    ? `Available to request: ${formatTokens(stats.spendableBalance)}.`
+                    : "You can only request up to your available balance."
+                }
+              >
+                <TextInput
+                  id="amount"
+                  type="number"
+                  min={1}
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="e.g. 50"
+                  disabled={blocked}
+                />
+              </Field>
 
-      {/* Withdrawals table */}
-      <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold tracking-tight">My withdrawal history</h2>
-          <p className="text-xs text-[var(--bb-text-tertiary)]">
-            Showing {withdrawals.length} requests.
-          </p>
+              <Button type="submit" variant="primary" disabled={submitting || blocked}>
+                {submitting ? "Submitting…" : "Submit withdrawal request"}
+              </Button>
+            </form>
+          </Card>
         </div>
 
-        {loading ? (
-          <LoadingState message="Loading withdrawals…" />
-        ) : withdrawals.length === 0 ? (
-          <EmptyState title="You have not requested any withdrawals yet." />
-        ) : (
-          <DataTable>
-            <THead>
-              <TH>Created</TH>
-              <TH>Amount</TH>
-              <TH>Status</TH>
-              <TH>Approved at</TH>
-              <TH> </TH>
-            </THead>
-            <tbody>
-              {withdrawals.map((w) => (
-                <tr
-                  key={w.id}
-                  className="border-b border-[var(--bb-border-subtle)] text-xs last:border-b-0"
-                >
-                  <TD>{formatDateTime(w.createdAt)}</TD>
-                  <TD>{w.amountTokens} tokens</TD>
-                  <TD>{renderStatusBadge(w.status)}</TD>
-                  <TD>{formatDateTime(w.approvedAt)}</TD>
-                  <TD>
-                    {w.status === "PENDING" && (
-                      <button
-                        onClick={() => handleCancel(w.id)}
-                        className="text-xs font-medium text-red-500 hover:text-red-700 hover:underline"
-                      >
-                        Cancel
-                      </button>
-                    )}
-                  </TD>
-                </tr>
-              ))}
-            </tbody>
-          </DataTable>
-        )}
-      </section>
-    </div>
+        {blocked && stats ? (
+          <Callout
+            title={
+              stats.spendableBalance > 0
+                ? `You can request ${formatTokens(stats.spendableBalance)}, below the ${formatTokens(minimum)} minimum.`
+                : "No tokens available to request."
+            }
+          >
+            {stats.reservedTokens > 0 ? "See your existing requests below for details." : null}
+          </Callout>
+        ) : null}
+
+        <Card padding="none">
+          <div className="px-6 pt-6">
+            <CardTitle
+              action={
+                <p className="flex items-center gap-1.5 text-sm text-[var(--av2-text-2)] max-sm:hidden">
+                  <IconAlertCircle width={16} height={16} className="shrink-0" />
+                  Approval and payout are separate steps.
+                </p>
+              }
+            >
+              My withdrawal history
+            </CardTitle>
+            <p className="mt-1 text-sm text-[var(--av2-text-2)] sm:hidden">
+              Approval and payout are separate steps.
+            </p>
+            {withdrawals.length > 0 ? (
+              <div className="mt-4">
+                <FilterChips
+                  label="Filter by status"
+                  options={[
+                    { value: "ALL" as StatusFilter, label: "All", count: withdrawals.length },
+                    ...STATUS_ORDER.map((s) => ({
+                      value: s as StatusFilter,
+                      label: WITHDRAWAL_STATUS[s].label,
+                      count: withdrawals.filter((w) => w.status === s).length,
+                    })),
+                  ]}
+                  value={statusFilter}
+                  onChange={(v) => {
+                    setStatusFilter(v);
+                    setPage(1);
+                  }}
+                />
+              </div>
+            ) : null}
+          </div>
+
+          {loading && !data ? (
+            <div aria-busy="true" aria-label="Loading withdrawals" className="p-6">
+              <Skeleton className="h-32" />
+            </div>
+          ) : withdrawals.length === 0 ? (
+            <EmptyState title="You have not requested any withdrawals yet." />
+          ) : paged.total === 0 ? (
+            <EmptyState title="No requests with this status." />
+          ) : (
+            <div className="mt-4">
+              <Table label="My withdrawal history">
+                <thead>
+                  <tr>
+                    <Th className="max-md:hidden">Created</Th>
+                    <Th className="max-md:pl-6">Amount</Th>
+                    <Th>Status</Th>
+                    <Th className="max-md:hidden">Approved at</Th>
+                    {paged.rows.some((w) => w.status === "PENDING") ? (
+                      <Th align="right">Action</Th>
+                    ) : null}
+                  </tr>
+                </thead>
+                <tbody>
+                  {paged.rows.map((w) => (
+                    <tr key={w.id} className="border-b border-[var(--av2-border)] last:border-b-0">
+                      <Td className="whitespace-nowrap max-md:hidden">
+                        {formatDateTime(w.createdAt)}
+                      </Td>
+                      <Td className="max-md:pl-6">
+                        <span className="font-semibold whitespace-nowrap tabular-nums">
+                          {formatTokens(w.amountTokens)}
+                        </span>
+                        <span className="mt-0.5 block text-xs text-[var(--av2-text-2)] md:hidden">
+                          Created {formatDateTime(w.createdAt)}
+                        </span>
+                        {w.approvedAt ? (
+                          <span className="mt-0.5 block text-xs text-[var(--av2-text-2)] md:hidden">
+                            Approved {formatDateTime(w.approvedAt)}
+                          </span>
+                        ) : null}
+                      </Td>
+                      <Td className="whitespace-nowrap">
+                        <WithdrawalBadge status={w.status} />
+                        {w.status === "APPROVED" ? (
+                          <span className="mt-1 block text-xs text-[var(--av2-text-2)]">
+                            Not paid yet
+                          </span>
+                        ) : null}
+                      </Td>
+                      <Td className="whitespace-nowrap max-md:hidden">
+                        {formatDateTime(w.approvedAt)}
+                      </Td>
+                      {paged.rows.some((r) => r.status === "PENDING") ? (
+                        <Td align="right">
+                          {w.status === "PENDING" ? (
+                            <Button
+                              variant="danger"
+                              onClick={() => handleCancel(w.id)}
+                              aria-label={`Cancel withdrawal of ${formatTokens(w.amountTokens)}`}
+                            >
+                              Cancel
+                            </Button>
+                          ) : null}
+                        </Td>
+                      ) : null}
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+              <ListFooter {...paged} onPage={setPage} />
+            </div>
+          )}
+        </Card>
+      </div>
+    </>
   );
 }

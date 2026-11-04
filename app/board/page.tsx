@@ -134,7 +134,7 @@ export default function BoardPage() {
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--bb-primary)] text-sm font-semibold text-white">
               B
             </div>
-            <span className="text-lg font-semibold tracking-tight">Brandbite</span>
+            <span className="text-lg font-semibold tracking-tight">brandbite</span>
           </div>
           <nav className="hidden items-center gap-6 text-sm text-[var(--bb-text-secondary)] md:flex">
             <button className="font-medium text-[var(--bb-secondary)]">Board</button>

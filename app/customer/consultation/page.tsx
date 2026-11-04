@@ -9,12 +9,30 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
-import { FormSelect, FormTextarea } from "@/components/ui/form-field";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import { LoadingState } from "@/components/ui/loading-state";
+import { IconArrowUpRight, IconClock, IconCoins } from "@/components/admin/v2/icons";
+import {
+  Badge,
+  Button,
+  buttonClass,
+  Callout,
+  Card,
+  CardTitle,
+  EmptyState,
+  Field,
+  fmt,
+  IconTile,
+  PageHeader,
+  plural,
+  SearchInput,
+  Select,
+  Skeleton,
+  TabPanel,
+  Tabs,
+  TextArea,
+  TextInput,
+  type Tone,
+} from "@/components/admin/v2/ui";
+import { ListPager } from "@/components/dashboard/workspace/list-pager";
 import {
   InsufficientTokensModal,
   type InsufficientTokensInfo,
@@ -52,12 +70,23 @@ const STATUS_LABEL: Record<ConsultationStatus, string> = {
   CANCELED: "Canceled",
 };
 
-const STATUS_VARIANT: Record<ConsultationStatus, "info" | "success" | "warning" | "neutral"> = {
-  PENDING: "warning",
-  SCHEDULED: "info",
-  COMPLETED: "success",
+const STATUS_TONE: Record<ConsultationStatus, Tone> = {
+  PENDING: "amber",
+  SCHEDULED: "blue",
+  COMPLETED: "green",
   CANCELED: "neutral",
 };
+
+const HISTORY_TABS = "consultation-history";
+const HISTORY_PAGE_SIZE = 5;
+const SELECT_THEME = "dark:[color-scheme:dark]";
+
+/** Still to happen: waiting for a slot, or scheduled for a time not yet passed. */
+function isUpcoming(c: ConsultationRow, now: number): boolean {
+  if (c.status === "PENDING") return true;
+  if (c.status !== "SCHEDULED") return false;
+  return !c.scheduledAt || new Date(c.scheduledAt).getTime() >= now;
+}
 
 const DESCRIPTION_MIN = 10;
 const DESCRIPTION_MAX = 4000;
@@ -219,6 +248,13 @@ export default function CustomerConsultationPage() {
   const [companyRole, setCompanyRole] = useState<CompanyRole | null>(null);
   const [companyRoleLoading, setCompanyRoleLoading] = useState(true);
   const [settings, setSettings] = useState<PublicSettings | null>(null);
+  const [balance, setBalance] = useState<number | null>(null);
+
+  // History list controls (client-side: the API returns every row).
+  const [historyTab, setHistoryTab] = useState<"upcoming" | "all">("all");
+  const [historyQuery, setHistoryQuery] = useState("");
+  const [historyStatus, setHistoryStatus] = useState<ConsultationStatus | "">("");
+  const [historyPage, setHistoryPage] = useState(1);
 
   // Form state — date + time as two separate fields so the time dropdown
   // can offer only valid 30-min slots (native datetime-local ignores step
@@ -270,6 +306,21 @@ export default function CustomerConsultationPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // The balance is informational; the form still works if this request fails.
+  const loadBalance = useCallback(() => {
+    fetch("/api/customer/tokens", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        const value = json?.company?.tokenBalance;
+        if (typeof value === "number") setBalance(value);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    loadBalance();
+  }, [loadBalance]);
 
   // Public settings — drives min/max slots, enabled gate, contact email.
   useEffect(() => {
@@ -518,6 +569,7 @@ export default function CustomerConsultationPage() {
       setDate("");
       setTime("");
       load();
+      loadBalance();
     } catch (err) {
       console.error("[CustomerConsultationPage] submit error", err);
       setFormError("Unexpected error while submitting.");
@@ -526,325 +578,440 @@ export default function CustomerConsultationPage() {
     }
   };
 
+  const now = Date.now();
+  const upcomingCount = rows.filter((c) => isUpcoming(c, now)).length;
+  const historyTerms = historyQuery.toLowerCase().split(/\s+/).filter(Boolean);
+  const visibleRows = rows.filter((c) => {
+    if (historyTab === "upcoming" && !isUpcoming(c, now)) return false;
+    if (historyStatus && c.status !== historyStatus) return false;
+    const text = `${c.description} ${STATUS_LABEL[c.status]}`.toLowerCase();
+    return historyTerms.every((t) => text.includes(t));
+  });
+  const historyPageCount = Math.max(1, Math.ceil(visibleRows.length / HISTORY_PAGE_SIZE));
+  // A reload can shrink the list under the current page.
+  const safeHistoryPage = Math.min(historyPage, historyPageCount);
+  const pageRows = visibleRows.slice(
+    (safeHistoryPage - 1) * HISTORY_PAGE_SIZE,
+    safeHistoryPage * HISTORY_PAGE_SIZE,
+  );
+
+  const history = (
+    <Card padding="sm" className="min-w-0 sm:p-6">
+      <CardTitle>Your consultations</CardTitle>
+
+      {loading ? (
+        <div aria-busy="true" aria-label="Loading consultations" className="mt-4 space-y-3">
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+        </div>
+      ) : error ? (
+        <div className="mt-4">
+          <Callout tone="error" title={error} />
+        </div>
+      ) : rows.length === 0 ? (
+        <EmptyState
+          title="No consultations yet"
+          description="Requests you submit will show up here with their current status."
+        />
+      ) : (
+        <div className="mt-3">
+          <Tabs
+            label="Consultation list"
+            idPrefix={HISTORY_TABS}
+            tabs={[
+              { value: "upcoming" as const, label: `Upcoming (${upcomingCount})` },
+              { value: "all" as const, label: `All (${rows.length})` },
+            ]}
+            value={historyTab}
+            onChange={(tab) => {
+              setHistoryTab(tab);
+              setHistoryPage(1);
+            }}
+          />
+          <TabPanel idPrefix={HISTORY_TABS} value={historyTab}>
+            <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_200px]">
+              <SearchInput
+                value={historyQuery}
+                onChange={(v) => {
+                  setHistoryQuery(v);
+                  setHistoryPage(1);
+                }}
+                label="Search consultations"
+                placeholder="Search consultations"
+              />
+              <Select
+                aria-label="Filter by status"
+                value={historyStatus}
+                onChange={(e) => {
+                  setHistoryStatus(e.target.value as ConsultationStatus | "");
+                  setHistoryPage(1);
+                }}
+                className={SELECT_THEME}
+              >
+                <option value="">All statuses</option>
+                {(Object.keys(STATUS_LABEL) as ConsultationStatus[]).map((s) => (
+                  <option key={s} value={s}>
+                    {STATUS_LABEL[s]}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            {visibleRows.length === 0 ? (
+              <EmptyState
+                title="No consultations match"
+                description={
+                  historyTab === "upcoming"
+                    ? "Nothing is awaiting scheduling or coming up. Look under All for past requests."
+                    : "Try a different word or status."
+                }
+              />
+            ) : (
+              <div className="mt-4 space-y-3">
+                {pageRows.map((c) => (
+                  <article key={c.id} className="rounded-xl border border-[var(--av2-border)] p-4">
+                    <header className="mb-2 flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 gap-3">
+                        <IconTile tone="lavender" size={40}>
+                          <IconClock />
+                        </IconTile>
+                        <div className="min-w-0">
+                          <Badge tone={STATUS_TONE[c.status]}>{STATUS_LABEL[c.status]}</Badge>
+                          <p className="mt-1 text-xs text-[var(--av2-text-2)]">
+                            Requested {formatDateTime(c.createdAt)}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge className="shrink-0">
+                        {c.tokenCost} {plural(c.tokenCost, "token", "tokens")}
+                      </Badge>
+                    </header>
+
+                    <p className="line-clamp-3 text-sm break-words text-[var(--av2-text-2)]">
+                      {c.description}
+                    </p>
+
+                    {c.status === "PENDING" && c.preferredTimes && c.preferredTimes.length > 0 && (
+                      <div className="mt-3 rounded-lg bg-[var(--av2-bg)] p-3 text-sm">
+                        <p className="text-xs text-[var(--av2-text-2)]">You offered</p>
+                        <ul className="mt-1 space-y-0.5">
+                          {c.preferredTimes.map((t, i) => (
+                            <li key={i}>{formatPreferred(t, c.timezone)}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {c.status === "SCHEDULED" && (
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-[var(--av2-bg)] p-3">
+                        <div>
+                          <p className="text-xs text-[var(--av2-text-2)]">Scheduled for</p>
+                          <p className="mt-0.5 text-sm font-semibold">
+                            {formatDateTime(c.scheduledAt)}
+                          </p>
+                        </div>
+                        {c.videoLink && (
+                          <a
+                            href={c.videoLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={buttonClass("secondary")}
+                          >
+                            Join call
+                            <IconArrowUpRight aria-hidden />
+                          </a>
+                        )}
+                      </div>
+                    )}
+                  </article>
+                ))}
+
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-1 text-sm text-[var(--av2-text-2)]">
+                  <p role="status">
+                    Showing {pageRows.length} of {visibleRows.length}
+                  </p>
+                  <ListPager
+                    label="Consultation pages"
+                    page={safeHistoryPage}
+                    pageCount={historyPageCount}
+                    onPage={setHistoryPage}
+                  />
+                </div>
+              </div>
+            )}
+          </TabPanel>
+        </div>
+      )}
+    </Card>
+  );
+
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 pb-16 md:px-0">
-      <header className="mb-6">
-        <p className="text-xs font-bold tracking-[0.2em] text-[var(--bb-primary)] uppercase">
-          Consultation
-        </p>
-        <h1 className="font-brand mt-2 text-3xl font-bold tracking-tight text-[var(--bb-secondary)] sm:text-4xl">
-          Book a call with our team
-        </h1>
-        <p className="mt-3 text-sm leading-relaxed text-[var(--bb-text-secondary)]">
-          Get a {settings?.durationMinutes ?? 30}-minute video consultation with the Brandbite team.
-          Pick what you want to discuss and a few time slots that work — we&apos;ll confirm one by
-          email with a video link
-          {settings?.contactEmail ? ` from ${settings.contactEmail}` : ""}.
-        </p>
-      </header>
+    <>
+      <PageHeader
+        title="Book a call with our team"
+        description={
+          <>
+            Get a {settings?.durationMinutes ?? 30}-minute video consultation with the brandbite
+            team. Pick what you want to discuss and a time that works — we&apos;ll confirm one by
+            email with a video link
+            {settings?.contactEmail ? ` from ${settings.contactEmail}` : ""}.
+          </>
+        }
+        actions={
+          balance !== null ? (
+            <Card padding="sm" as="div" className="flex items-center gap-3 px-4 py-2.5">
+              <IconCoins className="text-[var(--av2-link)]" />
+              <span className="text-sm text-[var(--av2-text-2)]">Balance</span>
+              <span className="text-base font-bold tabular-nums">
+                {fmt(balance)} {plural(balance, "token", "tokens")}
+              </span>
+            </Card>
+          ) : null
+        }
+      />
 
       {/* Access gate */}
       {featureDisabled && (
-        <InlineAlert variant="warning" className="mb-6">
-          Consultation bookings are paused right now. Please check back later.
-        </InlineAlert>
+        <div className="mb-6">
+          <Callout tone="warning" title="Consultation bookings are paused">
+            Consultation bookings are paused right now. Please check back later.
+          </Callout>
+        </div>
       )}
 
       {!featureDisabled && !companyRoleLoading && !canBook && (
-        <InlineAlert variant="info" className="mb-6">
-          Consultations are available to company <strong>Owners</strong> and <strong>PM</strong>{" "}
-          members. Ask a teammate with one of those roles to book on your behalf.
-        </InlineAlert>
+        <div className="mb-6">
+          <Callout tone="info">
+            Consultations are available to company <strong>Owners</strong> and <strong>PM</strong>{" "}
+            members. Ask a teammate with one of those roles to book on your behalf.
+          </Callout>
+        </div>
       )}
 
-      {/* Form (only if user has permission) */}
-      {canBook && (
-        <section className="mb-10 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] p-6 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-[var(--bb-secondary)]">
+      <div className={`grid items-start gap-6 ${canBook ? "xl:grid-cols-2" : ""}`}>
+        {/* Form (only if user has permission) */}
+        {canBook && (
+          <Card padding="sm" className="min-w-0 sm:p-6">
+            <CardTitle
+              action={
+                loading ? null : (
+                  <Badge className="shrink-0">
+                    {tokenCost} {plural(tokenCost, "token", "tokens")}
+                  </Badge>
+                )
+              }
+            >
               New consultation request
-            </h2>
-            <span className="rounded-full bg-[var(--bb-bg-warm)] px-3 py-1 text-[11px] font-semibold text-[var(--bb-secondary)]">
-              {tokenCost} tokens
-            </span>
-          </div>
+            </CardTitle>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Topic presets */}
-            <div>
-              <p className="mb-2 text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-tertiary)] uppercase">
-                Quick start (optional)
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {TOPIC_PRESETS.map((p) => (
-                  <button
-                    key={p.label}
-                    type="button"
-                    onClick={() => applyPreset(p.text)}
-                    className="rounded-full border border-[var(--bb-border)] bg-[var(--bb-bg-warm)] px-3 py-1 text-xs font-medium text-[var(--bb-secondary)] transition-colors hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
-                  >
-                    + {p.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Description */}
-            <div>
-              <label className="mb-1 block text-xs font-semibold tracking-[0.15em] text-[var(--bb-text-tertiary)] uppercase">
-                What do you want to discuss?
-              </label>
-              <FormTextarea
-                placeholder="e.g. We want to refresh our brand identity across web + packaging before a product launch."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={5}
-                maxLength={DESCRIPTION_MAX}
-                required
-              />
-              <div className="mt-1 flex items-center justify-between">
-                <span
-                  className={`text-[11px] ${
-                    charCount < DESCRIPTION_MIN
-                      ? "text-[var(--bb-text-muted)]"
-                      : "text-[var(--bb-text-tertiary)]"
-                  }`}
-                >
-                  {charCount < DESCRIPTION_MIN
-                    ? `${DESCRIPTION_MIN - charCount} more characters needed`
-                    : `${charCount} / ${DESCRIPTION_MAX} characters`}
-                </span>
-              </div>
-            </div>
-
-            {/* Preferred date + time */}
-            <div>
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <label className="block text-xs font-semibold tracking-[0.15em] text-[var(--bb-text-tertiary)] uppercase">
-                  Preferred date &amp; time
-                </label>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={suggestSlot}
-                    className="text-[11px] font-medium text-[var(--bb-primary)] hover:underline"
-                  >
-                    Suggest a time
-                  </button>
-                  {(date || time) && (
+            <form onSubmit={handleSubmit} className="mt-5 space-y-5">
+              {/* Topic presets */}
+              <div>
+                <p className="mb-1.5 text-sm font-medium">Quick start (optional)</p>
+                <div className="flex flex-wrap gap-2">
+                  {TOPIC_PRESETS.map((p) => (
                     <button
+                      key={p.label}
                       type="button"
-                      onClick={() => {
-                        setDate("");
-                        setTime("");
-                      }}
-                      className="text-[11px] font-medium text-[var(--bb-text-muted)] hover:text-[var(--bb-secondary)] hover:underline"
+                      onClick={() => applyPreset(p.text)}
+                      className="inline-flex h-10 items-center rounded-full border border-[var(--av2-border)] bg-[var(--av2-surface)] px-4 text-sm font-medium transition-colors hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
                     >
-                      Clear
+                      + {p.label}
                     </button>
-                  )}
+                  ))}
                 </div>
               </div>
-              <p className="mb-2 text-[11px] text-[var(--bb-text-muted)]">
-                Pick a date and a 30-minute slot. The admin will confirm or propose a different slot
-                by email.
-              </p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <input
-                  type="date"
-                  value={date}
-                  min={minDate}
-                  max={maxDate}
-                  onChange={(e) => {
-                    setDate(e.target.value);
-                    // Reset time if it's no longer valid for the new date's
-                    // same-day min-notice filter.
-                    setTime("");
-                  }}
-                  className="w-full rounded-md border border-[var(--bb-border-input)] bg-white px-2 py-1.5 text-sm text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
-                />
-                <FormSelect
-                  value={time}
-                  onChange={(e) => setTime(e.target.value)}
-                  disabled={!date || timeOptions.length === 0}
-                >
-                  <option value="">
-                    {date
-                      ? timeOptions.length === 0
-                        ? "No slots available on this day"
-                        : "Select a time..."
-                      : "Pick a date first"}
-                  </option>
-                  {timeOptions.map((t) => {
-                    const busy = busySlots.has(t);
-                    return (
-                      <option key={t} value={t} disabled={busy}>
-                        {formatTimeLabel(t)}
-                        {busy ? " — busy" : ""}
-                      </option>
-                    );
-                  })}
-                </FormSelect>
-              </div>
-              {date && time && (
-                <p className="mt-2 text-[11px] text-[var(--bb-text-secondary)]">
-                  →{" "}
-                  {new Date(`${date}T${time}`).toLocaleString(undefined, {
-                    weekday: "long",
-                    month: "short",
-                    day: "numeric",
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}
-                </p>
-              )}
-              {slotWarning && (
-                <p className="mt-2 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-900">
-                  {slotWarning}
-                </p>
-              )}
-              {date && busyLoading && (
-                <p className="mt-2 text-[11px] text-[var(--bb-text-muted)]">
-                  Checking team availability…
-                </p>
-              )}
-              {date && !busyLoading && busyGoogleConnected && busySlots.size > 0 && (
-                <p className="mt-2 text-[11px] text-[var(--bb-text-muted)]">
-                  {busySlots.size} slot{busySlots.size === 1 ? "" : "s"} are already booked and
-                  greyed out.
-                </p>
-              )}
-              <p className="mt-2 text-[11px] text-[var(--bb-text-muted)]">
-                {settings ? (
+
+              {/* Description */}
+              <Field
+                htmlFor="consultation-description"
+                label={
                   <>
-                    Team is available{" "}
-                    {settings.workingDays
-                      .map((d) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d])
-                      .join(", ")}{" "}
-                    from {settings.workingHourStart}:00 to {settings.workingHourEnd}:00
-                    {settings.companyTimezone ? ` ${settings.companyTimezone}` : ""}. Times snap to
-                    30-minute increments.
+                    What do you want to discuss?{" "}
+                    <span className="text-[var(--av2-error-text)]">*</span>
                   </>
-                ) : (
-                  "Times snap to 30-minute increments."
-                )}
-              </p>
-            </div>
-
-            {/* Timezone */}
-            <div>
-              <label className="mb-1 block text-xs font-semibold tracking-[0.15em] text-[var(--bb-text-tertiary)] uppercase">
-                Timezone
-              </label>
-              <FormSelect value={timezone} onChange={(e) => setTimezone(e.target.value)}>
-                {timezoneOptions.map((g) => (
-                  <optgroup key={g.label} label={g.label}>
-                    {g.zones.map((z) => (
-                      <option key={z} value={z}>
-                        {z.replace(/_/g, " ")} — {tzShortLabel(z)}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </FormSelect>
-              <p className="mt-1 text-[11px] text-[var(--bb-text-muted)]">
-                We detected {detectTimezone().replace(/_/g, " ")} ({tzShortLabel(detectTimezone())}
-                ). Change it if you&apos;d like to discuss slots in a different zone.
-              </p>
-            </div>
-
-            {formError && <InlineAlert variant="error">{formError}</InlineAlert>}
-            {successMessage && <InlineAlert variant="success">{successMessage}</InlineAlert>}
-
-            <div>
-              <Button
-                type="submit"
-                loading={submitting}
-                loadingText="Submitting..."
-                disabled={!charOk || !canBook}
+                }
+                hint={
+                  charCount < DESCRIPTION_MIN
+                    ? `${DESCRIPTION_MIN - charCount} more characters needed`
+                    : `${charCount} / ${DESCRIPTION_MAX} characters`
+                }
               >
-                Submit request — {tokenCost} tokens
-              </Button>
-            </div>
-          </form>
-        </section>
-      )}
+                <TextArea
+                  id="consultation-description"
+                  placeholder="e.g. We want to refresh our brand identity across web + packaging before a product launch."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={5}
+                  maxLength={DESCRIPTION_MAX}
+                  required
+                />
+              </Field>
 
-      {/* History */}
-      <section>
-        <h2 className="mb-3 text-sm font-semibold text-[var(--bb-secondary)]">
-          Your consultations
-        </h2>
-
-        {loading && <LoadingState />}
-        {error && <InlineAlert variant="error">{error}</InlineAlert>}
-
-        {!loading && !error && rows.length === 0 && (
-          <EmptyState
-            title="No consultations yet"
-            description="Requests you submit will show up here with their current status."
-          />
-        )}
-
-        {rows.length > 0 && (
-          <div className="space-y-3">
-            {rows.map((c) => (
-              <article
-                key={c.id}
-                className="rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] p-4"
-              >
-                <header className="mb-2 flex items-start justify-between gap-3">
-                  <div>
-                    <Badge variant={STATUS_VARIANT[c.status]}>{STATUS_LABEL[c.status]}</Badge>
-                    <p className="mt-2 text-xs text-[var(--bb-text-muted)]">
-                      Requested {formatDateTime(c.createdAt)}
-                    </p>
-                  </div>
-                  <span className="text-xs text-[var(--bb-text-tertiary)]">
-                    {c.tokenCost} tokens
-                  </span>
-                </header>
-
-                <p className="mb-3 line-clamp-3 text-sm text-[var(--bb-text-secondary)]">
-                  {c.description}
-                </p>
-
-                {c.status === "PENDING" && c.preferredTimes && c.preferredTimes.length > 0 && (
-                  <div className="mt-2 rounded-lg border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-warm)] p-3 text-xs">
-                    <p className="text-[var(--bb-text-muted)]">You offered</p>
-                    <ul className="mt-1 space-y-0.5 text-[var(--bb-secondary)]">
-                      {c.preferredTimes.map((t, i) => (
-                        <li key={i}>· {formatPreferred(t, c.timezone)}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {c.status === "SCHEDULED" && (
-                  <div className="mt-2 rounded-lg border border-[var(--bb-border-subtle)] bg-white p-3 text-xs">
-                    <p className="text-[var(--bb-text-muted)]">Scheduled for</p>
-                    <p className="mt-0.5 font-semibold text-[var(--bb-secondary)]">
-                      {formatDateTime(c.scheduledAt)}
-                    </p>
-                    {c.videoLink && (
-                      <a
-                        href={c.videoLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-1 inline-block break-all text-[var(--bb-primary)] hover:underline"
+              {/* Preferred date + time */}
+              <div>
+                <div className="flex flex-wrap items-center justify-between gap-x-2">
+                  <p className="text-sm font-medium">Preferred date &amp; time</p>
+                  <div className="flex items-center">
+                    <Button variant="ghost" onClick={suggestSlot}>
+                      Suggest a time
+                    </Button>
+                    {(date || time) && (
+                      <Button
+                        variant="ghost"
+                        onClick={() => {
+                          setDate("");
+                          setTime("");
+                        }}
                       >
-                        Join call ↗
-                      </a>
+                        Clear
+                      </Button>
                     )}
                   </div>
+                </div>
+                <p className="mb-2 text-xs text-[var(--av2-text-2)]">
+                  Pick a date and a 30-minute slot. The admin will confirm or propose a different
+                  slot by email.
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <TextInput
+                    type="date"
+                    aria-label="Preferred date"
+                    value={date}
+                    min={minDate}
+                    max={maxDate}
+                    onChange={(e) => {
+                      setDate(e.target.value);
+                      // Reset time if it's no longer valid for the new date's
+                      // same-day min-notice filter.
+                      setTime("");
+                    }}
+                    className={SELECT_THEME}
+                  />
+                  <Select
+                    aria-label="Preferred time"
+                    value={time}
+                    onChange={(e) => setTime(e.target.value)}
+                    disabled={!date || timeOptions.length === 0}
+                    className={SELECT_THEME}
+                  >
+                    <option value="">
+                      {date
+                        ? timeOptions.length === 0
+                          ? "No slots available on this day"
+                          : "Select a time..."
+                        : "Pick a date first"}
+                    </option>
+                    {timeOptions.map((t) => {
+                      const busy = busySlots.has(t);
+                      return (
+                        <option key={t} value={t} disabled={busy}>
+                          {formatTimeLabel(t)}
+                          {busy ? " — busy" : ""}
+                        </option>
+                      );
+                    })}
+                  </Select>
+                </div>
+                {date && time && (
+                  <p className="mt-2 text-sm">
+                    <span aria-hidden>→ </span>
+                    {new Date(`${date}T${time}`).toLocaleString(undefined, {
+                      weekday: "long",
+                      month: "short",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </p>
                 )}
-              </article>
-            ))}
-          </div>
+                {slotWarning && (
+                  <div className="mt-2">
+                    <Badge tone="amber">{slotWarning}</Badge>
+                  </div>
+                )}
+                {date && busyLoading && (
+                  <p className="mt-2 text-xs text-[var(--av2-text-2)]">
+                    Checking team availability…
+                  </p>
+                )}
+                {date && !busyLoading && busyGoogleConnected && busySlots.size > 0 && (
+                  <p className="mt-2 text-xs text-[var(--av2-text-2)]">
+                    {busySlots.size} slot{busySlots.size === 1 ? "" : "s"} are already booked and
+                    greyed out.
+                  </p>
+                )}
+                <p className="mt-2 text-xs text-[var(--av2-text-2)]">
+                  {settings ? (
+                    <>
+                      Team is available{" "}
+                      {settings.workingDays
+                        .map((d) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d])
+                        .join(", ")}{" "}
+                      from {settings.workingHourStart}:00 to {settings.workingHourEnd}:00
+                      {settings.companyTimezone ? ` ${settings.companyTimezone}` : ""}. Times snap
+                      to 30-minute increments.
+                    </>
+                  ) : (
+                    "Times snap to 30-minute increments."
+                  )}
+                </p>
+              </div>
+
+              {/* Timezone */}
+              <Field
+                htmlFor="consultation-timezone"
+                label="Timezone"
+                hint={
+                  <>
+                    We detected {detectTimezone().replace(/_/g, " ")} (
+                    {tzShortLabel(detectTimezone())}). Change it if you&apos;d like to discuss slots
+                    in a different zone.
+                  </>
+                }
+              >
+                <Select
+                  id="consultation-timezone"
+                  value={timezone}
+                  onChange={(e) => setTimezone(e.target.value)}
+                  className={SELECT_THEME}
+                >
+                  {timezoneOptions.map((g) => (
+                    <optgroup key={g.label} label={g.label}>
+                      {g.zones.map((z) => (
+                        <option key={z} value={z}>
+                          {z.replace(/_/g, " ")} — {tzShortLabel(z)}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </Select>
+              </Field>
+
+              {formError && <Callout tone="error" title={formError} />}
+              {successMessage && <Callout tone="success" title={successMessage} />}
+
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={submitting || !charOk || !canBook}
+                aria-busy={submitting}
+              >
+                {submitting
+                  ? "Submitting..."
+                  : loading
+                    ? "Submit request"
+                    : `Submit request — ${tokenCost} ${plural(tokenCost, "token", "tokens")}`}
+              </Button>
+            </form>
+          </Card>
         )}
-      </section>
+
+        {/* History */}
+        {history}
+      </div>
 
       <InsufficientTokensModal info={tokenError} onClose={() => setTokenError(null)} />
-    </div>
+    </>
   );
 }

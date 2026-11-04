@@ -85,7 +85,7 @@ export function TalentAcceptEmailTemplate({
 
   return (
     <BaseLayout
-      previewText="Pick a time for your Brandbite interview."
+      previewText="Pick a time for your brandbite interview."
       hero={
         <HeroBand>
           <Heading>You&apos;re through to the next round</Heading>
@@ -127,7 +127,7 @@ export function TalentAcceptEmailTemplate({
 
       <Signoff
         preamble="The booking link expires in 7 days. After you pick (or propose), you'll get a final confirmation with the Google Meet link."
-        from="Alper, Brandbite"
+        from="Alper, brandbite"
       />
     </BaseLayout>
   );
@@ -138,7 +138,7 @@ export async function renderTalentAcceptEmail(
 ): Promise<{ subject: string; html: string }> {
   const html = await render(<TalentAcceptEmailTemplate {...props} />);
   return {
-    subject: "Pick a time for your Brandbite interview",
+    subject: "Pick a time for your brandbite interview",
     html,
   };
 }

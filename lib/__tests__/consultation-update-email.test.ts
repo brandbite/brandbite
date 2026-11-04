@@ -34,7 +34,7 @@ describe("renderConsultationUpdateEmail", () => {
       timeZone: "Europe/Istanbul",
       videoLink: "https://meet.google.com/abc-defg-hij",
     });
-    expect(subject).toBe("Your Brandbite consultation is booked");
+    expect(subject).toBe("Your brandbite consultation is booked");
     expect(html).toContain("13:00");
     expect(html).toContain("https://meet.google.com/abc-defg-hij");
     expect(html).toContain("Hi Jane,");
@@ -47,7 +47,7 @@ describe("renderConsultationUpdateEmail", () => {
       scheduledAt: "2026-11-10T10:00:00.000Z",
       videoLink: "https://meet.google.com/x",
     });
-    expect(subject).toBe("Your Brandbite consultation has a new time");
+    expect(subject).toBe("Your brandbite consultation has a new time");
   });
 
   it("canceled: mentions the refund", async () => {
@@ -56,7 +56,7 @@ describe("renderConsultationUpdateEmail", () => {
       kind: "canceled",
       refundedTokens: 50,
     });
-    expect(subject).toBe("Your Brandbite consultation was cancelled");
+    expect(subject).toBe("Your brandbite consultation was cancelled");
     // React separates "{n}" and the text after it with <!-- --> markers.
     expect(html.replace(/<!--.*?-->/g, "")).toContain("50 tokens have been returned");
   });

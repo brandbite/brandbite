@@ -105,7 +105,7 @@ export function AdminSidebar({
       >
         <Link
           href="/admin"
-          aria-label="Brandbite admin home"
+          aria-label="brandbite admin home"
           className="rounded focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
         >
           {collapsed && (

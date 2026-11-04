@@ -9,22 +9,38 @@
 
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BoardViewToggle } from "@/components/board/board-view-toggle";
-import { DataTable, THead, TH, TD } from "@/components/ui/data-table";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Button,
+  ButtonLink,
+  Callout,
+  Card,
+  DASH,
+  EmptyState,
+  FilterChips,
+  PageHeader,
+  plural,
+  SearchInput,
+  Select,
+  Skeleton,
+  Table,
+  TableFooter,
+  Td,
+  Th,
+} from "@/components/admin/v2/ui";
+import { IconChevronDown } from "@/components/admin/v2/icons";
+import {
+  DueDate,
+  PriorityBadge,
+  SortableTh,
+  StatusBadge,
+  TicketViewToggle,
+} from "@/components/dashboard/tickets/shared";
 import type { CompanyRole as CompanyRoleString } from "@/lib/permissions/companyRoles";
 import { canCreateTickets } from "@/lib/permissions/companyRoles";
-import { EmptyState } from "@/components/ui/empty-state";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import { LoadingState } from "@/components/ui/loading-state";
-import { FormInput, FormSelect } from "@/components/ui/form-field";
-import { Badge } from "@/components/ui/badge";
-import {
-  priorityBadgeVariant,
-  statusBadgeVariant,
-  isDueDateOverdue,
-  isDueDateSoon,
-} from "@/lib/board";
+import { formatBoardDate } from "@/lib/board";
 
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -64,16 +80,17 @@ type CustomerTicketsResponse = {
 
 type TagOption = { id: string; name: string; color: string };
 
-const STATUS_LABELS: Record<TicketStatus, string> = {
-  TODO: "To do",
-  IN_PROGRESS: "In progress",
-  IN_REVIEW: "In review",
-  DONE: "Done",
+const COMPANY_ROLE_LABEL: Record<CompanyRoleString, string> = {
+  OWNER: "Owner",
+  PM: "Project manager",
+  BILLING: "Billing manager",
+  MEMBER: "Member",
 };
 
 const PAGE_SIZE = 50;
 
 export default function CustomerTicketsPage() {
+  const router = useRouter();
   const [company, setCompany] = useState<CustomerTicketsResponse["company"]>();
   const [tickets, setTickets] = useState<CustomerTicket[]>([]);
   const [pagination, setPagination] = useState<PaginationMeta | null>(null);
@@ -101,6 +118,12 @@ export default function CustomerTicketsPage() {
 
   // Projects derived from first load
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+
+  // Whole-company status counts for the filter chips
+  const [statusCounts, setStatusCounts] = useState<{
+    total: number;
+    byStatus: Record<TicketStatus, number>;
+  } | null>(null);
 
   // Company role
   const [companyRole, setCompanyRole] = useState<CompanyRoleString | null>(null);
@@ -241,6 +264,14 @@ export default function CustomerTicketsPage() {
       })
       .catch(() => {});
 
+    // Counts for the status chips. Optional: the chips work without them.
+    fetch("/api/customer/board", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        if (!cancelled && json?.stats?.byStatus) setStatusCounts(json.stats);
+      })
+      .catch(() => {});
+
     return () => {
       cancelled = true;
     };
@@ -259,135 +290,98 @@ export default function CustomerTicketsPage() {
 
   const canCreateNewTicket = companyRoleLoading ? false : canCreateTickets(companyRole);
 
-  const formatDate = (iso: string | null) => {
-    if (!iso) return "-";
-    return new Date(iso).toLocaleDateString();
-  };
-
-  const formatStatusLabel = (status: TicketStatus) => STATUS_LABELS[status];
-
-  const formatPriorityLabel = (priority: TicketPriority) => {
-    switch (priority) {
-      case "LOW":
-        return "Low";
-      case "MEDIUM":
-        return "Medium";
-      case "HIGH":
-        return "High";
-      case "URGENT":
-        return "Urgent";
-    }
-  };
+  const sortDirection = (field: SortField) => (sortField === field ? sortDir : null);
 
   const totalShown = pagination
     ? Math.min(page * PAGE_SIZE + tickets.length, pagination.total)
     : tickets.length;
 
+  // The chip counts are for the whole company, so they'd mislead next to a
+  // narrower search or filter. Show them only on the unfiltered list.
+  const otherFiltersActive =
+    debouncedSearch !== "" ||
+    projectFilter !== "ALL" ||
+    priorityFilter !== "ALL" ||
+    tagFilter !== "ALL";
+  const anyFilterActive = otherFiltersActive || statusFilter !== "ALL";
+  const countFor = (value: "ALL" | TicketStatus) =>
+    !statusCounts || otherFiltersActive
+      ? null
+      : value === "ALL"
+        ? statusCounts.total
+        : statusCounts.byStatus[value];
+
   return (
     <>
-      {/* View switcher — Board (kanban) ↔ Table (this page) */}
-      <div className="mt-2 mb-4">
-        <BoardViewToggle rolePath="/customer" />
-      </div>
+      <PageHeader
+        title="My requests"
+        description="All creative requests created for your company, with project, status, and creative information."
+        meta={
+          company ? (
+            <>
+              Company <span className="font-medium text-[var(--av2-text)]">{company.name}</span>
+              {companyRole ? (
+                <>
+                  {" · "}You are browsing as{" "}
+                  <span className="font-medium text-[var(--av2-text)]">
+                    {COMPANY_ROLE_LABEL[companyRole]}
+                  </span>
+                </>
+              ) : null}
+            </>
+          ) : null
+        }
+        actions={
+          canCreateNewTicket ? (
+            <ButtonLink href="/customer/tickets/new" variant="primary">
+              + New request
+            </ButtonLink>
+          ) : null
+        }
+      />
 
-      {/* Page header */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">My tickets</h1>
-          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-            All creative requests created for your company, with project, status, and creative
-            information.
-          </p>
-          {company && (
-            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-              Company:{" "}
-              <span className="font-medium text-[var(--bb-secondary)]">{company.name}</span> (
-              {company.slug})
-            </p>
-          )}
-        </div>
+      <div className="space-y-4">
+        <TicketViewToggle rolePath="/customer" />
 
-        <div className="flex flex-col items-end gap-2">
-          <button
-            type="button"
-            disabled={!canCreateNewTicket}
-            className={`inline-flex items-center justify-center rounded-full px-4 py-1.5 text-[11px] font-medium ${
-              canCreateNewTicket
-                ? "bg-[var(--bb-primary)] text-white hover:bg-[var(--bb-primary-hover)]"
-                : "cursor-not-allowed bg-[var(--bb-border-subtle)] text-[var(--bb-text-muted)]"
-            }`}
-            onClick={() => {
-              if (!canCreateNewTicket) return;
-              window.location.href = "/customer/tickets/new";
-            }}
-          >
-            New ticket
-          </button>
+        {!error && !companyRoleLoading && companyRole === "BILLING" ? (
+          <Callout tone="warning" title="Limited access">
+            Your billing role can review existing requests, but it can't create new ones for this
+            workspace. Ask your company owner or a project manager to add one.
+          </Callout>
+        ) : null}
 
-          {!loading && pagination && (
-            <div className="rounded-full bg-[var(--bb-bg-card)] px-3 py-1 text-xs text-[var(--bb-text-secondary)]">
-              {pagination.total} ticket
-              {pagination.total === 1 ? "" : "s"} total
-            </div>
-          )}
-        </div>
-      </div>
+        {error ? (
+          <Callout tone="error" title="We couldn't load your requests">
+            {error}
+          </Callout>
+        ) : null}
 
-      {/* Limited access for billing role */}
-      {!error && !companyRoleLoading && companyRole === "BILLING" && (
-        <div className="mb-4 rounded-xl border border-[var(--bb-warning-border)] bg-[var(--bb-warning-bg)] px-4 py-3 text-xs text-[var(--bb-text-secondary)]">
-          <p className="text-[11px] font-medium text-[var(--bb-warning-text)]">Limited access</p>
-          <p className="mt-1">
-            You can review existing tickets, but only your company owner or project manager can
-            create new tickets for this workspace.
-          </p>
-        </div>
-      )}
+        <FilterChips
+          label="Filter by status"
+          value={statusFilter}
+          onChange={setStatusFilter}
+          options={[
+            { value: "ALL", label: "All", count: countFor("ALL") },
+            { value: "TODO", label: "Backlog", count: countFor("TODO") },
+            { value: "IN_PROGRESS", label: "In progress", count: countFor("IN_PROGRESS") },
+            { value: "IN_REVIEW", label: "In review", count: countFor("IN_REVIEW") },
+            { value: "DONE", label: "Done", count: countFor("DONE") },
+          ]}
+        />
 
-      {/* Error */}
-      {error && (
-        <InlineAlert variant="error" title="Error" className="mb-4">
-          {error}
-        </InlineAlert>
-      )}
-
-      {/* Filters */}
-      <section className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div className="flex-1">
-          <label className="block text-xs font-medium text-[var(--bb-secondary)]">Search</label>
-          <FormInput
-            type="text"
+        <div className="flex flex-wrap items-center gap-3">
+          <SearchInput
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by ticket, project, job type..."
-            size="sm"
-            className="mt-1"
+            onChange={setSearch}
+            label="Search requests"
+            placeholder="Search by request, project or job type…"
+            className="min-w-[240px] flex-1"
           />
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-[var(--bb-secondary)]">Status</label>
-            <FormSelect
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as "ALL" | TicketStatus)}
-              size="sm"
-              className="w-auto"
-            >
-              <option value="ALL">All</option>
-              <option value="TODO">To do</option>
-              <option value="IN_PROGRESS">In progress</option>
-              <option value="IN_REVIEW">In review</option>
-              <option value="DONE">Done</option>
-            </FormSelect>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-[var(--bb-secondary)]">Project</label>
-            <FormSelect
+          <div className="w-full sm:w-52">
+            <Select
+              aria-label="Filter by project"
               value={projectFilter}
               onChange={(e) => setProjectFilter(e.target.value)}
-              size="sm"
-              className="w-auto"
             >
               <option value="ALL">All projects</option>
               {projects.map((p) => (
@@ -395,33 +389,27 @@ export default function CustomerTicketsPage() {
                   {p.name}
                 </option>
               ))}
-            </FormSelect>
+            </Select>
           </div>
-
-          <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-[var(--bb-secondary)]">Priority</label>
-            <FormSelect
+          <div className="w-full sm:w-44">
+            <Select
+              aria-label="Filter by priority"
               value={priorityFilter}
               onChange={(e) => setPriorityFilter(e.target.value as "ALL" | TicketPriority)}
-              size="sm"
-              className="w-auto"
             >
-              <option value="ALL">All</option>
+              <option value="ALL">All priorities</option>
               <option value="LOW">Low</option>
               <option value="MEDIUM">Medium</option>
               <option value="HIGH">High</option>
               <option value="URGENT">Urgent</option>
-            </FormSelect>
+            </Select>
           </div>
-
-          {availableTags.length > 0 && (
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-medium text-[var(--bb-secondary)]">Tag</label>
-              <FormSelect
+          {availableTags.length > 0 ? (
+            <div className="w-full sm:w-44">
+              <Select
+                aria-label="Filter by tag"
                 value={tagFilter}
                 onChange={(e) => setTagFilter(e.target.value)}
-                size="sm"
-                className="w-auto"
               >
                 <option value="ALL">All tags</option>
                 {availableTags.map((tag) => (
@@ -429,164 +417,150 @@ export default function CustomerTicketsPage() {
                     {tag.name}
                   </option>
                 ))}
-              </FormSelect>
+              </Select>
             </div>
-          )}
+          ) : null}
         </div>
-      </section>
 
-      {/* Tickets table */}
-      {!loading && tickets.length === 0 && !error && (
-        <EmptyState title="No tickets found for this filter." />
-      )}
-
-      {!loading && tickets.length > 0 && (
-        <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 py-4 shadow-sm">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold tracking-tight">Tickets</h2>
-            {pagination && (
-              <p className="text-xs text-[var(--bb-text-tertiary)]">
-                Showing {page * PAGE_SIZE + 1}–{totalShown} of {pagination.total} tickets
-              </p>
-            )}
+        {loading ? (
+          <div aria-busy="true" aria-label="Loading requests" className="space-y-3">
+            <Skeleton className="h-14" />
+            <Skeleton className="h-14" />
+            <Skeleton className="h-14" />
           </div>
-
-          <DataTable>
-            <THead>
-              <TH>Ticket</TH>
-              <TH>Project</TH>
-              <TH
-                sortable
-                sortDirection={sortField === "status" ? sortDir : null}
-                onSort={() => handleSort("status")}
-              >
-                Status
-              </TH>
-              <TH
-                sortable
-                sortDirection={sortField === "priority" ? sortDir : null}
-                onSort={() => handleSort("priority")}
-              >
-                Priority
-              </TH>
-              <TH className="hidden md:table-cell">Assigned</TH>
-              <TH className="hidden md:table-cell">Job type</TH>
-              <TH
-                className="hidden md:table-cell"
-                sortable
-                sortDirection={sortField === "createdAt" ? sortDir : null}
-                onSort={() => handleSort("createdAt")}
-              >
-                Created
-              </TH>
-              <TH
-                sortable
-                sortDirection={sortField === "dueDate" ? sortDir : null}
-                onSort={() => handleSort("dueDate")}
-              >
-                Due
-              </TH>
-            </THead>
-            <tbody>
-              {tickets.map((t) => (
-                <tr
-                  key={t.id}
-                  className="cursor-pointer border-b border-[var(--bb-border-subtle)] transition-colors last:border-b-0 hover:bg-[var(--bb-bg-warm)]"
-                  onClick={() => (window.location.href = `/customer/tickets/${t.id}`)}
-                >
-                  <TD>
-                    <div className="font-medium text-[var(--bb-secondary)]">{t.code}</div>
-                    <div className="text-[11px] text-[var(--bb-text-secondary)]">{t.title}</div>
-                  </TD>
-                  <TD>
-                    <div className="text-[11px] font-medium text-[var(--bb-secondary)]">
-                      {t.projectName ?? "-"}
-                    </div>
-                    {t.projectCode && (
-                      <div className="text-[11px] text-[var(--bb-text-tertiary)]">
-                        {t.projectCode}
-                      </div>
-                    )}
-                  </TD>
-                  <TD>
-                    <Badge variant={statusBadgeVariant(t.status)}>
-                      {formatStatusLabel(t.status)}
-                    </Badge>
-                  </TD>
-                  <TD>
-                    <Badge variant={priorityBadgeVariant(t.priority)}>
-                      {formatPriorityLabel(t.priority)}
-                    </Badge>
-                  </TD>
-                  <TD className="hidden md:table-cell">
-                    <div className="text-[11px] text-[var(--bb-secondary)]">
-                      {t.isAssigned ? "Yes" : "-"}
-                    </div>
-                  </TD>
-                  <TD className="hidden md:table-cell">
-                    <div className="text-[11px] text-[var(--bb-secondary)]">
-                      {t.jobTypeName ?? "-"}
-                    </div>
-                  </TD>
-                  <TD className="hidden text-[var(--bb-text-secondary)] md:table-cell">
-                    {formatDate(t.createdAt)}
-                  </TD>
-                  <TD>
-                    {t.dueDate ? (
-                      <span
-                        className={
-                          isDueDateOverdue(t.dueDate)
-                            ? "font-semibold text-[var(--bb-danger-text)]"
-                            : isDueDateSoon(t.dueDate)
-                              ? "font-semibold text-[var(--bb-warning-text)]"
-                              : "text-[var(--bb-text-secondary)]"
-                        }
-                      >
-                        {formatDate(t.dueDate)}
-                      </span>
-                    ) : (
-                      <span className="text-[var(--bb-text-secondary)]">-</span>
-                    )}
-                  </TD>
+        ) : tickets.length === 0 ? (
+          error ? null : (
+            <Card>
+              {anyFilterActive ? (
+                <EmptyState
+                  title="No requests match these filters"
+                  description="Try a different status, project or search."
+                />
+              ) : (
+                <EmptyState
+                  title="No requests yet"
+                  description="Requests created for your company will appear here."
+                  action={
+                    canCreateNewTicket ? (
+                      <ButtonLink href="/customer/tickets/new" variant="primary">
+                        + New request
+                      </ButtonLink>
+                    ) : undefined
+                  }
+                />
+              )}
+            </Card>
+          )
+        ) : (
+          <Card padding="none">
+            <Table label="Requests">
+              <thead className="max-lg:hidden">
+                <tr>
+                  <Th>Request</Th>
+                  <Th>Project</Th>
+                  <SortableTh
+                    label="Status"
+                    direction={sortDirection("status")}
+                    onSort={() => handleSort("status")}
+                  />
+                  <SortableTh
+                    label="Priority"
+                    direction={sortDirection("priority")}
+                    onSort={() => handleSort("priority")}
+                  />
+                  <Th className="max-xl:hidden">Job type</Th>
+                  <Th>Assigned</Th>
+                  <SortableTh
+                    label="Created"
+                    className="max-xl:hidden"
+                    direction={sortDirection("createdAt")}
+                    onSort={() => handleSort("createdAt")}
+                  />
+                  <SortableTh
+                    label="Due"
+                    direction={sortDirection("dueDate")}
+                    onSort={() => handleSort("dueDate")}
+                  />
+                  <Th>
+                    <span className="sr-only">Open</span>
+                  </Th>
                 </tr>
-              ))}
-            </tbody>
-          </DataTable>
-
-          {/* Pagination controls */}
-          {pagination && pagination.total > PAGE_SIZE && (
-            <div className="mt-4 flex items-center justify-between border-t border-[var(--bb-border-subtle)] pt-3">
-              <p className="text-xs text-[var(--bb-text-tertiary)]">
-                Page {page + 1} of {Math.ceil(pagination.total / PAGE_SIZE)}
-              </p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  disabled={page === 0}
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  className="rounded-full border border-[var(--bb-border)] px-3 py-1 text-[11px] font-medium text-[var(--bb-secondary)] transition-colors hover:bg-[var(--bb-bg-card)] disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  ← Previous
-                </button>
-                <button
-                  type="button"
-                  disabled={!pagination.hasMore}
-                  onClick={() => setPage((p) => p + 1)}
-                  className="rounded-full border border-[var(--bb-border)] px-3 py-1 text-[11px] font-medium text-[var(--bb-secondary)] transition-colors hover:bg-[var(--bb-bg-card)] disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Next →
-                </button>
-              </div>
-            </div>
-          )}
-        </section>
-      )}
-
-      {loading && (
-        <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-4 shadow-sm">
-          <LoadingState message="Loading tickets..." />
-        </section>
-      )}
+              </thead>
+              <tbody className="max-lg:block">
+                {tickets.map((t) => (
+                  <tr
+                    key={t.id}
+                    onClick={() => router.push(`/customer/tickets/${t.id}`)}
+                    className="cursor-pointer border-b border-[var(--av2-border)] last:border-b-0 hover:bg-[var(--av2-bg)] max-lg:block max-lg:p-4"
+                  >
+                    <Td className="max-lg:block max-lg:!p-0">
+                      <p className="text-[var(--av2-text-2)]">{t.code}</p>
+                      <Link
+                        href={`/customer/tickets/${t.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="font-semibold hover:underline"
+                      >
+                        {t.title}
+                      </Link>
+                    </Td>
+                    <Td className="max-lg:mt-1 max-lg:block max-lg:!p-0">
+                      <p>{t.projectName ?? DASH}</p>
+                      {t.projectCode ? (
+                        <p className="text-xs text-[var(--av2-text-2)]">{t.projectCode}</p>
+                      ) : null}
+                    </Td>
+                    <Td className="max-lg:mt-2 max-lg:inline-block max-lg:!p-0">
+                      <StatusBadge status={t.status} />
+                    </Td>
+                    <Td className="max-lg:mt-2 max-lg:ml-2 max-lg:inline-block max-lg:!p-0">
+                      <PriorityBadge priority={t.priority} />
+                    </Td>
+                    <Td className="max-xl:hidden">{t.jobTypeName ?? DASH}</Td>
+                    <Td className="max-lg:mt-2 max-lg:block max-lg:!p-0">
+                      <span className="text-[var(--av2-text-2)] lg:hidden">Assigned: </span>
+                      {t.isAssigned ? "Yes" : DASH}
+                    </Td>
+                    <Td className="whitespace-nowrap text-[var(--av2-text-2)] max-xl:hidden">
+                      {formatBoardDate(t.createdAt)}
+                    </Td>
+                    <Td className="whitespace-nowrap max-lg:mt-1 max-lg:block max-lg:!p-0">
+                      <span className="text-[var(--av2-text-2)] lg:hidden">Due: </span>
+                      <DueDate iso={t.dueDate} done={t.status === "DONE"} />
+                    </Td>
+                    <Td className="text-[var(--av2-text-2)] max-lg:hidden">
+                      <IconChevronDown className="-rotate-90" />
+                    </Td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+            {pagination ? (
+              <TableFooter>
+                <span>
+                  Showing {page * PAGE_SIZE + 1}–{totalShown} of {pagination.total}{" "}
+                  {plural(pagination.total, "request", "requests")}
+                </span>
+                {pagination.total > PAGE_SIZE ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      disabled={page === 0}
+                      onClick={() => setPage((p) => Math.max(0, p - 1))}
+                    >
+                      Previous
+                    </Button>
+                    <span className="tabular-nums">
+                      Page {page + 1} of {Math.ceil(pagination.total / PAGE_SIZE)}
+                    </span>
+                    <Button disabled={!pagination.hasMore} onClick={() => setPage((p) => p + 1)}>
+                      Next
+                    </Button>
+                  </div>
+                ) : null}
+              </TableFooter>
+            ) : null}
+          </Card>
+        )}
+      </div>
     </>
   );
 }

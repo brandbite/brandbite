@@ -18,11 +18,11 @@ import { HomeHeader } from "@/components/marketing/home-header";
 export const metadata: Metadata = {
   title: "Coming Soon",
   description:
-    "Brandbite is putting the final bite on something bold, playful, and seriously good.",
+    "brandbite is putting the final bite on something bold, playful, and seriously good.",
 };
 
-const displayFont = "font-[family-name:var(--font-inter)]";
-const caveat = "font-[family-name:var(--font-caveat)]";
+const displayFont = "font-[family-name:var(--font-jakarta)]";
+const caveat = "font-[family-name:var(--font-jakarta)]";
 
 const CARDS = [
   {
@@ -98,7 +98,7 @@ export default function ComingSoonPage() {
           <div className="relative h-[560px] w-[400px] shrink-0 max-[979px]:self-center max-[767px]:-mb-28 max-[767px]:w-80 max-[767px]:origin-top-left max-[767px]:scale-80">
             <Image
               src="/home/under-construction.webp"
-              alt="BB the unicorn building the Brandbite b"
+              alt="BB the unicorn building the brandbite b"
               width={460}
               height={560}
               className="absolute top-0 left-[-30px] w-[460px]"

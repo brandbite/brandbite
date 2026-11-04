@@ -42,7 +42,7 @@ export function creativeTransitionError(
 ): string | null {
   if (from === to) return null;
   if (ALLOWED[from].includes(to)) return null;
-  if (from === "DONE") return "This ticket is done. Only the customer can reopen it.";
+  if (from === "DONE") return "This ticket is done and can't be moved.";
   if (from === "CANCELED") return "This ticket was cancelled.";
   if (to === "DONE") return "Only the customer can mark a ticket as done.";
   if (from === "TODO" && to === "IN_REVIEW") {

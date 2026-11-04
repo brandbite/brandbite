@@ -9,6 +9,8 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { PageHeader } from "@/components/admin/v2/ui";
+import { BackLink } from "@/components/dashboard/tickets/shared";
 import NewTicketForm from "./NewTicketForm";
 import type { TagOption } from "@/components/ui/tag-multi-select";
 import { getAiTicketsMode, isAiTicketsAllowed, isTagsEnabled } from "@/lib/feature-flags";
@@ -106,35 +108,32 @@ export default async function CustomerNewTicketPage({
     : [];
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <main className="mt-4 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-6 shadow-sm">
-        <div className="mb-4">
-          <h1 className="text-2xl font-semibold tracking-tight">Create a new creative request</h1>
-          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-            Describe what you need, pick a project and a job type. We will route this request to
-            your creative team.
-          </p>
-          <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-            Company: <span className="font-medium text-[var(--bb-secondary)]">{company.name}</span>{" "}
-            ({company.slug})
-          </p>
-        </div>
+    <>
+      <BackLink href="/customer/tickets">Back to requests</BackLink>
+      <PageHeader
+        title="Create a new request"
+        description="Describe what you need, pick a project and a job type. We will route this request to your creative team."
+        meta={
+          <>
+            Company <span className="font-medium text-[var(--av2-text)]">{company.name}</span>
+          </>
+        }
+      />
 
-        <NewTicketForm
-          companySlug={company.slug}
-          projects={projects}
-          jobTypes={jobTypes}
-          tokenBalance={company.tokenBalance}
-          tags={tags as unknown as TagOption[]}
-          initialJobTypeId={initialJobTypeId}
-          aiEnabled={aiEnabled}
-          // When the global flag is off, force-hide tag UI for everyone —
-          // including OWNER/PM who would otherwise see the create-tag chip
-          // via the canManageTagsCheck fallback inside the form. Passing
-          // `false` overrides that fallback (the form uses `??`, not `||`).
-          canCreateTags={tagsEnabled ? undefined : false}
-        />
-      </main>
-    </div>
+      <NewTicketForm
+        companySlug={company.slug}
+        projects={projects}
+        jobTypes={jobTypes}
+        tokenBalance={company.tokenBalance}
+        tags={tags as unknown as TagOption[]}
+        initialJobTypeId={initialJobTypeId}
+        aiEnabled={aiEnabled}
+        // When the global flag is off, force-hide tag UI for everyone —
+        // including OWNER/PM who would otherwise see the create-tag chip
+        // via the canManageTagsCheck fallback inside the form. Passing
+        // `false` overrides that fallback (the form uses `??`, not `||`).
+        canCreateTags={tagsEnabled ? undefined : false}
+      />
+    </>
   );
 }

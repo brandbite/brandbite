@@ -7,7 +7,7 @@
 
 import Image from "next/image";
 
-const displayFont = "font-[family-name:var(--font-inter)]";
+const displayFont = "font-[family-name:var(--font-jakarta)]";
 
 export function QuestionsBand() {
   return (

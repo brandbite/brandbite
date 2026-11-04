@@ -12,14 +12,14 @@ export function ReadyBand() {
   return (
     <section className="relative flex h-[309px] w-full flex-row items-center justify-center gap-10 bg-[#B696FF] max-[1023px]:gap-6 max-[767px]:h-auto max-[767px]:flex-col max-[767px]:items-center max-[767px]:gap-10 max-[767px]:pt-10">
       <div className="flex w-[400px] flex-col items-start gap-6 max-[767px]:w-full max-[767px]:max-w-[400px] max-[767px]:px-[30px] max-[767px]:pt-5">
-        <h2 className="flex flex-col gap-[5px] font-[family-name:var(--font-inter)] text-4xl leading-9 font-extrabold">
+        <h2 className="flex flex-col gap-[5px] font-[family-name:var(--font-jakarta)] text-4xl leading-9 font-extrabold">
           <span className="whitespace-nowrap text-[#2B2D33] max-[767px]:whitespace-normal">
             Ready to feed your brand
           </span>
           <span className="text-white">better creative?</span>
         </h2>
         <p className="w-full text-sm leading-5 text-[#2B2D33]">
-          Send your first request and let Brandbite turn it into something worth shipping.
+          Send your first request and let brandbite turn it into something worth shipping.
         </p>
         <Link
           href="/meet"

@@ -456,7 +456,7 @@ export default function TalentApplicationPage() {
 
       <main id="main-content" className="mx-auto w-full max-w-2xl px-6 py-10">
         <header className="mb-8">
-          <h1 className="text-2xl font-bold text-[var(--bb-secondary)]">Apply to join Brandbite</h1>
+          <h1 className="text-2xl font-bold text-[var(--bb-secondary)]">Apply to join brandbite</h1>
           <p className="mt-2 text-sm text-[var(--bb-text-secondary)]">
             Tell us about your work and how you&rsquo;d like to collaborate. The form takes about 4
             minutes. Required fields are marked with an asterisk.
@@ -914,7 +914,7 @@ export default function TalentApplicationPage() {
 function SlimHeader() {
   return (
     <header className="flex items-center border-b border-[var(--bb-border-subtle)] bg-[var(--bb-bg-card)] px-6 py-4">
-      <Link href="/" className="flex items-center" aria-label="Back to Brandbite home">
+      <Link href="/" className="flex items-center" aria-label="Back to brandbite home">
         <BrandLogo width={120} className="h-6 w-auto" />
       </Link>
     </header>

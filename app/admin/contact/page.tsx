@@ -263,7 +263,7 @@ export default function AdminContactPage() {
   const filtered = statusFilter !== "ALL" || query.trim() !== "";
 
   const reply = (row: ContactRow) => {
-    window.location.href = `mailto:${row.email}?subject=${encodeURIComponent("Re: your message to Brandbite")}`;
+    window.location.href = `mailto:${row.email}?subject=${encodeURIComponent("Re: your message to brandbite")}`;
   };
 
   // ---------------------------------------------------------------------------

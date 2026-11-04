@@ -1,25 +1,54 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/settings/page.tsx
-// @purpose: Customer-facing settings page (account + company + plan overview)
-// @version: v1.4.0
-// @status: active
-// @lastUpdate: 2025-12-18
+// @purpose: Customer settings under Company, Plan & billing, Notifications and
+//           Workspace access tabs. Panels stay mounted so edits survive a switch.
 // -----------------------------------------------------------------------------
 
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import { EmptyState } from "@/components/ui/empty-state";
+
+import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
+import {
+  IconBuilding,
+  IconCoins,
+  IconDocument,
+  IconTicket,
+  IconUsers,
+} from "@/components/admin/v2/icons";
+import {
+  Badge,
+  Button,
+  ButtonLink,
+  Callout,
+  Card,
+  CardTitle,
+  DASH,
+  EmptyState,
+  Eyebrow,
+  Field,
+  fmt,
+  IconTile,
+  KeyValueList,
+  PageHeader,
+  plural,
+  Skeleton,
+  Tabs,
+  TextInput,
+  TextLink,
+  type Tone,
+} from "@/components/admin/v2/ui";
+import { KeptTabPanel, useTabFromUrl } from "@/components/dashboard/account/account-ui";
+import { CompanyTagsCard } from "@/components/dashboard/account/company-tags";
+import { DeleteAccountCard } from "@/components/dashboard/account/delete-account";
+import {
+  NotificationPreferencesBody,
+  useNotificationPreferences,
+} from "@/components/dashboard/account/notification-matrix";
+import { Modal, ModalFooter, ModalHeader } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast-provider";
-import { FormInput } from "@/components/ui/form-field";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Modal, ModalHeader, ModalFooter } from "@/components/ui/modal";
-import { TagBadge } from "@/components/ui/tag-badge";
 import { CONTACT_EMAIL } from "@/lib/brand";
-import { TAG_COLORS, TAG_COLOR_KEYS, type TagColorKey } from "@/lib/tag-colors";
 
 type UserRole = "SITE_OWNER" | "SITE_ADMIN" | "DESIGNER" | "CUSTOMER";
 type CompanyRole = "OWNER" | "PM" | "BILLING" | "MEMBER";
@@ -58,6 +87,29 @@ type CustomerSettingsResponse = {
   } | null;
 };
 
+// Top-up packs (one-time Plans where isRecurring=false).
+type Topup = {
+  id: string;
+  name: string;
+  description: string | null;
+  monthlyTokens: number;
+  priceCents: number | null;
+};
+
+// Available recurring plans (for upgrade/downgrade).
+type SubscriptionPlan = {
+  id: string;
+  name: string;
+  description: string | null;
+  monthlyTokens: number;
+  priceCents: number | null;
+};
+
+type SettingsTab = "company" | "plan" | "notifications" | "access";
+
+const TABS: readonly SettingsTab[] = ["company", "plan", "notifications", "access"];
+const TAB_PREFIX = "customer-settings";
+
 function hasPlanManagementAccess(role: CompanyRole | null | undefined): boolean {
   return role === "OWNER" || role === "BILLING";
 }
@@ -77,7 +129,22 @@ function prettyCompanyRole(role: CompanyRole | null | undefined): string {
     case "MEMBER":
       return "Member";
     default:
-      return "\u2014";
+      return DASH;
+  }
+}
+
+function prettyRole(role: UserRole): string {
+  switch (role) {
+    case "SITE_OWNER":
+      return "Site owner";
+    case "SITE_ADMIN":
+      return "Site admin";
+    case "DESIGNER":
+      return "Creative";
+    case "CUSTOMER":
+      return "Customer";
+    default:
+      return role;
   }
 }
 
@@ -94,56 +161,44 @@ function prettyBillingStatus(status: BillingStatus | null | undefined): string {
   }
 }
 
-function billingStatusClassName(status: BillingStatus | null | undefined): string {
+function billingStatusTone(status: BillingStatus | null | undefined): Tone {
   switch (status) {
     case "ACTIVE":
-      return "bg-[var(--bb-success-bg)] text-[var(--bb-success-text)]";
+      return "green";
     case "PAST_DUE":
-      return "bg-[var(--bb-warning-bg)] text-[var(--bb-warning-text)]";
-    case "CANCELED":
-      return "bg-[var(--bb-bg-card)] text-[var(--bb-text-tertiary)]";
+      return "amber";
     default:
-      return "bg-[var(--bb-bg-card)] text-[var(--bb-text-tertiary)]";
+      return "neutral";
   }
 }
 
-type PreferenceEntry = { type: string; enabled: boolean; emailEnabled: boolean };
+function formatPrice(priceCents: number | null): string {
+  if (priceCents == null) return DASH;
+  const dollars = priceCents / 100;
+  return Number.isInteger(dollars)
+    ? `$${dollars.toLocaleString("en-US")}`
+    : `$${dollars.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
-const CUSTOMER_PREFS: { type: string; label: string; description: string }[] = [
-  {
-    type: "REVISION_SUBMITTED",
-    label: "Creative submitted a new revision",
-    description: "Get notified when your creative uploads new work for review",
-  },
-  {
-    type: "TICKET_STATUS_CHANGED",
-    label: "Ticket status changed",
-    description: "Get notified when a ticket's status is updated",
-  },
-  {
-    type: "PIN_RESOLVED",
-    label: "Feedback note resolved",
-    description: "Get notified when a creative resolves one of your revision notes",
-  },
-  {
-    type: "TICKET_COMPLETED",
-    label: "Ticket completed",
-    description: "Get notified when a ticket is marked as done",
-  },
-];
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
-/** Pencil icon (inline SVG, 14x14) */
-function PencilIcon() {
+function StatTile({ icon, value, label }: { icon: ReactNode; value: ReactNode; label: string }) {
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 20 20"
-      fill="currentColor"
-      className="h-3.5 w-3.5"
-    >
-      <path d="m5.433 13.917 1.262-3.155A4 4 0 0 1 7.58 9.42l6.92-6.918a2.121 2.121 0 0 1 3 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 0 1-.65-.65Z" />
-      <path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0 0 10 3H4.75A2.75 2.75 0 0 0 2 5.75v9.5A2.75 2.75 0 0 0 4.75 18h9.5A2.75 2.75 0 0 0 17 15.25V10a.75.75 0 0 0-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5Z" />
-    </svg>
+    <div className="flex min-w-0 items-center gap-3">
+      <IconTile tone="neutral" size={44}>
+        {icon}
+      </IconTile>
+      <div className="min-w-0">
+        <p className="text-xl leading-7 font-bold tabular-nums">{value}</p>
+        <p className="text-sm text-[var(--av2-text-2)]">{label}</p>
+      </div>
+    </div>
   );
 }
 
@@ -152,9 +207,11 @@ export default function CustomerSettingsPage() {
   const [data, setData] = useState<CustomerSettingsResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [notifPrefs, setNotifPrefs] = useState<PreferenceEntry[]>([]);
-  const [notifPrefsLoading, setNotifPrefsLoading] = useState(true);
-  const [togglingType, setTogglingType] = useState<string | null>(null);
+  const notifications = useNotificationPreferences();
+
+  // Null until the user picks one: the default depends on the company role.
+  const [tab, setTab] = useState<SettingsTab | null>(null);
+  useTabFromUrl<SettingsTab>(TABS, setTab);
 
   // User profile editing
   const [editingUser, setEditingUser] = useState(false);
@@ -167,55 +224,14 @@ export default function CustomerSettingsPage() {
   const [draftWebsite, setDraftWebsite] = useState("");
   const [savingCompany, setSavingCompany] = useState(false);
 
-  // Tag management
-  type SettingsTag = { id: string; name: string; color: TagColorKey };
-  const [tags, setTags] = useState<SettingsTag[]>([]);
-  const [tagsLoading, setTagsLoading] = useState(true);
-  // Mirrors the global TAGS_ENABLED AppSetting via the GET response.
-  // Starts true (optimistic) — the section is also gated by `canEditCompany`
-  // anyway, so a brief flash before fetch can't leak the UI to ineligible
-  // users. Flipped to false hides the entire tag management card.
-  const [tagsEnabled, setTagsEnabled] = useState(true);
-  const [newTagName, setNewTagName] = useState("");
-  const [newTagColor, setNewTagColor] = useState<TagColorKey>("BLUE");
-  const [addingTag, setAddingTag] = useState(false);
-  const [editingTagId, setEditingTagId] = useState<string | null>(null);
-  const [editTagName, setEditTagName] = useState("");
-  const [editTagColor, setEditTagColor] = useState<TagColorKey>("BLUE");
-  const [savingTag, setSavingTag] = useState(false);
-  const [deletingTagId, setDeletingTagId] = useState<string | null>(null);
-  const [tagToDelete, setTagToDelete] = useState<string | null>(null);
-
   const [billingError, setBillingError] = useState<string | null>(null);
   const [billingLoading, setBillingLoading] = useState<boolean>(false);
 
-  // Top-up packs (one-time Plans where isRecurring=false) — loaded lazily.
-  type Topup = {
-    id: string;
-    name: string;
-    description: string | null;
-    monthlyTokens: number;
-    priceCents: number | null;
-  };
   const [topups, setTopups] = useState<Topup[]>([]);
   const [topupLoadingId, setTopupLoadingId] = useState<string | null>(null);
 
-  // Available recurring plans (for upgrade/downgrade).
-  type SubscriptionPlan = {
-    id: string;
-    name: string;
-    description: string | null;
-    monthlyTokens: number;
-    priceCents: number | null;
-  };
   const [availablePlans, setAvailablePlans] = useState<SubscriptionPlan[]>([]);
   const [planChangeTarget, setPlanChangeTarget] = useState<SubscriptionPlan | null>(null);
-
-  // Account deletion state
-  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
-  const [deleteConfirmEmail, setDeleteConfirmEmail] = useState("");
-  const [deletingAccount, setDeletingAccount] = useState(false);
-  const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null);
 
   // Leave-workspace state. Softer alternative to deleting the whole account
   // — severs CompanyMember row only, keeps the UserAccount + ledger. Server
@@ -304,53 +320,6 @@ export default function CustomerSettingsPage() {
     };
   }, []);
 
-  // Load notification preferences
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/notifications/preferences");
-        const json = await res.json().catch(() => null);
-        if (!cancelled && json?.preferences) {
-          setNotifPrefs(json.preferences);
-        }
-      } catch {
-        // silent
-      } finally {
-        if (!cancelled) setNotifPrefsLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const handleTogglePref = useCallback(
-    async (type: string, channel: "enabled" | "emailEnabled", currentValue: boolean) => {
-      setTogglingType(`${type}:${channel}`);
-      const newValue = !currentValue;
-      setNotifPrefs((prev) =>
-        prev.map((p) => (p.type === type ? { ...p, [channel]: newValue } : p)),
-      );
-      try {
-        const res = await fetch("/api/notifications/preferences", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type, [channel]: newValue }),
-        });
-        if (!res.ok) throw new Error();
-      } catch {
-        setNotifPrefs((prev) =>
-          prev.map((p) => (p.type === type ? { ...p, [channel]: currentValue } : p)),
-        );
-        showToast({ type: "error", title: "Failed to update preference" });
-      } finally {
-        setTogglingType(null);
-      }
-    },
-    [showToast],
-  );
-
   // ---- User profile save ----
   const handleSaveUser = useCallback(async () => {
     const trimmed = draftUserName.trim();
@@ -435,31 +404,16 @@ export default function CustomerSettingsPage() {
   const canManagePlan = hasPlanManagementAccess(user?.companyRole ?? null);
   const canEditCompany = hasCompanyEditAccess(user?.companyRole ?? null);
 
-  const formatPrice = (priceCents: number | null) => {
-    if (priceCents == null) return "\u2014";
-    const dollars = priceCents / 100;
-    return `$${dollars.toFixed(2)}`;
-  };
+  // Back from Stripe lands on the plan; otherwise whoever manages the plan
+  // starts there and everyone else starts on the company.
+  const activeTab: SettingsTab = tab ?? (billingStatusParam || canManagePlan ? "plan" : "company");
 
-  const formatDate = (iso: string) => {
-    const d = new Date(iso);
-    return d.toLocaleDateString();
-  };
-
-  const prettyRole = (role: UserRole) => {
-    switch (role) {
-      case "SITE_OWNER":
-        return "Site owner";
-      case "SITE_ADMIN":
-        return "Site admin";
-      case "DESIGNER":
-        return "Creative";
-      case "CUSTOMER":
-        return "Customer";
-      default:
-        return role;
-    }
-  };
+  const unsaved =
+    (editingUser && draftUserName.trim() !== (user?.name ?? "")) ||
+    (editingCompany &&
+      (draftCompanyName.trim() !== (company?.name ?? "") ||
+        draftWebsite.trim() !== (company?.website ?? "")));
+  useUnsavedChanges(unsaved, "Settings");
 
   const handleStartBillingCheckout = async () => {
     if (!plan?.id) return;
@@ -553,29 +507,6 @@ export default function CustomerSettingsPage() {
     }
   };
 
-  const handleDeleteAccount = async () => {
-    if (!data?.user?.email) return;
-    setDeletingAccount(true);
-    setDeleteAccountError(null);
-    try {
-      const res = await fetch("/api/customer/account", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirmEmail: deleteConfirmEmail }),
-      });
-      const json = await res.json().catch(() => null);
-      if (!res.ok) {
-        throw new Error(json?.error || "Failed to delete account.");
-      }
-      // Belt-and-suspenders: force a full reload to clear any client state.
-      window.location.href = "/login?deleted=1";
-    } catch (err) {
-      setDeleteAccountError(err instanceof Error ? err.message : "Failed to delete account.");
-    } finally {
-      setDeletingAccount(false);
-    }
-  };
-
   const handleLeaveWorkspace = async () => {
     setLeavingWorkspace(true);
     setLeaveWorkspaceError(null);
@@ -635,6 +566,7 @@ export default function CustomerSettingsPage() {
     setDraftCompanyName(company?.name || "");
     setDraftWebsite(company?.website || "");
     setEditingCompany(true);
+    setTab("company");
   };
 
   const cancelEditingCompany = () => {
@@ -643,975 +575,513 @@ export default function CustomerSettingsPage() {
     setDraftWebsite("");
   };
 
-  // ---- Tag management ----
-  useEffect(() => {
-    if (!data) return;
-    // Only fetch if user has edit access (OWNER + PM)
-    if (!hasCompanyEditAccess(data.user.companyRole)) {
-      setTagsLoading(false);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/customer/tags");
-        const json = await res.json().catch(() => null);
-        if (!cancelled && json?.tags) {
-          setTags(json.tags as SettingsTag[]);
-        }
-        // API returns `tagsEnabled: false` when the global flag is off.
-        // Treat missing as `true` so older deploys keep working.
-        if (!cancelled && typeof json?.tagsEnabled === "boolean") {
-          setTagsEnabled(json.tagsEnabled);
-        }
-      } catch {
-        // silent
-      } finally {
-        if (!cancelled) setTagsLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [data]);
-
-  const handleAddTag = useCallback(async () => {
-    const trimmed = newTagName.trim();
-    if (!trimmed) return;
-    setAddingTag(true);
-    try {
-      const res = await fetch("/api/customer/tags", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: trimmed, color: newTagColor }),
-      });
-      const json = await res.json().catch(() => null);
-      if (!res.ok) {
-        showToast({
-          type: "error",
-          title: json?.error || "Failed to create tag",
-        });
-        return;
-      }
-      setTags((prev) =>
-        [...prev, json.tag as SettingsTag].sort((a, b) => a.name.localeCompare(b.name)),
-      );
-      setNewTagName("");
-      setNewTagColor("BLUE");
-      showToast({ type: "success", title: `Tag "${trimmed}" created` });
-    } catch {
-      showToast({ type: "error", title: "Failed to create tag" });
-    } finally {
-      setAddingTag(false);
-    }
-  }, [newTagName, newTagColor, showToast]);
-
-  const handleSaveTag = useCallback(async () => {
-    if (!editingTagId) return;
-    const trimmed = editTagName.trim();
-    if (!trimmed) return;
-    setSavingTag(true);
-    try {
-      const res = await fetch(`/api/customer/tags/${editingTagId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: trimmed, color: editTagColor }),
-      });
-      const json = await res.json().catch(() => null);
-      if (!res.ok) {
-        showToast({
-          type: "error",
-          title: json?.error || "Failed to update tag",
-        });
-        return;
-      }
-      setTags((prev) => prev.map((t) => (t.id === editingTagId ? (json.tag as SettingsTag) : t)));
-      setEditingTagId(null);
-      showToast({ type: "success", title: "Tag updated" });
-    } catch {
-      showToast({ type: "error", title: "Failed to update tag" });
-    } finally {
-      setSavingTag(false);
-    }
-  }, [editingTagId, editTagName, editTagColor, showToast]);
-
-  const handleDeleteTag = useCallback(
-    async (tagId: string) => {
-      setDeletingTagId(tagId);
-      try {
-        const res = await fetch(`/api/customer/tags/${tagId}`, {
-          method: "DELETE",
-        });
-        if (!res.ok) {
-          const json = await res.json().catch(() => null);
-          showToast({
-            type: "error",
-            title: json?.error || "Failed to delete tag",
-          });
-          return;
-        }
-        setTags((prev) => prev.filter((t) => t.id !== tagId));
-        showToast({ type: "success", title: "Tag deleted" });
-      } catch {
-        showToast({ type: "error", title: "Failed to delete tag" });
-      } finally {
-        setDeletingTagId(null);
-      }
-    },
-    [showToast],
-  );
-
-  const startEditingTag = (tag: SettingsTag) => {
-    setEditingTagId(tag.id);
-    setEditTagName(tag.name);
-    setEditTagColor(tag.color);
-  };
-
-  const cancelEditingTag = () => {
-    setEditingTagId(null);
-    setEditTagName("");
-    setEditTagColor("BLUE");
-  };
+  const otherPlans = plan ? availablePlans.filter((p) => p.id !== plan.id) : [];
+  const panel = { idPrefix: TAB_PREFIX, active: activeTab };
 
   return (
     <>
-      {/* Page header */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-          <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
-            Your account, company and subscription information.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Settings"
+        description="Your account, company and subscription information."
+      />
 
-      {/* Error */}
-      {error && (
-        <InlineAlert variant="error" title="Something went wrong" className="mb-4">
-          {error}
-        </InlineAlert>
-      )}
+      <div className="space-y-6">
+        {error && (
+          <Callout tone="error" title="Something went wrong">
+            {error}
+          </Callout>
+        )}
 
-      {/* Billing status banner (after Stripe redirect) */}
-      {!loading && billingStatusParam === "success" && (
-        <InlineAlert variant="success" title="Billing updated" className="mb-4">
-          Your subscription has been updated successfully. If the changes are not reflected
-          immediately, they will appear after the next refresh.
-        </InlineAlert>
-      )}
+        {/* Billing status banner (after Stripe redirect) */}
+        {!loading && billingStatusParam === "success" && (
+          <Callout tone="success" title="Billing updated">
+            Your subscription has been updated successfully. If the changes are not reflected
+            immediately, they will appear after the next refresh.
+          </Callout>
+        )}
 
-      {!loading && billingStatusParam === "cancelled" && (
-        <InlineAlert variant="warning" title="Checkout cancelled" className="mb-4">
-          You cancelled the Stripe checkout. No changes were made to your current subscription.
-        </InlineAlert>
-      )}
+        {!loading && billingStatusParam === "cancelled" && (
+          <Callout tone="warning" title="Checkout cancelled">
+            You cancelled the Stripe checkout. No changes were made to your current subscription.
+          </Callout>
+        )}
 
-      {/* Content */}
-      {loading ? (
-        <div className="mt-6 text-sm text-[var(--bb-text-secondary)]">Loading settings…</div>
-      ) : !data ? (
-        <div className="mt-6">
-          <EmptyState
-            title="No settings data found."
-            description="We couldn't load your account information. Please try refreshing the page."
-          />
-        </div>
-      ) : (
-        <div className="mt-4 grid gap-4 md:grid-cols-3">
-          {/* ============================================================ */}
-          {/* Account card                                                  */}
-          {/* ============================================================ */}
-          <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm md:col-span-1">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-semibold tracking-tight">Account</h2>
-                <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
-                  Your personal profile inside Brandbite.
-                </p>
-              </div>
-              {!editingUser && (
-                <button
-                  type="button"
-                  onClick={startEditingUser}
-                  className="inline-flex items-center gap-1 rounded-full border border-[var(--bb-border)] px-2.5 py-1 text-[11px] font-medium text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
-                >
-                  <PencilIcon />
-                  Edit
-                </button>
-              )}
-            </div>
+        {loading ? (
+          <div aria-busy="true" aria-label="Loading settings" className="space-y-6">
+            <Skeleton className="h-9 w-96 max-w-full" />
+            <Skeleton className="h-24 rounded-2xl" />
+            <Skeleton className="h-72 rounded-2xl" />
+          </div>
+        ) : !data || !company || !user ? (
+          !error && (
+            <Card>
+              <EmptyState
+                title="No settings data found."
+                description="We couldn't load your account information. Please try refreshing the page."
+              />
+            </Card>
+          )
+        ) : (
+          <>
+            <Tabs<SettingsTab>
+              label="Settings sections"
+              idPrefix={TAB_PREFIX}
+              value={activeTab}
+              onChange={setTab}
+              tabs={[
+                { value: "company", label: "Company" },
+                { value: "plan", label: "Plan & billing" },
+                { value: "notifications", label: "Notifications" },
+                { value: "access", label: "Workspace access" },
+              ]}
+            />
 
-            <div className="mt-3 space-y-2 text-xs text-[var(--bb-secondary)]">
-              {/* Name — editable */}
-              <div>
-                <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">Name</p>
-                {editingUser ? (
-                  <FormInput
-                    size="sm"
-                    value={draftUserName}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setDraftUserName(e.target.value)
-                    }
-                    placeholder="Your name"
-                    autoComplete="name"
-                    disabled={savingUser}
-                    className="mt-1"
-                    autoFocus
-                  />
-                ) : (
-                  <p className="mt-0.5">{user?.name || "\u2014"}</p>
-                )}
-              </div>
-
-              {/* Email — always read-only */}
-              <div>
-                <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">Email</p>
-                <p className="mt-0.5">{user?.email}</p>
-              </div>
-
-              {/* Role — always read-only */}
-              <div>
-                <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">Role</p>
-                <p className="mt-0.5">{user ? prettyRole(user.role) : "\u2014"}</p>
-              </div>
-
-              {/* Company role — always read-only */}
-              <div>
-                <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
-                  Company role
-                </p>
-                <p className="mt-0.5">{prettyCompanyRole(user?.companyRole ?? null)}</p>
-              </div>
-
-              {/* Save / Cancel buttons */}
-              {editingUser && (
-                <div className="flex items-center gap-2 pt-1">
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    loading={savingUser}
-                    loadingText="Saving…"
-                    onClick={handleSaveUser}
-                  >
-                    Save
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={cancelEditingUser}
-                    disabled={savingUser}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              )}
-            </div>
-          </section>
-
-          {/* ============================================================ */}
-          {/* Company card                                                  */}
-          {/* ============================================================ */}
-          <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm md:col-span-1">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-semibold tracking-tight">Company</h2>
-                <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
-                  The workspace your requests belong to.
-                </p>
-              </div>
-              {canEditCompany && !editingCompany && (
-                <button
-                  type="button"
-                  onClick={startEditingCompany}
-                  className="inline-flex items-center gap-1 rounded-full border border-[var(--bb-border)] px-2.5 py-1 text-[11px] font-medium text-[var(--bb-text-secondary)] transition-colors hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)]"
-                >
-                  <PencilIcon />
-                  Edit
-                </button>
-              )}
-            </div>
-
-            <div className="mt-3 space-y-2 text-xs text-[var(--bb-secondary)]">
-              {/* Name — editable (OWNER + PM) */}
-              <div>
-                <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">Name</p>
-                {editingCompany ? (
-                  <FormInput
-                    size="sm"
-                    value={draftCompanyName}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setDraftCompanyName(e.target.value)
-                    }
-                    placeholder="Company name"
-                    autoComplete="organization"
-                    disabled={savingCompany}
-                    className="mt-1"
-                    autoFocus
-                  />
-                ) : (
-                  <p className="mt-0.5">{company?.name}</p>
-                )}
-              </div>
-
-              {/* Slug — always read-only */}
-              <div>
-                <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">Slug</p>
-                <p className="mt-0.5">{company?.slug}</p>
-              </div>
-
-              {/* Website — editable (OWNER + PM) */}
-              <div>
-                <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">Website</p>
-                {editingCompany ? (
-                  <FormInput
-                    size="sm"
-                    type="url"
-                    value={draftWebsite}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setDraftWebsite(e.target.value)
-                    }
-                    autoComplete="url"
-                    placeholder="https://example.com"
-                    disabled={savingCompany}
-                    className="mt-1"
-                  />
-                ) : company?.website ? (
-                  <a
-                    href={company.website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-0.5 inline-block text-[var(--bb-primary)] underline decoration-[var(--bb-primary)]/30 hover:decoration-[var(--bb-primary)]"
-                  >
-                    {company.website}
-                  </a>
-                ) : (
-                  <p className="mt-0.5">{"\u2014"}</p>
-                )}
-              </div>
-
-              {/* Counts — always read-only */}
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">Members</p>
-                  <p className="mt-0.5">{company?.counts.members ?? 0}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">Projects</p>
-                  <p className="mt-0.5">{company?.counts.projects ?? 0}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">Tickets</p>
-                  <p className="mt-0.5">{company?.counts.tickets ?? 0}</p>
-                </div>
-              </div>
-
-              {/* Created at — always read-only */}
-              <div>
-                <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">Created at</p>
-                <p className="mt-0.5">{company ? formatDate(company.createdAt) : "\u2014"}</p>
-              </div>
-
-              {/* Save / Cancel buttons */}
-              {editingCompany && (
-                <div className="flex items-center gap-2 pt-1">
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    loading={savingCompany}
-                    loadingText="Saving…"
-                    onClick={handleSaveCompany}
-                  >
-                    Save
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={cancelEditingCompany}
-                    disabled={savingCompany}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              )}
-            </div>
-          </section>
-
-          {/* ============================================================ */}
-          {/* Plan card                                                     */}
-          {/* ============================================================ */}
-          <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-4 shadow-sm md:col-span-1">
-            <h2 className="text-sm font-semibold tracking-tight">Subscription plan</h2>
-            <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">
-              The plan that defines your monthly token allowance.
-            </p>
-
-            {plan ? (
-              <div className="mt-3 space-y-2 text-xs text-[var(--bb-secondary)]">
-                {!canManagePlan && (
-                  <div className="rounded-lg border border-[var(--bb-warning-border)] bg-[var(--bb-warning-bg)] px-3 py-2 text-[11px] text-[var(--bb-text-secondary)]">
-                    <p className="text-[11px] font-medium text-[var(--bb-warning-text)]">
-                      Limited access
-                    </p>
-                    <p className="mt-1">
-                      You don&apos;t have permission to manage billing for this company. You can see
-                      the current plan, but only the owner or billing manager can request changes.
-                    </p>
-                  </div>
-                )}
-                <div>
-                  <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
-                    Plan name
+            {/* Company at a glance, on every tab */}
+            <Card>
+              <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <IconTile tone="peach" size={52}>
+                    <IconBuilding />
+                  </IconTile>
+                  <p className="min-w-0 text-xl leading-7 font-semibold break-words">
+                    {company.name}
                   </p>
-                  <p className="mt-0.5">{plan.name}</p>
                 </div>
-                <div>
-                  <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
-                    Monthly tokens
-                  </p>
-                  <p className="mt-0.5">{plan.monthlyTokens} tokens</p>
+                <div className="flex flex-wrap gap-x-8 gap-y-4">
+                  <StatTile
+                    icon={<IconUsers />}
+                    value={fmt(company.counts.members)}
+                    label={plural(company.counts.members, "member", "members")}
+                  />
+                  <StatTile
+                    icon={<IconDocument />}
+                    value={fmt(company.counts.projects)}
+                    label={plural(company.counts.projects, "project", "projects")}
+                  />
+                  <StatTile
+                    icon={<IconTicket />}
+                    value={fmt(company.counts.tickets)}
+                    label={plural(company.counts.tickets, "request", "requests")}
+                  />
                 </div>
-                <div>
-                  <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">Price</p>
-                  <p className="mt-0.5">{formatPrice(plan.priceCents)}</p>
-                </div>
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <p className="text-[11px] font-medium text-[var(--bb-text-tertiary)]">
-                      Subscription status
-                    </p>
-                    <div className="mt-1">
-                      <span
-                        className={
-                          "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold " +
-                          billingStatusClassName(company?.billingStatus ?? null)
-                        }
-                      >
-                        {prettyBillingStatus(company?.billingStatus ?? null)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {billingError && (
-                  <InlineAlert variant="error" size="sm" className="mt-2">
-                    {billingError}
-                  </InlineAlert>
+                {canEditCompany && !editingCompany && (
+                  <Button onClick={startEditingCompany}>Edit company</Button>
                 )}
+              </div>
+            </Card>
 
-                <div className="mt-2 flex items-center justify-between gap-2">
-                  <div className="rounded-lg bg-[var(--bb-bg-page)] px-3 py-2 text-[11px] text-[var(--bb-text-secondary)]">
-                    {canManagePlan && company?.hasLiveSubscription ? (
-                      <>
-                        To upgrade or downgrade, use <strong>Switch to a different plan</strong>{" "}
-                        below. For invoices, your payment method or cancelling, contact us at{" "}
-                        <a href={`mailto:${CONTACT_EMAIL}`} className="underline">
-                          {CONTACT_EMAIL}
-                        </a>
-                        .
-                      </>
-                    ) : canManagePlan ? (
-                      <>Start your subscription through Stripe to receive your monthly tokens.</>
+            {/* ======================== Company ======================== */}
+            <KeptTabPanel value="company" {...panel}>
+              <div className="grid items-start gap-6 xl:grid-cols-2">
+                <Card>
+                  <CardTitle description="The workspace your requests belong to.">
+                    Company profile
+                  </CardTitle>
+                  <div className="mt-4">
+                    {editingCompany ? (
+                      <div className="space-y-4">
+                        <Field label="Name" htmlFor="company-name">
+                          <TextInput
+                            id="company-name"
+                            value={draftCompanyName}
+                            onChange={(e) => setDraftCompanyName(e.target.value)}
+                            placeholder="Company name"
+                            autoComplete="organization"
+                            disabled={savingCompany}
+                            autoFocus
+                          />
+                        </Field>
+                        <Field label="Website" htmlFor="company-website">
+                          <TextInput
+                            id="company-website"
+                            type="url"
+                            value={draftWebsite}
+                            onChange={(e) => setDraftWebsite(e.target.value)}
+                            autoComplete="url"
+                            placeholder="https://example.com"
+                            disabled={savingCompany}
+                          />
+                        </Field>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            variant="primary"
+                            onClick={handleSaveCompany}
+                            disabled={savingCompany}
+                            aria-busy={savingCompany || undefined}
+                          >
+                            {savingCompany ? "Saving…" : "Save"}
+                          </Button>
+                          <Button onClick={cancelEditingCompany} disabled={savingCompany}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
                     ) : (
-                      <>
-                        Need to change something? Ask your company owner or billing manager to
-                        manage the subscription.
-                      </>
+                      <KeyValueList
+                        rows={[
+                          { label: "Name", value: company.name },
+                          { label: "Slug", value: company.slug },
+                          {
+                            label: "Website",
+                            value: company.website ? (
+                              <a
+                                href={company.website}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[var(--av2-link)] underline underline-offset-2"
+                              >
+                                {company.website}
+                              </a>
+                            ) : (
+                              DASH
+                            ),
+                          },
+                          { label: "Created at", value: formatDate(company.createdAt) },
+                        ]}
+                      />
                     )}
                   </div>
-
-                  {/* Only offered when there's no live subscription — a second
-                      checkout would create a second, double-billed subscription
-                      (the API refuses it too). */}
-                  {canManagePlan && !company?.hasLiveSubscription && (
-                    <button
-                      type="button"
-                      onClick={handleStartBillingCheckout}
-                      disabled={billingLoading || !plan.isActive}
-                      className="inline-flex flex-shrink-0 items-center justify-center rounded-full bg-[var(--bb-primary)] px-3 py-2 text-[11px] font-semibold text-white shadow-sm disabled:opacity-60"
-                    >
-                      {billingLoading ? "Redirecting\u2026" : "Start subscription"}
-                    </button>
+                  {!canEditCompany && (
+                    <p className="mt-4 text-sm text-[var(--av2-text-2)]">
+                      Only owners and project managers can edit the company profile.
+                    </p>
                   )}
-                </div>
+                </Card>
+                <CompanyTagsCard canManage={canEditCompany} />
               </div>
-            ) : (
-              <div className="mt-3 rounded-lg bg-[var(--bb-bg-page)] px-3 py-2 text-[11px] text-[var(--bb-text-secondary)]">
-                No subscription plan is assigned to your company yet. Please contact support if this
-                does not look correct.
-              </div>
-            )}
+            </KeptTabPanel>
 
-            {/* Change plan — upgrade/downgrade with Stripe proration */}
-            {plan && canManagePlan && availablePlans.filter((p) => p.id !== plan.id).length > 0 && (
-              <div className="mt-5 border-t border-[var(--bb-border-subtle)] pt-4">
-                <h3 className="text-sm font-semibold text-[var(--bb-secondary)]">
-                  Switch to a different plan
-                </h3>
-                <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
-                  Upgrade or downgrade at any time. Stripe prorates the charge so you only pay the
-                  difference for the remaining days in your billing period.
-                </p>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {availablePlans
-                    .filter((p) => p.id !== plan.id)
-                    .map((p) => {
-                      const isUpgrade = p.monthlyTokens > plan.monthlyTokens;
-                      const priceLabel =
-                        p.priceCents != null ? `$${(p.priceCents / 100).toFixed(2)}/mo` : "—";
-                      return (
-                        <div
-                          key={p.id}
-                          className="flex flex-col rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] p-3"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="text-xs font-semibold text-[var(--bb-secondary)]">
-                              {p.name}
-                            </div>
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                                isUpgrade
-                                  ? "bg-[var(--bb-primary-light)] text-[var(--bb-primary)]"
-                                  : "bg-[var(--bb-bg-card)] text-[var(--bb-text-tertiary)]"
-                              }`}
-                            >
-                              {isUpgrade ? "Upgrade" : "Downgrade"}
-                            </span>
-                          </div>
-                          {p.description && (
-                            <div className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
-                              {p.description}
-                            </div>
-                          )}
-                          <div className="mt-2 flex items-baseline gap-1">
-                            <span className="text-lg font-semibold text-[var(--bb-secondary)]">
-                              {p.monthlyTokens.toLocaleString()}
-                            </span>
-                            <span className="text-[11px] text-[var(--bb-text-tertiary)]">
-                              tokens/mo
-                            </span>
-                          </div>
-                          <div className="text-[11px] text-[var(--bb-text-secondary)]">
-                            {priceLabel}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => openPlanChange(p)}
-                            disabled={changePlanSaving}
-                            className="mt-3 rounded-full border border-[var(--bb-border)] bg-white px-3 py-1.5 text-[11px] font-semibold text-[var(--bb-secondary)] shadow-sm hover:border-[var(--bb-primary)] hover:text-[var(--bb-primary)] disabled:opacity-60"
-                          >
-                            Preview &amp; switch
-                          </button>
-                        </div>
-                      );
-                    })}
-                </div>
-              </div>
-            )}
-
-            {/* One-time token top-up packs */}
-            {topups.length > 0 && (
-              <div className="mt-5 border-t border-[var(--bb-border-subtle)] pt-4">
-                <h3 className="text-sm font-semibold text-[var(--bb-secondary)]">
-                  Need more tokens now?
-                </h3>
-                <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
-                  One-time top-up — charged immediately, tokens credited when payment succeeds.
-                </p>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {topups.map((t) => {
-                    const price =
-                      t.priceCents != null ? `$${(t.priceCents / 100).toFixed(2)}` : "—";
-                    return (
-                      <div
-                        key={t.id}
-                        className="flex flex-col rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] p-3"
-                      >
-                        <div className="text-xs font-semibold text-[var(--bb-secondary)]">
-                          {t.name}
-                        </div>
-                        {t.description && (
-                          <div className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
-                            {t.description}
-                          </div>
-                        )}
-                        <div className="mt-2 flex items-baseline gap-1">
-                          <span className="text-lg font-semibold text-[var(--bb-primary)]">
-                            {t.monthlyTokens.toLocaleString()}
-                          </span>
-                          <span className="text-[11px] text-[var(--bb-text-tertiary)]">tokens</span>
-                        </div>
-                        <div className="text-[11px] text-[var(--bb-text-secondary)]">
-                          {price} one-time
-                        </div>
-                        {canManagePlan ? (
-                          <button
-                            type="button"
-                            onClick={() => handleBuyTopup(t.id)}
-                            disabled={topupLoadingId !== null}
-                            className="mt-3 rounded-full bg-[var(--bb-primary)] px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm disabled:opacity-60"
-                          >
-                            {topupLoadingId === t.id ? "Redirecting…" : "Buy"}
-                          </button>
-                        ) : (
-                          <p className="mt-3 text-[10px] text-[var(--bb-text-muted)]">
-                            Owner / Billing only
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </section>
-        </div>
-      )}
-
-      {/* Notification preferences */}
-      {!loading && data && (
-        <div className="mt-6 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">
-            Notification preferences
-          </h2>
-          <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
-            Choose which events you want to be notified about
-          </p>
-
-          {notifPrefsLoading ? (
-            <p className="mt-4 text-xs text-[var(--bb-text-tertiary)]">Loading preferences...</p>
-          ) : (
-            <div className="mt-4">
-              {/* Column headers */}
-              <div className="flex items-center justify-end gap-4 px-3 pb-2">
-                <span className="w-9 text-center text-[10px] font-medium tracking-wider text-[var(--bb-text-tertiary)] uppercase">
-                  In-app
-                </span>
-                <span className="w-9 text-center text-[10px] font-medium tracking-wider text-[var(--bb-text-tertiary)] uppercase">
-                  Email
-                </span>
-              </div>
-              <div className="space-y-1">
-                {CUSTOMER_PREFS.map((pref) => {
-                  const prefData = notifPrefs.find((p) => p.type === pref.type);
-                  const enabled = prefData?.enabled ?? true;
-                  const emailEnabled = prefData?.emailEnabled ?? true;
-                  const isTogglingInApp = togglingType === `${pref.type}:enabled`;
-                  const isTogglingEmail = togglingType === `${pref.type}:emailEnabled`;
-
-                  return (
-                    <div
-                      key={pref.type}
-                      className="flex items-center justify-between rounded-xl px-3 py-3 transition-colors hover:bg-[var(--bb-bg-card)]/50"
-                    >
-                      <div className="mr-4 min-w-0 flex-1">
-                        <p className="text-xs font-medium text-[var(--bb-secondary)]">
-                          {pref.label}
-                        </p>
-                        <p className="mt-0.5 text-[10px] text-[var(--bb-text-tertiary)]">
-                          {pref.description}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        {/* In-app toggle */}
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-label={`${pref.label} in-app`}
-                          aria-checked={enabled}
-                          disabled={isTogglingInApp}
-                          onClick={() => handleTogglePref(pref.type, "enabled", enabled)}
-                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2 disabled:opacity-50 ${
-                            enabled ? "bg-[var(--bb-primary)]" : "bg-[var(--bb-border-input)]"
-                          }`}
-                        >
-                          <span
-                            className={`pointer-events-none inline-block h-4 w-4 translate-y-0.5 rounded-full bg-[var(--bb-bg-page)] shadow-sm transition-transform duration-200 ${
-                              enabled ? "translate-x-[18px]" : "translate-x-0.5"
-                            }`}
-                          />
-                        </button>
-                        {/* Email toggle */}
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-label={`${pref.label} email`}
-                          aria-checked={emailEnabled}
-                          disabled={isTogglingEmail}
-                          onClick={() => handleTogglePref(pref.type, "emailEnabled", emailEnabled)}
-                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2 disabled:opacity-50 ${
-                            emailEnabled ? "bg-[var(--bb-primary)]" : "bg-[var(--bb-border-input)]"
-                          }`}
-                        >
-                          <span
-                            className={`pointer-events-none inline-block h-4 w-4 translate-y-0.5 rounded-full bg-[var(--bb-bg-page)] shadow-sm transition-transform duration-200 ${
-                              emailEnabled ? "translate-x-[18px]" : "translate-x-0.5"
-                            }`}
-                          />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Tag management — OWNER + PM only, and only when the global
-          TAGS_ENABLED feature flag is on. When off, the whole card is
-          hidden so the company doesn't see a manage-UI for a feature
-          that's globally disabled. Existing rows are preserved. */}
-      {!loading && data && canEditCompany && tagsEnabled && (
-        <div className="mt-6 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-[var(--bb-secondary)]">Tags</h2>
-          <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
-            Manage tags used to categorize creative requests across your company.
-          </p>
-
-          {tagsLoading ? (
-            <p className="mt-4 text-xs text-[var(--bb-text-tertiary)]">Loading tags…</p>
-          ) : (
-            <>
-              {/* Existing tags */}
-              {tags.length === 0 ? (
-                <p className="mt-4 text-xs text-[var(--bb-text-tertiary)]">
-                  No tags yet. Create your first tag below.
-                </p>
-              ) : (
-                <div className="mt-4 space-y-2">
-                  {tags.map((tag) => (
-                    <div
-                      key={tag.id}
-                      className="flex items-center justify-between rounded-xl bg-[var(--bb-bg-warm)] px-3 py-2"
-                    >
-                      {editingTagId === tag.id ? (
-                        <div className="flex flex-1 flex-wrap items-center gap-2">
-                          <input
-                            type="text"
-                            value={editTagName}
-                            onChange={(e) => setEditTagName(e.target.value)}
-                            maxLength={30}
-                            aria-label={`Edit tag ${tag.name}`}
-                            className="w-32 rounded border border-[var(--bb-border)] px-2 py-1 text-[12px] text-[var(--bb-secondary)] focus:border-[var(--bb-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)]/30"
-                            autoFocus
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                handleSaveTag();
-                              }
-                              if (e.key === "Escape") cancelEditingTag();
-                            }}
-                          />
-                          <div className="flex gap-1">
-                            {TAG_COLOR_KEYS.map((key) => (
-                              <button
-                                key={key}
-                                type="button"
-                                onClick={() => setEditTagColor(key)}
-                                className={`h-6 w-6 rounded-full border-2 ${
-                                  editTagColor === key
-                                    ? "scale-110 border-[var(--bb-secondary)]"
-                                    : "border-transparent"
-                                }`}
-                                style={{
-                                  backgroundColor: TAG_COLORS[key].dot,
-                                }}
-                                title={TAG_COLORS[key].label}
-                              />
-                            ))}
-                          </div>
-                          <Button
-                            size="sm"
-                            onClick={handleSaveTag}
-                            loading={savingTag}
-                            loadingText="…"
-                            disabled={!editTagName.trim()}
-                          >
-                            Save
-                          </Button>
-                          <button
-                            type="button"
-                            onClick={cancelEditingTag}
-                            className="text-[11px] text-[var(--bb-text-tertiary)] hover:text-[var(--bb-secondary)]"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <>
-                          <TagBadge name={tag.name} color={tag.color} />
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => startEditingTag(tag)}
-                              className="rounded p-1 text-[var(--bb-text-tertiary)] hover:text-[var(--bb-secondary)]"
-                              title="Edit tag"
-                            >
-                              <PencilIcon />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setTagToDelete(tag.id)}
-                              disabled={deletingTagId === tag.id}
-                              className="rounded p-1 text-[var(--bb-text-tertiary)] hover:text-[var(--bb-danger-text)] disabled:opacity-50"
-                              title="Delete tag"
-                            >
-                              <svg
-                                width="14"
-                                height="14"
-                                viewBox="0 0 14 14"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
-                              >
-                                <path
-                                  d="M10.5 3.5L3.5 10.5M3.5 3.5L10.5 10.5"
-                                  stroke="currentColor"
-                                  strokeWidth="1.5"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                />
-                              </svg>
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  ))}
-                </div>
+            {/* ===================== Plan & billing ===================== */}
+            <KeptTabPanel value="plan" {...panel}>
+              {billingError && !planChangeTarget && (
+                <Callout tone="error" title="Billing">
+                  {billingError}
+                </Callout>
               )}
 
-              {/* Add new tag */}
-              <div className="mt-4 rounded-xl border border-dashed border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-3">
-                <p className="mb-2 text-[11px] font-medium text-[var(--bb-text-tertiary)]">
-                  Add a new tag
-                </p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    type="text"
-                    value={newTagName}
-                    onChange={(e) => setNewTagName(e.target.value)}
-                    placeholder="Tag name"
-                    maxLength={30}
-                    aria-label="New tag name"
-                    className="w-40 rounded border border-[var(--bb-border)] px-2 py-1.5 text-[12px] text-[var(--bb-secondary)] placeholder:text-[var(--bb-text-tertiary)] focus:border-[var(--bb-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)]/30"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleAddTag();
-                      }
-                    }}
-                  />
-                  <div className="flex gap-1.5">
-                    {TAG_COLOR_KEYS.map((key) => (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => setNewTagColor(key)}
-                        className={`h-6 w-6 rounded-full border-2 transition-transform ${
-                          newTagColor === key
-                            ? "scale-110 border-[var(--bb-secondary)]"
-                            : "border-transparent hover:scale-105"
-                        }`}
-                        style={{
-                          backgroundColor: TAG_COLORS[key].dot,
-                        }}
-                        title={TAG_COLORS[key].label}
-                      />
-                    ))}
-                  </div>
-                  <Button
-                    size="sm"
-                    onClick={handleAddTag}
-                    loading={addingTag}
-                    loadingText="Adding…"
-                    disabled={!newTagName.trim()}
-                  >
-                    Add tag
-                  </Button>
-                </div>
+              <div
+                className={
+                  topups.length > 0
+                    ? "grid items-stretch gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,1fr)]"
+                    : "grid gap-6"
+                }
+              >
+                <Card>
+                  <CardTitle description="The plan that defines your monthly token allowance.">
+                    Your plan &amp; billing
+                  </CardTitle>
+
+                  {plan ? (
+                    <>
+                      {!canManagePlan && (
+                        <div className="mt-4">
+                          <Callout tone="warning" title="Limited access">
+                            You don&apos;t have permission to manage billing for this company. You
+                            can see the current plan, but only the owner or billing manager can
+                            request changes.
+                          </Callout>
+                        </div>
+                      )}
+                      <div className="mt-5 flex flex-wrap items-start justify-between gap-6">
+                        <div className="flex min-w-0 items-center gap-4">
+                          <IconTile tone="green" size={64}>
+                            <IconCoins width={28} height={28} />
+                          </IconTile>
+                          <div className="min-w-0">
+                            <Eyebrow>Current plan</Eyebrow>
+                            <p className="mt-1 text-2xl leading-8 font-bold">{plan.name}</p>
+                            <p className="mt-0.5 text-sm text-[var(--av2-text-2)]">
+                              {plan.monthlyTokens.toLocaleString()} tokens/month ·{" "}
+                              {plan.priceCents == null
+                                ? DASH
+                                : `${formatPrice(plan.priceCents)}/month`}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="min-w-[200px]">
+                          <Eyebrow>Subscription status</Eyebrow>
+                          <div className="mt-2">
+                            <Badge tone={billingStatusTone(company.billingStatus)}>
+                              {prettyBillingStatus(company.billingStatus)}
+                            </Badge>
+                          </div>
+                          {/* Only offered when there's no live subscription — a second
+                              checkout would create a second, double-billed subscription
+                              (the API refuses it too). */}
+                          {canManagePlan && !company.hasLiveSubscription && (
+                            <Button
+                              variant="primary"
+                              className="mt-3 w-full"
+                              onClick={handleStartBillingCheckout}
+                              disabled={billingLoading || !plan.isActive}
+                              aria-busy={billingLoading || undefined}
+                            >
+                              {billingLoading ? "Redirecting…" : "Start subscription"}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      <p className="mt-5 border-t border-[var(--av2-border)] pt-4 text-sm text-[var(--av2-text-2)]">
+                        {canManagePlan && company.hasLiveSubscription ? (
+                          <>
+                            To upgrade or downgrade, use <strong>Switch to a different plan</strong>{" "}
+                            below. For invoices, your payment method or cancelling, contact us at{" "}
+                            <a href={`mailto:${CONTACT_EMAIL}`} className="underline">
+                              {CONTACT_EMAIL}
+                            </a>
+                            .
+                          </>
+                        ) : canManagePlan ? (
+                          <>
+                            Start your subscription through Stripe to receive your monthly tokens.
+                          </>
+                        ) : (
+                          <>
+                            Need to change something? Ask your company owner or billing manager to
+                            manage the subscription.
+                          </>
+                        )}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="mt-4 text-sm text-[var(--av2-text-2)]">
+                      No subscription plan is assigned to your company yet. Please contact support
+                      if this does not look correct.
+                    </p>
+                  )}
+                </Card>
+
+                {/* One-time token top-up packs */}
+                {topups.length > 0 && (
+                  <Card>
+                    <CardTitle description="One-time top-up — charged immediately, tokens credited when payment succeeds.">
+                      Need more tokens now?
+                    </CardTitle>
+                    <ul className="mt-4 space-y-3">
+                      {topups.map((t) => (
+                        <li
+                          key={t.id}
+                          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--av2-border)] p-4"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-base font-semibold">
+                              {t.monthlyTokens.toLocaleString()} tokens
+                            </p>
+                            <p className="text-sm text-[var(--av2-text-2)]">
+                              {formatPrice(t.priceCents)} one-time
+                            </p>
+                            <p className="mt-0.5 text-sm text-[var(--av2-text-2)]">
+                              {t.name}
+                              {t.description ? ` · ${t.description}` : ""}
+                            </p>
+                          </div>
+                          {canManagePlan ? (
+                            <Button
+                              onClick={() => handleBuyTopup(t.id)}
+                              disabled={topupLoadingId !== null}
+                              aria-busy={topupLoadingId === t.id || undefined}
+                            >
+                              {topupLoadingId === t.id ? "Redirecting…" : "Buy tokens"}
+                            </Button>
+                          ) : (
+                            <p className="text-xs text-[var(--av2-text-2)]">Owner / Billing only</p>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </Card>
+                )}
               </div>
-            </>
-          )}
-        </div>
-      )}
 
-      {/* Leave workspace — softer alternative to deleting the whole account.
-          Keeps the UserAccount + ledger; only severs the CompanyMember row.
-          Server blocks the last OWNER (must transfer ownership first). */}
-      {!loading && data && (
-        <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50/40 px-5 py-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-amber-900">Leave this workspace</h2>
-          <p className="mt-1 text-[11px] text-[var(--bb-text-tertiary)]">
-            Remove yourself from <strong>{data.company.name}</strong>. Your account stays active and
-            you keep access to any other workspaces you belong to. If you are the only owner, you
-            must promote another member to Owner before leaving.
-          </p>
-          <div className="mt-3">
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setLeaveWorkspaceError(null);
-                setLeaveWorkspaceOpen(true);
-              }}
-              className="!border !border-amber-300 !text-amber-800 hover:!bg-amber-50"
-            >
-              Leave workspace
-            </Button>
-          </div>
-        </div>
-      )}
+              {/* Change plan — upgrade/downgrade with Stripe proration */}
+              {plan && canManagePlan && otherPlans.length > 0 && (
+                <Card>
+                  <CardTitle description="Upgrade or downgrade at any time. Stripe prorates the charge so you only pay the difference for the remaining days in your billing period.">
+                    Switch to a different plan
+                  </CardTitle>
+                  <ul className="mt-4 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+                    {otherPlans.map((p) => {
+                      const isUpgrade = p.monthlyTokens > plan.monthlyTokens;
+                      return (
+                        <li
+                          key={p.id}
+                          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--av2-border)] p-4"
+                        >
+                          <div className="min-w-0">
+                            <p className="flex flex-wrap items-center gap-2 text-base font-semibold">
+                              {p.name}
+                              <Badge tone={isUpgrade ? "peach" : "neutral"}>
+                                {isUpgrade ? "Upgrade" : "Downgrade"}
+                              </Badge>
+                            </p>
+                            {p.description && (
+                              <p className="mt-0.5 text-sm text-[var(--av2-text-2)]">
+                                {p.description}
+                              </p>
+                            )}
+                            <p className="mt-1 text-sm text-[var(--av2-text-2)]">
+                              {p.monthlyTokens.toLocaleString()} tokens/month
+                            </p>
+                            <p className="text-sm font-semibold">
+                              {p.priceCents == null ? DASH : `${formatPrice(p.priceCents)}/month`}
+                            </p>
+                          </div>
+                          <Button onClick={() => openPlanChange(p)} disabled={changePlanSaving}>
+                            Preview change
+                          </Button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  <div className="mt-4">
+                    <Callout tone="info" title="Preview before you change plans">
+                      You&apos;ll see the prorated charge before you confirm the switch.
+                    </Callout>
+                  </div>
+                </Card>
+              )}
+            </KeptTabPanel>
 
-      {/* Danger zone — account deletion (GDPR right-to-erasure). */}
-      {!loading && data && (
-        <div className="mt-6 rounded-2xl border border-red-200 bg-red-50/40 px-5 py-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-[var(--bb-danger-text)]">Danger zone</h2>
-          <p className="mt-1 text-[11px] text-[var(--bb-text-tertiary)]">
-            Delete your Brandbite account permanently. Your ledger history and existing tickets are
-            retained in anonymized form for audit purposes; your email is freed up for future
-            sign-ups.
-          </p>
-          <div className="mt-3">
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setDeleteConfirmEmail("");
-                setDeleteAccountError(null);
-                setDeleteAccountOpen(true);
-              }}
-              className="!border !border-red-300 !text-red-700 hover:!bg-red-50"
-            >
-              Delete my account
-            </Button>
-          </div>
-        </div>
-      )}
+            {/* ===================== Notifications ===================== */}
+            <KeptTabPanel value="notifications" {...panel}>
+              <Card>
+                <CardTitle description="Choose which events you want to be notified about. Changes save instantly, and these are the same personal choices as under your profile.">
+                  Notification preferences
+                </CardTitle>
+                <div className="mt-4">
+                  <NotificationPreferencesBody role="CUSTOMER" state={notifications} />
+                </div>
+              </Card>
+            </KeptTabPanel>
+
+            {/* ==================== Workspace access ==================== */}
+            <KeptTabPanel value="access" {...panel}>
+              <div className="grid items-start gap-6 xl:grid-cols-2">
+                <Card>
+                  <CardTitle
+                    description="Your personal profile inside brandbite."
+                    action={
+                      !editingUser ? <Button onClick={startEditingUser}>Edit</Button> : undefined
+                    }
+                  >
+                    Your account
+                  </CardTitle>
+                  <div className="mt-4">
+                    {editingUser && (
+                      <Field label="Name" htmlFor="account-name" className="mb-4">
+                        <TextInput
+                          id="account-name"
+                          value={draftUserName}
+                          onChange={(e) => setDraftUserName(e.target.value)}
+                          placeholder="Your name"
+                          autoComplete="name"
+                          disabled={savingUser}
+                          autoFocus
+                        />
+                      </Field>
+                    )}
+                    <KeyValueList
+                      rows={[
+                        ...(editingUser ? [] : [{ label: "Name", value: user.name || DASH }]),
+                        { label: "Email", value: user.email },
+                        { label: "Role", value: prettyRole(user.role) },
+                        { label: "Company role", value: prettyCompanyRole(user.companyRole) },
+                      ]}
+                    />
+                    {editingUser && (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <Button
+                          variant="primary"
+                          onClick={handleSaveUser}
+                          disabled={savingUser}
+                          aria-busy={savingUser || undefined}
+                        >
+                          {savingUser ? "Saving…" : "Save"}
+                        </Button>
+                        <Button onClick={cancelEditingUser} disabled={savingUser}>
+                          Cancel
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-4 border-t border-[var(--av2-border)] pt-4">
+                    <TextLink href="/customer/profile">Open your profile</TextLink>
+                  </div>
+                </Card>
+
+                <Card>
+                  <CardTitle description="Who belongs to this company and what they can do.">
+                    Company members
+                  </CardTitle>
+                  <p className="mt-4 text-sm">
+                    {company.counts.members.toLocaleString()}{" "}
+                    {plural(company.counts.members, "member", "members")}
+                  </p>
+                  {canEditCompany ? (
+                    <div className="mt-4">
+                      <ButtonLink href="/customer/members">Manage members</ButtonLink>
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-sm text-[var(--av2-text-2)]">
+                      Only owners and project managers can view and manage members.
+                    </p>
+                  )}
+                </Card>
+              </div>
+
+              {/* Kept apart from the forms above. */}
+              <div className="space-y-6 border-t border-[var(--av2-border)] pt-6">
+                <Card className="border-[var(--av2-attention-border)]">
+                  <h2 className="text-xl leading-7 font-semibold">Leave this workspace</h2>
+                  <p className="mt-1 max-w-3xl text-sm text-[var(--av2-text-2)]">
+                    Remove yourself from <strong>{company.name}</strong>. Your account stays active
+                    and you keep access to any other workspaces you belong to. If you are the only
+                    owner, you must promote another member to Owner before leaving.
+                  </p>
+                  <Button
+                    variant="danger"
+                    className="mt-4"
+                    onClick={() => {
+                      setLeaveWorkspaceError(null);
+                      setLeaveWorkspaceOpen(true);
+                    }}
+                  >
+                    Leave workspace
+                  </Button>
+                </Card>
+
+                <DeleteAccountCard
+                  endpoint="/api/customer/account"
+                  email={user.email}
+                  description="Delete your brandbite account permanently. Your ledger history and existing tickets are retained in anonymized form for audit purposes; your email is freed up for future sign-ups."
+                />
+              </div>
+            </KeptTabPanel>
+          </>
+        )}
+      </div>
 
       {/* Leave-workspace confirm modal. No email echo — the action is
           reversible (owner can re-invite) and the server blocks the sole
           OWNER with a clear error, so a lightweight confirm is enough. */}
       <Modal open={leaveWorkspaceOpen} onClose={() => setLeaveWorkspaceOpen(false)} size="md">
         <ModalHeader
-          title={`Leave ${data?.company?.name ?? "this workspace"}?`}
+          title={`Leave ${company?.name ?? "this workspace"}?`}
           onClose={() => setLeaveWorkspaceOpen(false)}
         />
-        <div className="space-y-3 px-6 pb-4 text-sm text-[var(--bb-text-secondary)]">
+        <div className="space-y-3 px-6 pb-4 text-sm text-[var(--av2-text-2)]">
           <p>
             You&apos;ll lose access to this workspace&apos;s projects, tickets, and members. Your
             account stays active and you keep any other workspace memberships. An owner can
             re-invite you later.
           </p>
-          {data?.user?.companyRole === "OWNER" && (
-            <InlineAlert variant="warning" size="sm">
+          {user?.companyRole === "OWNER" && (
+            <Callout tone="warning">
               You&apos;re an Owner of this workspace. If you&apos;re the only Owner, this action
               will be blocked — promote another member to Owner first.
-            </InlineAlert>
+            </Callout>
           )}
-          {leaveWorkspaceError && (
-            <InlineAlert variant="error" size="sm">
-              {leaveWorkspaceError}
-            </InlineAlert>
-          )}
+          {leaveWorkspaceError && <Callout tone="error">{leaveWorkspaceError}</Callout>}
         </div>
         <ModalFooter>
           <Button
@@ -1622,126 +1092,44 @@ export default function CustomerSettingsPage() {
             Cancel
           </Button>
           <Button
-            variant="primary"
+            variant="danger"
             onClick={handleLeaveWorkspace}
-            loading={leavingWorkspace}
-            loadingText="Leaving…"
             disabled={leavingWorkspace}
-            className="!bg-amber-600 hover:!bg-amber-700"
+            aria-busy={leavingWorkspace || undefined}
           >
-            Leave workspace
+            {leavingWorkspace ? "Leaving…" : "Leave workspace"}
           </Button>
         </ModalFooter>
       </Modal>
-
-      {/* Delete account confirm modal — requires the user to type their
-          own email as a "yes I meant it" safeguard. */}
-      <Modal open={deleteAccountOpen} onClose={() => setDeleteAccountOpen(false)} size="md">
-        <ModalHeader title="Delete your account?" onClose={() => setDeleteAccountOpen(false)} />
-        <div className="space-y-3 px-6 pb-4 text-sm text-[var(--bb-text-secondary)]">
-          <p>
-            This is permanent. Your sign-in credentials are removed immediately. Historical tickets,
-            ratings, and ledger entries are kept but <strong>anonymized</strong>.
-          </p>
-          <p>
-            To confirm, type your account email: <strong>{data?.user?.email ?? ""}</strong>
-          </p>
-          <FormInput
-            type="email"
-            value={deleteConfirmEmail}
-            onChange={(e) => setDeleteConfirmEmail(e.target.value)}
-            placeholder="Type your email to confirm"
-            disabled={deletingAccount}
-            // Don't let password managers autofill this — the user must
-            // physically type their email as a "yes I meant it" safeguard.
-            autoComplete="off"
-          />
-          {deleteAccountError && (
-            <InlineAlert variant="error" size="sm">
-              {deleteAccountError}
-            </InlineAlert>
-          )}
-        </div>
-        <ModalFooter>
-          <Button
-            variant="ghost"
-            onClick={() => setDeleteAccountOpen(false)}
-            disabled={deletingAccount}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleDeleteAccount}
-            loading={deletingAccount}
-            loadingText="Deleting…"
-            disabled={
-              deletingAccount ||
-              deleteConfirmEmail.trim().toLowerCase() !== (data?.user?.email ?? "").toLowerCase()
-            }
-            className="!bg-red-600 hover:!bg-red-700"
-          >
-            Delete my account
-          </Button>
-        </ModalFooter>
-      </Modal>
-
-      {/* Delete tag confirmation */}
-      <ConfirmDialog
-        open={tagToDelete !== null}
-        onClose={() => setTagToDelete(null)}
-        onConfirm={async () => {
-          if (!tagToDelete) return;
-          await handleDeleteTag(tagToDelete);
-          setTagToDelete(null);
-        }}
-        title="Delete tag"
-        description="This tag will be removed from all tickets. This can't be undone."
-        confirmLabel="Delete"
-        loading={deletingTagId === tagToDelete}
-      />
 
       {/* Plan change confirm modal with Stripe preview */}
       <Modal open={planChangeTarget !== null} onClose={closePlanChange} size="md">
         <ModalHeader title="Confirm plan change" onClose={closePlanChange} />
-        <div className="px-6 pb-4 text-sm text-[var(--bb-text-secondary)]">
+        <div className="space-y-3 px-6 pb-4 text-sm text-[var(--av2-text-2)]">
           {planChangeTarget && (
             <>
               <p>
                 Switch to <strong>{planChangeTarget.name}</strong> (
                 {planChangeTarget.monthlyTokens.toLocaleString()} tokens/mo)?
               </p>
-              {previewLoading && (
-                <p className="mt-3 text-[11px] text-[var(--bb-text-muted)]">
-                  Fetching prorated cost from Stripe…
-                </p>
-              )}
+              {previewLoading && <p className="text-xs">Fetching prorated cost from Stripe…</p>}
               {!previewLoading && preview && (
-                <div className="mt-4 rounded-xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] p-3 text-xs">
-                  <p className="text-[var(--bb-text-muted)]">
-                    Your next invoice from Stripe will look like this:
-                  </p>
+                <div className="rounded-lg border border-[var(--av2-border)] p-3 text-sm">
+                  <p>Your next invoice from Stripe will look like this:</p>
                   <ul className="mt-2 space-y-1">
                     {preview.lineItems.map((li, i) => (
-                      <li
-                        key={i}
-                        className="flex items-start justify-between gap-3 text-[var(--bb-text-secondary)]"
-                      >
+                      <li key={i} className="flex items-start justify-between gap-3">
                         <span className="flex-1">
                           {li.description ?? "Line item"}
-                          {li.proration && (
-                            <span className="ml-1 text-[10px] text-[var(--bb-text-tertiary)]">
-                              (proration)
-                            </span>
-                          )}
+                          {li.proration && <span className="ml-1 text-xs">(proration)</span>}
                         </span>
-                        <span className="font-mono text-[var(--bb-secondary)]">
+                        <span className="font-mono text-[var(--av2-text)]">
                           {(li.amountCents / 100).toFixed(2)} {preview.currency.toUpperCase()}
                         </span>
                       </li>
                     ))}
                   </ul>
-                  <div className="mt-3 flex items-center justify-between border-t border-[var(--bb-border-subtle)] pt-2 font-semibold">
+                  <div className="mt-3 flex items-center justify-between border-t border-[var(--av2-border)] pt-2 font-semibold text-[var(--av2-text)]">
                     <span>Amount due now</span>
                     <span className="font-mono">
                       {(preview.amountDueCents / 100).toFixed(2)} {preview.currency.toUpperCase()}
@@ -1750,11 +1138,12 @@ export default function CustomerSettingsPage() {
                 </div>
               )}
               {!previewLoading && !preview && (
-                <p className="mt-3 text-[11px] text-[var(--bb-text-muted)]">
+                <p className="text-xs">
                   (Preview unavailable — Stripe will bill the prorated difference on your next
                   invoice.)
                 </p>
               )}
+              {billingError && <Callout tone="error">{billingError}</Callout>}
             </>
           )}
         </div>
@@ -1765,10 +1154,10 @@ export default function CustomerSettingsPage() {
           <Button
             variant="primary"
             onClick={confirmPlanChange}
-            loading={changePlanSaving}
-            loadingText="Switching…"
+            disabled={changePlanSaving}
+            aria-busy={changePlanSaving || undefined}
           >
-            Confirm switch
+            {changePlanSaving ? "Switching…" : "Confirm switch"}
           </Button>
         </ModalFooter>
       </Modal>

@@ -32,7 +32,7 @@ export const DEMO_PERSONAS: DemoPersona[] = [
     id: "site-owner",
     label: "Site owner",
     description:
-      "Platform-level owner for Brandbite. Full access to admin dashboard, analytics, and all configuration.",
+      "Platform-level owner for brandbite. Full access to admin dashboard, analytics, and all configuration.",
     redirectTo: "/admin",
     email: "owner@brandbite-demo.com",
     role: "SITE_OWNER",

@@ -20,7 +20,7 @@ import {
   FOOTER_SOCIAL_LINKS,
 } from "@/components/marketing/home-footer";
 
-export const AUTH_DISPLAY_FONT = "font-[family-name:var(--font-inter)]";
+export const AUTH_DISPLAY_FONT = "font-[family-name:var(--font-jakarta)]";
 
 /**
  * "fullbleed": the page itself is the layout — header and footer span the
@@ -54,8 +54,8 @@ export function AuthShell({ children }: { children: ReactNode }) {
         <header
           className={`flex items-center justify-between py-4 max-[767px]:px-5 ${EDGE_PADDING}`}
         >
-          <Link href="/" className="flex shrink-0" aria-label="Brandbite home">
-            <Image src="/brandbite-logo.svg" alt="Brandbite" width={118} height={24} priority />
+          <Link href="/" className="flex shrink-0" aria-label="brandbite home">
+            <Image src="/brandbite-logo.svg" alt="brandbite" width={118} height={24} priority />
           </Link>
           <Link
             href="/"

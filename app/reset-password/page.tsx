@@ -123,7 +123,7 @@ export default function ResetPasswordPage() {
     return (
       <div className="flex min-h-screen flex-col bg-[var(--bb-bg-page)]">
         <header className="flex items-center border-b border-[var(--bb-border-subtle)] px-6 py-4">
-          <Link href="/" className="flex items-center" aria-label="Brandbite home">
+          <Link href="/" className="flex items-center" aria-label="brandbite home">
             <BrandLogo width={120} className="h-6 w-auto" />
           </Link>
         </header>
@@ -167,7 +167,7 @@ export default function ResetPasswordPage() {
     return (
       <div className="flex min-h-screen flex-col bg-[var(--bb-bg-page)]">
         <header className="flex items-center border-b border-[var(--bb-border-subtle)] px-6 py-4">
-          <Link href="/" className="flex items-center" aria-label="Brandbite home">
+          <Link href="/" className="flex items-center" aria-label="brandbite home">
             <BrandLogo width={120} className="h-6 w-auto" />
           </Link>
         </header>
@@ -212,7 +212,7 @@ export default function ResetPasswordPage() {
   return (
     <div className="flex min-h-screen flex-col bg-[var(--bb-bg-page)]">
       <header className="flex items-center border-b border-[var(--bb-border-subtle)] px-6 py-4">
-        <Link href="/" className="flex items-center" aria-label="Brandbite home">
+        <Link href="/" className="flex items-center" aria-label="brandbite home">
           <BrandLogo width={120} className="h-6 w-auto" />
         </Link>
       </header>

@@ -347,7 +347,7 @@ async function handleAcceptProposed(args: {
   try {
     event = await createConsultationEvent(settings, {
       calendarId,
-      summary: `Brandbite interview — ${row.fullName}`,
+      summary: `brandbite interview — ${row.fullName}`,
       description: [
         `Talent interview with ${row.fullName} (${row.email}).`,
         ``,

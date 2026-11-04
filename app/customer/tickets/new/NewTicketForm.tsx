@@ -8,8 +8,19 @@
 
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import {
+  Button,
+  Callout,
+  Card,
+  DASH,
+  Field,
+  Select,
+  TextArea,
+  TextInput,
+} from "@/components/admin/v2/ui";
+import { tokenCount } from "@/components/dashboard/tickets/shared";
 import { createTicketSchema } from "@/lib/schemas/ticket.schemas";
 import {
   type CompanyRole,
@@ -17,8 +28,6 @@ import {
   canCreateTickets,
   isBillingReadOnly,
 } from "@/lib/permissions/companyRoles";
-import { Button } from "@/components/ui/button";
-import { FormInput, FormSelect } from "@/components/ui/form-field";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { TagMultiSelect, type TagOption } from "@/components/ui/tag-multi-select";
 import { JobTypePicker } from "@/components/ui/job-type-picker";
@@ -170,6 +179,8 @@ export default function NewTicketForm({
   aiEnabled = false,
 }: Props) {
   const router = useRouter();
+  const ids = useId();
+  const briefInputRef = useRef<HTMLInputElement>(null);
 
   const [creativeMode, setCreativeMode] = useState<"DESIGNER" | "AI">("DESIGNER");
   const [title, setTitle] = useState("");
@@ -669,543 +680,557 @@ export default function NewTicketForm({
   // ---------------------------------------------------------------------------
 
   const isBusy = submitting || uploadingBriefs;
+  // The board opens this form in a dialog (it passes onCancel), which is
+  // already a surface, so the sections drop their own card there.
+  const embedded = !!onCancel;
+  const Section = embedded ? PlainSection : CardSection;
+  const remaining =
+    tokenBalance != null && effectiveCost != null ? tokenBalance - effectiveCost : null;
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
-      {/* Limited access banner for BILLING role */}
-      {!companyRoleLoading && isLimitedAccess && (
-        <div className="rounded-lg border border-[var(--bb-warning-border)] bg-[var(--bb-warning-bg)] px-3 py-2 text-xs text-[var(--bb-text-secondary)]">
-          <p className="text-[11px] font-medium text-[var(--bb-warning-text)]">Limited access</p>
-          <p className="mt-1">
-            You can review existing tickets, but only your company owner or project manager can
-            create new tickets for this workspace.
-          </p>
-        </div>
-      )}
+    <form onSubmit={handleSubmit} className="@container">
+      <div className="space-y-6">
+        {!companyRoleLoading && isLimitedAccess ? (
+          <Callout tone="warning" title="Limited access">
+            Your billing role can review existing requests, but it can't create new ones for this
+            workspace. Ask your company owner or a project manager to add one.
+          </Callout>
+        ) : null}
 
-      {error && (
-        <div className="rounded-lg border border-red-200 bg-[var(--bb-danger-bg)] px-3 py-2 text-sm text-red-700">
-          {error}
-        </div>
-      )}
+        <div className="grid items-start gap-6 @2xl:grid-cols-[minmax(0,1.6fr)_minmax(280px,1fr)]">
+          {/* Left: what you need */}
+          <Section>
+            <div className="space-y-5">
+              {/* Creative mode: only when "Work with AI" is enabled
+                  (AI_TICKETS_MODE). Otherwise every ticket is a Designer ticket
+                  and the choice is hidden. */}
+              {aiEnabled ? (
+                <fieldset>
+                  <legend className="mb-1.5 text-sm font-medium">
+                    How would you like this done?
+                  </legend>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {(
+                      [
+                        {
+                          value: "DESIGNER",
+                          title: "Work with Designer",
+                          text: "A creative from our team handles the work. 2-3 day turnaround.",
+                        },
+                        {
+                          value: "AI",
+                          title: "Work with AI",
+                          text: "AI generates your design instantly. Ready in seconds.",
+                        },
+                      ] as const
+                    ).map((mode) => (
+                      <button
+                        key={mode.value}
+                        type="button"
+                        aria-pressed={creativeMode === mode.value}
+                        onClick={() => setCreativeMode(mode.value)}
+                        disabled={isBusy}
+                        className={`rounded-xl border p-4 text-left transition-colors focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:ring-offset-1 focus-visible:outline-none ${
+                          creativeMode === mode.value
+                            ? "border-[var(--av2-accent)] bg-[var(--av2-selected)]"
+                            : "border-[var(--av2-border)] hover:bg-[var(--av2-bg)]"
+                        }`}
+                      >
+                        <span className="block text-sm font-semibold">{mode.title}</span>
+                        <span className="mt-0.5 block text-xs text-[var(--av2-text-2)]">
+                          {mode.text}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
+              ) : null}
 
-      {successMessage && (
-        <div className="rounded-lg border border-emerald-200 bg-[var(--bb-success-bg)] px-3 py-2 text-sm text-emerald-800">
-          {successMessage}
-        </div>
-      )}
-
-      {uploadProgressText && (
-        <div className="rounded-lg border border-[var(--bb-border)] bg-[var(--bb-warning-bg)] px-3 py-2 text-xs text-[var(--bb-text-secondary)]">
-          {uploadProgressText}
-        </div>
-      )}
-
-      {/* Creative Mode Selector — only when "Work with AI" is enabled
-          (AI_TICKETS_MODE). Otherwise every ticket is a Designer ticket and
-          the choice is hidden. */}
-      {aiEnabled && (
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-[var(--bb-secondary)]">
-            How would you like this done?
-          </label>
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => setCreativeMode("DESIGNER")}
-              disabled={isBusy}
-              className={`rounded-xl border px-4 py-3 text-left transition-all ${
-                creativeMode === "DESIGNER"
-                  ? "border-[var(--bb-primary)] bg-[var(--bb-primary-light)] shadow-sm"
-                  : "border-[var(--bb-border)] bg-[var(--bb-bg-page)] hover:border-[var(--bb-primary)]"
-              }`}
-            >
-              <p className="text-sm font-semibold text-[var(--bb-secondary)]">Work with Designer</p>
-              <p className="mt-0.5 text-[11px] text-[var(--bb-text-muted)]">
-                A creative from our team handles the work. 2-3 day turnaround.
-              </p>
-            </button>
-            <button
-              type="button"
-              onClick={() => setCreativeMode("AI")}
-              disabled={isBusy}
-              className={`rounded-xl border px-4 py-3 text-left transition-all ${
-                creativeMode === "AI"
-                  ? "border-[var(--bb-primary)] bg-[var(--bb-primary-light)] shadow-sm"
-                  : "border-[var(--bb-border)] bg-[var(--bb-bg-page)] hover:border-[var(--bb-primary)]"
-              }`}
-            >
-              <p className="text-sm font-semibold text-[var(--bb-secondary)]">Work with AI</p>
-              <p className="mt-0.5 text-[11px] text-[var(--bb-text-muted)]">
-                AI generates your design instantly. Ready in seconds.
-              </p>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Title */}
-      <div className="space-y-1">
-        <label className="text-xs font-medium text-[var(--bb-secondary)]">Title</label>
-        <FormInput
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder={
-            creativeMode === "AI"
-              ? "Describe what you want AI to create"
-              : "Briefly describe what you need designed"
-          }
-          disabled={isBusy}
-        />
-        <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-          {creativeMode === "AI"
-            ? "This becomes the AI prompt for generating your design."
-            : "This will be the main line your creative sees on the board."}
-        </p>
-      </div>
-
-      {/* Brief — merged "Details" + "AI brief assist" into a single
-          section so customers read it as one concept. The AI textarea
-          is an opt-in drawer inside this block; the rich-text editor
-          is always the source of truth for what gets persisted as
-          Ticket.description. */}
-      <div className="space-y-1">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <label className="text-xs font-medium text-[var(--bb-secondary)]">Brief</label>
-          {!isLimitedAccess && !briefAiOpen && (
-            <button
-              type="button"
-              onClick={() => {
-                setBriefAiOpen(true);
-                setBriefHint(null);
-              }}
-              disabled={isBusy}
-              className="inline-flex items-center gap-1 rounded-full border border-[var(--bb-primary)] bg-[var(--bb-primary-light)] px-2.5 py-1 text-[11px] font-semibold text-[var(--bb-primary)] transition-colors hover:bg-[var(--bb-primary)] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
-              title="Paste plain text — AI structures it into Title + Brief + Job type + Priority"
-            >
-              ✨ Fill with AI
-            </button>
-          )}
-        </div>
-
-        {/* AI assist drawer — collapsed by default. When open, the
-            customer pastes plain text and clicks Fill; on success the
-            drawer auto-closes and the rich editor + Title + JobType +
-            Priority are populated from the parsed result. */}
-        {!isLimitedAccess && briefAiOpen && (
-          <div className="rounded-lg border border-[var(--bb-primary)] bg-[var(--bb-primary-light)] px-3 py-3">
-            <p className="text-[11px] text-[var(--bb-text-secondary)]">
-              Paste your request as plain text. AI fills Title, Brief, Job type, and Priority below
-              — you can edit anything before submitting.
-            </p>
-            <textarea
-              value={briefText}
-              onChange={(e) => setBriefText(e.target.value)}
-              disabled={briefParsing}
-              rows={3}
-              placeholder="e.g. We need a square social post for our new espresso blend launching next Tuesday. Moody, warm tones, inspired by old Italian cafes. Needs to be ready by Monday."
-              className="mt-2 w-full rounded-md border border-[var(--bb-border-input)] bg-white px-2 py-1.5 text-xs text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
-              maxLength={4000}
-            />
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                onClick={handleParseBrief}
-                loading={briefParsing}
-                loadingText="Parsing…"
-                disabled={briefParsing || briefText.trim().length < 10}
+              <Field
+                label={<RequiredLabel>Title</RequiredLabel>}
+                htmlFor={`${ids}-title`}
+                hint={
+                  creativeMode === "AI"
+                    ? "This becomes the AI prompt for generating your design."
+                    : "This will be the main line your creative sees on the board."
+                }
               >
-                ✨ Fill
-              </Button>
-              <button
-                type="button"
-                onClick={() => {
-                  setBriefAiOpen(false);
-                  setBriefText("");
-                  setBriefHint(null);
-                }}
-                disabled={briefParsing}
-                className="text-[11px] font-medium text-[var(--bb-text-muted)] hover:text-[var(--bb-secondary)] hover:underline disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Cancel
-              </button>
-              {briefHint && (
-                <span className="text-[11px] text-[var(--bb-text-secondary)]">{briefHint}</span>
-              )}
-            </div>
-          </div>
-        )}
+                <TextInput
+                  id={`${ids}-title`}
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder={
+                    creativeMode === "AI"
+                      ? "Describe what you want AI to create"
+                      : "Briefly describe what you need designed"
+                  }
+                  disabled={isBusy}
+                />
+              </Field>
 
-        <RichTextEditor
-          value={description}
-          onChange={setDescription}
-          placeholder="Share links, context, and any requirements that will help your creative"
-          disabled={isBusy}
-          minHeight="60px"
-        />
-        <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-          {!briefAiOpen && briefHint
-            ? briefHint
-            : "Write directly above, or paste plain text and click ✨ Fill with AI. You can add more context later from the ticket view."}
-        </p>
-      </div>
+              {/* Brief: the AI textarea is an opt-in drawer inside this block.
+                  The rich-text editor is always the source of truth for what
+                  gets persisted as Ticket.description. */}
+              <div>
+                <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-medium">Brief</p>
+                  {!isLimitedAccess && !briefAiOpen ? (
+                    <Button
+                      onClick={() => {
+                        setBriefAiOpen(true);
+                        setBriefHint(null);
+                      }}
+                      disabled={isBusy}
+                      title="Paste plain text. AI structures it into Title, Brief, Job type and Priority."
+                    >
+                      ✨ Fill with AI
+                    </Button>
+                  ) : null}
+                </div>
 
-      {/* Brief attachments */}
-      <div className="space-y-1">
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-medium text-[var(--bb-secondary)]">
-            Brief attachments (optional)
-          </label>
-          <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-            {briefFiles.length}/{maxBriefFiles}
-          </p>
-        </div>
+                {!isLimitedAccess && briefAiOpen ? (
+                  <div className="mb-3 rounded-xl border border-[var(--av2-accent)]/40 bg-[var(--av2-selected)] p-4">
+                    <label htmlFor={`${ids}-ai`} className="block text-sm">
+                      Paste your request as plain text. AI fills Title, Brief, Job type, and
+                      Priority. You can edit anything before submitting.
+                    </label>
+                    <TextArea
+                      id={`${ids}-ai`}
+                      value={briefText}
+                      onChange={(e) => setBriefText(e.target.value)}
+                      disabled={briefParsing}
+                      rows={3}
+                      placeholder="e.g. We need a square social post for our new espresso blend launching next Tuesday. Moody, warm tones, inspired by old Italian cafes. Needs to be ready by Monday."
+                      className="mt-2"
+                      maxLength={4000}
+                    />
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <Button
+                        onClick={handleParseBrief}
+                        disabled={briefParsing || briefText.trim().length < 10}
+                      >
+                        {briefParsing ? "Parsing…" : "✨ Fill"}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        onClick={() => {
+                          setBriefAiOpen(false);
+                          setBriefText("");
+                          setBriefHint(null);
+                        }}
+                        disabled={briefParsing}
+                      >
+                        Cancel
+                      </Button>
+                      {briefHint ? <span className="text-sm">{briefHint}</span> : null}
+                    </div>
+                  </div>
+                ) : null}
 
-        <div className="rounded-md border border-dashed border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-3">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-[11px] text-[var(--bb-text-secondary)]">
-              Attach reference files (logos, screenshots, briefs, inspiration). Accepts{" "}
-              {BRIEF_ACCEPTED_LABEL}. Max <strong>{MAX_UPLOAD_LABEL}</strong> per file.
-              <span className="ml-1 text-[var(--bb-text-tertiary)]">
-                Total: {formatBytes(totalBriefBytes)}
-              </span>
-            </div>
+                <RichTextEditor
+                  value={description}
+                  onChange={setDescription}
+                  placeholder="Share links, context, and any requirements that will help your creative"
+                  disabled={isBusy}
+                  minHeight="140px"
+                />
+                <p className="mt-1.5 text-xs text-[var(--av2-text-2)]">
+                  {!briefAiOpen && briefHint
+                    ? briefHint
+                    : "Write directly above, or paste plain text and click ✨ Fill with AI. You can add more context later from the request page."}
+                </p>
+              </div>
 
-            <label className="inline-flex cursor-pointer items-center justify-center rounded-full border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-4 py-2 text-xs font-medium text-[var(--bb-secondary)] hover:bg-[var(--bb-bg-warm)] disabled:cursor-not-allowed disabled:opacity-60">
-              <input
-                type="file"
-                accept={BRIEF_ACCEPT_ATTR}
-                multiple
-                className="hidden"
-                disabled={isBusy || isLimitedAccess || !canAddMoreBriefs}
-                onChange={(e) => {
-                  handleAddBriefFiles(e.target.files);
-                  // reset input so selecting same file again triggers change
-                  e.currentTarget.value = "";
-                }}
-              />
-              Add files
-            </label>
-          </div>
+              {/* Brief attachments */}
+              <div>
+                <div className="mb-1.5 flex items-center justify-between gap-2">
+                  <p className="text-sm font-medium">Brief attachments (optional)</p>
+                  <p className="text-sm text-[var(--av2-text-2)] tabular-nums">
+                    {briefFiles.length}/{maxBriefFiles}
+                  </p>
+                </div>
 
-          {briefFiles.length > 0 && (
-            <div className="mt-3 space-y-2">
-              {briefFiles.map((bf) => (
-                <div
-                  key={bf.id}
-                  className="flex items-center justify-between rounded-md border border-[var(--bb-border)] bg-[var(--bb-warning-bg)] px-3 py-2"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-xs font-medium text-[var(--bb-secondary)]">
-                      {bf.file.name}
-                    </p>
-                    <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-                      {formatBytes(bf.file.size)} • {bf.file.type || "file"}
-                    </p>
+                <div className="rounded-xl border border-dashed border-[var(--av2-border)] p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1 basis-56">
+                      <p className="text-sm">
+                        Attach reference files (logos, screenshots, briefs, inspiration).
+                      </p>
+                      <p className="mt-0.5 text-xs text-[var(--av2-text-2)]">
+                        Accepts {BRIEF_ACCEPTED_LABEL}. Max {MAX_UPLOAD_LABEL} per file. Total:{" "}
+                        {formatBytes(totalBriefBytes)}
+                      </p>
+                    </div>
+                    <input
+                      ref={briefInputRef}
+                      type="file"
+                      aria-label="Add brief attachments"
+                      accept={BRIEF_ACCEPT_ATTR}
+                      multiple
+                      hidden
+                      disabled={isBusy || isLimitedAccess || !canAddMoreBriefs}
+                      onChange={(e) => {
+                        handleAddBriefFiles(e.target.files);
+                        // reset input so selecting same file again triggers change
+                        e.currentTarget.value = "";
+                      }}
+                    />
+                    <Button
+                      disabled={isBusy || isLimitedAccess || !canAddMoreBriefs}
+                      onClick={() => briefInputRef.current?.click()}
+                    >
+                      Add files
+                    </Button>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveBriefFile(bf.id)}
-                    disabled={isBusy}
-                    className="ml-3 rounded-full border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-1.5 text-[11px] font-medium text-[var(--bb-secondary)] hover:bg-[var(--bb-bg-warm)] disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    Remove
-                  </button>
+                  {briefFiles.length > 0 ? (
+                    <div className="mt-3">
+                      <ul className="divide-y divide-[var(--av2-border)] rounded-lg border border-[var(--av2-border)]">
+                        {briefFiles.map((bf) => (
+                          <li
+                            key={bf.id}
+                            className="flex items-center justify-between gap-3 py-1 pr-1 pl-3"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium">{bf.file.name}</p>
+                              <p className="text-xs text-[var(--av2-text-2)]">
+                                {formatBytes(bf.file.size)} · {bf.file.type || "file"}
+                              </p>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              aria-label={`Remove ${bf.file.name}`}
+                              onClick={() => handleRemoveBriefFile(bf.id)}
+                              disabled={isBusy}
+                            >
+                              Remove
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="mt-2 text-xs text-[var(--av2-text-2)]">
+                        Attachments will be uploaded right after the request is created.
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {/* Per-file reasons, e.g. "logo.png is 6.2 MB. The current
+                      upload limit is 4 MB." Cleared on the next attempt. */}
+                  {uploadErrors.length > 0 ? (
+                    <div className="mt-3">
+                      <Callout tone="error" title="Some attachments couldn't be added">
+                        <ul className="list-disc space-y-0.5 pl-4">
+                          {uploadErrors.map((err, idx) => (
+                            <li key={idx}>{err}</li>
+                          ))}
+                        </ul>
+                      </Callout>
+                    </div>
+                  ) : null}
                 </div>
-              ))}
-              <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-                Attachments will be uploaded right after the ticket is created.
-              </p>
+              </div>
             </div>
-          )}
+          </Section>
 
-          {/* Per-file upload errors. Surfaces the specific reason each
-              attachment failed (e.g. "logo.png is 6.2 MB. The current
-              upload limit is 4 MB.") rather than the previous generic
-              "X failed" counter. Cleared on the next upload attempt. */}
-          {uploadErrors.length > 0 && (
-            <div
-              role="alert"
-              className="mt-3 space-y-1 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300"
-            >
-              <p className="font-semibold">Some attachments couldn&apos;t be added:</p>
-              <ul className="list-disc space-y-0.5 pl-4">
-                {uploadErrors.map((err, idx) => (
-                  <li key={idx}>{err}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      </div>
+          {/* Right: service and planning */}
+          <div className="min-w-0 space-y-6">
+            <Section title="Request details">
+              <div className="space-y-4">
+                <Field label={<RequiredLabel>Job type</RequiredLabel>}>
+                  <div className="[&>button]:min-h-10 [&>button]:rounded-lg">
+                    <JobTypePicker
+                      jobTypes={jobTypes}
+                      value={jobTypeId}
+                      onChange={handleJobTypeChange}
+                      disabled={isBusy}
+                    />
+                  </div>
+                </Field>
 
-      {/* Priority */}
-      <div className="space-y-1">
-        <label className="text-xs font-medium text-[var(--bb-secondary)]">Priority</label>
-        <FormSelect
-          value={priority}
-          onChange={(e) => setPriority(e.target.value as TicketPriorityValue)}
-          disabled={isBusy}
-        >
-          {PRIORITY_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </FormSelect>
-        <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-          Higher priority requests are more likely to be picked up first.
-        </p>
-      </div>
-
-      {/* Due date */}
-      <div className="space-y-1">
-        <label className="text-xs font-medium text-[var(--bb-secondary)]">Due date</label>
-        <FormInput
-          type="date"
-          value={dueDate}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDueDate(e.target.value)}
-          disabled={isBusy}
-          min={todayStr}
-          max={maxDateStr}
-        />
-        <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-          Set a target date for delivery. Optional.
-        </p>
-      </div>
-
-      {/* Project */}
-      <div className="space-y-1">
-        <label className="text-xs font-medium text-[var(--bb-secondary)]">Project</label>
-        <FormSelect
-          value={projectId}
-          onChange={(e) => setProjectId(e.target.value)}
-          disabled={isBusy}
-        >
-          <option value="">No specific project</option>
-          {projects.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name} {p.code ? `(${p.code})` : ""}
-            </option>
-          ))}
-        </FormSelect>
-        <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-          Use projects to group related requests together.
-        </p>
-      </div>
-
-      {/* Job type */}
-      <div className="space-y-1">
-        <label className="text-xs font-medium text-[var(--bb-secondary)]">
-          Job type <span className="text-[var(--bb-primary)]">*</span>
-        </label>
-        <JobTypePicker
-          jobTypes={jobTypes}
-          value={jobTypeId}
-          onChange={handleJobTypeChange}
-          disabled={isBusy}
-        />
-
-        {/* Quantity stepper — visible when a job type with hasQuantity is selected */}
-        {selectedJobType?.hasQuantity && (
-          <div className="flex items-center gap-2 pt-1">
-            <span className="text-[11px] text-[var(--bb-text-tertiary)]">
-              {selectedJobType.quantityLabel || "Quantity"}
-            </span>
-            <div className="inline-flex items-center rounded-md border border-[var(--bb-border-input)]">
-              <button
-                type="button"
-                disabled={isBusy || quantity <= 1}
-                onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                className="flex h-7 w-7 items-center justify-center rounded-l-md text-sm text-[var(--bb-text-secondary)] hover:bg-[var(--bb-bg-warm)] disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                −
-              </button>
-              <span className="flex h-7 w-8 items-center justify-center border-x border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] text-xs font-semibold text-[var(--bb-secondary)]">
-                {quantity}
-              </span>
-              <button
-                type="button"
-                disabled={isBusy || quantity >= 10}
-                onClick={() => setQuantity((q) => Math.min(10, q + 1))}
-                className="flex h-7 w-7 items-center justify-center rounded-r-md text-sm text-[var(--bb-text-secondary)] hover:bg-[var(--bb-bg-warm)] disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                +
-              </button>
-            </div>
-            {quantity > 1 && (
-              <span className="text-[11px] text-[var(--bb-text-tertiary)]">×{quantity}</span>
-            )}
-          </div>
-        )}
-
-        {/* Token balance + cost preview */}
-        {tokenBalance != null ? (
-          <div className="flex items-center gap-1.5 text-[11px]">
-            {effectiveCost != null && selectedJobType?.tokenCost != null ? (
-              <>
-                <span className="text-[var(--bb-text-tertiary)]">
-                  Cost:{" "}
-                  <span className="font-semibold text-[var(--bb-secondary)]">
-                    {quantity > 1
-                      ? `${selectedJobType.tokenCost} × ${quantity} = ${effectiveCost} tokens`
-                      : `${effectiveCost} tokens`}
-                  </span>
-                </span>
-                <span className="text-[var(--bb-border-input)]">·</span>
-                {(() => {
-                  const remaining = tokenBalance - effectiveCost;
-                  const isNegative = remaining < 0;
-                  return (
-                    <span
-                      className={
-                        isNegative
-                          ? "text-[var(--bb-danger-text)]"
-                          : "text-[var(--bb-text-tertiary)]"
-                      }
-                    >
-                      Remaining after:{" "}
-                      <span
-                        className={`font-semibold ${isNegative ? "text-[var(--bb-danger-text)]" : "text-[var(--bb-secondary)]"}`}
-                      >
-                        {remaining.toLocaleString()} tokens
-                      </span>
+                {selectedJobType?.hasQuantity ? (
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium">
+                      {selectedJobType.quantityLabel || "Quantity"}
                     </span>
-                  );
-                })()}
-              </>
-            ) : (
-              <span className="text-[var(--bb-text-tertiary)]">
-                Your balance:{" "}
-                <span className="font-semibold text-[var(--bb-secondary)]">
-                  {tokenBalance.toLocaleString()} tokens
-                </span>
-              </span>
-            )}
+                    <div className="inline-flex items-center rounded-lg border border-[var(--av2-border)]">
+                      <button
+                        type="button"
+                        aria-label="Decrease quantity"
+                        disabled={isBusy || quantity <= 1}
+                        onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                        className="flex h-10 w-10 items-center justify-center rounded-l-lg hover:bg-[var(--av2-bg)] disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        −
+                      </button>
+                      <span
+                        aria-live="polite"
+                        className="flex h-10 w-10 items-center justify-center border-x border-[var(--av2-border)] text-sm font-semibold tabular-nums"
+                      >
+                        {quantity}
+                      </span>
+                      <button
+                        type="button"
+                        aria-label="Increase quantity"
+                        disabled={isBusy || quantity >= 10}
+                        onClick={() => setQuantity((q) => Math.min(10, q + 1))}
+                        className="flex h-10 w-10 items-center justify-center rounded-r-lg hover:bg-[var(--av2-bg)] disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
+                <Field
+                  label="Project"
+                  htmlFor={`${ids}-project`}
+                  hint="Use projects to group related requests together."
+                >
+                  <Select
+                    id={`${ids}-project`}
+                    value={projectId}
+                    onChange={(e) => setProjectId(e.target.value)}
+                    disabled={isBusy}
+                  >
+                    <option value="">No specific project</option>
+                    {projects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} {p.code ? `(${p.code})` : ""}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+
+                <Field
+                  label="Priority"
+                  htmlFor={`${ids}-priority`}
+                  hint="Higher priority requests are more likely to be picked up first."
+                >
+                  <Select
+                    id={`${ids}-priority`}
+                    value={priority}
+                    onChange={(e) => setPriority(e.target.value as TicketPriorityValue)}
+                    disabled={isBusy}
+                  >
+                    {PRIORITY_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+
+                <Field
+                  label="Due date"
+                  htmlFor={`${ids}-due`}
+                  hint="Set a target date for delivery. Optional."
+                >
+                  <TextInput
+                    id={`${ids}-due`}
+                    type="date"
+                    className="dark:[color-scheme:dark]"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    disabled={isBusy}
+                    min={todayStr}
+                    max={maxDateStr}
+                  />
+                </Field>
+
+                {localTags.length > 0 || canCreateTagsProp ? (
+                  <Field label="Tags" hint="Add up to 5 tags to categorize this request.">
+                    <TagMultiSelect
+                      availableTags={localTags}
+                      selectedTagIds={selectedTagIds}
+                      onChange={setSelectedTagIds}
+                      onCreateTag={async (name, color) => {
+                        try {
+                          const res = await fetch("/api/customer/tags", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ name, color }),
+                          });
+                          const json = await res.json().catch(() => null);
+                          if (!res.ok) {
+                            setError(json?.error || "Failed to create tag");
+                            return null;
+                          }
+                          const created = json.tag as TagOption;
+                          setLocalTags((prev) =>
+                            [...prev, created].sort((a, b) => a.name.localeCompare(b.name)),
+                          );
+                          onTagCreated?.(created);
+                          return created;
+                        } catch {
+                          setError("Failed to create tag");
+                          return null;
+                        }
+                      }}
+                      canCreate={
+                        canCreateTagsProp ??
+                        (companyRole !== null && canManageTagsCheck(companyRole))
+                      }
+                      disabled={isBusy}
+                    />
+                  </Field>
+                ) : null}
+
+                {moodboards.length > 0 ? (
+                  <Field
+                    label="Attach moodboard (optional)"
+                    htmlFor={`${ids}-moodboard`}
+                    hint="Link a moodboard to share inspiration and references with your designer."
+                  >
+                    <Select
+                      id={`${ids}-moodboard`}
+                      value={moodboardId}
+                      onChange={(e) => setMoodboardId(e.target.value)}
+                      disabled={isBusy}
+                    >
+                      <option value="">No moodboard</option>
+                      {moodboards.map((mb) => (
+                        <option key={mb.id} value={mb.id}>
+                          {mb.title} ({mb.itemCount} items)
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                ) : null}
+              </div>
+            </Section>
+
+            <Section title="Cost summary">
+              <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-2 text-sm">
+                {tokenBalance != null ? (
+                  <>
+                    <dt className="text-[var(--av2-text-2)]">Current balance</dt>
+                    <dd className="text-right font-semibold tabular-nums">
+                      {tokenCount(tokenBalance)}
+                    </dd>
+                  </>
+                ) : null}
+                {/* No cost is shown until there's a job type to price. */}
+                <dt className="text-[var(--av2-text-2)]">Cost</dt>
+                <dd className="text-right font-semibold tabular-nums">
+                  {effectiveCost != null && selectedJobType?.tokenCost != null
+                    ? quantity > 1
+                      ? `${selectedJobType.tokenCost} × ${quantity} = ${tokenCount(effectiveCost)}`
+                      : tokenCount(effectiveCost)
+                    : selectedJobType
+                      ? DASH
+                      : "Select a job type"}
+                </dd>
+                {remaining != null ? (
+                  <>
+                    <dt className="text-[var(--av2-text-2)]">Remaining after</dt>
+                    <dd
+                      className={`text-right font-semibold tabular-nums ${
+                        remaining < 0 ? "text-[var(--av2-error-text)]" : ""
+                      }`}
+                    >
+                      {tokenCount(remaining)}
+                    </dd>
+                  </>
+                ) : null}
+              </dl>
+
+              {insufficientTokens ? (
+                <div className="mt-3">
+                  <Callout tone="error" title="Not enough tokens">
+                    Choose a different job type or{" "}
+                    <a href="/customer/settings" className="font-semibold underline">
+                      top up your balance
+                    </a>
+                    .
+                  </Callout>
+                </div>
+              ) : null}
+            </Section>
           </div>
-        ) : (
-          <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-            Job types are linked to token costs and creative payouts.
-          </p>
-        )}
-
-        {insufficientTokens && (
-          <div className="mt-1.5 rounded-md border border-red-200 bg-[var(--bb-danger-bg)] px-2.5 py-1.5 text-[11px] text-red-700">
-            Not enough tokens to create this ticket. Choose a different job type or{" "}
-            <a
-              href="/customer/settings"
-              className="font-semibold underline underline-offset-2 hover:no-underline"
-            >
-              top up your balance
-            </a>
-            .
-          </div>
-        )}
-      </div>
-
-      {/* Tags */}
-      {localTags.length > 0 || canCreateTagsProp ? (
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-[var(--bb-secondary)]">Tags</label>
-          <TagMultiSelect
-            availableTags={localTags}
-            selectedTagIds={selectedTagIds}
-            onChange={setSelectedTagIds}
-            onCreateTag={async (name, color) => {
-              try {
-                const res = await fetch("/api/customer/tags", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ name, color }),
-                });
-                const json = await res.json().catch(() => null);
-                if (!res.ok) {
-                  setError(json?.error || "Failed to create tag");
-                  return null;
-                }
-                const created = json.tag as TagOption;
-                setLocalTags((prev) =>
-                  [...prev, created].sort((a, b) => a.name.localeCompare(b.name)),
-                );
-                onTagCreated?.(created);
-                return created;
-              } catch {
-                setError("Failed to create tag");
-                return null;
-              }
-            }}
-            canCreate={
-              canCreateTagsProp ?? (companyRole !== null && canManageTagsCheck(companyRole))
-            }
-            disabled={isBusy}
-          />
-          <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-            Add up to 5 tags to categorize this request.
-          </p>
         </div>
-      ) : null}
 
-      {/* Attach moodboard */}
-      {moodboards.length > 0 && (
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-[#424143]">Attach moodboard (optional)</label>
-          <FormSelect
-            value={moodboardId}
-            onChange={(e) => setMoodboardId(e.target.value)}
-            disabled={isBusy}
-          >
-            <option value="">No moodboard</option>
-            {moodboards.map((mb) => (
-              <option key={mb.id} value={mb.id}>
-                {mb.title} ({mb.itemCount} items)
-              </option>
-            ))}
-          </FormSelect>
-          <p className="text-[11px] text-[#9a9892]">
-            Link a moodboard to share inspiration and references with your designer.
-          </p>
-        </div>
-      )}
-
-      {/* Actions */}
-      <div className="flex items-center justify-end gap-3 pt-2">
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          onClick={() => {
-            if (onCancel) {
-              onCancel();
-            } else {
-              router.push(redirectTo ?? "/customer/tickets");
-            }
-          }}
-          disabled={isBusy}
-        >
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          size="sm"
-          disabled={isLimitedAccess || insufficientTokens}
-          loading={isBusy}
-          loadingText={
-            uploadingBriefs
-              ? "Uploading attachments..."
-              : creativeMode === "AI"
-                ? "Generating..."
-                : "Creating..."
+        {/* Actions: results sit right above them, so they're seen after a click. */}
+        <div
+          className={
+            embedded
+              ? "sticky -bottom-5 z-10 -mx-5 -mb-5 space-y-3 border-t border-[var(--av2-border)] bg-[var(--av2-surface)] px-5 py-4"
+              : "sticky bottom-4 z-10 space-y-3 rounded-2xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-4"
           }
         >
-          {creativeMode === "AI" ? "Create & Generate with AI" : "Create ticket"}
-        </Button>
+          {error ? (
+            <Callout tone="error" title="This request wasn't created">
+              {error}
+            </Callout>
+          ) : null}
+          {successMessage ? <Callout tone="success">{successMessage}</Callout> : null}
+          {uploadProgressText ? (
+            <p role="status" className="text-sm text-[var(--av2-text-2)]">
+              {uploadProgressText}
+            </p>
+          ) : null}
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <Button
+              onClick={() => {
+                if (onCancel) {
+                  onCancel();
+                } else {
+                  router.push(redirectTo ?? "/customer/tickets");
+                }
+              }}
+              disabled={isBusy}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={isLimitedAccess || insufficientTokens || isBusy}
+            >
+              {isBusy
+                ? uploadingBriefs
+                  ? "Uploading attachments…"
+                  : creativeMode === "AI"
+                    ? "Generating…"
+                    : "Creating…"
+                : creativeMode === "AI"
+                  ? "Create & Generate with AI"
+                  : "Create request"}
+            </Button>
+          </div>
+        </div>
       </div>
 
       <InsufficientTokensModal info={tokenError} onClose={() => setTokenError(null)} />
     </form>
+  );
+}
+
+function RequiredLabel({ children }: { children: ReactNode }) {
+  return (
+    <>
+      {children}{" "}
+      <span aria-hidden className="text-[var(--av2-link)]">
+        *
+      </span>
+      <span className="sr-only">(required)</span>
+    </>
+  );
+}
+
+function CardSection({ title, children }: { title?: string; children: ReactNode }) {
+  return (
+    <Card>
+      {title ? <h2 className="mb-4 text-xl leading-7 font-semibold">{title}</h2> : null}
+      {children}
+    </Card>
+  );
+}
+
+function PlainSection({ title, children }: { title?: string; children: ReactNode }) {
+  return (
+    <div className="min-w-0">
+      {title ? <h3 className="mb-3 text-base font-semibold">{title}</h3> : null}
+      {children}
+    </div>
   );
 }
