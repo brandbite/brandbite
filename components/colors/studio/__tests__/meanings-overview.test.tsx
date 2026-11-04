@@ -103,11 +103,47 @@ describe("ColorMeaningsView", () => {
     ]);
   });
 
-  it("explains a load failure without claiming nothing is published", async () => {
+  it("still shows built-in families when the CMS can't be reached", async () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
     render(<ColorMeaningsView />);
-    expect(await screen.findByRole("alert")).toHaveTextContent(/couldn't be loaded/);
-    expect(screen.queryByText(/No colors published/)).toBeNull();
+    expect(await screen.findByRole("button", { name: /^Teal/ })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByRole("link", { name: /Read more/ })).toBeNull();
+  });
+
+  it("adds built-in families after CMS colors, without repeats", async () => {
+    mockApi();
+    render(<ColorMeaningsView />);
+    await screen.findByRole("button", { name: /^Pink/ });
+    expect(screen.getAllByRole("button", { name: /^Orange/ })).toHaveLength(1);
+  });
+
+  it("names any HEX and describes it from its closest family", async () => {
+    mockApi();
+    render(<ColorMeaningsView />);
+    await screen.findByRole("button", { name: /^Orange/ });
+    fireEvent.change(screen.getByLabelText("Look up any color"), {
+      target: { value: "#0A2A43" },
+    });
+    const panel = screen.getByRole("complementary", { name: "Deep Blue details" });
+    expect(panel).toHaveTextContent("Calm and dependable.");
+    expect(panel).toHaveTextContent(/Based on the Blue color family/);
+    expect(screen.queryByRole("link", { name: /Read more/ })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Build a deep blue palette" }));
+    const colors = storedWorkspace().activePalette.colors;
+    expect(colors[0].hex).toBe("#0a2a43");
+    expect(colors.length).toBeGreaterThan(1);
+  });
+
+  it("returns to a family when a card is chosen after a lookup", async () => {
+    mockApi();
+    render(<ColorMeaningsView />);
+    await screen.findByRole("button", { name: /^Orange/ });
+    fireEvent.click(screen.getByRole("button", { name: "Find its meaning" }));
+    expect(screen.getByRole("complementary", { name: "Muted Green details" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^Orange/ }));
+    expect(screen.getByRole("complementary", { name: "Orange details" })).toBeInTheDocument();
   });
 
   it("frames every cultural note as varying, for all published colors", () => {

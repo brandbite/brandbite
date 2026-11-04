@@ -144,8 +144,6 @@ describe("workspace session snapshot", () => {
 
 describe("Color Studio token contrast", () => {
   it.each([
-    ["primary button text", "#242528", "#FF6426", 4.5],
-    ["primary button hover text", "#242528", "#FF7F4D", 4.5],
     ["small link on panel", "#C2410C", "#FFFFFF", 4.5],
     ["small link on page", "#C2410C", "#F7F5F2", 4.5],
     ["body text on page", "#242528", "#F7F5F2", 4.5],

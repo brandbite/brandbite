@@ -13,3 +13,4 @@ export * from "./random";
 export * from "./tailwind";
 export * from "./studio";
 export * from "./workspace";
+export * from "./describe";

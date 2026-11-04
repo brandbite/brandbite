@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createStudioPalette } from "@/lib/colors";
+import { PALETTE_IDEA_CATALOG } from "@/lib/colors/palette-idea-catalog";
 
 import { ColorWheelView } from "../color-wheel-view";
 import { PaletteIdeasView } from "../palette-ideas-view";
@@ -89,19 +90,52 @@ describe("ColorWheelView", () => {
 });
 
 describe("PaletteIdeasView", () => {
+  const CATALOG_SIZE = PALETTE_IDEA_CATALOG.length;
+  const heading = (count: number) => `${count} palettes to make your own`;
+
+  it("shows CMS palettes first, then the built-in catalog, without repeats", async () => {
+    mockIdeas([...IDEAS, { ...IDEAS[0], id: "3", slug: PALETTE_IDEA_CATALOG[0].slug }]);
+    render(<PaletteIdeasView />);
+    await screen.findByText(heading(3 + CATALOG_SIZE - 1));
+    const titles = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
+    expect(titles[0]).toBe("Vintage Sunset");
+  });
+
+  it("still shows the catalog when the CMS can't be reached", async () => {
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
+    render(<PaletteIdeasView />);
+    expect(await screen.findByText(heading(CATALOG_SIZE))).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("loads more in pages, and starts over when the filter changes", async () => {
+    mockIdeas([]);
+    render(<PaletteIdeasView />);
+    const more = await screen.findByRole("button", { name: "Load more palettes" });
+    expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(24);
+
+    fireEvent.click(more);
+    expect(screen.getAllByRole("heading", { level: 3 }).length).toBeGreaterThan(24);
+
+    fireEvent.change(screen.getByLabelText("Sort by"), { target: { value: "name" } });
+    expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(24);
+  });
+
   it("combines search and tag, and clears both", async () => {
     mockIdeas();
     render(<PaletteIdeasView />);
-    await screen.findByText("2 palettes to make your own");
+    await screen.findByText(heading(2 + CATALOG_SIZE));
 
-    fireEvent.click(screen.getByRole("button", { name: "Vintage" }));
+    fireEvent.change(screen.getByLabelText("Search palettes"), {
+      target: { value: "faded tones" },
+    });
     expect(screen.getByText("1 palette to make your own")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Search palettes"), { target: { value: "blues" } });
+    fireEvent.click(screen.getByRole("button", { name: "Corporate" }));
     expect(screen.getByText("No palettes match your search.")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
-    expect(screen.getByText("2 palettes to make your own")).toBeInTheDocument();
+    expect(screen.getByText(heading(2 + CATALOG_SIZE))).toBeInTheDocument();
   });
 
   it("separates copying one color from copying the palette", async () => {
@@ -143,19 +177,5 @@ describe("PaletteIdeasView", () => {
       "#e8c4a0",
       "#d98859",
     ]);
-  });
-
-  it("separates nothing published from a load failure, and can retry", async () => {
-    mockIdeas([]);
-    const { unmount } = render(<PaletteIdeasView />);
-    expect(await screen.findByText(/No palettes published yet/)).toBeInTheDocument();
-    unmount();
-
-    mockIdeas(null, false);
-    render(<PaletteIdeasView />);
-    expect(await screen.findByRole("alert")).toHaveTextContent(/couldn't be loaded/);
-    mockIdeas();
-    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-    expect(await screen.findByText("2 palettes to make your own")).toBeInTheDocument();
   });
 });

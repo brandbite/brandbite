@@ -10,9 +10,18 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import { createStudioPalette, formatHex, normalizeHex, readableTextOn } from "@/lib/colors";
+import {
+  createStudioPalette,
+  describeColor,
+  formatHex,
+  normalizeHex,
+  readableTextOn,
+  suggestPairings,
+} from "@/lib/colors";
+import { COLOR_FAMILIES } from "@/lib/colors/color-families";
 import { MEANING_GUIDANCE } from "@/lib/colors/meaning-guidance";
 
+import { HexField } from "./hex-field";
 import { CheckIcon, CopyIcon } from "./icons";
 import { usePaletteOpener } from "./open-palette";
 import { CopyRow, STUDIO_FIELD } from "./palette-parts";
@@ -56,17 +65,23 @@ export function MeaningPanel({
   meaning,
   detail,
   showReadMore = true,
+  pairings: pairingsOverride,
+  note,
 }: {
   meaning: MeaningSummary;
   detail: MeaningDetail | null;
   showReadMore?: boolean;
+  /** Colors to suggest instead of the CMS sample palettes. */
+  pairings?: string[];
+  /** Shown under the summary, e.g. to explain where a description came from. */
+  note?: string;
 }) {
   const store = useSavedPalettes();
   const { copy, isCopied } = useStudioCopy();
   const opener = usePaletteOpener(async (active) => (await store.save(active)).ok);
 
   const guidance = MEANING_GUIDANCE[meaning.slug];
-  const pairings = pairingsFor(meaning, detail);
+  const pairings = pairingsOverride ?? pairingsFor(meaning, detail);
   const hex = normalizeHex(meaning.hex) ?? "#000000";
 
   const buildPalette = () => {
@@ -111,6 +126,7 @@ export function MeaningPanel({
       ) : null}
 
       {meaning.summary ? <p className="mt-4 text-sm leading-5">{meaning.summary}</p> : null}
+      {note ? <p className="mt-2 text-sm leading-5 text-[var(--cs-muted)]">{note}</p> : null}
 
       {guidance ? (
         <>
@@ -177,11 +193,13 @@ export function MeaningPanel({
   );
 }
 
-type LoadState = "loading" | "ready" | "error";
+const BUILT_IN_PREFIX = "family-";
 
 export function ColorMeaningsView() {
   const [meanings, setMeanings] = useState<MeaningSummary[]>([]);
-  const [loadState, setLoadState] = useState<LoadState>("loading");
+  const [loading, setLoading] = useState(true);
+  const [lookupHex, setLookupHex] = useState("#7a9e7e");
+  const [lookupActive, setLookupActive] = useState(false);
   const [query, setQuery] = useState("");
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [details, setDetails] = useState<Record<string, MeaningDetail>>({});
@@ -192,15 +210,11 @@ export function ColorMeaningsView() {
       try {
         const res = await fetch("/api/color-meanings");
         const json = await res.json().catch(() => null);
-        if (cancelled) return;
-        if (res.ok && Array.isArray(json?.meanings)) {
-          setMeanings(json.meanings);
-          setLoadState("ready");
-        } else {
-          setLoadState("error");
-        }
+        if (!cancelled && res.ok && Array.isArray(json?.meanings)) setMeanings(json.meanings);
       } catch {
-        if (!cancelled) setLoadState("error");
+        // The built-in families still show.
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => {
@@ -208,19 +222,49 @@ export function ColorMeaningsView() {
     };
   }, []);
 
+  // CMS entries first; built-in families fill the gaps.
+  const families = useMemo<MeaningSummary[]>(() => {
+    const cmsSlugs = new Set(meanings.map((m) => m.slug));
+    return [
+      ...meanings,
+      ...COLOR_FAMILIES.filter((f) => !cmsSlugs.has(f.slug)).map((f) => ({
+        ...f,
+        id: `${BUILT_IN_PREFIX}${f.slug}`,
+      })),
+    ];
+  }, [meanings]);
+
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return meanings;
-    return meanings.filter(
+    if (!q) return families;
+    return families.filter(
       (m) =>
         m.name.toLowerCase().includes(q) ||
         (m.summary ?? "").toLowerCase().includes(q) ||
         m.associations.some((a) => a.toLowerCase().includes(q)),
     );
-  }, [meanings, query]);
+  }, [families, query]);
 
   const selected = visible.find((m) => m.slug === selectedSlug) ?? visible[0] ?? null;
-  const selectedDetailSlug = selected?.slug ?? null;
+  const selectedIsCms = selected !== null && !selected.id.startsWith(BUILT_IN_PREFIX);
+  const selectedDetailSlug = selectedIsCms ? selected.slug : null;
+
+  const lookup = useMemo(() => {
+    if (!lookupActive) return null;
+    const { name, family } = describeColor(lookupHex);
+    const base = families.find((f) => f.slug === family);
+    return {
+      meaning: {
+        id: "lookup",
+        name,
+        slug: family,
+        hex: lookupHex,
+        summary: base?.summary ?? null,
+        associations: base?.associations ?? [],
+      },
+      familyName: base?.name ?? family,
+    };
+  }, [lookupActive, lookupHex, families]);
   const hasDetail = selectedDetailSlug ? details[selectedDetailSlug] !== undefined : true;
 
   useEffect(() => {
@@ -254,17 +298,26 @@ export function ColorMeaningsView() {
         />
       </label>
 
-      {loadState === "loading" ? (
+      <div className="mt-4 flex flex-wrap items-end gap-3 rounded-2xl bg-[var(--cs-soft)] p-4">
+        <div className="min-w-[240px] flex-1">
+          <HexField
+            label="Look up any color"
+            value={lookupHex}
+            onChange={(hex) => {
+              setLookupHex(hex);
+              setLookupActive(true);
+            }}
+          />
+        </div>
+        <StudioButton onClick={() => setLookupActive(true)}>Find its meaning</StudioButton>
+        <p className="w-full text-sm leading-5">
+          Get a name for any HEX, with the associations of its closest color family.
+        </p>
+      </div>
+
+      {loading ? (
         <p aria-busy="true" className="py-16 text-center text-sm leading-5 text-[var(--cs-muted)]">
           Loading colors…
-        </p>
-      ) : loadState === "error" ? (
-        <p role="alert" className="py-16 text-center text-base leading-6">
-          Colors couldn&apos;t be loaded. Refresh the page to try again.
-        </p>
-      ) : meanings.length === 0 ? (
-        <p className="py-16 text-center text-base leading-6">
-          No colors published yet. Check back soon.
         </p>
       ) : visible.length === 0 ? (
         <div className="py-16 text-center">
@@ -284,13 +337,16 @@ export function ColorMeaningsView() {
             </p>
             <ul className="grid grid-cols-2 gap-4 max-[479px]:grid-cols-1">
               {visible.map((meaning) => {
-                const isSelected = meaning.slug === selected?.slug;
+                const isSelected = !lookup && meaning.slug === selected?.slug;
                 return (
                   <li key={meaning.id}>
                     <button
                       type="button"
                       aria-pressed={isSelected}
-                      onClick={() => setSelectedSlug(meaning.slug)}
+                      onClick={() => {
+                        setSelectedSlug(meaning.slug);
+                        setLookupActive(false);
+                      }}
                       className={`block w-full overflow-hidden rounded-2xl border text-left ${
                         isSelected
                           ? "border-[var(--cs-text)] outline-2 outline-offset-2 outline-[var(--cs-text)]"
@@ -325,8 +381,21 @@ export function ColorMeaningsView() {
               })}
             </ul>
           </div>
-          {selected ? (
-            <MeaningPanel meaning={selected} detail={details[selected.slug] ?? null} />
+          {lookup ? (
+            <MeaningPanel
+              meaning={lookup.meaning}
+              detail={null}
+              showReadMore={false}
+              pairings={suggestPairings(lookupHex)}
+              note={`Based on the ${lookup.familyName} color family, as a starting point.`}
+            />
+          ) : selected ? (
+            <MeaningPanel
+              meaning={selected}
+              detail={details[selected.slug] ?? null}
+              showReadMore={selectedIsCms}
+              pairings={selectedIsCms ? undefined : suggestPairings(selected.hex)}
+            />
           ) : null}
         </div>
       )}

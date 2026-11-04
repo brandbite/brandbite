@@ -42,6 +42,26 @@ export const MEANING_GUIDANCE: Record<string, MeaningGuidance> = {
     culturalContext:
       "Associations vary by audience and culture. Purple often suggests luxury or imagination, and in some places it is associated with mourning.",
   },
+  teal: {
+    worksWellFor: ["Wellness", "Technology", "Finance"],
+    culturalContext:
+      "Associations vary by audience and culture. Teal often reads as calm and modern, and it is sometimes linked with water and healing.",
+  },
+  pink: {
+    worksWellFor: ["Beauty", "Fashion", "Kids"],
+    culturalContext:
+      "Associations vary by audience and culture. Pink is often seen as playful or caring, and how strongly it is tied to gender differs between audiences.",
+  },
+  brown: {
+    worksWellFor: ["Food", "Outdoors", "Home"],
+    culturalContext:
+      "Associations vary by audience and culture. Brown often suggests earth and craft, and for some audiences it can feel traditional or plain.",
+  },
+  gray: {
+    worksWellFor: ["Technology", "Corporate", "Editorial"],
+    culturalContext:
+      "Associations vary by audience and culture. Gray often reads as neutral and modern, though some audiences may find it cold or understated.",
+  },
   black: {
     worksWellFor: ["Fashion", "Luxury", "Technology"],
     culturalContext:

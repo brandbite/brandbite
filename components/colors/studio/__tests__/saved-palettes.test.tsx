@@ -393,9 +393,10 @@ describe("resolvePaletteColors", () => {
     expect(resolvePaletteColors(withRole).background).toBe("#41c2d0");
   });
 
-  it("falls back to lightest background and readable text", () => {
+  it("falls back to a white background and readable text", () => {
     const resolved = resolvePaletteColors(palette());
-    expect(resolved.background).toBe("#f6e5d5");
+    expect(resolved.background).toBe("#ffffff");
+    expect(resolved.surface).toBe("#f6e5d5");
     expect(resolved.text).toBe("#173b59");
   });
 

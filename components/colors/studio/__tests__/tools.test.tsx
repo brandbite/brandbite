@@ -163,7 +163,10 @@ describe("PaletteGeneratorView", () => {
     const save = await screen.findByRole("button", { name: "Save palette" });
     await vi.waitFor(() => expect(save).toBeEnabled());
     fireEvent.click(save);
-    fireEvent.change(screen.getByLabelText("Palette name"), { target: { value: "Coast" } });
+    const nameField = screen.getByLabelText("Palette name") as HTMLInputElement;
+    expect(nameField.value).not.toBe("");
+    expect(nameField.value).not.toBe("Untitled palette");
+    fireEvent.change(nameField, { target: { value: "Coast" } });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Save" }));
     });

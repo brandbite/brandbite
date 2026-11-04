@@ -1,9 +1,9 @@
 // -----------------------------------------------------------------------------
 // @file: components/colors/studio/studio-button.tsx
 // @purpose: The one Color Studio button: 44px high, 10px radius, four variants.
-//           Primary is the brand orange with dark text (5.18:1), because white
-//           text on #FF6426 is only 2.96:1. Links styled as buttons reuse
-//           studioButtonClasses.
+//           Primary is the brand orange with white text, by product decision;
+//           that pairing is 2.96:1, below AA for this size. Links styled as
+//           buttons reuse studioButtonClasses.
 // -----------------------------------------------------------------------------
 
 import type { ButtonHTMLAttributes, ReactNode } from "react";
@@ -12,7 +12,7 @@ export type StudioButtonVariant = "primary" | "secondary" | "tertiary" | "danger
 
 const VARIANTS: Record<StudioButtonVariant, string> = {
   primary:
-    "bg-[var(--cs-brand)] text-[var(--cs-text)] hover:bg-[var(--cs-brand-hover)] disabled:hover:bg-[var(--cs-brand)]",
+    "bg-[var(--cs-brand)] text-white hover:bg-[var(--cs-brand-hover)] disabled:hover:bg-[var(--cs-brand)]",
   secondary:
     "border border-[var(--cs-border)] bg-[var(--cs-surface)] text-[var(--cs-text)] hover:border-[var(--cs-text)] disabled:hover:border-[var(--cs-border)]",
   tertiary: "text-[var(--cs-brand-strong)] hover:underline disabled:hover:no-underline",

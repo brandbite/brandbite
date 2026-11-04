@@ -196,7 +196,7 @@ export function resolvePaletteColors(palette: StudioPalette): ResolvedPaletteCol
   const lightest = byLuminance[byLuminance.length - 1];
   const mostSaturated = [...hexes].sort((a, b) => hexToHsl(b).s - hexToHsl(a).s)[0];
 
-  const background = assigned("background") ?? lightest;
+  const background = assigned("background") ?? "#ffffff";
   const text =
     assigned("text") ??
     (contrastRatio(darkest, background) >= 4.5 ? darkest : readableTextOn(background));
@@ -207,7 +207,7 @@ export function resolvePaletteColors(palette: StudioPalette): ResolvedPaletteCol
     text,
     primary,
     accent: assigned("accent") ?? mostSaturated,
-    surface: assigned("surface") ?? "#ffffff",
+    surface: assigned("surface") ?? lightest,
     onPrimary: readableTextOn(primary),
   };
 }

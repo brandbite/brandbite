@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { useToast } from "@/components/ui/toast-provider";
+import { PALETTE_IDEA_CATALOG } from "@/lib/colors/palette-idea-catalog";
 import {
   createStudioPalette,
   formatHex,
@@ -35,7 +36,7 @@ type PaletteIdea = {
   tags: string[];
 };
 
-type LoadState = "loading" | "ready" | "error";
+const PAGE_SIZE = 24;
 type SortKey = "featured" | "name";
 
 function toStudioPalette(idea: PaletteIdea): StudioPalette {
@@ -53,8 +54,7 @@ export function PaletteIdeasView() {
   const { showToast } = useToast();
 
   const [ideas, setIdeas] = useState<PaletteIdea[]>([]);
-  const [loadState, setLoadState] = useState<LoadState>("loading");
-  const [reloadKey, setReloadKey] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [activeTag, setActiveTag] = useState("All");
   const [sort, setSort] = useState<SortKey>("featured");
@@ -66,30 +66,32 @@ export function PaletteIdeasView() {
       try {
         const res = await fetch("/api/palette-ideas");
         const json = await res.json().catch(() => null);
-        if (cancelled) return;
-        if (res.ok && Array.isArray(json?.ideas)) {
-          setIdeas(json.ideas);
-          setLoadState("ready");
-        } else {
-          setLoadState("error");
-        }
+        if (!cancelled && res.ok && Array.isArray(json?.ideas)) setIdeas(json.ideas);
       } catch {
-        if (!cancelled) setLoadState("error");
+        // The built-in catalog still shows.
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [reloadKey]);
+  }, []);
+
+  // CMS entries first; the built-in catalog follows without repeating a slug.
+  const allIdeas = useMemo(() => {
+    const cmsSlugs = new Set(ideas.map((idea) => idea.slug));
+    return [...ideas, ...PALETTE_IDEA_CATALOG.filter((idea) => !cmsSlugs.has(idea.slug))];
+  }, [ideas]);
 
   const tags = useMemo(
-    () => ["All", ...Array.from(new Set(ideas.flatMap((idea) => idea.tags))).sort()],
-    [ideas],
+    () => ["All", ...Array.from(new Set(allIdeas.flatMap((idea) => idea.tags))).sort()],
+    [allIdeas],
   );
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const filtered = ideas.filter(
+    const filtered = allIdeas.filter(
       (idea) =>
         (activeTag === "All" || idea.tags.includes(activeTag)) &&
         (!q ||
@@ -100,7 +102,12 @@ export function PaletteIdeasView() {
     return sort === "name"
       ? [...filtered].sort((a, b) => a.title.localeCompare(b.title))
       : filtered;
-  }, [ideas, query, activeTag, sort]);
+  }, [allIdeas, query, activeTag, sort]);
+
+  const filterKey = `${query}|${activeTag}|${sort}`;
+  const [paging, setPaging] = useState({ key: filterKey, limit: PAGE_SIZE });
+  const limit = paging.key === filterKey ? paging.limit : PAGE_SIZE;
+  const shown = visible.slice(0, limit);
 
   const savePalette = async (idea: PaletteIdea) => {
     setSaveError(null);
@@ -148,7 +155,7 @@ export function PaletteIdeasView() {
             onClick={() => setActiveTag(tag)}
             className={`h-11 rounded-full px-4 text-sm leading-5 font-medium transition-colors ${
               activeTag === tag
-                ? "bg-[var(--cs-brand)] text-[var(--cs-text)]"
+                ? "bg-[var(--cs-brand)] text-white"
                 : "border border-[var(--cs-border)] hover:border-[var(--cs-text)]"
             }`}
           >
@@ -163,28 +170,9 @@ export function PaletteIdeasView() {
         </p>
       ) : null}
 
-      {loadState === "loading" ? (
+      {loading ? (
         <p aria-busy="true" className="py-16 text-center text-sm leading-5 text-[var(--cs-muted)]">
           Loading palettes…
-        </p>
-      ) : loadState === "error" ? (
-        <div role="alert" className="py-16 text-center">
-          <p className="text-base leading-6">Palettes couldn&apos;t be loaded.</p>
-          <div className="mt-4">
-            <StudioButton
-              variant="secondary"
-              onClick={() => {
-                setLoadState("loading");
-                setReloadKey((key) => key + 1);
-              }}
-            >
-              Try again
-            </StudioButton>
-          </div>
-        </div>
-      ) : ideas.length === 0 ? (
-        <p className="py-16 text-center text-base leading-6">
-          No palettes published yet. Check back soon.
         </p>
       ) : visible.length === 0 ? (
         <div className="py-16 text-center">
@@ -207,7 +195,7 @@ export function PaletteIdeasView() {
             {visible.length} {visible.length === 1 ? "palette" : "palettes"} to make your own
           </h2>
           <ul className="mt-4 grid grid-cols-3 gap-6 max-[1023px]:grid-cols-2 max-[639px]:grid-cols-1">
-            {visible.map((idea) => (
+            {shown.map((idea) => (
               <li
                 key={idea.id}
                 className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-[var(--cs-border)]"
@@ -292,9 +280,19 @@ export function PaletteIdeasView() {
               </li>
             ))}
           </ul>
-          <p className="mt-6 text-sm leading-5 text-[var(--cs-muted)]">
-            Click any swatch to copy its HEX.
-          </p>
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm leading-5 text-[var(--cs-muted)]">
+              Click any swatch to copy its HEX.
+            </p>
+            {shown.length < visible.length ? (
+              <StudioButton
+                variant="secondary"
+                onClick={() => setPaging({ key: filterKey, limit: limit + PAGE_SIZE })}
+              >
+                Load more palettes
+              </StudioButton>
+            ) : null}
+          </div>
         </>
       )}
       {opener.dialog}

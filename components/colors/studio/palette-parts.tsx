@@ -15,6 +15,7 @@ import {
   COLOR_ROLES,
   formatHex,
   setStudioRole,
+  suggestPaletteName,
   type ColorRole,
   type StudioPalette,
   type StudioSource,
@@ -128,7 +129,12 @@ export function SavePaletteAction({
           if (exists) {
             void commit(palette);
           } else {
-            setName(palette.name);
+            setName(
+              suggestPaletteName(
+                palette.colors.map((c) => c.hex),
+                store.palettes.map((p) => p.name),
+              ),
+            );
             setError(null);
             setNaming(true);
           }
