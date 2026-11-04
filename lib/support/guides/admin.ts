@@ -1040,7 +1040,10 @@ export const ADMIN_GUIDES: SupportGuide[] = [
               },
               { term: "Blog", text: "/blog and each post." },
               { term: "News", text: "/news and each article." },
-              { term: "Showcase", text: "/showcase and each work." },
+              {
+                term: "Showcase",
+                text: "not shown on the public site for now; entries are kept here.",
+              },
               { term: "Docs", text: "the help centre at /documentation." },
               { term: "Palette Ideas", text: "/colors/color-palette-ideas." },
               { term: "Color Meanings", text: "/colors/color-meanings and each colour." },

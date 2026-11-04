@@ -2,7 +2,7 @@
 // @file: app/page.tsx
 // @purpose: Marketing homepage — 2026 redesign from the Claude Design handoff
 //           ("Creative that hits different"). Static content; sections still
-//           being redesigned link to /coming-soon.
+//           being redesigned link to /meet.
 // @version: v2.0.0
 // @status: active
 // @lastUpdate: 2026-07-12
@@ -115,7 +115,7 @@ export default function HomePage() {
                 How it works?
               </Link>
               <Link
-                href="/coming-soon"
+                href="/meet"
                 className="flex flex-row items-center gap-[9px] transition-opacity hover:opacity-75"
               >
                 <span className="text-xl leading-[30px] font-bold whitespace-nowrap text-[#2B2D33]">
@@ -243,7 +243,7 @@ export default function HomePage() {
               Send your first request and let Brandbite turn it into something worth shipping.
             </p>
             <Link
-              href="/coming-soon"
+              href="/meet"
               className="flex flex-row items-center gap-[9px] transition-opacity hover:opacity-85"
             >
               <span className="text-xl leading-[30px] font-bold whitespace-nowrap text-white">

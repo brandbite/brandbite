@@ -22,7 +22,7 @@ export function ReadyBand() {
           Send your first request and let Brandbite turn it into something worth shipping.
         </p>
         <Link
-          href="/coming-soon"
+          href="/meet"
           className="flex flex-row items-center gap-[9px] transition-opacity hover:opacity-85"
         >
           <span className="text-xl leading-8 font-bold whitespace-nowrap text-white">

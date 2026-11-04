@@ -129,6 +129,24 @@ const nextConfig: NextConfig = {
       destination: "/privacy#cookies",
       permanent: true,
     },
+    {
+      // Retired for good: the homepage section replaces this page.
+      source: "/how-it-works",
+      destination: "/#how-it-works",
+      permanent: true,
+    },
+    // Temporary, so browsers don't cache them: both paths are expected to return
+    // with redesigned pages. Pricing waits on Stripe.
+    {
+      source: "/pricing",
+      destination: "/meet",
+      permanent: false,
+    },
+    {
+      source: "/showcase/:path*",
+      destination: "/",
+      permanent: false,
+    },
   ],
 };
 
