@@ -1,48 +1,40 @@
 // -----------------------------------------------------------------------------
 // @file: components/colors/studio/saved-palettes-view.tsx
-// @purpose: The /colors/saved collection: search, filter, sort, palette detail
-//           with roles and preview, rename, duplicate, delete with undo, backup
-//           export/import, and moving browser palettes to an account.
+// @purpose: The /colors/saved collection: search, filter, sort, a scrolling palette
+//           list, duplicate, delete with undo, backup export/import, and moving
+//           browser palettes to an account. Details live in SavedPaletteDetail.
 // -----------------------------------------------------------------------------
 
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useToast } from "@/components/ui/toast-provider";
-import {
-  duplicateStudioPalette,
-  formatHex,
-  studioPaletteToCss,
-  type StudioPalette,
-  type StudioSource,
-} from "@/lib/colors";
+import { duplicateStudioPalette, type StudioPalette, type StudioSource } from "@/lib/colors";
 
-import { CheckIcon, CloseIcon, CopyIcon, EditIcon } from "./icons";
+import { ActionMenu } from "./action-menu";
+import {
+  CheckCircleIcon,
+  CheckIcon,
+  CloseIcon,
+  DownloadIcon,
+  GridIcon,
+  InfoIcon,
+  ListIcon,
+  SearchIcon,
+  UploadIcon,
+} from "./icons";
 import { usePaletteOpener } from "./open-palette";
-import { RoleFields } from "./palette-parts";
-import { PalettePreview } from "./palette-preview";
-import { SharePaletteButton } from "./share-palette";
+import { downloadText, IconToggle, STUDIO_FIELD, StudioSelect } from "./palette-parts";
+import { SavedPaletteDetail, SOURCE_LABELS } from "./saved-palette-detail";
 import { StudioButton, studioButtonClasses } from "./studio-button";
 import { useSavedPalettes } from "./use-saved-palettes";
-import { useStudioCopy } from "./use-studio-copy";
-
-const SOURCE_LABELS: Record<StudioSource, string> = {
-  generator: "Palette generator",
-  wheel: "Color wheel",
-  tailwind: "Tailwind shades",
-  ideas: "Palette ideas",
-  meanings: "Color meanings",
-  contrast: "Contrast checker",
-  image: "Image to palette",
-  shared: "Shared palette",
-};
 
 type SortKey = "updated" | "oldest" | "name";
 
-const FIELD =
-  "h-12 rounded-[10px] border border-[var(--cs-border)] bg-[var(--cs-surface)] px-3 text-sm leading-5";
+/** The list scrolls after this many rows; its height classes below fit exactly this. */
+const VISIBLE_ROWS = 3;
 
 function formatUpdated(iso: string, now: number): string {
   const seconds = Math.round((new Date(iso).getTime() - now) / 1000);
@@ -58,18 +50,9 @@ function formatUpdated(iso: string, now: number): string {
   return "just now";
 }
 
-function downloadJson(filename: string, text: string): void {
-  const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
 function ColorStrip({ palette }: { palette: StudioPalette }) {
   return (
-    <span className="flex h-10 min-w-0 flex-1 overflow-hidden rounded-[10px] border border-[var(--cs-border)]">
+    <span className="flex h-10 min-h-10 min-w-0 flex-1 overflow-hidden rounded-[10px] border border-[var(--cs-border)]">
       {palette.colors.map((color) => (
         <span key={color.id} className="flex-1" style={{ backgroundColor: color.hex }} />
       ))}
@@ -77,277 +60,12 @@ function ColorStrip({ palette }: { palette: StudioPalette }) {
   );
 }
 
-function RowMenu({
-  palette,
-  onRename,
-  onDuplicate,
-  onDelete,
-}: {
-  palette: StudioPalette;
-  onRename: () => void;
-  onDuplicate: () => void;
-  onDelete: () => void;
-}) {
-  const menuId = useId();
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpen(false);
-        buttonRef.current?.focus();
-      }
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
-
-  const item = (label: string, action: () => void, danger = false) => (
-    <li>
-      <button
-        type="button"
-        onClick={() => {
-          setOpen(false);
-          action();
-        }}
-        className={`flex h-11 w-full items-center rounded-[10px] px-3 text-left text-sm leading-5 font-medium hover:bg-[var(--cs-soft)] ${
-          danger ? "text-[var(--cs-danger)]" : ""
-        }`}
-      >
-        {label}
-      </button>
-    </li>
-  );
-
-  return (
-    <div ref={containerRef} className="relative shrink-0">
-      <button
-        ref={buttonRef}
-        type="button"
-        aria-label={`Actions for ${palette.name}`}
-        aria-expanded={open}
-        aria-controls={menuId}
-        onClick={() => setOpen((value) => !value)}
-        className={studioButtonClasses("secondary")}
-      >
-        <span aria-hidden="true">•••</span>
-      </button>
-      <ul
-        id={menuId}
-        hidden={!open}
-        className="absolute top-full right-0 z-20 mt-2 min-w-[160px] rounded-2xl border border-[var(--cs-border)] bg-[var(--cs-surface)] p-2 shadow-lg"
-      >
-        {item("Rename", onRename)}
-        {item("Duplicate", onDuplicate)}
-        {item("Delete palette", onDelete, true)}
-      </ul>
-    </div>
-  );
-}
-
-function PaletteDetail({
-  palette,
-  renaming,
-  onRenamingChange,
-  onSave,
-  onOpen,
-}: {
-  palette: StudioPalette;
-  renaming: boolean;
-  onRenamingChange: (renaming: boolean) => void;
-  onSave: (palette: StudioPalette) => Promise<boolean>;
-  onOpen: (href: string, selectedColorId?: string) => void;
-}) {
-  const { copy, isCopied } = useStudioCopy();
-  const nameId = useId();
-  const [selectedColorId, setSelectedColorId] = useState<string | null>(null);
-  const [draftName, setDraftName] = useState(palette.name);
-  const [nameError, setNameError] = useState<string | null>(null);
-  const [lastPaletteId, setLastPaletteId] = useState(palette.id);
-
-  if (palette.id !== lastPaletteId) {
-    setLastPaletteId(palette.id);
-    setSelectedColorId(null);
-    setDraftName(palette.name);
-    setNameError(null);
-  }
-
-  const selected = palette.colors.find((c) => c.id === selectedColorId) ?? palette.colors[0];
-
-  const submitName = async () => {
-    const name = draftName.trim();
-    if (!name || name.length > 80) {
-      setNameError("Enter a name of 1 to 80 characters.");
-      return;
-    }
-    setNameError(null);
-    if (name === palette.name || (await onSave({ ...palette, name }))) onRenamingChange(false);
-  };
-
-  return (
-    <div className="grid grid-cols-2 gap-6 max-[1199px]:grid-cols-1">
-      <section
-        aria-label={`${palette.name} details`}
-        className="min-w-0 rounded-2xl border border-[var(--cs-border)] bg-[var(--cs-surface)] p-8 max-[767px]:p-5"
-      >
-        {renaming ? (
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              void submitName();
-            }}
-          >
-            <label htmlFor={nameId} className="mb-2 block text-sm leading-5 font-medium">
-              Palette name
-            </label>
-            <div className="flex flex-wrap gap-2">
-              <input
-                id={nameId}
-                value={draftName}
-                maxLength={80}
-                autoFocus
-                aria-invalid={nameError ? true : undefined}
-                onChange={(event) => setDraftName(event.target.value)}
-                className={`${FIELD} min-w-0 flex-1`}
-              />
-              <StudioButton type="submit">Save name</StudioButton>
-              <StudioButton
-                variant="secondary"
-                onClick={() => {
-                  setDraftName(palette.name);
-                  setNameError(null);
-                  onRenamingChange(false);
-                }}
-              >
-                Cancel
-              </StudioButton>
-            </div>
-            {nameError ? (
-              <p className="mt-2 text-sm leading-5 text-[var(--cs-danger)]">{nameError}</p>
-            ) : null}
-          </form>
-        ) : (
-          <div className="flex items-center gap-1">
-            <h2 className="min-w-0 text-2xl leading-8 font-semibold break-words">{palette.name}</h2>
-            <button
-              type="button"
-              aria-label={`Rename ${palette.name}`}
-              onClick={() => {
-                setDraftName(palette.name);
-                onRenamingChange(true);
-              }}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] text-[var(--cs-muted)] hover:text-[var(--cs-text)]"
-            >
-              <EditIcon />
-            </button>
-          </div>
-        )}
-        <p className="mt-1 text-sm leading-5 text-[var(--cs-muted)]">
-          From {SOURCE_LABELS[palette.sourceTool]}
-        </p>
-
-        <ul className="mt-6 grid grid-cols-[repeat(auto-fill,minmax(112px,1fr))] gap-3">
-          {palette.colors.map((color) => {
-            const label = formatHex(color.hex);
-            const isSelected = color.id === selected.id;
-            return (
-              <li key={color.id}>
-                <button
-                  type="button"
-                  aria-pressed={isSelected}
-                  aria-label={`Select ${label}`}
-                  onClick={() => setSelectedColorId(color.id)}
-                  className={`block h-20 w-full rounded-[10px] border ${
-                    isSelected
-                      ? "border-[var(--cs-text)] outline-2 outline-offset-2 outline-[var(--cs-text)]"
-                      : "border-[var(--cs-border)]"
-                  }`}
-                  style={{ backgroundColor: color.hex }}
-                />
-                <div className="mt-1 flex items-center justify-between">
-                  <span className="font-mono text-sm leading-5 select-text">{label}</span>
-                  <button
-                    type="button"
-                    aria-label={`Copy ${label}`}
-                    onClick={() => void copy(label, color.id)}
-                    className="flex h-11 w-11 items-center justify-center rounded-[10px] text-[var(--cs-muted)] hover:text-[var(--cs-text)]"
-                  >
-                    {isCopied(color.id) ? <CheckIcon /> : <CopyIcon />}
-                  </button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-
-        <h3 className="mt-6 text-lg leading-[26px] font-semibold">Color roles</h3>
-        <div className="mt-3">
-          <RoleFields palette={palette} onChange={(next) => void onSave(next)} />
-        </div>
-
-        <div className="mt-6 flex flex-wrap gap-2">
-          <StudioButton onClick={() => onOpen("/colors/color-palette-generator", selected.id)}>
-            Open in generator
-          </StudioButton>
-          <StudioButton variant="secondary" onClick={() => onOpen("/colors/contrast-checker")}>
-            Check contrast
-          </StudioButton>
-          <StudioButton
-            variant="secondary"
-            onClick={() => onOpen("/colors/tailwind-color-generator", selected.id)}
-          >
-            Create shades
-          </StudioButton>
-          <StudioButton
-            variant="secondary"
-            onClick={() =>
-              void copy(
-                palette.colors.map((c) => formatHex(c.hex)).join(", "),
-                "hex-list",
-                "all HEX values",
-              )
-            }
-          >
-            Copy HEX
-          </StudioButton>
-          <StudioButton
-            variant="secondary"
-            onClick={() => void copy(studioPaletteToCss(palette), "css", "CSS variables")}
-          >
-            Copy CSS
-          </StudioButton>
-          <SharePaletteButton palette={palette} />
-        </div>
-      </section>
-
-      <section
-        aria-label="Preview with assigned roles"
-        className="min-w-0 rounded-2xl border border-[var(--cs-border)] bg-[var(--cs-surface)] p-8 max-[767px]:p-5"
-      >
-        <h2 className="text-2xl leading-8 font-semibold">Preview with assigned roles</h2>
-        <p className="mt-1 mb-4 text-sm leading-5 text-[var(--cs-muted)]">
-          Roles you haven&apos;t set use a suggested color from the palette.
-        </p>
-        <PalettePreview palette={palette} />
-      </section>
-    </div>
-  );
-}
-
 export function SavedPalettesView() {
   const store = useSavedPalettes();
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  const selectedRowRef = useRef<HTMLLIElement>(null);
 
   const [query, setQuery] = useState("");
   const [tool, setTool] = useState<StudioSource | "all">("all");
@@ -381,6 +99,20 @@ export function SavedPalettesView() {
   }, [store.palettes, query, tool, sort]);
 
   const selected = visible.find((p) => p.id === selectedId) ?? visible[0] ?? null;
+  const selectedRowId = selected?.id ?? null;
+
+  // A duplicated palette may land outside the scrolled part of the list. This moves
+  // only the list, because scrollIntoView would also scroll the page.
+  useEffect(() => {
+    const list = listRef.current;
+    const row = selectedRowRef.current;
+    if (!list || !row) return;
+    if (row.offsetTop < list.scrollTop) {
+      list.scrollTop = row.offsetTop;
+    } else if (row.offsetTop + row.offsetHeight > list.scrollTop + list.clientHeight) {
+      list.scrollTop = row.offsetTop + row.offsetHeight - list.clientHeight;
+    }
+  }, [selectedRowId]);
 
   const report = (message: string) => setActionError(message);
 
@@ -428,7 +160,11 @@ export function SavedPalettesView() {
   const exportBackup = async () => {
     const { serializeBackup } = await import("@/lib/colors/backup");
     const date = new Date().toISOString().slice(0, 10);
-    downloadJson(`brandbite-palettes-${date}.json`, serializeBackup(store.palettes));
+    downloadText(
+      `brandbite-palettes-${date}.json`,
+      serializeBackup(store.palettes),
+      "application/json",
+    );
   };
 
   const importBackup = async (file: File) => {
@@ -497,13 +233,25 @@ export function SavedPalettesView() {
     );
   }
 
+  const total = store.palettes.length;
+  const isFiltered = visible.length !== total;
+  const countLabel = `${isFiltered ? `${visible.length} of ${total}` : total} saved ${
+    total === 1 ? "palette" : "palettes"
+  }`;
+
   return (
     <>
-      <p className="-mt-2 text-sm leading-5 text-[var(--cs-muted)]">
-        {store.mode === "account" ? (
-          "Saved to your account, so they're available on any device."
-        ) : (
-          <>
+      {store.mode === "account" ? (
+        <p className="-mt-2 flex items-center gap-2 text-sm leading-5 text-[var(--cs-muted)]">
+          <span className="text-[var(--cs-success)]">
+            <CheckCircleIcon />
+          </span>
+          Saved to your account. Available on any device.
+        </p>
+      ) : (
+        <p className="-mt-2 flex items-start gap-2 text-sm leading-5 text-[var(--cs-muted)]">
+          <InfoIcon />
+          <span>
             Saved in this browser. Export a backup to keep a copy, or{" "}
             <Link
               href="/login?redirect=/colors/saved"
@@ -512,9 +260,9 @@ export function SavedPalettesView() {
               sign in
             </Link>{" "}
             to keep palettes on your account.
-          </>
-        )}
-      </p>
+          </span>
+        </p>
+      )}
 
       {store.status === "error" ? (
         <section
@@ -568,23 +316,28 @@ export function SavedPalettesView() {
             </section>
           ) : null}
 
-          <section className="rounded-2xl border border-[var(--cs-border)] bg-[var(--cs-surface)] p-8 max-[767px]:p-5">
+          <section className="rounded-2xl border border-[var(--cs-border)] bg-[var(--cs-surface)] p-6 max-[767px]:p-5">
             <div className="flex flex-wrap items-end gap-3">
               <label className="min-w-[220px] flex-1 text-sm leading-5 font-medium">
                 Search saved palettes
-                <input
-                  type="search"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  className={`${FIELD} mt-1 block w-full`}
-                />
+                <span className="relative mt-1 block">
+                  <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-[var(--cs-muted)]">
+                    <SearchIcon />
+                  </span>
+                  <input
+                    type="search"
+                    value={query}
+                    placeholder="Search saved palettes..."
+                    onChange={(event) => setQuery(event.target.value)}
+                    className={`${STUDIO_FIELD} block w-full pl-10`}
+                  />
+                </span>
               </label>
               <label className="text-sm leading-5 font-medium">
                 Tool
-                <select
+                <StudioSelect
                   value={tool}
                   onChange={(event) => setTool(event.target.value as StudioSource | "all")}
-                  className={`${FIELD} mt-1 block`}
                 >
                   <option value="all">All tools</option>
                   {usedTools.map((source) => (
@@ -592,65 +345,63 @@ export function SavedPalettesView() {
                       {SOURCE_LABELS[source]}
                     </option>
                   ))}
-                </select>
+                </StudioSelect>
               </label>
               <label className="text-sm leading-5 font-medium">
                 Sort by
-                <select
+                <StudioSelect
                   value={sort}
                   onChange={(event) => setSort(event.target.value as SortKey)}
-                  className={`${FIELD} mt-1 block`}
                 >
                   <option value="updated">Recently updated</option>
                   <option value="oldest">Oldest first</option>
                   <option value="name">Name</option>
-                </select>
+                </StudioSelect>
               </label>
-              <div role="group" aria-label="Layout" className="flex gap-1">
-                <StudioButton
-                  variant={layout === "list" ? "primary" : "secondary"}
-                  aria-pressed={layout === "list"}
-                  onClick={() => setLayout("list")}
-                >
-                  List
-                </StudioButton>
-                <StudioButton
-                  variant={layout === "grid" ? "primary" : "secondary"}
-                  aria-pressed={layout === "grid"}
-                  onClick={() => setLayout("grid")}
-                >
-                  Grid
-                </StudioButton>
-              </div>
+              <IconToggle
+                label="Layout"
+                value={layout}
+                onChange={setLayout}
+                activeClassName="border-transparent bg-[var(--cs-text)] text-white"
+                options={[
+                  { value: "list", label: "List", icon: <ListIcon /> },
+                  { value: "grid", label: "Grid", icon: <GridIcon /> },
+                ]}
+              />
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              <StudioButton
-                variant="secondary"
-                disabled={store.palettes.length === 0}
-                onClick={() => void exportBackup()}
-              >
-                Export backup
-              </StudioButton>
-              <StudioButton
-                variant="secondary"
-                loading={importing}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                Import backup
-              </StudioButton>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="application/json,.json"
-                aria-label="Backup file"
-                className="hidden"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  event.currentTarget.value = "";
-                  if (file) void importBackup(file);
-                }}
-              />
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-base leading-6 font-semibold">{total > 0 ? countLabel : null}</p>
+              <div className="flex flex-wrap gap-2">
+                <StudioButton
+                  variant="secondary"
+                  icon={<UploadIcon />}
+                  disabled={total === 0}
+                  onClick={() => void exportBackup()}
+                >
+                  Export backup
+                </StudioButton>
+                <StudioButton
+                  variant="secondary"
+                  icon={<DownloadIcon />}
+                  loading={importing}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  Import backup
+                </StudioButton>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/json,.json"
+                  aria-label="Backup file"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    event.currentTarget.value = "";
+                    if (file) void importBackup(file);
+                  }}
+                />
+              </div>
             </div>
 
             {actionError ? (
@@ -659,8 +410,8 @@ export function SavedPalettesView() {
               </p>
             ) : null}
 
-            {store.palettes.length === 0 ? (
-              <div className="mt-6 rounded-2xl border border-dashed border-[var(--cs-border)] p-8 text-center">
+            {total === 0 ? (
+              <div className="mt-4 rounded-2xl border border-dashed border-[var(--cs-border)] p-8 text-center">
                 <p className="text-base leading-6 font-medium">No saved palettes yet.</p>
                 <p className="mt-1 text-sm leading-5 text-[var(--cs-muted)]">
                   Create your first one, and it will appear here.
@@ -673,7 +424,7 @@ export function SavedPalettesView() {
                 </Link>
               </div>
             ) : visible.length === 0 ? (
-              <div className="mt-6 rounded-2xl border border-dashed border-[var(--cs-border)] p-8 text-center">
+              <div className="mt-4 rounded-2xl border border-dashed border-[var(--cs-border)] p-8 text-center">
                 <p className="text-base leading-6 font-medium">No palettes match your search.</p>
                 <div className="mt-4">
                   <StudioButton
@@ -688,70 +439,93 @@ export function SavedPalettesView() {
                 </div>
               </div>
             ) : (
-              <ul
-                className={`mt-6 ${
-                  layout === "grid"
-                    ? "grid grid-cols-3 gap-3 max-[1199px]:grid-cols-2 max-[767px]:grid-cols-1"
-                    : "flex flex-col gap-3"
-                }`}
-              >
-                {visible.map((palette) => {
-                  const isSelected = palette.id === selected?.id;
-                  return (
-                    <li
-                      key={palette.id}
-                      className={`flex items-center gap-2 rounded-2xl border p-3 ${
-                        isSelected
-                          ? "border-[var(--cs-text)] bg-[var(--cs-soft)]"
-                          : "border-[var(--cs-border)]"
-                      }`}
-                    >
-                      <button
-                        type="button"
-                        aria-pressed={isSelected}
-                        onClick={() => {
-                          setSelectedId(palette.id);
-                          setRenaming(false);
-                        }}
-                        className={`flex min-w-0 flex-1 items-center gap-4 rounded-[10px] text-left ${
-                          layout === "grid"
-                            ? "flex-col items-stretch gap-2"
-                            : "max-[767px]:flex-col max-[767px]:items-stretch max-[767px]:gap-2"
+              <>
+                <ul
+                  ref={listRef}
+                  className={`relative mt-4 overflow-y-auto p-0.5 ${
+                    layout === "grid"
+                      ? "grid max-h-[420px] grid-cols-3 gap-2 max-[1199px]:grid-cols-2 max-[767px]:grid-cols-1"
+                      : "flex max-h-[206px] flex-col gap-2 max-[767px]:max-h-[350px]"
+                  }`}
+                >
+                  {visible.map((palette) => {
+                    const isSelected = palette.id === selected?.id;
+                    return (
+                      <li
+                        key={palette.id}
+                        ref={isSelected ? selectedRowRef : undefined}
+                        className={`flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2 ${
+                          isSelected
+                            ? "border-[var(--cs-selected)] bg-[var(--cs-soft)]"
+                            : "border-[var(--cs-border)]"
                         }`}
                       >
-                        <span
-                          className="w-1/3 min-w-0 shrink-0 max-[767px]:w-full"
-                          style={layout === "grid" ? { width: "100%" } : undefined}
+                        <button
+                          type="button"
+                          aria-pressed={isSelected}
+                          onClick={() => {
+                            setSelectedId(palette.id);
+                            setRenaming(false);
+                          }}
+                          className={`flex min-w-0 flex-1 items-center gap-4 rounded-[10px] text-left ${
+                            layout === "grid"
+                              ? "flex-col items-stretch gap-2"
+                              : "max-[767px]:flex-col max-[767px]:items-stretch max-[767px]:gap-2"
+                          }`}
                         >
-                          <span className="flex items-center gap-1.5 text-base leading-6 font-semibold">
+                          <span
+                            className="flex w-2/5 min-w-0 shrink-0 items-center gap-2 max-[767px]:w-full"
+                            style={layout === "grid" ? { width: "100%" } : undefined}
+                          >
                             {isSelected ? <CheckIcon /> : null}
-                            <span className="truncate">{palette.name}</span>
+                            <span className="min-w-0">
+                              <span className="block truncate text-base leading-6 font-semibold">
+                                {palette.name}
+                              </span>
+                              <span className="block truncate text-sm leading-5 text-[var(--cs-muted)]">
+                                {SOURCE_LABELS[palette.sourceTool]} · Updated{" "}
+                                {formatUpdated(palette.updatedAt, now)}
+                              </span>
+                            </span>
                           </span>
-                          <span className="block truncate text-sm leading-5 text-[var(--cs-muted)]">
-                            {SOURCE_LABELS[palette.sourceTool]} · Updated{" "}
-                            {formatUpdated(palette.updatedAt, now)}
-                          </span>
-                        </span>
-                        <ColorStrip palette={palette} />
-                      </button>
-                      <RowMenu
-                        palette={palette}
-                        onRename={() => {
-                          setSelectedId(palette.id);
-                          setRenaming(true);
-                        }}
-                        onDuplicate={() => void duplicate(palette)}
-                        onDelete={() => void removePalette(palette)}
-                      />
-                    </li>
-                  );
-                })}
-              </ul>
+                          <ColorStrip palette={palette} />
+                        </button>
+                        <ActionMenu
+                          label={`Actions for ${palette.name}`}
+                          buttonClassName={studioButtonClasses("secondary")}
+                          items={[
+                            {
+                              label: "Rename",
+                              onSelect: () => {
+                                setSelectedId(palette.id);
+                                setRenaming(true);
+                              },
+                            },
+                            { label: "Duplicate", onSelect: () => void duplicate(palette) },
+                            {
+                              label: "Delete palette",
+                              danger: true,
+                              onSelect: () => void removePalette(palette),
+                            },
+                          ]}
+                        >
+                          <span aria-hidden="true">•••</span>
+                        </ActionMenu>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {layout === "list" && visible.length > VISIBLE_ROWS ? (
+                  <p className="mt-2 text-sm leading-5 text-[var(--cs-muted)]">
+                    Showing {VISIBLE_ROWS} of {visible.length} · Scroll to browse your palettes
+                  </p>
+                ) : null}
+              </>
             )}
           </section>
 
           {selected ? (
-            <PaletteDetail
+            <SavedPaletteDetail
               palette={selected}
               renaming={renaming}
               onRenamingChange={setRenaming}

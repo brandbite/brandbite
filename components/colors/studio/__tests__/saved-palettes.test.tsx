@@ -190,6 +190,110 @@ describe("guest collection", () => {
   });
 });
 
+describe("palette list", () => {
+  it("counts palettes, and says how many match a filter", async () => {
+    seedLocal(palette("One"), palette("Two"));
+    render(<SavedPalettesView />);
+    expect(await screen.findByText("2 saved palettes")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Search saved palettes"), {
+      target: { value: "one" },
+    });
+    expect(screen.getByText("1 of 2 saved palettes")).toBeInTheDocument();
+  });
+
+  it("explains the scrolling only when there are more rows than fit", async () => {
+    seedLocal(palette("A"), palette("B"), palette("C"));
+    const { unmount } = render(<SavedPalettesView />);
+    await screen.findByText("3 saved palettes");
+    expect(screen.queryByText(/Scroll to browse/)).toBeNull();
+    unmount();
+
+    seedLocal(palette("A"), palette("B"), palette("C"), palette("D"));
+    render(<SavedPalettesView />);
+    expect(
+      await screen.findByText("Showing 3 of 4 · Scroll to browse your palettes"),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Grid" }));
+    expect(screen.queryByText(/Scroll to browse/)).toBeNull();
+  });
+
+  it("opens a row's menu against the window and closes it on scroll", async () => {
+    seedLocal(palette());
+    render(<SavedPalettesView />);
+    const trigger = await screen.findByRole("button", { name: "Actions for Ocean Breeze" });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "Duplicate" })).toBeVisible();
+
+    fireEvent.scroll(window);
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+  });
+});
+
+describe("palette detail", () => {
+  it("copies a color's HEX when the swatch is clicked, and selects it", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    seedLocal(palette());
+    render(<SavedPalettesView />);
+    const swatch = await screen.findByRole("button", { name: "Select and copy #41C2D0" });
+    fireEvent.click(swatch);
+    expect(swatch).toHaveAttribute("aria-pressed", "true");
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("#41C2D0"));
+  });
+
+  it("names colors, including in the role options", async () => {
+    seedLocal(palette("Named", ["#ff7f50", "#173b59"]));
+    render(<SavedPalettesView />);
+    await screen.findByText("Coral");
+    expect(screen.getAllByRole("option", { name: "Coral #FF7F50" }).length).toBeGreaterThan(0);
+  });
+
+  it("exports one palette as CSS or JSON", async () => {
+    const createObjectURL = vi.fn(() => "blob:test");
+    Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() });
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    seedLocal(palette("Ocean Breeze!"));
+    render(<SavedPalettesView />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Export" }));
+    fireEvent.click(screen.getByRole("button", { name: "Download CSS" }));
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Export" }));
+    fireEvent.click(screen.getByRole("button", { name: "Download JSON" }));
+    await waitFor(() => expect(createObjectURL).toHaveBeenCalledTimes(2));
+  });
+
+  it("switches the preview between desktop and mobile", async () => {
+    seedLocal(palette());
+    render(<SavedPalettesView />);
+    const mobile = await screen.findByRole("button", { name: "Mobile" });
+    expect(screen.getByRole("button", { name: "Desktop" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(mobile);
+    expect(mobile).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByText("Home")).toBeNull();
+    expect(screen.getByText("Get started")).toBeInTheDocument();
+  });
+
+  it("calls out low text contrast instead of showing a pass", async () => {
+    const source = palette("Low", ["#777777", "#888888"]);
+    const low = setStudioRole(
+      setStudioRole(source, "text", source.colors[0].id),
+      "background",
+      source.colors[1].id,
+    );
+    seedLocal(low);
+    render(<SavedPalettesView />);
+    expect(await screen.findByText(/below AA for normal text/)).toBeInTheDocument();
+  });
+});
+
 describe("backup import", () => {
   function chooseFile(content: string, name = "backup.json") {
     const file = new File([content], name, { type: "application/json" });
@@ -234,7 +338,7 @@ describe("opening a palette", () => {
     const source = palette();
     seedLocal(source);
     render(<SavedPalettesView />);
-    fireEvent.click(await screen.findByRole("button", { name: "Select #41C2D0" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Select and copy #41C2D0" }));
     fireEvent.click(screen.getByRole("button", { name: "Create shades" }));
     expect(push).toHaveBeenCalledWith("/colors/tailwind-color-generator");
     const stored = JSON.parse(

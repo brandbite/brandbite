@@ -38,11 +38,14 @@ describe("SharePaletteButton", () => {
     );
     render(<SharePaletteButton palette={palette()} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Share" }));
-    expect(screen.getByText(/Anyone with this link can view this snapshot/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Share palette" }));
+    expect(screen.getByRole("dialog", { name: "Share palette" })).toBeInTheDocument();
+    expect(screen.getByText("Anyone with the link can view this palette.")).toBeInTheDocument();
+    expect(screen.getByText("Your saved palettes stay private.")).toBeInTheDocument();
+    expect(screen.getByText(/the link can't be removed/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Copy link" })).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Create link" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create share link" }));
     expect(screen.queryByRole("button", { name: "Copy link" })).toBeNull();
 
     await act(async () => {
@@ -52,6 +55,19 @@ describe("SharePaletteButton", () => {
     expect(screen.getByLabelText("Share link")).toHaveValue(
       `${window.location.origin}/colors/p/abc`,
     );
+    expect(screen.getByRole("button", { name: "Done" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
+  });
+
+  it("shows the palette, and closes without creating anything on cancel", () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    render(<SharePaletteButton palette={palette()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Share palette" }));
+    expect(screen.getByText("Ocean")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("sends only the name, colors and roles", async () => {
@@ -59,9 +75,9 @@ describe("SharePaletteButton", () => {
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(new Response(JSON.stringify({ id: "abc" }), { status: 201 }));
     render(<SharePaletteButton palette={palette()} />);
-    fireEvent.click(screen.getByRole("button", { name: "Share" }));
+    fireEvent.click(screen.getByRole("button", { name: "Share palette" }));
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Create link" }));
+      fireEvent.click(screen.getByRole("button", { name: "Create share link" }));
     });
     const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
     expect(Object.keys(body).sort()).toEqual(["colors", "name", "roles"]);
@@ -71,9 +87,9 @@ describe("SharePaletteButton", () => {
   it("shows a failure and no link", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 500 }));
     render(<SharePaletteButton palette={palette()} />);
-    fireEvent.click(screen.getByRole("button", { name: "Share" }));
+    fireEvent.click(screen.getByRole("button", { name: "Share palette" }));
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Create link" }));
+      fireEvent.click(screen.getByRole("button", { name: "Create share link" }));
     });
     expect(screen.getByRole("alert")).toHaveTextContent(/couldn't be created/);
     expect(screen.queryByRole("button", { name: "Copy link" })).toBeNull();

@@ -11,7 +11,10 @@
   --cs-brand-strong: #c2410c;
   --cs-soft: #ece4ff;
   --cs-soft-text: #4c1d95;
+  /* Outline of a selected palette or color. */
+  --cs-selected: #8d5bff;
   --cs-danger: #b42318;
+  --cs-success: #15803d;
 
   background-color: var(--cs-background);
   color: var(--cs-text);
