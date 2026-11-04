@@ -30,7 +30,7 @@ export function PageIntro({
 }: {
   /** Dark part of the headline. */
   title: string;
-  /** Orange part of the headline. */
+  /** Accent part of the headline. Uses brandStrong: #FF6426 fails AA large on the page background. */
   accent?: string;
   blurb: string;
   /** Current page name, for pages reached from another Color Studio page. */
@@ -53,7 +53,7 @@ export function PageIntro({
       </div>
       <h1 className="text-[48px] leading-[56px] font-bold max-[767px]:text-[32px] max-[767px]:leading-10">
         {title}
-        {accent ? <span className="text-[var(--cs-brand)]"> {accent}</span> : null}
+        {accent ? <span className="text-[var(--cs-brand-strong)]"> {accent}</span> : null}
       </h1>
       <p className="mt-2 text-base leading-6 text-[var(--cs-muted)]">{blurb}</p>
     </div>
