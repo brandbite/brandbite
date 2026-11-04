@@ -8,10 +8,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
-import { Modal, ModalFooter, ModalHeader } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast-provider";
 import {
   COLOR_ROLES,
@@ -25,11 +23,11 @@ import {
 } from "@/lib/colors";
 
 import { CheckIcon, CloseIcon, CopyIcon, EditIcon } from "./icons";
+import { usePaletteOpener } from "./open-palette";
 import { PalettePreview } from "./palette-preview";
 import { StudioButton, studioButtonClasses } from "./studio-button";
 import { useSavedPalettes } from "./use-saved-palettes";
 import { useStudioCopy } from "./use-studio-copy";
-import { useWorkspace, workspaceActions } from "./workspace-store";
 
 const SOURCE_LABELS: Record<StudioSource, string> = {
   generator: "Palette generator",
@@ -328,6 +326,9 @@ function PaletteDetail({
           <StudioButton onClick={() => onOpen("/colors/color-palette-generator", selected.id)}>
             Open in generator
           </StudioButton>
+          <StudioButton variant="secondary" onClick={() => onOpen("/colors/contrast-checker")}>
+            Check contrast
+          </StudioButton>
           <StudioButton
             variant="secondary"
             onClick={() => onOpen("/colors/tailwind-color-generator", selected.id)}
@@ -371,8 +372,6 @@ function PaletteDetail({
 
 export function SavedPalettesView() {
   const store = useSavedPalettes();
-  const router = useRouter();
-  const workspace = useWorkspace();
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -386,11 +385,6 @@ export function SavedPalettesView() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [moving, setMoving] = useState(false);
-  const [pendingOpen, setPendingOpen] = useState<{
-    palette: StudioPalette;
-    href: string;
-    selectedColorId?: string;
-  } | null>(null);
   const [now] = useState(() => Date.now());
 
   const usedTools = useMemo(
@@ -455,28 +449,7 @@ export function SavedPalettesView() {
     }
   };
 
-  const openPalette = (palette: StudioPalette, href: string, selectedColorId?: string) => {
-    workspaceActions.load(palette, selectedColorId);
-    router.push(href);
-  };
-
-  const requestOpen = (palette: StudioPalette, href: string, selectedColorId?: string) => {
-    if (workspace.dirty && workspace.activePalette?.id !== palette.id) {
-      setPendingOpen({ palette, href, selectedColorId });
-    } else {
-      openPalette(palette, href, selectedColorId);
-    }
-  };
-
-  const saveActiveThenOpen = async () => {
-    if (!pendingOpen || !workspace.activePalette) return;
-    const ok = await savePalette(workspace.activePalette);
-    if (!ok) {
-      setPendingOpen(null);
-      return;
-    }
-    openPalette(pendingOpen.palette, pendingOpen.href, pendingOpen.selectedColorId);
-  };
+  const opener = usePaletteOpener(savePalette);
 
   const exportBackup = async () => {
     const { serializeBackup } = await import("@/lib/colors/backup");
@@ -809,34 +782,13 @@ export function SavedPalettesView() {
               renaming={renaming}
               onRenamingChange={setRenaming}
               onSave={savePalette}
-              onOpen={(href, colorId) => requestOpen(selected, href, colorId)}
+              onOpen={(href, colorId) => opener.requestOpen(selected, href, colorId)}
             />
           ) : null}
         </>
       )}
 
-      <Modal open={pendingOpen !== null} onClose={() => setPendingOpen(null)} size="sm">
-        <ModalHeader
-          title="You have unsaved changes"
-          subtitle={`Opening this palette would replace "${workspace.activePalette?.name ?? ""}".`}
-          onClose={() => setPendingOpen(null)}
-        />
-        <ModalFooter>
-          <StudioButton variant="secondary" onClick={() => setPendingOpen(null)}>
-            Keep working
-          </StudioButton>
-          <StudioButton
-            variant="danger"
-            onClick={() =>
-              pendingOpen &&
-              openPalette(pendingOpen.palette, pendingOpen.href, pendingOpen.selectedColorId)
-            }
-          >
-            Discard
-          </StudioButton>
-          <StudioButton onClick={() => void saveActiveThenOpen()}>Save changes</StudioButton>
-        </ModalFooter>
-      </Modal>
+      {opener.dialog}
     </>
   );
 }
