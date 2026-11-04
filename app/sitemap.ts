@@ -39,6 +39,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       "/colors/color-palette-ideas",
       "/colors/color-meanings",
       "/colors/contrast-checker",
+      "/colors/image-to-palette",
     ].map((path) => ({
       url: `${baseUrl}${path}`,
       lastModified: new Date(),

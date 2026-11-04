@@ -160,5 +160,71 @@ async function loadBitmap(file: File): Promise<ImageBitmap | HTMLImageElement> {
   }
 }
 
+export const IMAGE_ACCEPT = ["image/jpeg", "image/png", "image/webp"];
+export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+export const MIN_IMAGE_COLORS = 3;
+export const MAX_IMAGE_COLORS = 8;
+
+export type ImageFileProblem = "type" | "size";
+
+/** Check a file before decoding it. Decoding can still fail on a mislabelled file. */
+export function checkImageFile(file: Pick<File, "type" | "size">): ImageFileProblem | null {
+  if (!IMAGE_ACCEPT.includes(file.type)) return "type";
+  if (file.size > MAX_IMAGE_BYTES) return "size";
+  return null;
+}
+
+export interface ColorLocation {
+  /** Position of the closest matching pixel, as fractions of the image size. */
+  x: number;
+  y: number;
+}
+
+/** Find where each color appears most closely in the image, for numbered markers. */
+export function locateColors(data: ImageData, palette: Palette): ColorLocation[] {
+  const { data: buf, width, height } = data;
+  return palette.map(({ rgb }) => {
+    let best = Infinity;
+    let bestIndex = 0;
+    for (let i = 0; i < buf.length; i += 4) {
+      if (buf[i + 3] < 128) continue;
+      const distance =
+        (buf[i] - rgb.r) ** 2 + (buf[i + 1] - rgb.g) ** 2 + (buf[i + 2] - rgb.b) ** 2;
+      if (distance < best) {
+        best = distance;
+        bestIndex = i / 4;
+      }
+    }
+    return {
+      x: ((bestIndex % width) + 0.5) / width,
+      y: (Math.floor(bestIndex / width) + 0.5) / height,
+    };
+  });
+}
+
+/**
+ * Analyze a file in the browser: a 512px copy gives the same result for the same
+ * image and settings. Throws when the file can't be decoded.
+ */
+export async function analyzeImage(
+  file: File,
+  colorCount: number,
+): Promise<{ palette: Palette; locations: ColorLocation[] }> {
+  const maxColors = Math.max(MIN_IMAGE_COLORS, Math.min(MAX_IMAGE_COLORS, colorCount));
+  const bitmap = await loadBitmap(file);
+  const scale = Math.min(1, 512 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) throw new Error("Canvas 2D context unavailable");
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  if ("close" in bitmap && typeof bitmap.close === "function") bitmap.close();
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const palette = extractFromImageData(imageData, maxColors);
+  return { palette, locations: locateColors(imageData, palette) };
+}
+
 /** Convenience re-export so callers can turn an rgb into hsl for display. */
 export { rgbToHsl };

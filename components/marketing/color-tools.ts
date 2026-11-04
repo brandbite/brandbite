@@ -18,6 +18,7 @@ export const STUDIO_NAV: StudioNavItem[] = [
 /** Tools under the "More tools" menu. The menu is hidden while this is empty. */
 export const STUDIO_MORE_TOOLS: StudioNavItem[] = [
   { href: "/colors/contrast-checker", label: "Contrast checker" },
+  { href: "/colors/image-to-palette", label: "Image to palette" },
 ];
 
 /** The "Saved" shortcut, shown on every Color Studio page. */
