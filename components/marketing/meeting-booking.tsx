@@ -67,7 +67,12 @@ function formatFull(iso: string, timeZone: string): string {
   }).format(new Date(iso));
 }
 
-type Availability = { status: "loading" | "ready" | "unavailable"; slots: string[] };
+type Availability = {
+  status: "loading" | "ready" | "unavailable";
+  slots: string[];
+  /** Preview deployments only: sample times, and nothing is submitted. */
+  demo?: boolean;
+};
 
 function useAvailability() {
   const [state, setState] = useState<Availability>({ status: "loading", slots: [] });
@@ -77,7 +82,7 @@ function useAvailability() {
       const res = await fetch("/api/meetings/availability", { cache: "no-store" });
       const json = await res.json().catch(() => null);
       if (res.ok && json?.available && Array.isArray(json.slots)) {
-        setState({ status: "ready", slots: json.slots });
+        setState({ status: "ready", slots: json.slots, demo: json.demo === true });
       } else {
         setState({ status: "unavailable", slots: [] });
       }
@@ -94,7 +99,7 @@ function useAvailability() {
         const json = await res.json().catch(() => null);
         if (cancelled) return;
         if (res.ok && json?.available && Array.isArray(json.slots)) {
-          setState({ status: "ready", slots: json.slots });
+          setState({ status: "ready", slots: json.slots, demo: json.demo === true });
         } else {
           setState({ status: "unavailable", slots: [] });
         }
@@ -202,14 +207,14 @@ function Unavailable() {
 }
 
 export function MeetingBooking() {
-  const { status, slots, reload } = useAvailability();
+  const { status, slots, demo, reload } = useAvailability();
   const [timeZone] = useState(visitorTimeZone);
   const [slot, setSlot] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", email: "", company: "", note: "" });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [booked, setBooked] = useState<{
-    token: string;
+    token: string | null;
     startsAt: string;
     videoLink: string | null;
   } | null>(null);
@@ -223,6 +228,10 @@ export function MeetingBooking() {
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!slot) return;
+    if (demo) {
+      setBooked({ token: null, startsAt: slot, videoLink: null });
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -263,7 +272,9 @@ export function MeetingBooking() {
           {formatFull(booked.startsAt, timeZone)}
         </p>
         <p className="mt-2 text-base leading-6 text-[#5E616E]">
-          A calendar invite and confirmation are on their way to {form.email}.
+          {booked.token
+            ? `A calendar invite and confirmation are on their way to ${form.email}.`
+            : "Preview only: nothing was booked and no emails were sent."}
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           {booked.videoLink ? (
@@ -271,9 +282,11 @@ export function MeetingBooking() {
               Join link
             </a>
           ) : null}
-          <Link href={`/meetings/${booked.token}`} className={SECONDARY}>
-            Reschedule or cancel
-          </Link>
+          {booked.token ? (
+            <Link href={`/meetings/${booked.token}`} className={SECONDARY}>
+              Reschedule or cancel
+            </Link>
+          ) : null}
         </div>
       </div>
     );
@@ -290,6 +303,11 @@ export function MeetingBooking() {
 
   return (
     <form onSubmit={(event) => void submit(event)} className="grid gap-8 md:grid-cols-2">
+      {demo ? (
+        <p className="rounded-[10px] bg-[#ECE4FF] p-3 text-sm leading-5 text-[#2B2D33] md:col-span-2">
+          Preview only: these are sample times. Nothing will be booked and no emails are sent.
+        </p>
+      ) : null}
       <SlotPicker slots={slots} timeZone={timeZone} value={slot} onChange={setSlot} />
 
       <div className="flex flex-col gap-4">
@@ -337,7 +355,7 @@ export function MeetingBooking() {
           />
         </label>
 
-        {turnstileSiteKey ? (
+        {turnstileSiteKey && !demo ? (
           <Turnstile
             ref={turnstileRef}
             siteKey={turnstileSiteKey}
@@ -356,7 +374,9 @@ export function MeetingBooking() {
           <button
             type="submit"
             className={PRIMARY}
-            disabled={!slot || submitting || (Boolean(turnstileSiteKey) && !turnstileToken)}
+            disabled={
+              !slot || submitting || (Boolean(turnstileSiteKey) && !demo && !turnstileToken)
+            }
           >
             {submitting
               ? "Booking…"

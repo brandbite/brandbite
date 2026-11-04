@@ -105,6 +105,18 @@ describe("availability", () => {
     expect(json).toEqual({ available: false, slots: [] });
   });
 
+  it("shows sample times only on Vercel previews, never in production", async () => {
+    await prisma.consultationSettings.create({ data: { singleton: true } });
+    vi.stubEnv("VERCEL_ENV", "preview");
+    const preview = await (await getAvailability(get())).json();
+    expect(preview.demo).toBe(true);
+    expect(preview.slots.length).toBeGreaterThan(0);
+
+    vi.stubEnv("VERCEL_ENV", "production");
+    expect(await (await getAvailability(get())).json()).toEqual({ available: false, slots: [] });
+    vi.unstubAllEnvs();
+  });
+
   it("offers no times when a calendar can't be read", async () => {
     await connectCalendar();
     mockBusy.mockRejectedValue(new Error("notFound"));

@@ -83,6 +83,19 @@ describe("MeetingBooking", () => {
     expect(JSON.parse(post?.[1]?.body as string).startsAt).toBe(SLOTS[0]);
   });
 
+  it("never submits in preview demo mode, and says so", async () => {
+    const fetchMock = mockFetch(() => ({ json: { available: true, demo: true, slots: SLOTS } }));
+    render(<MeetingBooking />);
+    expect(await screen.findByText(/these are sample times/)).toBeInTheDocument();
+    await fillAndChoose();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^Book / }));
+    });
+    expect(screen.getByText(/nothing was booked and no emails were sent/)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Reschedule or cancel" })).toBeNull();
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
+  });
+
   it("clears the choice and refreshes times if the slot was just taken", async () => {
     const fetchMock = mockFetch((url, init) =>
       init?.method === "POST"
