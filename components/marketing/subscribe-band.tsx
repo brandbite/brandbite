@@ -85,7 +85,7 @@ export function SubscribeBand() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="font-brand flex shrink-0 cursor-pointer flex-row items-center justify-center gap-2.5 rounded-[10px] border-none bg-[#2B2D33] p-5 text-xl leading-none font-bold text-white transition-colors hover:bg-[#FF6426] disabled:cursor-not-allowed disabled:opacity-60"
+                className="font-brand flex shrink-0 cursor-pointer flex-row items-center justify-center gap-2.5 rounded-[10px] border-none bg-[#2B2D33] p-5 text-base leading-none font-bold text-white transition-colors hover:bg-[#FF6426] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {submitting ? "Sending..." : "Subscribe"}
                 <Image src="/home/ico-send.svg" alt="" width={24} height={24} />

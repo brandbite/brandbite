@@ -28,7 +28,7 @@ const NAV_LINKS = [
 ];
 
 const CTA_CLASSES =
-  "font-brand flex h-10 shrink-0 flex-row items-center justify-center gap-2.5 rounded-[10px] bg-[#1F2024] px-5 py-2.5 text-xl leading-none font-bold text-white transition-colors hover:bg-[#FF6426] max-[899px]:ml-auto max-[899px]:h-9 max-[899px]:w-auto max-[899px]:min-w-0 max-[899px]:px-3.5 max-[899px]:py-2 max-[899px]:text-base";
+  "font-brand flex h-10 shrink-0 flex-row items-center justify-center gap-2.5 rounded-[10px] bg-[#1F2024] px-5 py-2.5 text-base leading-none font-bold whitespace-nowrap text-white transition-colors hover:bg-[#FF6426] max-[899px]:ml-auto max-[899px]:h-9 max-[899px]:w-auto max-[899px]:min-w-0 max-[899px]:px-3.5 max-[899px]:py-2";
 
 export function HomeHeader({ active }: { active?: string } = {}) {
   const [menuOpen, setMenuOpen] = useState(false);

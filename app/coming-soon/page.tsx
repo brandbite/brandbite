@@ -82,14 +82,14 @@ export default function ComingSoonPage() {
             <div className="flex flex-row items-center gap-5 max-[767px]:flex-col max-[767px]:items-start max-[767px]:gap-4">
               <Link
                 href="/"
-                className="font-brand flex h-11 flex-row items-center justify-center gap-3 rounded-[10px] bg-[#1F2024] px-[22px] py-2.5 text-lg font-bold whitespace-nowrap text-white transition-colors hover:bg-[#FF6426]"
+                className="font-brand flex h-11 flex-row items-center justify-center gap-3 rounded-[10px] bg-[#1F2024] px-[22px] py-2.5 text-base font-bold whitespace-nowrap text-white transition-colors hover:bg-[#FF6426]"
               >
                 Back to home
                 <Image src="/home/arrow-white.svg" alt="" width={20} height={15.7} />
               </Link>
               <a
                 href="mailto:hello@brandbite.studio"
-                className="font-brand flex h-11 items-center gap-2 rounded-[10px] border border-[#D7D8DD] bg-white px-[22px] py-2.5 text-lg font-bold whitespace-nowrap text-[#1F2024] transition-colors hover:border-[#FF6426] hover:text-[#FF6426]"
+                className="font-brand flex h-11 items-center gap-2 rounded-[10px] border border-[#D7D8DD] bg-white px-[22px] py-2.5 text-base font-bold whitespace-nowrap text-[#1F2024] transition-colors hover:border-[#FF6426] hover:text-[#FF6426]"
               >
                 Say hi 👋
               </a>

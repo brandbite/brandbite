@@ -27,7 +27,7 @@ export function QuestionsBand() {
           href="mailto:hello@brandbite.studio"
           className="flex flex-row items-center gap-[9px] transition-opacity hover:opacity-85"
         >
-          <span className="text-xl leading-8 font-bold whitespace-nowrap text-white">
+          <span className="text-base leading-6 font-bold whitespace-nowrap text-white">
             Chat with the team
           </span>
           <Image src="/home/arrow-chat.svg" alt="" width={24} height={24} />
