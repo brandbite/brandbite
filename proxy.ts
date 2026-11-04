@@ -13,6 +13,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
+import { resolveHexRoute } from "@/lib/colors/hex-route";
+
 const isDemoMode = process.env.DEMO_MODE === "true";
 
 // Routes that do NOT require authentication
@@ -100,6 +102,8 @@ const PUBLIC_PATHS = [
   // mutations live behind /api/admin/*).
   "/api/palette-ideas",
   "/api/color-meanings",
+  // Anonymous share-link creation; the route enforces rate and size limits.
+  "/api/colors/shares",
   // pdf.js web worker for the in-app PDF viewer/pin overlay. It's a vendored,
   // non-sensitive static library file loaded via `new Worker(...)`. The matcher
   // below only excludes image extensions, so without this entry the proxy 307s
@@ -138,6 +142,15 @@ function isDemoOnlyPath(pathname: string): boolean {
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Color pages: send one real status to crawlers, which the page itself can't do.
+  const hexRoute = resolveHexRoute(pathname);
+  if (hexRoute.kind === "redirect") {
+    return NextResponse.redirect(new URL(hexRoute.to, request.url), 308);
+  }
+  if (hexRoute.kind === "missing") {
+    return NextResponse.rewrite(new URL("/_not-found", request.url), { status: 404 });
+  }
 
   // Block debug routes in production (non-demo) mode
   if (!isDemoMode && isDemoOnlyPath(pathname)) {

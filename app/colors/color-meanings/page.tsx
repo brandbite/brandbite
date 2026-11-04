@@ -1,90 +1,26 @@
 // -----------------------------------------------------------------------------
 // @file: app/colors/color-meanings/page.tsx
-// @purpose: Encyclopedia hub — grid of published colors linking to per-color
-//           meaning pages. Content is CMS-managed (ColorMeaning).
+// @purpose: Color families with a detail panel, in the first HTML. CMS entries come
+//           first, followed by built-in families.
 // -----------------------------------------------------------------------------
 
-"use client";
+import { ColorMeaningsView } from "@/components/colors/studio/color-meanings-view";
+import { StudioShell } from "@/components/colors/studio/studio-shell";
+import { getColorMeanings } from "@/lib/colors/content";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { ColorToolShell } from "@/components/marketing/color-tool-shell";
-import { readableTextOn, formatHex } from "@/lib/colors";
+// Next.js needs a literal here: CMS changes show up within 5 minutes.
+export const revalidate = 300;
 
-type MeaningDTO = {
-  id: string;
-  name: string;
-  slug: string;
-  hex: string;
-  summary: string | null;
-  associations: string[];
-};
-
-export default function ColorMeaningsHubPage() {
-  const [meanings, setMeanings] = useState<MeaningDTO[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/color-meanings");
-        const json = await res.json().catch(() => null);
-        if (!cancelled && res.ok && Array.isArray(json?.meanings)) setMeanings(json.meanings);
-      } catch {
-        /* non-fatal */
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
+export default async function ColorMeaningsHubPage() {
+  const meanings = await getColorMeanings();
   return (
-    <ColorToolShell
-      currentHref="/colors/color-meanings"
-      title={"The story behind"}
-      accent="every shade."
-      blurb="What colors communicate — psychology, cultural symbolism, and palettes that put each color to work."
+    <StudioShell
+      title="Every color has a"
+      accent="story."
+      blurb="Explore the associations behind a shade, then put it to work."
+      ctaBlurb="Turn color insights into on-brand palettes, shades, and more with Brandbite."
     >
-      <div>
-        {loading ? (
-          <p className="py-16 text-center text-sm text-[var(--bb-text-tertiary)]">Loading…</p>
-        ) : meanings.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-[var(--bb-border)] bg-[var(--bb-bg-warm)] px-6 py-16 text-center text-sm text-[var(--bb-text-tertiary)]">
-            No colors published yet — check back soon.
-          </p>
-        ) : (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {meanings.map((m) => (
-              <Link
-                key={m.id}
-                href={`/colors/color-meanings/${m.slug}`}
-                className="group overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-card)] transition-all hover:border-[var(--bb-primary)] hover:shadow-md"
-              >
-                <div
-                  className="flex h-24 items-end p-3"
-                  style={{ backgroundColor: m.hex, color: readableTextOn(m.hex) }}
-                >
-                  <span className="font-mono text-xs opacity-80">{formatHex(m.hex)}</span>
-                </div>
-                <div className="p-4">
-                  <h2 className="text-base font-semibold text-[var(--bb-secondary)] group-hover:text-[var(--bb-primary)]">
-                    {m.name}
-                  </h2>
-                  {m.summary ? (
-                    <p className="mt-1 line-clamp-2 text-sm text-[var(--bb-text-tertiary)]">
-                      {m.summary}
-                    </p>
-                  ) : null}
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
-    </ColorToolShell>
+      <ColorMeaningsView meanings={meanings} />
+    </StudioShell>
   );
 }

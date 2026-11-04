@@ -33,15 +33,3 @@ export interface PaletteColor {
 }
 
 export type Palette = PaletteColor[];
-
-/** Which tool produced a saved palette (stored on SavedPalette.source). */
-export type PaletteSource = "WHEEL" | "GENERATOR" | "EXTRACTOR";
-
-/** Shape returned by the /api/colors/palettes endpoints. */
-export interface SavedPaletteDTO {
-  id: string;
-  name: string;
-  colors: string[];
-  source: PaletteSource | null;
-  createdAt: string;
-}

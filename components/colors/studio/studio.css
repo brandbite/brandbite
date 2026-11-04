@@ -1,0 +1,29 @@
+/* Color Studio design tokens, scoped so the rest of the marketing site is unaffected. */
+.color-studio {
+  --cs-background: #f7f5f2;
+  --cs-surface: #ffffff;
+  --cs-text: #242528;
+  --cs-muted: #6c6d75;
+  --cs-border: #e3e0dc;
+  --cs-brand: #ff6426;
+  --cs-brand-hover: #e8541a;
+  /* Small orange text only. #ff6426 is too light to read at link size. */
+  --cs-brand-strong: #c2410c;
+  --cs-soft: #ece4ff;
+  --cs-soft-text: #4c1d95;
+  --cs-danger: #b42318;
+
+  background-color: var(--cs-background);
+  color: var(--cs-text);
+  font-family: var(--font-inter);
+}
+
+/* The site's global heading rule uses the brand display font. */
+.color-studio :is(h1, h2, h3, h4) {
+  font-family: var(--font-inter);
+}
+
+.color-studio :focus-visible {
+  outline: 2px solid var(--cs-text);
+  outline-offset: 2px;
+}
