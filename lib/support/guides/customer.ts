@@ -1138,7 +1138,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             type: "list",
             items: [
               "Bookings need at least 24 hours' notice and can be up to 30 days ahead, during the team's working days and hours shown under the time picker. Times that are already booked may be greyed out.",
-              "We confirm a time by email with a video link. Sometimes a slot you picked is confirmed straight away.",
+              "When we schedule your call you get an email with the time (in your timezone) and the video link. Sometimes a slot you picked is confirmed straight away.",
               "Your requests are listed under **Your consultations** with their status: Awaiting scheduling, Scheduled, Completed or Canceled. Scheduled calls have a **Join call** link.",
             ],
           },
@@ -1149,7 +1149,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "There's no cancel button in the dashboard. Reply to the scheduling email or use the feedback button. When we cancel a booking, its tokens are refunded in full.",
+            text: "There's no cancel button in the dashboard. Write to us at hello@brandbite.studio or use the feedback button. When we cancel a booking, its tokens are refunded in full and you get an email confirming it.",
           },
         ],
       },

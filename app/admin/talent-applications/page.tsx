@@ -997,8 +997,8 @@ export default function TalentApplicationsPage() {
     //     kept failing) or DECLINE (revoking the offer)
     //   - CANDIDATE_PROPOSED_TIME: ACCEPT_PROPOSED, RE-OFFER (counter-
     //     propose 3 fresh slots) or DECLINE
-    //   - ACCEPTED (PR9): MARK_INTERVIEW_HELD, MARK_MISSED or
-    //     REJECT_POST_INTERVIEW (no-show path)
+    //   - ACCEPTED (PR9): MARK_INTERVIEW_HELD or MARK_MISSED (a no-show
+    //     goes to MISSED, then re-offer or DECLINE from there)
     //   - INTERVIEW_HELD (PR9): HIRE or REJECT_POST_INTERVIEW
     //   - HIRED (PR10): ONBOARD
     //   - ONBOARDED / DECLINED / REJECTED_AFTER_INTERVIEW: terminal info
@@ -1018,7 +1018,11 @@ export default function TalentApplicationsPage() {
       item.status === "MISSED";
     const canMarkInterviewHeld = item.status === "ACCEPTED";
     const canHire = item.status === "INTERVIEW_HELD";
-    const canRejectPostInterview = item.status === "ACCEPTED" || item.status === "INTERVIEW_HELD";
+    // Post-interview decline only after the interview happened — the server
+    // only allows it from INTERVIEW_HELD (and its email thanks the candidate
+    // for their time). For a no-show, mark it missed first: from MISSED the
+    // admin can re-offer slots or decline normally.
+    const canRejectPostInterview = item.status === "INTERVIEW_HELD";
     const canOnboard = item.status === "HIRED";
 
     const appliedCategoryIds = formatList(item.categoryIds);
@@ -1186,7 +1190,7 @@ export default function TalentApplicationsPage() {
             disabled={submitting}
             aria-busy={submitting}
           >
-            {busyLabel("No-show — reschedule", "Saving…")}
+            {busyLabel("Mark as no-show", "Saving…")}
           </Button>,
         );
       }
@@ -1218,7 +1222,7 @@ export default function TalentApplicationsPage() {
             }}
             disabled={submitting}
           >
-            {item.status === "ACCEPTED" ? "No-show — decline" : "Decline after interview"}
+            Decline after interview
           </Button>,
         );
       }
@@ -1423,11 +1427,7 @@ export default function TalentApplicationsPage() {
           <div className="space-y-4">
             <div>
               <h3 className="text-lg leading-[26px] font-semibold">
-                {mode === "decline"
-                  ? "Decline politely"
-                  : item.status === "ACCEPTED"
-                    ? "No-show — decline"
-                    : "Decline after interview"}
+                {mode === "decline" ? "Decline politely" : "Decline after interview"}
               </h3>
               <p className="mt-1 text-sm text-[var(--av2-text-2)]">
                 {mode === "decline"

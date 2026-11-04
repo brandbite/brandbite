@@ -12,8 +12,8 @@ export const ADMIN_SETTING_KEYS = [
   "TALENT_APPLICATIONS_OPEN",
   "ADMIN_EVENT_EMAILS_ENABLED",
   "TAGS_ENABLED",
-  // AI ticket mode: "off" | "test" | "on". Default off — there's no working
-  // AI generation API yet. "test" exposes the mode to site admins only.
+  // AI ticket mode: "off" | "on". Default off — there's no working AI
+  // generation API yet.
   "AI_TICKETS_MODE",
 ] as const;
 
@@ -63,11 +63,11 @@ export const updateAdminSettingSchema = z
         ctx.addIssue({ code: "custom", path: ["value"], message: "Value must be on or off." });
       }
     } else if (key === "AI_TICKETS_MODE") {
-      if (!["off", "test", "on"].includes(value)) {
+      if (!["off", "on"].includes(value)) {
         ctx.addIssue({
           code: "custom",
           path: ["value"],
-          message: "AI ticket mode must be off, test or on.",
+          message: "AI ticket mode must be off or on.",
         });
       }
     }

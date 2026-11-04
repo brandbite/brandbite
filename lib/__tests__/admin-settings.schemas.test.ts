@@ -32,8 +32,9 @@ describe("updateAdminSettingSchema", () => {
     expect(ok("TALENT_APPLICATIONS_OPEN", "yes")).toBe(false);
   });
 
-  it("only accepts off/test/on for AI ticket mode", () => {
-    expect(ok("AI_TICKETS_MODE", "test")).toBe(true);
+  it("only accepts off/on for AI ticket mode", () => {
+    expect(ok("AI_TICKETS_MODE", "on")).toBe(true);
+    expect(ok("AI_TICKETS_MODE", "test")).toBe(false);
     expect(ok("AI_TICKETS_MODE", "maybe")).toBe(false);
   });
 

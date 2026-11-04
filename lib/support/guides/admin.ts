@@ -998,7 +998,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
             items: [
               "**Accept & offer 3 slots**: enter three future 30-minute interview times (within 60 days) and an optional note. The candidate gets a booking link valid for 7 days.",
               "When they propose a time, **Confirm this time & book interview** creates a Google Calendar event with a Meet link. Google Calendar must be connected.",
-              "After the call, choose **Yes, interview held** or **No-show — reschedule**.",
+              "After the call, choose **Yes, interview held**. If the candidate didn't show, choose **Mark as no-show**; you can then re-offer slots or decline.",
               "**Hire & capture terms**: working hours, approved categories and task cap. No account is created yet.",
               "**Onboard now** creates the creative account with those skills and emails a sign-in link.",
             ],
@@ -1072,8 +1072,8 @@ export const ADMIN_GUIDES: SupportGuide[] = [
             ],
           },
           {
-            type: "warning",
-            text: "In the text editor's **Add link**, type full addresses starting with https://. Short internal links like /pricing don't work there yet.",
+            type: "tip",
+            text: "In the text editor's **Add link** you can use full addresses (https://…), site links like /pricing, mailto: addresses or #anchors.",
           },
         ],
       },

@@ -13,6 +13,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import { useEffect, useCallback } from "react";
+import { normalizeLinkHref } from "@/lib/rich-text-links";
 
 /* -------------------------------------------------------------------------- */
 /*  Props                                                                      */
@@ -92,8 +93,10 @@ function Toolbar({
       return;
     }
 
-    // Add https:// if no protocol
-    const href = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+    // Keeps internal paths (/pricing), anchors, mailto: and tel:; adds
+    // https:// to bare domains; refuses unsafe schemes (javascript: etc.).
+    const href = normalizeLinkHref(url);
+    if (!href) return;
 
     editor.chain().focus().extendMarkRange("link").setLink({ href }).run();
   };

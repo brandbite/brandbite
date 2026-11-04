@@ -21,7 +21,6 @@ import { createTicketSchema } from "@/lib/schemas/ticket.schemas";
 import { buildTicketCode } from "@/lib/ticket-code";
 import { createCustomerTicket } from "@/lib/tickets/create-ticket";
 import { getAiTicketsMode, isAiTicketsAllowed, isTagsEnabled } from "@/lib/feature-flags";
-import { isSiteAdminRole } from "@/lib/roles";
 
 // -----------------------------------------------------------------------------
 // GET: list tickets for the current customer's active company
@@ -252,7 +251,7 @@ export async function POST(req: NextRequest) {
     // which is restricted to site admins).
     if (parsed.data.creativeMode === "AI") {
       const aiMode = await getAiTicketsMode();
-      if (!isAiTicketsAllowed(aiMode, isSiteAdminRole(user.role))) {
+      if (!isAiTicketsAllowed(aiMode)) {
         return NextResponse.json(
           { error: "AI-generated tickets aren't available yet." },
           { status: 403 },
