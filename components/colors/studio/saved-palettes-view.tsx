@@ -23,6 +23,7 @@ import { CheckIcon, CloseIcon, CopyIcon, EditIcon } from "./icons";
 import { usePaletteOpener } from "./open-palette";
 import { RoleFields } from "./palette-parts";
 import { PalettePreview } from "./palette-preview";
+import { SharePaletteButton } from "./share-palette";
 import { StudioButton, studioButtonClasses } from "./studio-button";
 import { useSavedPalettes } from "./use-saved-palettes";
 import { useStudioCopy } from "./use-studio-copy";
@@ -325,6 +326,7 @@ function PaletteDetail({
           >
             Copy CSS
           </StudioButton>
+          <SharePaletteButton palette={palette} />
         </div>
       </section>
 

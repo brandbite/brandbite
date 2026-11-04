@@ -45,12 +45,53 @@ describe("image analysis", () => {
     expect(palette.every((color) => color.hex === "#ff0000")).toBe(true);
   });
 
-  it("locates a color at its closest visible pixel", () => {
-    const data = imageData([CLEAR, RED, BLUE, CLEAR], 2, 2);
+  it("finds the exact colors of a flat image", () => {
+    const stripes = [
+      [23, 59, 89, 255],
+      [65, 194, 208, 255],
+      [201, 241, 237, 255],
+      [255, 100, 38, 255],
+      [246, 229, 213, 255],
+    ];
+    const pixels = stripes.flatMap((color) => Array.from({ length: 40 }, () => color));
+    const palette = extractFromImageData(imageData(pixels, 20, 10), 5);
+    expect(palette.map((c) => c.hex).sort()).toEqual(
+      ["#173b59", "#41c2d0", "#c9f1ed", "#ff6426", "#f6e5d5"].sort(),
+    );
+  });
+
+  it("keeps small but distinct colors rather than splitting a large one", () => {
+    const pixels = [
+      ...Array.from({ length: 900 }, () => [240, 240, 240, 255]),
+      ...Array.from({ length: 90 }, () => [10, 30, 90, 255]),
+      ...Array.from({ length: 10 }, () => [255, 100, 38, 255]),
+    ];
+    const hexes = extractFromImageData(imageData(pixels, 100, 10), 3).map((c) => c.hex);
+    expect(hexes).toContain("#ff6426");
+    expect(hexes).toContain("#0a1e5a");
+  });
+
+  it("returns fewer colors when the image has fewer", () => {
+    expect(extractFromImageData(imageData([RED, RED, RED, RED], 2, 2), 5)).toHaveLength(1);
+  });
+
+  it("marks the middle of a color's area, inside the image", () => {
+    const row = [RED, RED, RED, BLUE, BLUE, BLUE];
+    const data = imageData([...row, ...row, ...row], 6, 3);
+    const palette = extractFromImageData(data, 2);
+    const located = locateColors(data, palette);
+    const redIndex = palette.findIndex((c) => c.hex === "#ff0000");
+    expect(located[redIndex].x).toBeCloseTo(0.25, 5);
+    expect(located[redIndex].y).toBeCloseTo(0.5, 5);
+  });
+
+  it("keeps markers away from the edges", () => {
+    const data = imageData([BLUE, ...Array.from({ length: 99 }, () => RED)], 10, 10);
     const palette = extractFromImageData(data, 2);
     const located = locateColors(data, palette);
     const blueIndex = palette.findIndex((c) => c.hex === "#0000ff");
-    expect(located[blueIndex]).toEqual({ x: 0.25, y: 0.75 });
+    expect(located[blueIndex].x).toBeGreaterThanOrEqual(0.04);
+    expect(located[blueIndex].y).toBeGreaterThanOrEqual(0.04);
   });
 });
 

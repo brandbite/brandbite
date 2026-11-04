@@ -134,7 +134,7 @@ export function TailwindShadesView() {
         </div>
 
         <p className="mt-6 rounded-[10px] bg-[var(--cs-soft)] px-4 py-2 text-sm leading-5">
-          Click a color to copy its HEX. Use the circle below a shade to inspect it, then set it as
+          Click a color to copy its HEX. Click the value below a shade to inspect it, then set it as
           your base if you like.
         </p>
 

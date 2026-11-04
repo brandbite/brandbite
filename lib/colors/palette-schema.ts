@@ -27,6 +27,24 @@ const colorSchema = z.object({
   locked: z.boolean().default(false),
 });
 
+/** What a share link may contain: nothing beyond the name, colors and roles. */
+export const sharedPaletteSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(1, "Name is required.")
+      .max(80, "Name must be 80 characters or fewer."),
+    colors: z
+      .array(colorSchema)
+      .min(1, "A palette must have between 1 and 12 colors.")
+      .max(12, "A palette must have between 1 and 12 colors."),
+    roles: z.partialRecord(z.enum(COLOR_ROLES), z.string()).default({}),
+  })
+  .refine((palette) => new Set(palette.colors.map((c) => c.id)).size === palette.colors.length, {
+    message: "Color ids must be unique.",
+  });
+
 /** Roles pointing at colors the palette doesn't have are dropped. */
 export const studioPaletteSchema = z
   .object({

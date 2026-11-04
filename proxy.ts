@@ -95,6 +95,8 @@ const PUBLIC_PATHS = [
   // mutations live behind /api/admin/*).
   "/api/palette-ideas",
   "/api/color-meanings",
+  // Anonymous share-link creation; the route enforces rate and size limits.
+  "/api/colors/shares",
   // pdf.js web worker for the in-app PDF viewer/pin overlay. It's a vendored,
   // non-sensitive static library file loaded via `new Worker(...)`. The matcher
   // below only excludes image extensions, so without this entry the proxy 307s
