@@ -1,12 +1,18 @@
 // -----------------------------------------------------------------------------
 // @file: app/colors/color-meanings/page.tsx
-// @purpose: Color families with a detail panel. Content is CMS-managed (ColorMeaning).
+// @purpose: Color families with a detail panel, in the first HTML. CMS entries come
+//           first, followed by built-in families.
 // -----------------------------------------------------------------------------
 
 import { ColorMeaningsView } from "@/components/colors/studio/color-meanings-view";
 import { StudioShell } from "@/components/colors/studio/studio-shell";
+import { getColorMeanings } from "@/lib/colors/content";
 
-export default function ColorMeaningsHubPage() {
+// Next.js needs a literal here: CMS changes show up within 5 minutes.
+export const revalidate = 300;
+
+export default async function ColorMeaningsHubPage() {
+  const meanings = await getColorMeanings();
   return (
     <StudioShell
       title="Every color has a"
@@ -14,7 +20,7 @@ export default function ColorMeaningsHubPage() {
       blurb="Explore the associations behind a shade, then put it to work."
       ctaBlurb="Turn color insights into on-brand palettes, shades, and more with Brandbite."
     >
-      <ColorMeaningsView />
+      <ColorMeaningsView meanings={meanings} />
     </StudioShell>
   );
 }

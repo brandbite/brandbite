@@ -18,8 +18,12 @@ import {
   readableTextOn,
   suggestPairings,
 } from "@/lib/colors";
-import { COLOR_FAMILIES } from "@/lib/colors/color-families";
 import { MEANING_GUIDANCE } from "@/lib/colors/meaning-guidance";
+import {
+  isBuiltInMeaning,
+  type MeaningDetail,
+  type MeaningSummary,
+} from "@/lib/colors/meaning-types";
 
 import { HexField } from "./hex-field";
 import { CheckIcon, CopyIcon } from "./icons";
@@ -29,20 +33,6 @@ import { StudioButton } from "./studio-button";
 import { WorkspacePanel } from "./studio-shell";
 import { useSavedPalettes } from "./use-saved-palettes";
 import { useStudioCopy } from "./use-studio-copy";
-
-export type MeaningSummary = {
-  id: string;
-  name: string;
-  slug: string;
-  hex: string;
-  summary: string | null;
-  associations: string[];
-};
-
-export type MeaningDetail = MeaningSummary & {
-  meaning: string | null;
-  samplePalettes: string[][];
-};
 
 function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
@@ -193,46 +183,12 @@ export function MeaningPanel({
   );
 }
 
-const BUILT_IN_PREFIX = "family-";
-
-export function ColorMeaningsView() {
-  const [meanings, setMeanings] = useState<MeaningSummary[]>([]);
-  const [loading, setLoading] = useState(true);
+export function ColorMeaningsView({ meanings: families }: { meanings: MeaningSummary[] }) {
   const [lookupHex, setLookupHex] = useState("#7a9e7e");
   const [lookupActive, setLookupActive] = useState(false);
   const [query, setQuery] = useState("");
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [details, setDetails] = useState<Record<string, MeaningDetail>>({});
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/color-meanings");
-        const json = await res.json().catch(() => null);
-        if (!cancelled && res.ok && Array.isArray(json?.meanings)) setMeanings(json.meanings);
-      } catch {
-        // The built-in families still show.
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // CMS entries first; built-in families fill the gaps.
-  const families = useMemo<MeaningSummary[]>(() => {
-    const cmsSlugs = new Set(meanings.map((m) => m.slug));
-    return [
-      ...meanings,
-      ...COLOR_FAMILIES.filter((f) => !cmsSlugs.has(f.slug)).map((f) => ({
-        ...f,
-        id: `${BUILT_IN_PREFIX}${f.slug}`,
-      })),
-    ];
-  }, [meanings]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -246,7 +202,7 @@ export function ColorMeaningsView() {
   }, [families, query]);
 
   const selected = visible.find((m) => m.slug === selectedSlug) ?? visible[0] ?? null;
-  const selectedIsCms = selected !== null && !selected.id.startsWith(BUILT_IN_PREFIX);
+  const selectedIsCms = selected !== null && !isBuiltInMeaning(selected);
   const selectedDetailSlug = selectedIsCms ? selected.slug : null;
 
   const lookup = useMemo(() => {
@@ -315,11 +271,7 @@ export function ColorMeaningsView() {
         </p>
       </div>
 
-      {loading ? (
-        <p aria-busy="true" className="py-16 text-center text-sm leading-5 text-[var(--cs-muted)]">
-          Loading colors…
-        </p>
-      ) : visible.length === 0 ? (
+      {visible.length === 0 ? (
         <div className="py-16 text-center">
           <p className="text-base leading-6 font-medium">No colors match your search.</p>
           <div className="mt-4">
@@ -393,7 +345,7 @@ export function ColorMeaningsView() {
             <MeaningPanel
               meaning={selected}
               detail={details[selected.slug] ?? null}
-              showReadMore={selectedIsCms}
+              showReadMore
               pairings={selectedIsCms ? undefined : suggestPairings(selected.hex)}
             />
           ) : null}

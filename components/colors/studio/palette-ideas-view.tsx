@@ -7,10 +7,11 @@
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useMemo, useState } from "react";
 
 import { useToast } from "@/components/ui/toast-provider";
-import { PALETTE_IDEA_CATALOG } from "@/lib/colors/palette-idea-catalog";
+import type { PaletteIdea } from "@/lib/colors/content";
 import {
   createStudioPalette,
   formatHex,
@@ -27,15 +28,6 @@ import { WorkspacePanel } from "./studio-shell";
 import { useSavedPalettes } from "./use-saved-palettes";
 import { useStudioCopy } from "./use-studio-copy";
 
-type PaletteIdea = {
-  id: string;
-  title: string;
-  slug: string;
-  summary: string | null;
-  colors: string[];
-  tags: string[];
-};
-
 const PAGE_SIZE = 24;
 type SortKey = "featured" | "name";
 
@@ -48,41 +40,15 @@ function toStudioPalette(idea: PaletteIdea): StudioPalette {
   });
 }
 
-export function PaletteIdeasView() {
+export function PaletteIdeasView({ ideas: allIdeas }: { ideas: PaletteIdea[] }) {
   const store = useSavedPalettes();
   const { copy, isCopied } = useStudioCopy();
   const { showToast } = useToast();
 
-  const [ideas, setIdeas] = useState<PaletteIdea[]>([]);
-  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [activeTag, setActiveTag] = useState("All");
   const [sort, setSort] = useState<SortKey>("featured");
   const [saveError, setSaveError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/palette-ideas");
-        const json = await res.json().catch(() => null);
-        if (!cancelled && res.ok && Array.isArray(json?.ideas)) setIdeas(json.ideas);
-      } catch {
-        // The built-in catalog still shows.
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // CMS entries first; the built-in catalog follows without repeating a slug.
-  const allIdeas = useMemo(() => {
-    const cmsSlugs = new Set(ideas.map((idea) => idea.slug));
-    return [...ideas, ...PALETTE_IDEA_CATALOG.filter((idea) => !cmsSlugs.has(idea.slug))];
-  }, [ideas]);
 
   const tags = useMemo(
     () => ["All", ...Array.from(new Set(allIdeas.flatMap((idea) => idea.tags))).sort()],
@@ -170,11 +136,7 @@ export function PaletteIdeasView() {
         </p>
       ) : null}
 
-      {loading ? (
-        <p aria-busy="true" className="py-16 text-center text-sm leading-5 text-[var(--cs-muted)]">
-          Loading palettes…
-        </p>
-      ) : visible.length === 0 ? (
+      {visible.length === 0 ? (
         <div className="py-16 text-center">
           <p className="text-base leading-6 font-medium">No palettes match your search.</p>
           <div className="mt-4">
@@ -225,7 +187,11 @@ export function PaletteIdeasView() {
                   })}
                 </div>
                 <div className="flex flex-1 flex-col p-4">
-                  <h3 className="text-lg leading-[26px] font-semibold">{idea.title}</h3>
+                  <h3 className="text-lg leading-[26px] font-semibold">
+                    <Link href={`/colors/palettes/${idea.slug}`} className="hover:underline">
+                      {idea.title}
+                    </Link>
+                  </h3>
                   {idea.summary ? (
                     <p className="mt-1 text-sm leading-5 text-[var(--cs-muted)]">{idea.summary}</p>
                   ) : null}

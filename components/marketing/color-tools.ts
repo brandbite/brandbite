@@ -19,6 +19,7 @@ export const STUDIO_NAV: StudioNavItem[] = [
 export const STUDIO_MORE_TOOLS: StudioNavItem[] = [
   { href: "/colors/contrast-checker", label: "Contrast checker" },
   { href: "/colors/image-to-palette", label: "Image to palette" },
+  { href: "/colors/hex", label: "Color library" },
 ];
 
 /** The "Saved" shortcut, shown on every Color Studio page. */

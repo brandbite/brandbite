@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { COLOR_FAMILIES } from "@/lib/colors/color-families";
 import { MEANING_GUIDANCE } from "@/lib/colors/meaning-guidance";
 
 import { ColorMeaningsView } from "../color-meanings-view";
@@ -32,6 +33,14 @@ const SUMMARIES = [
     summary: "Calm and dependable.",
     associations: ["trust", "calm", "professional"],
   },
+];
+
+const ALL_MEANINGS = [
+  ...SUMMARIES,
+  ...COLOR_FAMILIES.filter((f) => !["orange", "blue"].includes(f.slug)).map((f) => ({
+    ...f,
+    id: `family-${f.slug}`,
+  })),
 ];
 
 function mockApi() {
@@ -66,7 +75,7 @@ beforeEach(() => {
 describe("ColorMeaningsView", () => {
   it("shows the first color's details and changes with selection", async () => {
     mockApi();
-    render(<ColorMeaningsView />);
+    render(<ColorMeaningsView meanings={ALL_MEANINGS} />);
     expect(
       await screen.findByRole("complementary", { name: "Orange details" }),
     ).toBeInTheDocument();
@@ -78,7 +87,7 @@ describe("ColorMeaningsView", () => {
 
   it("searches names and associations, with a separate empty result", async () => {
     mockApi();
-    render(<ColorMeaningsView />);
+    render(<ColorMeaningsView meanings={ALL_MEANINGS} />);
     await screen.findByRole("button", { name: /^Orange/ });
     const search = screen.getByLabelText("Find a color or feeling");
 
@@ -92,7 +101,7 @@ describe("ColorMeaningsView", () => {
 
   it("carries the color and its pairings into the generator", async () => {
     mockApi();
-    render(<ColorMeaningsView />);
+    render(<ColorMeaningsView meanings={ALL_MEANINGS} />);
     await screen.findByRole("button", { name: "Copy #1F2A44" });
     fireEvent.click(screen.getByRole("button", { name: "Build an orange palette" }));
     expect(push).toHaveBeenCalledWith("/colors/color-palette-generator");
@@ -103,24 +112,19 @@ describe("ColorMeaningsView", () => {
     ]);
   });
 
-  it("still shows built-in families when the CMS can't be reached", async () => {
-    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
-    render(<ColorMeaningsView />);
-    expect(await screen.findByRole("button", { name: /^Teal/ })).toBeInTheDocument();
-    expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.queryByRole("link", { name: /Read more/ })).toBeNull();
-  });
-
-  it("adds built-in families after CMS colors, without repeats", async () => {
+  it("links built-in families to their own page", () => {
     mockApi();
-    render(<ColorMeaningsView />);
-    await screen.findByRole("button", { name: /^Pink/ });
-    expect(screen.getAllByRole("button", { name: /^Orange/ })).toHaveLength(1);
+    render(<ColorMeaningsView meanings={ALL_MEANINGS} />);
+    fireEvent.click(screen.getByRole("button", { name: /^Teal/ }));
+    expect(screen.getByRole("link", { name: "Read more about teal" })).toHaveAttribute(
+      "href",
+      "/colors/color-meanings/teal",
+    );
   });
 
   it("names any HEX and describes it from its closest family", async () => {
     mockApi();
-    render(<ColorMeaningsView />);
+    render(<ColorMeaningsView meanings={ALL_MEANINGS} />);
     await screen.findByRole("button", { name: /^Orange/ });
     fireEvent.change(screen.getByLabelText("Look up any color"), {
       target: { value: "#0A2A43" },
@@ -138,7 +142,7 @@ describe("ColorMeaningsView", () => {
 
   it("returns to a family when a card is chosen after a lookup", async () => {
     mockApi();
-    render(<ColorMeaningsView />);
+    render(<ColorMeaningsView meanings={ALL_MEANINGS} />);
     await screen.findByRole("button", { name: /^Orange/ });
     fireEvent.click(screen.getByRole("button", { name: "Find its meaning" }));
     expect(screen.getByRole("complementary", { name: "Muted Green details" })).toBeInTheDocument();

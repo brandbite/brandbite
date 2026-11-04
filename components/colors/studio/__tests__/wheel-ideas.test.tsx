@@ -36,12 +36,6 @@ const IDEAS = [
   },
 ];
 
-function mockIdeas(ideas: unknown = IDEAS, ok = true) {
-  vi.spyOn(globalThis, "fetch").mockResolvedValue(
-    new Response(JSON.stringify({ ideas }), { status: ok ? 200 : 500 }),
-  );
-}
-
 beforeEach(() => {
   window.localStorage.clear();
   window.sessionStorage.clear();
@@ -90,42 +84,38 @@ describe("ColorWheelView", () => {
 });
 
 describe("PaletteIdeasView", () => {
-  const CATALOG_SIZE = PALETTE_IDEA_CATALOG.length;
+  const CATALOG = PALETTE_IDEA_CATALOG.slice(0, 40);
+  const ALL = [...IDEAS, ...CATALOG];
   const heading = (count: number) => `${count} palettes to make your own`;
 
-  it("shows CMS palettes first, then the built-in catalog, without repeats", async () => {
-    mockIdeas([...IDEAS, { ...IDEAS[0], id: "3", slug: PALETTE_IDEA_CATALOG[0].slug }]);
-    render(<PaletteIdeasView />);
-    await screen.findByText(heading(3 + CATALOG_SIZE - 1));
-    const titles = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
-    expect(titles[0]).toBe("Vintage Sunset");
+  it("renders its content without loading anything", () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    render(<PaletteIdeasView ideas={ALL} />);
+    expect(screen.getByText(heading(ALL.length))).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("palette-ideas"))).toBe(false);
   });
 
-  it("still shows the catalog when the CMS can't be reached", async () => {
-    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
-    render(<PaletteIdeasView />);
-    expect(await screen.findByText(heading(CATALOG_SIZE))).toBeInTheDocument();
-    expect(screen.queryByRole("alert")).toBeNull();
+  it("links each palette to its own page", () => {
+    render(<PaletteIdeasView ideas={IDEAS} />);
+    expect(screen.getByRole("link", { name: "Vintage Sunset" })).toHaveAttribute(
+      "href",
+      "/colors/palettes/vintage-sunset",
+    );
   });
 
-  it("loads more in pages, and starts over when the filter changes", async () => {
-    mockIdeas([]);
-    render(<PaletteIdeasView />);
-    const more = await screen.findByRole("button", { name: "Load more palettes" });
+  it("loads more in pages, and starts over when the filter changes", () => {
+    render(<PaletteIdeasView ideas={ALL} />);
     expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(24);
 
-    fireEvent.click(more);
+    fireEvent.click(screen.getByRole("button", { name: "Load more palettes" }));
     expect(screen.getAllByRole("heading", { level: 3 }).length).toBeGreaterThan(24);
 
     fireEvent.change(screen.getByLabelText("Sort by"), { target: { value: "name" } });
     expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(24);
   });
 
-  it("combines search and tag, and clears both", async () => {
-    mockIdeas();
-    render(<PaletteIdeasView />);
-    await screen.findByText(heading(2 + CATALOG_SIZE));
-
+  it("combines search and tag, and clears both", () => {
+    render(<PaletteIdeasView ideas={ALL} />);
     fireEvent.change(screen.getByLabelText("Search palettes"), {
       target: { value: "faded tones" },
     });
@@ -135,13 +125,12 @@ describe("PaletteIdeasView", () => {
     expect(screen.getByText("No palettes match your search.")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
-    expect(screen.getByText(heading(2 + CATALOG_SIZE))).toBeInTheDocument();
+    expect(screen.getByText(heading(ALL.length))).toBeInTheDocument();
   });
 
   it("separates copying one color from copying the palette", async () => {
-    mockIdeas();
-    render(<PaletteIdeasView />);
-    fireEvent.click(await screen.findByRole("button", { name: "Copy #E8C4A0" }));
+    render(<PaletteIdeasView ideas={IDEAS} />);
+    fireEvent.click(screen.getByRole("button", { name: "Copy #E8C4A0" }));
     await vi.waitFor(() => expect(writeText).toHaveBeenLastCalledWith("#E8C4A0"));
 
     fireEvent.click(screen.getAllByRole("button", { name: "Copy palette" })[0]);
@@ -149,9 +138,8 @@ describe("PaletteIdeasView", () => {
   });
 
   it("saves to the shared collection", async () => {
-    mockIdeas();
-    render(<PaletteIdeasView />);
-    const save = await screen.findByRole("button", { name: "Save Vintage Sunset" });
+    render(<PaletteIdeasView ideas={IDEAS} />);
+    const save = screen.getByRole("button", { name: "Save Vintage Sunset" });
     await vi.waitFor(() => expect(save).toBeEnabled());
     await act(async () => {
       fireEvent.click(save);
@@ -164,11 +152,9 @@ describe("PaletteIdeasView", () => {
     expect(saved.tags).toEqual(["Vintage", "Warm"]);
   });
 
-  it("opens in the generator with colors in order", async () => {
-    mockIdeas();
-    render(<PaletteIdeasView />);
-    const [open] = await screen.findAllByRole("button", { name: "Open in generator" });
-    fireEvent.click(open);
+  it("opens in the generator with colors in order", () => {
+    render(<PaletteIdeasView ideas={IDEAS} />);
+    fireEvent.click(screen.getAllByRole("button", { name: "Open in generator" })[0]);
     expect(push).toHaveBeenCalledWith("/colors/color-palette-generator");
     const stored = JSON.parse(
       window.sessionStorage.getItem("brandbite.colorStudio.workspace.v1") as string,
