@@ -16,6 +16,7 @@ import type { StudioPalette } from "@/lib/colors";
 import {
   accountPaletteStore,
   localPaletteStore,
+  moveLocalPalettesToAccount,
   PaletteStoreError,
   type PaletteStore,
   type PaletteStoreErrorKind,
@@ -36,7 +37,7 @@ const MESSAGES: Record<PaletteStoreErrorKind, string> = {
   invalid: "That palette isn't valid.",
 };
 
-function messageFor(err: unknown): string {
+export function messageFor(err: unknown): string {
   if (err instanceof PaletteStoreError) {
     return err.kind === "limit" && err.message !== err.kind ? err.message : MESSAGES[err.kind];
   }
@@ -148,13 +149,9 @@ export function useSavedPalettes() {
     [mode, setPalettes],
   );
 
-  /** Copies browser palettes to the account, clearing them only after that succeeds. */
   const moveLocalToAccount = useCallback(async (): Promise<SaveResult<number>> => {
     try {
-      const local = await localPaletteStore.list();
-      if (local.length === 0) return { ok: true, value: 0 };
-      const created = await accountPaletteStore.createMany(local);
-      localPaletteStore.clear();
+      const created = await moveLocalPalettesToAccount();
       setLocalCount(0);
       setPalettes((prev) => [...created, ...prev]);
       return { ok: true, value: created.length };

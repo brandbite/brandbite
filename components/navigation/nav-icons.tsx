@@ -175,6 +175,17 @@ export function IconAiTools(p: Props) {
   );
 }
 
+export function IconColorStudio(p: Props) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M12 3a9 9 0 1 0 0 18c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.2 0-1.1.9-2 2-2h2.3a3.7 3.7 0 0 0 3.7-3.7C21 6.4 17 3 12 3z" />
+      <circle cx="7.5" cy="11.5" r="1" />
+      <circle cx="10.5" cy="7.5" r="1" />
+      <circle cx="15.5" cy="7.5" r="1" />
+    </svg>
+  );
+}
+
 export function IconConsultation(p: Props) {
   return (
     <svg {...base} {...p}>

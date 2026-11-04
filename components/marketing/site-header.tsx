@@ -25,6 +25,7 @@ import { useEffect, useState } from "react";
 
 import { DEFAULT_SITE_HEADER_DATA } from "@/lib/blocks/defaults";
 import { BLOCK_TYPES, parseBlockData, type SiteHeaderData } from "@/lib/blocks/types";
+import { dashboardHrefForRole } from "@/lib/dashboard-href";
 
 type SiteHeaderProps = {
   /** Highlight the active page in the nav (match by label). */
@@ -52,25 +53,6 @@ const GLASS_BAR =
   "sticky top-0 z-50 border-b border-black/[0.06] bg-white/70 backdrop-blur-xl backdrop-saturate-150 dark:border-white/[0.08] dark:bg-[color:var(--bb-bg-page)]/70";
 
 type GlobalBlocksApiPayload = { type?: string; data?: unknown };
-
-/** Map a SessionUser.role to the entry point of their dashboard. Mirrors
- *  the post-sign-in redirect logic in app/login. SITE_OWNER + SITE_ADMIN
- *  both land on /admin; CUSTOMER on the customer board; DESIGNER on the
- *  creative board. Falls back to "/" for unknown roles so the link is
- *  never broken. */
-function dashboardHrefForRole(role: string | undefined): string {
-  switch (role) {
-    case "SITE_OWNER":
-    case "SITE_ADMIN":
-      return "/admin";
-    case "CUSTOMER":
-      return "/customer/board";
-    case "DESIGNER":
-      return "/creative/board";
-    default:
-      return "/";
-  }
-}
 
 type SessionApiPayload = {
   user: { id: string; email: string; role: string; name: string | null } | null;

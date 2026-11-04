@@ -38,6 +38,10 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
               { term: "Overview", text: "a summary of your work, earnings and deadlines." },
               { term: "Board", text: "the jobs assigned to you, by status." },
               { term: "Portfolio", text: "every job you've completed, collected automatically." },
+              {
+                term: "Color Studio",
+                text: "our public color tools. Use **Go to dashboard** at the top of the page to come back.",
+              },
               { term: "Balance", text: "the tokens you've earned and how they moved." },
               { term: "Withdrawals", text: "requesting payouts from your balance." },
               {

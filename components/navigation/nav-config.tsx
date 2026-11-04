@@ -15,6 +15,7 @@ import {
   IconBalance,
   IconBoard,
   IconCatalog,
+  IconColorStudio,
   IconCompanies,
   IconConsultation,
   IconConsultations,
@@ -184,6 +185,7 @@ export const CUSTOMER_NAV: NavConfig = {
         },
         { href: "/customer/moodboards", label: "Moodboards", icon: IconMoodboards },
         { href: "/customer/ai-tools", label: "AI Tools", icon: IconAiTools },
+        { href: "/colors", label: "Color Studio", icon: IconColorStudio },
       ],
     },
     {
@@ -227,6 +229,7 @@ export const CREATIVE_NAV: NavConfig = {
           highlightOnPaths: ["/creative/tickets"],
         },
         { href: "/creative/portfolio", label: "Portfolio", icon: IconPortfolio },
+        { href: "/colors", label: "Color Studio", icon: IconColorStudio },
         { href: "/creative/balance", label: "Balance", icon: IconBalance },
         { href: "/creative/withdrawals", label: "Withdrawals", icon: IconWithdrawals },
       ],

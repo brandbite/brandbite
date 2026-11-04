@@ -5,6 +5,7 @@
 
 import { AppSidebar } from "@/components/navigation/app-sidebar";
 import { SessionTimeoutWarning } from "@/components/auth/session-timeout-warning";
+import { GuestPalettesNotice } from "@/components/colors/studio/guest-palettes-notice";
 import { FeedbackWidget } from "@/components/feedback/feedback-widget";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,7 @@ export default function CreativeLayout({ children }: { children: React.ReactNode
       <AppSidebar role="creative" />
       <div className="md:pl-[var(--bb-sidebar-w,240px)] md:transition-[padding] md:duration-200">
         <main id="main-content" className="px-4 py-6 md:px-6 md:py-8 lg:px-8 lg:py-10">
+          <GuestPalettesNotice />
           {children}
         </main>
       </div>
