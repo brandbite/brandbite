@@ -256,6 +256,7 @@ export function KpiCard({
   value,
   hint,
   highlight = false,
+  action,
 }: {
   icon?: ReactNode;
   tone?: Tone;
@@ -263,6 +264,8 @@ export function KpiCard({
   value: ReactNode;
   hint?: ReactNode;
   highlight?: boolean;
+  /** Small link in the card's top-right corner. */
+  action?: ReactNode;
 }) {
   return (
     <section
@@ -275,10 +278,13 @@ export function KpiCard({
         <span aria-hidden className="absolute inset-x-0 top-0 h-[3px] bg-[var(--av2-accent)]" />
       )}
       {icon && <IconTile tone={tone ?? "neutral"}>{icon}</IconTile>}
-      <div className="min-w-0">
-        <Eyebrow>{label}</Eyebrow>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-3">
+          <Eyebrow>{label}</Eyebrow>
+          {action}
+        </div>
         <p className="mt-1 text-[32px] leading-10 font-bold tracking-tight tabular-nums">{value}</p>
-        {hint && <p className="mt-1 text-xs text-[var(--av2-text-2)]">{hint}</p>}
+        {hint && <div className="mt-1 text-xs text-[var(--av2-text-2)]">{hint}</div>}
       </div>
     </section>
   );

@@ -12,6 +12,7 @@ import { APIError } from "better-auth/api";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { magicLink, twoFactor } from "better-auth/plugins";
 import { nextCookies } from "better-auth/next-js";
+import { previewTrustedOrigins } from "@/lib/auth-trusted-origins";
 import { prisma } from "@/lib/prisma";
 import { sendNotificationEmail } from "@/lib/email";
 import { renderVerifyEmail } from "@/lib/email-templates/auth/verify-email";
@@ -49,6 +50,7 @@ const isDemoBuild =
 
 export const auth = betterAuth({
   baseURL: baseUrl,
+  trustedOrigins: previewTrustedOrigins(process.env),
   secret: process.env.BETTER_AUTH_SECRET,
 
   database: prismaAdapter(prisma, { provider: "postgresql" }),

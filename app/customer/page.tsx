@@ -1,50 +1,73 @@
 // -----------------------------------------------------------------------------
 // @file: app/customer/page.tsx
-// @purpose: Customer-facing workspace overview dashboard (tokens + tickets + plan)
-// @version: v2.0.0
-// @status: active
-// @lastUpdate: 2025-11-25
+// @purpose: Customer overview: tokens, requests that need attention, upcoming work,
+//           company and plan. Everything shown comes from the customer's own data.
 // -----------------------------------------------------------------------------
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { buildTicketCode } from "@/lib/ticket-code";
-import { InlineAlert } from "@/components/ui/inline-alert";
-import {
-  type CompanyRole,
-  normalizeCompanyRole,
-  canManagePlan,
-  canCreateTickets,
-} from "@/lib/permissions/companyRoles";
-import { isDueDateOverdue, isDueDateSoon, formatDueDateCountdown } from "@/lib/board";
-import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from "recharts";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
-type UserRole = "SITE_OWNER" | "SITE_ADMIN" | "DESIGNER" | "CUSTOMER";
+import {
+  IconAlertCircle,
+  IconArrowUpRight,
+  IconClock,
+  IconCoins,
+  IconDocument,
+  IconTicket,
+  IconUsers,
+} from "@/components/admin/v2/icons";
+import {
+  Badge,
+  ButtonLink,
+  Callout,
+  Card,
+  CardTitle,
+  DASH,
+  EmptyState,
+  fmt,
+  IconTile,
+  KpiCard,
+  PageHeader,
+  plural,
+  Skeleton,
+  StatusDot,
+  Table,
+  Td,
+  Th,
+  TextLink,
+  TICKET_STATUS,
+  type Tone,
+} from "@/components/admin/v2/ui";
+import { IconCatalog, IconMoodboards } from "@/components/navigation/nav-icons";
+import { isDueDateOverdue } from "@/lib/board";
+import {
+  canCreateTickets,
+  canManagePlan,
+  normalizeCompanyRole,
+  type CompanyRole,
+} from "@/lib/permissions/companyRoles";
+import { buildTicketCode } from "@/lib/ticket-code";
+
+/** Matches the admin dashboard's definition of a low-balance company. */
+const LOW_BALANCE_TOKENS = 5;
+const UPCOMING_LIMIT = 5;
+
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
-type LedgerDirection = "CREDIT" | "DEBIT";
 
 type CustomerSettingsResponse = {
   user: {
     id: string;
     email: string;
     name: string | null;
-    role: UserRole;
     companyRole: CompanyRole | null;
   };
   company: {
     id: string;
     name: string;
     slug: string;
-    tokenBalance: number;
-    createdAt: string;
-    updatedAt: string;
-    counts: {
-      members: number;
-      projects: number;
-      tickets: number;
-    };
+    counts: { members: number; projects: number; tickets: number };
   };
   plan: {
     id: string;
@@ -56,27 +79,8 @@ type CustomerSettingsResponse = {
 };
 
 type CustomerTokensResponse = {
-  company: {
-    id: string;
-    name: string;
-    slug: string;
-    tokenBalance: number;
-  };
-  stats: {
-    totalCredits: number;
-    totalDebits: number;
-  };
-  ledger: {
-    id: string;
-    createdAt: string;
-    direction: LedgerDirection;
-    amount: number;
-    reason: string | null;
-    notes: string | null;
-    ticketCode: string | null;
-    balanceBefore: number | null;
-    balanceAfter: number | null;
-  }[];
+  company: { tokenBalance: number };
+  stats: { totalCredits: number; totalDebits: number };
 };
 
 type CustomerBoardTicket = {
@@ -89,10 +93,7 @@ type CustomerBoardTicket = {
 };
 
 type CustomerBoardResponse = {
-  stats: {
-    byStatus: Record<TicketStatus, number>;
-    total: number;
-  };
+  stats: { byStatus: Record<TicketStatus, number>; total: number };
   tickets: CustomerBoardTicket[];
 };
 
@@ -107,7 +108,16 @@ type DashboardState =
   | { status: "error"; message: string }
   | { status: "ready"; data: DashboardData };
 
-function prettyCompanyRole(role: CompanyRole | null): string {
+const STATUS_ORDER: TicketStatus[] = ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"];
+
+const STATUS_FILL: Record<TicketStatus, string> = {
+  TODO: "var(--av2-fill-neutral)",
+  IN_PROGRESS: "var(--av2-fill-lavender)",
+  IN_REVIEW: "var(--av2-fill-orange)",
+  DONE: "var(--av2-fill-green)",
+};
+
+function prettyCompanyRole(role: CompanyRole | null): string | null {
   switch (role) {
     case "OWNER":
       return "Owner";
@@ -118,544 +128,441 @@ function prettyCompanyRole(role: CompanyRole | null): string {
     case "MEMBER":
       return "Member";
     default:
-      return "\u2014";
+      return null;
   }
 }
 
-function formatMoneyFromCents(cents: number | null | undefined): string {
-  if (cents == null) return "\u2014";
-  const amount = cents / 100;
-  return `$${amount.toFixed(2)}/mo`;
+function formatPrice(cents: number | null): string {
+  if (cents == null) return DASH;
+  const dollars = cents / 100;
+  const amount = Number.isInteger(dollars)
+    ? dollars.toLocaleString("en-US")
+    : dollars.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `$${amount}/mo`;
 }
 
-/* Status accent colors for chart bars */
-const STATUS_COLORS: Record<TicketStatus, string> = {
-  TODO: "#9CA3AF",
-  IN_PROGRESS: "#3B82F6",
-  IN_REVIEW: "#F15B2B",
-  DONE: "#22C55E",
-};
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
-const STATUS_LABELS: Record<TicketStatus, string> = {
-  TODO: "Backlog",
-  IN_PROGRESS: "In progress",
-  IN_REVIEW: "In review",
-  DONE: "Done",
-};
+function codeOf(ticket: CustomerBoardTicket): string {
+  return buildTicketCode({
+    projectCode: ticket.project?.code,
+    companyTicketNumber: ticket.companyTicketNumber,
+    ticketId: ticket.id,
+  });
+}
 
-const STATUS_ORDER: TicketStatus[] = ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"];
+async function readJson<T>(url: string, label: string): Promise<T> {
+  const res = await fetch(url, { cache: "no-store" });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(json?.error || `${label} request failed with status ${res.status}`);
+  return json as T;
+}
 
-export default function CustomerDashboardPage() {
+function StatTile({ icon, value, label }: { icon: ReactNode; value: ReactNode; label: string }) {
+  return (
+    <div className="flex min-w-0 items-center gap-3">
+      <IconTile tone="neutral" size={44}>
+        {icon}
+      </IconTile>
+      <div className="min-w-0">
+        <p className="text-xl leading-7 font-bold tabular-nums">{value}</p>
+        <p className="text-sm text-[var(--av2-text-2)]">{label}</p>
+      </div>
+    </div>
+  );
+}
+
+export default function CustomerOverviewPage() {
   const [state, setState] = useState<DashboardState>({ status: "loading" });
 
   useEffect(() => {
     let cancelled = false;
-
-    const load = async () => {
-      setState({ status: "loading" });
-
+    (async () => {
       try {
-        const [settingsRes, tokensRes, boardRes] = await Promise.all([
-          fetch("/api/customer/settings", { cache: "no-store" }),
-          fetch("/api/customer/tokens", { cache: "no-store" }),
-          fetch("/api/customer/board", { cache: "no-store" }),
+        const [settings, tokens, board] = await Promise.all([
+          readJson<CustomerSettingsResponse>("/api/customer/settings", "Settings"),
+          readJson<CustomerTokensResponse>("/api/customer/tokens", "Tokens"),
+          readJson<CustomerBoardResponse>("/api/customer/board", "Board"),
         ]);
-
-        const [settingsJson, tokensJson, boardJson] = await Promise.all([
-          settingsRes.json().catch(() => null),
-          tokensRes.json().catch(() => null),
-          boardRes.json().catch(() => null),
-        ]);
-
-        if (!settingsRes.ok) {
-          const message =
-            (settingsJson as any)?.error ||
-            `Settings request failed with status ${settingsRes.status}`;
-          throw new Error(message);
-        }
-
-        if (!tokensRes.ok) {
-          const message =
-            (tokensJson as any)?.error || `Tokens request failed with status ${tokensRes.status}`;
-          throw new Error(message);
-        }
-
-        if (!boardRes.ok) {
-          const message =
-            (boardJson as any)?.error || `Board request failed with status ${boardRes.status}`;
-          throw new Error(message);
-        }
-
-        if (cancelled) return;
-
-        setState({
-          status: "ready",
-          data: {
-            settings: settingsJson as CustomerSettingsResponse,
-            tokens: tokensJson as CustomerTokensResponse,
-            board: boardJson as CustomerBoardResponse,
-          },
-        });
-      } catch (err: any) {
-        console.error("[CustomerDashboard] load error", err);
+        if (!cancelled) setState({ status: "ready", data: { settings, tokens, board } });
+      } catch (err) {
+        console.error("[CustomerOverview] load error", err);
         if (!cancelled) {
           setState({
             status: "error",
-            message: err?.message || "Failed to load customer overview. Please try again.",
+            message: err instanceof Error ? err.message : "Failed to load your overview.",
           });
         }
       }
-    };
-
-    load();
-
+    })();
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const isLoading = state.status === "loading";
-  const isError = state.status === "error";
   const data = state.status === "ready" ? state.data : null;
+  const tickets = useMemo(() => data?.board.tickets ?? [], [data]);
 
-  const settings = data?.settings ?? null;
-  const tokens = data?.tokens ?? null;
-  const board = data?.board ?? null;
-
-  const company = settings?.company ?? null;
-  const user = settings?.user ?? null;
-  const plan = settings?.plan ?? null;
-  const companyRole = normalizeCompanyRole(user?.companyRole ?? null);
-
-  const canManageCompanyPlan = canManagePlan(companyRole);
-  const tokenBalance = tokens?.company.tokenBalance ?? null;
-  const tokenStats = tokens?.stats ?? null;
-  const boardStats = board?.stats ?? null;
-  const boardTickets = board?.tickets ?? [];
-
-  const upcomingTickets = useMemo(
+  const upcoming = useMemo(
     () =>
-      boardTickets
+      tickets
         .filter((t) => t.dueDate != null && t.status !== "DONE")
         .sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime())
-        .slice(0, 5),
-    [boardTickets],
+        .slice(0, UPCOMING_LIMIT),
+    [tickets],
   );
+  const toReview = useMemo(() => tickets.filter((t) => t.status === "IN_REVIEW"), [tickets]);
 
-  const openTickets =
-    boardStats?.total && boardStats.total > 0
-      ? (boardStats.total ?? 0) - (boardStats.byStatus.DONE ?? 0)
-      : 0;
-
-  const doneTickets = boardStats?.byStatus.DONE ?? 0;
-
-  /* Chart data for ticket pipeline */
-  const pipelineChartData = boardStats
-    ? STATUS_ORDER.map((s) => ({
-        name: STATUS_LABELS[s],
-        count: boardStats.byStatus[s] ?? 0,
-        fill: STATUS_COLORS[s],
-      }))
-    : [];
-
-  /* Token bar data */
-  const totalCredits = tokenStats?.totalCredits ?? 0;
-  const totalDebits = tokenStats?.totalDebits ?? 0;
-  const maxToken = Math.max(totalCredits, totalDebits, 1);
+  const company = data?.settings.company ?? null;
+  const plan = data?.settings.plan ?? null;
+  const companyRole = normalizeCompanyRole(data?.settings.user.companyRole ?? null);
+  const roleLabel = prettyCompanyRole(companyRole);
+  const stats = data?.board.stats ?? null;
+  const total = stats?.total ?? 0;
+  const done = stats?.byStatus.DONE ?? 0;
+  const open = total - done;
+  const completion = total > 0 ? Math.round((done / total) * 100) : 0;
+  const balance = data?.tokens.company.tokenBalance ?? null;
 
   return (
     <>
-      {/* Header */}
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--bb-text-muted)] uppercase">
-            Customer workspace
-          </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Overview</h1>
-          {company && (
-            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-              Company <span className="font-medium text-[var(--bb-secondary)]">{company.name}</span>{" "}
-              ({company.slug})
-            </p>
-          )}
-          {companyRole && (
-            <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-              You are browsing as{" "}
-              <span className="font-medium text-[var(--bb-secondary)]">
-                {prettyCompanyRole(companyRole)}
-              </span>
-              .
-            </p>
-          )}
-        </div>
-        <div className="flex items-center gap-3">
-          {isLoading && (
-            <div className="rounded-full bg-[var(--bb-bg-card)] px-3 py-1 text-[11px] text-[var(--bb-text-secondary)]">
-              Loading overview...
-            </div>
-          )}
-          {canCreateTickets(companyRole) && (
-            <Link
-              href="/customer/tickets/new"
-              className="rounded-full bg-[var(--bb-primary)] px-4 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-[var(--bb-primary-hover)]"
-            >
+      <PageHeader
+        title="Overview"
+        description="Your creative workspace at a glance."
+        meta={
+          company ? (
+            <>
+              Company <span className="font-medium text-[var(--av2-text)]">{company.name}</span>
+              {roleLabel ? (
+                <>
+                  {" · "}You are browsing as{" "}
+                  <span className="font-medium text-[var(--av2-text)]">{roleLabel}</span>
+                </>
+              ) : null}
+            </>
+          ) : null
+        }
+        actions={
+          canCreateTickets(companyRole) ? (
+            <ButtonLink href="/customer/tickets/new" variant="primary">
               + New request
-            </Link>
-          )}
-        </div>
-      </div>
+            </ButtonLink>
+          ) : null
+        }
+      />
 
-      {/* Error */}
-      {isError && (
-        <InlineAlert variant="error" title="Something went wrong" className="mb-4">
+      {state.status === "error" ? (
+        <Callout tone="error" title="We couldn't load your overview">
           {state.message}
-        </InlineAlert>
-      )}
-
-      {/* Content */}
-      {!isError && (
-        <div className="space-y-4">
-          {/* Row 1: Hero stat cards */}
-          <div className="grid gap-4 md:grid-cols-3">
-            {/* Token balance card */}
-            <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-[#F15B2B] to-[#f6a07a]" />
-              <div className="flex items-center justify-between">
-                <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
-                  Token balance
-                </p>
-                <Link
-                  href="/customer/tokens"
-                  className="text-[11px] font-medium text-[var(--bb-primary)] hover:underline"
-                >
+        </Callout>
+      ) : state.status === "loading" ? (
+        <div aria-busy="true" aria-label="Loading your overview" className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-3">
+            <Skeleton className="h-36" />
+            <Skeleton className="h-36" />
+            <Skeleton className="h-36" />
+          </div>
+          <Skeleton className="h-32" />
+          <Skeleton className="h-64" />
+        </div>
+      ) : (
+        <div className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-3">
+            <KpiCard
+              icon={<IconCoins />}
+              tone="green"
+              label="Token balance"
+              value={
+                <>
+                  {fmt(balance)}{" "}
+                  <span className="text-xl font-semibold">
+                    {plural(balance ?? 0, "token", "tokens")}
+                  </span>
+                </>
+              }
+              action={
+                <TextLink href="/customer/tokens" arrow={false}>
                   View ledger
-                </Link>
-              </div>
-              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">
-                {tokenBalance != null ? tokenBalance.toLocaleString() : "\u2014"}
-              </p>
-              <p className="text-[11px] text-[var(--bb-text-tertiary)]">tokens available</p>
-
-              {/* Credit / Debit mini bar */}
-              {tokenStats && (
-                <div className="mt-4 space-y-1.5">
-                  <div className="flex items-center gap-2 text-[11px]">
-                    <span className="w-14 text-[var(--bb-text-tertiary)]">Credits</span>
-                    <div className="relative h-2 flex-1 rounded-full bg-[var(--bb-bg-card)]">
-                      <div
-                        className="h-full rounded-full bg-[#22C55E]"
-                        style={{ width: `${(totalCredits / maxToken) * 100}%` }}
-                      />
-                    </div>
-                    <span className="w-10 text-right font-semibold text-[var(--bb-secondary)]">
-                      {totalCredits}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-[11px]">
-                    <span className="w-14 text-[var(--bb-text-tertiary)]">Debits</span>
-                    <div className="relative h-2 flex-1 rounded-full bg-[var(--bb-bg-card)]">
-                      <div
-                        className="h-full rounded-full bg-[#EF4444]"
-                        style={{ width: `${(totalDebits / maxToken) * 100}%` }}
-                      />
-                    </div>
-                    <span className="w-10 text-right font-semibold text-[var(--bb-secondary)]">
-                      {totalDebits}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </section>
-
-            {/* Open tickets card */}
-            <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-[#3B82F6] to-[#93C5FD]" />
-              <div className="flex items-center justify-between">
-                <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
-                  Open tickets
-                </p>
-                <Link
-                  href="/customer/board"
-                  className="text-[11px] font-medium text-[var(--bb-primary)] hover:underline"
-                >
+                </TextLink>
+              }
+              hint={
+                balance != null && balance < LOW_BALANCE_TOKENS ? (
+                  <Badge tone="amber" icon={<IconAlertCircle width={14} height={14} />}>
+                    Low balance
+                  </Badge>
+                ) : undefined
+              }
+            />
+            <KpiCard
+              icon={<IconTicket />}
+              tone="lavender"
+              label="Open requests"
+              value={
+                <>
+                  {fmt(open)}{" "}
+                  <span className="text-xl font-medium text-[var(--av2-text-2)]">
+                    of {fmt(total)} total
+                  </span>
+                </>
+              }
+              action={
+                <TextLink href="/customer/board" arrow={false}>
                   Open board
-                </Link>
-              </div>
-              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">{openTickets}</p>
-              <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-                of {boardStats?.total ?? 0} total
-              </p>
-
-              {/* Status breakdown dots */}
-              {boardStats && (
-                <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1">
-                  {STATUS_ORDER.filter((s) => s !== "DONE").map((s) => (
-                    <div key={s} className="flex items-center gap-1.5 text-[11px]">
+                </TextLink>
+              }
+            />
+            <KpiCard
+              icon={<IconClock />}
+              tone="green"
+              label="Completed"
+              value={
+                <>
+                  {fmt(done)}{" "}
+                  <span className="text-xl font-medium text-[var(--av2-text-2)]">
+                    of {fmt(total)} total
+                  </span>
+                </>
+              }
+              hint={
+                total > 0 ? (
+                  <>
+                    <span className="text-sm text-[var(--av2-text)]">{completion}% completion</span>
+                    <span
+                      role="progressbar"
+                      aria-label="Completion rate"
+                      aria-valuenow={completion}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      className="mt-2 block h-2 w-full overflow-hidden rounded-full bg-[var(--av2-track)]"
+                    >
                       <span
-                        className="inline-block h-2 w-2 rounded-full"
-                        style={{ backgroundColor: STATUS_COLORS[s] }}
+                        className="block h-full rounded-full bg-[var(--av2-fill-green)]"
+                        style={{ width: `${completion}%` }}
                       />
-                      <span className="text-[var(--bb-text-tertiary)]">{STATUS_LABELS[s]}</span>
-                      <span className="font-semibold text-[var(--bb-secondary)]">
-                        {boardStats.byStatus[s] ?? 0}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            {/* Completed tickets card */}
-            <section className="relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-[#22C55E] to-[#86EFAC]" />
-              <p className="text-[11px] font-semibold tracking-[0.15em] text-[var(--bb-text-muted)] uppercase">
-                Completed
-              </p>
-              <p className="mt-2 text-3xl font-bold text-[var(--bb-secondary)]">{doneTickets}</p>
-              <p className="text-[11px] text-[var(--bb-text-tertiary)]">
-                of {boardStats?.total ?? 0} total
-              </p>
-
-              {/* Completion rate */}
-              {boardStats &&
-                boardStats.total > 0 &&
-                (doneTickets > 0 ? (
-                  <div className="mt-4">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-[var(--bb-text-tertiary)]">Completion rate</span>
-                      <span className="font-semibold text-[#22C55E]">
-                        {Math.round((doneTickets / boardStats.total) * 100)}%
-                      </span>
-                    </div>
-                    <div className="mt-1 h-2 rounded-full bg-[var(--bb-bg-card)]">
-                      <div
-                        className="h-full rounded-full bg-[#22C55E]"
-                        style={{
-                          width: `${(doneTickets / boardStats.total) * 100}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <p className="mt-4 text-[11px] text-[var(--bb-text-tertiary)]">
-                    Complete your first ticket to see progress here.
-                  </p>
-                ))}
-            </section>
+                    </span>
+                  </>
+                ) : undefined
+              }
+            />
           </div>
 
-          {/* Row 2: Ticket pipeline chart */}
-          {boardStats && boardStats.total > 0 && (
-            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
-                Ticket pipeline
-              </h2>
-              <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
-                Distribution of tickets across workflow stages
-              </p>
-              <div className="mt-4 h-48">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={pipelineChartData}
-                    margin={{ top: 4, right: 0, bottom: 0, left: -20 }}
-                  >
-                    <XAxis
-                      dataKey="name"
-                      tick={{ fontSize: 11, fill: "var(--bb-text-tertiary)" }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      allowDecimals={false}
-                      tick={{ fontSize: 11, fill: "var(--bb-text-tertiary)" }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        borderRadius: 12,
-                        border: "1px solid var(--bb-border)",
-                        fontSize: 12,
-                      }}
-                    />
-                    <Bar dataKey="count" radius={[6, 6, 0, 0]} maxBarSize={56}>
-                      {pipelineChartData.map((entry, i) => (
-                        <Cell key={i} fill={entry.fill} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+            <Card className="flex items-center">
+              <div className="flex w-full flex-wrap items-center gap-x-8 gap-y-4">
+                <div className="flex min-w-[220px] flex-1 items-center gap-4">
+                  <IconTile tone="peach">
+                    <IconDocument />
+                  </IconTile>
+                  <div className="min-w-0">
+                    <h2 className="text-xl leading-7 font-semibold">Token activity</h2>
+                    <p className="text-sm text-[var(--av2-text-2)]">All-time ledger totals</p>
+                  </div>
+                </div>
+                <dl className="flex flex-wrap gap-x-8 gap-y-3">
+                  <div className="min-w-0 border-l border-[var(--av2-border)] pl-6">
+                    <dt className="text-sm text-[var(--av2-text-2)]">Credits</dt>
+                    <dd className="text-xl leading-7 font-bold tabular-nums">
+                      {fmt(data?.tokens.stats.totalCredits)}
+                    </dd>
+                  </div>
+                  <div className="min-w-0 border-l border-[var(--av2-border)] pl-6">
+                    <dt className="text-sm text-[var(--av2-text-2)]">Debits</dt>
+                    <dd className="text-xl leading-7 font-bold tabular-nums">
+                      {fmt(data?.tokens.stats.totalDebits)}
+                    </dd>
+                  </div>
+                </dl>
               </div>
-            </section>
-          )}
+            </Card>
 
-          {/* Row 2.5: Upcoming deadlines */}
-          {boardTickets.length > 0 && (
-            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
-                Upcoming deadlines
-              </h2>
-              <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
-                Open tickets with due dates, sorted by urgency
-              </p>
-              {upcomingTickets.length === 0 ? (
-                <p className="mt-4 text-[11px] text-[var(--bb-text-tertiary)]">
-                  No upcoming deadlines.
+            <Card>
+              <h2 className="text-xl leading-7 font-semibold">Workflow</h2>
+              {total > 0 ? (
+                <div
+                  aria-hidden
+                  className="mt-3 flex h-3 w-full gap-0.5 overflow-hidden rounded-full"
+                >
+                  {STATUS_ORDER.map((status) =>
+                    (stats?.byStatus[status] ?? 0) > 0 ? (
+                      <span
+                        key={status}
+                        style={{
+                          flexGrow: stats?.byStatus[status] ?? 0,
+                          background: STATUS_FILL[status],
+                        }}
+                      />
+                    ) : null,
+                  )}
+                </div>
+              ) : null}
+              <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {STATUS_ORDER.map((status) => (
+                  <div key={status} className="min-w-0">
+                    <dt>
+                      <StatusDot
+                        tone={TICKET_STATUS[status].tone}
+                        label={TICKET_STATUS[status].label}
+                      />
+                    </dt>
+                    <dd className="mt-1 text-xl leading-7 font-bold tabular-nums">
+                      {fmt(stats?.byStatus[status] ?? 0)}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </Card>
+          </div>
+
+          {toReview.length > 0 ? (
+            <section className="flex flex-wrap items-center gap-4 rounded-2xl border border-[var(--av2-attention-border)] bg-gradient-to-r from-[var(--av2-attention-from)] to-[var(--av2-attention-to)] p-6">
+              <IconTile tone="peach" round>
+                <IconClock />
+              </IconTile>
+              <div className="min-w-[240px] flex-1">
+                <h2 className="text-xl leading-7 font-semibold">
+                  {toReview.length === 1
+                    ? "Needs your review"
+                    : `${toReview.length} requests need your review`}
+                </h2>
+                <p className="mt-0.5 text-base">
+                  <span className="text-[var(--av2-text-2)]">{codeOf(toReview[0])}</span>{" "}
+                  {toReview[0].title}
                 </p>
-              ) : (
-                <div className="mt-4 divide-y divide-[var(--bb-border-subtle)]">
-                  {upcomingTickets.map((t) => {
-                    const countdown = formatDueDateCountdown(t.dueDate);
-                    const overdue = isDueDateOverdue(t.dueDate);
-                    const soon = isDueDateSoon(t.dueDate);
-                    const code = buildTicketCode({
-                      projectCode: t.project?.code,
-                      companyTicketNumber: t.companyTicketNumber,
-                      ticketId: t.id,
-                    });
+              </div>
+              <ButtonLink href={`/customer/tickets/${toReview[0].id}`} variant="primary">
+                Review request
+                <IconArrowUpRight />
+              </ButtonLink>
+            </section>
+          ) : null}
+
+          <Card padding="none">
+            <div className="px-6 pt-6 pb-4">
+              <CardTitle>Upcoming requests</CardTitle>
+            </div>
+            {upcoming.length === 0 ? (
+              <EmptyState
+                title="No upcoming due dates"
+                description="Open requests with a due date will appear here."
+              />
+            ) : (
+              <Table label="Upcoming requests">
+                <thead>
+                  <tr>
+                    <Th className="max-sm:hidden">ID</Th>
+                    <Th>Request</Th>
+                    <Th>Status</Th>
+                    <Th>Due date</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {upcoming.map((ticket) => {
+                    const status = TICKET_STATUS[ticket.status];
+                    const overdue = isDueDateOverdue(ticket.dueDate);
                     return (
-                      <Link
-                        key={t.id}
-                        href={`/customer/tickets/${t.id}`}
-                        className="flex items-center justify-between py-2.5 transition-opacity first:pt-0 last:pb-0 hover:opacity-80"
+                      <tr
+                        key={ticket.id}
+                        className="border-b border-[var(--av2-border)] last:border-b-0"
                       >
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-medium text-[var(--bb-secondary)]">
-                            {code && (
-                              <span className="mr-1.5 text-[var(--bb-text-tertiary)]">{code}</span>
-                            )}
-                            {t.title}
-                          </p>
-                        </div>
-                        {countdown && (
-                          <span
-                            className={`ml-4 shrink-0 text-[11px] font-medium ${
-                              overdue
-                                ? "text-[var(--bb-danger-text)]"
-                                : soon
-                                  ? "text-[var(--bb-warning-text)]"
-                                  : "text-[var(--bb-text-tertiary)]"
-                            }`}
+                        <Td className="whitespace-nowrap text-[var(--av2-text-2)] max-sm:hidden">
+                          {codeOf(ticket)}
+                        </Td>
+                        <Td>
+                          <Link
+                            href={`/customer/tickets/${ticket.id}`}
+                            className="font-medium hover:underline"
                           >
-                            {countdown.label}
+                            {ticket.title}
+                          </Link>
+                        </Td>
+                        <Td>
+                          <Badge tone={status.tone as Tone} dot>
+                            {status.label}
+                          </Badge>
+                        </Td>
+                        <Td className="whitespace-nowrap">
+                          <span
+                            className={overdue ? "font-medium text-[var(--av2-error-text)]" : ""}
+                          >
+                            {formatDate(ticket.dueDate!)}
+                            {overdue ? " · Overdue" : ""}
                           </span>
-                        )}
-                      </Link>
+                        </Td>
+                      </tr>
                     );
                   })}
-                </div>
-              )}
-            </section>
-          )}
+                </tbody>
+              </Table>
+            )}
+          </Card>
 
-          {/* Row 3: Company + Plan cards */}
-          <div className="grid gap-4 md:grid-cols-2">
-            {/* Company card */}
-            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
-                Company
-              </h2>
-              <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
-                Basic workspace metadata and footprint.
-              </p>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Card>
+              <CardTitle description={company?.name}>Company</CardTitle>
               {company ? (
-                <div className="mt-4 space-y-3">
-                  <div className="grid grid-cols-2 gap-2 text-[11px]">
-                    <div>
-                      <p className="text-[var(--bb-text-tertiary)]">Name</p>
-                      <p className="font-semibold text-[var(--bb-secondary)]">{company.name}</p>
-                    </div>
-                    <div>
-                      <p className="text-[var(--bb-text-tertiary)]">Slug</p>
-                      <p className="font-semibold text-[var(--bb-secondary)]">{company.slug}</p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { label: "Members", value: company.counts.members },
-                      { label: "Projects", value: company.counts.projects },
-                      { label: "Tickets", value: company.counts.tickets },
-                    ].map((item) => (
-                      <div
-                        key={item.label}
-                        className="rounded-xl bg-[var(--bb-bg-card)] px-3 py-2.5 text-center"
-                      >
-                        <p className="text-lg font-bold text-[var(--bb-secondary)]">{item.value}</p>
-                        <p className="text-[10px] text-[var(--bb-text-tertiary)]">{item.label}</p>
-                      </div>
-                    ))}
-                  </div>
+                <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <StatTile
+                    icon={<IconUsers />}
+                    value={fmt(company.counts.members)}
+                    label={plural(company.counts.members, "member", "members")}
+                  />
+                  <StatTile
+                    icon={<IconMoodboards width={20} height={20} />}
+                    value={fmt(company.counts.projects)}
+                    label={plural(company.counts.projects, "project", "projects")}
+                  />
+                  <StatTile
+                    icon={<IconTicket />}
+                    value={fmt(company.counts.tickets)}
+                    label={plural(company.counts.tickets, "request", "requests")}
+                  />
                 </div>
-              ) : (
-                <p className="mt-3 text-[11px] text-[var(--bb-text-tertiary)]">
-                  We could not load company information.
-                </p>
-              )}
-            </section>
+              ) : null}
+            </Card>
 
-            {/* Plan & billing card */}
-            <section className="rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-5 shadow-sm">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold tracking-tight text-[var(--bb-secondary)]">
-                  Plan &amp; billing
-                </h2>
-                <Link
-                  href="/customer/settings"
-                  className="text-[11px] font-medium text-[var(--bb-primary)] hover:underline"
-                >
-                  Open settings
-                </Link>
-              </div>
-              <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">
-                Your current subscription configuration.
-              </p>
-
-              {!canManageCompanyPlan && (
-                <div className="mt-3 rounded-lg border border-[var(--bb-warning-border)] bg-[var(--bb-warning-bg)] px-3 py-2 text-[11px] text-[var(--bb-text-secondary)]">
-                  <p className="font-medium text-[var(--bb-warning-text)]">Limited access</p>
-                  <p className="mt-1">
-                    Only the owner or billing manager can modify billing details.
-                  </p>
-                </div>
-              )}
-
+            <Card>
+              <CardTitle
+                description={plan?.name}
+                action={
+                  canManagePlan(companyRole) ? (
+                    <TextLink href="/customer/settings" arrow={false}>
+                      Manage plan
+                    </TextLink>
+                  ) : undefined
+                }
+              >
+                Plan
+              </CardTitle>
               {plan ? (
-                <div className="mt-4 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex rounded-full bg-[var(--bb-bg-card)] px-3 py-1 text-xs font-semibold text-[var(--bb-secondary)]">
-                      {plan.name}
-                    </span>
-                    <span
-                      className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
-                        plan.isActive
-                          ? "bg-[var(--bb-success-bg)] text-[var(--bb-success-text)]"
-                          : "bg-[var(--bb-danger-bg)] text-[var(--bb-danger-text)]"
-                      }`}
-                    >
-                      {plan.isActive ? "Active" : "Inactive"}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 text-[11px]">
-                    <div className="rounded-xl bg-[var(--bb-bg-card)] px-3 py-2.5 text-center">
-                      <p className="text-lg font-bold text-[var(--bb-secondary)]">
-                        {plan.monthlyTokens}
-                      </p>
-                      <p className="text-[10px] text-[var(--bb-text-tertiary)]">Monthly tokens</p>
-                    </div>
-                    <div className="rounded-xl bg-[var(--bb-bg-card)] px-3 py-2.5 text-center">
-                      <p className="text-lg font-bold text-[var(--bb-secondary)]">
-                        {formatMoneyFromCents(plan.priceCents)}
-                      </p>
-                      <p className="text-[10px] text-[var(--bb-text-tertiary)]">Price</p>
-                    </div>
-                  </div>
+                <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <StatTile
+                    icon={<IconCoins />}
+                    value={fmt(plan.monthlyTokens)}
+                    label="monthly tokens"
+                  />
+                  <StatTile
+                    icon={<IconCatalog width={20} height={20} />}
+                    value={formatPrice(plan.priceCents)}
+                    label="price"
+                  />
                 </div>
               ) : (
-                <p className="mt-4 text-[11px] text-[var(--bb-text-tertiary)]">
-                  No subscription plan is assigned yet. Please contact support.
+                <p className="mt-3 text-sm text-[var(--av2-text-2)]">
+                  No plan is assigned yet. Please contact support.
                 </p>
               )}
-            </section>
+              {!canManagePlan(companyRole) ? (
+                <p className="mt-4 text-sm text-[var(--av2-text-2)]">
+                  Only the owner or billing manager can change billing details.
+                </p>
+              ) : null}
+            </Card>
           </div>
         </div>
       )}
