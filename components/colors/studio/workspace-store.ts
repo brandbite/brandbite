@@ -17,6 +17,7 @@ import {
   markWorkspaceSaved,
   parseWorkspace,
   redoWorkspace,
+  replaceWorkspacePalette,
   selectWorkspaceColor,
   serializeWorkspace,
   undoWorkspace,
@@ -67,6 +68,7 @@ export const workspaceActions = {
     setState(loadWorkspacePalette(palette, selectedColorId ?? null)),
   commit: (palette: StudioPalette, selectedColorId?: string | null) =>
     setState(commitWorkspaceChange(getSnapshot(), palette, selectedColorId ?? undefined)),
+  replace: (palette: StudioPalette) => setState(replaceWorkspacePalette(getSnapshot(), palette)),
   undo: () => setState(undoWorkspace(getSnapshot())),
   redo: () => setState(redoWorkspace(getSnapshot())),
   select: (colorId: string) => setState(selectWorkspaceColor(getSnapshot(), colorId)),

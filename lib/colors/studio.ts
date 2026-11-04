@@ -142,6 +142,39 @@ export function moveStudioColor(
   return { ...palette, colors, updatedAt: now.toISOString() };
 }
 
+/** Change one color's value. Its id, lock and roles stay as they were. */
+export function setStudioColorHex(
+  palette: StudioPalette,
+  colorId: string,
+  hex: Hex,
+  now: Date = new Date(),
+): StudioPalette {
+  return {
+    ...palette,
+    colors: palette.colors.map((c) => (c.id === colorId ? { ...c, hex } : c)),
+    updatedAt: now.toISOString(),
+  };
+}
+
+export function toggleStudioLock(palette: StudioPalette, colorId: string): StudioPalette {
+  return {
+    ...palette,
+    colors: palette.colors.map((c) => (c.id === colorId ? { ...c, locked: !c.locked } : c)),
+  };
+}
+
+export function addStudioColor(
+  palette: StudioPalette,
+  hex: Hex,
+  now: Date = new Date(),
+): StudioPalette {
+  return {
+    ...palette,
+    colors: [...palette.colors, { id: createStudioId(), hex, locked: false }],
+    updatedAt: now.toISOString(),
+  };
+}
+
 export interface ResolvedPaletteColors extends Record<ColorRole, Hex> {
   /** Text color with the best contrast on the primary color. */
   onPrimary: Hex;

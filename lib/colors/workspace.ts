@@ -74,6 +74,14 @@ export function commitWorkspaceChange(
   };
 }
 
+/** Refine the current undo step, e.g. while a slider is being dragged. */
+export function replaceWorkspacePalette(
+  state: WorkspaceState,
+  palette: StudioPalette,
+): WorkspaceState {
+  return { ...state, activePalette: palette, dirty: true };
+}
+
 export function undoWorkspace(state: WorkspaceState): WorkspaceState {
   const previous = state.undoStack[state.undoStack.length - 1];
   const snapshot = currentSnapshot(state);
