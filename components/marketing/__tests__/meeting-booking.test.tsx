@@ -25,8 +25,8 @@ async function fillAndChoose() {
     /^\d\d:\d\d$/.test(b.textContent ?? ""),
   ) as HTMLElement;
   fireEvent.click(time);
-  fireEvent.change(screen.getByLabelText("Your name"), { target: { value: "Ada" } });
-  fireEvent.change(screen.getByLabelText("Work email"), { target: { value: "ada@test.local" } });
+  fireEvent.change(screen.getByLabelText(/Your name/), { target: { value: "Ada" } });
+  fireEvent.change(screen.getByLabelText(/Email address/), { target: { value: "ada@test.local" } });
 }
 
 beforeEach(() => {
@@ -51,13 +51,77 @@ describe("MeetingBooking", () => {
   it("can't be submitted until a time is chosen", async () => {
     mockFetch(() => open);
     render(<MeetingBooking />);
-    expect(await screen.findByRole("button", { name: "Choose a time to continue" })).toBeDisabled();
+    expect(await screen.findByRole("button", { name: /Book my 30-minute call/ })).toBeDisabled();
   });
 
-  it("shows which time zone times are in", async () => {
+  it("shows times in the chosen time zone, and sends that zone", async () => {
+    const fetchMock = mockFetch((url, init) =>
+      init?.method === "POST"
+        ? { status: 201, json: { token: "tok", startsAt: SLOTS[0], videoLink: null } }
+        : open,
+    );
+    render(<MeetingBooking />);
+    const zone = await screen.findByLabelText("Time zone");
+    fireEvent.change(zone, { target: { value: "Asia/Tokyo" } });
+    expect(screen.getByRole("button", { name: "18:00" })).toBeInTheDocument();
+
+    fireEvent.change(zone, { target: { value: "UTC" } });
+    expect(screen.getByRole("button", { name: "09:00" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "09:00" }));
+    fireEvent.change(screen.getByLabelText(/Your name/), { target: { value: "Ada" } });
+    fireEvent.change(screen.getByLabelText(/Email address/), { target: { value: "a@test.local" } });
+    expect(screen.getByText("Your intro call")).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Book my 30-minute call/ }));
+    });
+    const post = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
+    expect(JSON.parse(post?.[1]?.body as string).timezone).toBe("UTC");
+  });
+
+  it("moves between weeks that have open times", async () => {
+    mockFetch(() => ({
+      json: { available: true, slots: ["2026-12-01T09:00:00.000Z", "2026-12-09T09:00:00.000Z"] },
+    }));
+    render(<MeetingBooking />);
+    fireEvent.change(await screen.findByLabelText("Time zone"), { target: { value: "UTC" } });
+    expect(screen.getByRole("button", { name: "Previous week" })).toBeDisabled();
+    expect(screen.getByText("Tuesday, 1 December")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Next week" }));
+    expect(screen.getByText("Wednesday, 9 December")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next week" })).toBeDisabled();
+  });
+
+  it("disables days with no open times", async () => {
     mockFetch(() => open);
     render(<MeetingBooking />);
-    expect(await screen.findByText(/Times are shown in/)).toBeInTheDocument();
+    fireEvent.change(await screen.findByLabelText("Time zone"), { target: { value: "UTC" } });
+    expect(screen.getByRole("button", { name: /Friday, 4 December/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Tuesday, 1 December/ })).toBeEnabled();
+  });
+
+  it("shows a few times first, with more on request", async () => {
+    const many = Array.from({ length: 12 }, (_, i) =>
+      new Date(Date.UTC(2026, 11, 1, 9 + Math.floor(i / 2), (i % 2) * 30)).toISOString(),
+    );
+    mockFetch(() => ({ json: { available: true, slots: many } }));
+    render(<MeetingBooking />);
+    fireEvent.change(await screen.findByLabelText("Time zone"), { target: { value: "UTC" } });
+    const times = () =>
+      screen.getAllByRole("button").filter((b) => /^\d\d:\d\d$/.test(b.textContent ?? ""));
+    expect(times()).toHaveLength(9);
+    fireEvent.click(screen.getByRole("button", { name: "Show more times" }));
+    expect(times()).toHaveLength(12);
+  });
+
+  it("links the privacy policy from the form", async () => {
+    mockFetch(() => open);
+    render(<MeetingBooking />);
+    expect(await screen.findByRole("link", { name: "Privacy Policy" })).toHaveAttribute(
+      "href",
+      "/privacy",
+    );
   });
 
   it("confirms a booking with the manage link", async () => {
@@ -72,7 +136,7 @@ describe("MeetingBooking", () => {
     render(<MeetingBooking />);
     await fillAndChoose();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /^Book / }));
+      fireEvent.click(screen.getByRole("button", { name: /Book my 30-minute call/ }));
     });
     expect(screen.getByText("You're booked.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Reschedule or cancel" })).toHaveAttribute(
@@ -89,7 +153,7 @@ describe("MeetingBooking", () => {
     expect(await screen.findByText(/these are sample times/)).toBeInTheDocument();
     await fillAndChoose();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /^Book / }));
+      fireEvent.click(screen.getByRole("button", { name: /Book my 30-minute call/ }));
     });
     expect(screen.getByText(/nothing was booked and no emails were sent/)).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Reschedule or cancel" })).toBeNull();
@@ -105,13 +169,13 @@ describe("MeetingBooking", () => {
     render(<MeetingBooking />);
     await fillAndChoose();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /^Book / }));
+      fireEvent.click(screen.getByRole("button", { name: /Book my 30-minute call/ }));
     });
     expect(screen.getByRole("alert")).toHaveTextContent(/just taken/);
-    expect(screen.getByRole("button", { name: "Choose a time to continue" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Book my 30-minute call/ })).toBeDisabled();
     const reads = fetchMock.mock.calls.filter(([url]) => String(url).includes("availability"));
     expect(reads.length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByLabelText("Your name")).toHaveValue("Ada");
+    expect(screen.getByLabelText(/Your name/)).toHaveValue("Ada");
   });
 });
 

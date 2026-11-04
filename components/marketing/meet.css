@@ -1,0 +1,30 @@
+/* Meet page design tokens, matching Color Studio and scoped to these pages. */
+.meet-page {
+  --meet-background: #f7f5f2;
+  --meet-surface: #ffffff;
+  --meet-text: #242528;
+  --meet-muted: #6c6d75;
+  --meet-border: #e3e0dc;
+  --meet-brand: #ff6426;
+  --meet-brand-hover: #e8541a;
+  /* Small orange text only. #ff6426 is too light to read at this size. */
+  --meet-brand-strong: #c2410c;
+  --meet-brand-tint: #fff1ea;
+  --meet-soft: #ece4ff;
+  --meet-soft-text: #4c1d95;
+  --meet-danger: #b42318;
+
+  background-color: var(--meet-background);
+  color: var(--meet-text);
+  font-family: var(--font-inter);
+}
+
+/* The site's global heading rule uses the brand display font. */
+.meet-page :is(h1, h2, h3, h4) {
+  font-family: var(--font-inter);
+}
+
+.meet-page :focus-visible {
+  outline: 2px solid var(--meet-text);
+  outline-offset: 2px;
+}
