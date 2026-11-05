@@ -14,11 +14,12 @@ import { BackLink } from "@/components/dashboard/tickets/shared";
 import NewTicketForm from "./NewTicketForm";
 import type { TagOption } from "@/components/ui/tag-multi-select";
 import { getAiTicketsMode, isAiTicketsAllowed, isTagsEnabled } from "@/lib/feature-flags";
+import { DRAFT_ATTACHMENT_SELECT, draftToClient } from "@/lib/ticket-drafts";
 
 export default async function CustomerNewTicketPage({
   searchParams,
 }: {
-  searchParams: Promise<{ jobTypeId?: string }>;
+  searchParams: Promise<{ jobTypeId?: string; draft?: string }>;
 }) {
   const user = await getCurrentUserOrThrow();
 
@@ -40,6 +41,17 @@ export default async function CustomerNewTicketPage({
 
   if (!company) {
     redirect("/onboarding");
+  }
+
+  // Only the person's own draft; a link to anything else goes to their list.
+  const draftRow = params.draft
+    ? await prisma.ticketDraft.findFirst({
+        where: { id: params.draft, createdById: user.id, companyId: company.id },
+        include: { attachments: { select: DRAFT_ATTACHMENT_SELECT } },
+      })
+    : null;
+  if (params.draft && !draftRow) {
+    redirect("/customer/tickets/drafts");
   }
 
   const projects = await prisma.project.findMany({
@@ -111,7 +123,7 @@ export default async function CustomerNewTicketPage({
     <>
       <BackLink href="/customer/tickets">Back to requests</BackLink>
       <PageHeader
-        title="Create a new request"
+        title={draftRow ? "Continue your draft" : "Create a new request"}
         description="Describe what you need, pick a project and a job type. We will route this request to your creative team."
         meta={
           <>
@@ -127,6 +139,7 @@ export default async function CustomerNewTicketPage({
         tokenBalance={company.tokenBalance}
         tags={tags as unknown as TagOption[]}
         initialJobTypeId={initialJobTypeId}
+        initialDraft={draftRow ? draftToClient(draftRow) : null}
         aiEnabled={aiEnabled}
         // When the global flag is off, force-hide tag UI for everyone —
         // including OWNER/PM who would otherwise see the create-tag chip

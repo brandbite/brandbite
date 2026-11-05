@@ -18,6 +18,7 @@ import { prisma } from "@/lib/prisma";
 import { resolveAssetUrl } from "@/lib/r2";
 import { parseBody } from "@/lib/schemas/helpers";
 import { createTicketSchema } from "@/lib/schemas/ticket.schemas";
+import { moveDraftToTicket } from "@/lib/ticket-drafts";
 import { buildTicketCode } from "@/lib/ticket-code";
 import { createCustomerTicket } from "@/lib/tickets/create-ticket";
 import { getAiTicketsMode, isAiTicketsAllowed, isTagsEnabled } from "@/lib/feature-flags";
@@ -246,6 +247,21 @@ export async function POST(req: NextRequest) {
     const parsed = await parseBody(req, createTicketSchema);
     if (!parsed.success) return parsed.response;
 
+    // Only the person's own draft, checked before anything is charged.
+    if (parsed.data.draftId) {
+      const draft = await prisma.ticketDraft.findFirst({
+        where: {
+          id: parsed.data.draftId,
+          createdById: user.id,
+          companyId: user.activeCompanyId,
+        },
+        select: { id: true },
+      });
+      if (!draft) {
+        return NextResponse.json({ error: "Draft not found" }, { status: 400 });
+      }
+    }
+
     // Guard "Work with AI" against the feature flag. Even if the form is
     // bypassed, a customer can't force AI mode while it's off (or test-only,
     // which is restricted to site admins).
@@ -298,6 +314,22 @@ export async function POST(req: NextRequest) {
     }
 
     const ticket = outcome.ticket;
+
+    // The request exists and has been charged, so this must not fail the response.
+    // If it goes wrong, the draft and its files are still there to recover from.
+    let draftMoved = true;
+    if (parsed.data.draftId) {
+      try {
+        await moveDraftToTicket({
+          draftId: parsed.data.draftId,
+          ticketId: ticket.id,
+          userId: user.id,
+        });
+      } catch (err) {
+        draftMoved = false;
+        console.error("[customer/tickets POST] moving draft failed", err);
+      }
+    }
 
     // Fire-and-forget assignment notification. Kept in the route so the
     // service stays free of I/O beyond the DB transaction.
@@ -359,6 +391,7 @@ export async function POST(req: NextRequest) {
           jobTypeName: ticket.jobType?.name ?? null,
           createdAt: ticket.createdAt.toISOString(),
         },
+        draftMoved,
       },
       { status: 201 },
     );

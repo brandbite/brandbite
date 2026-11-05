@@ -342,6 +342,9 @@ model UserAccount {
   // "Was this helpful?" answers on Support guides.
   guideVotes GuideVote[]
 
+  // Requests saved but not sent yet.
+  ticketDrafts TicketDraft[]
+
   // MFA challenges issued to this user (email-code second factor)
   mfaChallenges MfaChallenge[]
 
@@ -418,6 +421,8 @@ model Company {
   aiGenerations AiGeneration[]
 
   moodboards Moodboard[]
+
+  ticketDrafts TicketDraft[]
 
   creativeRatings CreativeRating[]
 
@@ -2696,4 +2701,52 @@ model GuideVote {
 
   @@unique([userId, audience, slug])
   @@index([audience, slug])
+}
+
+// -----------------------------------------------------------------------------
+// TicketDraft: an unsent request. Spends no tokens and reaches nobody until it's
+// submitted, when its attachments become the ticket's brief files. See
+// lib/ticket-drafts.ts.
+// -----------------------------------------------------------------------------
+
+model TicketDraft {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   UserAccount @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  title       String @default("")
+  description String @default("") @db.Text
+  /// Everything else on the form. Unvalidated until the draft is submitted.
+  fields      Json   @default("{}")
+
+  attachments TicketDraftAttachment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdById, updatedAt])
+  @@index([companyId])
+}
+
+model TicketDraftAttachment {
+  id String @id @default(cuid())
+
+  draftId String
+  draft   TicketDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+
+  storageKey   String
+  url          String?
+  mimeType     String
+  bytes        Int
+  width        Int?
+  height       Int?
+  originalName String?
+
+  createdAt DateTime @default(now())
+
+  @@index([draftId])
 }

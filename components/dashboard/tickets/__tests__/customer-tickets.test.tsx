@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import CustomerTicketDetailPage from "@/app/customer/tickets/[ticketId]/page";
@@ -326,5 +326,71 @@ describe("New request form", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Title is required");
     const writes = vi.mocked(fetch).mock.calls.filter(([, init]) => init?.method === "POST");
     expect(writes).toHaveLength(0);
+  });
+
+  it("offers saving when the balance can't cover it, and saves with one click", async () => {
+    respond([
+      ["/api/customer/settings", { user: { companyRole: "OWNER" } }],
+      ["/api/moodboards", { moodboards: [] }],
+      ["/api/customer/ticket-drafts", { draft: { id: "draft1" } }],
+    ]);
+    render(
+      <NewTicketForm
+        companySlug="acme"
+        projects={[]}
+        jobTypes={jobTypes}
+        tokenBalance={3}
+        initialJobTypeId="dear"
+      />,
+    );
+    await screen.findByText("Not enough tokens");
+    const save = await screen.findByRole("button", { name: "Save as draft" });
+    await waitFor(() => expect(save).toBeEnabled());
+
+    fireEvent.click(save);
+
+    expect(await screen.findByText(/^Draft saved/)).toBeInTheDocument();
+    const [, init] = vi
+      .mocked(fetch)
+      .mock.calls.find(
+        ([url, i]) => String(url).includes("ticket-drafts") && i?.method === "POST",
+      )!;
+    expect(JSON.parse(String(init?.body))).toMatchObject({ jobTypeId: "dear" });
+  });
+
+  it("carries on from a draft: refills the form and lists its files", async () => {
+    respond([
+      ["/api/customer/settings", { user: { companyRole: "OWNER" } }],
+      ["/api/moodboards", { moodboards: [] }],
+    ]);
+    render(
+      <NewTicketForm
+        companySlug="acme"
+        projects={[]}
+        jobTypes={jobTypes}
+        tokenBalance={3}
+        initialDraft={{
+          id: "draft1",
+          title: "Espresso launch",
+          description: "",
+          jobTypeId: "removed-from-catalog",
+          projectId: "",
+          quantity: 1,
+          priority: "HIGH",
+          dueDate: "",
+          tagIds: [],
+          moodboardId: "",
+          creativeMode: "DESIGNER",
+          attachments: [{ id: "a1", originalName: "logo.png", mimeType: "image/png", bytes: 2048 }],
+          updatedAt: "2026-11-06T10:00:00.000Z",
+        }}
+      />,
+    );
+    expect(await screen.findByDisplayValue("Espresso launch")).toBeInTheDocument();
+    expect(screen.getByText("logo.png")).toBeInTheDocument();
+    expect(screen.getByText("1/8")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Delete draft" })).toBeInTheDocument();
+    // A job type that no longer exists asks to be chosen again.
+    expect(screen.getByText("Select a job type")).toBeInTheDocument();
   });
 });

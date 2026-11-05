@@ -45,7 +45,7 @@ const RULES = [
     // Mirrors the "Who can see your work" card on the privacy page.
     icon: "/home/why-flow.png",
     title: "Our team can see what's on Brandbite",
-    body: "To run the service, give support and prevent misuse, the brandbite team can see what's in your account, including requests, files, comments and moodboards. That includes moodboards a creative hasn't shared with anyone. The privacy policy explains who else can see your work.",
+    body: "To run the service, give support and prevent misuse, the brandbite team can see what's in your account, including requests, request drafts, files, comments and moodboards. That includes drafts you haven't sent and moodboards a creative hasn't shared with anyone. The privacy policy explains who else can see your work.",
   },
 ];
 

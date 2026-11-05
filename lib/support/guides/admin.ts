@@ -310,6 +310,30 @@ export const ADMIN_GUIDES: SupportGuide[] = [
     ],
   },
   {
+    slug: "request-drafts",
+    title: "Request drafts",
+    summary: "See requests customers have saved but not sent yet.",
+    category: "Workspace",
+    routes: ["/admin/ticket-drafts"],
+    keywords: ["drafts", "unsent", "saved requests", "brief"],
+    related: ["board-and-tickets"],
+    sections: [
+      {
+        heading: "Using the list",
+        blocks: [
+          {
+            type: "p",
+            text: "The list shows every draft with its company, who wrote it, its job type and when it last changed. Click a row to read the brief and open its files.",
+          },
+          {
+            type: "p",
+            text: "It's view only. A draft has no ticket number, costs no tokens and hasn't reached anyone. It stays until the customer creates the request or deletes it, and nothing removes it automatically.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     slug: "board-and-tickets",
     title: "Board and Tickets",
     summary: "See every request, assign creatives, override pricing and make bulk changes.",
