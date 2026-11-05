@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { BoardToolbar } from "@/components/moodboard/board-toolbar";
 import { BoardHeader } from "@/components/moodboard/board-header";
+import { LinkJobModal } from "@/components/moodboard/link-job-modal";
 import { BoardCanvas, type BoardCanvasHandle } from "@/components/moodboard/board-canvas";
 import { useIsPhone } from "@/components/moodboard/use-is-phone";
 import { useToast } from "@/components/ui/toast-provider";
@@ -39,6 +40,7 @@ import type { CreatableKind, ToolMode } from "@/components/moodboard/board-toolb
 
 type MoodboardViewProps = {
   moodboardId: string;
+  basePath: string;
 };
 
 type ModalType = "link" | "embed" | null;
@@ -67,12 +69,13 @@ function placeNear(
   return { x, y };
 }
 
-export function MoodboardView({ moodboardId }: MoodboardViewProps) {
+export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
   const router = useRouter();
   const { showToast } = useToast();
   const isPhone = useIsPhone();
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [jobPickerOpen, setJobPickerOpen] = useState(false);
 
   const [moodboard, setMoodboard] = useState<MoodboardClient | null>(null);
   const [loading, setLoading] = useState(true);
@@ -108,7 +111,7 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
 
   const fetchMoodboard = useCallback(async () => {
     try {
-      const res = await fetch(`/api/customer/moodboards/${moodboardId}`);
+      const res = await fetch(`/api/moodboards/${moodboardId}`);
       if (!res.ok) throw new Error("Failed to load moodboard");
 
       const json = await res.json();
@@ -239,7 +242,7 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
       canvasHandle.current?.selectCard(id, { edit: opts.edit });
     });
 
-    const saved = fetch(`/api/customer/moodboards/${moodboardId}/items`, {
+    const saved = fetch(`/api/moodboards/${moodboardId}/items`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ type, data, x, y, width, height }),
@@ -326,6 +329,7 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
   // ---------------------------------------------------------------------------
 
   async function handleUpdateItem(itemId: string, data: MoodboardItemData) {
+    if (!moodboard?.access.canEdit) return;
     setMoodboard((prev) => {
       if (!prev) return prev;
       return {
@@ -336,7 +340,7 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
 
     try {
       const sid = await serverId(itemId);
-      const res = await fetch(`/api/customer/moodboards/${moodboardId}/items/${sid}`, {
+      const res = await fetch(`/api/moodboards/${moodboardId}/items/${sid}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ data }),
@@ -376,7 +380,7 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
 
     try {
       const sid = await serverId(itemId);
-      const res = await fetch(`/api/customer/moodboards/${moodboardId}/items/${sid}`, {
+      const res = await fetch(`/api/moodboards/${moodboardId}/items/${sid}`, {
         method: "DELETE",
       });
 
@@ -399,7 +403,7 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
     );
     try {
       const sid = await serverId(itemId);
-      await fetch(`/api/customer/moodboards/${moodboardId}/items/${sid}`, { method: "DELETE" });
+      await fetch(`/api/moodboards/${moodboardId}/items/${sid}`, { method: "DELETE" });
     } catch (err) {
       console.error("[moodboard-view] remove empty item error:", err);
     }
@@ -413,7 +417,7 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
     setDeleted(null);
 
     try {
-      const res = await fetch(`/api/customer/moodboards/${moodboardId}/items`, {
+      const res = await fetch(`/api/moodboards/${moodboardId}/items`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -463,7 +467,7 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
 
     try {
       const sid = await serverId(itemId);
-      const res = await fetch(`/api/customer/moodboards/${moodboardId}/items/${sid}`, {
+      const res = await fetch(`/api/moodboards/${moodboardId}/items/${sid}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ x, y }),
@@ -499,7 +503,7 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
 
     try {
       const sid = await serverId(itemId);
-      const res = await fetch(`/api/customer/moodboards/${moodboardId}/items/${sid}`, {
+      const res = await fetch(`/api/moodboards/${moodboardId}/items/${sid}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ x, y, width, height }),
@@ -523,7 +527,7 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
     });
 
     try {
-      const res = await fetch(`/api/customer/moodboards/${moodboardId}`, {
+      const res = await fetch(`/api/moodboards/${moodboardId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title }),
@@ -547,13 +551,13 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
     if (!confirmed) return;
 
     try {
-      const res = await fetch(`/api/customer/moodboards/${moodboardId}`, {
+      const res = await fetch(`/api/moodboards/${moodboardId}`, {
         method: "DELETE",
       });
 
       if (!res.ok) throw new Error("Failed to delete moodboard");
 
-      router.push("/customer/moodboards");
+      router.push(basePath);
     } catch (err) {
       console.error("[moodboard-view] delete board error:", err);
     }
@@ -562,6 +566,21 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
   // ---------------------------------------------------------------------------
   // Connections (arrows between cards)
   // ---------------------------------------------------------------------------
+
+  async function patchSharing(body: { ticketId?: string | null; sharedWithCustomer?: boolean }) {
+    try {
+      const res = await fetch(`/api/moodboards/${moodboardId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+      await fetchMoodboard();
+    } catch (err) {
+      console.error("[moodboard-view] sharing error:", err);
+      showToast({ type: "error", title: "We couldn't update sharing. Please try again." });
+    }
+  }
 
   /** Saved with server ids, since temporary ones mean nothing after a reload. */
   async function saveConnections(connections: MoodboardConnection[]) {
@@ -572,7 +591,7 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
         targetItemId: await serverId(c.targetItemId),
       })),
     );
-    return fetch(`/api/customer/moodboards/${moodboardId}`, {
+    return fetch(`/api/moodboards/${moodboardId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ connections: resolved }),
@@ -646,7 +665,7 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
     } as MoodboardItemClient;
     setMoodboard((prev) => (prev ? { ...prev, items: [...prev.items, item] } : prev));
 
-    const saved = fetch(`/api/customer/moodboards/${moodboardId}/items`, {
+    const saved = fetch(`/api/moodboards/${moodboardId}/items`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -761,7 +780,7 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
           <h1 className="text-base font-semibold text-[var(--av2-text)]">Moodboard not found</h1>
           <button
             type="button"
-            onClick={() => router.push("/customer/moodboards")}
+            onClick={() => router.push(basePath)}
             className="mt-2 min-h-10 text-sm font-medium text-[var(--av2-link)] hover:underline"
           >
             Back to moodboards
@@ -770,6 +789,8 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
       </div>
     );
   }
+
+  const canEdit = moodboard.access.canEdit;
 
   // ---------------------------------------------------------------------------
   // Render
@@ -797,6 +818,7 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
         drawSize={drawSize * PEN_PRESETS[penKind].widthFactor}
         drawOpacity={PEN_PRESETS[penKind].opacity}
         placing={placing}
+        readOnly={!canEdit}
         handleRef={canvasHandle}
         isPhone={isPhone}
         keyboardOpen={keyboardOpen}
@@ -829,34 +851,43 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
         title={moodboard.title}
         itemCount={moodboard.items.filter((i) => i.type !== "DRAWING").length}
         onTitleChange={handleUpdateTitle}
-        onBack={() => router.push("/customer/moodboards")}
+        readOnly={!canEdit}
+        canDelete={moodboard.access.canDelete}
+        canShare={moodboard.access.canShare}
+        shared={moodboard.sharedWithCustomer}
+        jobTitle={moodboard.ticketTitle}
+        onPickJob={() => setJobPickerOpen(true)}
+        onToggleShared={() => patchSharing({ sharedWithCustomer: !moodboard.sharedWithCustomer })}
+        onBack={() => router.push(basePath)}
         onDelete={handleDeleteBoard}
       />
 
-      <BoardToolbar
-        isPhone={isPhone}
-        moreOpen={moreOpen}
-        onSetMoreOpen={setMoreOpen}
-        hidden={keyboardOpen}
-        toolMode={toolMode}
-        placing={placing}
-        onSetToolMode={handleSetToolMode}
-        onPick={handlePick}
-        onDropAt={handleDropAt}
-        penKind={penKind}
-        drawColor={drawColor}
-        drawSize={drawSize}
-        shapeKind={shapeKind}
-        onSetPenKind={(kind) => {
-          setPenKind(kind);
-          if (kind === "highlighter" && drawColor === DRAW_COLORS[0]) {
-            setDrawColor(HIGHLIGHTER_DEFAULT_COLOR);
-          }
-        }}
-        onSetDrawColor={setDrawColor}
-        onSetDrawSize={setDrawSize}
-        onSetShapeKind={setShapeKind}
-      />
+      {canEdit && (
+        <BoardToolbar
+          isPhone={isPhone}
+          moreOpen={moreOpen}
+          onSetMoreOpen={setMoreOpen}
+          hidden={keyboardOpen}
+          toolMode={toolMode}
+          placing={placing}
+          onSetToolMode={handleSetToolMode}
+          onPick={handlePick}
+          onDropAt={handleDropAt}
+          penKind={penKind}
+          drawColor={drawColor}
+          drawSize={drawSize}
+          shapeKind={shapeKind}
+          onSetPenKind={(kind) => {
+            setPenKind(kind);
+            if (kind === "highlighter" && drawColor === DRAW_COLORS[0]) {
+              setDrawColor(HIGHLIGHTER_DEFAULT_COLOR);
+            }
+          }}
+          onSetDrawColor={setDrawColor}
+          onSetDrawSize={setDrawSize}
+          onSetShapeKind={setShapeKind}
+        />
+      )}
 
       {deleted && (
         <div
@@ -872,6 +903,18 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
             Undo
           </button>
         </div>
+      )}
+
+      {moodboard.access.canShare && (
+        <LinkJobModal
+          open={jobPickerOpen}
+          currentTicketId={moodboard.ticketId}
+          onClose={() => setJobPickerOpen(false)}
+          onPick={(ticketId) => {
+            setJobPickerOpen(false);
+            patchSharing({ ticketId });
+          }}
+        />
       )}
 
       {/* Hidden file inputs */}

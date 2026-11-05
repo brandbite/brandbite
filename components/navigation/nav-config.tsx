@@ -89,6 +89,7 @@ export const ADMIN_NAV: NavConfig = {
         },
         { href: "/admin/consultations", label: "Consultations", icon: IconConsultations },
         { href: "/admin/meetings", label: "Meetings", icon: IconConsultations },
+        { href: "/admin/moodboards", label: "Moodboards", icon: IconMoodboards },
       ],
     },
     {
@@ -229,6 +230,7 @@ export const CREATIVE_NAV: NavConfig = {
           icon: IconBoard,
           highlightOnPaths: ["/creative/tickets"],
         },
+        { href: "/creative/moodboards", label: "Moodboards", icon: IconMoodboards },
         { href: "/creative/portfolio", label: "Portfolio", icon: IconPortfolio },
         { href: "/colors", label: "Color Studio", icon: IconColorStudio },
       ],

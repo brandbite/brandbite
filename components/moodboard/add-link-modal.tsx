@@ -36,7 +36,7 @@ export function AddLinkModal({ open, onClose, onSave }: AddLinkModalProps) {
 
       setFetching(true);
       try {
-        const res = await fetch("/api/customer/moodboards/link-preview", {
+        const res = await fetch("/api/moodboards/link-preview", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ url: targetUrl }),

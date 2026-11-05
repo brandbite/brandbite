@@ -1,5 +1,5 @@
 // -----------------------------------------------------------------------------
-// @file: app/api/customer/moodboards/video-oembed/route.ts
+// @file: app/api/moodboards/video-oembed/route.ts
 // @purpose: Fetch video title via oembed API (YouTube, Vimeo)
 // -----------------------------------------------------------------------------
 
@@ -9,7 +9,7 @@ import { getCurrentUserOrThrow } from "@/lib/auth";
 export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
-    if (user.role !== "CUSTOMER") {
+    if (user.role !== "CUSTOMER" && user.role !== "DESIGNER") {
       return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
     }
 

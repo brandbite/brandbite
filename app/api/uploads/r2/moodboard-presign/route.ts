@@ -14,6 +14,7 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { MOODBOARD_ACCESS_SELECT, moodboardAccess } from "@/lib/moodboard-access";
 import { createR2Client, getR2BucketName, getR2PublicBaseUrl, resolveAssetUrl } from "@/lib/r2";
 import { MAX_UPLOAD_BYTES } from "@/lib/upload-helpers";
 
@@ -39,17 +40,6 @@ export async function POST(req: Request) {
   try {
     const user = await getCurrentUserOrThrow();
 
-    if (user.role !== "CUSTOMER") {
-      return NextResponse.json(
-        { error: "Only customers can upload moodboard assets" },
-        { status: 403 },
-      );
-    }
-
-    if (!user.activeCompanyId) {
-      return NextResponse.json({ error: "No active company" }, { status: 400 });
-    }
-
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     const moodboardId = formData.get("moodboardId") as string | null;
@@ -65,17 +55,16 @@ export async function POST(req: Request) {
       );
     }
 
-    // Verify moodboard belongs to user's company
     const moodboard = await prisma.moodboard.findUnique({
       where: { id: moodboardId },
-      select: { id: true, companyId: true },
+      select: { id: true, ...MOODBOARD_ACCESS_SELECT },
     });
 
     if (!moodboard) {
       return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
     }
 
-    if (moodboard.companyId !== user.activeCompanyId) {
+    if (!moodboardAccess(user, moodboard).canEdit) {
       return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
     }
 

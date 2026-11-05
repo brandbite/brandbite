@@ -20,7 +20,8 @@ export type NotificationType =
   | "TICKET_STATUS_CHANGED"
   | "PIN_RESOLVED"
   | "WITHDRAWAL_UPDATED"
-  | "CREATIVE_SCHEDULE_UPDATED";
+  | "CREATIVE_SCHEDULE_UPDATED"
+  | "MOODBOARD_SHARED";
 
 export type NotificationPreference = {
   type: NotificationType;
@@ -68,12 +69,17 @@ export const NOTIFICATION_LABELS: Record<NotificationType, { title: string; desc
       title: "Creative working hours",
       description: "A creative changed their own working hours.",
     },
+    MOODBOARD_SHARED: {
+      title: "Shared moodboards",
+      description: "Your creative shared a moodboard on one of your requests.",
+    },
   };
 
 /** Types that only make sense for one role; others are shown to everyone. */
 const NOTIFICATION_ROLE_ONLY: Partial<Record<NotificationType, AccountRole[]>> = {
   WITHDRAWAL_UPDATED: ["DESIGNER"],
   CREATIVE_SCHEDULE_UPDATED: ["SITE_OWNER", "SITE_ADMIN"],
+  MOODBOARD_SHARED: ["CUSTOMER"],
 };
 
 export function notificationAppliesTo(type: NotificationType, role: AccountRole): boolean {
@@ -92,6 +98,7 @@ export const NOTIFICATION_ORDER: NotificationType[] = [
   "TICKET_COMPLETED",
   "WITHDRAWAL_UPDATED",
   "CREATIVE_SCHEDULE_UPDATED",
+  "MOODBOARD_SHARED",
 ];
 
 export function notificationEventsFor(role: AccountRole): NotificationType[] {

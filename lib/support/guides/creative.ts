@@ -806,6 +806,60 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
     ],
   },
   {
+    slug: "moodboards",
+    title: "Moodboards",
+    summary:
+      "Collect references and develop ideas on a canvas, see the boards customers attach to your jobs, and share yours when you're ready.",
+    category: "Work",
+    routes: ["/creative/moodboards"],
+    keywords: ["canvas", "references", "inspiration", "ideas", "share", "sticky note", "arrow"],
+    related: ["ticket-details"],
+    sections: [
+      {
+        heading: "Your moodboards",
+        blocks: [
+          {
+            type: "p",
+            text: "Click **+ New Moodboard**, or **+ New moodboard for this job** on a job page. Drag items out of the toolbar at the bottom of the canvas, or click one and then click the canvas. Notes, shapes and text are ready to type on straight away.",
+          },
+          {
+            type: "p",
+            text: "Select an item and drag a dot on its edge onto another item to connect them with an arrow. Scroll, drag the empty canvas or pinch to move around.",
+          },
+          {
+            type: "warning",
+            text: "A moodboard you haven't shared is visible only to you and the brandbite team.",
+          },
+        ],
+      },
+      {
+        heading: "Sharing with the customer",
+        blocks: [
+          {
+            type: "steps",
+            items: [
+              "Open **More** on the moodboard and choose **Link to a job**. Boards started from a job page are already linked.",
+              "Choose **Share with customer**.",
+            ],
+          },
+          {
+            type: "p",
+            text: "The person who created the request is notified, and the customer can then look through the board, but can't change it. **Stop sharing with customer** takes it back. Linking the board to a different job also stops sharing it.",
+          },
+        ],
+      },
+      {
+        heading: "Customer moodboards",
+        blocks: [
+          {
+            type: "p",
+            text: "When a customer attaches a moodboard to a request, you can open it from the job page while the job is assigned to you. It also appears in your list as **From the customer**. These boards are view only.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     slug: "portfolio",
     title: "Your portfolio",
     summary: "Every job you've completed, collected automatically from your approved work.",

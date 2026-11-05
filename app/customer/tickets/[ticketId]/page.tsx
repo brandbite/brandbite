@@ -84,6 +84,7 @@ type TicketMoodboard = {
   id: string;
   title: string;
   itemCount: number;
+  fromCreative?: boolean;
 };
 
 type TicketDetailResponse = {
@@ -1096,7 +1097,14 @@ export default function CustomerTicketDetailPage() {
                             href={`/customer/moodboards/${mb.id}`}
                             className="flex min-h-10 items-center justify-between gap-3 rounded-lg border border-[var(--av2-border)] px-3 py-2 text-sm hover:bg-[var(--av2-bg)]"
                           >
-                            <span className="truncate font-medium">{mb.title}</span>
+                            <span className="min-w-0">
+                              <span className="block truncate font-medium">{mb.title}</span>
+                              {mb.fromCreative && (
+                                <span className="text-xs text-[var(--av2-text-2)]">
+                                  From your creative
+                                </span>
+                              )}
+                            </span>
                             <span className="shrink-0 text-xs text-[var(--av2-text-2)]">
                               {mb.itemCount} {plural(mb.itemCount, "item", "items")}
                             </span>

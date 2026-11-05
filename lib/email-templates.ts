@@ -33,6 +33,7 @@ const SUBJECT_MAP: Record<NotificationType, string> = {
   PIN_RESOLVED: "Feedback note resolved",
   WITHDRAWAL_UPDATED: "Withdrawal update",
   CREATIVE_SCHEDULE_UPDATED: "A creative changed their working hours",
+  MOODBOARD_SHARED: "Your creative shared a moodboard",
 };
 
 export function getSubjectForType(type: NotificationType, title: string): string {
@@ -86,6 +87,7 @@ const CTA_LABELS: Record<NotificationType, string> = {
   PIN_RESOLVED: "View Ticket",
   WITHDRAWAL_UPDATED: "View Withdrawals",
   CREATIVE_SCHEDULE_UPDATED: "View Users",
+  MOODBOARD_SHARED: "View Request",
 };
 
 // ---------------------------------------------------------------------------
@@ -101,6 +103,7 @@ const TYPE_EMOJI: Record<NotificationType, string> = {
   PIN_RESOLVED: "\u{1F4CC}",
   WITHDRAWAL_UPDATED: "\u{1F4B8}",
   CREATIVE_SCHEDULE_UPDATED: "\u{1F552}",
+  MOODBOARD_SHARED: "\u{1F3A8}",
 };
 
 // ---------------------------------------------------------------------------

@@ -204,16 +204,18 @@ export default function NewTicketForm({
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/customer/moodboards");
+        const res = await fetch("/api/moodboards");
         if (!res.ok) return;
         const json = await res.json();
         if (!cancelled && Array.isArray(json.moodboards)) {
           setMoodboards(
-            json.moodboards.map((mb: any) => ({
-              id: mb.id,
-              title: mb.title,
-              itemCount: mb._count?.items ?? 0,
-            })),
+            json.moodboards
+              .filter((mb: any) => !mb.isCreativeBoard)
+              .map((mb: any) => ({
+                id: mb.id,
+                title: mb.title,
+                itemCount: mb._count?.items ?? 0,
+              })),
           );
         }
       } catch {

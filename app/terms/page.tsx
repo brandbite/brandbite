@@ -6,7 +6,7 @@
 //           so the old page rendered empty chrome).
 // @version: v2.0.0
 // @status: active
-// @lastUpdate: 2026-07-26
+// @lastUpdate: 2026-11-06
 // -----------------------------------------------------------------------------
 
 import type { Metadata } from "next";
@@ -40,6 +40,12 @@ const RULES = [
     icon: "/home/about-momentum.png",
     title: "Pause, cancel, no drama",
     body: "You can pause or cancel your plan anytime. No guilt trip, no dramatic goodbye scene. Your files, assets and completed work stay yours.",
+  },
+  {
+    // Mirrors the "Who can see your work" card on the privacy page.
+    icon: "/home/why-flow.png",
+    title: "Our team can see what's on Brandbite",
+    body: "To run the service, give support and prevent misuse, the brandbite team can see what's in your account, including requests, files, comments and moodboards. That includes moodboards a creative hasn't shared with anyone. The privacy policy explains who else can see your work.",
   },
 ];
 

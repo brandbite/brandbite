@@ -24,6 +24,7 @@ import {
   Tabs,
 } from "@/components/admin/v2/ui";
 import { DeliveryForm } from "@/components/dashboard/tickets/delivery-form";
+import { JobMoodboards } from "@/components/dashboard/tickets/job-moodboards";
 import {
   BackLink,
   CollapsedVersion,
@@ -612,6 +613,8 @@ export default function CreativeTicketDetailPage() {
                   ]}
                 />
               </Card>
+
+              <JobMoodboards ticketId={ticket.id} />
 
               <Card>
                 <h2 className="mb-2 text-xl leading-7 font-semibold">Quick links</h2>
