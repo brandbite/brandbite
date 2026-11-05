@@ -1388,8 +1388,19 @@ export const ADMIN_GUIDES: SupportGuide[] = [
     title: "Feedback and contact inboxes",
     summary: "Triage in-app feedback and messages from the public contact form.",
     category: "System",
-    routes: ["/admin/feedback", "/admin/contact"],
-    keywords: ["feedback", "bugs", "feature requests", "contact", "messages", "inbox", "reply"],
+    routes: ["/admin/feedback", "/admin/contact", "/admin/guide-votes"],
+    keywords: [
+      "feedback",
+      "bugs",
+      "feature requests",
+      "contact",
+      "messages",
+      "inbox",
+      "reply",
+      "guide ratings",
+      "helpful",
+      "votes",
+    ],
     related: ["settings"],
     sections: [
       {
@@ -1407,6 +1418,15 @@ export const ADMIN_GUIDES: SupportGuide[] = [
           {
             type: "p",
             text: "Messages from the public /contact form. Opening a message doesn't change its status. Use **Reply by email** to answer from your mail app, then **Mark as read** or **Archive**.",
+          },
+        ],
+      },
+      {
+        heading: "Guide ratings",
+        blocks: [
+          {
+            type: "p",
+            text: "Every Support guide ends with **Was this helpful?**. Each person has one answer per guide and can change it. **Guide ratings** shows the totals for each guide, with the most **No** answers first, so you can see which guides to improve. It doesn't show who answered.",
           },
         ],
       },
