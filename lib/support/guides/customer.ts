@@ -815,7 +815,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Use the toolbar on the left (on mobile, the **+** button). New items are placed below what's already there.",
+            text: "Use the toolbar above the canvas. New items appear in the middle of what you're looking at.",
           },
           {
             type: "list",
@@ -828,13 +828,13 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
                 text: "paste a URL. Its title and description are filled in for you.",
               },
               { term: "File", text: "upload any file (4 MB max)." },
-              { term: "Todo", text: "a checklist with as many items as you like." },
+              { term: "Checklist", text: "a checklist with as many items as you like." },
               { term: "Video", text: "paste a YouTube, Vimeo or Loom link." },
             ],
           },
           {
             type: "p",
-            text: "On desktop you can also **Draw** freehand (right-click Draw to change the colour and size) and connect two cards with an **Arrow**: click the first card, then the second.",
+            text: "You can also **Draw** freehand, picking the colour and size under the toolbar, and connect two cards with an **Arrow**: click the first card, then the second.",
           },
         ],
       },
@@ -844,10 +844,15 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           {
             type: "list",
             items: [
-              "Drag a card by its handle to move it. Drag the bottom-right corner to resize.",
-              "Scroll to pan, or hold **Space** and drag.",
-              "**Ctrl** + scroll (**⌘** + scroll on a Mac) to zoom, or use the zoom buttons, including **Fit to content**.",
+              "Click a card to select it, and click it again to edit it. Double-clicking does both.",
+              "Drag a card from anywhere on it to move it. With a card selected, drag a corner to resize it or use the arrow keys to nudge it.",
+              "Scroll, drag the empty canvas, or hold **Space** and drag to move around. The canvas has no edges.",
+              "**Ctrl** + scroll (**⌘** + scroll on a Mac) or pinch to zoom, or use the zoom buttons, including **Fit to content**.",
             ],
+          },
+          {
+            type: "p",
+            text: "Shortcuts: **V** Select, **L** Arrow, **M** Draw, **E** Eraser, **Shift** + **1** fit to content, **Ctrl** + **0** back to 100%.",
           },
         ],
       },
@@ -855,12 +860,16 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         heading: "Deleting",
         blocks: [
           {
-            type: "warning",
-            text: "Deleting a card (**⋮** → **Delete**), an arrow (click it) or a drawing (Eraser) happens immediately, with no undo.",
+            type: "p",
+            text: "Select a card, arrow or drawing and press **Delete**, or use its delete button. The Eraser removes drawings as you touch them.",
           },
           {
             type: "p",
-            text: "**Delete** at the top removes the whole moodboard and its uploaded files after you confirm. Only the person who created it, an Owner or a Project manager can do this.",
+            text: "After deleting a card or drawing, **Undo** appears for a few seconds, and **Ctrl** + **Z** (**⌘** + **Z** on a Mac) does the same. Only the last one can be brought back. Deleted arrows can't.",
+          },
+          {
+            type: "p",
+            text: "**More** → **Delete moodboard** removes the whole moodboard and its uploaded files after you confirm. Only the person who created it, an Owner or a Project manager can do this.",
           },
         ],
       },

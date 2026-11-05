@@ -132,8 +132,8 @@ export function AddEmbedModal({ open, onClose, onSave }: AddEmbedModalProps) {
             onChange={(e) => handleUrlChange(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Paste a YouTube, Vimeo, or Loom URL..."
-            className={`w-full rounded-lg border bg-white px-3 py-2 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-gray-400 focus:border-[var(--bb-primary)] ${
-              url.trim() && !valid ? "border-red-300" : "border-[var(--bb-border)]"
+            className={`w-full rounded-lg border bg-[var(--av2-surface)] px-3 py-2 text-sm text-[var(--av2-text)] outline-none placeholder:text-[var(--av2-text-2)] focus:border-[var(--av2-accent)] ${
+              url.trim() && !valid ? "border-red-300" : "border-[var(--av2-border)]"
             }`}
           />
           {url.trim() && !valid && (
@@ -153,16 +153,16 @@ export function AddEmbedModal({ open, onClose, onSave }: AddEmbedModalProps) {
             }}
             onKeyDown={handleKeyDown}
             placeholder="Title (auto-filled from video)"
-            className="w-full rounded-lg border border-[var(--bb-border)] bg-white px-3 py-2 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-gray-400 focus:border-[var(--bb-primary)]"
+            className="w-full rounded-lg border border-[var(--av2-border)] bg-[var(--av2-surface)] px-3 py-2 text-sm text-[var(--av2-text)] outline-none placeholder:text-[var(--av2-text-2)] focus:border-[var(--av2-accent)]"
           />
           {fetching && (
-            <p className="mt-1 text-xs text-[var(--bb-text-secondary)]">Fetching video title...</p>
+            <p className="mt-1 text-xs text-[var(--av2-text-2)]">Fetching video title...</p>
           )}
         </div>
 
         {/* Preview */}
         {parsed && (
-          <div className="overflow-hidden rounded-lg border border-[var(--bb-border)] bg-[var(--bb-bg-warm)]">
+          <div className="overflow-hidden rounded-lg border border-[var(--av2-border)] bg-[var(--av2-bg)]">
             {parsed.thumbnailUrl ? (
               <div className="relative aspect-video w-full bg-gray-900">
                 <img
@@ -179,7 +179,7 @@ export function AddEmbedModal({ open, onClose, onSave }: AddEmbedModalProps) {
                 </div>
               </div>
             ) : (
-              <div className="flex aspect-video w-full items-center justify-center bg-gray-100">
+              <div className="flex aspect-video w-full items-center justify-center bg-[var(--av2-bg)]">
                 <svg width="32" height="32" viewBox="0 0 48 48" fill="none">
                   <rect x="6" y="10" width="36" height="28" rx="4" stroke="#999" strokeWidth="2" />
                   <path d="M20 18V30L30 24L20 18Z" fill="#999" />
@@ -187,7 +187,7 @@ export function AddEmbedModal({ open, onClose, onSave }: AddEmbedModalProps) {
               </div>
             )}
             <div className="px-3 py-2">
-              <p className="text-xs font-medium text-[var(--bb-secondary)]">
+              <p className="text-xs font-medium text-[var(--av2-text)]">
                 {title ? title : `${providerLabels[parsed.provider]} video detected`}
               </p>
             </div>
@@ -198,14 +198,14 @@ export function AddEmbedModal({ open, onClose, onSave }: AddEmbedModalProps) {
       <div className="mt-4 flex justify-end gap-2">
         <button
           onClick={handleClose}
-          className="rounded-lg border border-[var(--bb-border)] px-4 py-2 text-sm font-medium text-[var(--bb-secondary)] transition-colors hover:bg-[var(--bb-bg-warm)]"
+          className="rounded-lg border border-[var(--av2-border)] px-4 py-2 text-sm font-medium text-[var(--av2-text)] transition-colors hover:bg-[var(--av2-bg)]"
         >
           Cancel
         </button>
         <button
           onClick={handleSave}
           disabled={!parsed}
-          className="rounded-lg bg-[var(--bb-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--bb-primary-hover)] disabled:opacity-50"
+          className="rounded-lg bg-[var(--av2-accent)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--av2-accent-strong)] disabled:opacity-50"
         >
           Save
         </button>

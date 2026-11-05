@@ -170,9 +170,10 @@ export const CANVAS_DEFAULTS = {
   GAP: 20,
   MIN_WIDTH: 160,
   MIN_HEIGHT: 80,
-  MIN_ZOOM: 0.15,
-  MAX_ZOOM: 2,
-  ZOOM_STEP: 0.1,
+  MIN_ZOOM: 0.1,
+  MAX_ZOOM: 4,
+  /** Zoom buttons and shortcuts multiply by this. */
+  ZOOM_STEP: 1.25,
 } as const;
 
 export type MoodboardClient = {

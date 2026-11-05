@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { MoodboardItemClient, DrawingCardData } from "@/lib/moodboard";
 
 type DrawingLayerProps = {
@@ -14,10 +14,9 @@ type DrawingLayerProps = {
   strokeColor: string;
   /** Current stroke width. */
   strokeWidth: number;
+  /** Read when needed, so moving the canvas doesn't re-render this layer. */
+  getTransform: () => { panX: number; panY: number; zoom: number };
   /** Viewport ref for coordinate conversion. */
-  panX: number;
-  panY: number;
-  zoom: number;
   viewportRef: React.RefObject<HTMLDivElement | null>;
   /** Called when a new stroke is completed. */
   onStrokeComplete: (
@@ -98,15 +97,13 @@ function computeBounds(points: { x: number; y: number }[], strokeWidth: number) 
   };
 }
 
-export function DrawingLayer({
+function DrawingLayerBase({
   drawings,
   active,
   eraserActive,
   strokeColor,
   strokeWidth,
-  panX,
-  panY,
-  zoom,
+  getTransform,
   viewportRef,
   onStrokeComplete,
   onSelectDrawing,
@@ -139,13 +136,14 @@ export function DrawingLayer({
       (e.target as SVGSVGElement).setPointerCapture(e.pointerId);
 
       const rect = viewportRef.current.getBoundingClientRect();
+      const { panX, panY, zoom } = getTransform();
       const pt = toCanvas(e.clientX, e.clientY, rect, panX, panY, zoom);
 
       pointsRef.current = [pt];
       setCurrentPoints([pt]);
       setIsDrawing(true);
     },
-    [active, panX, panY, zoom, viewportRef],
+    [active, getTransform, viewportRef],
   );
 
   const handlePointerMove = useCallback(
@@ -153,6 +151,7 @@ export function DrawingLayer({
       if (!isDrawing || !viewportRef.current) return;
 
       const rect = viewportRef.current.getBoundingClientRect();
+      const { panX, panY, zoom } = getTransform();
       const pt = toCanvas(e.clientX, e.clientY, rect, panX, panY, zoom);
 
       // Throttle: skip if too close to the previous point
@@ -163,7 +162,7 @@ export function DrawingLayer({
       pointsRef.current.push(pt);
       setCurrentPoints([...pointsRef.current]);
     },
-    [isDrawing, panX, panY, zoom, viewportRef],
+    [isDrawing, getTransform, viewportRef],
   );
 
   const handlePointerUp = useCallback(
@@ -212,10 +211,11 @@ export function DrawingLayer({
       if (!eraserActive || !viewportRef.current) return;
 
       const rect = viewportRef.current.getBoundingClientRect();
+      const { panX, panY, zoom } = getTransform();
       const pt = toCanvas(e.clientX, e.clientY, rect, panX, panY, zoom);
       setEraserCursorPos(pt);
     },
-    [eraserActive, panX, panY, zoom, viewportRef],
+    [eraserActive, getTransform, viewportRef],
   );
 
   const handleEraserPointerUp = useCallback(
@@ -268,7 +268,7 @@ export function DrawingLayer({
                 strokeWidth={Math.max(data.strokeWidth + 12, 16)}
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="pointer-events-stroke cursor-pointer"
+                style={{ pointerEvents: "stroke", cursor: "pointer" }}
                 onClick={(e) => {
                   e.stopPropagation();
                   if (eraserActive && onDeleteDrawing) {
@@ -315,7 +315,7 @@ export function DrawingLayer({
             {/* Delete button for selected drawing (select mode only) */}
             {isSelected && !eraserActive && onDeleteDrawing && (
               <g
-                className="pointer-events-auto cursor-pointer"
+                style={{ pointerEvents: "auto", cursor: "pointer" }}
                 onClick={(e) => {
                   e.stopPropagation();
                   onDeleteDrawing(item.id);
@@ -374,3 +374,5 @@ export function DrawingLayer({
     </svg>
   );
 }
+
+export const DrawingLayer = memo(DrawingLayerBase);

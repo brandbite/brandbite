@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React from "react";
 import { DRAW_COLORS, DRAW_SIZES } from "@/lib/moodboard";
 
 export type ToolMode = "select" | "arrow" | "draw" | "eraser";
@@ -214,6 +214,21 @@ function VideoIcon() {
   );
 }
 
+const TOOL_BUTTON =
+  "flex min-h-14 min-w-16 flex-col items-center justify-center gap-1 rounded-xl px-3 py-1.5 text-xs font-medium focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none";
+
+function toolClass(active: boolean) {
+  return `${TOOL_BUTTON} ${
+    active
+      ? "bg-[var(--av2-selected)] text-[var(--av2-link)]"
+      : "text-[var(--av2-text)] hover:bg-[var(--av2-bg)]"
+  }`;
+}
+
+function Divider() {
+  return <div aria-hidden className="mx-1 h-10 w-px shrink-0 self-center bg-[var(--av2-border)]" />;
+}
+
 export function BoardToolbar({
   onAddNote,
   onAddImage,
@@ -229,283 +244,123 @@ export function BoardToolbar({
   onSetDrawColor,
   onSetDrawSize,
 }: BoardToolbarProps) {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [drawSettingsOpen, setDrawSettingsOpen] = useState(false);
-  const drawSettingsRef = useRef<HTMLDivElement>(null);
-
-  // Close draw settings on outside click
-  useEffect(() => {
-    if (!drawSettingsOpen) return;
-    function handleClick(e: MouseEvent) {
-      if (drawSettingsRef.current && !drawSettingsRef.current.contains(e.target as Node)) {
-        setDrawSettingsOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [drawSettingsOpen]);
-
-  const tools: ToolItem[] = [
+  const content: ToolItem[] = [
     { label: "Note", onClick: onAddNote, icon: <NoteIcon /> },
     { label: "Image", onClick: onAddImage, icon: <ImageIcon /> },
     { label: "Color", onClick: onAddColor, icon: <ColorIcon /> },
     { label: "Link", onClick: onAddLink, icon: <LinkIcon /> },
     { label: "File", onClick: onAddFile, icon: <FileIcon /> },
-    { label: "Todo", onClick: onAddTodo, icon: <TodoIcon /> },
+  ];
+  const lists: ToolItem[] = [
+    { label: "Checklist", onClick: onAddTodo, icon: <TodoIcon /> },
     { label: "Video", onClick: onAddEmbed, icon: <VideoIcon /> },
   ];
 
-  const arrowActive = toolMode === "arrow";
-  const drawActive = toolMode === "draw";
-
-  function handleToolClick(tool: ToolItem) {
-    tool.onClick();
-    setMobileOpen(false);
-  }
+  const toggle = (mode: ToolMode) => onSetToolMode(toolMode === mode ? "select" : mode);
+  const add = (tool: ToolItem) => (
+    <button key={tool.label} type="button" onClick={tool.onClick} className={toolClass(false)}>
+      {tool.icon}
+      {tool.label}
+    </button>
+  );
 
   return (
-    <>
-      {/* Desktop vertical sidebar */}
-      <div className="hidden w-14 flex-shrink-0 flex-col gap-0.5 border-r border-[var(--bb-border-subtle)] bg-white/80 py-4 backdrop-blur-sm md:flex">
-        {/* Select tool (pointer/cursor) */}
+    <div className="relative rounded-2xl border border-[var(--av2-border)] bg-[var(--av2-surface)]">
+      <div
+        role="toolbar"
+        aria-label="Moodboard tools"
+        className="relative flex items-stretch gap-1 overflow-x-auto p-2 [scrollbar-width:none]"
+      >
         <button
           type="button"
+          aria-pressed={toolMode === "select"}
           onClick={() => onSetToolMode("select")}
-          className={`flex w-full flex-col items-center gap-1 rounded-xl px-1 py-2.5 text-[10px] font-medium transition-all duration-150 active:scale-95 ${
-            toolMode === "select"
-              ? "border-l-2 border-l-[var(--bb-primary)] text-[var(--bb-primary)]"
-              : "text-[var(--bb-text-tertiary)] hover:bg-[var(--bb-bg-warm)] hover:text-[var(--bb-secondary)]"
-          }`}
+          className={toolClass(toolMode === "select")}
+          title="Select (V)"
         >
           <SelectIcon />
           Select
         </button>
-
-        {/* Divider */}
-        <div className="mx-3 my-1.5 border-t border-[var(--bb-border-subtle)]" />
-
-        {tools.map((tool) => (
-          <button
-            key={tool.label}
-            type="button"
-            onClick={() => handleToolClick(tool)}
-            className="flex w-full flex-col items-center gap-1 rounded-xl px-1 py-2.5 text-[10px] font-medium text-[var(--bb-text-tertiary)] transition-all duration-150 hover:bg-[var(--bb-bg-warm)] hover:text-[var(--bb-secondary)] active:scale-95"
-          >
-            {tool.icon}
-            {tool.label}
-          </button>
-        ))}
-
-        {/* Divider */}
-        <div className="mx-3 my-1.5 border-t border-[var(--bb-border-subtle)]" />
-
-        {/* Arrow toggle */}
+        <Divider />
+        {content.map(add)}
+        <Divider />
+        {lists.map(add)}
+        <Divider />
         <button
           type="button"
-          onClick={() => onSetToolMode(arrowActive ? "select" : "arrow")}
-          className={`flex w-full flex-col items-center gap-1 rounded-xl px-1 py-2.5 text-[10px] font-medium transition-all duration-150 active:scale-95 ${
-            arrowActive
-              ? "border-l-2 border-l-[var(--bb-primary)] text-[var(--bb-primary)]"
-              : "text-[var(--bb-text-tertiary)] hover:bg-[var(--bb-bg-warm)] hover:text-[var(--bb-secondary)]"
-          }`}
+          aria-pressed={toolMode === "arrow"}
+          onClick={() => toggle("arrow")}
+          className={toolClass(toolMode === "arrow")}
+          title="Arrow (L)"
         >
           <ArrowIcon />
           Arrow
         </button>
-
-        {/* Draw toggle + settings */}
-        <div ref={drawSettingsRef} className="relative">
-          <button
-            type="button"
-            onClick={() => {
-              if (drawActive) {
-                onSetToolMode("select");
-              } else {
-                onSetToolMode("draw");
-              }
-            }}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              setDrawSettingsOpen((prev) => !prev);
-            }}
-            className={`flex w-full flex-col items-center gap-1 rounded-xl px-1 py-2.5 text-[10px] font-medium transition-all duration-150 active:scale-95 ${
-              drawActive
-                ? "border-l-2 border-l-[var(--bb-primary)] text-[var(--bb-primary)]"
-                : "text-[var(--bb-text-tertiary)] hover:bg-[var(--bb-bg-warm)] hover:text-[var(--bb-secondary)]"
-            }`}
-          >
-            <DrawIcon />
-            Draw
-          </button>
-
-          {/* Draw color indicator dot */}
-          {drawActive && (
-            <button
-              type="button"
-              onClick={() => setDrawSettingsOpen((prev) => !prev)}
-              className="mx-auto mt-0.5 flex items-center justify-center"
-              aria-label="Drawing settings"
-            >
-              <div
-                className="h-3 w-3 rounded-full border border-gray-300"
-                style={{ backgroundColor: drawColor }}
-              />
-            </button>
-          )}
-
-          {/* Draw settings popover */}
-          {drawSettingsOpen && (
-            <div className="absolute top-0 left-14 z-50 w-44 rounded-xl border border-[var(--bb-border-subtle)] bg-white/95 p-3 shadow-[0_4px_16px_rgba(0,0,0,0.1),0_1px_4px_rgba(0,0,0,0.06)] backdrop-blur-md">
-              <p className="mb-2 text-[10px] font-semibold tracking-wider text-[var(--bb-text-secondary)] uppercase">
-                Color
-              </p>
-              <div className="mb-3 flex flex-wrap gap-1.5">
-                {DRAW_COLORS.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => onSetDrawColor(c)}
-                    className={`h-6 w-6 rounded-full border-2 transition-transform hover:scale-110 ${
-                      drawColor === c
-                        ? "scale-110 border-[var(--bb-primary)]"
-                        : "border-transparent"
-                    }`}
-                    style={{ backgroundColor: c }}
-                    aria-label={`Color ${c}`}
-                  />
-                ))}
-              </div>
-
-              <p className="mb-2 text-[10px] font-semibold tracking-wider text-[var(--bb-text-secondary)] uppercase">
-                Size
-              </p>
-              <div className="flex items-center gap-2">
-                {DRAW_SIZES.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => onSetDrawSize(s)}
-                    className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${
-                      drawSize === s
-                        ? "border-[var(--bb-primary)] bg-[var(--bb-primary)]/10"
-                        : "border-[var(--bb-border)] hover:bg-[var(--bb-bg-warm)]"
-                    }`}
-                    aria-label={`${s}px stroke`}
-                  >
-                    <div
-                      className="rounded-full"
-                      style={{
-                        width: s + 2,
-                        height: s + 2,
-                        backgroundColor: drawColor,
-                      }}
-                    />
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Eraser toggle */}
         <button
           type="button"
-          onClick={() => onSetToolMode(toolMode === "eraser" ? "select" : "eraser")}
-          className={`flex w-full flex-col items-center gap-1 rounded-xl px-1 py-2.5 text-[10px] font-medium transition-all duration-150 active:scale-95 ${
-            toolMode === "eraser"
-              ? "border-l-2 border-l-[var(--bb-primary)] text-[var(--bb-primary)]"
-              : "text-[var(--bb-text-tertiary)] hover:bg-[var(--bb-bg-warm)] hover:text-[var(--bb-secondary)]"
-          }`}
+          aria-pressed={toolMode === "draw"}
+          onClick={() => toggle("draw")}
+          className={toolClass(toolMode === "draw")}
+          title="Draw (M)"
+        >
+          <DrawIcon />
+          Draw
+        </button>
+        <button
+          type="button"
+          aria-pressed={toolMode === "eraser"}
+          onClick={() => toggle("eraser")}
+          className={toolClass(toolMode === "eraser")}
+          title="Eraser (E)"
         >
           <EraserIcon />
           Eraser
         </button>
       </div>
 
-      {/* Mobile floating action button */}
-      <div className="fixed right-6 bottom-6 z-40 md:hidden">
-        {/* Expanded menu */}
-        {mobileOpen && (
-          <>
-            {/* Backdrop */}
-            <div className="fixed inset-0 z-30" onClick={() => setMobileOpen(false)} />
-            <div className="absolute right-0 bottom-16 z-40 flex flex-col gap-1 rounded-2xl border border-[var(--bb-border-subtle)] bg-white/95 p-2 shadow-[0_8px_32px_rgba(0,0,0,0.12)] backdrop-blur-md">
-              {/* Select tool */}
+      {toolMode === "draw" && (
+        // Floats over the canvas: pushing it down would make every card jump.
+        <div className="absolute top-full left-2 z-30 mt-3 flex max-w-[calc(100%-1rem)] flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-1 shadow-sm">
+          <div role="group" aria-label="Pen color" className="flex items-center gap-1">
+            {DRAW_COLORS.map((c) => (
               <button
+                key={c}
                 type="button"
-                onClick={() => {
-                  onSetToolMode("select");
-                  setMobileOpen(false);
-                }}
-                className={`flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm transition-colors ${
-                  toolMode === "select"
-                    ? "bg-[var(--bb-primary)]/10 text-[var(--bb-primary)]"
-                    : "text-[var(--bb-secondary)] hover:bg-[var(--bb-bg-warm)] hover:text-[var(--bb-primary)]"
+                aria-pressed={drawColor === c}
+                aria-label={`Color ${c}`}
+                onClick={() => onSetDrawColor(c)}
+                className="flex h-10 w-10 items-center justify-center rounded-lg hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
+              >
+                <span
+                  className={`h-6 w-6 rounded-full border-2 ${
+                    drawColor === c ? "border-[var(--av2-accent)]" : "border-[var(--av2-border)]"
+                  }`}
+                  style={{ backgroundColor: c }}
+                />
+              </button>
+            ))}
+          </div>
+          <div role="group" aria-label="Pen size" className="flex items-center gap-1">
+            {DRAW_SIZES.map((size) => (
+              <button
+                key={size}
+                type="button"
+                aria-pressed={drawSize === size}
+                aria-label={`${size} pixel stroke`}
+                onClick={() => onSetDrawSize(size)}
+                className={`flex h-10 w-10 items-center justify-center rounded-lg focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none ${
+                  drawSize === size ? "bg-[var(--av2-selected)]" : "hover:bg-[var(--av2-bg)]"
                 }`}
               >
-                <SelectIcon />
-                Select
+                <span
+                  className="rounded-full"
+                  style={{ width: size + 2, height: size + 2, backgroundColor: drawColor }}
+                />
               </button>
-
-              <div className="mx-2 my-1 border-t border-[var(--bb-border-subtle)]" />
-
-              {tools.map((tool) => (
-                <button
-                  key={tool.label}
-                  type="button"
-                  onClick={() => handleToolClick(tool)}
-                  className="flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm text-[var(--bb-secondary)] transition-colors hover:bg-[var(--bb-bg-warm)] hover:text-[var(--bb-primary)]"
-                >
-                  {tool.icon}
-                  {tool.label}
-                </button>
-              ))}
-
-              <div className="mx-2 my-1 border-t border-[var(--bb-border-subtle)]" />
-
-              {/* Eraser tool */}
-              <button
-                type="button"
-                onClick={() => {
-                  onSetToolMode(toolMode === "eraser" ? "select" : "eraser");
-                  setMobileOpen(false);
-                }}
-                className={`flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm transition-colors ${
-                  toolMode === "eraser"
-                    ? "bg-[var(--bb-primary)]/10 text-[var(--bb-primary)]"
-                    : "text-[var(--bb-secondary)] hover:bg-[var(--bb-bg-warm)] hover:text-[var(--bb-primary)]"
-                }`}
-              >
-                <EraserIcon />
-                Eraser
-              </button>
-            </div>
-          </>
-        )}
-
-        {/* FAB toggle button */}
-        <button
-          type="button"
-          onClick={() => setMobileOpen((prev) => !prev)}
-          className="relative z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--bb-primary)] text-white shadow-lg transition-transform hover:bg-[var(--bb-primary-hover)] active:scale-95"
-          aria-label="Add item"
-        >
-          <svg
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            className={`transition-transform ${mobileOpen ? "rotate-45" : ""}`}
-          >
-            <path
-              d="M12 5V19M5 12H19"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-          </svg>
-        </button>
-      </div>
-    </>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

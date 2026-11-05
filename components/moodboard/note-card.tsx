@@ -63,14 +63,14 @@ export function NoteCard({ data, onUpdate }: NoteCardProps) {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Title (optional)"
-          className="mb-2 w-full border-none bg-transparent text-sm font-semibold text-[var(--bb-secondary)] outline-none placeholder:text-gray-400"
+          className="mb-2 w-full border-none bg-transparent text-sm font-semibold text-[var(--av2-text)] outline-none placeholder:text-[var(--av2-text-2)]"
         />
         <textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
           placeholder="Write something..."
           rows={4}
-          className="w-full resize-none border-none bg-transparent text-sm text-[var(--bb-text-secondary)] outline-none placeholder:text-gray-400"
+          className="w-full resize-none border-none bg-transparent text-sm text-[var(--av2-text-2)] outline-none placeholder:text-[var(--av2-text-2)]"
         />
       </div>
     );
@@ -82,19 +82,19 @@ export function NoteCard({ data, onUpdate }: NoteCardProps) {
   });
 
   return (
-    <div className="min-h-[4rem] cursor-pointer p-4" onClick={enterEdit}>
+    <div className="h-full min-h-[4rem] p-4" onClick={enterEdit}>
       {data.title && (
-        <h3 className="mb-1 text-[13px] leading-snug font-semibold text-[var(--bb-secondary)]">
+        <h3 className="mb-1 text-[13px] leading-snug font-semibold text-[var(--av2-text)]">
           {data.title}
         </h3>
       )}
       {data.body ? (
         <div
-          className="bb-rich-text text-[13px] leading-relaxed text-[var(--bb-text-secondary)]"
+          className="bb-rich-text text-[13px] leading-relaxed text-[var(--av2-text-2)]"
           dangerouslySetInnerHTML={{ __html: sanitizedBody }}
         />
       ) : (
-        <p className="text-sm text-gray-400 italic">Click to add a note...</p>
+        <p className="text-sm text-[var(--av2-text-2)] italic">Click to add a note...</p>
       )}
     </div>
   );

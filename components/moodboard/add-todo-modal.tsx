@@ -68,28 +68,28 @@ export function AddTodoModal({ open, onClose, onSave }: AddTodoModalProps) {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="List title (optional)"
-          className="w-full rounded-lg border border-[var(--bb-border)] bg-white px-3 py-2 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-gray-400 focus:border-[var(--bb-primary)]"
+          className="w-full rounded-lg border border-[var(--av2-border)] bg-[var(--av2-surface)] px-3 py-2 text-sm text-[var(--av2-text)] outline-none placeholder:text-[var(--av2-text-2)] focus:border-[var(--av2-accent)]"
         />
 
         <div className="space-y-2">
-          <p className="text-xs font-medium text-[var(--bb-text-secondary)]">Items</p>
+          <p className="text-xs font-medium text-[var(--av2-text-2)]">Items</p>
           {items.map((item, index) => (
             <div key={index} className="flex items-center gap-2">
               <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border border-gray-300">
-                <div className="h-2 w-2 rounded-sm bg-gray-200" />
+                <div className="h-2 w-2 rounded-sm bg-[var(--av2-border)]" />
               </div>
               <input
                 type="text"
                 value={item}
                 onChange={(e) => updateItem(index, e.target.value)}
                 placeholder={`Item ${index + 1}`}
-                className="flex-1 rounded-lg border border-[var(--bb-border)] bg-white px-3 py-1.5 text-sm text-[var(--bb-secondary)] outline-none placeholder:text-gray-400 focus:border-[var(--bb-primary)]"
+                className="flex-1 rounded-lg border border-[var(--av2-border)] bg-[var(--av2-surface)] px-3 py-1.5 text-sm text-[var(--av2-text)] outline-none placeholder:text-[var(--av2-text-2)] focus:border-[var(--av2-accent)]"
               />
               {items.length > 1 && (
                 <button
                   type="button"
                   onClick={() => removeItem(index)}
-                  className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                  className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-[var(--av2-text-2)] transition-colors hover:bg-red-50 hover:text-red-500"
                   aria-label="Remove item"
                 >
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -109,7 +109,7 @@ export function AddTodoModal({ open, onClose, onSave }: AddTodoModalProps) {
         <button
           type="button"
           onClick={addItem}
-          className="text-xs font-medium text-[var(--bb-primary)] transition-colors hover:underline"
+          className="text-xs font-medium text-[var(--av2-accent)] transition-colors hover:underline"
         >
           + Add item
         </button>
@@ -118,14 +118,14 @@ export function AddTodoModal({ open, onClose, onSave }: AddTodoModalProps) {
       <div className="mt-4 flex justify-end gap-2">
         <button
           onClick={handleClose}
-          className="rounded-lg border border-[var(--bb-border)] px-4 py-2 text-sm font-medium text-[var(--bb-secondary)] transition-colors hover:bg-[var(--bb-bg-warm)]"
+          className="rounded-lg border border-[var(--av2-border)] px-4 py-2 text-sm font-medium text-[var(--av2-text)] transition-colors hover:bg-[var(--av2-bg)]"
         >
           Cancel
         </button>
         <button
           onClick={handleSave}
           disabled={!hasValidItems}
-          className="rounded-lg bg-[var(--bb-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--bb-primary-hover)] disabled:opacity-50"
+          className="rounded-lg bg-[var(--av2-accent)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--av2-accent-strong)] disabled:opacity-50"
         >
           Save
         </button>

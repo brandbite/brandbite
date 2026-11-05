@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 import { BoardToolbar } from "@/components/moodboard/board-toolbar";
 import { BoardHeader } from "@/components/moodboard/board-header";
-import { BoardCanvas } from "@/components/moodboard/board-canvas";
+import { BoardCanvas, type BoardCanvasHandle } from "@/components/moodboard/board-canvas";
 import { AddNoteModal } from "@/components/moodboard/add-note-modal";
 import { AddColorModal } from "@/components/moodboard/add-color-modal";
 import { AddLinkModal } from "@/components/moodboard/add-link-modal";
@@ -24,6 +24,7 @@ import type {
   FileCardData,
   EmbedCardData,
   DrawingCardData,
+  MoodboardConnection,
 } from "@/lib/moodboard";
 import { CANVAS_DEFAULTS, createConnection, DRAW_COLORS, DRAW_SIZES } from "@/lib/moodboard";
 import type { ToolMode } from "@/components/moodboard/board-toolbar";
@@ -34,40 +35,25 @@ type MoodboardViewProps = {
 
 type ModalType = "note" | "color" | "link" | "todo" | "embed" | null;
 
-/** Find a non-overlapping position for a new item near the center of existing content. */
-function findOpenPosition(items: MoodboardItemClient[], width: number): { x: number; y: number } {
-  // Place the first item with breathing room from the canvas origin so it feels centered
-  if (items.length === 0) return { x: 400, y: 260 };
+/** How long the Undo offer stays on screen after deleting. */
+const UNDO_MS = 8000;
+const CASCADE_PX = 24;
 
-  // Find bounding box of existing items
-  let minX = Infinity;
-  let maxY = 0;
-  for (const item of items) {
-    minX = Math.min(minX, item.x);
-    maxY = Math.max(maxY, item.y + (item.height || 200));
+type DeletedItem = { item: MoodboardItemClient; connections: MoodboardConnection[] };
+
+/** The middle of the view, stepped diagonally so new cards don't stack exactly. */
+function placeNear(
+  center: { x: number; y: number },
+  items: MoodboardItemClient[],
+  width: number,
+): { x: number; y: number } {
+  let x = Math.round(center.x - width / 2);
+  let y = Math.round(center.y - 100);
+  while (items.some((i) => Math.abs(i.x - x) < CASCADE_PX && Math.abs(i.y - y) < CASCADE_PX)) {
+    x += CASCADE_PX;
+    y += CASCADE_PX;
   }
-
-  const gap = CANVAS_DEFAULTS.GAP;
-  const colBase = Math.max(40, minX); // Align new items with leftmost existing item
-  const candidate = { x: colBase, y: maxY + gap };
-
-  // Place below existing content in a grid, checking for overlap
-  for (let row = 0; row < 20; row++) {
-    for (let col = 0; col < 4; col++) {
-      const cx = colBase + col * (CANVAS_DEFAULTS.CARD_WIDTH + gap);
-      const cy = maxY + gap + row * (220 + gap);
-      const overlaps = items.some(
-        (item) =>
-          cx < item.x + item.width + gap &&
-          cx + width + gap > item.x &&
-          cy < item.y + (item.height || 200) + gap &&
-          cy + 200 + gap > item.y,
-      );
-      if (!overlaps) return { x: cx, y: cy };
-    }
-  }
-
-  return candidate;
+  return { x, y };
 }
 
 export function MoodboardView({ moodboardId }: MoodboardViewProps) {
@@ -80,6 +66,10 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
   const [drawColor, setDrawColor] = useState<string>(DRAW_COLORS[0]);
   const [drawSize, setDrawSize] = useState<number>(DRAW_SIZES[1]); // 4px default
 
+  const [deleted, setDeleted] = useState<DeletedItem | null>(null);
+
+  const canvasHandle = useRef<BoardCanvasHandle | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -105,6 +95,27 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
     fetchMoodboard();
   }, [fetchMoodboard]);
 
+  // The canvas fills the rest of the window, so the page itself never scrolls and
+  // can't compete with the canvas. Measured, because banners change where it starts.
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const fit = () => {
+      const top = root.getBoundingClientRect().top + window.scrollY;
+      const bottomGap = parseFloat(getComputedStyle(root.parentElement!).paddingBottom) || 0;
+      root.style.height = `${Math.max(420, window.innerHeight - top - bottomGap)}px`;
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, [loading]);
+
+  useEffect(() => {
+    if (!deleted) return;
+    const timer = setTimeout(() => setDeleted(null), UNDO_MS);
+    return () => clearTimeout(timer);
+  }, [deleted]);
+
   // ---------------------------------------------------------------------------
   // Add item (with canvas position)
   // ---------------------------------------------------------------------------
@@ -117,7 +128,8 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
     const items = moodboard?.items ?? [];
     const width = opts?.width ?? CANVAS_DEFAULTS.CARD_WIDTH;
     const height = opts?.height ?? CANVAS_DEFAULTS.CARD_HEIGHT;
-    const { x, y } = findOpenPosition(items, width);
+    const center = canvasHandle.current?.viewCenter() ?? { x: 400, y: 260 };
+    const { x, y } = placeNear(center, items, width);
 
     try {
       const res = await fetch(`/api/customer/moodboards/${moodboardId}/items`, {
@@ -135,6 +147,7 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
         if (!prev) return prev;
         return { ...prev, items: [...prev.items, newItem] };
       });
+      canvasHandle.current?.selectCard(newItem.id);
     } catch (err) {
       console.error("[moodboard-view] add item error:", err);
     }
@@ -172,6 +185,8 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
   // ---------------------------------------------------------------------------
 
   async function handleDeleteItem(itemId: string) {
+    const item = moodboard?.items.find((i) => i.id === itemId);
+
     // Also remove any connections referencing this item
     const orphanedConns = (moodboard?.connections ?? []).filter(
       (c) => c.sourceItemId === itemId || c.targetItemId === itemId,
@@ -188,6 +203,7 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
         connections: cleanedConnections,
       };
     });
+    if (item) setDeleted({ item, connections: orphanedConns });
 
     try {
       const res = await fetch(`/api/customer/moodboards/${moodboardId}/items/${itemId}`, {
@@ -206,6 +222,53 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
       }
     } catch (err) {
       console.error("[moodboard-view] delete item error:", err);
+      fetchMoodboard();
+    }
+  }
+
+  // Deleting is one key away on the canvas, so the last delete can be taken back.
+  // The card comes back as a new row, with its arrows pointed at the new id.
+  async function handleUndoDelete() {
+    if (!deleted) return;
+    const { item, connections } = deleted;
+    setDeleted(null);
+
+    try {
+      const res = await fetch(`/api/customer/moodboards/${moodboardId}/items`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: item.type,
+          data: item.data,
+          x: item.x,
+          y: item.y,
+          width: item.width,
+          height: item.height,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to restore item");
+      const restored: MoodboardItemClient = (await res.json()).item;
+
+      const relinked = connections.map((c) => ({
+        ...c,
+        sourceItemId: c.sourceItemId === item.id ? restored.id : c.sourceItemId,
+        targetItemId: c.targetItemId === item.id ? restored.id : c.targetItemId,
+      }));
+      const nextConnections = [...(moodboard?.connections ?? []), ...relinked];
+
+      setMoodboard((prev) =>
+        prev ? { ...prev, items: [...prev.items, restored], connections: nextConnections } : prev,
+      );
+
+      if (relinked.length > 0) {
+        await fetch(`/api/customer/moodboards/${moodboardId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ connections: nextConnections }),
+        });
+      }
+    } catch (err) {
+      console.error("[moodboard-view] undo delete error:", err);
       fetchMoodboard();
     }
   }
@@ -241,12 +304,20 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
   // Resize item
   // ---------------------------------------------------------------------------
 
-  async function handleResizeItem(itemId: string, width: number, height: number) {
+  async function handleResizeItem(
+    itemId: string,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ) {
     setMoodboard((prev) => {
       if (!prev) return prev;
       return {
         ...prev,
-        items: prev.items.map((item) => (item.id === itemId ? { ...item, width, height } : item)),
+        items: prev.items.map((item) =>
+          item.id === itemId ? { ...item, x, y, width, height } : item,
+        ),
       };
     });
 
@@ -254,7 +325,7 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
       const res = await fetch(`/api/customer/moodboards/${moodboardId}/items/${itemId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ width, height }),
+        body: JSON.stringify({ x, y, width, height }),
       });
 
       if (!res.ok) throw new Error("Failed to resize item");
@@ -497,20 +568,21 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
 
   if (loading) {
     return (
-      <div className="flex h-[calc(100vh-64px)] items-center justify-center bg-[var(--bb-bg-page)]">
-        <div className="text-sm text-[var(--bb-text-secondary)]">Loading moodboard...</div>
+      <div className="flex h-64 items-center justify-center" role="status">
+        <span className="text-sm text-[var(--av2-text-2)]">Loading moodboard…</span>
       </div>
     );
   }
 
   if (!moodboard) {
     return (
-      <div className="flex h-[calc(100vh-64px)] items-center justify-center bg-[var(--bb-bg-page)]">
+      <div className="flex h-64 items-center justify-center">
         <div className="text-center">
-          <h3 className="text-sm font-semibold text-[var(--bb-secondary)]">Moodboard not found</h3>
+          <h1 className="text-base font-semibold text-[var(--av2-text)]">Moodboard not found</h1>
           <button
+            type="button"
             onClick={() => router.push("/customer/moodboards")}
-            className="mt-2 text-sm text-[var(--bb-primary)] hover:underline"
+            className="mt-2 min-h-10 text-sm font-medium text-[var(--av2-link)] hover:underline"
           >
             Back to moodboards
           </button>
@@ -524,7 +596,15 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
   // ---------------------------------------------------------------------------
 
   return (
-    <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-[var(--bb-bg-page)]">
+    <div ref={rootRef} className="flex flex-col gap-4">
+      <BoardHeader
+        title={moodboard.title}
+        itemCount={moodboard.items.filter((i) => i.type !== "DRAWING").length}
+        onTitleChange={handleUpdateTitle}
+        onBack={() => router.push("/customer/moodboards")}
+        onDelete={handleDeleteBoard}
+      />
+
       <BoardToolbar
         onAddNote={() => setActiveModal("note")}
         onAddImage={handleImageClick}
@@ -541,21 +621,15 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
         onSetDrawSize={setDrawSize}
       />
 
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <BoardHeader
-          title={moodboard.title}
-          onTitleChange={handleUpdateTitle}
-          projectName={moodboard.project?.name ?? undefined}
-          onBack={() => router.push("/customer/moodboards")}
-          onDelete={handleDeleteBoard}
-        />
-
+      <div className="relative flex min-h-0 flex-1 flex-col">
         <BoardCanvas
           items={moodboard.items}
           connections={moodboard.connections}
           toolMode={toolMode}
           drawColor={drawColor}
           drawSize={drawSize}
+          handleRef={canvasHandle}
+          onSetToolMode={setToolMode}
           onUpdateItem={handleUpdateItem}
           onDeleteItem={handleDeleteItem}
           onMoveItem={handleMoveItem}
@@ -563,7 +637,24 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
           onAddConnection={handleAddConnection}
           onDeleteConnection={handleDeleteConnection}
           onAddDrawing={handleAddDrawing}
+          onUndoDelete={handleUndoDelete}
         />
+
+        {deleted && (
+          <div
+            role="status"
+            className="absolute bottom-4 left-4 z-20 flex items-center gap-3 rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] py-1 pr-1 pl-4 text-sm text-[var(--av2-text)] shadow-sm"
+          >
+            Deleted
+            <button
+              type="button"
+              onClick={handleUndoDelete}
+              className="flex min-h-10 items-center rounded-lg px-3 font-semibold text-[var(--av2-link)] hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
+            >
+              Undo
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Hidden file inputs */}

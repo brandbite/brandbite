@@ -40,6 +40,9 @@ export function ImageCard({ data, onUpdate }: ImageCardProps) {
         src={data.url}
         alt={data.caption || data.originalName || "Moodboard image"}
         className="w-full object-cover"
+        draggable={false}
+        decoding="async"
+        loading="lazy"
         style={{ aspectRatio: "auto" }}
       />
 
@@ -56,14 +59,16 @@ export function ImageCard({ data, onUpdate }: ImageCardProps) {
               if (e.key === "Escape") setEditingCaption(false);
             }}
             placeholder="Add a caption..."
-            className="w-full border-none bg-transparent text-sm text-[var(--bb-secondary)] outline-none placeholder:text-gray-400"
+            className="w-full border-none bg-transparent text-sm text-[var(--av2-text)] outline-none placeholder:text-[var(--av2-text-2)]"
           />
         ) : (
           <p
-            className="min-h-[1.25rem] cursor-pointer text-sm text-[var(--bb-text-secondary)]"
+            className="min-h-[1.25rem] cursor-pointer text-sm text-[var(--av2-text-2)]"
             onClick={() => setEditingCaption(true)}
           >
-            {data.caption || <span className="text-gray-400 italic">Add a caption...</span>}
+            {data.caption || (
+              <span className="text-[var(--av2-text-2)] italic">Add a caption...</span>
+            )}
           </p>
         )}
       </div>

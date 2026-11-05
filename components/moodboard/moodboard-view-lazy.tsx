@@ -19,7 +19,7 @@ const MoodboardView = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex min-h-[60vh] items-center justify-center text-sm text-[var(--bb-text-muted)]">
+      <div className="flex min-h-[60vh] items-center justify-center text-sm text-[var(--av2-text-2)]">
         Loading moodboard…
       </div>
     ),

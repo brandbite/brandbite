@@ -1,8 +1,16 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
-import { useDraggable } from "@dnd-kit/core";
-import { CANVAS_DEFAULTS } from "@/lib/moodboard";
+// -----------------------------------------------------------------------------
+// @file: components/moodboard/card-wrapper.tsx
+// @purpose: The frame around a moodboard card: position, selection outline,
+//           resize handles and the delete button. It holds no pointer logic;
+//           BoardCanvas handles dragging for all cards from one place, reading
+//           the data attributes set here.
+// -----------------------------------------------------------------------------
+
+import React, { memo } from "react";
+
+export type ResizeCorner = "nw" | "ne" | "sw" | "se";
 
 type CardWrapperProps = {
   id: string;
@@ -10,213 +18,101 @@ type CardWrapperProps = {
   y: number;
   width: number;
   height: number;
-  zoom: number;
+  selected: boolean;
+  label: string;
+  registerCard: (node: HTMLDivElement | null) => void;
+  onDelete: (id: string) => void;
   children: React.ReactNode;
-  onDelete?: () => void;
-  onResize?: (width: number, height: number) => void;
-  /** Called when the card's actual DOM height is measured (for auto-height cards). */
-  onMeasuredHeight?: (height: number) => void;
 };
 
-const { MIN_WIDTH, MIN_HEIGHT } = CANVAS_DEFAULTS;
+const CORNERS: { corner: ResizeCorner; className: string }[] = [
+  { corner: "nw", className: "left-0 top-0 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize" },
+  { corner: "ne", className: "right-0 top-0 translate-x-1/2 -translate-y-1/2 cursor-nesw-resize" },
+  {
+    corner: "sw",
+    className: "left-0 bottom-0 -translate-x-1/2 translate-y-1/2 cursor-nesw-resize",
+  },
+  {
+    corner: "se",
+    className: "right-0 bottom-0 translate-x-1/2 translate-y-1/2 cursor-nwse-resize",
+  },
+];
 
-export function CardWrapper({
+function CardWrapperBase({
   id,
   x,
   y,
   width,
   height,
-  zoom,
-  children,
+  selected,
+  label,
+  registerCard,
   onDelete,
-  onResize,
-  onMeasuredHeight,
+  children,
 }: CardWrapperProps) {
-  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } =
-    useDraggable({ id });
-
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const cardElRef = useRef<HTMLDivElement | null>(null);
-
-  // Merge dnd-kit's setNodeRef with our own ref for ResizeObserver
-  const mergedRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      setNodeRef(node);
-      cardElRef.current = node;
-    },
-    [setNodeRef],
-  );
-
-  // ResizeObserver to measure actual DOM height for auto-height cards
-  useEffect(() => {
-    const el = cardElRef.current;
-    if (!el || !onMeasuredHeight) return;
-
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const observedH = entry.contentRect.height;
-        if (observedH > 0) {
-          onMeasuredHeight(observedH);
-        }
-      }
-    });
-
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [onMeasuredHeight]);
-
-  // Resize state — use state (not ref) for values read during render
-  const [resizing, setResizing] = useState(false);
-  const [resizeOrigin, setResizeOrigin] = useState({ x: 0, y: 0, w: 0, h: 0 });
-  const [resizeDelta, setResizeDelta] = useState({ dw: 0, dh: 0 });
-
-  // Close menu on outside click
-  useEffect(() => {
-    if (!menuOpen) return;
-    function handleClickOutside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [menuOpen]);
-
-  // Resize handlers
-  function onResizePointerDown(e: React.PointerEvent) {
-    e.stopPropagation();
-    e.preventDefault();
-    const origin = { x: e.clientX, y: e.clientY, w: width, h: height || 200 };
-    setResizeOrigin(origin);
-    setResizeDelta({ dw: 0, dh: 0 });
-    setResizing(true);
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-  }
-
-  function onResizePointerMove(e: React.PointerEvent) {
-    if (!resizing) return;
-    const dw = (e.clientX - resizeOrigin.x) / zoom;
-    const dh = (e.clientY - resizeOrigin.y) / zoom;
-    setResizeDelta({ dw, dh });
-  }
-
-  function onResizePointerUp(e: React.PointerEvent) {
-    if (!resizing) return;
-    setResizing(false);
-    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-
-    const newW = Math.max(MIN_WIDTH, resizeOrigin.w + resizeDelta.dw);
-    const newH = Math.max(MIN_HEIGHT, resizeOrigin.h + resizeDelta.dh);
-    setResizeDelta({ dw: 0, dh: 0 });
-    onResize?.(newW, newH);
-  }
-
-  // Position: base + drag offset (in screen space, which canvas div undoes via its transform)
-  const dragOffsetX = transform ? transform.x / zoom : 0;
-  const dragOffsetY = transform ? transform.y / zoom : 0;
-
-  const currentW = resizing ? Math.max(MIN_WIDTH, resizeOrigin.w + resizeDelta.dw) : width;
-  const currentH = resizing ? Math.max(MIN_HEIGHT, resizeOrigin.h + resizeDelta.dh) : height;
-
-  const style: React.CSSProperties = {
-    position: "absolute",
-    left: x + dragOffsetX,
-    top: y + dragOffsetY,
-    width: currentW,
-    ...(currentH > 0 ? { height: currentH } : {}),
-  };
-
   return (
     <div
-      ref={mergedRef}
-      style={style}
-      className={`animate-card-enter group relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.06)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_4px_12px_rgba(0,0,0,0.08),0_2px_4px_rgba(0,0,0,0.04)] ${
-        isDragging ? "z-50 scale-[0.98] opacity-40" : ""
-      }`}
-      {...attributes}
+      ref={registerCard}
+      data-mb-card-id={id}
+      role="group"
+      aria-label={label}
+      tabIndex={0}
+      className={`group absolute cursor-default rounded-2xl outline-none ${selected ? "z-30" : ""}`}
+      style={{ left: x, top: y, width, ...(height > 0 ? { height } : {}) }}
     >
-      {/* Drag handle + menu — visible on hover */}
-      <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-        {/* Drag handle */}
-        <button
-          ref={setActivatorNodeRef}
-          {...listeners}
-          className="flex h-7 w-7 cursor-grab items-center justify-center rounded-lg border border-white/50 bg-white/70 shadow-sm backdrop-blur-sm transition-all duration-150 hover:bg-white/90 active:cursor-grabbing"
-          aria-label="Drag to move"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 14 14"
-            fill="none"
-            className="text-[var(--bb-text-secondary)]"
-          >
-            <circle cx="4" cy="2" r="1.25" fill="currentColor" />
-            <circle cx="10" cy="2" r="1.25" fill="currentColor" />
-            <circle cx="4" cy="7" r="1.25" fill="currentColor" />
-            <circle cx="10" cy="7" r="1.25" fill="currentColor" />
-            <circle cx="4" cy="12" r="1.25" fill="currentColor" />
-            <circle cx="10" cy="12" r="1.25" fill="currentColor" />
-          </svg>
-        </button>
-
-        {/* Menu */}
-        <div ref={menuRef} className="relative">
-          <button
-            onClick={() => setMenuOpen((prev) => !prev)}
-            className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/50 bg-white/70 shadow-sm backdrop-blur-sm transition-all duration-150 hover:bg-white/90"
-            aria-label="Card options"
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 14 14"
-              fill="none"
-              className="text-[var(--bb-text-secondary)]"
-            >
-              <circle cx="7" cy="2.5" r="1.25" fill="currentColor" />
-              <circle cx="7" cy="7" r="1.25" fill="currentColor" />
-              <circle cx="7" cy="11.5" r="1.25" fill="currentColor" />
-            </svg>
-          </button>
-
-          {menuOpen && (
-            <div className="absolute top-8 right-0 z-20 w-40 rounded-xl border border-[var(--bb-border)] bg-white/95 py-1 shadow-[0_4px_16px_rgba(0,0,0,0.1),0_1px_4px_rgba(0,0,0,0.06)] backdrop-blur-md">
-              {onDelete && (
-                <button
-                  onClick={() => {
-                    onDelete();
-                    setMenuOpen(false);
-                  }}
-                  className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-                >
-                  Delete
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {children}
-
-      {/* Resize handle — bottom-right corner */}
       <div
-        className="absolute right-0 bottom-0 z-10 flex h-5 w-5 cursor-se-resize items-center justify-center opacity-0 transition-opacity group-hover:opacity-100"
-        onPointerDown={onResizePointerDown}
-        onPointerMove={onResizePointerMove}
-        onPointerUp={onResizePointerUp}
+        className={`h-full overflow-hidden rounded-2xl border bg-[var(--av2-surface)] shadow-[0_1px_2px_rgba(0,0,0,0.06)] transition-[border-color,box-shadow] duration-150 ${
+          selected
+            ? "border-transparent [&_iframe]:pointer-events-auto"
+            : "border-[var(--av2-border)] group-hover:border-[var(--av2-accent)] [&_iframe]:pointer-events-none"
+        }`}
       >
-        <svg width="10" height="10" viewBox="0 0 10 10" className="text-gray-400">
-          <path
-            d="M9 1L1 9M9 5L5 9M9 9L9 9"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-        </svg>
+        {children}
       </div>
+
+      {selected && (
+        <>
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 rounded-2xl"
+            style={{
+              boxShadow:
+                "0 0 0 calc(2px * var(--mb-inverse-zoom, 1)) var(--av2-accent), 0 8px 24px rgba(0,0,0,0.12)",
+            }}
+          />
+
+          {CORNERS.map(({ corner, className }) => (
+            <div key={corner} aria-hidden className={`absolute z-10 ${className}`}>
+              <div
+                data-mb-handle={corner}
+                className="rounded-[3px] border-2 border-[var(--av2-accent)] bg-[var(--av2-surface)]"
+                style={{
+                  width: 12,
+                  height: 12,
+                  touchAction: "none",
+                  transform: "scale(var(--mb-inverse-zoom, 1))",
+                }}
+              />
+            </div>
+          ))}
+
+          <div
+            className="absolute right-0 bottom-full z-10 pb-2"
+            style={{ transform: "scale(var(--mb-inverse-zoom, 1))", transformOrigin: "100% 100%" }}
+          >
+            <button
+              type="button"
+              onClick={() => onDelete(id)}
+              aria-label={`Delete ${label}`}
+              className="flex h-9 items-center gap-1.5 rounded-lg border border-[var(--av2-border)] bg-[var(--av2-surface)] px-3 text-sm font-medium text-[var(--av2-error-text)] shadow-sm hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
+            >
+              Delete
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
+
+export const CardWrapper = memo(CardWrapperBase);

@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { memo, useState, useSyncExternalStore } from "react";
 import type { MoodboardConnection, MoodboardItemClient } from "@/lib/moodboard";
+
+import type { CardOverrideStore } from "./card-override-store";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -10,13 +12,17 @@ import type { MoodboardConnection, MoodboardItemClient } from "@/lib/moodboard";
 type ConnectionLayerProps = {
   connections: MoodboardConnection[];
   items: MoodboardItemClient[];
+  /** The card being moved or resized right now, if any. */
+  overrides: CardOverrideStore;
+  selectedId: string | null;
+  /** Arrows can only be picked with the Select tool. */
+  interactive: boolean;
+  onSelectConnection: (id: string) => void;
   onDeleteConnection: (id: string) => void;
   /** In arrow creation mode, this is the source item ID (first click done). */
   pendingSourceId: string | null;
   /** Current mouse position in canvas coords (for temp arrow while creating). */
   pendingTarget: { x: number; y: number } | null;
-  /** Called when a connection is hovered/unhovered (for keyboard delete). */
-  onHoverConnection?: (id: string | null) => void;
 };
 
 type Side = "top" | "right" | "bottom" | "left";
@@ -33,6 +39,8 @@ const GAP = 28;
 const RADIUS = 14;
 /** Default arrow stroke color — dark charcoal like FigJam. */
 const STROKE_COLOR = "#555555";
+/** A hovered or selected arrow. */
+const SELECTED_COLOR = "#F15B2B";
 /** Old default colors stored in DB — treat as "no custom color". */
 const LEGACY_DEFAULTS = new Set(["#b8b5af", "#9ca3af"]);
 /** Arrow stroke width. */
@@ -334,17 +342,36 @@ function itemRect(item: MoodboardItemClient): Rect {
 // Component
 // ---------------------------------------------------------------------------
 
-export function ConnectionLayer({
+function ConnectionLayerBase({
   connections,
   items,
+  overrides,
+  selectedId,
+  interactive,
+  onSelectConnection,
   onDeleteConnection,
   pendingSourceId,
   pendingTarget,
-  onHoverConnection,
 }: ConnectionLayerProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
-  const itemMap = new Map(items.map((i) => [i.id, i]));
+  // While a card moves, its arrows follow the live position, not the saved one.
+  const override = useSyncExternalStore(overrides.subscribe, overrides.get, overrides.get);
+
+  const itemMap = new Map(
+    items.map((i) => [
+      i.id,
+      override?.id === i.id
+        ? {
+            ...i,
+            x: override.x,
+            y: override.y,
+            width: override.width ?? i.width,
+            height: override.height ?? i.height,
+          }
+        : i,
+    ]),
+  );
 
   return (
     <svg
@@ -409,63 +436,57 @@ export function ConnectionLayer({
         const mid = pathMidpoint(sr, tr);
 
         const isHovered = hoveredId === conn.id;
+        const isSelected = selectedId === conn.id;
         // Use new dark color unless user has explicitly set a custom (non-legacy) color
         const customColor = conn.color && !LEGACY_DEFAULTS.has(conn.color) ? conn.color : null;
-        const strokeColor = isHovered ? "#ef4444" : (customColor ?? STROKE_COLOR);
-        const marker = isHovered ? "url(#arrowhead-hover)" : "url(#arrowhead)";
+        const strokeColor =
+          isSelected || isHovered ? SELECTED_COLOR : (customColor ?? STROKE_COLOR);
+        const marker = isSelected || isHovered ? "url(#arrowhead-pending)" : "url(#arrowhead)";
 
         return (
           <g key={conn.id}>
-            {/* Invisible wider path for easier hover/click targeting */}
-            <path
-              d={pathD}
-              fill="none"
-              stroke="transparent"
-              strokeWidth={16}
-              className="pointer-events-stroke cursor-pointer"
-              onMouseEnter={() => {
-                setHoveredId(conn.id);
-                onHoverConnection?.(conn.id);
-              }}
-              onMouseLeave={() => {
-                setHoveredId(null);
-                onHoverConnection?.(null);
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                onDeleteConnection(conn.id);
-              }}
-            />
+            {/* Invisible wider path for easier hover/click targeting. The svg has
+                pointer-events: none, so this has to opt back in with an inline style. */}
+            {interactive && (
+              <path
+                d={pathD}
+                fill="none"
+                stroke="transparent"
+                strokeWidth={16}
+                style={{ pointerEvents: "stroke", cursor: "pointer" }}
+                data-testid={`connection-${conn.id}`}
+                onMouseEnter={() => setHoveredId(conn.id)}
+                onMouseLeave={() => setHoveredId(null)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectConnection(conn.id);
+                }}
+              />
+            )}
             {/* Visible path */}
             <path
               d={pathD}
               fill="none"
               stroke={strokeColor}
-              strokeWidth={isHovered ? STROKE_WIDTH_HOVER : STROKE_WIDTH}
+              strokeWidth={isSelected || isHovered ? STROKE_WIDTH_HOVER : STROKE_WIDTH}
               strokeDasharray={conn.style === "dashed" ? "8 4" : undefined}
               markerEnd={marker}
-              className="pointer-events-none transition-colors"
+              className="pointer-events-none"
             />
-            {/* Delete indicator on hover */}
-            {isHovered && (
-              <g transform={`translate(${mid.x - 8}, ${mid.y - 8})`}>
-                <circle
-                  cx="8"
-                  cy="8"
-                  r="10"
-                  fill="white"
-                  stroke="#ef4444"
-                  strokeWidth="1.5"
-                  className="pointer-events-none"
-                />
-                <text
-                  x="8"
-                  y="12"
-                  textAnchor="middle"
-                  fontSize="12"
-                  fill="#ef4444"
-                  className="pointer-events-none"
-                >
+            {/* Delete button on the selected arrow */}
+            {isSelected && (
+              <g
+                transform={`translate(${mid.x - 8}, ${mid.y - 8})`}
+                style={{ pointerEvents: "auto", cursor: "pointer" }}
+                role="button"
+                aria-label="Delete arrow"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteConnection(conn.id);
+                }}
+              >
+                <circle cx="8" cy="8" r="11" fill="white" stroke="#ef4444" strokeWidth="1.5" />
+                <text x="8" y="12" textAnchor="middle" fontSize="13" fill="#ef4444">
                   ×
                 </text>
               </g>
@@ -510,3 +531,5 @@ export function ConnectionLayer({
     </svg>
   );
 }
+
+export const ConnectionLayer = memo(ConnectionLayerBase);
