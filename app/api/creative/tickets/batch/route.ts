@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { TicketStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { recordTicketEvent } from "@/lib/tickets/ticket-events";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { createNotification } from "@/lib/notifications";
 import { creativeTransitionError } from "@/lib/tickets/creative-transitions";
@@ -220,6 +221,12 @@ export async function PATCH(req: NextRequest) {
         await prisma.ticket.update({
           where: { id: ticket.id },
           data: { status: nextStatus },
+        });
+        await recordTicketEvent({
+          ticketId: ticket.id,
+          actorId: user.id,
+          type: "STATUS_CHANGED",
+          metadata: { from: ticket.status, to: nextStatus },
         });
 
         results.push({ ticketId, success: true });

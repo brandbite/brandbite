@@ -362,7 +362,7 @@ export default function CustomerOverviewPage() {
                   </IconTile>
                   <div className="min-w-0">
                     <h2 className="text-xl leading-7 font-semibold">Token activity</h2>
-                    <p className="text-sm text-[var(--av2-text-2)]">Latest 50 ledger movements</p>
+                    <p className="text-sm text-[var(--av2-text-2)]">All-time totals</p>
                   </div>
                 </div>
                 <dl className="flex flex-wrap gap-x-8 gap-y-3">

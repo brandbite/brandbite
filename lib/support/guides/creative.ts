@@ -535,6 +535,10 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
               { term: "Time tracking", text: "your time entries for this job." },
               { term: "Comments", text: "your conversation with the customer." },
               {
+                term: "Activity",
+                text: "what happened on this job and when, newest first. Older jobs may show only part of their history.",
+              },
+              {
                 term: "Job summary",
                 text: "the project, job type, payout, people and dates, always on the side.",
               },

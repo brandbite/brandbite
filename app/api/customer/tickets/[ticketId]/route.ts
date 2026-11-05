@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { recordTicketEvent, type TicketDetailField } from "@/lib/tickets/ticket-events";
 import { TicketStatus, CompanyRole, LedgerDirection } from "@prisma/client";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { buildTicketCode } from "@/lib/ticket-code";
@@ -274,6 +275,11 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
       select: {
         id: true,
         status: true,
+        title: true,
+        description: true,
+        priority: true,
+        dueDate: true,
+        projectId: true,
         companyId: true,
         quantity: true,
         tokenCostOverride: true,
@@ -336,6 +342,15 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
         },
       });
 
+      if (existing.status !== targetStatus) {
+        await recordTicketEvent({
+          ticketId: existing.id,
+          actorId: user.id,
+          type: "STATUS_CHANGED",
+          metadata: { from: existing.status, to: targetStatus },
+        });
+      }
+
       return NextResponse.json(
         {
           ticket: {
@@ -377,7 +392,11 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
       if (fields.title !== undefined) updateData.title = fields.title;
       if (fields.description !== undefined) updateData.description = fields.description;
       if (fields.priority !== undefined) updateData.priority = fields.priority;
-      if (fields.dueDate !== undefined) updateData.dueDate = fields.dueDate ?? null;
+      // The schema turns a missing dueDate into null, so check the raw body: a
+      // request that doesn't mention the date must not clear it.
+      if ("dueDate" in body && fields.dueDate !== undefined) {
+        updateData.dueDate = fields.dueDate ?? null;
+      }
 
       // projectId — DB lookup stays inline
       if (fields.projectId !== undefined) {
@@ -481,7 +500,47 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
       }
 
       // Use transaction so ticket update + tag replacement are atomic
+      // Forms send every field, so compare to record only what really changed.
+      const newDueDate = updateData.dueDate ? new Date(updateData.dueDate as string | Date) : null;
+      const changedFields: TicketDetailField[] = [];
+      if ("title" in updateData && updateData.title !== existing.title) {
+        changedFields.push("title");
+      }
+      if ("description" in updateData && updateData.description !== existing.description) {
+        changedFields.push("description");
+      }
+      if ("priority" in updateData && updateData.priority !== existing.priority) {
+        changedFields.push("priority");
+      }
+      if (
+        "dueDate" in updateData &&
+        (newDueDate?.getTime() ?? null) !== (existing.dueDate?.getTime() ?? null)
+      ) {
+        changedFields.push("dueDate");
+      }
+      if ("projectId" in updateData && updateData.projectId !== existing.projectId) {
+        changedFields.push("project");
+      }
+      if (jobTypeActuallyChanged) changedFields.push("jobType");
+
       const updated = await prisma.$transaction(async (tx) => {
+        if (changedFields.length > 0) {
+          await recordTicketEvent(
+            {
+              ticketId: existing.id,
+              actorId: user.id,
+              type: "DETAILS_UPDATED",
+              metadata: {
+                fields: changedFields,
+                ...(changedFields.includes("priority")
+                  ? { priority: { from: existing.priority, to: String(updateData.priority) } }
+                  : {}),
+              },
+            },
+            tx,
+          );
+        }
+
         // Update scalar fields (if any)
         const ticket =
           Object.keys(updateData).length > 0

@@ -15,6 +15,7 @@ import { TicketStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { creativeTransitionError } from "@/lib/tickets/creative-transitions";
+import { recordTicketEvent } from "@/lib/tickets/ticket-events";
 
 export type TransitionStatusInput = {
   creativeUserId: string;
@@ -197,6 +198,13 @@ export async function transitionCreativeTicketStatus(
       where: { id: ticket.id },
       data: { status: nextStatus },
       select: { id: true, status: true, updatedAt: true },
+    });
+    // The new revision records the IN_PROGRESS → IN_REVIEW case above.
+    await recordTicketEvent({
+      ticketId: ticket.id,
+      actorId: creativeUserId,
+      type: "STATUS_CHANGED",
+      metadata: { from: ticket.status, to: nextStatus },
     });
   }
 

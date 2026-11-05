@@ -43,6 +43,7 @@ function mockApi({
   companyRole = "OWNER",
   failServices = false,
   failTokens = false,
+  failExport = false,
 }: {
   services?: ReturnType<typeof service>[];
   ledger?: ReturnType<typeof entry>[];
@@ -50,6 +51,7 @@ function mockApi({
   companyRole?: string;
   failServices?: boolean;
   failTokens?: boolean;
+  failExport?: boolean;
 } = {}) {
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
     const url = String(input);
@@ -58,13 +60,42 @@ function mockApi({
       if (failServices) return Response.json({ error: "Catalog is down" }, { status: 500 });
       return Response.json({ services, categories: [] });
     }
+    if (url.includes("/export")) {
+      if (failExport) return Response.json({ error: "Export is down" }, { status: 500 });
+      return new Response("csv");
+    }
     if (failTokens) return Response.json({ error: "Ledger is down" }, { status: 500 });
+
+    // Filters and paging happen on the server, so the mock does them too.
+    const params = new URL(url, "http://localhost").searchParams;
+    const direction = params.get("direction");
+    const q = params.get("q")?.toLowerCase();
+    const matching = ledger.filter(
+      (row) =>
+        (!direction || row.direction === direction) &&
+        (!q || String(row.reason).toLowerCase().includes(q)),
+    );
+    const pageSize = Number(params.get("pageSize") ?? 50);
+    const page = Number(params.get("page") ?? 1);
     return Response.json({
       company: { id: "c", name: "Acme Studio", slug: "acme", tokenBalance: balance },
       stats: { totalCredits: 1116565638, totalDebits: 1116565873 },
-      ledger,
+      ledger: matching.slice((page - 1) * pageSize, page * pageSize),
+      pagination: {
+        page,
+        pageSize,
+        pageCount: Math.max(1, Math.ceil(matching.length / pageSize)),
+        total: matching.length,
+      },
     });
   });
+}
+
+function tokenRequests(path = "/api/customer/tokens?") {
+  return vi
+    .mocked(globalThis.fetch)
+    .mock.calls.map(([input]) => String(input))
+    .filter((url) => url.includes(path));
 }
 
 afterEach(() => vi.restoreAllMocks());
@@ -159,15 +190,17 @@ describe("Customer services", () => {
 });
 
 describe("Customer tokens", () => {
-  it("shows long totals in full and doesn't call them all-time", async () => {
+  it("labels the totals as all-time and shows them in full", async () => {
     mockApi();
     render(<CustomerTokensPage />);
     expect(await screen.findByText("1,116,565,638")).toBeInTheDocument();
     expect(screen.getByText("1,116,565,873")).toBeInTheDocument();
-    expect(screen.queryByText(/all-time/i)).toBeNull();
+    expect(screen.getByText("All-time credits")).toBeInTheDocument();
+    expect(screen.getByText("All-time debits")).toBeInTheDocument();
+    expect(screen.queryByText(/50 most recent/)).toBeNull();
   });
 
-  it("paginates the ledger and resets to page one when filtering", async () => {
+  it("asks the server for each page and resets to page one when filtering", async () => {
     const ledger = Array.from({ length: 8 }, (_, i) =>
       entry({
         id: `e${i}`,
@@ -180,8 +213,83 @@ describe("Customer tokens", () => {
     render(<CustomerTokensPage />);
     expect(await screen.findByText(/Showing 1–6 of 8/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
-    expect(screen.getByText(/Showing 7–8 of 8/)).toBeInTheDocument();
+    expect(await screen.findByText(/Showing 7–8 of 8/)).toBeInTheDocument();
+    expect(tokenRequests().at(-1)).toContain("page=2");
     fireEvent.click(screen.getByRole("button", { name: "Debits" }));
+    expect(await screen.findByText(/Showing 1–1 of 1/)).toBeInTheDocument();
+    expect(tokenRequests().at(-1)).toContain("direction=DEBIT");
+    expect(tokenRequests().at(-1)).toContain("page=1");
+  });
+
+  it("searches on the server after a pause in typing", async () => {
+    mockApi({ ledger: [entry({ id: "a" }), entry({ id: "b", reason: "TOKEN_TOPUP" })] });
+    render(<CustomerTokensPage />);
+    await screen.findByText(/Showing 1–2 of 2/);
+    const before = tokenRequests().length;
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "t" } });
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "topup" } });
+    expect(await screen.findByText(/Showing 1–1 of 1/)).toBeInTheDocument();
+    expect(tokenRequests().length).toBe(before + 1);
+    expect(tokenRequests().at(-1)).toContain("q=topup");
+  });
+
+  it("explains an empty ledger and an empty search differently", async () => {
+    mockApi({ ledger: [] });
+    render(<CustomerTokensPage />);
+    expect(await screen.findByText("No token movements yet.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Debits" }));
+    expect(await screen.findByText("No movements match these filters")).toBeInTheDocument();
+  });
+
+  it("sends a date range as the customer's local days, end day included", async () => {
+    mockApi();
+    render(<CustomerTokensPage />);
+    await screen.findByText(/Showing 1–1 of 1/);
+    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-03-01" } });
+    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-03-31" } });
+    await vi.waitFor(() => expect(tokenRequests().at(-1)).toContain("to="));
+    const params = new URL(tokenRequests().at(-1)!, "http://localhost").searchParams;
+    expect(params.get("from")).toBe(new Date(2026, 2, 1).toISOString());
+    expect(params.get("to")).toBe(new Date(2026, 3, 1).toISOString());
+  });
+
+  it("doesn't request or export a backwards date range", async () => {
+    mockApi();
+    render(<CustomerTokensPage />);
+    await screen.findByText(/Showing 1–1 of 1/);
+    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-03-31" } });
+    await vi.waitFor(() => expect(tokenRequests().at(-1)).toContain("from="));
+    const before = tokenRequests().length;
+    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-03-01" } });
+    expect(await screen.findByRole("alert")).toHaveTextContent(/on or before the end date/);
+    expect(screen.getByRole("button", { name: "Export CSV" })).toBeDisabled();
+    expect(tokenRequests().length).toBe(before);
+  });
+
+  it("exports with the filters on screen", async () => {
+    mockApi();
+    const createUrl = vi.fn(() => "blob:ledger");
+    Object.assign(URL, { createObjectURL: createUrl, revokeObjectURL: vi.fn() });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    render(<CustomerTokensPage />);
+    await screen.findByText(/Showing 1–1 of 1/);
+    fireEvent.click(screen.getByRole("button", { name: "Credits" }));
+    await screen.findByText(/Showing 1–1 of 1/);
+    fireEvent.click(screen.getByRole("button", { name: "Export CSV" }));
+    await vi.waitFor(() => expect(click).toHaveBeenCalledOnce());
+    const [url] = tokenRequests("/export");
+    expect(url).toContain("direction=CREDIT");
+    expect(url).not.toContain("page");
+    expect(createUrl).toHaveBeenCalledOnce();
+  });
+
+  it("explains a failed export and keeps the ledger on screen", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mockApi({ failExport: true });
+    render(<CustomerTokensPage />);
+    await screen.findByText(/Showing 1–1 of 1/);
+    fireEvent.click(screen.getByRole("button", { name: "Export CSV" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Export is down");
     expect(screen.getByText(/Showing 1–1 of 1/)).toBeInTheDocument();
   });
 

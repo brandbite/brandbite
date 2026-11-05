@@ -283,6 +283,7 @@ model UserAccount {
   ticketComments TicketComment[]
 
   assignmentLogs TicketAssignmentLog[]
+  ticketEvents   TicketEvent[]         @relation("TicketEventActor")
 
   submittedRevisions TicketRevision[] @relation("TicketRevisionSubmittedBy")
   feedbackRevisions  TicketRevision[] @relation("TicketRevisionFeedbackBy")
@@ -956,6 +957,7 @@ model Ticket {
   comments      TicketComment[]
 
   assignmentLogs TicketAssignmentLog[]
+  events         TicketEvent[]
   notifications  Notification[]
 
   tagAssignments TicketTagAssignment[]
@@ -1481,6 +1483,31 @@ model PayoutRule {
 // -----------------------------------------------------------------------------
 // Ticket Assignment Logs
 // -----------------------------------------------------------------------------
+
+enum TicketEventType {
+  STATUS_CHANGED
+  CREATIVE_CHANGED
+  DETAILS_UPDATED
+}
+
+/// Ticket changes no other table keeps, for the Activity tab. Created, assigned,
+/// version, feedback and completion history come from their own tables.
+model TicketEvent {
+  id String @id @default(cuid())
+
+  ticketId String
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  actorId String?
+  actor   UserAccount? @relation("TicketEventActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  type     TicketEventType
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([ticketId, createdAt])
+}
 
 model TicketAssignmentLog {
   id String @id @default(cuid())

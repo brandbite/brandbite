@@ -373,6 +373,10 @@ export const ADMIN_GUIDES: SupportGuide[] = [
               { term: "Revisions", text: "every version the creative sent, with feedback." },
               { term: "Comments", text: "the conversation on the request." },
               {
+                term: "Activity",
+                text: "what happened on the ticket, when and by whom, newest first. Older tickets may show only part of their history.",
+              },
+              {
                 term: "Ticket details",
                 text: "customer, creative, token cost (with any overrides) and job type.",
               },

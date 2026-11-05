@@ -54,6 +54,7 @@ import {
   IconCoins,
   IconDocument,
 } from "@/components/admin/v2/icons";
+import { TicketActivityPanel } from "@/components/dashboard/ticket-activity-panel";
 
 // ---------------------------------------------------------------------------
 // Types — narrow mirrors of the API shape, kept colocated so the page
@@ -152,7 +153,7 @@ type DetailResponse = {
   auditLogs: AuditLogRow[];
 };
 
-type TabKey = "brief" | "revisions" | "comments";
+type TabKey = "brief" | "revisions" | "comments" | "activity";
 
 // ---------------------------------------------------------------------------
 // Display helpers
@@ -495,6 +496,7 @@ export default function AdminTicketDetailPage() {
                 { value: "brief", label: "Brief" },
                 { value: "revisions", label: `Revisions (${revisions.length})` },
                 { value: "comments", label: `Comments (${comments.length})` },
+                { value: "activity", label: "Activity" },
               ]}
             />
 
@@ -646,6 +648,12 @@ export default function AdminTicketDetailPage() {
                     ))}
                   </ul>
                 )}
+              </TabPanel>
+            )}
+
+            {tab === "activity" && (
+              <TabPanel idPrefix={tabPrefix} value="activity">
+                <TicketActivityPanel url={`/api/admin/tickets/${ticketId}/activity`} />
               </TabPanel>
             )}
           </Card>

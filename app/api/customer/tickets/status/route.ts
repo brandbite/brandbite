@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { TicketStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { recordTicketEvent } from "@/lib/tickets/ticket-events";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import {
   canMoveTicketsOnBoard,
@@ -333,6 +334,19 @@ export async function PATCH(req: NextRequest) {
         data: { status: nextStatus },
         select: { id: true, status: true, updatedAt: true },
       });
+
+      // Revision feedback already records the IN_REVIEW → IN_PROGRESS case.
+      if (!isReviewToInProgress && currentStatus !== nextStatus) {
+        await recordTicketEvent(
+          {
+            ticketId: ticket.id,
+            actorId: user.id,
+            type: "STATUS_CHANGED",
+            metadata: { from: currentStatus, to: nextStatus },
+          },
+          tx,
+        );
+      }
 
       return updatedTicket;
     });
