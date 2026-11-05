@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ProfileForm } from "@/components/profile/profile-form";
+import { defaultWorkSchedule } from "@/lib/work-schedule";
 
 vi.mock("@/components/ui/toast-provider", () => ({
   useToast: () => ({ showToast: vi.fn() }),
@@ -16,7 +17,7 @@ vi.mock("@/lib/auth-client", () => ({
 
 function mockApi({
   role = "CUSTOMER",
-  workingHours = null as string | null,
+  workSchedule = null as ReturnType<typeof defaultWorkSchedule> | null,
   selected = [] as string[],
   twoFactorEnabled = false,
   failPrefs = false,
@@ -33,7 +34,9 @@ function mockApi({
           timezone: null,
           twoFactorEnabled,
           image: null,
-          workingHours,
+          workingHours: null,
+          workSchedule,
+          workScheduleUpdatedAt: null,
           tasksPerWeekCap: null,
         },
       });
@@ -154,18 +157,19 @@ describe("ProfileForm surfaces", () => {
 
 describe("Creative setup", () => {
   it("nudges until working hours and skills are set", async () => {
-    mockApi({ role: "DESIGNER", workingHours: null, selected: [] });
+    mockApi({ role: "DESIGNER", workSchedule: null, selected: [] });
     render(<ProfileForm layout="tabs" surface="dashboard" />);
     expect(await screen.findByText("Finish setting up your account")).toBeInTheDocument();
     expect(screen.getByText(/None selected yet/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Open Workload" }));
     expect(screen.getByRole("tab", { selected: true })).toHaveTextContent("Workload");
-    expect(screen.getByLabelText("Working hours")).toBeVisible();
+    expect(screen.getByLabelText("Time zone")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Save working hours" })).toBeEnabled();
   });
 
   it("drops the nudge once the checklist is complete", async () => {
-    mockApi({ role: "DESIGNER", workingHours: "9-18 weekdays", selected: ["s1", "s2"] });
+    mockApi({ role: "DESIGNER", workSchedule: defaultWorkSchedule("UTC"), selected: ["s1", "s2"] });
     render(<ProfileForm layout="tabs" surface="dashboard" />);
     await screen.findByText(/2 selected/);
     await waitFor(() => expect(screen.queryByText("Finish setting up your account")).toBeNull());

@@ -21,6 +21,7 @@ const ALL_TYPES: NotificationType[] = [
   "TICKET_STATUS_CHANGED",
   "PIN_RESOLVED",
   "WITHDRAWAL_UPDATED",
+  "CREATIVE_SCHEDULE_UPDATED",
 ];
 
 // ---------------------------------------------------------------------------

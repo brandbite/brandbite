@@ -17,6 +17,14 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
+import {
+  parseWorkSchedule,
+  sameWorkSchedule,
+  workScheduleSchema,
+  type WorkSchedule,
+} from "@/lib/work-schedule";
+import { notifyAdminsOfWorkScheduleChange } from "@/lib/work-schedule-notifications";
 
 // IANA timezone strings can be quite long but the longest in the
 // real world ("America/Argentina/ComodRivadavia") is 36 chars. Cap
@@ -46,6 +54,8 @@ type ProfileResponseUser = {
    *  DESIGNER, so these are populated unconditionally on the server
    *  side and the client decides whether to surface them. */
   workingHours: string | null;
+  workSchedule: WorkSchedule | null;
+  workScheduleUpdatedAt: string | null;
   tasksPerWeekCap: number | null;
 };
 
@@ -67,6 +77,8 @@ export async function GET() {
         timezone: true,
         authUserId: true,
         workingHours: true,
+        workSchedule: true,
+        workScheduleUpdatedAt: true,
         tasksPerWeekCap: true,
       },
     });
@@ -97,6 +109,8 @@ export async function GET() {
       twoFactorEnabled: !!authRow?.twoFactorEnabled,
       image: authRow?.image ?? null,
       workingHours: row.workingHours,
+      workSchedule: parseWorkSchedule(row.workSchedule),
+      workScheduleUpdatedAt: row.workScheduleUpdatedAt?.toISOString() ?? null,
       tasksPerWeekCap: row.tasksPerWeekCap,
     };
     return NextResponse.json({ user });
@@ -114,7 +128,7 @@ export async function GET() {
 //
 // Body shape:
 //   { name?: string, timezone?: string | null,
-//     workingHours?: string | null,        // DESIGNER only
+//     workSchedule?: WorkSchedule,         // DESIGNER only
 //     tasksPerWeekCap?: number | null }    // DESIGNER only
 //
 // All fields are optional; sending none is a no-op (returns the current
@@ -122,12 +136,10 @@ export async function GET() {
 // Email changes are NOT handled here — they need BetterAuth's
 // verification flow and live on /api/auth/change-email.
 //
-// Workload fields (workingHours, tasksPerWeekCap) are creative-self-edit:
+// Workload fields (workSchedule, tasksPerWeekCap) are creative-self-edit:
 // rejected from non-DESIGNER callers so a CUSTOMER can't accidentally
 // set a workload that the auto-assign would later read back as a cap.
 // ---------------------------------------------------------------------------
-
-const MAX_WORKING_HOURS_LENGTH = 200;
 
 export async function PATCH(req: NextRequest) {
   try {
@@ -136,7 +148,7 @@ export async function PATCH(req: NextRequest) {
     const body = (await req.json().catch(() => null)) as {
       name?: unknown;
       timezone?: unknown;
-      workingHours?: unknown;
+      workSchedule?: unknown;
       tasksPerWeekCap?: unknown;
     } | null;
     if (!body || typeof body !== "object") {
@@ -146,7 +158,8 @@ export async function PATCH(req: NextRequest) {
     const data: {
       name?: string;
       timezone?: string | null;
-      workingHours?: string | null;
+      workSchedule?: Prisma.InputJsonValue;
+      workScheduleUpdatedAt?: Date;
       tasksPerWeekCap?: number | null;
     } = {};
 
@@ -211,33 +224,32 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
-    // ----- workingHours (DESIGNER only) -----
-    if (body.workingHours !== undefined) {
+    // ----- workSchedule (DESIGNER only) -----
+    let changedSchedule: WorkSchedule | null = null;
+    if (body.workSchedule !== undefined) {
       if (session.role !== "DESIGNER") {
         return NextResponse.json(
           { error: "Working hours are a creative-only field." },
           { status: 403 },
         );
       }
-      if (body.workingHours === null || body.workingHours === "") {
-        data.workingHours = null;
-      } else if (typeof body.workingHours !== "string") {
+      const parsed = workScheduleSchema.safeParse(body.workSchedule);
+      if (!parsed.success) {
         return NextResponse.json(
-          { error: "workingHours must be a string or null" },
+          { error: parsed.error.issues[0]?.message ?? "Invalid working hours" },
           { status: 400 },
         );
-      } else {
-        const trimmed = body.workingHours.trim();
-        if (trimmed.length === 0) {
-          data.workingHours = null;
-        } else if (trimmed.length > MAX_WORKING_HOURS_LENGTH) {
-          return NextResponse.json(
-            { error: `Working hours must be ${MAX_WORKING_HOURS_LENGTH} characters or fewer.` },
-            { status: 400 },
-          );
-        } else {
-          data.workingHours = trimmed;
-        }
+      }
+      const current = await prisma.userAccount.findUniqueOrThrow({
+        where: { id: session.id },
+        select: { workSchedule: true },
+      });
+      // Saving the same hours again isn't news, so it neither notifies admins
+      // nor moves the "last updated" date.
+      if (!sameWorkSchedule(parseWorkSchedule(current.workSchedule), parsed.data)) {
+        data.workSchedule = parsed.data;
+        data.workScheduleUpdatedAt = new Date();
+        changedSchedule = parsed.data;
       }
     }
 
@@ -287,6 +299,8 @@ export async function PATCH(req: NextRequest) {
           timezone: true,
           authUserId: true,
           workingHours: true,
+          workSchedule: true,
+          workScheduleUpdatedAt: true,
           tasksPerWeekCap: true,
         },
       });
@@ -304,6 +318,8 @@ export async function PATCH(req: NextRequest) {
           twoFactorEnabled: !!auth?.twoFactorEnabled,
           image: auth?.image ?? null,
           workingHours: row.workingHours,
+          workSchedule: parseWorkSchedule(row.workSchedule),
+          workScheduleUpdatedAt: row.workScheduleUpdatedAt?.toISOString() ?? null,
           tasksPerWeekCap: row.tasksPerWeekCap,
         } satisfies ProfileResponseUser,
       });
@@ -320,9 +336,20 @@ export async function PATCH(req: NextRequest) {
         timezone: true,
         authUserId: true,
         workingHours: true,
+        workSchedule: true,
+        workScheduleUpdatedAt: true,
         tasksPerWeekCap: true,
       },
     });
+    if (changedSchedule) {
+      await notifyAdminsOfWorkScheduleChange({
+        creativeId: updated.id,
+        creativeName: updated.name,
+        creativeEmail: updated.email,
+        schedule: changedSchedule,
+      });
+    }
+
     const auth = await prisma.authUser.findUnique({
       where: { id: updated.authUserId },
       select: { twoFactorEnabled: true, image: true },
@@ -337,6 +364,8 @@ export async function PATCH(req: NextRequest) {
         twoFactorEnabled: !!auth?.twoFactorEnabled,
         image: auth?.image ?? null,
         workingHours: updated.workingHours,
+        workSchedule: parseWorkSchedule(updated.workSchedule),
+        workScheduleUpdatedAt: updated.workScheduleUpdatedAt?.toISOString() ?? null,
         tasksPerWeekCap: updated.tasksPerWeekCap,
       } satisfies ProfileResponseUser,
     });

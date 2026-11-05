@@ -51,6 +51,12 @@ import {
   type Tone,
 } from "@/components/admin/v2/ui";
 import { IconBuilding, IconTicket, IconUsers } from "@/components/admin/v2/icons";
+import {
+  WorkScheduleEditor,
+  workScheduleProblem,
+} from "@/components/work-schedule/work-schedule-editor";
+import { WorkScheduleSummary } from "@/components/work-schedule/work-schedule-summary";
+import { defaultWorkSchedule, sameWorkSchedule, type WorkSchedule } from "@/lib/work-schedule";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -66,8 +72,10 @@ type UserRow = {
   creativeRevisionNotesEnabled: boolean;
   // PR11 — capacity cap. Null = no cap (legacy default).
   tasksPerWeekCap: number | null;
-  // Workload PR — free-text working hours. Null = unset.
+  // Old free-text note, shown read-only until a schedule is set.
   workingHours: string | null;
+  workSchedule: WorkSchedule | null;
+  workScheduleUpdatedAt: string | null;
   // Set when the account is soft-deleted (anonymized tombstone kept for
   // ledger / audit integrity). Rows with this set render read-only.
   deletedAt: string | null;
@@ -191,7 +199,7 @@ export default function AdminUsersPage() {
   // selected user and are reset whenever the selection changes.
   const [pendingCap, setPendingCap] = useState<string>("");
   const [savingCap, setSavingCap] = useState(false);
-  const [pendingHours, setPendingHours] = useState<string>("");
+  const [pendingSchedule, setPendingSchedule] = useState<WorkSchedule>(() => defaultWorkSchedule());
   const [savingHours, setSavingHours] = useState(false);
 
   useEffect(() => {
@@ -261,14 +269,21 @@ export default function AdminUsersPage() {
     selected != null &&
     pendingCap.trim() !==
       (selected.tasksPerWeekCap == null ? "" : String(selected.tasksPerWeekCap));
-  const hoursDirty = selected != null && pendingHours.trim() !== (selected.workingHours ?? "");
+  // A creative with no schedule yet starts from a default, which isn't an edit.
+  const scheduleBaseline = selected?.workSchedule ?? defaultWorkSchedule();
+  const hoursDirty =
+    selected?.role === "DESIGNER" && !sameWorkSchedule(pendingSchedule, scheduleBaseline);
+  const canSaveSchedule =
+    selected?.role === "DESIGNER" &&
+    workScheduleProblem(pendingSchedule) === null &&
+    (hoursDirty || !selected.workSchedule);
   const confirmDiscard = useUnsavedChanges(roleDirty || capDirty || hoursDirty, "Manage user");
 
   const resetDrafts = (u: UserRow | null) => {
     if (!u) return;
     setPendingRole(u.role);
     setPendingCap(u.tasksPerWeekCap == null ? "" : String(u.tasksPerWeekCap));
-    setPendingHours(u.workingHours ?? "");
+    setPendingSchedule(u.workSchedule ?? defaultWorkSchedule());
   };
 
   // Below xl the panel stacks under the list — bring it into view.
@@ -483,28 +498,31 @@ export default function AdminUsersPage() {
     }
   };
 
-  // Workload PR — save free-text working hours. Empty string clears.
   const handleSaveHours = async (userId: string) => {
     setSavingHours(true);
     try {
-      const trimmed = pendingHours.trim();
-      const next = trimmed === "" ? null : trimmed;
       const res = await fetch("/api/admin/users", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, workingHours: next }),
+        body: JSON.stringify({ userId, workSchedule: pendingSchedule }),
       });
       const json = await res.json().catch(() => null);
       if (!res.ok) {
         showToast({ title: json?.error || "Failed to save working hours", type: "error" });
         return;
       }
-      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, workingHours: next } : u)));
-      showToast({
-        title: next == null ? "Working hours cleared" : "Working hours updated",
-        type: "success",
-      });
-      setPendingHours(next ?? "");
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === userId
+            ? {
+                ...u,
+                workSchedule: json.user.workSchedule,
+                workScheduleUpdatedAt: json.user.workScheduleUpdatedAt,
+              }
+            : u,
+        ),
+      );
+      showToast({ title: "Working hours updated", type: "success" });
     } catch {
       showToast({ title: "Failed to save working hours", type: "error" });
     } finally {
@@ -759,32 +777,30 @@ export default function AdminUsersPage() {
                 </div>
               </Field>
 
-              {/* Workload PR — free-form availability hint. Empty clears. */}
-              <Field
-                label="Working hours"
-                htmlFor="user-hours"
-                hint="Free-form availability hint shown to scheduling admins. Empty to unset."
-              >
-                <div className="flex gap-2">
-                  <div className="min-w-0 flex-1">
-                    <TextInput
-                      id="user-hours"
-                      type="text"
-                      value={pendingHours}
-                      onChange={(e) => setPendingHours(e.target.value)}
-                      placeholder="9–18 weekdays, Europe/Istanbul"
-                      maxLength={200}
-                    />
-                  </div>
-                  <Button
-                    onClick={() => handleSaveHours(selected.id)}
-                    disabled={!hoursDirty || savingHours}
-                    aria-busy={savingHours}
-                  >
-                    {savingHours ? "Saving…" : "Save"}
-                  </Button>
+              <div>
+                <h3 className="mb-1.5 text-sm font-medium">Working hours</h3>
+                <WorkScheduleSummary
+                  schedule={selected.workSchedule}
+                  legacyNote={selected.workingHours}
+                  updatedAt={selected.workScheduleUpdatedAt}
+                />
+                <div className="mt-4">
+                  <WorkScheduleEditor
+                    idPrefix="user-schedule"
+                    value={pendingSchedule}
+                    onChange={setPendingSchedule}
+                    disabled={savingHours}
+                  />
                 </div>
-              </Field>
+                <Button
+                  className="mt-3"
+                  onClick={() => handleSaveHours(selected.id)}
+                  disabled={!canSaveSchedule || savingHours}
+                  aria-busy={savingHours}
+                >
+                  {savingHours ? "Saving…" : "Save working hours"}
+                </Button>
+              </div>
             </div>
           </PanelSection>
         )}

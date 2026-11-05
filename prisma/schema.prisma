@@ -117,6 +117,7 @@ enum NotificationType {
   TICKET_STATUS_CHANGED // Any status transition
   PIN_RESOLVED // Creative resolved a pin
   WITHDRAWAL_UPDATED // Creative's withdrawal approved, rejected or paid
+  CREATIVE_SCHEDULE_UPDATED // A creative changed their own working hours
 }
 
 // --- CMS Content ---
@@ -242,12 +243,14 @@ model UserAccount {
   /// invalid at format time anyway.
   timezone String?
 
-  /// Free-text working hours (e.g. "9-18 weekdays, Europe/Istanbul").
-  /// Populated at hire-time from TalentApplication.workingHours; the
-  /// creative can amend it later from /profile and admins can edit it
-  /// from /admin/users. Not parsed — it's a hint operators read when
-  /// scheduling; no business logic depends on the format.
+  /// Old free-text working hours note. No longer editable; kept read-only so
+  /// admins can see it until the creative has set a workSchedule.
   workingHours String?
+
+  /// Weekly working hours: a time zone plus one optional range per day. See
+  /// lib/work-schedule.ts for the shape. Null = not set yet.
+  workSchedule          Json?
+  workScheduleUpdatedAt DateTime?
 
   /// Optional TOTP secret for the L4 MFA second factor. When set, money
   /// actions use TOTP codes from an authenticator app instead of email
@@ -735,10 +738,12 @@ model TalentApplication {
   // (DECLINED at SUBMITTED, etc.) stay valid without backfill.
   // ---------------------------------------------------------------------
 
-  /// Free-text working hours captured at hire time. Free-form because
-  /// hiring arrangements are negotiated, not constrained — a per-day
-  /// grid is premature precision. Example: "9-18 weekdays Europe/Istanbul".
+  /// Old free-text terms, kept for applications hired before workSchedule.
   workingHours String?
+
+  /// Weekly working hours agreed at hire, copied to the account on onboarding.
+  /// See lib/work-schedule.ts for the shape.
+  workSchedule Json?
 
   /// Final approved subset of the applied categories. Stored as a JSON
   /// array of JobTypeCategory.id strings. The candidate's original

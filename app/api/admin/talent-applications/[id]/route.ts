@@ -58,6 +58,7 @@ import {
   generateBookingToken,
 } from "@/lib/talent-booking-token";
 import { onboardHiredTalent } from "@/lib/talent-onboarding";
+import type { WorkSchedule } from "@/lib/work-schedule";
 
 export const runtime = "nodejs";
 // Force the runtime to evaluate per-request — this route writes to two
@@ -610,7 +611,7 @@ async function handleMarkMissed(args: {
 // HIRE — capture onboarding terms; status → HIRED (PR9)
 // ---------------------------------------------------------------------------
 //
-// Persists the negotiated terms (workingHours, approvedCategoryIds,
+// Persists the negotiated terms (workSchedule, approvedCategoryIds,
 // tasksPerWeekCap, hireNotes) plus the hiredBy* audit triple. No
 // UserAccount creation here — that's the next PR's onboarding
 // orchestrator, which reads exactly these columns. No candidate email
@@ -627,7 +628,7 @@ async function handleHire(args: {
   row: TalentApplication;
   action: {
     action: "HIRE";
-    workingHours: string;
+    workSchedule: WorkSchedule;
     approvedCategoryIds: string[];
     tasksPerWeekCap?: number | null;
     hireNotes?: string | null;
@@ -664,7 +665,7 @@ async function handleHire(args: {
       hiredAt: new Date(),
       hiredByUserId: actor.id,
       hiredByUserEmail: actor.email,
-      workingHours: action.workingHours,
+      workSchedule: action.workSchedule,
       approvedCategoryIds: action.approvedCategoryIds,
       approvedTasksPerWeekCap: tasksCap,
       hireNotes: action.hireNotes?.trim() || null,

@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { parseWorkSchedule } from "@/lib/work-schedule";
 import { getUserTokenBalance } from "@/lib/token-engine";
 import { isSiteAdminRole } from "@/lib/roles";
 
@@ -74,6 +75,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ use
         deletedAt: true,
         timezone: true,
         workingHours: true,
+        workSchedule: true,
+        workScheduleUpdatedAt: true,
         tasksPerWeekCap: true,
         creativeRevisionNotesEnabled: true,
         isPaused: true,
@@ -311,6 +314,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ use
         deletedAt: user.deletedAt ? user.deletedAt.toISOString() : null,
         timezone: user.timezone,
         workingHours: user.workingHours,
+        workSchedule: parseWorkSchedule(user.workSchedule),
+        workScheduleUpdatedAt: user.workScheduleUpdatedAt?.toISOString() ?? null,
         tasksPerWeekCap: user.tasksPerWeekCap,
         creativeRevisionNotesEnabled: user.creativeRevisionNotesEnabled,
         isPaused: user.isPaused,
