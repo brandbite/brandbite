@@ -34,6 +34,7 @@ import {
 import { buildLedgerParams } from "@/components/dashboard/money/ledger-query";
 import {
   DirectionBadge,
+  downloadLedgerCsv,
   formatDateTime,
   formatLedgerReason,
   formatSignedTokens,
@@ -81,15 +82,6 @@ type CustomerTokensResponse = {
     total: number;
   };
 };
-
-function downloadCsv(blob: Blob) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "token-ledger.csv";
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 function prettyCompanyRole(role: CompanyRole | null): string | null {
   switch (role) {
@@ -238,7 +230,7 @@ export default function CustomerTokensPage() {
         const json = await res.json().catch(() => null);
         throw new Error(json?.error || `Request failed with status ${res.status}`);
       }
-      downloadCsv(await res.blob());
+      downloadLedgerCsv(await res.blob());
     } catch (err: any) {
       console.error("Customer tokens export error:", err);
       setExportError(err?.message || "Failed to export the ledger.");

@@ -98,7 +98,9 @@ describe("Support center", () => {
     for (const group of groups) {
       fireEvent.click(screen.getByRole("tab", { name: group.category }));
       for (const guide of group.items) {
-        expect(screen.getByRole("link", { name: new RegExp(guide.title) })).toHaveAttribute(
+        // Inside the panel, because a popular guide is also listed above the tabs.
+        const panel = within(screen.getByRole("tabpanel"));
+        expect(panel.getByRole("link", { name: new RegExp(guide.title) })).toHaveAttribute(
           "href",
           guideHref("customer", guide.slug),
         );

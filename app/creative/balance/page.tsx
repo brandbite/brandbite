@@ -28,6 +28,7 @@ import {
 } from "@/components/admin/v2/ui";
 import {
   DirectionBadge,
+  downloadLedgerCsv,
   formatDateTime,
   formatLedgerReason,
   formatSignedTokens,
@@ -37,6 +38,7 @@ import {
   TokenFigure,
   type LedgerDirection,
 } from "@/components/dashboard/money/money-ui";
+import { buildLedgerParams } from "@/components/dashboard/money/ledger-query";
 
 const PAGE_SIZE = 10;
 
@@ -69,27 +71,6 @@ type CreativeBalanceResponse = {
   ledger: LedgerEntry[];
 };
 
-function exportLedgerCsv(ledger: LedgerEntry[]) {
-  const rows = [
-    ["Date", "Direction", "Amount", "Reason", "Balance After"],
-    ...ledger.map((e) => [
-      new Date(e.createdAt).toISOString(),
-      e.direction,
-      String(e.amount),
-      e.reason ?? "",
-      e.balanceAfter != null ? String(e.balanceAfter) : "",
-    ]),
-  ];
-  const csv = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "token-ledger.csv";
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
 export default function CreativeBalancePage() {
   const [data, setData] = useState<CreativeBalanceResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -98,6 +79,32 @@ export default function CreativeBalancePage() {
   const [directionFilter, setDirectionFilter] = useState<DirectionFilter>("ALL");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  const handleExport = async () => {
+    setExporting(true);
+    setExportError(null);
+    try {
+      const params = buildLedgerParams({
+        direction: directionFilter,
+        fromDay: "",
+        toDay: "",
+        q: query,
+      });
+      const res = await fetch(`/api/creative/balance/export?${params}`, { cache: "no-store" });
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error || `Request failed with status ${res.status}`);
+      }
+      downloadLedgerCsv(await res.blob());
+    } catch (err: any) {
+      console.error("Creative balance export error:", err);
+      setExportError(err?.message || "Failed to export your activity.");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -195,7 +202,9 @@ export default function CreativeBalancePage() {
               Request withdrawal
             </ButtonLink>
             {ledger.length > 0 ? (
-              <Button onClick={() => exportLedgerCsv(ledger)}>Export CSV</Button>
+              <Button onClick={handleExport} disabled={exporting}>
+                {exporting ? "Exporting…" : "Export CSV"}
+              </Button>
             ) : null}
           </>
         }
@@ -205,6 +214,12 @@ export default function CreativeBalancePage() {
         {error ? (
           <Callout tone="error" title="We couldn't load your balance">
             {error}
+          </Callout>
+        ) : null}
+
+        {exportError ? (
+          <Callout tone="error" title="We couldn't export your activity">
+            {exportError}
           </Callout>
         ) : null}
 
@@ -249,7 +264,7 @@ export default function CreativeBalancePage() {
         ) : (
           <Card padding="none">
             <div className="px-6 pt-6">
-              <CardTitle description="Showing the 50 most recent movements.">
+              <CardTitle description="Showing the 50 most recent movements. Export CSV covers your full history.">
                 Recent token activity
               </CardTitle>
               {ledger.length > 0 ? (

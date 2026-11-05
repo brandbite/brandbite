@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: parsed.error }, { status: 400 });
     }
 
-    const where = await buildLedgerWhere(company.id, parsed.filters);
+    const where = await buildLedgerWhere(companyLedgerScope(company.id), parsed.filters);
     const pageSize = Math.min(
       positiveInt(params.get("pageSize"), DEFAULT_PAGE_SIZE),
       MAX_PAGE_SIZE,

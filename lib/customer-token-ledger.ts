@@ -1,7 +1,8 @@
 // -----------------------------------------------------------------------------
 // @file: lib/customer-token-ledger.ts
 // @purpose: What the customer ledger list and its CSV export share: who may read
-//           it, which rows belong to it, and how filters are read.
+//           it, which rows belong to it, and how filters are read. The creative
+//           export reuses the filters and row shape with its own scope.
 // -----------------------------------------------------------------------------
 
 import { NextResponse } from "next/server";
@@ -139,11 +140,12 @@ function ticketSearch(q: string): Prisma.TicketWhereInput[] {
   return [text(escapeLike(q)), { id: q }];
 }
 
+/** `scope` decides whose rows these are. Filters only ever narrow it. */
 export async function buildLedgerWhere(
-  companyId: string,
+  scope: Prisma.TokenLedgerWhereInput,
   filters: LedgerFilters,
 ): Promise<Prisma.TokenLedgerWhereInput> {
-  const where: Prisma.TokenLedgerWhereInput = { ...companyLedgerScope(companyId) };
+  const where: Prisma.TokenLedgerWhereInput = { ...scope };
 
   if (filters.direction) where.direction = filters.direction;
 
@@ -159,9 +161,9 @@ export async function buildLedgerWhere(
 
     // Reasons are stored as codes but read as labels, so "token top-up" has to
     // find TOKEN_TOPUP. The database can't match on the label, so check this
-    // company's reasons here and filter on the ones that match.
+    // ledger's reasons here and filter on the ones that match.
     const reasons = await prisma.tokenLedger.findMany({
-      where: companyLedgerScope(companyId),
+      where: scope,
       distinct: ["reason"],
       select: { reason: true },
     });

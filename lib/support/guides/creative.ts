@@ -723,7 +723,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
           },
           {
             type: "p",
-            text: "**Export CSV** downloads your activity as a spreadsheet.",
+            text: "**Export CSV** downloads your full history that matches the type and search you've set, not only the 50 movements on screen.",
           },
         ],
       },
