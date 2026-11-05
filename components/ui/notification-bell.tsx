@@ -48,6 +48,7 @@ const TYPE_ICONS: Record<string, string> = {
   PIN_RESOLVED: "\u{1F4CC}",
   WITHDRAWAL_UPDATED: "\u{1F4B8}",
   CREATIVE_SCHEDULE_UPDATED: "\u{1F552}",
+  MOODBOARD_SHARED: "\u{1F3A8}",
 };
 
 // ---------------------------------------------------------------------------

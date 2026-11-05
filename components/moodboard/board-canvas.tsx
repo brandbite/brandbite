@@ -86,6 +86,8 @@ type BoardCanvasProps = {
   drawSize: number;
   drawOpacity: number;
   placing: CreatableKind | null;
+  /** Look around only: nothing can be selected or changed. */
+  readOnly?: boolean;
   isPhone?: boolean;
   keyboardOpen?: boolean;
   /** Another row is using that spot above the toolbar. */
@@ -291,6 +293,7 @@ export function BoardCanvas({
   drawSize,
   drawOpacity,
   placing,
+  readOnly = false,
   isPhone = false,
   keyboardOpen = false,
   hideObjectToolbar = false,
@@ -331,6 +334,7 @@ export function BoardCanvas({
     selection,
     toolMode,
     placing,
+    readOnly,
     arrowSourceId,
     onSetToolMode,
     onPlace,
@@ -351,6 +355,7 @@ export function BoardCanvas({
       selection,
       toolMode,
       placing,
+      readOnly,
       arrowSourceId,
       onSetToolMode,
       onPlace,
@@ -591,6 +596,12 @@ export function BoardCanvas({
     const mode = latest.current.toolMode;
 
     if (target.closest("[data-mb-canvas-ui], [data-mb-card-toolbar]")) return;
+
+    // Viewers can only move around. A link still opens, unless the press became a pan.
+    if (latest.current.readOnly) {
+      startPan(e);
+      return;
+    }
 
     const placingKind = latest.current.placing;
     if (placingKind) {
@@ -968,6 +979,14 @@ export function BoardCanvas({
         return;
       }
 
+      if (latest.current.readOnly) {
+        if (e.shiftKey && e.code === "Digit1") {
+          e.preventDefault();
+          canvas.fit(latest.current.items, { animate: true });
+        }
+        return;
+      }
+
       if (mod && e.key.toLowerCase() === "z" && !e.shiftKey) {
         e.preventDefault();
         latest.current.onUndoDelete();
@@ -1071,7 +1090,7 @@ export function BoardCanvas({
       viewport.scrollLeft = 0;
       viewport.scrollTop = 0;
     }
-    if (el.dataset?.mbCardId && el.matches(":focus-visible")) {
+    if (!latest.current.readOnly && el.dataset?.mbCardId && el.matches(":focus-visible")) {
       setSelection({ kind: "card", id: el.dataset.mbCardId });
     }
   };
@@ -1095,6 +1114,10 @@ export function BoardCanvas({
       ref={viewportRef}
       data-testid="moodboard-viewport"
       className={`relative min-h-0 flex-1 overflow-hidden bg-[var(--av2-surface)] select-none [&_input]:select-text [&_textarea]:select-text ${
+        readOnly
+          ? "[&_[data-mb-card-id]_*]:pointer-events-none [&_[data-mb-card-id]_a]:pointer-events-auto"
+          : ""
+      }${
         isPhone
           ? "[&_input]:text-base! [&_textarea]:text-base!"
           : "rounded-2xl border border-[var(--av2-border)]"
@@ -1161,7 +1184,7 @@ export function BoardCanvas({
           getTransform={canvas.getTransform}
           viewportRef={viewportRef}
           onStrokeComplete={onAddDrawing}
-          onSelectDrawing={toolMode === "select" ? selectDrawing : undefined}
+          onSelectDrawing={toolMode === "select" && !readOnly ? selectDrawing : undefined}
           selectedDrawingId={selection?.kind === "drawing" ? selection.id : null}
           onDeleteDrawing={
             toolMode === "select" || toolMode === "eraser" ? deleteDrawing : undefined
@@ -1173,7 +1196,7 @@ export function BoardCanvas({
           items={enrichedCardItems}
           overrides={overrides}
           selectedId={selection?.kind === "connection" ? selection.id : null}
-          interactive={toolMode === "select"}
+          interactive={toolMode === "select" && !readOnly}
           onSelectConnection={selectConnection}
           onDeleteConnection={deleteConnection}
           pendingSourceId={arrowSourceId}
@@ -1205,7 +1228,9 @@ export function BoardCanvas({
             Your moodboard is empty
           </h2>
           <p className="mt-1 text-sm text-[var(--av2-text-2)]">
-            Drag something from the toolbar below, or click one and then click here.
+            {readOnly
+              ? "Nothing has been added yet."
+              : "Drag something from the toolbar below, or click one and then click here."}
           </p>
         </div>
       )}

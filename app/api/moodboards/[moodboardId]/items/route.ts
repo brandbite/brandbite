@@ -1,5 +1,5 @@
 // -----------------------------------------------------------------------------
-// @file: app/api/customer/moodboards/[moodboardId]/items/route.ts
+// @file: app/api/moodboards/[moodboardId]/items/route.ts
 // @purpose: Add items to a moodboard
 // @version: v1.0.0
 // @status: active
@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { MoodboardItemType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
-import { canManageMoodboards } from "@/lib/permissions/companyRoles";
+import { MOODBOARD_ACCESS_SELECT, moodboardAccess } from "@/lib/moodboard-access";
 
 type RouteParams = { params: Promise<{ moodboardId: string }> };
 
@@ -23,34 +23,26 @@ const VALID_ITEM_TYPES = new Set<string>(Object.values(MoodboardItemType));
 export async function POST(req: NextRequest, { params }: RouteParams) {
   try {
     const user = await getCurrentUserOrThrow();
-    if (user.role !== "CUSTOMER") {
-      return NextResponse.json({ error: "Only customers can access moodboards" }, { status: 403 });
-    }
-    if (!user.activeCompanyId) {
-      return NextResponse.json({ error: "No active company" }, { status: 400 });
-    }
-
-    if (!canManageMoodboards(user.companyRole ?? null)) {
-      return NextResponse.json(
-        { error: "You don't have permission to manage moodboards" },
-        { status: 403 },
-      );
-    }
-
     const { moodboardId } = await params;
 
-    // Verify moodboard belongs to user's company
     const moodboard = await prisma.moodboard.findUnique({
       where: { id: moodboardId },
-      select: { id: true, companyId: true },
+      select: { id: true, ...MOODBOARD_ACCESS_SELECT },
     });
 
     if (!moodboard) {
       return NextResponse.json({ error: "Moodboard not found" }, { status: 404 });
     }
 
-    if (moodboard.companyId !== user.activeCompanyId) {
+    const access = moodboardAccess(user, moodboard);
+    if (!access.canView) {
       return NextResponse.json({ error: "Moodboard not found" }, { status: 404 });
+    }
+    if (!access.canEdit) {
+      return NextResponse.json(
+        { error: "You don't have permission to change this moodboard" },
+        { status: 403 },
+      );
     }
 
     const body = await req.json().catch(() => null);

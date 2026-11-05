@@ -285,7 +285,7 @@ const jobTypes = [
 function renderForm(props: { initialJobTypeId?: string; role?: string } = {}) {
   respond([
     ["/api/customer/settings", { user: { companyRole: props.role ?? "OWNER" } }],
-    ["/api/customer/moodboards", { moodboards: [] }],
+    ["/api/moodboards", { moodboards: [] }],
   ]);
   return render(
     <NewTicketForm

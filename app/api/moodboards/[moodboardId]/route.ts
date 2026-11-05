@@ -1,5 +1,5 @@
 // -----------------------------------------------------------------------------
-// @file: app/api/customer/moodboards/[moodboardId]/route.ts
+// @file: app/api/moodboards/[moodboardId]/route.ts
 // @purpose: Single moodboard detail, update, and delete API
 // @version: v1.0.0
 // @status: active
@@ -9,7 +9,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
-import { canManageMoodboards, isCompanyAdminRole } from "@/lib/permissions/companyRoles";
+import { MOODBOARD_ACCESS_SELECT, moodboardAccess } from "@/lib/moodboard-access";
+import { createNotification } from "@/lib/notifications";
 import { resolveAssetUrl, deleteR2Objects } from "@/lib/r2";
 import type { MoodboardItemType } from "@prisma/client";
 
@@ -34,12 +35,6 @@ async function refreshItemData(
 export async function GET(_req: NextRequest, { params }: RouteParams) {
   try {
     const user = await getCurrentUserOrThrow();
-    if (user.role !== "CUSTOMER") {
-      return NextResponse.json({ error: "Only customers can access moodboards" }, { status: 403 });
-    }
-    if (!user.activeCompanyId) {
-      return NextResponse.json({ error: "No active company" }, { status: 400 });
-    }
 
     const { moodboardId } = await params;
 
@@ -47,7 +42,9 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
       where: { id: moodboardId },
       include: {
         project: { select: { id: true, name: true } },
-        ticket: { select: { id: true, title: true } },
+        ticket: {
+          select: { id: true, title: true, ...MOODBOARD_ACCESS_SELECT.ticket.select },
+        },
         items: {
           orderBy: { position: "asc" },
           select: {
@@ -72,8 +69,9 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Moodboard not found" }, { status: 404 });
     }
 
-    // Verify company ownership
-    if (moodboard.companyId !== user.activeCompanyId) {
+    // Someone with no access can't tell the board exists.
+    const access = moodboardAccess(user, moodboard);
+    if (!access.canView) {
       return NextResponse.json({ error: "Moodboard not found" }, { status: 404 });
     }
 
@@ -106,6 +104,9 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
         ticketId: moodboard.ticket?.id ?? null,
         ticketTitle: moodboard.ticket?.title ?? null,
         createdById: moodboard.createdById,
+        isCreativeBoard: moodboard.companyId === null,
+        sharedWithCustomer: moodboard.sharedWithCustomer,
+        access,
         items,
         connections: (moodboard.connections as unknown[]) ?? [],
         createdAt: moodboard.createdAt.toISOString(),
@@ -128,33 +129,27 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
 export async function PATCH(req: NextRequest, { params }: RouteParams) {
   try {
     const user = await getCurrentUserOrThrow();
-    if (user.role !== "CUSTOMER") {
-      return NextResponse.json({ error: "Only customers can access moodboards" }, { status: 403 });
-    }
-    if (!user.activeCompanyId) {
-      return NextResponse.json({ error: "No active company" }, { status: 400 });
-    }
-
-    if (!canManageMoodboards(user.companyRole ?? null)) {
-      return NextResponse.json(
-        { error: "You don't have permission to manage moodboards" },
-        { status: 403 },
-      );
-    }
 
     const { moodboardId } = await params;
 
     const moodboard = await prisma.moodboard.findUnique({
       where: { id: moodboardId },
-      select: { id: true, companyId: true },
+      select: { id: true, ...MOODBOARD_ACCESS_SELECT },
     });
 
     if (!moodboard) {
       return NextResponse.json({ error: "Moodboard not found" }, { status: 404 });
     }
 
-    if (moodboard.companyId !== user.activeCompanyId) {
+    const access = moodboardAccess(user, moodboard);
+    if (!access.canView) {
       return NextResponse.json({ error: "Moodboard not found" }, { status: 404 });
+    }
+    if (!access.canEdit) {
+      return NextResponse.json(
+        { error: "You don't have permission to change this moodboard" },
+        { status: 403 },
+      );
     }
 
     const body = await req.json().catch(() => null);
@@ -182,6 +177,46 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       data.connections = raw.connections;
     }
 
+    if (raw.ticketId !== undefined || raw.sharedWithCustomer !== undefined) {
+      if (!access.canShare) {
+        return NextResponse.json(
+          { error: "You don't have permission to share this moodboard" },
+          { status: 403 },
+        );
+      }
+
+      let ticketId = moodboard.ticketId;
+      if (raw.ticketId !== undefined) {
+        ticketId = typeof raw.ticketId === "string" && raw.ticketId ? raw.ticketId : null;
+        if (ticketId) {
+          const ticket = await prisma.ticket.findFirst({
+            where: { id: ticketId, creativeId: user.id },
+            select: { id: true },
+          });
+          if (!ticket) {
+            return NextResponse.json({ error: "Job not found" }, { status: 400 });
+          }
+        }
+        data.ticketId = ticketId;
+      }
+
+      // Moving a board to another job, or off one, takes it back from the customer.
+      const movedJob = raw.ticketId !== undefined && ticketId !== moodboard.ticketId;
+      const shared =
+        typeof raw.sharedWithCustomer === "boolean"
+          ? raw.sharedWithCustomer
+          : movedJob
+            ? false
+            : moodboard.sharedWithCustomer;
+      if (shared && !ticketId) {
+        return NextResponse.json(
+          { error: "Link this moodboard to a job before sharing it" },
+          { status: 400 },
+        );
+      }
+      data.sharedWithCustomer = shared;
+    }
+
     if (Object.keys(data).length === 0) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
@@ -191,9 +226,21 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       data,
       include: {
         project: { select: { id: true, name: true } },
-        ticket: { select: { id: true, title: true } },
+        ticket: { select: { id: true, title: true, createdById: true } },
       },
     });
+
+    // Only when it goes from unshared to shared, not on every later edit.
+    if (updated.sharedWithCustomer && !moodboard.sharedWithCustomer && updated.ticket) {
+      await createNotification({
+        userId: updated.ticket.createdById,
+        type: "MOODBOARD_SHARED",
+        title: "A moodboard was shared with you",
+        message: `Your creative shared the moodboard "${updated.title}" on "${updated.ticket.title}".`,
+        ticketId: updated.ticket.id,
+        actorId: user.id,
+      });
+    }
 
     return NextResponse.json({
       moodboard: {
@@ -204,6 +251,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
         projectName: updated.project?.name ?? null,
         ticketId: updated.ticket?.id ?? null,
         ticketTitle: updated.ticket?.title ?? null,
+        sharedWithCustomer: updated.sharedWithCustomer,
         createdAt: updated.createdAt.toISOString(),
         updatedAt: updated.updatedAt.toISOString(),
       },
@@ -224,33 +272,23 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
 export async function DELETE(_req: NextRequest, { params }: RouteParams) {
   try {
     const user = await getCurrentUserOrThrow();
-    if (user.role !== "CUSTOMER") {
-      return NextResponse.json({ error: "Only customers can access moodboards" }, { status: 403 });
-    }
-    if (!user.activeCompanyId) {
-      return NextResponse.json({ error: "No active company" }, { status: 400 });
-    }
 
     const { moodboardId } = await params;
 
     const moodboard = await prisma.moodboard.findUnique({
       where: { id: moodboardId },
-      select: { id: true, companyId: true, createdById: true },
+      select: { id: true, ...MOODBOARD_ACCESS_SELECT },
     });
 
     if (!moodboard) {
       return NextResponse.json({ error: "Moodboard not found" }, { status: 404 });
     }
 
-    if (moodboard.companyId !== user.activeCompanyId) {
+    const access = moodboardAccess(user, moodboard);
+    if (!access.canView) {
       return NextResponse.json({ error: "Moodboard not found" }, { status: 404 });
     }
-
-    // Only the creator or a company admin can delete
-    const isCreator = moodboard.createdById === user.id;
-    const isAdmin = isCompanyAdminRole(user.companyRole ?? null);
-
-    if (!isCreator && !isAdmin) {
+    if (!access.canDelete) {
       return NextResponse.json(
         { error: "Only the creator or a company admin can delete this moodboard" },
         { status: 403 },

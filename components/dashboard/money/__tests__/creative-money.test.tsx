@@ -326,7 +326,8 @@ describe("Creative withdrawals", () => {
     mockApi();
     render(<CreativeWithdrawalsPage />);
     const held = (await screen.findByText("Held for existing requests")).closest("section")!;
-    expect(within(held).getByText("10")).toBeInTheDocument();
+    // The cards render before their figures arrive, so wait for the number itself.
+    expect(await within(held).findByText("10")).toBeInTheDocument();
     const available = screen.getByText("Available to request").closest("section")!;
     expect(within(available).getByText("0")).toBeInTheDocument();
     const pending = screen.getByText("Pending approval").closest("section")!;

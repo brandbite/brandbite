@@ -1,5 +1,5 @@
 // -----------------------------------------------------------------------------
-// @file: app/api/customer/moodboards/link-preview/route.ts
+// @file: app/api/moodboards/link-preview/route.ts
 // @purpose: Fetch Open Graph metadata (title, description, image) for a URL
 // -----------------------------------------------------------------------------
 
@@ -59,7 +59,7 @@ async function assertPublicHost(hostname: string): Promise<boolean> {
 export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
-    if (user.role !== "CUSTOMER") {
+    if (user.role !== "CUSTOMER" && user.role !== "DESIGNER") {
       return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
     }
 

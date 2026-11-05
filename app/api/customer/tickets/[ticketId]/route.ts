@@ -101,9 +101,11 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
           },
         },
         moodboards: {
+          where: { OR: [{ companyId: { not: null } }, { sharedWithCustomer: true }] },
           select: {
             id: true,
             title: true,
+            companyId: true,
             _count: { select: { items: true } },
           },
           take: 5,
@@ -194,6 +196,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
             id: mb.id,
             title: mb.title,
             itemCount: mb._count?.items ?? 0,
+            fromCreative: mb.companyId === null,
           })),
         },
       },

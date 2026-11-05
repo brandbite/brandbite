@@ -19,6 +19,7 @@ const VALID_TYPES: NotificationType[] = [
   "PIN_RESOLVED",
   "WITHDRAWAL_UPDATED",
   "CREATIVE_SCHEDULE_UPDATED",
+  "MOODBOARD_SHARED",
 ];
 
 // ---------------------------------------------------------------------------

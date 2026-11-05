@@ -1,6 +1,6 @@
 // -----------------------------------------------------------------------------
 // @file: components/dashboard/workspace/moodboard-preview-card.tsx
-// @purpose: Moodboard card for the customer list: always a 2x2 preview of the
+// @purpose: Moodboard card for the list pages: always a 2x2 preview of the
 //           board's first items, so cards line up whatever a board contains.
 // -----------------------------------------------------------------------------
 
@@ -163,9 +163,14 @@ function PreviewCell({ item }: { item: Record<string, unknown> }) {
 
 export function MoodboardPreviewCard({
   moodboard,
+  href,
+  badge,
   dateLabel,
 }: {
   moodboard: MoodboardPreview;
+  href: string;
+  /** Says where the board came from, when it isn't simply the viewer's own. */
+  badge?: string | null;
   /** Already-formatted line, e.g. "Updated Mar 9, 2026". */
   dateLabel: string;
 }) {
@@ -173,7 +178,7 @@ export function MoodboardPreviewCard({
 
   return (
     <Link
-      href={`/customer/moodboards/${moodboard.id}`}
+      href={href}
       className="group flex h-full flex-col rounded-2xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-3 transition-colors hover:border-[var(--av2-accent)]/50 focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:ring-offset-1 focus-visible:outline-none"
     >
       <div
@@ -194,6 +199,11 @@ export function MoodboardPreviewCard({
           {moodboard.projectName && (
             <Badge className="mt-1.5 max-w-full">
               <span className="truncate">{moodboard.projectName}</span>
+            </Badge>
+          )}
+          {badge && (
+            <Badge tone="lavender" className="mt-1.5 max-w-full">
+              <span className="truncate">{badge}</span>
             </Badge>
           )}
           <p className="mt-1.5 text-sm text-[var(--av2-text-2)]">

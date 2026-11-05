@@ -6,7 +6,7 @@
 //           never authored, so the old page rendered empty chrome).
 // @version: v2.0.0
 // @status: active
-// @lastUpdate: 2026-11-04
+// @lastUpdate: 2026-11-06
 // -----------------------------------------------------------------------------
 
 import type { Metadata } from "next";
@@ -41,6 +41,14 @@ const RULES: { id?: string; icon: string; title: string; body: string }[] = [
     icon: "/home/about-momentum.png",
     title: "You stay in control",
     body: "You can request access, updates or deletion of your information anytime. Clear rights, simple process, zero tiny-print drama.",
+  },
+  {
+    // Keep in sync with who can actually see what: lib/moodboard-access.ts and
+    // the admin area. Mirrored in the terms page.
+    id: "who-can-see",
+    icon: "/home/why-flow.png",
+    title: "Who can see your work",
+    body: "Your requests, files, comments and moodboards are visible to your company's members and to the creative assigned to the request. A moodboard you attach to a request is visible to that request's creative. A creative's own moodboard stays with them until they choose to share it, and then the customer on that request can see it too. The brandbite team can see all of this, including moodboards a creative hasn't shared with anyone, so we can run the service, give support and prevent misuse.",
   },
   {
     // Linked from the /meet form. Keep in sync with lib/meetings/service.ts.

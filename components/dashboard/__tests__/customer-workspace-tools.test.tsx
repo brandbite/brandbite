@@ -149,7 +149,7 @@ describe("Moodboards list", () => {
       if (init?.method === "POST") {
         return Response.json({ moodboard: { id: "new" } });
       }
-      if (url.includes("/api/customer/moodboards")) return Response.json({ moodboards: boards });
+      if (url.includes("/api/moodboards")) return Response.json({ moodboards: boards });
       return undefined;
     });
   }

@@ -118,6 +118,7 @@ enum NotificationType {
   PIN_RESOLVED // Creative resolved a pin
   WITHDRAWAL_UPDATED // Creative's withdrawal approved, rejected or paid
   CREATIVE_SCHEDULE_UPDATED // A creative changed their own working hours
+  MOODBOARD_SHARED // A creative shared a moodboard with the customer
 }
 
 // --- CMS Content ---
@@ -2033,8 +2034,9 @@ model Moodboard {
   title       String
   description String?
 
-  companyId String
-  company   Company @relation(fields: [companyId], references: [id])
+  /// Null for a creative's own board. See lib/moodboard-access.ts.
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   projectId String?
   project   Project? @relation(fields: [projectId], references: [id])
@@ -2045,6 +2047,9 @@ model Moodboard {
   createdById String
   createdBy   UserAccount @relation("MoodboardCreatedBy", fields: [createdById], references: [id])
 
+  /// A creative's board shows to the customer of its job only when this is on.
+  sharedWithCustomer Boolean @default(false)
+
   items       MoodboardItem[]
   connections Json            @default("[]")
 
@@ -2052,6 +2057,7 @@ model Moodboard {
   updatedAt DateTime @updatedAt
 
   @@index([companyId, createdAt])
+  @@index([createdById])
   @@index([projectId])
   @@index([ticketId])
 }

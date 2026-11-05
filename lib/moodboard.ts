@@ -212,7 +212,7 @@ export type MoodboardClient = {
   id: string;
   title: string;
   description: string | null;
-  companyId: string;
+  companyId: string | null;
   projectId: string | null;
   ticketId: string | null;
   createdById: string;
@@ -220,6 +220,11 @@ export type MoodboardClient = {
   connections: MoodboardConnection[];
   project?: { id: string; name: string } | null;
   ticket?: { id: string; title: string } | null;
+  ticketTitle: string | null;
+  isCreativeBoard: boolean;
+  sharedWithCustomer: boolean;
+  /** What the person viewing can do. The API enforces the same rules. */
+  access: { canView: boolean; canEdit: boolean; canDelete: boolean; canShare: boolean };
   createdAt: string;
   updatedAt: string;
 };

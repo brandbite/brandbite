@@ -1,5 +1,5 @@
 // -----------------------------------------------------------------------------
-// @file: app/api/customer/moodboards/[moodboardId]/items/[itemId]/route.ts
+// @file: app/api/moodboards/[moodboardId]/items/[itemId]/route.ts
 // @purpose: Update and delete individual moodboard items
 // @version: v1.0.0
 // @status: active
@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
-import { canManageMoodboards } from "@/lib/permissions/companyRoles";
+import { MOODBOARD_ACCESS_SELECT, moodboardAccess } from "@/lib/moodboard-access";
 import { deleteR2Objects } from "@/lib/r2";
 
 /** Pull the R2 storage key out of an IMAGE/FILE item's data blob, if any. */
@@ -34,20 +34,6 @@ type RouteParams = {
 export async function PATCH(req: NextRequest, { params }: RouteParams) {
   try {
     const user = await getCurrentUserOrThrow();
-    if (user.role !== "CUSTOMER") {
-      return NextResponse.json({ error: "Only customers can access moodboards" }, { status: 403 });
-    }
-    if (!user.activeCompanyId) {
-      return NextResponse.json({ error: "No active company" }, { status: 400 });
-    }
-
-    if (!canManageMoodboards(user.companyRole ?? null)) {
-      return NextResponse.json(
-        { error: "You don't have permission to manage moodboards" },
-        { status: 403 },
-      );
-    }
-
     const { moodboardId, itemId } = await params;
 
     // Verify ownership chain: item -> moodboard -> company
@@ -55,7 +41,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       where: { id: itemId },
       include: {
         moodboard: {
-          select: { id: true, companyId: true },
+          select: { id: true, ...MOODBOARD_ACCESS_SELECT },
         },
       },
     });
@@ -68,8 +54,15 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
 
-    if (item.moodboard.companyId !== user.activeCompanyId) {
+    const access = moodboardAccess(user, item.moodboard);
+    if (!access.canView) {
       return NextResponse.json({ error: "Item not found" }, { status: 404 });
+    }
+    if (!access.canEdit) {
+      return NextResponse.json(
+        { error: "You don't have permission to change this moodboard" },
+        { status: 403 },
+      );
     }
 
     const body = await req.json().catch(() => null);
@@ -164,20 +157,6 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
 export async function DELETE(_req: NextRequest, { params }: RouteParams) {
   try {
     const user = await getCurrentUserOrThrow();
-    if (user.role !== "CUSTOMER") {
-      return NextResponse.json({ error: "Only customers can access moodboards" }, { status: 403 });
-    }
-    if (!user.activeCompanyId) {
-      return NextResponse.json({ error: "No active company" }, { status: 400 });
-    }
-
-    if (!canManageMoodboards(user.companyRole ?? null)) {
-      return NextResponse.json(
-        { error: "You don't have permission to manage moodboards" },
-        { status: 403 },
-      );
-    }
-
     const { moodboardId, itemId } = await params;
 
     // Verify ownership chain: item -> moodboard -> company
@@ -185,7 +164,7 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams) {
       where: { id: itemId },
       include: {
         moodboard: {
-          select: { id: true, companyId: true },
+          select: { id: true, ...MOODBOARD_ACCESS_SELECT },
         },
       },
     });
@@ -198,8 +177,15 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
 
-    if (item.moodboard.companyId !== user.activeCompanyId) {
+    const access = moodboardAccess(user, item.moodboard);
+    if (!access.canView) {
       return NextResponse.json({ error: "Item not found" }, { status: 404 });
+    }
+    if (!access.canEdit) {
+      return NextResponse.json(
+        { error: "You don't have permission to change this moodboard" },
+        { status: 403 },
+      );
     }
 
     await prisma.moodboardItem.delete({

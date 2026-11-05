@@ -56,7 +56,7 @@ export function AddEmbedModal({ open, onClose, onSave }: AddEmbedModalProps) {
           debounceRef.current = setTimeout(() => {
             fetchedUrlRef.current = trimmed;
             setFetching(true);
-            fetch("/api/customer/moodboards/video-oembed", {
+            fetch("/api/moodboards/video-oembed", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ url: trimmed }),

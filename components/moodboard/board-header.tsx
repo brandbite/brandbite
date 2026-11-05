@@ -8,10 +8,20 @@ type BoardHeaderProps = {
   onTitleChange: (title: string) => void;
   onBack: () => void;
   onDelete: () => void;
+  readOnly?: boolean;
+  canDelete?: boolean;
+  canShare?: boolean;
+  shared?: boolean;
+  jobTitle?: string | null;
+  onPickJob?: () => void;
+  onToggleShared?: () => void;
 };
 
 const CONTROL =
   "flex h-11 shrink-0 items-center gap-2 rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] px-4 text-sm font-medium shadow-sm text-[var(--av2-text)] hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none";
+
+const MENU_ITEM =
+  "flex min-h-10 w-full items-center rounded-lg px-3 text-left text-sm font-medium hover:bg-[var(--av2-bg)]";
 
 export function BoardHeader({
   title,
@@ -19,6 +29,13 @@ export function BoardHeader({
   onTitleChange,
   onBack,
   onDelete,
+  readOnly = false,
+  canDelete = true,
+  canShare = false,
+  shared = false,
+  jobTitle = null,
+  onPickJob,
+  onToggleShared,
 }: BoardHeaderProps) {
   const [value, setValue] = useState(title);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -61,6 +78,7 @@ export function BoardHeader({
         <input
           type="text"
           value={value}
+          readOnly={readOnly}
           onChange={(e) => setValue(e.target.value)}
           onBlur={saveTitle}
           onKeyDown={(e) => {
@@ -73,57 +91,106 @@ export function BoardHeader({
           }}
           className="w-full min-w-0 bg-transparent text-base font-semibold text-[var(--av2-text)] outline-none"
         />
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 16 16"
-          fill="none"
-          aria-hidden
-          className="shrink-0"
-        >
-          <path
-            d="M11 2.5l2.5 2.5L6 12.5l-3 .5.5-3L11 2.5z"
-            stroke="var(--av2-text-2)"
-            strokeWidth="1.25"
-            strokeLinejoin="round"
-          />
-        </svg>
+        {!readOnly && (
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+            aria-hidden
+            className="shrink-0"
+          >
+            <path
+              d="M11 2.5l2.5 2.5L6 12.5l-3 .5.5-3L11 2.5z"
+              stroke="var(--av2-text-2)"
+              strokeWidth="1.25"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
       </label>
 
-      <span className="hidden rounded-full border border-[var(--av2-border)] bg-[var(--av2-surface)] px-3 py-1 text-sm whitespace-nowrap text-[var(--av2-text-2)] tabular-nums sm:inline">
-        {itemCount} {itemCount === 1 ? "item" : "items"}
+      <span
+        className={`rounded-full border border-[var(--av2-border)] bg-[var(--av2-surface)] px-3 py-1 text-sm whitespace-nowrap text-[var(--av2-text-2)] tabular-nums ${readOnly ? "" : "hidden sm:inline"}`}
+      >
+        {readOnly ? "View only" : `${itemCount} ${itemCount === 1 ? "item" : "items"}`}
       </span>
 
-      <div ref={menuRef} className="relative md:ml-auto">
-        <button
-          type="button"
-          aria-haspopup="menu"
-          aria-expanded={menuOpen}
-          onClick={() => setMenuOpen((open) => !open)}
-          className={CONTROL}
-        >
-          <span aria-hidden>•••</span>
-          <span className="max-md:sr-only">More</span>
-        </button>
-        {menuOpen && (
-          <div
-            role="menu"
-            className="absolute top-full right-0 z-40 mt-2 w-48 rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-1 shadow-lg"
+      {canShare && (
+        <span className="hidden rounded-full border border-[var(--av2-border)] bg-[var(--av2-surface)] px-3 py-1 text-sm whitespace-nowrap text-[var(--av2-text-2)] lg:inline">
+          {shared ? "Shared with the customer" : "Only you and the brandbite team can see this"}
+        </span>
+      )}
+
+      {(canDelete || canShare) && (
+        <div ref={menuRef} className="relative md:ml-auto">
+          <button
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((open) => !open)}
+            className={CONTROL}
           >
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setMenuOpen(false);
-                onDelete();
-              }}
-              className="flex min-h-10 w-full items-center rounded-lg px-3 text-left text-sm font-medium text-[var(--av2-error-text)] hover:bg-[var(--av2-bg)]"
+            <span aria-hidden>•••</span>
+            <span className="max-md:sr-only">More</span>
+          </button>
+          {menuOpen && (
+            <div
+              role="menu"
+              className="absolute top-full right-0 z-40 mt-2 w-64 rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-1 shadow-lg"
             >
-              Delete moodboard
-            </button>
-          </div>
-        )}
-      </div>
+              {canShare && (
+                <>
+                  <p className="px-3 py-2 text-xs text-[var(--av2-text-2)]">
+                    {shared
+                      ? "The customer of this job can see this board, but can't change it."
+                      : "Only you and the brandbite team can see this board."}
+                  </p>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onPickJob?.();
+                    }}
+                    className={`${MENU_ITEM} text-[var(--av2-text)]`}
+                  >
+                    <span className="truncate">
+                      {jobTitle ? `Job: ${jobTitle}` : "Link to a job"}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={!jobTitle}
+                    title={jobTitle ? undefined : "Link this board to a job first"}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onToggleShared?.();
+                    }}
+                    className={`${MENU_ITEM} text-[var(--av2-text)] disabled:opacity-50`}
+                  >
+                    {shared ? "Stop sharing with customer" : "Share with customer"}
+                  </button>
+                </>
+              )}
+              {canDelete && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onDelete();
+                  }}
+                  className={`${MENU_ITEM} text-[var(--av2-error-text)]`}
+                >
+                  Delete moodboard
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

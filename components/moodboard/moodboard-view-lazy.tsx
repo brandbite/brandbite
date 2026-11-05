@@ -26,6 +26,13 @@ const MoodboardView = dynamic(
   },
 );
 
-export function MoodboardViewLazy({ moodboardId }: { moodboardId: string }) {
-  return <MoodboardView moodboardId={moodboardId} />;
+export function MoodboardViewLazy({
+  moodboardId,
+  basePath = "/customer/moodboards",
+}: {
+  moodboardId: string;
+  /** Where "back" goes, since this screen is shared by every role. */
+  basePath?: string;
+}) {
+  return <MoodboardView moodboardId={moodboardId} basePath={basePath} />;
 }

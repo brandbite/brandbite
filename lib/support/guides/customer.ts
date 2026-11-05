@@ -888,7 +888,11 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "When you create a request, choose the moodboard under **Attach moodboard**. It is then listed on the request for your creative. A moodboard can be attached to one request.",
+            text: "When you create a request, choose the moodboard under **Attach moodboard**. Your creative can then open it from their job, but can't change it. A moodboard can be attached to one request.",
+          },
+          {
+            type: "p",
+            text: "Creatives can also share their own moodboards with you, and you're notified when they do. These appear on the request and in your Moodboards list as **From your creative**, and you can look through them but not change them.",
           },
         ],
       },

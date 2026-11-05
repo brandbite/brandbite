@@ -282,6 +282,34 @@ export const ADMIN_GUIDES: SupportGuide[] = [
     ],
   },
   {
+    slug: "moodboards",
+    title: "Moodboards",
+    summary: "Look through every moodboard on the platform, including creatives' private ones.",
+    category: "Workspace",
+    routes: ["/admin/moodboards"],
+    keywords: ["canvas", "boards", "creative boards", "customer boards", "private"],
+    related: ["board-and-tickets"],
+    sections: [
+      {
+        heading: "Using the list",
+        blocks: [
+          {
+            type: "p",
+            text: "The list shows every board with who it belongs to, who created it and its job. Search by title, company, person or job, and use the filter to see **Customer boards** or **Creative boards**.",
+          },
+          {
+            type: "p",
+            text: "**Creative, private** boards haven't been shared with a customer. Creatives are told that only they and the brandbite team can see them.",
+          },
+          {
+            type: "p",
+            text: "Click a row to open the board. It's view only here: you can move around and open links, but not change anything.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     slug: "board-and-tickets",
     title: "Board and Tickets",
     summary: "See every request, assign creatives, override pricing and make bulk changes.",
