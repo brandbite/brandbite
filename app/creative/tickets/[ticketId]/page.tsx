@@ -54,8 +54,9 @@ import { useToast } from "@/components/ui/toast-provider";
 import { formatBoardDate } from "@/lib/board";
 import type { AssetEntry } from "@/components/ui/revision-image";
 import { RevisionCompare } from "@/components/ui/revision-compare";
+import { TicketActivityPanel } from "@/components/dashboard/ticket-activity-panel";
 
-type JobTab = "delivery" | "brief" | "time" | "comments";
+type JobTab = "delivery" | "brief" | "time" | "comments" | "activity";
 
 const TAB_PREFIX = "job-detail";
 
@@ -505,6 +506,7 @@ export default function CreativeTicketDetailPage() {
     },
     { value: "time", label: "Time tracking" },
     { value: "comments", label: comments ? `Comments (${comments.length})` : "Comments" },
+    { value: "activity", label: "Activity" },
   ];
 
   return (
@@ -829,6 +831,12 @@ export default function CreativeTicketDetailPage() {
                 visibilityNote="Comments are visible to the customer and brandbite admins."
                 emptyDescription="Use the form below to coordinate with the customer or brandbite team."
               />
+            </TabPanel>
+          ) : null}
+
+          {tab === "activity" ? (
+            <TabPanel idPrefix={TAB_PREFIX} value="activity">
+              <TicketActivityPanel url={`/api/creative/tickets/${ticket.id}/activity`} />
             </TabPanel>
           ) : null}
         </DetailColumns>

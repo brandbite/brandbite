@@ -646,6 +646,10 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
                 term: "Comments",
                 text: "on the **Comments** tab you can leave comments for your team and the creative. Comments can't be edited or deleted.",
               },
+              {
+                term: "Activity",
+                text: "on the full request page, the **Activity** tab lists what happened and when, newest first. Older requests may show only part of their history.",
+              },
             ],
           },
         ],

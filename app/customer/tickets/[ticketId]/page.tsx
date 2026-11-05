@@ -74,6 +74,7 @@ import {
 } from "@/lib/permissions/companyRoles";
 import { RevisionCompare } from "@/components/ui/revision-compare";
 import { AiTicketControls } from "@/components/ui/ai-ticket-controls";
+import { TicketActivityPanel } from "@/components/dashboard/ticket-activity-panel";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -150,7 +151,7 @@ type NewTicketMetadata = {
   tagsEnabled?: boolean;
 };
 
-type DetailTab = "current" | "brief" | "versions" | "comments";
+type DetailTab = "current" | "brief" | "versions" | "comments" | "activity";
 
 const TAB_PREFIX = "request-detail";
 
@@ -816,6 +817,7 @@ export default function CustomerTicketDetailPage() {
       label: revisions && revisions.length > 0 ? `Versions (${revisions.length})` : "Versions",
     },
     { value: "comments", label: comments ? `Comments (${comments.length})` : "Comments" },
+    { value: "activity", label: "Activity" },
   ];
 
   return (
@@ -1339,6 +1341,12 @@ export default function CustomerTicketDetailPage() {
                 visibilityNote="Comments are visible to your team and brandbite creatives."
                 emptyDescription="Use the form below to start a thread with your team and the creative."
               />
+            </TabPanel>
+          ) : null}
+
+          {activeTab === "activity" ? (
+            <TabPanel idPrefix={TAB_PREFIX} value="activity">
+              <TicketActivityPanel url={`/api/customer/tickets/${ticket.id}/activity`} />
             </TabPanel>
           ) : null}
         </DetailColumns>

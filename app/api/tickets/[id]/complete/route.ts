@@ -8,6 +8,7 @@
 import { NextResponse } from "next/server";
 import { completeTicketAndApplyTokens } from "@/lib/token-engine";
 import { prisma } from "@/lib/prisma";
+import { recordTicketEvent } from "@/lib/tickets/ticket-events";
 import { createNotification } from "@/lib/notifications";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { isSiteAdminRole } from "@/lib/roles";
@@ -39,7 +40,7 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
 
     const exists = await prisma.ticket.findUnique({
       where: { id: ticketId },
-      select: { id: true },
+      select: { id: true, status: true },
     });
     if (!exists) {
       return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
@@ -57,6 +58,14 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
         { status: 409 },
       );
     }
+
+    // This path doesn't stamp completedAt, so the Activity tab needs its own record.
+    await recordTicketEvent({
+      ticketId,
+      actorId: user.id,
+      type: "STATUS_CHANGED",
+      metadata: { from: exists.status, to: "DONE" },
+    });
 
     // Fire notifications (fire-and-forget)
     const ticketMeta = await prisma.ticket.findUnique({

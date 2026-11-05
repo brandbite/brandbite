@@ -15,6 +15,7 @@ import { UserRole } from "@prisma/client";
 import { TicketStatus } from "@prisma/client";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { recordTicketEvent } from "@/lib/tickets/ticket-events";
 import { parseBody } from "@/lib/schemas/helpers";
 import { bulkTicketsSchema, type BulkTicketsInput } from "@/lib/schemas/bulk-tickets.schemas";
 import { completeTicketAndApplyTokens } from "@/lib/token-engine";
@@ -74,7 +75,14 @@ export async function POST(req: NextRequest) {
       try {
         const existing = await prisma.ticket.findUnique({
           where: { id },
-          select: { id: true, status: true, completedAt: true, jobTypeId: true },
+          select: {
+            id: true,
+            status: true,
+            priority: true,
+            creativeId: true,
+            completedAt: true,
+            jobTypeId: true,
+          },
         });
         if (!existing) {
           result.failed.push({ id, error: "Ticket not found" });
@@ -86,6 +94,14 @@ export async function POST(req: NextRequest) {
             where: { id },
             data: { creativeId: data.creativeId },
           });
+          if (existing.creativeId !== data.creativeId) {
+            await recordTicketEvent({
+              ticketId: id,
+              actorId: user.id,
+              type: "CREATIVE_CHANGED",
+              metadata: { toCreativeId: data.creativeId },
+            });
+          }
         } else if (data.op === "status") {
           // Admin override — no transition guards here by design. If the
           // state machine needs enforcement, callers should use the per-role
@@ -130,6 +146,12 @@ export async function POST(req: NextRequest) {
               where: { id },
               data: { status: data.status },
             });
+            await recordTicketEvent({
+              ticketId: id,
+              actorId: user.id,
+              type: "STATUS_CHANGED",
+              metadata: { from: existing.status, to: data.status },
+            });
           }
           transitions.push({ id, from: existing.status, to: data.status });
         } else if (data.op === "priority") {
@@ -137,6 +159,17 @@ export async function POST(req: NextRequest) {
             where: { id },
             data: { priority: data.priority },
           });
+          if (existing.priority !== data.priority) {
+            await recordTicketEvent({
+              ticketId: id,
+              actorId: user.id,
+              type: "DETAILS_UPDATED",
+              metadata: {
+                fields: ["priority"],
+                priority: { from: existing.priority, to: data.priority },
+              },
+            });
+          }
         }
 
         result.succeeded.push(id);

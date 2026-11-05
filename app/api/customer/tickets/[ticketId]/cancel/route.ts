@@ -20,6 +20,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { LedgerDirection, TicketStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { recordTicketEvent } from "@/lib/tickets/ticket-events";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { normalizeCompanyRole, isCompanyAdminRole } from "@/lib/permissions/companyRoles";
 import { getEffectiveTokenValues } from "@/lib/token-engine";
@@ -120,6 +121,16 @@ export async function POST(_req: NextRequest, ctx: RouteContext) {
       if (flipped.count === 0) {
         throw new Error("LOST_RACE");
       }
+
+      await recordTicketEvent(
+        {
+          ticketId: ticket.id,
+          actorId: user.id,
+          type: "STATUS_CHANGED",
+          metadata: { from: TicketStatus.TODO, to: TicketStatus.CANCELED },
+        },
+        tx,
+      );
 
       // Refund only when there was a cost to begin with. AI tickets and
       // edge cases without a jobType have effectiveCost=0 — we still flip

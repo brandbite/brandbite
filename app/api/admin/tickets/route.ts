@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AdminActionType, UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { recordTicketEvent } from "@/lib/tickets/ticket-events";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 import { canOverrideTicketFinancials } from "@/lib/roles";
@@ -263,6 +264,7 @@ export async function PATCH(req: NextRequest) {
       select: {
         id: true,
         companyId: true,
+        creativeId: true,
         quantity: true,
         tokenCostOverride: true,
         creativePayoutOverride: true,
@@ -459,6 +461,15 @@ export async function PATCH(req: NextRequest) {
         },
       },
     });
+
+    if (hasCreativeChange && ticket.creativeId !== creativeId) {
+      await recordTicketEvent({
+        ticketId: updated.id,
+        actorId: user.id,
+        type: "CREATIVE_CHANGED",
+        metadata: { toCreativeId: creativeId },
+      });
+    }
 
     // Log only financial-override changes. Assignment-only or other
     // edits don't need to live in the security-audit trail (they don't
