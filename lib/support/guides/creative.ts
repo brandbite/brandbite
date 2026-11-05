@@ -824,7 +824,11 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
           },
           {
             type: "p",
-            text: "Select an item and drag a dot on its edge onto another item to connect them with an arrow. Scroll, drag the empty canvas or pinch to move around.",
+            text: "Select an item and drag a dot on its edge onto another item to connect them with an arrow. Scroll or pinch to move around. On a phone, drag with one finger.",
+          },
+          {
+            type: "p",
+            text: "Drag across the empty canvas to select several items, or **Shift**-click them, then move, duplicate or delete them together. **Ctrl/⌘ + Z** undoes and **Ctrl/⌘ + Shift + Z** redoes, or use the buttons at the top right. **Ctrl/⌘ + C**, **X**, **V** and **D** copy, cut, paste and duplicate.",
           },
           {
             type: "warning",

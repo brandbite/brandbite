@@ -106,7 +106,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
             id: true,
             title: true,
             companyId: true,
-            _count: { select: { items: true } },
+            _count: { select: { items: { where: { deletedAt: null } } } },
           },
           take: 5,
         },

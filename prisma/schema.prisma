@@ -2138,6 +2138,9 @@ model MoodboardItem {
   /// TODO:  { title?, items: [{ id, text, checked }] }
   data Json
 
+  /// Set when deleted. The item stays for a day so undo can bring it back.
+  deletedAt DateTime?
+
   createdById String
   createdBy   UserAccount @relation("MoodboardItemCreatedBy", fields: [createdById], references: [id])
 
@@ -2145,6 +2148,7 @@ model MoodboardItem {
   updatedAt DateTime @updatedAt
 
   @@index([moodboardId, position])
+  @@index([deletedAt])
 }
 
 // -----------------------------------------------------------------------------

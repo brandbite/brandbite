@@ -13,7 +13,7 @@ import { roundedPath, routeConnection, routeMidpoint, type RouteRect } from "./c
 type ConnectionLayerProps = {
   connections: MoodboardConnection[];
   items: MoodboardItemClient[];
-  /** The card being moved or resized right now, if any. */
+  /** The cards being moved or resized right now, if any. */
   overrides: CardOverrideStore;
   selectedId: string | null;
   /** Arrows can only be picked with the Select tool. */
@@ -63,21 +63,24 @@ function ConnectionLayerBase({
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   // While a card moves, its arrows follow the live position, not the saved one.
-  const override = useSyncExternalStore(overrides.subscribe, overrides.get, overrides.get);
+  const moving = useSyncExternalStore(overrides.subscribe, overrides.get, overrides.get);
 
   const itemMap = new Map(
-    items.map((i) => [
-      i.id,
-      override?.id === i.id
-        ? {
-            ...i,
-            x: override.x,
-            y: override.y,
-            width: override.width ?? i.width,
-            height: override.height ?? i.height,
-          }
-        : i,
-    ]),
+    items.map((i) => {
+      const override = moving?.find((o) => o.id === i.id);
+      return [
+        i.id,
+        override
+          ? {
+              ...i,
+              x: override.x,
+              y: override.y,
+              width: override.width ?? i.width,
+              height: override.height ?? i.height,
+            }
+          : i,
+      ];
+    }),
   );
 
   return (

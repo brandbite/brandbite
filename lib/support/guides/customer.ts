@@ -873,7 +873,9 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             items: [
               "Click an item to select it. Click it again or press **Enter** to edit it. Double-clicking does both.",
               "Drag an item from anywhere on it to move it. With an item selected, drag a corner to resize it or use the arrow keys to nudge it.",
-              "Scroll, drag the empty canvas, use the **Hand** tool, or hold **Space** and drag to move around. The canvas has no edges.",
+              "Scroll, use the **Hand** tool, or hold **Space** and drag to move around. On a phone, drag with one finger. The canvas has no edges.",
+              "Drag across the empty canvas to select several objects, or **Shift**-click them. Then move, duplicate or delete them together.",
+              "**Ctrl/⌘ + Z** undoes and **Ctrl/⌘ + Shift + Z** redoes, or use the buttons at the top right. **Ctrl/⌘ + C**, **X**, **V** and **D** copy, cut, paste and duplicate.",
               "**Ctrl** + scroll (**⌘** + scroll on a Mac) or pinch to zoom, or use the zoom buttons, including **Fit to content**.",
             ],
           },

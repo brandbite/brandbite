@@ -81,6 +81,23 @@ export function fitTransform(
   };
 }
 
+export function rectsIntersect(
+  a: { x: number; y: number; width: number; height: number },
+  b: { x: number; y: number; width: number; height: number },
+): boolean {
+  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+}
+
+/** A drawing's path, moved. Every number in it is an x then a y, in canvas units. */
+export function shiftPath(pathData: string, dx: number, dy: number): string {
+  let isX = true;
+  return pathData.replace(/-?\d+(?:\.\d+)?(?:e-?\d+)?/gi, (value) => {
+    const moved = parseFloat(value) + (isX ? dx : dy);
+    isX = !isX;
+    return String(Math.round(moved * 100) / 100);
+  });
+}
+
 /** Dot spacing on screen: doubles when zoomed out so the grid never turns to noise. */
 export function gridSpacing(zoom: number): number {
   let spacing = GRID_BASE_PX * zoom;

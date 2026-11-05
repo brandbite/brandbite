@@ -3,7 +3,7 @@
 // -----------------------------------------------------------------------------
 // @file: components/moodboard/board-canvas.tsx
 // @purpose: The infinite moodboard canvas. One set of pointer handlers drives
-//           panning, pinching, and moving and resizing cards. During a gesture
+//           panning, pinching, box selection, and moving and resizing cards. During a gesture
 //           styles are written directly to the element, so React only re-renders
 //           when the gesture ends and the new position is committed.
 // -----------------------------------------------------------------------------
@@ -57,7 +57,7 @@ import {
   STICKY_COLORS,
 } from "@/lib/moodboard";
 
-import { resizeFromCorner, zoomAtPoint, type CanvasRect } from "./canvas-math";
+import { rectsIntersect, resizeFromCorner, zoomAtPoint, type CanvasRect } from "./canvas-math";
 import { createCardOverrideStore } from "./card-override-store";
 
 const { MIN_WIDTH, MIN_HEIGHT } = CANVAS_DEFAULTS;
@@ -66,16 +66,29 @@ const { MIN_WIDTH, MIN_HEIGHT } = CANVAS_DEFAULTS;
 const DRAG_THRESHOLD = 4;
 const NUDGE_PX = 10;
 const NUDGE_LARGE_PX = 50;
+/** How long to wait for the browser's own paste event before using the last copy. */
+const PASTE_FALLBACK_MS = 60;
 /** These keep their own click and typing behaviour inside a card. */
 const INTERACTIVE = "input, textarea, select, button, iframe";
 
-export type Selection = { kind: "card" | "drawing" | "connection"; id: string } | null;
+export type Selection =
+  | { kind: "card" | "drawing" | "connection"; id: string }
+  | { kind: "multi"; ids: string[] }
+  | null;
+
+/** The cards and drawings in a selection. An arrow isn't one of them. */
+function selectedItemIds(selection: Selection): string[] {
+  if (!selection || selection.kind === "connection") return [];
+  return selection.kind === "multi" ? selection.ids : [selection.id];
+}
 
 export type BoardCanvasHandle = {
   viewCenter: () => { x: number; y: number };
   /** The canvas point under this spot on screen, or null if it's off the canvas. */
   clientToCanvas: (clientX: number, clientY: number) => { x: number; y: number } | null;
   selectCard: (id: string, options?: { edit?: boolean }) => void;
+  selectItems: (ids: string[]) => void;
+  clearSelection: () => void;
 };
 
 type BoardCanvasProps = {
@@ -101,6 +114,16 @@ type BoardCanvasProps = {
   onUpdateItem: (itemId: string, data: MoodboardItemData) => void;
   onDeleteItem: (itemId: string) => void;
   onMoveItem: (itemId: string, x: number, y: number) => void;
+  /** Several at once. A nudge from the arrow keys is one undo step, however many presses. */
+  onMoveItems: (moves: ItemMove[], options?: { nudge?: boolean }) => void;
+  onDeleteItems: (itemIds: string[]) => void;
+  onDuplicateItems: (itemIds: string[]) => void;
+  /** Remembers these items and returns the text for the clipboard. */
+  onCopyItems: (itemIds: string[]) => string;
+  /** False if the clipboard holds something other than board items. */
+  onPasteText: (text: string | null) => boolean;
+  /** The last copy, for browsers that don't report a paste with nothing to paste into. */
+  onPasteLastCopy: () => void;
   onResizeItem: (itemId: string, x: number, y: number, width: number, height: number) => void;
   onAddConnection: (sourceId: string, targetId: string) => void;
   onDeleteConnection: (id: string) => void;
@@ -108,8 +131,13 @@ type BoardCanvasProps = {
     data: DrawingCardData,
     bounds: { x: number; y: number; w: number; h: number },
   ) => void;
-  onUndoDelete: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
 };
+
+export type ItemMove = { id: string; x: number; y: number };
 
 type Gesture =
   | {
@@ -139,6 +167,24 @@ type Gesture =
       wasSelected: boolean;
       dx: number;
       dy: number;
+    }
+  | {
+      kind: "group";
+      pointerId: number;
+      clickedId: string;
+      members: { id: string; el: Element; isDrawing: boolean; x: number; y: number }[];
+      startX: number;
+      startY: number;
+      moved: boolean;
+    }
+  | {
+      kind: "marquee";
+      pointerId: number;
+      startX: number;
+      startY: number;
+      /** Already selected, when Shift adds to a selection. */
+      base: string[];
+      moved: boolean;
     }
   | {
       kind: "resize";
@@ -264,6 +310,19 @@ function ObjectControls({
 
 const MemoCardContent = memo(CardContent);
 
+/** Shows one member of a dragged group at its offset. Zero puts it back. */
+function moveMember(member: { el: Element; isDrawing: boolean }, dx: number, dy: number) {
+  const still = dx === 0 && dy === 0;
+  if (member.isDrawing) {
+    if (still) member.el.removeAttribute("transform");
+    else member.el.setAttribute("transform", `translate(${dx} ${dy})`);
+    return;
+  }
+  const el = member.el as HTMLElement;
+  el.style.translate = still ? "" : `${dx}px ${dy}px`;
+  el.style.zIndex = still ? "" : "50";
+}
+
 function isTyping(target: EventTarget | null) {
   const el = target as HTMLElement | null;
   if (!el?.tagName) return false;
@@ -306,15 +365,25 @@ export function BoardCanvas({
   onUpdateItem,
   onDeleteItem,
   onMoveItem,
+  onMoveItems,
+  onDeleteItems,
+  onDuplicateItems,
+  onCopyItems,
+  onPasteText,
+  onPasteLastCopy,
   onResizeItem,
   onAddConnection,
   onDeleteConnection,
   onAddDrawing,
-  onUndoDelete,
+  onUndo,
+  onRedo,
+  canUndo = false,
+  canRedo = false,
 }: BoardCanvasProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const worldRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
+  const marqueeRef = useRef<HTMLDivElement>(null);
 
   const canvas = useCanvasTransform(viewportRef, worldRef, gridRef);
   const overrides = useMemo(() => createCardOverrideStore(), []);
@@ -331,6 +400,7 @@ export function BoardCanvas({
   // callbacks stable, so memoized cards don't re-render.
   const latest = useRef({
     items,
+    measuredHeights,
     selection,
     toolMode,
     placing,
@@ -345,13 +415,21 @@ export function BoardCanvas({
     onUpdateItem,
     onDeleteItem,
     onMoveItem,
+    onMoveItems,
+    onDeleteItems,
+    onDuplicateItems,
+    onCopyItems,
+    onPasteText,
+    onPasteLastCopy,
     onResizeItem,
     onDeleteConnection,
-    onUndoDelete,
+    onUndo,
+    onRedo,
   });
   useLayoutEffect(() => {
     latest.current = {
       items,
+      measuredHeights,
       selection,
       toolMode,
       placing,
@@ -366,9 +444,16 @@ export function BoardCanvas({
       onUpdateItem,
       onDeleteItem,
       onMoveItem,
+      onMoveItems,
+      onDeleteItems,
+      onDuplicateItems,
+      onCopyItems,
+      onPasteText,
+      onPasteLastCopy,
       onResizeItem,
       onDeleteConnection,
-      onUndoDelete,
+      onUndo,
+      onRedo,
     };
   });
 
@@ -383,6 +468,20 @@ export function BoardCanvas({
   const deleteCard = useCallback((id: string) => {
     latest.current.onDeleteItem(id);
     setSelection(null);
+  }, []);
+
+  const duplicateCard = useCallback((id: string) => {
+    latest.current.onDuplicateItems([id]);
+  }, []);
+
+  /** One id is an ordinary selection, with that object's own controls. */
+  const selectIds = useCallback((ids: string[]) => {
+    if (ids.length === 0) setSelection(null);
+    else if (ids.length > 1) setSelection({ kind: "multi", ids });
+    else {
+      const item = latest.current.items.find((i) => i.id === ids[0]);
+      setSelection({ kind: item?.type === "DRAWING" ? "drawing" : "card", id: ids[0] });
+    }
   }, []);
 
   const cardItems = useMemo(() => items.filter((i) => i.type !== "DRAWING"), [items]);
@@ -495,11 +594,16 @@ export function BoardCanvas({
         setSelection({ kind: "card", id });
         if (options?.edit) setEditRequest({ id, nonce: Date.now() });
       },
+      selectItems: (ids) => {
+        onSetToolMode("select");
+        selectIds(ids);
+      },
+      clearSelection: () => setSelection(null),
     };
     return () => {
       handleRef.current = null;
     };
-  }, [handleRef, canvas, onSetToolMode]);
+  }, [handleRef, canvas, onSetToolMode, selectIds]);
 
   // ---------------------------------------------------------------------------
   // Gestures
@@ -508,6 +612,7 @@ export function BoardCanvas({
   const gesture = useRef<Gesture | null>(null);
   const spaceHeld = useRef(false);
   const suppressClick = useRef(false);
+  const pasteSeen = useRef(false);
   const touches = useRef(new Map<number, { x: number; y: number }>());
   const frame = useRef<number | null>(null);
 
@@ -547,6 +652,12 @@ export function BoardCanvas({
   /** Abandon a card gesture, as when a second finger turns it into a pinch. */
   const cancelCardGesture = useCallback(() => {
     const g = gesture.current;
+    if (g?.kind === "group") {
+      for (const member of g.members) moveMember(member, 0, 0);
+      overrides.set(null);
+      return;
+    }
+    if (g?.kind === "marquee" && marqueeRef.current) marqueeRef.current.style.display = "none";
     if (!g || (g.kind !== "card" && g.kind !== "resize")) return;
     g.el.style.translate = "";
     g.el.style.zIndex = "";
@@ -649,14 +760,71 @@ export function BoardCanvas({
       return;
     }
 
+    /** Starts moving everything selected, or just this object if it's on its own. */
+    const beginGroup = (clickedId: string, ids: string[]) => {
+      const members = ids.flatMap((id) => {
+        const item = latest.current.items.find((i) => i.id === id);
+        const isDrawing = item?.type === "DRAWING";
+        const el = viewportRef.current?.querySelector(
+          isDrawing ? `[data-mb-drawing-group="${id}"]` : `[data-mb-card-id="${id}"]`,
+        );
+        return item && el ? [{ id, el, isDrawing, x: item.x, y: item.y }] : [];
+      });
+      gesture.current = {
+        kind: "group",
+        pointerId: e.pointerId,
+        clickedId,
+        members,
+        startX: e.clientX,
+        startY: e.clientY,
+        moved: false,
+      };
+    };
+
+    /** Shift adds an object to the selection, or takes it back out. */
+    const toggle = (id: string) => {
+      const ids = selectedItemIds(latest.current.selection);
+      selectIds(ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
+      suppressClick.current = true;
+    };
+
+    const drawingId = target.closest("[data-mb-drawing-id]")?.getAttribute("data-mb-drawing-id");
+    if (!cardEl && drawingId && mode === "select") {
+      if (e.shiftKey) {
+        toggle(drawingId);
+        return;
+      }
+      const chosen = selectedItemIds(latest.current.selection);
+      if (chosen.includes(drawingId)) {
+        beginGroup(drawingId, chosen);
+      } else {
+        setSelection({ kind: "drawing", id: drawingId });
+        beginGroup(drawingId, [drawingId]);
+      }
+      return;
+    }
+
     if (!cardEl) {
       if (mode === "arrow") {
         setArrowSourceId(null);
         setPendingTarget(null);
         setPendingTargetId(null);
       }
-      setSelection(null);
+      const base = e.shiftKey ? selectedItemIds(latest.current.selection) : [];
+      if (!e.shiftKey) setSelection(null);
       (document.activeElement as HTMLElement | null)?.blur?.();
+      // A finger moves the canvas; a mouse draws a box, and moves it with Space or the Hand.
+      if (mode === "select" && e.pointerType !== "touch") {
+        gesture.current = {
+          kind: "marquee",
+          pointerId: e.pointerId,
+          startX: e.clientX,
+          startY: e.clientY,
+          base,
+          moved: false,
+        };
+        return;
+      }
       startPan(e);
       return;
     }
@@ -666,6 +834,17 @@ export function BoardCanvas({
     const id = cardEl.dataset.mbCardId!;
     const item = latest.current.items.find((i) => i.id === id);
     if (!item) return;
+
+    if (e.shiftKey) {
+      toggle(id);
+      return;
+    }
+
+    const selected = latest.current.selection;
+    if (selected?.kind === "multi" && selected.ids.includes(id)) {
+      beginGroup(id, selected.ids);
+      return;
+    }
 
     const handle = target.closest<HTMLElement>("[data-mb-handle]");
     if (handle) {
@@ -756,7 +935,46 @@ export function BoardCanvas({
       g.dx = (x - g.startX) / zoom;
       g.dy = (y - g.startY) / zoom;
       g.el.style.translate = `${g.dx}px ${g.dy}px`;
-      overrides.set({ id: g.id, x: g.origin.x + g.dx, y: g.origin.y + g.dy });
+      overrides.set([{ id: g.id, x: g.origin.x + g.dx, y: g.origin.y + g.dy }]);
+    } else if (g.kind === "group" && g.moved) {
+      const dx = (x - g.startX) / zoom;
+      const dy = (y - g.startY) / zoom;
+      for (const member of g.members) moveMember(member, dx, dy);
+      overrides.set(g.members.map((m) => ({ id: m.id, x: m.x + dx, y: m.y + dy })));
+    } else if (g.kind === "marquee" && g.moved) {
+      const box = marqueeRef.current;
+      const rect = viewportRef.current?.getBoundingClientRect();
+      if (!box || !rect) return;
+      const left = Math.min(x, g.startX) - rect.left;
+      const top = Math.min(y, g.startY) - rect.top;
+      const width = Math.abs(x - g.startX);
+      const height = Math.abs(y - g.startY);
+      box.style.display = "block";
+      box.style.left = `${left}px`;
+      box.style.top = `${top}px`;
+      box.style.width = `${width}px`;
+      box.style.height = `${height}px`;
+
+      const { panX, panY } = canvas.getTransform();
+      const area = {
+        x: (left - panX) / zoom,
+        y: (top - panY) / zoom,
+        width: width / zoom,
+        height: height / zoom,
+      };
+      const { items: all, measuredHeights: heights, selection: now } = latest.current;
+      const hits = all
+        .filter((i) =>
+          rectsIntersect(area, {
+            x: i.x,
+            y: i.y,
+            width: i.width,
+            height: i.height || heights.get(i.id) || 100,
+          }),
+        )
+        .map((i) => i.id);
+      const next = [...new Set([...g.base, ...hits])];
+      if (next.join() !== selectedItemIds(now).join()) selectIds(next);
     } else if (g.kind === "resize") {
       const next = resizeFromCorner(
         g.origin,
@@ -771,9 +989,9 @@ export function BoardCanvas({
       g.el.style.top = `${next.y}px`;
       g.el.style.width = `${next.width}px`;
       g.el.style.height = `${next.height}px`;
-      overrides.set({ id: g.id, x: next.x, y: next.y, width: next.width, height: next.height });
+      overrides.set([{ id: g.id, x: next.x, y: next.y, width: next.width, height: next.height }]);
     }
-  }, [canvas, overrides, updatePendingArrow]);
+  }, [canvas, overrides, selectIds, updatePendingArrow]);
 
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
@@ -822,6 +1040,16 @@ export function BoardCanvas({
         g.moved = true;
         g.el.style.zIndex = "50";
         setCursor("grabbing");
+      }
+      if (g.kind === "group" && !g.moved) {
+        if (Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < DRAG_THRESHOLD) return;
+        g.moved = true;
+        setCursor("grabbing");
+      }
+      if (g.kind === "marquee" && !g.moved) {
+        if (Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < DRAG_THRESHOLD) return;
+        g.moved = true;
+        suppressClick.current = true;
       }
       if (
         g.kind === "pan" &&
@@ -878,6 +1106,36 @@ export function BoardCanvas({
         return;
       }
 
+      if (g.kind === "marquee") {
+        if (marqueeRef.current) marqueeRef.current.style.display = "none";
+        return;
+      }
+
+      if (g.kind === "group") {
+        if (!g.moved) {
+          // A plain click on one of several narrows the selection to it.
+          if (g.members.length > 1) {
+            selectIds([g.clickedId]);
+            suppressClick.current = true;
+          }
+          return;
+        }
+        suppressClick.current = true;
+        const { zoom } = canvas.getTransform();
+        const dx = Math.round((e.clientX - g.startX) / zoom);
+        const dy = Math.round((e.clientY - g.startY) / zoom);
+        for (const member of g.members) {
+          moveMember(member, 0, 0);
+          if (!member.isDrawing) {
+            (member.el as HTMLElement).style.left = `${member.x + dx}px`;
+            (member.el as HTMLElement).style.top = `${member.y + dy}px`;
+          }
+        }
+        latest.current.onMoveItems(g.members.map((m) => ({ id: m.id, x: m.x + dx, y: m.y + dy })));
+        overrides.set(null);
+        return;
+      }
+
       if (g.kind === "card") {
         if (!g.moved) {
           // First click selects; only a click on a selected card reaches its content.
@@ -931,6 +1189,7 @@ export function BoardCanvas({
     objectAt,
     overrides,
     paintGesture,
+    selectIds,
     setCursor,
     updatePendingArrow,
   ]);
@@ -987,9 +1246,40 @@ export function BoardCanvas({
         return;
       }
 
-      if (mod && e.key.toLowerCase() === "z" && !e.shiftKey) {
+      if (mod && e.key.toLowerCase() === "z") {
         e.preventDefault();
-        latest.current.onUndoDelete();
+        if (e.shiftKey) latest.current.onRedo();
+        else latest.current.onUndo();
+        return;
+      }
+      if (mod && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        latest.current.onRedo();
+        return;
+      }
+      if (mod && e.key.toLowerCase() === "a") {
+        e.preventDefault();
+        latest.current.onSetToolMode("select");
+        selectIds(latest.current.items.map((i) => i.id));
+        return;
+      }
+      if (mod && e.key.toLowerCase() === "d") {
+        e.preventDefault();
+        const ids = selectedItemIds(latest.current.selection);
+        if (ids.length > 0) latest.current.onDuplicateItems(ids);
+        return;
+      }
+      if (mod && e.key.toLowerCase() === "v") {
+        // The paste event below handles it where the browser sends one.
+        pasteSeen.current = false;
+        setTimeout(() => {
+          if (!pasteSeen.current) latest.current.onPasteLastCopy();
+        }, PASTE_FALLBACK_MS);
+        return;
+      }
+      if (mod && e.key.toLowerCase() === "c") {
+        const ids = selectedItemIds(latest.current.selection);
+        if (ids.length > 0) latest.current.onCopyItems(ids);
         return;
       }
       if (e.shiftKey && e.code === "Digit1") {
@@ -1019,19 +1309,24 @@ export function BoardCanvas({
       if ((e.key === "Delete" || e.key === "Backspace") && current) {
         e.preventDefault();
         if (current.kind === "connection") latest.current.onDeleteConnection(current.id);
+        else if (current.kind === "multi") latest.current.onDeleteItems(current.ids);
         else latest.current.onDeleteItem(current.id);
         setSelection(null);
         return;
       }
 
-      if (current?.kind === "card" && e.key.startsWith("Arrow")) {
-        const item = latest.current.items.find((i) => i.id === current.id);
-        if (!item) return;
+      const nudged = selectedItemIds(current);
+      if (nudged.length > 0 && e.key.startsWith("Arrow")) {
         e.preventDefault();
         const step = e.shiftKey ? NUDGE_LARGE_PX : NUDGE_PX;
         const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
         const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
-        latest.current.onMoveItem(current.id, item.x + dx, item.y + dy);
+        latest.current.onMoveItems(
+          latest.current.items
+            .filter((i) => nudged.includes(i.id))
+            .map((i) => ({ id: i.id, x: i.x + dx, y: i.y + dy })),
+          { nudge: true },
+        );
         return;
       }
 
@@ -1059,13 +1354,46 @@ export function BoardCanvas({
       setCursor(idleCursor());
     };
 
+    // Copying through these events reaches other tabs, and needs no permission.
+    const boardHasFocus = (e: Event) =>
+      !isTyping(e.target) && !document.querySelector('[role="dialog"]') && !latest.current.readOnly;
+
+    const onCopy = (e: ClipboardEvent) => {
+      if (!boardHasFocus(e)) return;
+      const ids = selectedItemIds(latest.current.selection);
+      if (ids.length === 0) return;
+      e.clipboardData?.setData("text/plain", latest.current.onCopyItems(ids));
+      e.preventDefault();
+    };
+    const onCut = (e: ClipboardEvent) => {
+      onCopy(e);
+      if (!boardHasFocus(e)) return;
+      const ids = selectedItemIds(latest.current.selection);
+      if (ids.length === 0) return;
+      latest.current.onDeleteItems(ids);
+      setSelection(null);
+    };
+    const onPaste = (e: ClipboardEvent) => {
+      pasteSeen.current = true;
+      if (!boardHasFocus(e)) return;
+      if (latest.current.onPasteText(e.clipboardData?.getData("text/plain") ?? null)) {
+        e.preventDefault();
+      }
+    };
+
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("copy", onCopy);
+    window.addEventListener("cut", onCut);
+    window.addEventListener("paste", onPaste);
     return () => {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("copy", onCopy);
+      window.removeEventListener("cut", onCut);
+      window.removeEventListener("paste", onPaste);
     };
-  }, [canvas, idleCursor, setCursor]);
+  }, [canvas, idleCursor, selectIds, setCursor]);
 
   // ---------------------------------------------------------------------------
   // Arrow tool
@@ -1090,12 +1418,20 @@ export function BoardCanvas({
       viewport.scrollLeft = 0;
       viewport.scrollTop = 0;
     }
-    if (!latest.current.readOnly && el.dataset?.mbCardId && el.matches(":focus-visible")) {
+    if (
+      !latest.current.readOnly &&
+      el.dataset?.mbCardId &&
+      el.matches(":focus-visible") &&
+      !selectedItemIds(latest.current.selection).includes(el.dataset.mbCardId)
+    ) {
       setSelection({ kind: "card", id: el.dataset.mbCardId });
     }
   };
 
-  const selectDrawing = useCallback((id: string) => setSelection({ kind: "drawing", id }), []);
+  const groupIds = useMemo(
+    () => new Set(selection?.kind === "multi" ? selection.ids : []),
+    [selection],
+  );
   const selectConnection = useCallback(
     (id: string) => setSelection({ kind: "connection", id }),
     [],
@@ -1154,6 +1490,7 @@ export function BoardCanvas({
             width={item.width}
             height={item.height}
             selected={selection?.kind === "card" && selection.id === item.id}
+            inGroup={groupIds.has(item.id)}
             bare={item.type === "NOTE" || item.type === "SHAPE" || item.type === "TEXT"}
             label={cardLabel(item)}
             registerCard={registerCard}
@@ -1164,6 +1501,7 @@ export function BoardCanvas({
             }
             hideToolbar={isPhone}
             onDelete={deleteCard}
+            onDuplicate={duplicateCard}
           >
             <MemoCardContent
               item={item}
@@ -1184,8 +1522,8 @@ export function BoardCanvas({
           getTransform={canvas.getTransform}
           viewportRef={viewportRef}
           onStrokeComplete={onAddDrawing}
-          onSelectDrawing={toolMode === "select" && !readOnly ? selectDrawing : undefined}
           selectedDrawingId={selection?.kind === "drawing" ? selection.id : null}
+          highlightedIds={groupIds}
           onDeleteDrawing={
             toolMode === "select" || toolMode === "eraser" ? deleteDrawing : undefined
           }
@@ -1235,6 +1573,42 @@ export function BoardCanvas({
         </div>
       )}
 
+      <div
+        ref={marqueeRef}
+        aria-hidden
+        className="pointer-events-none absolute z-20 rounded-sm border border-[var(--av2-accent)] bg-[var(--av2-accent)]/10"
+        style={{ display: "none" }}
+      />
+
+      {!keyboardOpen && !hideObjectToolbar && selection?.kind === "multi" && (
+        <div
+          data-mb-canvas-ui
+          className="absolute bottom-[calc(5rem+env(safe-area-inset-bottom))] left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-1 whitespace-nowrap shadow-md"
+        >
+          <span role="status" className="px-3 text-sm font-medium text-[var(--av2-text)]">
+            {selection.ids.length} selected
+          </span>
+          <div aria-hidden className="mx-1 h-5 w-px bg-[var(--av2-border)]" />
+          <button
+            type="button"
+            onClick={() => latest.current.onDuplicateItems(selection.ids)}
+            className="flex h-9 items-center rounded-lg px-3 text-sm font-medium text-[var(--av2-text)] hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
+          >
+            Duplicate
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              latest.current.onDeleteItems(selection.ids);
+              setSelection(null);
+            }}
+            className="flex h-9 items-center rounded-lg px-3 text-sm font-medium text-[var(--av2-error-text)] hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
+          >
+            Delete
+          </button>
+        </div>
+      )}
+
       {isPhone &&
         !keyboardOpen &&
         !hideObjectToolbar &&
@@ -1250,6 +1624,14 @@ export function BoardCanvas({
               <ObjectControls item={item} onUpdateItem={updateItem} />
               <button
                 type="button"
+                onClick={() => duplicateCard(item.id)}
+                aria-label={`Duplicate ${cardLabel(item)}`}
+                className="flex h-9 shrink-0 items-center rounded-lg px-3 text-sm font-medium text-[var(--av2-text)]"
+              >
+                Duplicate
+              </button>
+              <button
+                type="button"
                 onClick={() => deleteCard(item.id)}
                 aria-label={`Delete ${cardLabel(item)}`}
                 className="flex h-9 shrink-0 items-center rounded-lg px-3 text-sm font-medium text-[var(--av2-error-text)]"
@@ -1262,7 +1644,12 @@ export function BoardCanvas({
 
       <div data-mb-canvas-ui>
         {!keyboardOpen && (
-          <CanvasControls canvas={canvas} onFitToContent={handleFit} hasItems={items.length > 0} />
+          <CanvasControls
+            canvas={canvas}
+            onFitToContent={handleFit}
+            hasItems={items.length > 0}
+            history={readOnly ? undefined : { canUndo, canRedo, onUndo, onRedo }}
+          />
         )}
       </div>
     </div>

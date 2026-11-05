@@ -8,17 +8,60 @@ type CanvasControlsProps = {
   canvas: CanvasController;
   hasItems: boolean;
   onFitToContent: () => void;
+  /** Left out for people who can only look. */
+  history?: { canUndo: boolean; canRedo: boolean; onUndo: () => void; onRedo: () => void };
 };
 
 const BUTTON =
   "flex h-10 items-center justify-center rounded-lg text-[var(--av2-text)] hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none disabled:opacity-40";
 
-export function CanvasControls({ canvas, hasItems, onFitToContent }: CanvasControlsProps) {
+export function CanvasControls({ canvas, hasItems, onFitToContent, history }: CanvasControlsProps) {
   // The only part of the canvas that re-renders while zooming.
   const zoom = useSyncExternalStore(canvas.subscribeZoom, canvas.getZoom, canvas.getZoom);
 
   return (
     <div className="absolute top-16 right-3 z-20 flex items-center gap-1 rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-1 shadow-sm">
+      {history && (
+        <>
+          <button
+            type="button"
+            onClick={history.onUndo}
+            disabled={!history.canUndo}
+            className={`${BUTTON} w-10`}
+            aria-label="Undo"
+            title="Undo"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+              <path
+                d="M6 3 2.5 6.5 6 10M3 6.5h6.5a4 4 0 0 1 0 8H7"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={history.onRedo}
+            disabled={!history.canRedo}
+            className={`${BUTTON} w-10`}
+            aria-label="Redo"
+            title="Redo"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+              <path
+                d="M10 3l3.5 3.5L10 10M13 6.5H6.5a4 4 0 0 0 0 8H9"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+          <div aria-hidden className="mx-1 h-5 w-px bg-[var(--av2-border)]" />
+        </>
+      )}
       <button
         type="button"
         onClick={canvas.zoomOut}

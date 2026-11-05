@@ -68,9 +68,9 @@ export async function GET(req: NextRequest) {
             project: { select: { code: true } },
           },
         },
-        _count: { select: { items: true } },
+        _count: { select: { items: { where: { deletedAt: null } } } },
         items: {
-          where: { type: { not: "DRAWING" } },
+          where: { deletedAt: null, type: { not: "DRAWING" } },
           orderBy: { position: "asc" },
           take: 4,
           select: { id: true, type: true, data: true },
