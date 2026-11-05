@@ -9,12 +9,14 @@ import { useEffect, useMemo, useState } from "react";
 
 import { IconCoins, IconTicket } from "@/components/admin/v2/icons";
 import {
+  Button,
   Callout,
   Card,
   CardTitle,
   DASH,
   DetailPanel,
   EmptyState,
+  Field,
   FilterChips,
   KeyValueList,
   KpiCard,
@@ -25,16 +27,17 @@ import {
   SplitView,
   Table,
   Td,
+  TextInput,
   Th,
   Tr,
 } from "@/components/admin/v2/ui";
+import { buildLedgerParams } from "@/components/dashboard/money/ledger-query";
 import {
   DirectionBadge,
   formatDateTime,
   formatLedgerReason,
   formatSignedTokens,
   ListFooter,
-  pageOf,
   RecordedBalance,
   TokenFigure,
   useRevealPanel,
@@ -43,6 +46,7 @@ import {
 import { canManageBilling, type CompanyRole } from "@/lib/permissions/companyRoles";
 
 const PAGE_SIZE = 6;
+const SEARCH_DELAY_MS = 300;
 
 type DirectionFilter = "ALL" | LedgerDirection;
 
@@ -70,7 +74,22 @@ type CustomerTokensResponse = {
     totalDebits: number;
   };
   ledger: LedgerEntry[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    pageCount: number;
+    total: number;
+  };
 };
+
+function downloadCsv(blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "token-ledger.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 function prettyCompanyRole(role: CompanyRole | null): string | null {
   switch (role) {
@@ -95,12 +114,40 @@ export default function CustomerTokensPage() {
 
   const [directionFilter, setDirectionFilter] = useState<DirectionFilter>("ALL");
   const [query, setQuery] = useState("");
+  const [appliedQuery, setAppliedQuery] = useState("");
+  const [fromDay, setFromDay] = useState("");
+  const [toDay, setToDay] = useState("");
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [panelClosed, setPanelClosed] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const { ref: panelRef, reveal } = useRevealPanel();
 
+  const rangeInvalid = Boolean(fromDay && toDay && fromDay > toDay);
+  const hasFilters = Boolean(directionFilter !== "ALL" || appliedQuery.trim() || fromDay || toDay);
+  const filterParams = useMemo(
+    () =>
+      rangeInvalid
+        ? ""
+        : buildLedgerParams({
+            direction: directionFilter,
+            fromDay,
+            toDay,
+            q: appliedQuery,
+          }).toString(),
+    [directionFilter, fromDay, toDay, appliedQuery, rangeInvalid],
+  );
+
+  // Search runs on the server, so wait for a pause in typing.
   useEffect(() => {
+    const timer = setTimeout(() => setAppliedQuery(query), SEARCH_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  useEffect(() => {
+    // Keep the last good rows on screen until the dates make sense again.
+    if (rangeInvalid) return;
     let cancelled = false;
 
     const load = async () => {
@@ -108,7 +155,11 @@ export default function CustomerTokensPage() {
       setError(null);
 
       try {
-        const res = await fetch("/api/customer/tokens", {
+        const params = new URLSearchParams(filterParams);
+        params.set("page", String(page));
+        params.set("pageSize", String(PAGE_SIZE));
+
+        const res = await fetch(`/api/customer/tokens?${params}`, {
           cache: "no-store",
         });
         const json = await res.json().catch(() => null);
@@ -120,30 +171,6 @@ export default function CustomerTokensPage() {
 
         if (!cancelled) {
           setData(json as CustomerTokensResponse);
-        }
-
-        // Fetch company role in the background; failures here should not
-        // block the main tokens view.
-        try {
-          const settingsRes = await fetch("/api/customer/settings", {
-            cache: "no-store",
-          });
-          const settingsJson = await settingsRes.json().catch(() => null);
-
-          if (settingsRes.ok && !cancelled) {
-            const role = settingsJson?.user?.companyRole ?? null;
-            if (
-              role === "OWNER" ||
-              role === "PM" ||
-              role === "BILLING" ||
-              role === "MEMBER" ||
-              role === null
-            ) {
-              setCompanyRole(role);
-            }
-          }
-        } catch (settingsError) {
-          console.error("Customer settings fetch error (companyRole only):", settingsError);
         }
       } catch (err: any) {
         console.error("Customer tokens fetch error:", err);
@@ -162,39 +189,71 @@ export default function CustomerTokensPage() {
     return () => {
       cancelled = true;
     };
+  }, [filterParams, page, rangeInvalid]);
+
+  // Fetch company role in the background; failures here should not block the
+  // main tokens view.
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadRole = async () => {
+      try {
+        const settingsRes = await fetch("/api/customer/settings", {
+          cache: "no-store",
+        });
+        const settingsJson = await settingsRes.json().catch(() => null);
+
+        if (settingsRes.ok && !cancelled) {
+          const role = settingsJson?.user?.companyRole ?? null;
+          if (
+            role === "OWNER" ||
+            role === "PM" ||
+            role === "BILLING" ||
+            role === "MEMBER" ||
+            role === null
+          ) {
+            setCompanyRole(role);
+          }
+        }
+      } catch (settingsError) {
+        console.error("Customer settings fetch error (companyRole only):", settingsError);
+      }
+    };
+
+    loadRole();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
+  const handleExport = async () => {
+    setExporting(true);
+    setExportError(null);
+    try {
+      const res = await fetch(`/api/customer/tokens/export?${filterParams}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error || `Request failed with status ${res.status}`);
+      }
+      downloadCsv(await res.blob());
+    } catch (err: any) {
+      console.error("Customer tokens export error:", err);
+      setExportError(err?.message || "Failed to export the ledger.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const company = data?.company;
-  const ledger = useMemo(() => data?.ledger ?? [], [data]);
-  const needle = query.trim().toLowerCase();
+  const rows = data?.ledger ?? [];
+  const pagination = data?.pagination;
+  const firstRow = pagination ? (pagination.page - 1) * pagination.pageSize + 1 : 0;
 
-  const filteredLedger = useMemo(
-    () =>
-      ledger.filter((entry) => {
-        if (directionFilter !== "ALL" && entry.direction !== directionFilter) {
-          return false;
-        }
-        if (needle) {
-          const haystack = [
-            entry.reason ?? "",
-            formatLedgerReason(entry.reason),
-            entry.notes ?? "",
-            entry.ticketCode ?? "",
-          ]
-            .join(" ")
-            .toLowerCase();
-          if (!haystack.includes(needle)) return false;
-        }
-        return true;
-      }),
-    [ledger, directionFilter, needle],
-  );
-
-  const paged = pageOf(filteredLedger, page, PAGE_SIZE);
   // Derived from the visible rows, so the panel and the highlighted row always agree.
-  const selected = panelClosed
-    ? null
-    : (paged.rows.find((e) => e.id === selectedId) ?? paged.rows[0] ?? null);
+  const selected = panelClosed ? null : (rows.find((e) => e.id === selectedId) ?? rows[0] ?? null);
 
   const roleLabel = prettyCompanyRole(companyRole);
 
@@ -233,34 +292,42 @@ export default function CustomerTokensPage() {
           </Callout>
         ) : null}
 
+        {exportError ? (
+          <Callout tone="error" title="We couldn't export your ledger">
+            {exportError}
+          </Callout>
+        ) : null}
+
         <div className="grid gap-6 xl:grid-cols-3">
           <KpiCard
             icon={<IconCoins />}
             tone="green"
             label="Current balance"
-            value={loading ? DASH : <TokenFigure value={data?.company.tokenBalance} />}
+            value={data ? <TokenFigure value={data.company.tokenBalance} /> : DASH}
             hint="Your company's current token balance."
           />
           <KpiCard
             icon={<IconTicket />}
             tone="lavender"
-            label="Credits"
-            value={loading ? DASH : <TokenFigure value={data?.stats.totalCredits} unit={false} />}
-            hint="Plan renewals, top-ups and adjustments in the 50 most recent movements."
+            label="All-time credits"
+            value={data ? <TokenFigure value={data.stats.totalCredits} unit={false} /> : DASH}
+            hint="Every plan renewal, top-up and adjustment. Filters don't change this."
           />
           <KpiCard
             icon={<IconTicket />}
             tone="peach"
-            label="Debits"
-            value={loading ? DASH : <TokenFigure value={data?.stats.totalDebits} unit={false} />}
-            hint="Ticket work and other debits in the 50 most recent movements."
+            label="All-time debits"
+            value={data ? <TokenFigure value={data.stats.totalDebits} unit={false} /> : DASH}
+            hint="All ticket work and other debits. Filters don't change this."
           />
         </div>
 
-        {error ? null : loading ? (
-          <div aria-busy="true" aria-label="Loading token ledger">
-            <Skeleton className="h-96" />
-          </div>
+        {!data ? (
+          error ? null : (
+            <div aria-busy="true" aria-label="Loading token ledger">
+              <Skeleton className="h-96" />
+            </div>
+          )
         ) : (
           <SplitView
             panel={
@@ -276,7 +343,7 @@ export default function CustomerTokensPage() {
                 <CardTitle description="A chronological view of how tokens have moved in or out of your balance.">
                   Token ledger
                 </CardTitle>
-                <div className="mt-4 flex flex-wrap items-center gap-3">
+                <div className="mt-4 flex flex-wrap items-end gap-3">
                   <FilterChips
                     label="Filter by type"
                     options={[
@@ -300,18 +367,52 @@ export default function CustomerTokensPage() {
                     placeholder="Search ledger"
                     label="Search ledger"
                   />
+                  <Field label="From" htmlFor="ledger-from" className="w-full sm:w-40">
+                    <TextInput
+                      id="ledger-from"
+                      type="date"
+                      value={fromDay}
+                      max={toDay || undefined}
+                      onChange={(e) => {
+                        setFromDay(e.target.value);
+                        setPage(1);
+                      }}
+                    />
+                  </Field>
+                  <Field label="To" htmlFor="ledger-to" className="w-full sm:w-40">
+                    <TextInput
+                      id="ledger-to"
+                      type="date"
+                      value={toDay}
+                      min={fromDay || undefined}
+                      onChange={(e) => {
+                        setToDay(e.target.value);
+                        setPage(1);
+                      }}
+                    />
+                  </Field>
+                  <Button onClick={handleExport} disabled={exporting || rangeInvalid}>
+                    {exporting ? "Exporting…" : "Export CSV"}
+                  </Button>
                 </div>
+                {rangeInvalid ? (
+                  <p role="alert" className="mt-2 text-xs text-[var(--av2-error-text)]">
+                    The start date needs to be on or before the end date.
+                  </p>
+                ) : null}
               </div>
 
-              {ledger.length === 0 ? (
-                <EmptyState title="No token movements yet." />
-              ) : paged.total === 0 ? (
-                <EmptyState
-                  title="No movements match these filters"
-                  description="Try another type, or clear the search."
-                />
+              {pagination?.total === 0 ? (
+                hasFilters ? (
+                  <EmptyState
+                    title="No movements match these filters"
+                    description="Try another type or date range, or clear the search."
+                  />
+                ) : (
+                  <EmptyState title="No token movements yet." />
+                )
               ) : (
-                <div className="mt-4">
+                <div className={loading ? "mt-4 opacity-60" : "mt-4"} aria-busy={loading}>
                   <Table label="Token ledger">
                     <thead>
                       <tr>
@@ -322,7 +423,7 @@ export default function CustomerTokensPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {paged.rows.map((entry) => (
+                      {rows.map((entry) => (
                         <Tr
                           key={entry.id}
                           selected={entry.id === selected?.id}
@@ -348,11 +449,16 @@ export default function CustomerTokensPage() {
                       ))}
                     </tbody>
                   </Table>
-                  <ListFooter
-                    {...paged}
-                    onPage={setPage}
-                    note="From the 50 most recent movements."
-                  />
+                  {pagination ? (
+                    <ListFooter
+                      from={firstRow}
+                      to={firstRow + rows.length - 1}
+                      total={pagination.total}
+                      page={pagination.page}
+                      pageCount={pagination.pageCount}
+                      onPage={setPage}
+                    />
+                  ) : null}
                 </div>
               )}
             </Card>

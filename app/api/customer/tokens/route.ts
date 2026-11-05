@@ -1,104 +1,78 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/customer/tokens/route.ts
-// @purpose: Customer token balance & ledger API (session-based company)
-// @version: v1.2.0
+// @purpose: Customer token balance, all-time totals and filtered ledger page
+// @version: v1.3.0
 // @status: active
-// @lastUpdate: 2025-11-14
+// @lastUpdate: 2026-11-05
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
+
+import {
+  buildLedgerWhere,
+  companyLedgerScope,
+  LEDGER_INCLUDE,
+  ledgerTicketCode,
+  parseLedgerFilters,
+  resolveCustomerCompany,
+} from "@/lib/customer-token-ledger";
 import { prisma } from "@/lib/prisma";
-import { LedgerDirection } from "@prisma/client";
-import { getCurrentUserOrThrow } from "@/lib/auth";
-import { buildTicketCode } from "@/lib/ticket-code";
+
+const DEFAULT_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 100;
+
+function positiveInt(raw: string | null, fallback: number): number {
+  const value = Number(raw);
+  return Number.isSafeInteger(value) && value > 0 ? value : fallback;
+}
 
 // -----------------------------------------------------------------------------
-// GET: token balance + recent ledger entries for current customer's company
+// GET: balance + all-time totals + one page of ledger entries.
+// Optional params: direction, from (inclusive), to (exclusive), q, page, pageSize.
+// Filters narrow the ledger only. stats always covers the whole ledger.
 // -----------------------------------------------------------------------------
 
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
-    const user = await getCurrentUserOrThrow();
+    const resolved = await resolveCustomerCompany();
+    if (!resolved.company) return resolved.response;
+    const { company } = resolved;
 
-    if (user.role !== "CUSTOMER") {
-      return NextResponse.json(
-        { error: "Only customers can access token balance" },
-        { status: 403 },
-      );
+    const params = new URL(req.url).searchParams;
+    const parsed = parseLedgerFilters(params);
+    if ("error" in parsed) {
+      return NextResponse.json({ error: parsed.error }, { status: 400 });
     }
 
-    if (!user.activeCompanyId) {
-      return NextResponse.json({ error: "User has no active company" }, { status: 400 });
-    }
+    const where = await buildLedgerWhere(company.id, parsed.filters);
+    const pageSize = Math.min(
+      positiveInt(params.get("pageSize"), DEFAULT_PAGE_SIZE),
+      MAX_PAGE_SIZE,
+    );
 
-    const company = await prisma.company.findUnique({
-      where: { id: user.activeCompanyId },
-    });
+    const [total, sums] = await Promise.all([
+      prisma.tokenLedger.count({ where }),
+      prisma.tokenLedger.groupBy({
+        by: ["direction"],
+        where: companyLedgerScope(company.id),
+        _sum: { amount: true },
+      }),
+    ]);
 
-    if (!company) {
-      return NextResponse.json({ error: "Company not found for current user" }, { status: 404 });
-    }
+    const pageCount = Math.max(1, Math.ceil(total / pageSize));
+    const page = Math.min(positiveInt(params.get("page"), 1), pageCount);
 
     const ledger = await prisma.tokenLedger.findMany({
-      where: {
-        companyId: company.id,
-        // Company ledger only. Creative payout rows (JOB_PAYMENT) carry the
-        // ticket's companyId AND a userId — they belong to the creative's
-        // balance, not the company's. Without this filter they'd show up in
-        // the customer's ledger and inflate totalCredits, disagreeing with
-        // the stored company.tokenBalance. Matches recalculateCompanyToken-
-        // Balance and admin/token-analytics.
-        userId: null,
-      },
-      include: {
-        ticket: {
-          select: {
-            id: true,
-            companyTicketNumber: true,
-            project: {
-              select: {
-                code: true,
-              },
-            },
-          },
-        },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-      take: 50,
+      where,
+      include: LEDGER_INCLUDE,
+      // id breaks ties, so rows written in the same instant can't move between pages.
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
     });
 
-    const entries = ledger.map((entry) => {
-      const ticket = entry.ticket;
-      const ticketCode = ticket
-        ? buildTicketCode({
-            projectCode: ticket.project?.code,
-            companyTicketNumber: ticket.companyTicketNumber,
-            ticketId: ticket.id,
-          })
-        : null;
-
-      return {
-        id: entry.id,
-        createdAt: entry.createdAt.toISOString(),
-        direction: entry.direction,
-        amount: entry.amount,
-        reason: entry.reason,
-        notes: entry.notes,
-        ticketCode,
-        balanceBefore: entry.balanceBefore,
-        balanceAfter: entry.balanceAfter,
-      };
-    });
-
-    const totalCredits = ledger
-      .filter((l) => l.direction === LedgerDirection.CREDIT)
-      .reduce((sum, l) => sum + l.amount, 0);
-
-    const totalDebits = ledger
-      .filter((l) => l.direction === LedgerDirection.DEBIT)
-      .reduce((sum, l) => sum + l.amount, 0);
+    const sumFor = (direction: "CREDIT" | "DEBIT") =>
+      sums.find((s) => s.direction === direction)?._sum.amount ?? 0;
 
     return NextResponse.json({
       company: {
@@ -108,10 +82,21 @@ export async function GET(_req: NextRequest) {
         tokenBalance: company.tokenBalance,
       },
       stats: {
-        totalCredits,
-        totalDebits,
+        totalCredits: sumFor("CREDIT"),
+        totalDebits: sumFor("DEBIT"),
       },
-      ledger: entries,
+      ledger: ledger.map((entry) => ({
+        id: entry.id,
+        createdAt: entry.createdAt.toISOString(),
+        direction: entry.direction,
+        amount: entry.amount,
+        reason: entry.reason,
+        notes: entry.notes,
+        ticketCode: ledgerTicketCode(entry),
+        balanceBefore: entry.balanceBefore,
+        balanceAfter: entry.balanceAfter,
+      })),
+      pagination: { page, pageSize, pageCount, total },
     });
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {

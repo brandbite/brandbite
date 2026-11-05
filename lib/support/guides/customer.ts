@@ -1009,12 +1009,12 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             items: [
               { term: "Current balance", text: "what you can spend right now." },
               {
-                term: "Credits",
-                text: "tokens added by plan renewals, top-ups and adjustments, within your 50 most recent movements.",
+                term: "All-time credits",
+                text: "every token added by plan renewals, top-ups and adjustments.",
               },
               {
-                term: "Debits",
-                text: "tokens used by requests, AI tools and consultations, within your 50 most recent movements.",
+                term: "All-time debits",
+                text: "every token used by requests, AI tools and consultations.",
               },
             ],
           },
@@ -1029,7 +1029,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "The ledger shows your 50 most recent movements with the date, amount and reason. Use **All / Credits / Debits** or **Search ledger** to narrow it, and click a row for the ticket code and your balance before and after. Common reasons:",
+            text: "The ledger shows all your movements, newest first, with the date, amount and reason. Use **All / Credits / Debits**, **Search ledger** or the **From** and **To** dates to narrow it, and click a row for the ticket code and your balance before and after. **Export CSV** downloads every movement that matches your filters, not only the page on screen. Common reasons:",
           },
           {
             type: "list",
