@@ -490,8 +490,9 @@ export default function AdminBoardPage() {
       </div>
 
       {/* Columns. min-w-0 on the wrapper lets the strip scroll internally
-          instead of pushing the page wider than the viewport. */}
-      <div className="min-w-0 overflow-x-auto pb-2" aria-busy={loading}>
+          instead of pushing the page wider than the viewport; relative keeps
+          the cards' sr-only text inside it too. */}
+      <div className="relative min-w-0 overflow-x-auto pb-2" aria-busy={loading}>
         {loading && (
           <p className="sr-only" role="status">
             Loading board…
