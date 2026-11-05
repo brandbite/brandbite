@@ -1,8 +1,8 @@
 // -----------------------------------------------------------------------------
 // @file: app/admin/board/page.tsx
-// @purpose: Admin-facing kanban board over all tickets (read-only). Restyled
-//           on the admin design language v1 (`.bb-admin-v2` tokens + shared
-//           primitives in components/admin/v2/ui.tsx).
+// @purpose: Admin-facing kanban board over all tickets. Dragging a card changes
+//           its status through the bulk route, after a confirmation that says
+//           what the move does. Done cards stay put: the creative has been paid.
 // @version: v3.0.0
 // @status: active
 // @lastUpdate: 2026-11-01
@@ -13,6 +13,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { fetchAllTickets } from "@/lib/fetch-all-tickets";
 import Link from "next/link";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast-provider";
 import { STATUS_ORDER, isDueDateOverdue } from "@/lib/board";
 import type { TicketStatus } from "@/lib/board";
@@ -57,7 +58,26 @@ type AdminTicket = {
   creative: { id: string; name: string | null; email: string } | null;
   jobType: { id: string; name: string } | null;
   tags: { id: string; name: string; color: string }[];
+  /// Tokens the creative would get at their current rate.
+  estimatedPayout: number | null;
 };
+
+type PendingMove = { ticket: AdminTicket; to: TicketStatus };
+
+/** Spells out what a move does, since it skips the usual customer and creative steps. */
+function describeMove({ ticket, to }: PendingMove): string {
+  const label = TICKET_STATUS[to].label;
+  if (to !== "DONE") {
+    return `This skips the usual customer and creative steps. No tokens are charged or refunded, and the people on this request are told it moved to ${label}.`;
+  }
+  const creative = ticket.creative?.name || ticket.creative?.email;
+  const payment = !creative
+    ? "Nobody is assigned, so nobody gets paid."
+    : ticket.estimatedPayout != null
+      ? `${creative} is paid ${fmt(ticket.estimatedPayout)} ${plural(ticket.estimatedPayout, "token", "tokens")} straight away.`
+      : `${creative} is paid straight away.`;
+  return `${payment} This skips customer approval, and a Done request can't be moved back.`;
+}
 
 type AdminTicketsResponse = {
   tickets: AdminTicket[];
@@ -96,27 +116,6 @@ function formatDue(iso: string | null): string | null {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-}
-
-/** Page-local lock glyph (same 24px / 1.75 stroke family as the v2 icons). */
-function IconLock(p: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      width={16}
-      height={16}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.75}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-      {...p}
-    >
-      <rect x="5" y="11" width="14" height="10" rx="2" />
-      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-    </svg>
-  );
 }
 
 export default function AdminBoardPage() {
@@ -165,6 +164,66 @@ export default function AdminBoardPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ---------------------------------------------------------------------------
+  // Moving cards
+  // ---------------------------------------------------------------------------
+
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState<TicketStatus | null>(null);
+  const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
+  const [moving, setMoving] = useState<boolean>(false);
+
+  const canDropOn = (status: TicketStatus) => {
+    const ticket = tickets.find((t) => t.id === draggingId);
+    return !!ticket && ticket.status !== status;
+  };
+
+  const handleDrop = (status: TicketStatus) => {
+    const ticket = tickets.find((t) => t.id === draggingId);
+    setDraggingId(null);
+    setDragOver(null);
+    if (ticket && ticket.status !== status) setPendingMove({ ticket, to: status });
+  };
+
+  const confirmMove = async () => {
+    if (!pendingMove) return;
+    const { ticket, to } = pendingMove;
+    setMoving(true);
+    try {
+      const res = await fetch("/api/admin/tickets/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ op: "status", ticketIds: [ticket.id], status: to }),
+      });
+      const json = (await res.json().catch(() => null)) as {
+        failed?: { error: string }[];
+        error?: string;
+      } | null;
+      const problem = !res.ok
+        ? (json?.error ?? `Request failed (${res.status})`)
+        : json?.failed?.[0]?.error;
+      if (problem) throw new Error(problem);
+
+      setTickets((prev) => prev.map((t) => (t.id === ticket.id ? { ...t, status: to } : t)));
+      showToast({
+        type: "success",
+        title: `Moved to ${TICKET_STATUS[to].label}`,
+        description: ticket.title,
+      });
+    } catch (err) {
+      showToast({
+        type: "error",
+        title: "The request didn't move",
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
+      // It may have changed under us, so show where it really is.
+      await load();
+    } finally {
+      setMoving(false);
+      setPendingMove(null);
+    }
+  };
 
   // Re-run auto-assign across currently-unassigned TODO tickets. Useful for
   // tickets created before a company turned auto-assign on. Safe to re-run.
@@ -378,13 +437,6 @@ export default function AdminBoardPage() {
         }
         actions={
           <>
-            <span
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-[var(--av2-border)] px-4 text-sm text-[var(--av2-text-2)]"
-              title="Cards open the ticket detail page; status changes happen there."
-            >
-              <IconLock />
-              Read-only board
-            </span>
             <Button
               onClick={runAutoAssignBackfill}
               disabled={backfilling}
@@ -509,7 +561,23 @@ export default function AdminBoardPage() {
               <section
                 key={status}
                 aria-labelledby={headingId}
-                className="flex min-h-[480px] flex-col rounded-2xl border border-[var(--av2-border)] p-3"
+                onDragOver={(e) => {
+                  if (!canDropOn(status)) return;
+                  e.preventDefault();
+                  if (dragOver !== status) setDragOver(status);
+                }}
+                onDragLeave={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver(null);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  handleDrop(status);
+                }}
+                className={`flex min-h-[480px] flex-col rounded-2xl border p-3 transition-colors ${
+                  dragOver === status
+                    ? "border-[var(--av2-accent)] ring-2 ring-[var(--av2-accent)]"
+                    : "border-[var(--av2-border)]"
+                }`}
                 style={{
                   background: `color-mix(in srgb, ${fill} 7%, var(--av2-surface))`,
                 }}
@@ -542,7 +610,19 @@ export default function AdminBoardPage() {
                       {filtersActive ? "No tickets match these filters." : "No tickets here yet."}
                     </li>
                   ) : (
-                    columnTickets.map((t) => <BoardCard key={t.id} t={t} overdue={isOverdue(t)} />)
+                    columnTickets.map((t) => (
+                      <BoardCard
+                        key={t.id}
+                        t={t}
+                        overdue={isOverdue(t)}
+                        dragging={draggingId === t.id}
+                        onDragStart={() => setDraggingId(t.id)}
+                        onDragEnd={() => {
+                          setDraggingId(null);
+                          setDragOver(null);
+                        }}
+                      />
+                    ))
                   )}
                 </ul>
 
@@ -574,10 +654,26 @@ export default function AdminBoardPage() {
           <span aria-hidden className="hidden h-5 w-px bg-[var(--av2-border)] sm:block" />
           <p className="flex items-center gap-2">
             <IconAlertCircle width={18} height={18} />
-            Open a ticket to view its brief and history.
+            Drag a card to change its status, or open it to view its brief and history.
           </p>
         </div>
       )}
+
+      <ConfirmDialog
+        open={pendingMove !== null}
+        onClose={() => setPendingMove(null)}
+        onConfirm={confirmMove}
+        loading={moving}
+        variant={pendingMove?.to === "DONE" ? "danger" : "warning"}
+        title={
+          pendingMove
+            ? `Move "${pendingMove.ticket.title}" to ${TICKET_STATUS[pendingMove.to].label}?`
+            : ""
+        }
+        description={pendingMove ? describeMove(pendingMove) : undefined}
+        confirmLabel={pendingMove?.to === "DONE" ? "Complete request" : "Move request"}
+        cancelLabel="Keep it here"
+      />
     </div>
   );
 }
@@ -586,7 +682,21 @@ export default function AdminBoardPage() {
 // Card
 // -----------------------------------------------------------------------------
 
-function BoardCard({ t, overdue }: { t: AdminTicket; overdue: boolean }) {
+function BoardCard({
+  t,
+  overdue,
+  dragging,
+  onDragStart,
+  onDragEnd,
+}: {
+  t: AdminTicket;
+  overdue: boolean;
+  dragging: boolean;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+}) {
+  // The creative has been paid, and moving it back wouldn't reverse that.
+  const canDrag = t.status !== "DONE";
   const companyName = t.company?.name ?? DASH;
   const projectCode = t.project?.code ?? null;
   const creativeLabel = t.creative?.name || t.creative?.email || null;
@@ -600,11 +710,21 @@ function BoardCard({ t, overdue }: { t: AdminTicket; overdue: boolean }) {
   const priority = PRIORITY[t.priority];
 
   return (
-    <li>
+    <li
+      draggable={canDrag}
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", t.id);
+        onDragStart();
+      }}
+      onDragEnd={onDragEnd}
+      className={`${canDrag ? "cursor-grab active:cursor-grabbing" : ""} ${dragging ? "opacity-50" : ""}`}
+    >
       <Link
         href={`/admin/tickets/${t.id}`}
-        title="Open ticket detail"
-        className="group block rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-4 transition-colors hover:border-[var(--av2-accent)]/50 focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:ring-offset-1 focus-visible:outline-none"
+        draggable={false}
+        title={canDrag ? "Open ticket detail, or drag to change status" : "Open ticket detail"}
+        className="group block cursor-[inherit] rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-4 transition-colors hover:border-[var(--av2-accent)]/50 focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:ring-offset-1 focus-visible:outline-none"
       >
         <div className="flex items-start justify-between gap-3">
           {/* Company name — admin-only context the customer / creative

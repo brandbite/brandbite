@@ -37,10 +37,13 @@ function Answer({ faq }: { faq: Faq }) {
 
 export function FaqExplorer({
   categories: categoryRestriction,
+  endpoint = "/api/faq",
   footer,
 }: {
   /** Limit the categories shown, e.g. ["General", "Creative Process"]. */
   categories?: readonly string[];
+  /** Where the questions come from. */
+  endpoint?: string;
   /** Links shown next to the pager. */
   footer?: ReactNode;
 }) {
@@ -53,9 +56,9 @@ export function FaqExplorer({
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/faq")
+    fetch(endpoint)
       .then((res) => {
-        if (!res.ok) throw new Error(`/api/faq returned ${res.status}`);
+        if (!res.ok) throw new Error(`${endpoint} returned ${res.status}`);
         return res.json();
       })
       .then((json: FaqData) => {
@@ -72,7 +75,7 @@ export function FaqExplorer({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [endpoint]);
 
   const allowed = useMemo(() => {
     const faqs = data?.faqs ?? [];
@@ -151,15 +154,18 @@ export function FaqExplorer({
         />
       </div>
 
-      <FilterChips
-        label="Question category"
-        options={chipOptions}
-        value={category}
-        onChange={(c) => {
-          setCategory(c);
-          resetSelection();
-        }}
-      />
+      {/* One category has nothing to filter. */}
+      {chipOptions.length > 2 ? (
+        <FilterChips
+          label="Question category"
+          options={chipOptions}
+          value={category}
+          onChange={(c) => {
+            setCategory(c);
+            resetSelection();
+          }}
+        />
+      ) : null}
 
       {matches.length === 0 ? (
         <Card padding="none">
