@@ -622,7 +622,9 @@ export function Tabs<T extends string>({
       role="tablist"
       aria-label={label}
       onKeyDown={onKey}
-      className="flex gap-6 overflow-x-auto overflow-y-hidden border-b border-[var(--av2-border)]"
+      // The line is a shadow, not a border: tabs draw over it without overflowing the
+      // row, which is what used to show a vertical scrollbar next to the tabs.
+      className="flex gap-6 overflow-x-auto overflow-y-hidden shadow-[inset_0_-1px_0_var(--av2-border)]"
     >
       {tabs.map((t) => {
         const active = t.value === value;
@@ -637,7 +639,7 @@ export function Tabs<T extends string>({
             tabIndex={active ? 0 : -1}
             onClick={() => onChange(t.value)}
             className={cx(
-              "-mb-px border-b-2 px-1 pt-1 pb-3 text-sm font-semibold whitespace-nowrap transition-colors",
+              "border-b-2 px-1 pt-1 pb-3 text-sm font-semibold whitespace-nowrap transition-colors",
               active
                 ? "border-[var(--av2-accent)] text-[var(--av2-link)]"
                 : "border-transparent text-[var(--av2-text-2)] hover:text-[var(--av2-text)]",

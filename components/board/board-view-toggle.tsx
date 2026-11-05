@@ -38,7 +38,7 @@ export function BoardViewToggle({ rolePath }: BoardViewToggleProps) {
         href={boardHref}
         className={`rounded-full px-4 py-1.5 transition-colors ${
           isBoard
-            ? "bg-[var(--bb-secondary)] text-white"
+            ? "bg-[var(--bb-secondary)] text-[var(--bb-bg-page)]"
             : "text-[var(--bb-text-secondary)] hover:text-[var(--bb-secondary)]"
         }`}
       >
@@ -50,7 +50,7 @@ export function BoardViewToggle({ rolePath }: BoardViewToggleProps) {
         href={tableHref}
         className={`rounded-full px-4 py-1.5 transition-colors ${
           isTable
-            ? "bg-[var(--bb-secondary)] text-white"
+            ? "bg-[var(--bb-secondary)] text-[var(--bb-bg-page)]"
             : "text-[var(--bb-text-secondary)] hover:text-[var(--bb-secondary)]"
         }`}
       >

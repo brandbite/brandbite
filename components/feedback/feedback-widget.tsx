@@ -137,7 +137,7 @@ export function FeedbackWidget() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed right-4 bottom-4 z-40 inline-flex items-center gap-1.5 rounded-full bg-[var(--bb-secondary)] px-3.5 py-2 text-xs font-semibold text-white shadow-lg ring-1 ring-black/10 transition-transform hover:-translate-y-0.5 hover:bg-[var(--bb-primary)] focus:ring-2 focus:ring-[var(--bb-primary)] focus:ring-offset-2 focus:outline-none"
+        className="fixed right-4 bottom-4 z-40 inline-flex items-center gap-1.5 rounded-full bg-[var(--bb-secondary)] px-3.5 py-2 text-xs font-semibold text-[var(--bb-bg-page)] shadow-lg ring-1 ring-black/10 transition-transform hover:-translate-y-0.5 hover:bg-[var(--bb-primary)] hover:text-white focus:ring-2 focus:ring-[var(--bb-primary)] focus:ring-offset-2 focus:outline-none"
         title="Send feedback (⌘ + /)"
         aria-label="Send feedback"
       >
