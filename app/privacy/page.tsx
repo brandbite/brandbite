@@ -43,12 +43,12 @@ const RULES: { id?: string; icon: string; title: string; body: string }[] = [
     body: "You can request access, updates or deletion of your information anytime. Clear rights, simple process, zero tiny-print drama.",
   },
   {
-    // Keep in sync with who can actually see what: lib/moodboard-access.ts and
+    // Keep in sync with who can actually see what: lib/moodboard-access.ts, lib/ticket-drafts.ts and
     // the admin area. Mirrored in the terms page.
     id: "who-can-see",
     icon: "/home/why-flow.png",
     title: "Who can see your work",
-    body: "Your requests, files, comments and moodboards are visible to your company's members and to the creative assigned to the request. A moodboard you attach to a request is visible to that request's creative. A creative's own moodboard stays with them until they choose to share it, and then the customer on that request can see it too. The brandbite team can see all of this, including moodboards a creative hasn't shared with anyone, so we can run the service, give support and prevent misuse.",
+    body: "Your requests, files, comments and moodboards are visible to your company's members and to the creative assigned to the request. A draft of a request stays with the person who wrote it until they send it. A moodboard you attach to a request is visible to that request's creative. A creative's own moodboard stays with them until they choose to share it, and then the customer on that request can see it too. The brandbite team can see all of this, including request drafts that haven't been sent and moodboards a creative hasn't shared with anyone, so we can run the service, give support and prevent misuse.",
   },
   {
     // Linked from the /meet form. Keep in sync with lib/meetings/service.ts.

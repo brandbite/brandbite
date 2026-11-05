@@ -17,6 +17,7 @@ const WORKSPACE_LABELS: Record<DashboardRole, string> = {
 /** Pages reachable from a dashboard that have no sidebar entry. */
 const EXTRA_PAGES: Record<DashboardRole, PageEntry[]> = {
   customer: [
+    { href: "/customer/tickets/drafts", label: "Drafts", section: "Workspace" },
     { href: "/customer/tickets", section: "Workspace", label: "My requests" },
     { href: "/customer/tickets/new", section: "Workspace", label: "New request" },
   ],

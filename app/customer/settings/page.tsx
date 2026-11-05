@@ -249,6 +249,7 @@ export default function CustomerSettingsPage() {
 
   const searchParams = useSearchParams();
   const billingStatusParam = searchParams.get("billing");
+  const returnDraftId = searchParams.get("draft");
 
   useEffect(() => {
     let cancelled = false;
@@ -426,7 +427,7 @@ export default function CustomerSettingsPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ planId: plan.id }),
+        body: JSON.stringify({ planId: plan.id, returnDraftId }),
       });
 
       const json = await res.json().catch(() => null);
@@ -535,7 +536,7 @@ export default function CustomerSettingsPage() {
       const res = await fetch("/api/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId: topupId }),
+        body: JSON.stringify({ planId: topupId, returnDraftId }),
       });
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.url) {
@@ -589,6 +590,20 @@ export default function CustomerSettingsPage() {
         {error && (
           <Callout tone="error" title="Something went wrong">
             {error}
+          </Callout>
+        )}
+
+        {returnDraftId && (
+          <Callout
+            tone="info"
+            title="Your request is saved as a draft"
+            action={
+              <ButtonLink href={`/customer/tickets/new?draft=${encodeURIComponent(returnDraftId)}`}>
+                Continue your request
+              </ButtonLink>
+            }
+          >
+            Pick up where you left off once your balance is ready.
           </Callout>
         )}
 

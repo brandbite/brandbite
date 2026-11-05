@@ -70,6 +70,7 @@ import { TicketCard } from "@/components/dashboard/customer-board/ticket-card";
 import { TicketDetailDialog } from "@/components/dashboard/customer-board/ticket-detail-dialog";
 
 import NewTicketForm from "@/app/customer/tickets/new/NewTicketForm";
+import { DraftsLink } from "@/components/dashboard/tickets/drafts-link";
 import { RateCreativeModal } from "@/components/ratings/rate-creative-modal";
 
 type BoardStats = {
@@ -281,6 +282,9 @@ export default function CustomerBoardPage() {
   } | null>(null);
 
   const [newTicketModalOpen, setNewTicketModalOpen] = useState<boolean>(false);
+  const newTicketGuardRef = useRef<(() => Promise<boolean>) | null>(null);
+  const [newTicketDraftId, setNewTicketDraftId] = useState<string | null>(null);
+  const [draftsVersion, setDraftsVersion] = useState(0);
   const [newTicketMeta, setNewTicketMeta] = useState<NewTicketMetadata | null>(null);
   const [newTicketMetaLoading, setNewTicketMetaLoading] = useState<boolean>(false);
   const [newTicketMetaError, setNewTicketMetaError] = useState<string | null>(null);
@@ -452,9 +456,13 @@ export default function CustomerBoardPage() {
     }
   };
 
-  const closeNewTicketModal = () => {
+  const closeNewTicketModal = async () => {
+    // Saves the draft, and asks first if that fails.
+    if (newTicketGuardRef.current && !(await newTicketGuardRef.current())) return;
     setNewTicketModalOpen(false);
     setNewTicketMetaError(null);
+    setNewTicketDraftId(null);
+    setDraftsVersion((v) => v + 1);
   };
 
   const openNewProjectModal = () => {
@@ -1807,10 +1815,13 @@ export default function CustomerBoardPage() {
         </nav>
 
         {canCreateTickets(companyRole) ? (
-          <Button variant="primary" className="ml-auto max-sm:w-full" onClick={openNewTicketModal}>
-            <IconPlus />
-            <span>New request</span>
-          </Button>
+          <div className="ml-auto flex items-center gap-3 max-sm:w-full">
+            <DraftsLink refreshKey={draftsVersion} />
+            <Button variant="primary" className="max-sm:flex-1" onClick={openNewTicketModal}>
+              <IconPlus />
+              <span>New request</span>
+            </Button>
+          </div>
         ) : null}
       </div>
 
@@ -1984,7 +1995,14 @@ export default function CustomerBoardPage() {
         title="Create a new creative request"
         subtitle="Added to Backlog when submitted."
         headerActions={
-          <ButtonLink href="/customer/tickets/new" className="max-sm:!w-10 max-sm:!px-0">
+          <ButtonLink
+            href={
+              newTicketDraftId
+                ? `/customer/tickets/new?draft=${newTicketDraftId}`
+                : "/customer/tickets/new"
+            }
+            className="max-sm:!w-10 max-sm:!px-0"
+          >
             <IconExternal />
             <span className="max-sm:sr-only">Open full page</span>
           </ButtonLink>
@@ -2032,6 +2050,8 @@ export default function CustomerBoardPage() {
             }}
             redirectTo="/customer/board"
             onCancel={closeNewTicketModal}
+            closeGuardRef={newTicketGuardRef}
+            onDraftChange={setNewTicketDraftId}
             onCreated={() => {
               closeNewTicketModal();
               showToast({

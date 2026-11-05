@@ -454,6 +454,23 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         ],
       },
       {
+        heading: "Saving a draft",
+        blocks: [
+          {
+            type: "p",
+            text: "Once you start writing, your request saves itself as a draft every few seconds, along with its files. You can also click **Save as draft**. A draft costs no tokens and nobody works on it until you create the request.",
+          },
+          {
+            type: "p",
+            text: "Open **Drafts** next to **New request** to carry on with one or delete it. Others in your company don't see your drafts. The brandbite team can. A draft stays until you create the request or delete it yourself.",
+          },
+          {
+            type: "p",
+            text: "If your balance is too low, **top up your balance** saves your draft first. The billing page then offers **Continue your request** to bring you back to it.",
+          },
+        ],
+      },
+      {
         heading: "The fields",
         blocks: [
           {

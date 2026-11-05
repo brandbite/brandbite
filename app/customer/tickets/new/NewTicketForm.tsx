@@ -8,7 +8,18 @@
 
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type MutableRefObject,
+  type ReactNode,
+} from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   Button,
@@ -28,7 +39,9 @@ import {
   canCreateTickets,
   isBillingReadOnly,
 } from "@/lib/permissions/companyRoles";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import type { DraftAttachment, TicketDraftClient } from "@/lib/ticket-drafts";
 import { TagMultiSelect, type TagOption } from "@/components/ui/tag-multi-select";
 import { JobTypePicker } from "@/components/ui/job-type-picker";
 import {
@@ -86,7 +99,16 @@ type Props = {
   /** Whether "Work with AI" mode is available (AI_TICKETS_MODE flag). When
    *  false, the mode selector is hidden and tickets are always DESIGNER. */
   aiEnabled?: boolean;
+  /** A saved draft to carry on with. */
+  initialDraft?: TicketDraftClient | null;
+  /** Tells a parent which draft this form is saving to. */
+  onDraftChange?: (draftId: string) => void;
+  /** Lets a parent dialog ask before closing. Resolves true when it's safe to close. */
+  closeGuardRef?: MutableRefObject<(() => Promise<boolean>) | null>;
 };
+
+/** How long typing has to pause before the draft saves itself. */
+const AUTOSAVE_DELAY_MS = 3000;
 
 type TicketPriorityValue = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 
@@ -135,6 +157,15 @@ function formatBytes(bytes: number): string {
   return `${v.toFixed(precision)} ${units[i]}`;
 }
 
+function hasText(html: string): boolean {
+  return (
+    html
+      .replace(/<[^>]*>/g, "")
+      .replace(/&nbsp;/g, " ")
+      .trim().length > 0
+  );
+}
+
 async function getImageDimensions(file: File): Promise<{ width: number; height: number } | null> {
   // Only attempt for images
   if (!file.type.startsWith("image/")) return null;
@@ -177,21 +208,40 @@ export default function NewTicketForm({
   onCancel,
   initialJobTypeId,
   aiEnabled = false,
+  initialDraft = null,
+  onDraftChange,
+  closeGuardRef,
 }: Props) {
   const router = useRouter();
   const ids = useId();
   const briefInputRef = useRef<HTMLInputElement>(null);
 
-  const [creativeMode, setCreativeMode] = useState<"DESIGNER" | "AI">("DESIGNER");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [projectId, setProjectId] = useState<string>("");
-  const [jobTypeId, setJobTypeId] = useState<string>(initialJobTypeId ?? "");
-  const [priority, setPriority] = useState<TicketPriorityValue>("MEDIUM");
-  const [dueDate, setDueDate] = useState<string>("");
-  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  // A draft isn't checked against the catalog when it's saved, so anything that
+  // has since been removed falls back to empty here instead of failing on submit.
+  const [creativeMode, setCreativeMode] = useState<"DESIGNER" | "AI">(
+    aiEnabled && initialDraft?.creativeMode === "AI" ? "AI" : "DESIGNER",
+  );
+  const [title, setTitle] = useState(initialDraft?.title ?? "");
+  const [description, setDescription] = useState(initialDraft?.description ?? "");
+  const [projectId, setProjectId] = useState<string>(
+    projects.some((p) => p.id === initialDraft?.projectId) ? initialDraft!.projectId : "",
+  );
+  const [jobTypeId, setJobTypeId] = useState<string>(
+    initialDraft
+      ? jobTypes.some((j) => j.id === initialDraft.jobTypeId)
+        ? initialDraft.jobTypeId
+        : ""
+      : (initialJobTypeId ?? ""),
+  );
+  const [priority, setPriority] = useState<TicketPriorityValue>(
+    PRIORITY_OPTIONS.find((o) => o.value === initialDraft?.priority)?.value ?? "MEDIUM",
+  );
+  const [dueDate, setDueDate] = useState<string>(initialDraft?.dueDate ?? "");
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>(
+    (initialDraft?.tagIds ?? []).filter((id) => (tagsProp ?? []).some((t) => t.id === id)),
+  );
   const [localTags, setLocalTags] = useState<TagOption[]>(tagsProp ?? []);
-  const [moodboardId, setMoodboardId] = useState<string>("");
+  const [moodboardId, setMoodboardId] = useState<string>(initialDraft?.moodboardId ?? "");
   const [moodboards, setMoodboards] = useState<MoodboardOption[]>([]);
 
   // Sync when tags prop changes (e.g. after parent re-fetches)
@@ -231,7 +281,7 @@ export default function NewTicketForm({
   const initialQty = initialJobTypeId
     ? (jobTypes.find((j) => j.id === initialJobTypeId)?.defaultQuantity ?? 1)
     : 1;
-  const [quantity, setQuantity] = useState(initialQty);
+  const [quantity, setQuantity] = useState(initialDraft?.quantity ?? initialQty);
 
   const handleJobTypeChange = (id: string) => {
     setJobTypeId(id);
@@ -334,15 +384,35 @@ export default function NewTicketForm({
   // Brief uploads (selected locally, uploaded after ticket creation)
   // ---------------------------------------------------------------------------
 
-  const [briefFiles, setBriefFiles] = useState<PendingBriefFile[]>([]);
+  const [briefFiles, setBriefFilesState] = useState<PendingBriefFile[]>([]);
+  // Files already stored with the draft.
+  const [savedFiles, setSavedFilesState] = useState<DraftAttachment[]>(
+    initialDraft?.attachments ?? [],
+  );
+  // Saving runs across awaits, so it reads the current lists from these.
+  const briefFilesRef = useRef<PendingBriefFile[]>([]);
+  const savedFilesRef = useRef<DraftAttachment[]>(initialDraft?.attachments ?? []);
+
+  const setBriefFiles = (next: PendingBriefFile[]) => {
+    briefFilesRef.current = next;
+    setBriefFilesState(next);
+  };
+  const setSavedFiles = (next: DraftAttachment[]) => {
+    savedFilesRef.current = next;
+    setSavedFilesState(next);
+  };
 
   const totalBriefBytes = useMemo(() => {
-    return briefFiles.reduce((sum, f) => sum + (f.file.size ?? 0), 0);
-  }, [briefFiles]);
+    return (
+      briefFiles.reduce((sum, f) => sum + (f.file.size ?? 0), 0) +
+      savedFiles.reduce((sum, f) => sum + f.bytes, 0)
+    );
+  }, [briefFiles, savedFiles]);
 
   const maxBriefFiles = 8;
 
-  const canAddMoreBriefs = briefFiles.length < maxBriefFiles;
+  const attachedCount = briefFiles.length + savedFiles.length;
+  const canAddMoreBriefs = attachedCount < maxBriefFiles;
 
   const handleAddBriefFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -371,26 +441,40 @@ export default function NewTicketForm({
       return true;
     });
 
-    setBriefFiles((prev) => {
-      const room = Math.max(0, maxBriefFiles - prev.length);
-      const next = accepted.slice(0, room).map((file) => ({
-        id: crypto.randomUUID(),
-        file,
-      }));
+    const prev = briefFilesRef.current;
+    const room = Math.max(0, maxBriefFiles - prev.length - savedFilesRef.current.length);
+    const next = accepted.slice(0, room).map((file) => ({
+      id: crypto.randomUUID(),
+      file,
+    }));
 
-      if (accepted.length > room) {
-        rejections.push(`You can attach up to ${maxBriefFiles} files — some were not added.`);
-      }
+    if (accepted.length > room) {
+      rejections.push(`You can attach up to ${maxBriefFiles} files — some were not added.`);
+    }
 
-      return [...prev, ...next];
-    });
+    setBriefFiles([...prev, ...next]);
 
     // Persistent, per-file reasons (cleared on the next successful add or upload).
     setUploadErrors(rejections);
   };
 
   const handleRemoveBriefFile = (id: string) => {
-    setBriefFiles((prev) => prev.filter((x) => x.id !== id));
+    setBriefFiles(briefFilesRef.current.filter((x) => x.id !== id));
+  };
+
+  const handleRemoveSavedFile = async (attachment: DraftAttachment) => {
+    setSavedFiles(savedFilesRef.current.filter((x) => x.id !== attachment.id));
+    try {
+      const res = await fetch(
+        `/api/customer/ticket-drafts/${draftIdRef.current}/attachments/${attachment.id}`,
+        { method: "DELETE" },
+      );
+      if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+    } catch (err) {
+      console.error("[NewTicketForm] Removing a draft file failed", err);
+      setSavedFiles([...savedFilesRef.current, attachment]);
+      setUploadErrors([`${attachment.originalName ?? "That file"} couldn't be removed.`]);
+    }
   };
 
   async function uploadBriefsForTicket(ticketId: string): Promise<{
@@ -398,6 +482,8 @@ export default function NewTicketForm({
     succeeded: number;
     failed: number;
   }> {
+    // Files a draft already holds move over on the server; these are the rest.
+    const briefFiles = briefFilesRef.current;
     if (briefFiles.length === 0) {
       return { attempted: 0, succeeded: 0, failed: 0 };
     }
@@ -466,6 +552,279 @@ export default function NewTicketForm({
 
     return { attempted: briefFiles.length, succeeded, failed };
   }
+
+  // ---------------------------------------------------------------------------
+  // Drafts: saved by hand or after a pause in typing. Saves run one at a time so
+  // the first one can't create two drafts.
+  // ---------------------------------------------------------------------------
+
+  const draftFields = useMemo(
+    () => ({
+      title,
+      description,
+      jobTypeId,
+      projectId,
+      quantity,
+      priority,
+      dueDate,
+      tagIds: selectedTagIds,
+      moodboardId,
+      creativeMode,
+    }),
+    [
+      title,
+      description,
+      jobTypeId,
+      projectId,
+      quantity,
+      priority,
+      dueDate,
+      selectedTagIds,
+      moodboardId,
+      creativeMode,
+    ],
+  );
+  const serializedFields = useMemo(() => JSON.stringify(draftFields), [draftFields]);
+
+  const [draftId, setDraftId] = useState<string | null>(initialDraft?.id ?? null);
+  const [savedFields, setSavedFields] = useState(serializedFields);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">(
+    initialDraft ? "saved" : "idle",
+  );
+  const [savedAt, setSavedAt] = useState<Date | null>(
+    initialDraft ? new Date(initialDraft.updatedAt) : null,
+  );
+  const [leavePrompt, setLeavePrompt] = useState<((leave: boolean) => void) | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deletingDraft, setDeletingDraft] = useState(false);
+
+  const draftIdRef = useRef<string | null>(initialDraft?.id ?? null);
+  const savedFieldsRef = useRef(serializedFields);
+  const latestFieldsRef = useRef(draftFields);
+  const saveQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Nothing should save while the request is going out, or after it has.
+  const submittingRef = useRef(false);
+  const finishedRef = useRef(false);
+  const leavePromptOpenRef = useRef(false);
+
+  const canSaveDrafts =
+    !companyRoleLoading &&
+    !isLimitedAccess &&
+    (companyRole === null || canCreateTickets(companyRole));
+
+  const hasDraftContent =
+    !!draftId ||
+    !!title.trim() ||
+    hasText(description) ||
+    briefFiles.length > 0 ||
+    savedFiles.length > 0;
+
+  const needsSaving =
+    canSaveDrafts && hasDraftContent && (serializedFields !== savedFields || briefFiles.length > 0);
+
+  const needsSavingRef = useRef(needsSaving);
+
+  useEffect(() => {
+    latestFieldsRef.current = draftFields;
+    needsSavingRef.current = needsSaving;
+  });
+
+  const createDraft = async (fields: typeof draftFields) => {
+    const res = await fetch("/api/customer/ticket-drafts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(fields),
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok || !json?.draft?.id) throw new Error(json?.error || "Couldn't save the draft");
+
+    draftIdRef.current = json.draft.id as string;
+    setDraftId(json.draft.id);
+    onDraftChange?.(json.draft.id);
+    // On the full page, a reload carries on with this draft rather than starting over.
+    if (!onCancel) {
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `/customer/tickets/new?draft=${json.draft.id}`,
+      );
+    }
+  };
+
+  const runSave = async (): Promise<boolean> => {
+    if (finishedRef.current) return true;
+
+    const fields = latestFieldsRef.current;
+    const serialized = JSON.stringify(fields);
+    setSaveState("saving");
+
+    try {
+      if (!draftIdRef.current) {
+        await createDraft(fields);
+      } else if (serialized !== savedFieldsRef.current) {
+        const res = await fetch(`/api/customer/ticket-drafts/${draftIdRef.current}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(fields),
+        });
+        if (res.status === 404) {
+          // Deleted in another tab. What's on screen is still worth keeping.
+          setSavedFiles([]);
+          await createDraft(fields);
+        } else if (!res.ok) {
+          throw new Error(`Request failed: ${res.status}`);
+        }
+      }
+      savedFieldsRef.current = serialized;
+      setSavedFields(serialized);
+
+      const errors: string[] = [];
+      for (const entry of [...briefFilesRef.current]) {
+        if (!briefFilesRef.current.some((x) => x.id === entry.id)) continue;
+
+        const dims = await getImageDimensions(entry.file);
+        const body = new FormData();
+        body.append("file", entry.file);
+        if (dims?.width) body.append("width", String(dims.width));
+        if (dims?.height) body.append("height", String(dims.height));
+
+        try {
+          const res = await fetch(`/api/customer/ticket-drafts/${draftIdRef.current}/attachments`, {
+            method: "POST",
+            body,
+          });
+          if (!res.ok) {
+            errors.push(`${entry.file.name}: ${await readUploadError(res)}`);
+            continue;
+          }
+          const json = await res.json();
+          setSavedFiles([...savedFilesRef.current, json.attachment]);
+          setBriefFiles(briefFilesRef.current.filter((x) => x.id !== entry.id));
+        } catch (err) {
+          errors.push(
+            `${entry.file.name}: ${err instanceof Error ? err.message : "Upload failed"}`,
+          );
+        }
+      }
+      setUploadErrors(errors);
+
+      if (errors.length > 0) {
+        setSaveState("error");
+        return false;
+      }
+      setSavedAt(new Date());
+      setSaveState("saved");
+      return true;
+    } catch (err) {
+      console.error("[NewTicketForm] Saving the draft failed", err);
+      setSaveState("error");
+      return false;
+    }
+  };
+
+  const saveDraft = (): Promise<boolean> => {
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    const run = saveQueueRef.current.then(runSave);
+    saveQueueRef.current = run;
+    return run;
+  };
+
+  const saveDraftRef = useRef(saveDraft);
+  useEffect(() => {
+    saveDraftRef.current = saveDraft;
+  });
+
+  // Save after a pause in typing, or soon after a file is added. A failed save
+  // waits for the next change rather than retrying in a loop.
+  const pendingFileCount = briefFiles.length;
+  useEffect(() => {
+    if (!needsSavingRef.current || submitting) return;
+    autosaveTimerRef.current = setTimeout(() => {
+      if (!submittingRef.current) void saveDraftRef.current();
+    }, AUTOSAVE_DELAY_MS);
+    return () => {
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    };
+  }, [serializedFields, pendingFileCount, canSaveDrafts, submitting]);
+
+  // Closing the tab can't wait for a save, so the browser asks.
+  useEffect(() => {
+    if (!needsSaving) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [needsSaving]);
+
+  // Following a link inside the app unmounts the form: save what's left on the way out.
+  useEffect(() => {
+    return () => {
+      if (needsSavingRef.current && !finishedRef.current && !submittingRef.current) {
+        void saveDraftRef.current();
+      }
+    };
+  }, []);
+
+  /** Resolves true when it's fine to leave: saved, or the person chose to go anyway. */
+  const confirmLeave = async (): Promise<boolean> => {
+    if (finishedRef.current || submittingRef.current) return true;
+    // Escape reaches the dialog behind the prompt too; the prompt answers for both.
+    if (leavePromptOpenRef.current) return false;
+    const saved = needsSavingRef.current ? await saveDraft() : await saveQueueRef.current;
+    if (saved) return true;
+
+    leavePromptOpenRef.current = true;
+    const leave = await new Promise<boolean>((resolve) => setLeavePrompt(() => resolve));
+    leavePromptOpenRef.current = false;
+    setLeavePrompt(null);
+    if (leave) finishedRef.current = true;
+    return leave;
+  };
+
+  const confirmLeaveRef = useRef(confirmLeave);
+  useEffect(() => {
+    confirmLeaveRef.current = confirmLeave;
+  });
+  const guard = useCallback(() => confirmLeaveRef.current(), []);
+
+  useEffect(() => {
+    if (!closeGuardRef) return;
+    closeGuardRef.current = guard;
+    return () => {
+      closeGuardRef.current = null;
+    };
+  }, [closeGuardRef, guard]);
+
+  // Saves first, so topping up can't cost anyone their brief, and hands the draft
+  // to the billing page so it can bring them back.
+  const handleTopUp = async () => {
+    setError(null);
+    if (!(await saveDraft())) {
+      setError("We couldn't save your draft, so we've kept you here. Please try again.");
+      return;
+    }
+    router.push(`/customer/settings?draft=${draftIdRef.current}`);
+  };
+
+  const handleDeleteDraft = async () => {
+    setDeletingDraft(true);
+    try {
+      await saveQueueRef.current;
+      const res = await fetch(`/api/customer/ticket-drafts/${draftIdRef.current}`, {
+        method: "DELETE",
+      });
+      if (!res.ok && res.status !== 404) throw new Error(`Request failed: ${res.status}`);
+      finishedRef.current = true;
+      if (onCancel) onCancel();
+      else router.push("/customer/tickets/drafts");
+    } catch (err) {
+      console.error("[NewTicketForm] Deleting the draft failed", err);
+      setError("We couldn't delete this draft. Please try again.");
+    } finally {
+      setDeletingDraft(false);
+      setConfirmingDelete(false);
+    }
+  };
 
   // ---------------------------------------------------------------------------
   // AI brief parsing — take the free-text brief, call the AI tool, pre-fill
@@ -587,8 +946,13 @@ export default function NewTicketForm({
     }
 
     setSubmitting(true);
+    submittingRef.current = true;
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
 
     try {
+      // A save in progress may still be creating the draft or storing its files.
+      await saveQueueRef.current;
+
       // 1) Create ticket
       const res = await fetch(
         `/api/customer/tickets?companySlug=${encodeURIComponent(companySlug)}`,
@@ -608,6 +972,7 @@ export default function NewTicketForm({
             tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined,
             creativeMode,
             moodboardId: moodboardId || undefined,
+            draftId: draftIdRef.current ?? undefined,
           }),
         },
       );
@@ -616,6 +981,8 @@ export default function NewTicketForm({
 
       if (!res.ok) {
         if (res.status === 402 && isInsufficientTokensBody(json)) {
+          // Same moment as the top-up link: nothing is lost if they go and pay.
+          await saveDraft();
           setTokenError(json);
         } else if (res.status === 403) {
           setError(
@@ -635,12 +1002,23 @@ export default function NewTicketForm({
         return;
       }
 
+      finishedRef.current = true;
+
       // 2) Upload brief attachments (optional)
       const uploadResult = await uploadBriefsForTicket(createdTicket.id);
 
       const code = createdTicket?.code ?? createdTicket?.id ?? "";
+      const draftMoved = json?.draftMoved !== false;
+      if (draftMoved) {
+        uploadResult.succeeded += savedFilesRef.current.length;
+        uploadResult.attempted += savedFilesRef.current.length;
+      }
 
-      if (uploadResult.attempted > 0) {
+      if (!draftMoved) {
+        setSuccessMessage(
+          `Ticket ${code} created, but the files on your draft couldn't be added. Your draft is still in Drafts, so you can add them from the ticket page.`,
+        );
+      } else if (uploadResult.attempted > 0) {
         if (uploadResult.failed === 0) {
           setSuccessMessage(
             `Ticket ${code} created successfully with ${uploadResult.succeeded} attachment(s).`,
@@ -673,6 +1051,7 @@ export default function NewTicketForm({
       console.error("New ticket submit error:", err);
       setError("Unexpected error while creating ticket.");
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -848,7 +1227,7 @@ export default function NewTicketForm({
                 <div className="mb-1.5 flex items-center justify-between gap-2">
                   <p className="text-sm font-medium">Brief attachments (optional)</p>
                   <p className="text-sm text-[var(--av2-text-2)] tabular-nums">
-                    {briefFiles.length}/{maxBriefFiles}
+                    {attachedCount}/{maxBriefFiles}
                   </p>
                 </div>
 
@@ -885,9 +1264,32 @@ export default function NewTicketForm({
                     </Button>
                   </div>
 
-                  {briefFiles.length > 0 ? (
+                  {attachedCount > 0 ? (
                     <div className="mt-3">
                       <ul className="divide-y divide-[var(--av2-border)] rounded-lg border border-[var(--av2-border)]">
+                        {savedFiles.map((sf) => (
+                          <li
+                            key={sf.id}
+                            className="flex items-center justify-between gap-3 py-1 pr-1 pl-3"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium">
+                                {sf.originalName ?? "File"}
+                              </p>
+                              <p className="text-xs text-[var(--av2-text-2)]">
+                                {formatBytes(sf.bytes)} · {sf.mimeType}
+                              </p>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              aria-label={`Remove ${sf.originalName ?? "file"}`}
+                              onClick={() => handleRemoveSavedFile(sf)}
+                              disabled={isBusy}
+                            >
+                              Remove
+                            </Button>
+                          </li>
+                        ))}
                         {briefFiles.map((bf) => (
                           <li
                             key={bf.id}
@@ -911,7 +1313,8 @@ export default function NewTicketForm({
                         ))}
                       </ul>
                       <p className="mt-2 text-xs text-[var(--av2-text-2)]">
-                        Attachments will be uploaded right after the request is created.
+                        Attachments are saved with your draft and added to the request when you
+                        create it.
                       </p>
                     </div>
                   ) : null}
@@ -1139,11 +1542,15 @@ export default function NewTicketForm({
               {insufficientTokens ? (
                 <div className="mt-3">
                   <Callout tone="error" title="Not enough tokens">
-                    Choose a different job type or{" "}
-                    <a href="/customer/settings" className="font-semibold underline">
+                    Choose a different job type, save this as a draft, or{" "}
+                    <button
+                      type="button"
+                      onClick={handleTopUp}
+                      className="cursor-pointer font-semibold underline"
+                    >
                       top up your balance
-                    </a>
-                    .
+                    </button>
+                    . We&apos;ll save your draft first and you can come back to it.
                   </Callout>
                 </div>
               ) : null}
@@ -1171,11 +1578,42 @@ export default function NewTicketForm({
             </p>
           ) : null}
           <div className="flex flex-wrap items-center justify-end gap-3">
+            {canSaveDrafts ? (
+              <p
+                role="status"
+                className={`mr-auto min-w-0 basis-full text-sm sm:basis-auto ${
+                  saveState === "error"
+                    ? "text-[var(--av2-error-text)]"
+                    : "text-[var(--av2-text-2)]"
+                }`}
+              >
+                {saveState === "saving"
+                  ? "Saving draft…"
+                  : saveState === "error"
+                    ? "Your draft couldn't be saved. Try Save as draft again."
+                    : saveState === "saved" && savedAt
+                      ? `Draft saved ${savedAt.toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}`
+                      : null}
+              </p>
+            ) : null}
+            {draftId ? (
+              <Button
+                variant="ghost"
+                onClick={() => setConfirmingDelete(true)}
+                disabled={isBusy || deletingDraft}
+              >
+                Delete draft
+              </Button>
+            ) : null}
             <Button
-              onClick={() => {
+              onClick={async () => {
                 if (onCancel) {
+                  // The parent's close runs the same check.
                   onCancel();
-                } else {
+                } else if (await confirmLeave()) {
                   router.push(redirectTo ?? "/customer/tickets");
                 }
               }}
@@ -1183,9 +1621,23 @@ export default function NewTicketForm({
             >
               Cancel
             </Button>
+            {canSaveDrafts ? (
+              <Button
+                variant={insufficientTokens ? "primary" : "secondary"}
+                onClick={() => void saveDraft()}
+                disabled={
+                  isBusy ||
+                  saveState === "saving" ||
+                  (!hasDraftContent && !jobTypeId) ||
+                  (!!draftId && !needsSaving && saveState === "saved")
+                }
+              >
+                Save as draft
+              </Button>
+            ) : null}
             <Button
               type="submit"
-              variant="primary"
+              variant={insufficientTokens ? "secondary" : "primary"}
               disabled={isLimitedAccess || insufficientTokens || isBusy}
             >
               {isBusy
@@ -1202,9 +1654,53 @@ export default function NewTicketForm({
         </div>
       </div>
 
-      <InsufficientTokensModal info={tokenError} onClose={() => setTokenError(null)} />
+      {tokenError ? (
+        <OnTopOfDialog>
+          <InsufficientTokensModal
+            info={tokenError}
+            onClose={() => setTokenError(null)}
+            upgradeHref={draftId ? `/customer/settings?draft=${draftId}` : undefined}
+          />
+        </OnTopOfDialog>
+      ) : null}
+      {leavePrompt ? (
+        <OnTopOfDialog>
+          <ConfirmDialog
+            open
+            onClose={() => leavePrompt(false)}
+            onConfirm={() => leavePrompt(true)}
+            variant="warning"
+            title="Leave without saving?"
+            description="We couldn't save your latest changes to this draft. If you leave now, they'll be lost."
+            confirmLabel="Leave"
+            cancelLabel="Keep editing"
+          />
+        </OnTopOfDialog>
+      ) : null}
+      {confirmingDelete ? (
+        <OnTopOfDialog>
+          <ConfirmDialog
+            open
+            onClose={() => setConfirmingDelete(false)}
+            onConfirm={handleDeleteDraft}
+            loading={deletingDraft}
+            title="Delete this draft?"
+            description="The draft and its files will be removed. This can't be undone."
+            confirmLabel="Delete draft"
+            cancelLabel="Keep draft"
+          />
+        </OnTopOfDialog>
+      ) : null}
     </form>
   );
+}
+
+/**
+ * The form can sit inside the board's dialog, whose panel would otherwise trap a
+ * second dialog and clip it. Only rendered once something is open, so never on the server.
+ */
+function OnTopOfDialog({ children }: { children: ReactNode }) {
+  return createPortal(children, document.body);
 }
 
 function RequiredLabel({ children }: { children: ReactNode }) {
