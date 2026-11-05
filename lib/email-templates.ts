@@ -32,6 +32,7 @@ const SUBJECT_MAP: Record<NotificationType, string> = {
   TICKET_STATUS_CHANGED: "Ticket status updated",
   PIN_RESOLVED: "Feedback note resolved",
   WITHDRAWAL_UPDATED: "Withdrawal update",
+  CREATIVE_SCHEDULE_UPDATED: "A creative changed their working hours",
 };
 
 export function getSubjectForType(type: NotificationType, title: string): string {
@@ -63,6 +64,10 @@ function getCTAUrl(
     return `${baseUrl}/creative/board`;
   }
 
+  if (type === "CREATIVE_SCHEDULE_UPDATED" && recipientRole === "admin") {
+    return `${baseUrl}/admin/users`;
+  }
+
   // Admin notifications link to admin tickets
   if (recipientRole === "admin") {
     return `${baseUrl}/admin/tickets`;
@@ -80,6 +85,7 @@ const CTA_LABELS: Record<NotificationType, string> = {
   TICKET_STATUS_CHANGED: "View Ticket",
   PIN_RESOLVED: "View Ticket",
   WITHDRAWAL_UPDATED: "View Withdrawals",
+  CREATIVE_SCHEDULE_UPDATED: "View Users",
 };
 
 // ---------------------------------------------------------------------------
@@ -94,6 +100,7 @@ const TYPE_EMOJI: Record<NotificationType, string> = {
   TICKET_STATUS_CHANGED: "\u{1F504}",
   PIN_RESOLVED: "\u{1F4CC}",
   WITHDRAWAL_UPDATED: "\u{1F4B8}",
+  CREATIVE_SCHEDULE_UPDATED: "\u{1F552}",
 };
 
 // ---------------------------------------------------------------------------

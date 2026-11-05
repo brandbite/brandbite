@@ -52,6 +52,8 @@ import {
   IconTicket,
   IconUsers,
 } from "@/components/admin/v2/icons";
+import { WorkScheduleSummary } from "@/components/work-schedule/work-schedule-summary";
+import type { WorkSchedule } from "@/lib/work-schedule";
 
 // ---------------------------------------------------------------------------
 // Types — kept narrow so the page compiles without leaking server-only types
@@ -90,6 +92,8 @@ type DetailResponse = {
     deletedAt: string | null;
     timezone: string | null;
     workingHours: string | null;
+    workSchedule: WorkSchedule | null;
+    workScheduleUpdatedAt: string | null;
     tasksPerWeekCap: number | null;
     creativeRevisionNotesEnabled: boolean;
     isPaused: boolean;
@@ -550,7 +554,16 @@ export default function AdminUserDetailPage() {
             { label: "Timezone", value: user.timezone ?? "Not set" },
             ...(user.role === "DESIGNER"
               ? [
-                  { label: "Working hours", value: user.workingHours ?? "Not set" },
+                  {
+                    label: "Working hours",
+                    value: (
+                      <WorkScheduleSummary
+                        schedule={user.workSchedule}
+                        legacyNote={user.workingHours}
+                        updatedAt={user.workScheduleUpdatedAt}
+                      />
+                    ),
+                  },
                   {
                     label: "Open task cap",
                     value: user.tasksPerWeekCap == null ? "No cap" : fmt(user.tasksPerWeekCap),

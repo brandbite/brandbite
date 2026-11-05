@@ -47,6 +47,7 @@ const TYPE_ICONS: Record<string, string> = {
   TICKET_STATUS_CHANGED: "\u{1F504}",
   PIN_RESOLVED: "\u{1F4CC}",
   WITHDRAWAL_UPDATED: "\u{1F4B8}",
+  CREATIVE_SCHEDULE_UPDATED: "\u{1F552}",
 };
 
 // ---------------------------------------------------------------------------
@@ -177,6 +178,12 @@ export function NotificationBell({
       if (notif.type === "WITHDRAWAL_UPDATED" && role === "creative") {
         setOpen(false);
         router.push("/creative/withdrawals");
+        return;
+      }
+
+      if (notif.type === "CREATIVE_SCHEDULE_UPDATED" && role === "admin") {
+        setOpen(false);
+        router.push("/admin/users");
         return;
       }
 

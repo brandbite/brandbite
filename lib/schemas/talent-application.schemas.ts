@@ -9,6 +9,7 @@
 // -----------------------------------------------------------------------------
 
 import { z } from "zod";
+import { workScheduleSchema } from "@/lib/work-schedule";
 
 // ---------------------------------------------------------------------------
 // Public option lists. Exported because both the form (radio/checkbox
@@ -234,9 +235,8 @@ export const talentApplicationActionSchema = z.discriminatedUnion("action", [
   }),
   z.object({
     action: z.literal("HIRE"),
-    /** Free-text working hours from the post-interview onboarding form.
-     *  Negotiated, not constrained — see model comment in schema.prisma. */
-    workingHours: z.string().trim().min(2).max(200),
+    /** Weekly working hours agreed in the post-interview form. */
+    workSchedule: workScheduleSchema,
     /** Final approved subset of the candidate's applied categories.
      *  Cuid format matches the JobTypeCategory.id shape. Min 1 because
      *  hiring with no approved categories has no functional meaning —

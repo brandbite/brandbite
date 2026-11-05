@@ -8,6 +8,7 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { parseWorkSchedule } from "@/lib/work-schedule";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { isCreativePaused } from "@/lib/creative-availability";
 import { TicketPriority, TicketStatus } from "@prisma/client";
@@ -54,6 +55,7 @@ export async function GET() {
             pausedAt: true,
             pauseExpiresAt: true,
             workingHours: true,
+            workSchedule: true,
             tasksPerWeekCap: true,
           },
         }),
@@ -292,6 +294,7 @@ export async function GET() {
         ratingSpeed: rating ? Math.round(rating.speed * 10) / 10 : null,
         // Workload PR
         workingHours: d.workingHours,
+        workSchedule: parseWorkSchedule(d.workSchedule),
         tasksPerWeekCap: d.tasksPerWeekCap,
         completedThisWeek,
       };

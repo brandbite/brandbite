@@ -126,12 +126,13 @@ function ChecklistRow({
 
 export function CreativeSetupChecklist({
   name,
-  workingHours,
+  workingHoursSummary,
   skillCount,
   onOpenWorkload,
 }: {
   name: string | null;
-  workingHours: string | null;
+  /** Null until the creative has set a schedule. */
+  workingHoursSummary: string | null;
   /** Null while unknown (loading or the request failed). */
   skillCount: number | null;
   onOpenWorkload: () => void;
@@ -150,11 +151,13 @@ export function CreativeSetupChecklist({
             detail={name ? "Name and email are set." : "Add your full name."}
           />
           <ChecklistRow
-            done={!!workingHours}
+            done={!!workingHoursSummary}
             title="Working hours"
-            detail={workingHours ? workingHours : "Not set."}
+            detail={workingHoursSummary ?? "Not set."}
             action={
-              <Button onClick={onOpenWorkload}>{workingHours ? "Edit" : "Open Workload"}</Button>
+              <Button onClick={onOpenWorkload}>
+                {workingHoursSummary ? "Edit" : "Open Workload"}
+              </Button>
             }
           />
           <ChecklistRow

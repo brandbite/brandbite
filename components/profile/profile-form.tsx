@@ -76,9 +76,20 @@ import {
 } from "@/components/admin/v2/ui";
 import { useTabFromUrl } from "@/components/dashboard/account/account-ui";
 import {
+  WorkScheduleEditor,
+  workScheduleProblem,
+} from "@/components/work-schedule/work-schedule-editor";
+import {
+  defaultWorkSchedule,
+  describeWorkSchedule,
+  formatTimeZone,
+  sameWorkSchedule,
+  type WorkSchedule,
+} from "@/lib/work-schedule";
+import {
   NOTIFICATION_LABELS,
   NOTIFICATION_ORDER,
-  NOTIFICATION_ROLE_ONLY,
+  notificationAppliesTo,
   NotificationMatrix,
   type NotificationChannel,
   type NotificationPreference,
@@ -347,8 +358,11 @@ type ProfileUser = {
    *  Optional so older API responses (before this field shipped) don't
    *  break the type — treated as null when missing. */
   image: string | null;
-  /** Creative-only: free-text working hours. Null on non-DESIGNER. */
+  /** Creative-only: the old free-text note, shown until a schedule is set. */
   workingHours: string | null;
+  /** Creative-only: weekly working hours. Null until set. */
+  workSchedule: WorkSchedule | null;
+  workScheduleUpdatedAt: string | null;
   /** Creative-only: max concurrent open tickets. 1..40 or null (no cap). */
   tasksPerWeekCap: number | null;
 };
@@ -541,7 +555,9 @@ function ProfileFormBody({ layout, dashboard }: { layout: ProfileFormLayout; das
   // server-side; admins read it as a hint when scheduling. Cap is a
   // number 1..40 or null (no cap), matching the value the auto-assign
   // reads in lib/tickets/create-ticket.ts.
-  const [workingHoursDraft, setWorkingHoursDraft] = useState<string>("");
+  const [workScheduleDraft, setWorkScheduleDraft] = useState<WorkSchedule>(() =>
+    defaultWorkSchedule(),
+  );
   const [savingWorkingHours, setSavingWorkingHours] = useState(false);
   const [tasksCapDraft, setTasksCapDraft] = useState<string>("");
   const [savingTasksCap, setSavingTasksCap] = useState(false);
@@ -643,7 +659,9 @@ function ProfileFormBody({ layout, dashboard }: { layout: ProfileFormLayout; das
         setNameDraft(profileJson.user.name ?? "");
         setTimezoneDraft(profileJson.user.timezone ?? "");
         setEmailDraft(profileJson.user.email);
-        setWorkingHoursDraft(profileJson.user.workingHours ?? "");
+        setWorkScheduleDraft(
+          profileJson.user.workSchedule ?? defaultWorkSchedule(profileJson.user.timezone),
+        );
         setTasksCapDraft(
           profileJson.user.tasksPerWeekCap == null ? "" : String(profileJson.user.tasksPerWeekCap),
         );
@@ -946,19 +964,12 @@ function ProfileFormBody({ layout, dashboard }: { layout: ProfileFormLayout; das
   // section itself only renders for DESIGNER.
   // -----------------------------------------------------------------
   const handleSaveWorkingHours = useCallback(async () => {
-    if (!user) return;
-    const next = workingHoursDraft.trim();
-    const current = user.workingHours ?? "";
-    if (next === current) {
-      showToast({ type: "info", title: "No changes to save." });
-      return;
-    }
     setSavingWorkingHours(true);
     try {
       const res = await fetch("/api/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workingHours: next === "" ? null : next }),
+        body: JSON.stringify({ workSchedule: workScheduleDraft }),
       });
       const body = (await res.json().catch(() => null)) as {
         user?: ProfileUser;
@@ -968,7 +979,7 @@ function ProfileFormBody({ layout, dashboard }: { layout: ProfileFormLayout; das
         throw new Error(body?.error || "Failed to save");
       }
       setUser(body.user);
-      setWorkingHoursDraft(body.user.workingHours ?? "");
+      if (body.user.workSchedule) setWorkScheduleDraft(body.user.workSchedule);
       showToast({ type: "success", title: "Working hours updated" });
     } catch (err) {
       showToast({
@@ -978,7 +989,7 @@ function ProfileFormBody({ layout, dashboard }: { layout: ProfileFormLayout; das
     } finally {
       setSavingWorkingHours(false);
     }
-  }, [showToast, user, workingHoursDraft]);
+  }, [showToast, workScheduleDraft]);
 
   // `draft` lets Clear save "" directly: setTasksCapDraft("") hasn't landed
   // in state yet when the handler runs, so reading the state saved the old
@@ -1356,13 +1367,15 @@ function ProfileFormBody({ layout, dashboard }: { layout: ProfileFormLayout; das
   // unsaved-changes guard; a no-op on the customer / creative profiles,
   // which render outside the admin provider. Renders no DOM either way.
   const emailTarget = emailDraft.trim().toLowerCase();
+  // With nothing saved yet the form starts from a default, which isn't an edit.
+  const savedOrDefaultSchedule = user?.workSchedule ?? defaultWorkSchedule(user?.timezone);
   const profileDirty =
     user != null &&
     (nameDraft.trim() !== (user.name ?? "") ||
       (emailTarget !== user.email.toLowerCase() && emailTarget !== pendingEmail) ||
       timezoneDraft !== (user.timezone ?? "") ||
       (user.role === "DESIGNER" &&
-        (workingHoursDraft.trim() !== (user.workingHours ?? "") ||
+        (!sameWorkSchedule(workScheduleDraft, savedOrDefaultSchedule) ||
           tasksCapDraft.trim() !==
             (user.tasksPerWeekCap == null ? "" : String(user.tasksPerWeekCap)))));
   useUnsavedChanges(profileDirty, "Profile");
@@ -1410,7 +1423,7 @@ function ProfileFormBody({ layout, dashboard }: { layout: ProfileFormLayout; das
     { value: "account", label: "Account management" },
   ];
 
-  const setupComplete = !!user.name && !!user.workingHours && !!skillCount;
+  const setupComplete = !!user.name && !!user.workSchedule && !!skillCount;
 
   return (
     <ProfileShell
@@ -1453,7 +1466,11 @@ function ProfileFormBody({ layout, dashboard }: { layout: ProfileFormLayout; das
           user.role === "DESIGNER" ? (
             <CreativeSetupChecklist
               name={user.name}
-              workingHours={user.workingHours}
+              workingHoursSummary={
+                user.workSchedule
+                  ? `${describeWorkSchedule(user.workSchedule)} (${formatTimeZone(user.workSchedule.timezone)})`
+                  : null
+              }
               skillCount={skillCount ?? null}
               onOpenWorkload={() => openTab("workload")}
             />
@@ -1687,37 +1704,41 @@ function ProfileFormBody({ layout, dashboard }: { layout: ProfileFormLayout; das
                 <p className={T.desc}>
                   When you&apos;re available and how many tickets you&apos;re willing to hold at
                   once. Auto-assign uses the cap to skip you when you&apos;re already at capacity;
-                  admins use the working-hours hint when scheduling rush work.
+                  admins use your working hours when planning work.
                 </p>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className={T.label}>Working hours</label>
-                  <div className={`${T.inputLabelGap} flex flex-wrap items-center gap-2`}>
-                    <PInput
-                      value={workingHoursDraft}
-                      onChange={(e) => setWorkingHoursDraft(e.target.value)}
-                      placeholder="e.g. 9–18 weekdays, Europe/Istanbul"
-                      aria-label="Working hours"
-                      maxLength={200}
-                      className="min-w-[220px] flex-1"
-                    />
+                  <h3 className={T.label}>Working hours</h3>
+                  <p className={`${T.hint} mb-3`}>
+                    Choose your time zone and your hours for each day. Our team sees these when
+                    planning work and is told when you change them.
+                  </p>
+                  {user.workingHours && !user.workSchedule ? (
+                    <p className={`${T.hint} mb-3`}>Your old note: {user.workingHours}</p>
+                  ) : null}
+                  <WorkScheduleEditor
+                    idPrefix="profile-schedule"
+                    value={workScheduleDraft}
+                    onChange={setWorkScheduleDraft}
+                    disabled={savingWorkingHours}
+                  />
+                  <div className="mt-3">
                     <PButton
                       onClick={() => void handleSaveWorkingHours()}
                       disabled={
-                        savingWorkingHours || workingHoursDraft.trim() === (user.workingHours ?? "")
+                        savingWorkingHours ||
+                        workScheduleProblem(workScheduleDraft) !== null ||
+                        (!!user.workSchedule &&
+                          sameWorkSchedule(workScheduleDraft, user.workSchedule))
                       }
                       loading={savingWorkingHours}
                       loadingText="Saving…"
                     >
-                      Save
+                      Save working hours
                     </PButton>
                   </div>
-                  <p className={T.hint}>
-                    Free-form text — describe the days and hours you&apos;re typically online.
-                    Anything an admin can read at a glance works.
-                  </p>
                 </div>
 
                 <div>
@@ -1796,37 +1817,36 @@ function ProfileFormBody({ layout, dashboard }: { layout: ProfileFormLayout; das
             />
           ) : (
             <ul className={T.divide}>
-              {NOTIFICATION_ORDER.filter(
-                (type) =>
-                  !NOTIFICATION_ROLE_ONLY[type] || NOTIFICATION_ROLE_ONLY[type] === user.role,
-              ).map((type) => {
-                const pref = prefs[type];
-                const meta = NOTIFICATION_LABELS[type];
-                const inAppKey = `${type}:enabled`;
-                const emailKey = `${type}:emailEnabled`;
-                return (
-                  <li key={type} className="flex flex-wrap items-start gap-3 py-3">
-                    <div className="min-w-0 flex-1">
-                      <p className={T.rowTitle}>{meta.title}</p>
-                      <p className={T.desc}>{meta.description}</p>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-[var(--bb-text-secondary)]">
-                      <ToggleSwitch
-                        label="In-app"
-                        checked={pref.enabled}
-                        disabled={prefsSaving.has(inAppKey)}
-                        onChange={(next) => void handleTogglePref(type, "enabled", next)}
-                      />
-                      <ToggleSwitch
-                        label="Email"
-                        checked={pref.emailEnabled}
-                        disabled={prefsSaving.has(emailKey)}
-                        onChange={(next) => void handleTogglePref(type, "emailEnabled", next)}
-                      />
-                    </div>
-                  </li>
-                );
-              })}
+              {NOTIFICATION_ORDER.filter((type) => notificationAppliesTo(type, user.role)).map(
+                (type) => {
+                  const pref = prefs[type];
+                  const meta = NOTIFICATION_LABELS[type];
+                  const inAppKey = `${type}:enabled`;
+                  const emailKey = `${type}:emailEnabled`;
+                  return (
+                    <li key={type} className="flex flex-wrap items-start gap-3 py-3">
+                      <div className="min-w-0 flex-1">
+                        <p className={T.rowTitle}>{meta.title}</p>
+                        <p className={T.desc}>{meta.description}</p>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-[var(--bb-text-secondary)]">
+                        <ToggleSwitch
+                          label="In-app"
+                          checked={pref.enabled}
+                          disabled={prefsSaving.has(inAppKey)}
+                          onChange={(next) => void handleTogglePref(type, "enabled", next)}
+                        />
+                        <ToggleSwitch
+                          label="Email"
+                          checked={pref.emailEnabled}
+                          disabled={prefsSaving.has(emailKey)}
+                          onChange={(next) => void handleTogglePref(type, "emailEnabled", next)}
+                        />
+                      </div>
+                    </li>
+                  );
+                },
+              )}
             </ul>
           )}
         </section>

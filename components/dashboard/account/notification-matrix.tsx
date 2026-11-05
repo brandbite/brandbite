@@ -19,7 +19,8 @@ export type NotificationType =
   | "TICKET_ASSIGNED"
   | "TICKET_STATUS_CHANGED"
   | "PIN_RESOLVED"
-  | "WITHDRAWAL_UPDATED";
+  | "WITHDRAWAL_UPDATED"
+  | "CREATIVE_SCHEDULE_UPDATED";
 
 export type NotificationPreference = {
   type: NotificationType;
@@ -63,12 +64,22 @@ export const NOTIFICATION_LABELS: Record<NotificationType, { title: string; desc
       title: "Withdrawal updates",
       description: "A withdrawal you requested was approved, rejected or paid.",
     },
+    CREATIVE_SCHEDULE_UPDATED: {
+      title: "Creative working hours",
+      description: "A creative changed their own working hours.",
+    },
   };
 
 /** Types that only make sense for one role; others are shown to everyone. */
-export const NOTIFICATION_ROLE_ONLY: Partial<Record<NotificationType, AccountRole>> = {
-  WITHDRAWAL_UPDATED: "DESIGNER",
+const NOTIFICATION_ROLE_ONLY: Partial<Record<NotificationType, AccountRole[]>> = {
+  WITHDRAWAL_UPDATED: ["DESIGNER"],
+  CREATIVE_SCHEDULE_UPDATED: ["SITE_OWNER", "SITE_ADMIN"],
 };
+
+export function notificationAppliesTo(type: NotificationType, role: AccountRole): boolean {
+  const roles = NOTIFICATION_ROLE_ONLY[type];
+  return !roles || roles.includes(role);
+}
 
 // Stable order for rendering. Matches the candidate flow: ticket created →
 // assigned → revisions → feedback → pins resolved → completed.
@@ -80,12 +91,11 @@ export const NOTIFICATION_ORDER: NotificationType[] = [
   "PIN_RESOLVED",
   "TICKET_COMPLETED",
   "WITHDRAWAL_UPDATED",
+  "CREATIVE_SCHEDULE_UPDATED",
 ];
 
 export function notificationEventsFor(role: AccountRole): NotificationType[] {
-  return NOTIFICATION_ORDER.filter(
-    (type) => !NOTIFICATION_ROLE_ONLY[type] || NOTIFICATION_ROLE_ONLY[type] === role,
-  );
+  return NOTIFICATION_ORDER.filter((type) => notificationAppliesTo(type, role));
 }
 
 /**

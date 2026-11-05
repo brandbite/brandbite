@@ -44,6 +44,7 @@ import { auth } from "@/lib/better-auth";
 import { sendNotificationEmail } from "@/lib/email";
 import { renderTalentOnboardedEmail } from "@/lib/email-templates/talent/onboarded";
 import { prisma } from "@/lib/prisma";
+import { describeWorkSchedule, formatTimeZone, parseWorkSchedule } from "@/lib/work-schedule";
 
 /** Result envelope. The route handler turns these into HTTP status codes. */
 export type OnboardResult =
@@ -132,6 +133,7 @@ export async function onboardHiredTalent(applicationId: string): Promise<Onboard
   //    application stays at HIRED for a retry. The non-atomic side-effects
   //    (magic-link, welcome email, audit log) come AFTER and are
   //    best-effort — see the comment at the top of the file.
+  const agreedSchedule = parseWorkSchedule(row.workSchedule);
   const placeholderAuthId = generatePendingAuthUserId();
   let userAccountId: string;
   let createdSkillCount = 0;
@@ -144,6 +146,10 @@ export async function onboardHiredTalent(applicationId: string): Promise<Onboard
           name: row.fullName,
           role: "DESIGNER",
           tasksPerWeekCap: row.approvedTasksPerWeekCap,
+          workingHours: row.workingHours,
+          ...(agreedSchedule
+            ? { workSchedule: agreedSchedule, workScheduleUpdatedAt: new Date() }
+            : {}),
         },
         select: { id: true },
       });
@@ -228,7 +234,9 @@ export async function onboardHiredTalent(applicationId: string): Promise<Onboard
   try {
     const { subject, html } = await renderTalentOnboardedEmail({
       candidateName: row.fullName,
-      workingHours: row.workingHours ?? "(to be confirmed)",
+      workingHours: agreedSchedule
+        ? `${describeWorkSchedule(agreedSchedule)} (${formatTimeZone(agreedSchedule.timezone)})`
+        : (row.workingHours ?? "(to be confirmed)"),
       approvedCategoryNames,
       tasksPerWeekCap: row.approvedTasksPerWeekCap,
     });

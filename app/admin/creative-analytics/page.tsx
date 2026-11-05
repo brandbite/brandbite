@@ -43,6 +43,8 @@ import {
   plural,
 } from "@/components/admin/v2/ui";
 import { IconClock, IconDocument, IconUsers } from "@/components/admin/v2/icons";
+import { WorkScheduleSummary } from "@/components/work-schedule/work-schedule-summary";
+import type { WorkSchedule } from "@/lib/work-schedule";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -72,6 +74,7 @@ type CreativeMetrics = {
   ratingSpeed: number | null;
   // Workload PR
   workingHours: string | null;
+  workSchedule: WorkSchedule | null;
   tasksPerWeekCap: number | null;
   completedThisWeek: number;
 };
@@ -326,23 +329,24 @@ export default function CreativeAnalyticsPage() {
           <p className="truncate text-sm text-[var(--av2-text-2)]">{selected.email}</p>
         </div>
       </div>
-      {(selected.isPaused || selected.workingHours) && (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          {selected.isPaused && (
-            <Badge tone="amber" dot>
-              {selected.pauseExpiresAt
-                ? `Paused until ${new Date(selected.pauseExpiresAt).toLocaleDateString()}`
-                : "Paused · no end date"}
-            </Badge>
-          )}
-          {selected.workingHours && (
-            <span className="inline-flex items-center gap-1.5 text-sm text-[var(--av2-text-2)]">
-              <IconClock width={16} height={16} className="shrink-0" />
-              {selected.workingHours}
-            </span>
-          )}
+      {selected.isPaused && (
+        <div className="mt-3">
+          <Badge tone="amber" dot>
+            {selected.pauseExpiresAt
+              ? `Paused until ${new Date(selected.pauseExpiresAt).toLocaleDateString()}`
+              : "Paused · no end date"}
+          </Badge>
         </div>
       )}
+      <div className="mt-3 flex items-start gap-2">
+        <IconClock width={16} height={16} className="mt-0.5 shrink-0 text-[var(--av2-text-2)]" />
+        <div className="min-w-0">
+          <WorkScheduleSummary
+            schedule={selected.workSchedule}
+            legacyNote={selected.workingHours}
+          />
+        </div>
+      </div>
 
       <div className="mt-6">
         <PanelSection title="Delivery">
@@ -707,6 +711,7 @@ export default function CreativeAnalyticsPage() {
                             <div className="flex items-center gap-2">
                               <span className="truncate font-semibold">{c.name || DASH}</span>
                               {c.isPaused && <Badge tone="amber">Paused</Badge>}
+                              {!c.workSchedule && <Badge tone="neutral">No hours set</Badge>}
                             </div>
                             <div className="truncate text-xs text-[var(--av2-text-2)]">
                               {c.email}

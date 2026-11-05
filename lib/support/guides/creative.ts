@@ -905,7 +905,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
             items: [
               {
                 term: "Working hours",
-                text: 'a short note on when you usually work, for our team (for example "9–18 weekdays").',
+                text: "choose your time zone and your hours for each day. Our team uses them when planning work and is told when you change them.",
               },
               {
                 term: "Concurrent task cap",

@@ -59,6 +59,17 @@ import {
 import { useToast } from "@/components/ui/toast-provider";
 import { useSessionRole } from "@/lib/hooks/use-session-role";
 import { IconPeople } from "@/components/navigation/nav-icons";
+import {
+  WorkScheduleEditor,
+  workScheduleProblem,
+} from "@/components/work-schedule/work-schedule-editor";
+import { WorkScheduleSummary } from "@/components/work-schedule/work-schedule-summary";
+import {
+  defaultWorkSchedule,
+  parseWorkSchedule,
+  sameWorkSchedule,
+  type WorkSchedule,
+} from "@/lib/work-schedule";
 
 // Mirror the API response shape. We avoid importing the route module
 // because Next.js client components can't import server-only modules
@@ -116,6 +127,7 @@ type Application = {
   candidateProposedAt: string | null;
   // PR9 — post-interview lifecycle fields
   workingHours: string | null;
+  workSchedule: unknown;
   approvedCategoryIds: unknown;
   approvedTasksPerWeekCap: number | null;
   hiredAt: string | null;
@@ -227,14 +239,19 @@ function defaultTasksCapForBucket(bucket: string | null): number {
   }
 }
 
+/** The agreed schedule, or a starting point in the candidate's own time zone. */
+function hireSchedule(sel: Application | null | undefined): WorkSchedule {
+  return parseWorkSchedule(sel?.workSchedule) ?? defaultWorkSchedule(sel?.timezone);
+}
+
 /** HIRE form pre-fill for a row: what the admin sees before typing anything.
  *  Shared by the reset effect and the dirty check so they can't drift. */
 function hirePrefill(sel: Application | null | undefined) {
   if (sel?.status !== "INTERVIEW_HELD") {
-    return { workingHours: sel?.workingHours ?? "", categoryIds: [] as string[], cap: "" };
+    return { workSchedule: hireSchedule(sel), categoryIds: [] as string[], cap: "" };
   }
   return {
-    workingHours: sel.workingHours ?? "",
+    workSchedule: hireSchedule(sel),
     categoryIds: Array.isArray(sel.categoryIds)
       ? (sel.categoryIds as unknown[]).filter((v): v is string => typeof v === "string")
       : [],
@@ -625,7 +642,9 @@ export default function TalentApplicationsPage() {
   const [proposedSlotsLocal, setProposedSlotsLocal] = useState<string[]>(["", "", ""]);
   const [customMessage, setCustomMessage] = useState("");
   const [declineReason, setDeclineReason] = useState("");
-  const [workingHoursLocal, setWorkingHoursLocal] = useState("");
+  const [workScheduleLocal, setWorkScheduleLocal] = useState<WorkSchedule>(() =>
+    defaultWorkSchedule(),
+  );
   const [approvedCategoryIdsLocal, setApprovedCategoryIdsLocal] = useState<string[]>([]);
   const [tasksPerWeekCapLocal, setTasksPerWeekCapLocal] = useState<string>("");
   const [hireNotesLocal, setHireNotesLocal] = useState("");
@@ -708,7 +727,7 @@ export default function TalentApplicationsPage() {
     // already entered instead of a blank field they have to re-type. At
     // INTERVIEW_HELD the HIRE form is pre-filled from the application data.
     const prefill = hirePrefill(items.find((it) => it.id === selectedId));
-    setWorkingHoursLocal(prefill.workingHours);
+    setWorkScheduleLocal(prefill.workSchedule);
     setApprovedCategoryIdsLocal(prefill.categoryIds);
     setTasksPerWeekCapLocal(prefill.cap);
   }, [selectedId, items]);
@@ -722,7 +741,7 @@ export default function TalentApplicationsPage() {
     if (mode === "decline" || mode === "rejectPost") return declineReason.trim() !== "";
     const prefill = hirePrefill(selected);
     return (
-      workingHoursLocal !== prefill.workingHours ||
+      !sameWorkSchedule(workScheduleLocal, prefill.workSchedule) ||
       !sameIds(approvedCategoryIdsLocal, prefill.categoryIds) ||
       tasksPerWeekCapLocal !== prefill.cap ||
       hireNotesLocal.trim() !== ""
@@ -749,7 +768,7 @@ export default function TalentApplicationsPage() {
       setDeclineReason("");
     } else if (mode === "hire") {
       const prefill = hirePrefill(selected);
-      setWorkingHoursLocal(prefill.workingHours);
+      setWorkScheduleLocal(prefill.workSchedule);
       setApprovedCategoryIdsLocal(prefill.categoryIds);
       setTasksPerWeekCapLocal(prefill.cap);
       setHireNotesLocal("");
@@ -884,8 +903,9 @@ export default function TalentApplicationsPage() {
   }
 
   function handleHire() {
-    if (!workingHoursLocal.trim()) {
-      setActionError("Working hours is required.");
+    const scheduleProblem = workScheduleProblem(workScheduleLocal);
+    if (scheduleProblem) {
+      setActionError(scheduleProblem);
       return;
     }
     if (approvedCategoryIdsLocal.length === 0) {
@@ -902,7 +922,7 @@ export default function TalentApplicationsPage() {
     }
     void submitAction({
       action: "HIRE",
-      workingHours: workingHoursLocal.trim(),
+      workSchedule: workScheduleLocal,
       approvedCategoryIds: approvedCategoryIdsLocal,
       tasksPerWeekCap: tasksPerWeekCapLocal ? tasksCapNum : null,
       hireNotes: hireNotesLocal.trim() || null,
@@ -1090,7 +1110,9 @@ export default function TalentApplicationsPage() {
             variant="primary"
             onClick={handleHire}
             disabled={
-              submitting || !workingHoursLocal.trim() || approvedCategoryIdsLocal.length === 0
+              submitting ||
+              workScheduleProblem(workScheduleLocal) !== null ||
+              approvedCategoryIdsLocal.length === 0
             }
             aria-busy={submitting}
           >
@@ -1319,7 +1341,15 @@ export default function TalentApplicationsPage() {
               <div className="mt-3">
                 <KeyValueList
                   rows={[
-                    { label: "Working hours", value: item.workingHours || DASH },
+                    {
+                      label: "Working hours",
+                      value: (
+                        <WorkScheduleSummary
+                          schedule={parseWorkSchedule(item.workSchedule)}
+                          legacyNote={item.workingHours}
+                        />
+                      ),
+                    },
                     { label: "Tasks / week cap", value: fmt(item.approvedTasksPerWeekCap) },
                     {
                       label: "Approved categories",
@@ -1468,16 +1498,11 @@ export default function TalentApplicationsPage() {
                 UserAccount, CreativeSkill rows and a magic-link sign-in email.
               </p>
             </div>
-            <Field label="Working hours" htmlFor={`${idPrefix}-hours`}>
-              <TextInput
-                id={`${idPrefix}-hours`}
-                value={workingHoursLocal}
-                onChange={(e) => setWorkingHoursLocal(e.target.value)}
-                placeholder={`e.g. 9-18 weekdays ${item.timezone}`}
-                maxLength={200}
-                aria-invalid={actionError === "Working hours is required." || undefined}
-              />
-            </Field>
+            <WorkScheduleEditor
+              idPrefix={`${idPrefix}-schedule`}
+              value={workScheduleLocal}
+              onChange={setWorkScheduleLocal}
+            />
             <fieldset>
               <legend className="mb-1.5 text-sm font-medium">
                 Approved categories ({approvedCategoryIdsLocal.length} of{" "}
