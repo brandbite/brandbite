@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import type { TodoCardData, TodoItem } from "@/lib/moodboard";
+import { newClientId, type TodoCardData, type TodoItem } from "@/lib/moodboard";
 
 type TodoCardProps = {
   data: TodoCardData;
@@ -64,7 +64,7 @@ export function TodoCard({ data, onUpdate }: TodoCardProps) {
 
   function addItem() {
     const newItem: TodoItem = {
-      id: crypto.randomUUID(),
+      id: newClientId(),
       text: "",
       checked: false,
     };
@@ -90,7 +90,7 @@ export function TodoCard({ data, onUpdate }: TodoCardProps) {
             if (e.key === "Escape") setEditingTitle(false);
           }}
           placeholder="List title (optional)"
-          className="mb-2 w-full border-none bg-transparent text-sm font-semibold text-[var(--bb-secondary)] outline-none placeholder:text-gray-400"
+          className="mb-2 w-full border-none bg-transparent text-sm font-semibold text-[var(--av2-text)] outline-none placeholder:text-[var(--av2-text-2)]"
         />
       ) : (
         <div
@@ -101,9 +101,9 @@ export function TodoCard({ data, onUpdate }: TodoCardProps) {
           }}
         >
           {data.title ? (
-            <h3 className="text-sm font-semibold text-[var(--bb-secondary)]">{data.title}</h3>
+            <h3 className="text-sm font-semibold text-[var(--av2-text)]">{data.title}</h3>
           ) : (
-            <p className="text-xs text-gray-400 italic">Click to add title...</p>
+            <p className="text-xs text-[var(--av2-text-2)] italic">Click to add title...</p>
           )}
         </div>
       )}
@@ -116,7 +116,7 @@ export function TodoCard({ data, onUpdate }: TodoCardProps) {
               type="checkbox"
               checked={item.checked}
               onChange={() => toggleItem(item.id)}
-              className="h-4 w-4 flex-shrink-0 cursor-pointer rounded accent-[var(--bb-primary)]"
+              className="h-4 w-4 flex-shrink-0 cursor-pointer rounded accent-[var(--av2-accent)]"
             />
 
             {editingItemId === item.id ? (
@@ -134,18 +134,16 @@ export function TodoCard({ data, onUpdate }: TodoCardProps) {
                   }
                 }}
                 placeholder="Item text..."
-                className="flex-1 border-none bg-transparent text-sm text-[var(--bb-secondary)] outline-none placeholder:text-gray-400"
+                className="flex-1 border-none bg-transparent text-sm text-[var(--av2-text)] outline-none placeholder:text-[var(--av2-text-2)]"
               />
             ) : (
               <span
                 className={`flex-1 cursor-pointer text-sm ${
-                  item.checked
-                    ? "text-[var(--bb-text-secondary)] line-through"
-                    : "text-[var(--bb-secondary)]"
+                  item.checked ? "text-[var(--av2-text-2)] line-through" : "text-[var(--av2-text)]"
                 }`}
                 onClick={() => startEditItem(item)}
               >
-                {item.text || <span className="text-gray-400 italic">Empty item</span>}
+                {item.text || <span className="text-[var(--av2-text-2)] italic">Empty item</span>}
               </span>
             )}
           </li>
@@ -153,15 +151,15 @@ export function TodoCard({ data, onUpdate }: TodoCardProps) {
       </ul>
 
       {/* Footer: Add item + progress */}
-      <div className="mt-3 flex items-center justify-between border-t border-[var(--bb-border-subtle)] pt-2">
+      <div className="mt-3 flex items-center justify-between border-t border-[var(--av2-border)] pt-2">
         <button
           onClick={addItem}
-          className="text-xs font-medium text-[var(--bb-primary)] hover:underline"
+          className="text-xs font-medium text-[var(--av2-accent)] hover:underline"
         >
           + Add item
         </button>
         <span
-          className="text-xs text-[var(--bb-text-secondary)]"
+          className="text-xs text-[var(--av2-text-2)]"
           style={{ fontVariantNumeric: "tabular-nums" }}
         >
           {checkedCount}/{totalCount} done

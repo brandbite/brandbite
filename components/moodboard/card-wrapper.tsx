@@ -1,8 +1,18 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
-import { useDraggable } from "@dnd-kit/core";
-import { CANVAS_DEFAULTS } from "@/lib/moodboard";
+// -----------------------------------------------------------------------------
+// @file: components/moodboard/card-wrapper.tsx
+// @purpose: The frame around a moodboard object: position, selection outline,
+//           resize handles, arrow connectors and its floating toolbar. It holds
+//           no pointer logic; BoardCanvas handles all gestures in one place,
+//           reading the data attributes set here.
+// -----------------------------------------------------------------------------
+
+import React, { memo } from "react";
+
+import type { Side } from "./connection-routing";
+
+export type ResizeCorner = "nw" | "ne" | "sw" | "se";
 
 type CardWrapperProps = {
   id: string;
@@ -10,213 +20,149 @@ type CardWrapperProps = {
   y: number;
   width: number;
   height: number;
-  zoom: number;
+  selected: boolean;
+  /** Stickies, shapes and text draw themselves, with no card around them. */
+  bare: boolean;
+  label: string;
+  registerCard: (node: HTMLDivElement | null) => void;
+  /** Extra controls for this object's type, shown when selected. */
+  toolbar?: React.ReactNode;
+  /** Phones show the toolbar pinned to the screen, since it wouldn't fit here. */
+  hideToolbar?: boolean;
+  onDelete: (id: string) => void;
   children: React.ReactNode;
-  onDelete?: () => void;
-  onResize?: (width: number, height: number) => void;
-  /** Called when the card's actual DOM height is measured (for auto-height cards). */
-  onMeasuredHeight?: (height: number) => void;
 };
 
-const { MIN_WIDTH, MIN_HEIGHT } = CANVAS_DEFAULTS;
+const CORNERS: { corner: ResizeCorner; className: string }[] = [
+  { corner: "nw", className: "left-0 top-0 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize" },
+  { corner: "ne", className: "right-0 top-0 translate-x-1/2 -translate-y-1/2 cursor-nesw-resize" },
+  {
+    corner: "sw",
+    className: "left-0 bottom-0 -translate-x-1/2 translate-y-1/2 cursor-nesw-resize",
+  },
+  {
+    corner: "se",
+    className: "right-0 bottom-0 translate-x-1/2 translate-y-1/2 cursor-nwse-resize",
+  },
+];
 
-export function CardWrapper({
+const INVERSE = "var(--mb-inverse-zoom, 1)";
+const CONNECTOR_OFFSET = `calc(-22px * ${INVERSE})`;
+
+const CONNECTORS: { side: Side; style: React.CSSProperties; shift: string }[] = [
+  { side: "top", style: { top: CONNECTOR_OFFSET, left: "50%" }, shift: "-50%, -50%" },
+  { side: "right", style: { right: CONNECTOR_OFFSET, top: "50%" }, shift: "50%, -50%" },
+  { side: "bottom", style: { bottom: CONNECTOR_OFFSET, left: "50%" }, shift: "-50%, 50%" },
+  { side: "left", style: { left: CONNECTOR_OFFSET, top: "50%" }, shift: "-50%, -50%" },
+];
+
+function CardWrapperBase({
   id,
   x,
   y,
   width,
   height,
-  zoom,
-  children,
+  selected,
+  bare,
+  label,
+  registerCard,
+  toolbar,
+  hideToolbar = false,
   onDelete,
-  onResize,
-  onMeasuredHeight,
+  children,
 }: CardWrapperProps) {
-  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } =
-    useDraggable({ id });
-
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const cardElRef = useRef<HTMLDivElement | null>(null);
-
-  // Merge dnd-kit's setNodeRef with our own ref for ResizeObserver
-  const mergedRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      setNodeRef(node);
-      cardElRef.current = node;
-    },
-    [setNodeRef],
-  );
-
-  // ResizeObserver to measure actual DOM height for auto-height cards
-  useEffect(() => {
-    const el = cardElRef.current;
-    if (!el || !onMeasuredHeight) return;
-
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const observedH = entry.contentRect.height;
-        if (observedH > 0) {
-          onMeasuredHeight(observedH);
-        }
-      }
-    });
-
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [onMeasuredHeight]);
-
-  // Resize state — use state (not ref) for values read during render
-  const [resizing, setResizing] = useState(false);
-  const [resizeOrigin, setResizeOrigin] = useState({ x: 0, y: 0, w: 0, h: 0 });
-  const [resizeDelta, setResizeDelta] = useState({ dw: 0, dh: 0 });
-
-  // Close menu on outside click
-  useEffect(() => {
-    if (!menuOpen) return;
-    function handleClickOutside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [menuOpen]);
-
-  // Resize handlers
-  function onResizePointerDown(e: React.PointerEvent) {
-    e.stopPropagation();
-    e.preventDefault();
-    const origin = { x: e.clientX, y: e.clientY, w: width, h: height || 200 };
-    setResizeOrigin(origin);
-    setResizeDelta({ dw: 0, dh: 0 });
-    setResizing(true);
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-  }
-
-  function onResizePointerMove(e: React.PointerEvent) {
-    if (!resizing) return;
-    const dw = (e.clientX - resizeOrigin.x) / zoom;
-    const dh = (e.clientY - resizeOrigin.y) / zoom;
-    setResizeDelta({ dw, dh });
-  }
-
-  function onResizePointerUp(e: React.PointerEvent) {
-    if (!resizing) return;
-    setResizing(false);
-    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-
-    const newW = Math.max(MIN_WIDTH, resizeOrigin.w + resizeDelta.dw);
-    const newH = Math.max(MIN_HEIGHT, resizeOrigin.h + resizeDelta.dh);
-    setResizeDelta({ dw: 0, dh: 0 });
-    onResize?.(newW, newH);
-  }
-
-  // Position: base + drag offset (in screen space, which canvas div undoes via its transform)
-  const dragOffsetX = transform ? transform.x / zoom : 0;
-  const dragOffsetY = transform ? transform.y / zoom : 0;
-
-  const currentW = resizing ? Math.max(MIN_WIDTH, resizeOrigin.w + resizeDelta.dw) : width;
-  const currentH = resizing ? Math.max(MIN_HEIGHT, resizeOrigin.h + resizeDelta.dh) : height;
-
-  const style: React.CSSProperties = {
-    position: "absolute",
-    left: x + dragOffsetX,
-    top: y + dragOffsetY,
-    width: currentW,
-    ...(currentH > 0 ? { height: currentH } : {}),
-  };
-
   return (
     <div
-      ref={mergedRef}
-      style={style}
-      className={`animate-card-enter group relative overflow-hidden rounded-2xl border border-[var(--bb-border)] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.06)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_4px_12px_rgba(0,0,0,0.08),0_2px_4px_rgba(0,0,0,0.04)] ${
-        isDragging ? "z-50 scale-[0.98] opacity-40" : ""
-      }`}
-      {...attributes}
+      ref={registerCard}
+      data-mb-card-id={id}
+      role="group"
+      aria-label={label}
+      tabIndex={0}
+      className={`group absolute cursor-default outline-none ${selected ? "z-30" : ""} ${bare ? "" : "rounded-2xl"}`}
+      style={{ left: x, top: y, width, ...(height > 0 ? { height } : {}) }}
     >
-      {/* Drag handle + menu — visible on hover */}
-      <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-        {/* Drag handle */}
-        <button
-          ref={setActivatorNodeRef}
-          {...listeners}
-          className="flex h-7 w-7 cursor-grab items-center justify-center rounded-lg border border-white/50 bg-white/70 shadow-sm backdrop-blur-sm transition-all duration-150 hover:bg-white/90 active:cursor-grabbing"
-          aria-label="Drag to move"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 14 14"
-            fill="none"
-            className="text-[var(--bb-text-secondary)]"
-          >
-            <circle cx="4" cy="2" r="1.25" fill="currentColor" />
-            <circle cx="10" cy="2" r="1.25" fill="currentColor" />
-            <circle cx="4" cy="7" r="1.25" fill="currentColor" />
-            <circle cx="10" cy="7" r="1.25" fill="currentColor" />
-            <circle cx="4" cy="12" r="1.25" fill="currentColor" />
-            <circle cx="10" cy="12" r="1.25" fill="currentColor" />
-          </svg>
-        </button>
+      <div
+        className={
+          bare
+            ? `h-full ${selected ? "" : "[&_iframe]:pointer-events-none"}`
+            : `h-full overflow-hidden rounded-2xl border bg-[var(--av2-surface)] shadow-[0_1px_2px_rgba(0,0,0,0.06)] transition-[border-color] duration-150 ${
+                selected
+                  ? "border-transparent [&_iframe]:pointer-events-auto"
+                  : "border-[var(--av2-border)] group-hover:border-[var(--av2-accent)] [&_iframe]:pointer-events-none"
+              }`
+        }
+      >
+        {children}
+      </div>
 
-        {/* Menu */}
-        <div ref={menuRef} className="relative">
-          <button
-            onClick={() => setMenuOpen((prev) => !prev)}
-            className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/50 bg-white/70 shadow-sm backdrop-blur-sm transition-all duration-150 hover:bg-white/90"
-            aria-label="Card options"
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 14 14"
-              fill="none"
-              className="text-[var(--bb-text-secondary)]"
+      {selected && (
+        <>
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0"
+            style={{
+              borderRadius: bare ? 4 : 16,
+              boxShadow: `0 0 0 calc(2px * ${INVERSE}) var(--av2-accent)`,
+            }}
+          />
+
+          {CORNERS.map(({ corner, className }) => (
+            <div key={corner} aria-hidden className={`absolute z-10 ${className}`}>
+              {/* The grab area is larger than what's drawn, for fingers. */}
+              <div
+                data-mb-handle={corner}
+                className="flex h-7 w-7 items-center justify-center"
+                style={{ touchAction: "none", transform: `scale(${INVERSE})` }}
+              >
+                <span className="h-3 w-3 rounded-[3px] border-2 border-[var(--av2-accent)] bg-[var(--av2-surface)]" />
+              </div>
+            </div>
+          ))}
+
+          {CONNECTORS.map(({ side, style, shift }) => (
+            <div
+              key={side}
+              aria-hidden
+              data-mb-connector={side}
+              className="absolute z-10 flex h-7 w-7 cursor-crosshair items-center justify-center"
+              style={{
+                ...style,
+                touchAction: "none",
+                transform: `translate(${shift}) scale(${INVERSE})`,
+              }}
             >
-              <circle cx="7" cy="2.5" r="1.25" fill="currentColor" />
-              <circle cx="7" cy="7" r="1.25" fill="currentColor" />
-              <circle cx="7" cy="11.5" r="1.25" fill="currentColor" />
-            </svg>
-          </button>
+              <span className="h-2.5 w-2.5 rounded-full bg-[var(--av2-accent)] transition-transform hover:scale-150" />
+            </div>
+          ))}
 
-          {menuOpen && (
-            <div className="absolute top-8 right-0 z-20 w-40 rounded-xl border border-[var(--bb-border)] bg-white/95 py-1 shadow-[0_4px_16px_rgba(0,0,0,0.1),0_1px_4px_rgba(0,0,0,0.06)] backdrop-blur-md">
-              {onDelete && (
+          {!hideToolbar && (
+            <div
+              data-mb-card-toolbar
+              // The padding lifts the toolbar clear of the top connector, so it must not catch
+              // clicks, or that connector stops working.
+              className="pointer-events-none absolute bottom-full left-1/2 z-20 pb-9"
+              style={{
+                transform: `translateX(-50%) scale(${INVERSE})`,
+                transformOrigin: "50% 100%",
+              }}
+            >
+              <div className="pointer-events-auto flex items-center gap-1 rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-1 whitespace-nowrap shadow-md">
+                {toolbar}
                 <button
-                  onClick={() => {
-                    onDelete();
-                    setMenuOpen(false);
-                  }}
-                  className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                  type="button"
+                  onClick={() => onDelete(id)}
+                  aria-label={`Delete ${label}`}
+                  className="flex h-9 items-center rounded-lg px-3 text-sm font-medium text-[var(--av2-error-text)] hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
                 >
                   Delete
                 </button>
-              )}
+              </div>
             </div>
           )}
-        </div>
-      </div>
-
-      {children}
-
-      {/* Resize handle — bottom-right corner */}
-      <div
-        className="absolute right-0 bottom-0 z-10 flex h-5 w-5 cursor-se-resize items-center justify-center opacity-0 transition-opacity group-hover:opacity-100"
-        onPointerDown={onResizePointerDown}
-        onPointerMove={onResizePointerMove}
-        onPointerUp={onResizePointerUp}
-      >
-        <svg width="10" height="10" viewBox="0 0 10 10" className="text-gray-400">
-          <path
-            d="M9 1L1 9M9 5L5 9M9 9L9 9"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-        </svg>
-      </div>
+        </>
+      )}
     </div>
   );
 }
+
+export const CardWrapper = memo(CardWrapperBase);

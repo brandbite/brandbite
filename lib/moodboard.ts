@@ -5,6 +5,12 @@
 
 import type { MoodboardItemType } from "@prisma/client";
 
+/** A unique id made in the browser. randomUUID only exists on https and localhost. */
+export function newClientId(): string {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
 // ---------------------------------------------------------------------------
 // Card data shapes (stored as JSON in MoodboardItem.data)
 // ---------------------------------------------------------------------------
@@ -12,6 +18,20 @@ import type { MoodboardItemType } from "@prisma/client";
 export type NoteCardData = {
   title?: string;
   body: string;
+  /** Sticky note color. Notes from before colors existed render in the first one. */
+  color?: string;
+};
+
+export type ShapeKind = "rect" | "ellipse" | "diamond";
+
+export type ShapeCardData = {
+  kind: ShapeKind;
+  text: string;
+  fill: string;
+};
+
+export type TextCardData = {
+  text: string;
 };
 
 export type ImageCardData = {
@@ -69,10 +89,14 @@ export type DrawingCardData = {
   pathData: string;
   strokeColor: string;
   strokeWidth: number;
+  /** Below 1 for the highlighter. */
+  opacity?: number;
 };
 
 export type MoodboardItemData =
   | NoteCardData
+  | ShapeCardData
+  | TextCardData
   | ImageCardData
   | ColorCardData
   | LinkCardData
@@ -87,6 +111,14 @@ export type MoodboardItemData =
 
 export function isNoteData(type: MoodboardItemType, data: unknown): data is NoteCardData {
   return type === "NOTE";
+}
+
+export function isShapeData(type: MoodboardItemType, data: unknown): data is ShapeCardData {
+  return type === "SHAPE";
+}
+
+export function isTextData(type: MoodboardItemType, data: unknown): data is TextCardData {
+  return type === "TEXT";
 }
 
 export function isImageData(type: MoodboardItemType, data: unknown): data is ImageCardData {
@@ -151,7 +183,7 @@ export type MoodboardConnection = {
 
 export function createConnection(sourceItemId: string, targetItemId: string): MoodboardConnection {
   return {
-    id: crypto.randomUUID(),
+    id: newClientId(),
     sourceItemId,
     targetItemId,
     color: "#9ca3af",
@@ -168,11 +200,12 @@ export const CANVAS_DEFAULTS = {
   CARD_HEIGHT: 0, // 0 = auto-height
   GRID_SNAP: 20,
   GAP: 20,
-  MIN_WIDTH: 160,
-  MIN_HEIGHT: 80,
-  MIN_ZOOM: 0.15,
-  MAX_ZOOM: 2,
-  ZOOM_STEP: 0.1,
+  MIN_WIDTH: 80,
+  MIN_HEIGHT: 40,
+  MIN_ZOOM: 0.1,
+  MAX_ZOOM: 4,
+  /** Zoom buttons and shortcuts multiply by this. */
+  ZOOM_STEP: 1.25,
 } as const;
 
 export type MoodboardClient = {
@@ -206,7 +239,7 @@ export function defaultColorData(): ColorCardData {
 export function defaultTodoData(): TodoCardData {
   return {
     title: "",
-    items: [{ id: crypto.randomUUID(), text: "", checked: false }],
+    items: [{ id: newClientId(), text: "", checked: false }],
   };
 }
 
@@ -225,9 +258,39 @@ export const DRAW_COLORS = [
   "#32B37B",
   "#D63A35",
   "#8B5CF6",
+  "#F5C518",
 ] as const;
 
+/** The highlighter starts here, since it reads as gray in the default dark color. */
+export const HIGHLIGHTER_DEFAULT_COLOR = "#F5C518";
+
 export const DRAW_SIZES = [2, 4, 8] as const;
+
+export type PenKind = "marker" | "highlighter";
+
+/** The highlighter is wide and see-through, so it marks up what's under it. */
+export const PEN_PRESETS: Record<PenKind, { widthFactor: number; opacity: number }> = {
+  marker: { widthFactor: 1, opacity: 1 },
+  highlighter: { widthFactor: 5, opacity: 0.4 },
+};
+
+export const STICKY_COLORS = [
+  "#FFE58A",
+  "#FFC8A8",
+  "#FFB3C1",
+  "#D9C8FF",
+  "#B9DCFF",
+  "#BDEBC8",
+] as const;
+
+export const SHAPE_FILLS = [
+  "#FFFFFF",
+  "#FFE58A",
+  "#FFC8A8",
+  "#D9C8FF",
+  "#B9DCFF",
+  "#BDEBC8",
+] as const;
 
 // ---------------------------------------------------------------------------
 // Video URL parser — extracts embed URL and thumbnail from video platforms

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { MoodboardItemClient, DrawingCardData } from "@/lib/moodboard";
 
 type DrawingLayerProps = {
@@ -14,10 +14,11 @@ type DrawingLayerProps = {
   strokeColor: string;
   /** Current stroke width. */
   strokeWidth: number;
+  /** Below 1 for the highlighter. */
+  strokeOpacity: number;
+  /** Read when needed, so moving the canvas doesn't re-render this layer. */
+  getTransform: () => { panX: number; panY: number; zoom: number };
   /** Viewport ref for coordinate conversion. */
-  panX: number;
-  panY: number;
-  zoom: number;
   viewportRef: React.RefObject<HTMLDivElement | null>;
   /** Called when a new stroke is completed. */
   onStrokeComplete: (
@@ -31,6 +32,9 @@ type DrawingLayerProps = {
   /** Called to delete the selected drawing. */
   onDeleteDrawing?: (itemId: string) => void;
 };
+
+/** How often a swipe checks for strokes along its path, in screen pixels. */
+const ERASE_STEP_PX = 6;
 
 /** Convert client coordinates to canvas (untransformed) coordinates. */
 function toCanvas(
@@ -98,15 +102,14 @@ function computeBounds(points: { x: number; y: number }[], strokeWidth: number) 
   };
 }
 
-export function DrawingLayer({
+function DrawingLayerBase({
   drawings,
   active,
   eraserActive,
   strokeColor,
   strokeWidth,
-  panX,
-  panY,
-  zoom,
+  strokeOpacity,
+  getTransform,
   viewportRef,
   onStrokeComplete,
   onSelectDrawing,
@@ -120,14 +123,16 @@ export function DrawingLayer({
   // Eraser state
   const [eraserHoveredId, setEraserHoveredId] = useState<string | null>(null);
   const [eraserCursorPos, setEraserCursorPos] = useState<{ x: number; y: number } | null>(null);
-  const [isErasing, setIsErasing] = useState(false);
+  const erasing = useRef(false);
+  const erased = useRef(new Set<string>());
+  const lastErasePoint = useRef<{ x: number; y: number } | null>(null);
 
   // Clear eraser state when eraser mode is deactivated
   useEffect(() => {
     if (!eraserActive) {
       setEraserHoveredId(null);
       setEraserCursorPos(null);
-      setIsErasing(false);
+      erasing.current = false;
     }
   }, [eraserActive]);
 
@@ -139,13 +144,14 @@ export function DrawingLayer({
       (e.target as SVGSVGElement).setPointerCapture(e.pointerId);
 
       const rect = viewportRef.current.getBoundingClientRect();
+      const { panX, panY, zoom } = getTransform();
       const pt = toCanvas(e.clientX, e.clientY, rect, panX, panY, zoom);
 
       pointsRef.current = [pt];
       setCurrentPoints([pt]);
       setIsDrawing(true);
     },
-    [active, panX, panY, zoom, viewportRef],
+    [active, getTransform, viewportRef],
   );
 
   const handlePointerMove = useCallback(
@@ -153,6 +159,7 @@ export function DrawingLayer({
       if (!isDrawing || !viewportRef.current) return;
 
       const rect = viewportRef.current.getBoundingClientRect();
+      const { panX, panY, zoom } = getTransform();
       const pt = toCanvas(e.clientX, e.clientY, rect, panX, panY, zoom);
 
       // Throttle: skip if too close to the previous point
@@ -163,7 +170,7 @@ export function DrawingLayer({
       pointsRef.current.push(pt);
       setCurrentPoints([...pointsRef.current]);
     },
-    [isDrawing, panX, panY, zoom, viewportRef],
+    [isDrawing, getTransform, viewportRef],
   );
 
   const handlePointerUp = useCallback(
@@ -181,48 +188,108 @@ export function DrawingLayer({
       const pathData = pointsToPath(points);
       const bounds = computeBounds(points, strokeWidth);
 
-      onStrokeComplete({ pathData, strokeColor, strokeWidth }, bounds);
+      onStrokeComplete(
+        {
+          pathData,
+          strokeColor,
+          strokeWidth,
+          ...(strokeOpacity < 1 ? { opacity: strokeOpacity } : {}),
+        },
+        bounds,
+      );
 
       setCurrentPoints([]);
       pointsRef.current = [];
     },
-    [isDrawing, strokeColor, strokeWidth, onStrokeComplete],
+    [isDrawing, strokeColor, strokeWidth, strokeOpacity, onStrokeComplete],
   );
 
   // --- Eraser handlers ---
+
+  // Looks up what's under the pointer rather than relying on enter and leave events:
+  // those don't fire on touch screens, or while the pointer is captured for a drag.
+  const drawingAt = useCallback((clientX: number, clientY: number) => {
+    return (
+      document
+        .elementFromPoint(clientX, clientY)
+        ?.closest("[data-mb-drawing-id]")
+        ?.getAttribute("data-mb-drawing-id") ?? null
+    );
+  }, []);
+
+  /** Erases everything along the line, so a fast swipe doesn't jump over a stroke. */
+  const eraseAlong = useCallback(
+    (from: { x: number; y: number }, to: { x: number; y: number }) => {
+      const steps = Math.max(
+        1,
+        Math.ceil(Math.hypot(to.x - from.x, to.y - from.y) / ERASE_STEP_PX),
+      );
+      for (let i = 0; i <= steps; i++) {
+        const id = drawingAt(
+          from.x + ((to.x - from.x) * i) / steps,
+          from.y + ((to.y - from.y) * i) / steps,
+        );
+        if (id && !erased.current.has(id)) {
+          erased.current.add(id);
+          onDeleteDrawing?.(id);
+        }
+      }
+    },
+    [drawingAt, onDeleteDrawing],
+  );
+
+  const moveEraserCursor = useCallback(
+    (e: React.PointerEvent<SVGSVGElement>) => {
+      if (!viewportRef.current) return;
+      const rect = viewportRef.current.getBoundingClientRect();
+      const { panX, panY, zoom } = getTransform();
+      setEraserCursorPos(toCanvas(e.clientX, e.clientY, rect, panX, panY, zoom));
+    },
+    [getTransform, viewportRef],
+  );
 
   const handleEraserPointerDown = useCallback(
     (e: React.PointerEvent<SVGSVGElement>) => {
       if (!eraserActive || !viewportRef.current) return;
       e.preventDefault();
       e.stopPropagation();
-      (e.target as SVGSVGElement).setPointerCapture(e.pointerId);
-      setIsErasing(true);
-
-      if (eraserHoveredId && onDeleteDrawing) {
-        onDeleteDrawing(eraserHoveredId);
-        setEraserHoveredId(null);
-      }
+      e.currentTarget.setPointerCapture(e.pointerId);
+      erasing.current = true;
+      erased.current.clear();
+      const point = { x: e.clientX, y: e.clientY };
+      lastErasePoint.current = point;
+      eraseAlong(point, point);
+      setEraserHoveredId(null);
+      moveEraserCursor(e);
     },
-    [eraserActive, eraserHoveredId, onDeleteDrawing, viewportRef],
+    [eraserActive, eraseAlong, moveEraserCursor, viewportRef],
   );
 
   const handleEraserPointerMove = useCallback(
     (e: React.PointerEvent<SVGSVGElement>) => {
-      if (!eraserActive || !viewportRef.current) return;
-
-      const rect = viewportRef.current.getBoundingClientRect();
-      const pt = toCanvas(e.clientX, e.clientY, rect, panX, panY, zoom);
-      setEraserCursorPos(pt);
+      if (!eraserActive) return;
+      moveEraserCursor(e);
+      const point = { x: e.clientX, y: e.clientY };
+      if (erasing.current) {
+        eraseAlong(lastErasePoint.current ?? point, point);
+        lastErasePoint.current = point;
+      } else {
+        setEraserHoveredId(drawingAt(point.x, point.y));
+      }
     },
-    [eraserActive, panX, panY, zoom, viewportRef],
+    [eraserActive, eraseAlong, moveEraserCursor, drawingAt],
   );
 
-  const handleEraserPointerUp = useCallback(
+  const handleEraserPointerEnd = useCallback(
     (e: React.PointerEvent<SVGSVGElement>) => {
       if (!eraserActive) return;
-      (e.target as SVGSVGElement).releasePointerCapture(e.pointerId);
-      setIsErasing(false);
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+      erasing.current = false;
+      lastErasePoint.current = null;
+      // A finger has lifted, so there's no longer a position to show.
+      if (e.pointerType === "touch") setEraserCursorPos(null);
     },
     [eraserActive],
   );
@@ -241,7 +308,7 @@ export function DrawingLayer({
         height: 30000,
         overflow: "visible",
         pointerEvents: active || eraserActive ? "auto" : "none",
-        cursor: active ? "crosshair" : "default",
+        cursor: active ? "crosshair" : eraserActive ? "none" : "default",
       }}
       onPointerDown={
         active ? handlePointerDown : eraserActive ? handleEraserPointerDown : undefined
@@ -249,7 +316,8 @@ export function DrawingLayer({
       onPointerMove={
         active ? handlePointerMove : eraserActive ? handleEraserPointerMove : undefined
       }
-      onPointerUp={active ? handlePointerUp : eraserActive ? handleEraserPointerUp : undefined}
+      onPointerUp={active ? handlePointerUp : eraserActive ? handleEraserPointerEnd : undefined}
+      onPointerCancel={eraserActive ? handleEraserPointerEnd : undefined}
     >
       {/* Rendered saved drawings */}
       {drawings.map((item) => {
@@ -268,30 +336,11 @@ export function DrawingLayer({
                 strokeWidth={Math.max(data.strokeWidth + 12, 16)}
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="pointer-events-stroke cursor-pointer"
+                style={{ pointerEvents: "stroke", cursor: "pointer" }}
+                data-mb-drawing-id={item.id}
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (eraserActive && onDeleteDrawing) {
-                    onDeleteDrawing(item.id);
-                    setEraserHoveredId(null);
-                  } else if (onSelectDrawing) {
-                    onSelectDrawing(item.id);
-                  }
-                }}
-                onMouseEnter={() => {
-                  if (eraserActive) {
-                    if (isErasing && onDeleteDrawing) {
-                      onDeleteDrawing(item.id);
-                      setEraserHoveredId(null);
-                    } else {
-                      setEraserHoveredId(item.id);
-                    }
-                  }
-                }}
-                onMouseLeave={() => {
-                  if (eraserActive) {
-                    setEraserHoveredId((prev) => (prev === item.id ? null : prev));
-                  }
+                  if (!eraserActive) onSelectDrawing?.(item.id);
                 }}
               />
             )}
@@ -310,12 +359,12 @@ export function DrawingLayer({
               strokeLinecap="round"
               strokeLinejoin="round"
               className="pointer-events-none"
-              opacity={isEraserHovered ? 0.6 : isSelected ? 0.8 : 1}
+              opacity={isEraserHovered ? 0.6 : isSelected ? 0.8 : (data.opacity ?? 1)}
             />
             {/* Delete button for selected drawing (select mode only) */}
             {isSelected && !eraserActive && onDeleteDrawing && (
               <g
-                className="pointer-events-auto cursor-pointer"
+                style={{ pointerEvents: "auto", cursor: "pointer" }}
                 onClick={(e) => {
                   e.stopPropagation();
                   onDeleteDrawing(item.id);
@@ -352,6 +401,7 @@ export function DrawingLayer({
           fill="none"
           stroke={strokeColor}
           strokeWidth={strokeWidth}
+          opacity={strokeOpacity}
           strokeLinecap="round"
           strokeLinejoin="round"
           className="pointer-events-none"
@@ -363,14 +413,16 @@ export function DrawingLayer({
         <circle
           cx={eraserCursorPos.x}
           cy={eraserCursorPos.y}
-          r={10}
+          r={10 / getTransform().zoom}
           fill="white"
           fillOpacity={0.7}
           stroke="#ef4444"
-          strokeWidth={2}
+          strokeWidth={2 / getTransform().zoom}
           className="pointer-events-none"
         />
       )}
     </svg>
   );
 }
+
+export const DrawingLayer = memo(DrawingLayerBase);

@@ -184,6 +184,8 @@ enum MoodboardItemType {
   TODO
   EMBED
   DRAWING
+  SHAPE
+  TEXT
 }
 
 enum TalentApplicationStatus {

@@ -1,77 +1,78 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 import { BoardToolbar } from "@/components/moodboard/board-toolbar";
 import { BoardHeader } from "@/components/moodboard/board-header";
-import { BoardCanvas } from "@/components/moodboard/board-canvas";
-import { AddNoteModal } from "@/components/moodboard/add-note-modal";
-import { AddColorModal } from "@/components/moodboard/add-color-modal";
+import { BoardCanvas, type BoardCanvasHandle } from "@/components/moodboard/board-canvas";
+import { useIsPhone } from "@/components/moodboard/use-is-phone";
+import { useToast } from "@/components/ui/toast-provider";
 import { AddLinkModal } from "@/components/moodboard/add-link-modal";
-import { AddTodoModal } from "@/components/moodboard/add-todo-modal";
 import { AddEmbedModal } from "@/components/moodboard/add-embed-modal";
 
 import type {
   MoodboardClient,
   MoodboardItemClient,
   MoodboardItemData,
-  NoteCardData,
-  ColorCardData,
   LinkCardData,
-  TodoCardData,
   ImageCardData,
   FileCardData,
   EmbedCardData,
   DrawingCardData,
+  MoodboardConnection,
+  PenKind,
+  ShapeKind,
 } from "@/lib/moodboard";
-import { CANVAS_DEFAULTS, createConnection, DRAW_COLORS, DRAW_SIZES } from "@/lib/moodboard";
-import type { ToolMode } from "@/components/moodboard/board-toolbar";
+import {
+  createConnection,
+  defaultTodoData,
+  DRAW_COLORS,
+  DRAW_SIZES,
+  HIGHLIGHTER_DEFAULT_COLOR,
+  newClientId,
+  PEN_PRESETS,
+  SHAPE_FILLS,
+  STICKY_COLORS,
+} from "@/lib/moodboard";
+import type { CreatableKind, ToolMode } from "@/components/moodboard/board-toolbar";
 
 type MoodboardViewProps = {
   moodboardId: string;
 };
 
-type ModalType = "note" | "color" | "link" | "todo" | "embed" | null;
+type ModalType = "link" | "embed" | null;
 
-/** Find a non-overlapping position for a new item near the center of existing content. */
-function findOpenPosition(items: MoodboardItemClient[], width: number): { x: number; y: number } {
-  // Place the first item with breathing room from the canvas origin so it feels centered
-  if (items.length === 0) return { x: 400, y: 260 };
+type Point = { x: number; y: number };
 
-  // Find bounding box of existing items
-  let minX = Infinity;
-  let maxY = 0;
-  for (const item of items) {
-    minX = Math.min(minX, item.x);
-    maxY = Math.max(maxY, item.y + (item.height || 200));
+/** How long the Undo offer stays on screen after deleting. */
+const UNDO_MS = 8000;
+const CASCADE_PX = 24;
+
+type DeletedItem = { item: MoodboardItemClient; connections: MoodboardConnection[] };
+
+/** The middle of the view, stepped diagonally so new cards don't stack exactly. */
+function placeNear(
+  center: Point,
+  items: MoodboardItemClient[],
+  width: number,
+  height: number,
+): Point {
+  let x = Math.round(center.x - width / 2);
+  let y = Math.round(center.y - (height || 100) / 2);
+  while (items.some((i) => Math.abs(i.x - x) < CASCADE_PX && Math.abs(i.y - y) < CASCADE_PX)) {
+    x += CASCADE_PX;
+    y += CASCADE_PX;
   }
-
-  const gap = CANVAS_DEFAULTS.GAP;
-  const colBase = Math.max(40, minX); // Align new items with leftmost existing item
-  const candidate = { x: colBase, y: maxY + gap };
-
-  // Place below existing content in a grid, checking for overlap
-  for (let row = 0; row < 20; row++) {
-    for (let col = 0; col < 4; col++) {
-      const cx = colBase + col * (CANVAS_DEFAULTS.CARD_WIDTH + gap);
-      const cy = maxY + gap + row * (220 + gap);
-      const overlaps = items.some(
-        (item) =>
-          cx < item.x + item.width + gap &&
-          cx + width + gap > item.x &&
-          cy < item.y + (item.height || 200) + gap &&
-          cy + 200 + gap > item.y,
-      );
-      if (!overlaps) return { x: cx, y: cy };
-    }
-  }
-
-  return candidate;
+  return { x, y };
 }
 
 export function MoodboardView({ moodboardId }: MoodboardViewProps) {
   const router = useRouter();
+  const { showToast } = useToast();
+  const isPhone = useIsPhone();
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const [moodboard, setMoodboard] = useState<MoodboardClient | null>(null);
   const [loading, setLoading] = useState(true);
@@ -79,6 +80,24 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
   const [toolMode, setToolMode] = useState<ToolMode>("select");
   const [drawColor, setDrawColor] = useState<string>(DRAW_COLORS[0]);
   const [drawSize, setDrawSize] = useState<number>(DRAW_SIZES[1]); // 4px default
+  const [penKind, setPenKind] = useState<PenKind>("marker");
+  const [shapeKind, setShapeKind] = useState<ShapeKind>("rect");
+  const [placing, setPlacing] = useState<CreatableKind | null>(null);
+
+  const [deleted, setDeleted] = useState<DeletedItem | null>(null);
+
+  const canvasHandle = useRef<BoardCanvasHandle | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  // New objects appear at once under a temporary id, and that id stays in use on
+  // screen. Each server call resolves it first, so editing or moving something
+  // that's still being saved just waits its turn.
+  const serverIds = useRef(new Map<string, Promise<string>>());
+  const serverId = useCallback(
+    (id: string) => serverIds.current.get(id) ?? Promise.resolve(id),
+    [],
+  );
+  /** Where the object from a file picker or dialog should land. */
+  const pendingPoint = useRef<Point | null>(null);
 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -105,39 +124,201 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
     fetchMoodboard();
   }, [fetchMoodboard]);
 
+  // The canvas fills the rest of the window, so the page itself never scrolls and
+  // can't compete with the canvas. Measured, because banners change where it starts.
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!root || isPhone) return;
+    const fit = () => {
+      const top = root.getBoundingClientRect().top + window.scrollY;
+      const bottomGap = parseFloat(getComputedStyle(root.parentElement!).paddingBottom) || 0;
+      root.style.height = `${Math.max(420, window.innerHeight - top - bottomGap)}px`;
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => {
+      window.removeEventListener("resize", fit);
+      root.style.height = "";
+    };
+  }, [loading, isPhone]);
+
+  // Phones get the canvas alone: the page behind it is locked, so nothing but the
+  // canvas can move, and Safari's own pinch zoom can't take over.
+  useEffect(() => {
+    if (!isPhone || loading) return;
+    const { documentElement: html, body } = document;
+    const previous = {
+      htmlOverflow: html.style.overflow,
+      bodyOverflow: body.style.overflow,
+      bodyOverscroll: body.style.overscrollBehavior,
+    };
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    body.style.overscrollBehavior = "none";
+
+    const blockGesture = (e: Event) => e.preventDefault();
+    document.addEventListener("gesturestart", blockGesture);
+    return () => {
+      html.style.overflow = previous.htmlOverflow;
+      body.style.overflow = previous.bodyOverflow;
+      body.style.overscrollBehavior = previous.bodyOverscroll;
+      document.removeEventListener("gesturestart", blockGesture);
+    };
+  }, [isPhone, loading]);
+
+  // The board is sized to the visible area, not to the page. Safari can lay a page
+  // out wider than the screen when something on it overflows, and the on-screen
+  // keyboard shrinks only the visible area, so what's typed on stays above it.
+  // A layout effect, so the canvas's first fit measures the final size.
+  useLayoutEffect(() => {
+    const viewport = window.visualViewport;
+    const root = rootRef.current;
+    if (!isPhone || !viewport || !root) return;
+    const follow = () => {
+      root.style.width = `${viewport.width}px`;
+      root.style.height = `${viewport.height}px`;
+      root.style.left = `${viewport.offsetLeft}px`;
+      root.style.top = `${viewport.offsetTop}px`;
+      setKeyboardOpen(window.innerHeight - viewport.height > 120);
+    };
+    follow();
+    viewport.addEventListener("resize", follow);
+    viewport.addEventListener("scroll", follow);
+    return () => {
+      viewport.removeEventListener("resize", follow);
+      viewport.removeEventListener("scroll", follow);
+      root.style.width = "";
+      root.style.height = "";
+      root.style.left = "";
+      root.style.top = "";
+      setKeyboardOpen(false);
+    };
+  }, [isPhone, loading]);
+
+  useEffect(() => {
+    if (!deleted) return;
+    const timer = setTimeout(() => setDeleted(null), UNDO_MS);
+    return () => clearTimeout(timer);
+  }, [deleted]);
+
   // ---------------------------------------------------------------------------
   // Add item (with canvas position)
   // ---------------------------------------------------------------------------
 
-  async function handleAddItem(
+  function handleAddItem(
     type: string,
     data: MoodboardItemData,
-    opts?: { width?: number; height?: number },
+    opts: { width: number; height: number; at?: Point | null; edit?: boolean },
   ) {
     const items = moodboard?.items ?? [];
-    const width = opts?.width ?? CANVAS_DEFAULTS.CARD_WIDTH;
-    const height = opts?.height ?? CANVAS_DEFAULTS.CARD_HEIGHT;
-    const { x, y } = findOpenPosition(items, width);
+    const { width, height } = opts;
+    const center = opts.at ?? canvasHandle.current?.viewCenter() ?? { x: 400, y: 260 };
+    const { x, y } = placeNear(center, items, width, height);
 
-    try {
-      const res = await fetch(`/api/customer/moodboards/${moodboardId}/items`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, data, x, y, width, height }),
-      });
+    const id = `tmp_${newClientId()}`;
+    const now = new Date().toISOString();
+    const item = {
+      id,
+      type,
+      data,
+      x,
+      y,
+      width,
+      height,
+      position: items.length,
+      colSpan: 1,
+      createdById: "",
+      createdAt: now,
+      updatedAt: now,
+    } as MoodboardItemClient;
 
+    setMoodboard((prev) => (prev ? { ...prev, items: [...prev.items, item] } : prev));
+    setPlacing(null);
+    // The card has to be on screen before it can be selected and edited.
+    requestAnimationFrame(() => {
+      canvasHandle.current?.selectCard(id, { edit: opts.edit });
+    });
+
+    const saved = fetch(`/api/customer/moodboards/${moodboardId}/items`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type, data, x, y, width, height }),
+    }).then(async (res) => {
       if (!res.ok) throw new Error("Failed to add item");
+      return (await res.json()).item.id as string;
+    });
+    serverIds.current.set(id, saved);
 
-      const json = await res.json();
-      const newItem: MoodboardItemClient = json.item;
-
-      setMoodboard((prev) => {
-        if (!prev) return prev;
-        return { ...prev, items: [...prev.items, newItem] };
-      });
-    } catch (err) {
+    saved.catch((err) => {
       console.error("[moodboard-view] add item error:", err);
+      showToast({ type: "error", title: "We couldn't save that. Please try again." });
+      setMoodboard((prev) =>
+        prev ? { ...prev, items: prev.items.filter((i) => i.id !== id) } : prev,
+      );
+    });
+  }
+
+  function createAt(kind: CreatableKind, at: Point | null) {
+    setPlacing(null);
+    pendingPoint.current = at;
+
+    switch (kind) {
+      case "note":
+        handleAddItem(
+          "NOTE",
+          { body: "", color: STICKY_COLORS[0] },
+          { width: 240, height: 240, at, edit: true },
+        );
+        return;
+      case "shape":
+        handleAddItem(
+          "SHAPE",
+          { kind: shapeKind, text: "", fill: SHAPE_FILLS[0] },
+          { width: 200, height: 200, at, edit: true },
+        );
+        return;
+      case "text":
+        handleAddItem("TEXT", { text: "" }, { width: 280, height: 0, at, edit: true });
+        return;
+      case "color":
+        handleAddItem("COLOR", { hex: "#F15B2B" }, { width: 200, height: 160, at });
+        return;
+      case "todo":
+        handleAddItem("TODO", defaultTodoData(), { width: 280, height: 0, at });
+        return;
+      case "image":
+        imageInputRef.current?.click();
+        return;
+      case "file":
+        fileInputRef.current?.click();
+        return;
+      case "link":
+        setActiveModal("link");
+        return;
+      case "video":
+        setActiveModal("embed");
+        return;
     }
+  }
+
+  /** Clicked in the dock: place it with the next click, or ask for what it needs. */
+  function handlePick(kind: CreatableKind) {
+    if (kind === "image" || kind === "file" || kind === "link" || kind === "video") {
+      createAt(kind, null);
+      return;
+    }
+    setToolMode("select");
+    setPlacing((current) => (current === kind ? null : kind));
+  }
+
+  function handleDropAt(kind: CreatableKind, clientX: number, clientY: number) {
+    const point = canvasHandle.current?.clientToCanvas(clientX, clientY);
+    if (point) createAt(kind, point);
+  }
+
+  function handleSetToolMode(mode: ToolMode) {
+    setPlacing(null);
+    setToolMode(mode);
   }
 
   // ---------------------------------------------------------------------------
@@ -154,7 +335,8 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
     });
 
     try {
-      const res = await fetch(`/api/customer/moodboards/${moodboardId}/items/${itemId}`, {
+      const sid = await serverId(itemId);
+      const res = await fetch(`/api/customer/moodboards/${moodboardId}/items/${sid}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ data }),
@@ -172,6 +354,8 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
   // ---------------------------------------------------------------------------
 
   async function handleDeleteItem(itemId: string) {
+    const item = moodboard?.items.find((i) => i.id === itemId);
+
     // Also remove any connections referencing this item
     const orphanedConns = (moodboard?.connections ?? []).filter(
       (c) => c.sourceItemId === itemId || c.targetItemId === itemId,
@@ -188,9 +372,11 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
         connections: cleanedConnections,
       };
     });
+    if (item) setDeleted({ item, connections: orphanedConns });
 
     try {
-      const res = await fetch(`/api/customer/moodboards/${moodboardId}/items/${itemId}`, {
+      const sid = await serverId(itemId);
+      const res = await fetch(`/api/customer/moodboards/${moodboardId}/items/${sid}`, {
         method: "DELETE",
       });
 
@@ -198,14 +384,66 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
 
       // If connections were cleaned up, persist that too
       if (orphanedConns.length > 0) {
-        await fetch(`/api/customer/moodboards/${moodboardId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ connections: cleanedConnections }),
-        });
+        await saveConnections(cleanedConnections);
       }
     } catch (err) {
       console.error("[moodboard-view] delete item error:", err);
+      fetchMoodboard();
+    }
+  }
+
+  /** Text left empty: nothing worth offering to restore. */
+  async function handleRemoveEmpty(itemId: string) {
+    setMoodboard((prev) =>
+      prev ? { ...prev, items: prev.items.filter((i) => i.id !== itemId) } : prev,
+    );
+    try {
+      const sid = await serverId(itemId);
+      await fetch(`/api/customer/moodboards/${moodboardId}/items/${sid}`, { method: "DELETE" });
+    } catch (err) {
+      console.error("[moodboard-view] remove empty item error:", err);
+    }
+  }
+
+  // Deleting is one key away on the canvas, so the last delete can be taken back.
+  // The card comes back as a new row, with its arrows pointed at the new id.
+  async function handleUndoDelete() {
+    if (!deleted) return;
+    const { item, connections } = deleted;
+    setDeleted(null);
+
+    try {
+      const res = await fetch(`/api/customer/moodboards/${moodboardId}/items`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: item.type,
+          data: item.data,
+          x: item.x,
+          y: item.y,
+          width: item.width,
+          height: item.height,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to restore item");
+      const restored: MoodboardItemClient = (await res.json()).item;
+
+      const relinked = connections.map((c) => ({
+        ...c,
+        sourceItemId: c.sourceItemId === item.id ? restored.id : c.sourceItemId,
+        targetItemId: c.targetItemId === item.id ? restored.id : c.targetItemId,
+      }));
+      const nextConnections = [...(moodboard?.connections ?? []), ...relinked];
+
+      setMoodboard((prev) =>
+        prev ? { ...prev, items: [...prev.items, restored], connections: nextConnections } : prev,
+      );
+
+      if (relinked.length > 0) {
+        await saveConnections(nextConnections);
+      }
+    } catch (err) {
+      console.error("[moodboard-view] undo delete error:", err);
       fetchMoodboard();
     }
   }
@@ -224,7 +462,8 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
     });
 
     try {
-      const res = await fetch(`/api/customer/moodboards/${moodboardId}/items/${itemId}`, {
+      const sid = await serverId(itemId);
+      const res = await fetch(`/api/customer/moodboards/${moodboardId}/items/${sid}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ x, y }),
@@ -241,20 +480,29 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
   // Resize item
   // ---------------------------------------------------------------------------
 
-  async function handleResizeItem(itemId: string, width: number, height: number) {
+  async function handleResizeItem(
+    itemId: string,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ) {
     setMoodboard((prev) => {
       if (!prev) return prev;
       return {
         ...prev,
-        items: prev.items.map((item) => (item.id === itemId ? { ...item, width, height } : item)),
+        items: prev.items.map((item) =>
+          item.id === itemId ? { ...item, x, y, width, height } : item,
+        ),
       };
     });
 
     try {
-      const res = await fetch(`/api/customer/moodboards/${moodboardId}/items/${itemId}`, {
+      const sid = await serverId(itemId);
+      const res = await fetch(`/api/customer/moodboards/${moodboardId}/items/${sid}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ width, height }),
+        body: JSON.stringify({ x, y, width, height }),
       });
 
       if (!res.ok) throw new Error("Failed to resize item");
@@ -315,6 +563,22 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
   // Connections (arrows between cards)
   // ---------------------------------------------------------------------------
 
+  /** Saved with server ids, since temporary ones mean nothing after a reload. */
+  async function saveConnections(connections: MoodboardConnection[]) {
+    const resolved = await Promise.all(
+      connections.map(async (c) => ({
+        ...c,
+        sourceItemId: await serverId(c.sourceItemId),
+        targetItemId: await serverId(c.targetItemId),
+      })),
+    );
+    return fetch(`/api/customer/moodboards/${moodboardId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ connections: resolved }),
+    });
+  }
+
   async function handleAddConnection(sourceId: string, targetId: string) {
     const newConn = createConnection(sourceId, targetId);
     const updatedConnections = [...(moodboard?.connections ?? []), newConn];
@@ -327,11 +591,7 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
 
     // Persist to API
     try {
-      const res = await fetch(`/api/customer/moodboards/${moodboardId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ connections: updatedConnections }),
-      });
+      const res = await saveConnections(updatedConnections);
 
       if (!res.ok) throw new Error("Failed to save connection");
     } catch (err) {
@@ -351,11 +611,7 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
 
     // Persist to API
     try {
-      const res = await fetch(`/api/customer/moodboards/${moodboardId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ connections: updatedConnections }),
-      });
+      const res = await saveConnections(updatedConnections);
 
       if (!res.ok) throw new Error("Failed to delete connection");
     } catch (err) {
@@ -368,36 +624,51 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
   // Freehand drawing
   // ---------------------------------------------------------------------------
 
-  async function handleAddDrawing(
+  function handleAddDrawing(
     data: DrawingCardData,
     bounds: { x: number; y: number; w: number; h: number },
   ) {
-    try {
-      const res = await fetch(`/api/customer/moodboards/${moodboardId}/items`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "DRAWING",
-          data,
-          x: bounds.x,
-          y: bounds.y,
-          width: bounds.w,
-          height: bounds.h,
-        }),
-      });
+    const id = `tmp_${newClientId()}`;
+    const now = new Date().toISOString();
+    const item = {
+      id,
+      type: "DRAWING",
+      data,
+      x: bounds.x,
+      y: bounds.y,
+      width: bounds.w,
+      height: bounds.h,
+      position: moodboard?.items.length ?? 0,
+      colSpan: 1,
+      createdById: "",
+      createdAt: now,
+      updatedAt: now,
+    } as MoodboardItemClient;
+    setMoodboard((prev) => (prev ? { ...prev, items: [...prev.items, item] } : prev));
 
+    const saved = fetch(`/api/customer/moodboards/${moodboardId}/items`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "DRAWING",
+        data,
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.w,
+        height: bounds.h,
+      }),
+    }).then(async (res) => {
       if (!res.ok) throw new Error("Failed to save drawing");
-
-      const json = await res.json();
-      const newItem: MoodboardItemClient = json.item;
-
-      setMoodboard((prev) => {
-        if (!prev) return prev;
-        return { ...prev, items: [...prev.items, newItem] };
-      });
-    } catch (err) {
+      return (await res.json()).item.id as string;
+    });
+    serverIds.current.set(id, saved);
+    saved.catch((err) => {
       console.error("[moodboard-view] add drawing error:", err);
-    }
+      showToast({ type: "error", title: "We couldn't save that drawing. Please try again." });
+      setMoodboard((prev) =>
+        prev ? { ...prev, items: prev.items.filter((i) => i.id !== id) } : prev,
+      );
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -427,7 +698,7 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
           mimeType: mimeType ?? file.type,
           bytes: bytes ?? file.size,
         };
-        await handleAddItem("IMAGE", data);
+        handleAddItem("IMAGE", data, { width: 280, height: 0, at: pendingPoint.current });
       } else {
         const data: FileCardData = {
           url: url ?? "",
@@ -436,7 +707,7 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
           mimeType: mimeType ?? file.type,
           bytes: bytes ?? file.size,
         };
-        await handleAddItem("FILE", data);
+        handleAddItem("FILE", data, { width: 280, height: 0, at: pendingPoint.current });
       }
     } catch (err) {
       console.error("[moodboard-view] upload error:", err);
@@ -451,32 +722,12 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
     setActiveModal(null);
   }
 
-  function handleAddNoteData(data: NoteCardData) {
-    handleAddItem("NOTE", data);
-  }
-
-  function handleAddColorData(data: ColorCardData) {
-    handleAddItem("COLOR", data, { width: 200, height: 160 });
-  }
-
   function handleAddLinkData(data: LinkCardData) {
-    handleAddItem("LINK", data);
-  }
-
-  function handleAddTodoData(data: TodoCardData) {
-    handleAddItem("TODO", data);
+    handleAddItem("LINK", data, { width: 280, height: 0, at: pendingPoint.current });
   }
 
   function handleAddEmbedData(data: EmbedCardData) {
-    handleAddItem("EMBED", data, { width: 420, height: 280 });
-  }
-
-  function handleImageClick() {
-    imageInputRef.current?.click();
-  }
-
-  function handleFileClick() {
-    fileInputRef.current?.click();
+    handleAddItem("EMBED", data, { width: 420, height: 280, at: pendingPoint.current });
   }
 
   function onImageInputChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -497,20 +748,21 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
 
   if (loading) {
     return (
-      <div className="flex h-[calc(100vh-64px)] items-center justify-center bg-[var(--bb-bg-page)]">
-        <div className="text-sm text-[var(--bb-text-secondary)]">Loading moodboard...</div>
+      <div className="flex h-64 items-center justify-center" role="status">
+        <span className="text-sm text-[var(--av2-text-2)]">Loading moodboard…</span>
       </div>
     );
   }
 
   if (!moodboard) {
     return (
-      <div className="flex h-[calc(100vh-64px)] items-center justify-center bg-[var(--bb-bg-page)]">
+      <div className="flex h-64 items-center justify-center">
         <div className="text-center">
-          <h3 className="text-sm font-semibold text-[var(--bb-secondary)]">Moodboard not found</h3>
+          <h1 className="text-base font-semibold text-[var(--av2-text)]">Moodboard not found</h1>
           <button
+            type="button"
             onClick={() => router.push("/customer/moodboards")}
-            className="mt-2 text-sm text-[var(--bb-primary)] hover:underline"
+            className="mt-2 min-h-10 text-sm font-medium text-[var(--av2-link)] hover:underline"
           >
             Back to moodboards
           </button>
@@ -524,47 +776,103 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
   // ---------------------------------------------------------------------------
 
   return (
-    <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-[var(--bb-bg-page)]">
-      <BoardToolbar
-        onAddNote={() => setActiveModal("note")}
-        onAddImage={handleImageClick}
-        onAddColor={() => setActiveModal("color")}
-        onAddLink={() => setActiveModal("link")}
-        onAddFile={handleFileClick}
-        onAddTodo={() => setActiveModal("todo")}
-        onAddEmbed={() => setActiveModal("embed")}
+    <div
+      ref={rootRef}
+      className={
+        isPhone
+          ? "fixed top-0 left-0 z-45 flex h-dvh w-dvw flex-col overflow-hidden bg-[var(--av2-surface)]"
+          : "relative flex flex-col"
+      }
+      style={isPhone ? { touchAction: "none" } : undefined}
+      onPointerDownCapture={(e) => {
+        // Touching anything outside the toolbar closes its "more" row.
+        if (moreOpen && !(e.target as Element).closest("[data-mb-dock]")) setMoreOpen(false);
+      }}
+    >
+      <BoardCanvas
+        items={moodboard.items}
+        connections={moodboard.connections}
         toolMode={toolMode}
-        onSetToolMode={setToolMode}
         drawColor={drawColor}
-        drawSize={drawSize}
-        onSetDrawColor={setDrawColor}
-        onSetDrawSize={setDrawSize}
+        drawSize={drawSize * PEN_PRESETS[penKind].widthFactor}
+        drawOpacity={PEN_PRESETS[penKind].opacity}
+        placing={placing}
+        handleRef={canvasHandle}
+        isPhone={isPhone}
+        keyboardOpen={keyboardOpen}
+        hideObjectToolbar={moreOpen}
+        onSetToolMode={handleSetToolMode}
+        onPlace={createAt}
+        onPick={handlePick}
+        onCancelPlacing={() => setPlacing(null)}
+        onRemoveEmpty={handleRemoveEmpty}
+        onUpdateItem={handleUpdateItem}
+        onDeleteItem={handleDeleteItem}
+        onMoveItem={handleMoveItem}
+        onResizeItem={handleResizeItem}
+        onAddConnection={handleAddConnection}
+        onDeleteConnection={handleDeleteConnection}
+        onAddDrawing={handleAddDrawing}
+        onUndoDelete={handleUndoDelete}
       />
 
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <BoardHeader
-          title={moodboard.title}
-          onTitleChange={handleUpdateTitle}
-          projectName={moodboard.project?.name ?? undefined}
-          onBack={() => router.push("/customer/moodboards")}
-          onDelete={handleDeleteBoard}
-        />
+      {isPhone && placing && (
+        <div
+          role="status"
+          className="pointer-events-none absolute top-16 left-1/2 z-30 -translate-x-1/2 rounded-full bg-[var(--av2-text)] px-4 py-2 text-sm font-medium whitespace-nowrap text-[var(--av2-surface)]"
+        >
+          Tap where you want it
+        </div>
+      )}
 
-        <BoardCanvas
-          items={moodboard.items}
-          connections={moodboard.connections}
-          toolMode={toolMode}
-          drawColor={drawColor}
-          drawSize={drawSize}
-          onUpdateItem={handleUpdateItem}
-          onDeleteItem={handleDeleteItem}
-          onMoveItem={handleMoveItem}
-          onResizeItem={handleResizeItem}
-          onAddConnection={handleAddConnection}
-          onDeleteConnection={handleDeleteConnection}
-          onAddDrawing={handleAddDrawing}
-        />
-      </div>
+      <BoardHeader
+        title={moodboard.title}
+        itemCount={moodboard.items.filter((i) => i.type !== "DRAWING").length}
+        onTitleChange={handleUpdateTitle}
+        onBack={() => router.push("/customer/moodboards")}
+        onDelete={handleDeleteBoard}
+      />
+
+      <BoardToolbar
+        isPhone={isPhone}
+        moreOpen={moreOpen}
+        onSetMoreOpen={setMoreOpen}
+        hidden={keyboardOpen}
+        toolMode={toolMode}
+        placing={placing}
+        onSetToolMode={handleSetToolMode}
+        onPick={handlePick}
+        onDropAt={handleDropAt}
+        penKind={penKind}
+        drawColor={drawColor}
+        drawSize={drawSize}
+        shapeKind={shapeKind}
+        onSetPenKind={(kind) => {
+          setPenKind(kind);
+          if (kind === "highlighter" && drawColor === DRAW_COLORS[0]) {
+            setDrawColor(HIGHLIGHTER_DEFAULT_COLOR);
+          }
+        }}
+        onSetDrawColor={setDrawColor}
+        onSetDrawSize={setDrawSize}
+        onSetShapeKind={setShapeKind}
+      />
+
+      {deleted && (
+        <div
+          role="status"
+          className="absolute top-16 left-3 z-30 flex items-center gap-3 rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] py-1 pr-1 pl-4 text-sm text-[var(--av2-text)] shadow-sm"
+        >
+          Deleted
+          <button
+            type="button"
+            onClick={handleUndoDelete}
+            className="flex min-h-10 items-center rounded-lg px-3 font-semibold text-[var(--av2-link)] hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
+          >
+            Undo
+          </button>
+        </div>
+      )}
 
       {/* Hidden file inputs */}
       <input
@@ -577,14 +885,7 @@ export function MoodboardView({ moodboardId }: MoodboardViewProps) {
       <input ref={fileInputRef} type="file" className="hidden" onChange={onFileInputChange} />
 
       {/* Modals */}
-      <AddNoteModal open={activeModal === "note"} onClose={closeModal} onSave={handleAddNoteData} />
-      <AddColorModal
-        open={activeModal === "color"}
-        onClose={closeModal}
-        onSave={handleAddColorData}
-      />
       <AddLinkModal open={activeModal === "link"} onClose={closeModal} onSave={handleAddLinkData} />
-      <AddTodoModal open={activeModal === "todo"} onClose={closeModal} onSave={handleAddTodoData} />
       <AddEmbedModal
         open={activeModal === "embed"}
         onClose={closeModal}

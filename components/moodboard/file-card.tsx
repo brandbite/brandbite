@@ -15,7 +15,7 @@ function DocumentIcon() {
       height="40"
       viewBox="0 0 40 40"
       fill="none"
-      className="flex-shrink-0 text-[var(--bb-text-secondary)]"
+      className="flex-shrink-0 text-[var(--av2-text-2)]"
     >
       <path
         d="M10 4C10 2.89543 10.8954 2 12 2H24L32 10V36C32 37.1046 31.1046 38 30 38H12C10.8954 38 10 37.1046 10 36V4Z"
@@ -65,10 +65,8 @@ export function FileCard({ data }: FileCardProps) {
     >
       <DocumentIcon />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-[var(--bb-secondary)]">
-          {data.originalName}
-        </p>
-        <p className="mt-0.5 text-xs text-[var(--bb-text-secondary)]">{formatBytes(data.bytes)}</p>
+        <p className="truncate text-sm font-medium text-[var(--av2-text)]">{data.originalName}</p>
+        <p className="mt-0.5 text-xs text-[var(--av2-text-2)]">{formatBytes(data.bytes)}</p>
       </div>
     </a>
   );

@@ -74,7 +74,7 @@ export function ColorCard({ data, onUpdate }: ColorCardProps) {
                 if (e.key === "Escape") setEditing(false);
               }}
               placeholder="#F15B2B"
-              className="rounded-lg border border-[var(--bb-border)] bg-gray-50 px-2 py-1 font-mono text-sm text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)]"
+              className="rounded-lg border border-[var(--av2-border)] bg-[var(--av2-bg)] px-2 py-1 font-mono text-sm text-[var(--av2-text)] outline-none focus:border-[var(--av2-accent)]"
             />
             <input
               type="text"
@@ -85,15 +85,13 @@ export function ColorCard({ data, onUpdate }: ColorCardProps) {
                 if (e.key === "Escape") setEditing(false);
               }}
               placeholder="Color name (optional)"
-              className="rounded-lg border border-[var(--bb-border)] bg-gray-50 px-2 py-1 text-sm text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)]"
+              className="rounded-lg border border-[var(--av2-border)] bg-[var(--av2-bg)] px-2 py-1 text-sm text-[var(--av2-text)] outline-none focus:border-[var(--av2-accent)]"
             />
           </div>
         ) : (
           <div>
-            <p className="font-mono text-sm text-[var(--bb-secondary)]">{data.hex}</p>
-            {data.name && (
-              <p className="mt-0.5 text-xs text-[var(--bb-text-secondary)]">{data.name}</p>
-            )}
+            <p className="font-mono text-sm text-[var(--av2-text)]">{data.hex}</p>
+            {data.name && <p className="mt-0.5 text-xs text-[var(--av2-text-2)]">{data.name}</p>}
           </div>
         )}
       </div>

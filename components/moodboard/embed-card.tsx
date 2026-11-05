@@ -122,17 +122,15 @@ export function EmbedCard({ data }: EmbedCardProps) {
       </div>
 
       {/* Title bar — always visible */}
-      <div className="flex items-center justify-between border-t border-[var(--bb-border)] px-3 py-2">
+      <div className="flex items-center justify-between border-t border-[var(--av2-border)] px-3 py-2">
         <div className="min-w-0 flex-1">
           {data.title ? (
             <>
-              <p className="truncate text-xs font-medium text-[var(--bb-secondary)]">
-                {data.title}
-              </p>
-              <p className="truncate text-[10px] text-[var(--bb-text-secondary)]">{data.url}</p>
+              <p className="truncate text-xs font-medium text-[var(--av2-text)]">{data.title}</p>
+              <p className="truncate text-[10px] text-[var(--av2-text-2)]">{data.url}</p>
             </>
           ) : (
-            <p className="truncate text-xs text-[var(--bb-text-secondary)]">{data.url}</p>
+            <p className="truncate text-xs text-[var(--av2-text-2)]">{data.url}</p>
           )}
         </div>
         <button
@@ -141,7 +139,7 @@ export function EmbedCard({ data }: EmbedCardProps) {
           className={`ml-2 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md transition-colors ${
             copied
               ? "text-green-600"
-              : "text-[var(--bb-text-secondary)] hover:bg-gray-100 hover:text-[var(--bb-secondary)]"
+              : "text-[var(--av2-text-2)] hover:bg-[var(--av2-bg)] hover:text-[var(--av2-text)]"
           }`}
           title={copied ? "Copied!" : "Copy link"}
         >

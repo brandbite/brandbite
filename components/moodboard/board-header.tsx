@@ -1,125 +1,128 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 type BoardHeaderProps = {
   title: string;
+  itemCount: number;
   onTitleChange: (title: string) => void;
-  projectName?: string;
   onBack: () => void;
   onDelete: () => void;
 };
 
+const CONTROL =
+  "flex h-11 shrink-0 items-center gap-2 rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] px-4 text-sm font-medium shadow-sm text-[var(--av2-text)] hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none";
+
 export function BoardHeader({
   title,
+  itemCount,
   onTitleChange,
-  projectName,
   onBack,
   onDelete,
 }: BoardHeaderProps) {
-  const [editing, setEditing] = useState(false);
-  const [editValue, setEditValue] = useState(title);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [value, setValue] = useState(title);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => setValue(title), [title]);
 
   useEffect(() => {
-    if (!editing) {
-      setEditValue(title);
-    }
-  }, [title, editing]);
-
-  useEffect(() => {
-    if (editing) {
-      inputRef.current?.focus();
-      inputRef.current?.select();
-    }
-  }, [editing]);
+    if (!menuOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [menuOpen]);
 
   function saveTitle() {
-    const trimmed = editValue.trim();
-    if (trimmed && trimmed !== title) {
-      onTitleChange(trimmed);
-    }
-    setEditing(false);
+    const trimmed = value.trim();
+    if (trimmed && trimmed !== title) onTitleChange(trimmed);
+    else setValue(title);
   }
 
   return (
-    <div className="flex items-center justify-between border-b border-[var(--bb-border-subtle)] bg-white/80 px-6 py-3 backdrop-blur-md">
-      {/* Left: back + breadcrumbs */}
-      <div className="flex min-w-0 items-center gap-3">
-        <button
-          type="button"
-          onClick={onBack}
-          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-[var(--bb-text-secondary)] transition-colors hover:bg-[var(--bb-bg-warm)] hover:text-[var(--bb-secondary)]"
-          aria-label="Go back"
+    <div className="pointer-events-none absolute inset-x-3 top-3 z-30 flex items-center gap-2 [&>*]:pointer-events-auto">
+      <button type="button" onClick={onBack} className={CONTROL}>
+        <span aria-hidden>←</span>
+        <span className="hidden sm:inline">Back to moodboards</span>
+        <span className="sr-only sm:hidden">Back to moodboards</span>
+      </button>
+
+      <label className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] px-4 shadow-sm focus-within:border-[var(--av2-accent)] md:w-64 md:flex-none">
+        <span className="sr-only">Moodboard title</span>
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={saveTitle}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+            if (e.key === "Escape") {
+              setValue(title);
+              // Skips the save in onBlur, since the value is back to the title.
+              requestAnimationFrame(() => (document.activeElement as HTMLElement)?.blur());
+            }
+          }}
+          className="w-full min-w-0 bg-transparent text-base font-semibold text-[var(--av2-text)] outline-none"
+        />
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 16 16"
+          fill="none"
+          aria-hidden
+          className="shrink-0"
         >
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <path
-              d="M11.25 4.5L6.75 9L11.25 13.5"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-
-        <nav className="hidden items-center gap-1.5 text-sm sm:flex">
-          <span className="text-[var(--bb-text-secondary)]">Moodboards</span>
-          {projectName && (
-            <>
-              <span className="text-[var(--bb-text-muted)]">/</span>
-              <span className="text-[var(--bb-text-secondary)]">{projectName}</span>
-            </>
-          )}
-          <span className="text-[var(--bb-text-muted)]">/</span>
-        </nav>
-      </div>
-
-      {/* Center: editable title */}
-      <div className="min-w-0 flex-1 px-4 text-center">
-        {editing ? (
-          <input
-            ref={inputRef}
-            type="text"
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-            onBlur={saveTitle}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") saveTitle();
-              if (e.key === "Escape") setEditing(false);
-            }}
-            className="mx-auto w-full max-w-md rounded-lg border border-[var(--bb-primary)] bg-white px-3 py-1.5 text-center text-sm font-semibold text-[var(--bb-secondary)] outline-none"
+          <path
+            d="M11 2.5l2.5 2.5L6 12.5l-3 .5.5-3L11 2.5z"
+            stroke="var(--av2-text-2)"
+            strokeWidth="1.25"
+            strokeLinejoin="round"
           />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            className="inline-block max-w-md truncate rounded-lg px-3 py-1.5 text-sm font-semibold text-[var(--bb-secondary)] transition-colors hover:bg-[var(--bb-bg-warm)]"
-            title="Click to edit title"
-          >
-            {title}
-          </button>
-        )}
-      </div>
+        </svg>
+      </label>
 
-      {/* Right: delete */}
-      <div className="flex-shrink-0">
+      <span className="hidden rounded-full border border-[var(--av2-border)] bg-[var(--av2-surface)] px-3 py-1 text-sm whitespace-nowrap text-[var(--av2-text-2)] tabular-nums sm:inline">
+        {itemCount} {itemCount === 1 ? "item" : "items"}
+      </span>
+
+      <div ref={menuRef} className="relative md:ml-auto">
         <button
           type="button"
-          onClick={onDelete}
-          className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-red-500 transition-colors hover:bg-red-50"
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((open) => !open)}
+          className={CONTROL}
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path
-              d="M3 4.5H13M5.5 4.5V3.5C5.5 2.94772 5.94772 2.5 6.5 2.5H9.5C10.0523 2.5 10.5 2.94772 10.5 3.5V4.5M6.5 7.5V11.5M9.5 7.5V11.5M4 4.5L4.5 13C4.5 13.5523 4.94772 14 5.5 14H10.5C11.0523 14 11.5 13.5523 11.5 13L12 4.5"
-              stroke="currentColor"
-              strokeWidth="1.25"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          <span className="hidden sm:inline">Delete</span>
+          <span aria-hidden>•••</span>
+          <span className="max-md:sr-only">More</span>
         </button>
+        {menuOpen && (
+          <div
+            role="menu"
+            className="absolute top-full right-0 z-40 mt-2 w-48 rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-1 shadow-lg"
+          >
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setMenuOpen(false);
+                onDelete();
+              }}
+              className="flex min-h-10 w-full items-center rounded-lg px-3 text-left text-sm font-medium text-[var(--av2-error-text)] hover:bg-[var(--av2-bg)]"
+            >
+              Delete moodboard
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

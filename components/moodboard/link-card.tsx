@@ -22,7 +22,7 @@ function DomainIcon({ domain }: { domain: string }) {
     .charAt(0)
     .toUpperCase();
   return (
-    <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-gray-200 text-[10px] font-bold text-gray-500">
+    <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-[var(--av2-border)] text-[10px] font-bold text-[var(--av2-text-2)]">
       {letter}
     </div>
   );
@@ -39,7 +39,7 @@ export function LinkCard({ data }: LinkCardProps) {
     <a href={data.url} target="_blank" rel="noopener noreferrer" className="block">
       {/* OG Image preview — hide entire container on error */}
       {data.image && !ogImageFailed && (
-        <div className="aspect-[2/1] overflow-hidden bg-gray-100">
+        <div className="aspect-[2/1] overflow-hidden bg-[var(--av2-bg)]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={data.image}
@@ -71,10 +71,10 @@ export function LinkCard({ data }: LinkCardProps) {
             />
           )}
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-[var(--bb-secondary)]">{data.title || domain}</p>
-            <p className="mt-0.5 truncate text-xs text-[var(--bb-text-secondary)]">{data.url}</p>
+            <p className="text-sm font-medium text-[var(--av2-text)]">{data.title || domain}</p>
+            <p className="mt-0.5 truncate text-xs text-[var(--av2-text-2)]">{data.url}</p>
             {data.description && (
-              <p className="mt-1 line-clamp-2 text-xs text-[var(--bb-text-secondary)]">
+              <p className="mt-1 line-clamp-2 text-xs text-[var(--av2-text-2)]">
                 {data.description}
               </p>
             )}

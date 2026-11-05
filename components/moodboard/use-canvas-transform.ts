@@ -1,283 +1,223 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+// -----------------------------------------------------------------------------
+// @file: components/moodboard/use-canvas-transform.ts
+// @purpose: Pan and zoom for the moodboard canvas. The transform lives in a ref
+//           and is written straight to the DOM once per frame, so moving the
+//           canvas doesn't re-render React. Only the zoom readout subscribes.
+// -----------------------------------------------------------------------------
+
+import { useCallback, useEffect, useMemo, useRef, type RefObject } from "react";
+
 import { CANVAS_DEFAULTS } from "@/lib/moodboard";
-import type { MoodboardItemClient } from "@/lib/moodboard";
 
-const { MIN_ZOOM, MAX_ZOOM, ZOOM_STEP } = CANVAS_DEFAULTS;
+import {
+  clampZoom,
+  fitTransform,
+  gridSpacing,
+  wheelDeltaPx,
+  wheelZoomFactor,
+  zoomAtPoint,
+  type CanvasRect,
+  type CanvasTransform,
+} from "./canvas-math";
 
-/** Padding (in canvas px) allowed beyond content edges when panning. */
-const PAN_PADDING = 100;
+const ANIMATION_MS = 180;
+/** Layer stays promoted this long after a gesture, then re-rasters so text is crisp. */
+const SETTLE_MS = 150;
 
-export type CanvasTransform = {
-  panX: number;
-  panY: number;
-  zoom: number;
-};
+export type CanvasController = ReturnType<typeof useCanvasTransform>;
 
 export function useCanvasTransform(
-  items: MoodboardItemClient[],
-  viewportRef: React.RefObject<HTMLDivElement | null>,
+  viewportRef: RefObject<HTMLDivElement | null>,
+  worldRef: RefObject<HTMLDivElement | null>,
+  gridRef: RefObject<HTMLDivElement | null>,
 ) {
-  const [transform, setTransform] = useState<CanvasTransform>({
-    panX: 0,
-    panY: 0,
-    zoom: 1,
-  });
+  const transformRef = useRef<CanvasTransform>({ panX: 0, panY: 0, zoom: 1 });
+  const frameRef = useRef<number | null>(null);
+  const animationRef = useRef<number | null>(null);
+  const settleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const zoomListeners = useRef(new Set<() => void>());
+  const shownZoom = useRef(1);
 
-  const isPanning = useRef(false);
-  const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
-  const spaceHeld = useRef(false);
+  const paint = useCallback(() => {
+    frameRef.current = null;
+    const { panX, panY, zoom } = transformRef.current;
 
-  // Keep a ref so callbacks always read latest items without re-creating
-  const itemsRef = useRef(items);
-  useEffect(() => {
-    itemsRef.current = items;
-  }, [items]);
+    const world = worldRef.current;
+    if (world) {
+      world.style.transform = `translate3d(${panX}px, ${panY}px, 0) scale(${zoom})`;
+      // Lets selection outlines and handles keep a constant size on screen.
+      world.style.setProperty("--mb-inverse-zoom", String(1 / zoom));
+    }
 
-  // -------------------------------------------------------------------------
-  // Pan clamping — keep content at least partially in view
-  // -------------------------------------------------------------------------
+    const grid = gridRef.current;
+    if (grid) {
+      const spacing = gridSpacing(zoom);
+      grid.style.backgroundSize = `${spacing}px ${spacing}px`;
+      grid.style.backgroundPosition = `${panX % spacing}px ${panY % spacing}px`;
+    }
 
-  const clampPan = useCallback(
-    (panX: number, panY: number, zoom: number) => {
-      const curItems = itemsRef.current;
-      const el = viewportRef.current;
-      if (curItems.length === 0 || !el) return { panX, panY };
+    if (shownZoom.current !== zoom) {
+      shownZoom.current = zoom;
+      zoomListeners.current.forEach((listener) => listener());
+    }
+  }, [worldRef, gridRef]);
 
-      const { width: vw, height: vh } = el.getBoundingClientRect();
+  const schedulePaint = useCallback(() => {
+    if (frameRef.current === null) frameRef.current = requestAnimationFrame(paint);
 
-      let cMinX = Infinity,
-        cMinY = Infinity,
-        cMaxX = -Infinity,
-        cMaxY = -Infinity;
-      for (const item of curItems) {
-        cMinX = Math.min(cMinX, item.x);
-        cMinY = Math.min(cMinY, item.y);
-        cMaxX = Math.max(cMaxX, item.x + item.width);
-        cMaxY = Math.max(cMaxY, item.y + (item.height || 200));
-      }
+    const world = worldRef.current;
+    if (!world) return;
+    world.style.willChange = "transform";
+    if (settleRef.current) clearTimeout(settleRef.current);
+    settleRef.current = setTimeout(() => {
+      world.style.willChange = "";
+    }, SETTLE_MS);
+  }, [paint, worldRef]);
 
-      // Visible canvas region:
-      //   left  = -panX / zoom          right  = (-panX + vw) / zoom
-      //   top   = -panY / zoom          bottom = (-panY + vh) / zoom
-      //
-      // Constraint: visible region must overlap content + padding
-      //   left  < cMaxX + pad   →  panX > -(cMaxX + pad) * zoom
-      //   right > cMinX - pad   →  panX < -(cMinX - pad) * zoom + vw
-      //   (same for Y)
-      const loPanX = -(cMaxX + PAN_PADDING) * zoom;
-      const hiPanX = -(cMinX - PAN_PADDING) * zoom + vw;
-      const loPanY = -(cMaxY + PAN_PADDING) * zoom;
-      const hiPanY = -(cMinY - PAN_PADDING) * zoom + vh;
+  const cancelAnimation = useCallback(() => {
+    if (animationRef.current !== null) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
+  }, []);
 
-      return {
-        panX: Math.max(loPanX, Math.min(hiPanX, panX)),
-        panY: Math.max(loPanY, Math.min(hiPanY, panY)),
-      };
+  /** Jump there now; a gesture owns the canvas from this point. */
+  const setTransform = useCallback(
+    (next: CanvasTransform) => {
+      cancelAnimation();
+      transformRef.current = next;
+      schedulePaint();
     },
-    [viewportRef],
+    [cancelAnimation, schedulePaint],
   );
 
-  /** setTransform wrapper that clamps pan values to content bounds. */
-  const setClampedTransform = useCallback(
-    (updater: (prev: CanvasTransform) => CanvasTransform) => {
-      setTransform((prev) => {
-        const next = updater(prev);
-        const { panX, panY } = clampPan(next.panX, next.panY, next.zoom);
-        return { ...next, panX, panY };
-      });
-    },
-    [clampPan],
-  );
-
-  // -------------------------------------------------------------------------
-  // Coordinate conversion
-  // -------------------------------------------------------------------------
-
-  /** Convert screen (viewport) coordinates to canvas (logical) coordinates */
-  const screenToCanvas = useCallback(
-    (screenX: number, screenY: number, viewportRect: DOMRect) => {
-      return {
-        x: (screenX - viewportRect.left - transform.panX) / transform.zoom,
-        y: (screenY - viewportRect.top - transform.panY) / transform.zoom,
-      };
-    },
-    [transform],
-  );
-
-  // -------------------------------------------------------------------------
-  // Zoom
-  // -------------------------------------------------------------------------
-
-  const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
-
-  const zoomIn = useCallback(() => {
-    setClampedTransform((t) => ({ ...t, zoom: clampZoom(t.zoom + ZOOM_STEP) }));
-  }, [setClampedTransform]);
-
-  const zoomOut = useCallback(() => {
-    setClampedTransform((t) => ({ ...t, zoom: clampZoom(t.zoom - ZOOM_STEP) }));
-  }, [setClampedTransform]);
-
-  const resetView = useCallback(() => {
-    // Reset zoom to 100% and clamp pan to keep content visible
-    setClampedTransform(() => ({ panX: 0, panY: 0, zoom: 1 }));
-  }, [setClampedTransform]);
-
-  /** Zoom centered on a specific point (e.g., cursor position) */
-  const zoomAtPoint = useCallback(
-    (delta: number, clientX: number, clientY: number, rect: DOMRect) => {
-      setClampedTransform((t) => {
-        const newZoom = clampZoom(t.zoom + delta);
-        if (newZoom === t.zoom) return t;
-
-        const pointX = clientX - rect.left;
-        const pointY = clientY - rect.top;
-
-        const scale = newZoom / t.zoom;
-        const newPanX = pointX - (pointX - t.panX) * scale;
-        const newPanY = pointY - (pointY - t.panY) * scale;
-
-        return { panX: newPanX, panY: newPanY, zoom: newZoom };
-      });
-    },
-    [setClampedTransform],
-  );
-
-  /** Fit all items into view (unclamped — this calculates perfect position) */
-  const fitToContent = useCallback(
-    (fitItems: MoodboardItemClient[], viewportWidth: number, viewportHeight: number) => {
-      if (fitItems.length === 0) {
-        setTransform({ panX: 0, panY: 0, zoom: 1 });
+  /** Ease there, for the buttons and shortcuts. */
+  const animateTo = useCallback(
+    (target: CanvasTransform) => {
+      cancelAnimation();
+      if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+        setTransform(target);
         return;
       }
 
-      let minX = Infinity,
-        minY = Infinity,
-        maxX = -Infinity,
-        maxY = -Infinity;
-      for (const item of fitItems) {
-        minX = Math.min(minX, item.x);
-        minY = Math.min(minY, item.y);
-        maxX = Math.max(maxX, item.x + item.width);
-        maxY = Math.max(maxY, item.y + (item.height || 200));
-      }
-
-      const contentW = maxX - minX;
-      const contentH = maxY - minY;
-      const padding = 60;
-
-      const scaleX = (viewportWidth - padding * 2) / contentW;
-      const scaleY = (viewportHeight - padding * 2) / contentH;
-      const zoom = clampZoom(Math.min(scaleX, scaleY, 1));
-
-      const panX = (viewportWidth - contentW * zoom) / 2 - minX * zoom;
-      const panY = (viewportHeight - contentH * zoom) / 2 - minY * zoom;
-
-      setTransform({ panX, panY, zoom });
-    },
-    [],
-  );
-
-  // -------------------------------------------------------------------------
-  // Wheel handler (zoom + pan)
-  // -------------------------------------------------------------------------
-
-  const onWheel = useCallback(
-    (e: React.WheelEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      const rect = e.currentTarget.getBoundingClientRect();
-
-      if (e.ctrlKey || e.metaKey) {
-        // Pinch-to-zoom / ctrl+scroll = zoom
-        const delta = -e.deltaY * 0.005;
-        zoomAtPoint(delta, e.clientX, e.clientY, rect);
-      } else {
-        // Regular scroll = pan (clamped)
-        setClampedTransform((t) => ({
-          ...t,
-          panX: t.panX - e.deltaX,
-          panY: t.panY - e.deltaY,
-        }));
-      }
-    },
-    [zoomAtPoint, setClampedTransform],
-  );
-
-  // -------------------------------------------------------------------------
-  // Pan via middle-click or space+drag
-  // -------------------------------------------------------------------------
-
-  const onPointerDown = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      // Middle mouse button OR space+left-click
-      if (e.button === 1 || (e.button === 0 && spaceHeld.current)) {
-        e.preventDefault();
-        isPanning.current = true;
-        panStart.current = {
-          x: e.clientX,
-          y: e.clientY,
-          panX: transform.panX,
-          panY: transform.panY,
+      const from = transformRef.current;
+      const started = performance.now();
+      const step = (now: number) => {
+        const t = Math.min(1, (now - started) / ANIMATION_MS);
+        const eased = 1 - Math.pow(1 - t, 3);
+        transformRef.current = {
+          panX: from.panX + (target.panX - from.panX) * eased,
+          panY: from.panY + (target.panY - from.panY) * eased,
+          // Interpolated in log space so the zoom speed looks constant.
+          zoom: from.zoom * Math.pow(target.zoom / from.zoom, eased),
         };
-        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+        schedulePaint();
+        animationRef.current = t < 1 ? requestAnimationFrame(step) : null;
+      };
+      animationRef.current = requestAnimationFrame(step);
+    },
+    [cancelAnimation, schedulePaint, setTransform],
+  );
+
+  const viewportSize = useCallback(() => {
+    const rect = viewportRef.current?.getBoundingClientRect();
+    return { width: rect?.width ?? 0, height: rect?.height ?? 0 };
+  }, [viewportRef]);
+
+  const zoomBy = useCallback(
+    (factor: number) => {
+      const { width, height } = viewportSize();
+      const current = transformRef.current;
+      animateTo(zoomAtPoint(current, clampZoom(current.zoom * factor), width / 2, height / 2));
+    },
+    [animateTo, viewportSize],
+  );
+
+  const controller = useMemo(
+    () => ({
+      getTransform: () => transformRef.current,
+      getZoom: () => shownZoom.current,
+      subscribeZoom: (listener: () => void) => {
+        zoomListeners.current.add(listener);
+        return () => {
+          zoomListeners.current.delete(listener);
+        };
+      },
+      setTransform,
+      animateTo,
+      zoomIn: () => zoomBy(CANVAS_DEFAULTS.ZOOM_STEP),
+      zoomOut: () => zoomBy(1 / CANVAS_DEFAULTS.ZOOM_STEP),
+      resetZoom: () => {
+        const { width, height } = viewportSize();
+        animateTo(zoomAtPoint(transformRef.current, 1, width / 2, height / 2));
+      },
+      fit: (rects: CanvasRect[], options: { animate?: boolean } = {}) => {
+        const { width, height } = viewportSize();
+        const target = fitTransform(rects, width, height);
+        if (options.animate) animateTo(target);
+        else setTransform(target);
+      },
+      /** The canvas point at the middle of what's on screen. */
+      viewCenter: () => {
+        const { width, height } = viewportSize();
+        const { panX, panY, zoom } = transformRef.current;
+        return { x: (width / 2 - panX) / zoom, y: (height / 2 - panY) / zoom };
+      },
+    }),
+    [animateTo, setTransform, viewportSize, zoomBy],
+  );
+
+  // React registers wheel listeners as passive, and a passive listener can't
+  // stop the browser zooming the whole page. This has to be a native listener.
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    const onWheel = (e: WheelEvent) => {
+      const target = e.target as HTMLElement;
+      const zooming = e.ctrlKey || e.metaKey;
+      // A focused text box keeps its own scrolling.
+      if (!zooming && target.tagName === "TEXTAREA" && document.activeElement === target) return;
+
+      e.preventDefault();
+      const dx = wheelDeltaPx(e.deltaX, e.deltaMode);
+      const dy = wheelDeltaPx(e.deltaY, e.deltaMode);
+      const current = transformRef.current;
+
+      if (zooming) {
+        const rect = viewport.getBoundingClientRect();
+        setTransform(
+          zoomAtPoint(
+            current,
+            current.zoom * wheelZoomFactor(dy),
+            e.clientX - rect.left,
+            e.clientY - rect.top,
+          ),
+        );
+      } else if (e.shiftKey && dx === 0) {
+        // Shift + wheel moves sideways on a mouse, which has no horizontal axis.
+        setTransform({ ...current, panX: current.panX - dy });
+      } else {
+        setTransform({ ...current, panX: current.panX - dx, panY: current.panY - dy });
       }
-    },
-    [transform.panX, transform.panY],
-  );
+    };
 
-  const onPointerMove = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      if (!isPanning.current) return;
-      const dx = e.clientX - panStart.current.x;
-      const dy = e.clientY - panStart.current.y;
-      setClampedTransform((t) => ({
-        ...t,
-        panX: panStart.current.panX + dx,
-        panY: panStart.current.panY + dy,
-      }));
-    },
-    [setClampedTransform],
-  );
+    viewport.addEventListener("wheel", onWheel, { passive: false });
+    return () => viewport.removeEventListener("wheel", onWheel);
+  }, [viewportRef, setTransform]);
 
-  const onPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (isPanning.current) {
-      isPanning.current = false;
-      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-    }
-  }, []);
+  useEffect(() => {
+    // Also repaints after an effect re-run, which cancels any frame still pending.
+    schedulePaint();
+    return () => {
+      if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+      cancelAnimation();
+      if (settleRef.current) clearTimeout(settleRef.current);
+    };
+  }, [schedulePaint, cancelAnimation]);
 
-  // -------------------------------------------------------------------------
-  // Space key tracking (for space+drag pan)
-  // -------------------------------------------------------------------------
-
-  const onKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.code === "Space" && !e.repeat) {
-      spaceHeld.current = true;
-    }
-  }, []);
-
-  const onKeyUp = useCallback((e: KeyboardEvent) => {
-    if (e.code === "Space") {
-      spaceHeld.current = false;
-    }
-  }, []);
-
-  return {
-    transform,
-    screenToCanvas,
-    zoomIn,
-    zoomOut,
-    resetView,
-    fitToContent,
-    onWheel,
-    onPointerDown,
-    onPointerMove,
-    onPointerUp,
-    onKeyDown,
-    onKeyUp,
-    isPanningRef: isPanning,
-    spaceHeldRef: spaceHeld,
-  };
+  return controller;
 }
