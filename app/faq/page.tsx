@@ -17,6 +17,7 @@ import { FaqAccordion } from "@/components/marketing/faq-accordion";
 import { HomeFooter } from "@/components/marketing/home-footer";
 import { HomeHeader } from "@/components/marketing/home-header";
 import { QuestionsBand } from "@/components/marketing/questions-band";
+import { CREATIVE_FAQ_CATEGORY } from "@/lib/faq/audience";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -36,7 +37,7 @@ export default async function FaqPage() {
   // Same query as /api/faq: active rows, grouped by category then manual
   // position — the order admins arrange at /admin/faq.
   const faqs = await prisma.faq.findMany({
-    where: { isActive: true },
+    where: { isActive: true, category: { not: CREATIVE_FAQ_CATEGORY } },
     orderBy: [{ category: "asc" }, { position: "asc" }],
     select: { id: true, question: true, answer: true },
   });
