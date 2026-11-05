@@ -75,6 +75,7 @@ type Options = {
   loadScore?: number;
   skills?: string[];
   failBalance?: boolean;
+  failExport?: boolean;
   failWithdrawals?: number;
   failPayoutTier?: boolean;
   portfolioItems?: unknown[];
@@ -89,6 +90,7 @@ function mockApi({
   loadScore = 72,
   skills = ["a"],
   failBalance = false,
+  failExport = false,
   failWithdrawals,
   failPayoutTier = false,
   portfolioItems = [],
@@ -102,6 +104,10 @@ function mockApi({
       if (init?.method === "DELETE") return Response.json({ success: true });
       if (failWithdrawals) return Response.json({ error: "Nope" }, { status: failWithdrawals });
       return Response.json({ stats: { ...WITHDRAWAL_STATS, ...stats }, withdrawals });
+    }
+    if (url.includes("/balance/export")) {
+      if (failExport) return Response.json({ error: "Export is down" }, { status: 500 });
+      return new Response("csv");
     }
     if (url.includes("/balance")) {
       if (failBalance) return Response.json({ error: "Balance is down" }, { status: 500 });
@@ -274,6 +280,34 @@ describe("Creative balance", () => {
     render(<CreativeBalancePage />);
     expect(await screen.findByText("No token movements yet.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Export CSV" })).toBeNull();
+  });
+
+  it("exports from the server with the type and search on screen", async () => {
+    const fetchMock = mockApi();
+    const createUrl = vi.fn(() => "blob:ledger");
+    Object.assign(URL, { createObjectURL: createUrl, revokeObjectURL: vi.fn() });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    render(<CreativeBalancePage />);
+    await screen.findByText(/Showing 1–1 of 1/);
+    fireEvent.click(screen.getByRole("button", { name: "Credits" }));
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "logo" } });
+    fireEvent.click(screen.getByRole("button", { name: "Export CSV" }));
+    await vi.waitFor(() => expect(click).toHaveBeenCalledOnce());
+    const url = fetchMock.mock.calls.map(([input]) => String(input)).at(-1)!;
+    expect(url).toContain("/api/creative/balance/export?");
+    expect(url).toContain("direction=CREDIT");
+    expect(url).toContain("q=logo");
+    expect(createUrl).toHaveBeenCalledOnce();
+  });
+
+  it("explains a failed export and keeps the activity on screen", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mockApi({ failExport: true });
+    render(<CreativeBalancePage />);
+    await screen.findByText(/Showing 1–1 of 1/);
+    fireEvent.click(screen.getByRole("button", { name: "Export CSV" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Export is down");
+    expect(screen.getByText(/Showing 1–1 of 1/)).toBeInTheDocument();
   });
 
   it("uses dashes, not zeros, when the balance can't load", async () => {

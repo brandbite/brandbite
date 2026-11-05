@@ -25,6 +25,13 @@ const CATEGORY_ORDER: Record<SupportRole, string[]> = {
   admin: ["Getting started", "Workspace", "Catalog", "Finance", "People", "Content", "System"],
 };
 
+/** Hand-picked for now: guide views aren't measured, so this isn't a usage ranking. */
+const POPULAR_SLUGS: Record<SupportRole, string[]> = {
+  customer: ["create-request", "review-and-approve", "tokens"],
+  creative: ["deliver-work", "handle-feedback", "withdrawals"],
+  admin: ["board-and-tickets", "companies", "withdrawals", "users"],
+};
+
 export function supportBasePath(role: SupportRole): string {
   return `/${role}/support`;
 }
@@ -39,6 +46,17 @@ export function getGuides(role: SupportRole, opts: { isSiteOwner?: boolean } = {
 
 export function getGuide(role: SupportRole, slug: string): SupportGuide | undefined {
   return GUIDES[role].find((g) => g.slug === slug);
+}
+
+/** The role's popular guides that the viewer can open, in the listed order. */
+export function popularGuides(
+  role: SupportRole,
+  opts: { isSiteOwner?: boolean } = {},
+): SupportGuide[] {
+  const visible = getGuides(role, opts);
+  return POPULAR_SLUGS[role]
+    .map((slug) => visible.find((g) => g.slug === slug))
+    .filter((g): g is SupportGuide => !!g);
 }
 
 /** Guides grouped by category, in the role's hub order. */

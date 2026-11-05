@@ -20,7 +20,14 @@ import {
   TabPanel,
   Tabs,
 } from "@/components/admin/v2/ui";
-import { getGuides, groupGuides, guideHref, searchGuides, type SupportGuide } from "@/lib/support";
+import {
+  getGuides,
+  groupGuides,
+  guideHref,
+  popularGuides,
+  searchGuides,
+  type SupportGuide,
+} from "@/lib/support";
 
 import { guideIcon, guideTone, type HelpRole, StillStuckText, toAnchor } from "./guide-meta";
 
@@ -65,6 +72,7 @@ function GuideGrid({ role, guides }: { role: HelpRole; guides: SupportGuide[] })
 export function SupportCenter({ role }: { role: HelpRole }) {
   const guides = useMemo(() => getGuides(role), [role]);
   const groups = useMemo(() => groupGuides(role, guides), [role, guides]);
+  const popular = useMemo(() => popularGuides(role), [role]);
   const [query, setQuery] = useState("");
   const [topic, setTopic] = useState(groups[0]?.category ?? "");
 
@@ -121,6 +129,10 @@ export function SupportCenter({ role }: { role: HelpRole }) {
         </section>
       ) : (
         <>
+          <section className="mb-8">
+            <h2 className="mb-3 text-lg font-semibold">Popular guides</h2>
+            <GuideGrid role={role} guides={popular} />
+          </section>
           <Tabs
             label="Support topics"
             idPrefix={ID_PREFIX}

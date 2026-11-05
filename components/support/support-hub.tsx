@@ -11,7 +11,14 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 
-import { getGuides, groupGuides, guideHref, searchGuides, type SupportRole } from "@/lib/support";
+import {
+  getGuides,
+  groupGuides,
+  guideHref,
+  popularGuides,
+  searchGuides,
+  type SupportRole,
+} from "@/lib/support";
 import { useSessionRole } from "@/lib/hooks/use-session-role";
 
 import { SupportScope } from "./support-ui";
@@ -36,6 +43,7 @@ export function SupportHub({ role }: { role: SupportRole }) {
   const results = useMemo(() => searchGuides(guides, query), [guides, query]);
   const searching = query.trim().length > 0;
   const groups = useMemo(() => groupGuides(role, guides), [role, guides]);
+  const popular = useMemo(() => popularGuides(role, { isSiteOwner }), [role, isSiteOwner]);
 
   return (
     <SupportScope role={role}>
@@ -77,6 +85,10 @@ export function SupportHub({ role }: { role: SupportRole }) {
         </section>
       ) : (
         <div className="space-y-8">
+          <section>
+            <h2 className="mb-3 text-lg font-bold tracking-tight">Popular guides</h2>
+            <GuideGrid role={role} guides={popular} />
+          </section>
           {groups.map((g) => (
             <section key={g.category}>
               <h2 className="mb-3 text-lg font-bold tracking-tight">{g.category}</h2>

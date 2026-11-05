@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import {
   findGuideForPath,
   getGuides,
+  popularGuides,
   primaryRoute,
   relatedGuides,
   searchGuides,
@@ -116,6 +117,18 @@ describe("relatedGuides", () => {
   it("resolves slugs to guides in order", () => {
     const guide = getGuides("customer").find((g) => g.slug === "getting-around")!;
     expect(relatedGuides("customer", guide).map((g) => g.slug)).toEqual(guide.related);
+  });
+});
+
+describe("popularGuides", () => {
+  it.each([
+    ["customer", ["create-request", "review-and-approve", "tokens"]],
+    ["creative", ["deliver-work", "handle-feedback", "withdrawals"]],
+    ["admin", ["board-and-tickets", "companies", "withdrawals", "users"]],
+  ] as const)("%s: lists its picks in order, for every viewer", (role, slugs) => {
+    // Without the owner flag, so a site admin gets the full list too and a renamed
+    // slug can't quietly drop out of it.
+    expect(popularGuides(role).map((g) => g.slug)).toEqual(slugs);
   });
 });
 

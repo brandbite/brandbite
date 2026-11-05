@@ -123,7 +123,8 @@ export function SplitView({ children, panel }: { children: ReactNode; panel?: Re
   return (
     <div
       className={cx(
-        "grid items-start gap-6",
+        // minmax(0,1fr): on phones the panel's content must not widen the page.
+        "grid grid-cols-[minmax(0,1fr)] items-start gap-6",
         panel && "xl:grid-cols-[minmax(0,1fr)_minmax(360px,420px)]",
       )}
     >
@@ -879,7 +880,8 @@ export function SaveBar({
 
 export function Table({ children, label }: { children: ReactNode; label?: string }) {
   return (
-    <div className="overflow-x-auto">
+    // relative: keeps sr-only header text inside this scroller, not the page's width.
+    <div className="relative overflow-x-auto">
       <table aria-label={label} className="w-full border-collapse text-left text-sm">
         {children}
       </table>

@@ -24,6 +24,15 @@ import {
 export type LedgerDirection = "CREDIT" | "DEBIT";
 export type WithdrawalStatus = "PENDING" | "APPROVED" | "REJECTED" | "PAID";
 
+export function downloadLedgerCsv(blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "token-ledger.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // ---------------------------------------------------------------------------
 // Formatting
 // ---------------------------------------------------------------------------
