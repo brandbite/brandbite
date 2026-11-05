@@ -336,6 +336,9 @@ model UserAccount {
   // /admin/feedback.
   submittedFeedback Feedback[] @relation("FeedbackSubmitter")
 
+  // "Was this helpful?" answers on Support guides.
+  guideVotes GuideVote[]
+
   // MFA challenges issued to this user (email-code second factor)
   mfaChallenges MfaChallenge[]
 
@@ -2661,4 +2664,28 @@ model PluginRelease {
 
   @@unique([product, version])
   @@index([product, releasedAt])
+}
+
+// -----------------------------------------------------------------------------
+// GuideVote: one "Was this helpful?" answer per person per Support guide. Guides
+// live in code (lib/support), so they're referenced by audience + slug; the same
+// slug can exist for two audiences, e.g. "withdrawals".
+// -----------------------------------------------------------------------------
+
+model GuideVote {
+  id String @id @default(cuid())
+
+  userId String
+  user   UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// The guide's audience: "customer", "creative" or "admin".
+  audience String
+  slug     String
+  helpful  Boolean
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, audience, slug])
+  @@index([audience, slug])
 }

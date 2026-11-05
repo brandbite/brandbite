@@ -9,6 +9,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 
+import { GuideVote } from "@/components/support/guide-vote";
 import type { GuideBlock, SupportGuide, SupportRole } from "@/lib/support";
 import { guideHref, primaryRoute, relatedGuides, supportBasePath } from "@/lib/support";
 
@@ -206,6 +207,10 @@ export function SupportGuideView({
             </div>
           </section>
         ))}
+      </div>
+
+      <div className="mt-12">
+        <GuideVote key={guide.slug} slug={guide.slug} />
       </div>
 
       {related.length > 0 && (

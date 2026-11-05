@@ -21,6 +21,7 @@ import {
   IconTile,
   PageHeader,
 } from "@/components/admin/v2/ui";
+import { GuideVote } from "@/components/support/guide-vote";
 import { RichText } from "@/components/support/support-ui";
 import {
   guideHref,
@@ -276,6 +277,8 @@ export function GuideView({ role, guide }: { role: HelpRole; guide: SupportGuide
               </div>
             </details>
           ))}
+
+          <GuideVote key={guide.slug} slug={guide.slug} />
         </div>
 
         <aside className="min-w-0 space-y-4 xl:sticky xl:top-24 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto">
