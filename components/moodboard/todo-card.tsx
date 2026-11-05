@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import type { TodoCardData, TodoItem } from "@/lib/moodboard";
+import { newClientId, type TodoCardData, type TodoItem } from "@/lib/moodboard";
 
 type TodoCardProps = {
   data: TodoCardData;
@@ -64,7 +64,7 @@ export function TodoCard({ data, onUpdate }: TodoCardProps) {
 
   function addItem() {
     const newItem: TodoItem = {
-      id: crypto.randomUUID(),
+      id: newClientId(),
       text: "",
       checked: false,
     };

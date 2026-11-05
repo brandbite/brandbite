@@ -18,11 +18,11 @@ export function CanvasControls({ canvas, hasItems, onFitToContent }: CanvasContr
   const zoom = useSyncExternalStore(canvas.subscribeZoom, canvas.getZoom, canvas.getZoom);
 
   return (
-    <div className="absolute right-4 bottom-14 z-20 flex items-center gap-1 rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-1 shadow-sm md:bottom-4">
+    <div className="absolute top-16 right-3 z-20 flex items-center gap-1 rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-1 shadow-sm">
       <button
         type="button"
         onClick={canvas.zoomOut}
-        className={`${BUTTON} w-10`}
+        className={`${BUTTON} w-10 max-md:hidden`}
         aria-label="Zoom out"
       >
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
@@ -42,7 +42,7 @@ export function CanvasControls({ canvas, hasItems, onFitToContent }: CanvasContr
       <button
         type="button"
         onClick={canvas.zoomIn}
-        className={`${BUTTON} w-10`}
+        className={`${BUTTON} w-10 max-md:hidden`}
         aria-label="Zoom in"
       >
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>

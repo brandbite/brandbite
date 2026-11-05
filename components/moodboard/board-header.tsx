@@ -11,7 +11,7 @@ type BoardHeaderProps = {
 };
 
 const CONTROL =
-  "flex h-11 items-center gap-2 rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] px-4 text-sm font-medium text-[var(--av2-text)] hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none";
+  "flex h-11 shrink-0 items-center gap-2 rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] px-4 text-sm font-medium shadow-sm text-[var(--av2-text)] hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none";
 
 export function BoardHeader({
   title,
@@ -49,14 +49,14 @@ export function BoardHeader({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
+    <div className="pointer-events-none absolute inset-x-3 top-3 z-30 flex items-center gap-2 [&>*]:pointer-events-auto">
       <button type="button" onClick={onBack} className={CONTROL}>
         <span aria-hidden>←</span>
         <span className="hidden sm:inline">Back to moodboards</span>
         <span className="sr-only sm:hidden">Back to moodboards</span>
       </button>
 
-      <label className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] px-4 focus-within:border-[var(--av2-accent)] sm:max-w-sm sm:flex-none">
+      <label className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] px-4 shadow-sm focus-within:border-[var(--av2-accent)] md:w-64 md:flex-none">
         <span className="sr-only">Moodboard title</span>
         <input
           type="text"
@@ -90,11 +90,11 @@ export function BoardHeader({
         </svg>
       </label>
 
-      <span className="rounded-full bg-[var(--av2-bg)] px-3 py-1 text-sm whitespace-nowrap text-[var(--av2-text-2)] tabular-nums">
+      <span className="hidden rounded-full border border-[var(--av2-border)] bg-[var(--av2-surface)] px-3 py-1 text-sm whitespace-nowrap text-[var(--av2-text-2)] tabular-nums sm:inline">
         {itemCount} {itemCount === 1 ? "item" : "items"}
       </span>
 
-      <div ref={menuRef} className="relative ml-auto">
+      <div ref={menuRef} className="relative md:ml-auto">
         <button
           type="button"
           aria-haspopup="menu"
@@ -103,7 +103,7 @@ export function BoardHeader({
           className={CONTROL}
         >
           <span aria-hidden>•••</span>
-          More
+          <span className="max-md:sr-only">More</span>
         </button>
         {menuOpen && (
           <div

@@ -98,12 +98,29 @@ function PreviewCell({ item }: { item: Record<string, unknown> }) {
     );
   }
 
+  if (type === "SHAPE" || type === "TEXT") {
+    const text = typeof item.text === "string" ? item.text : "";
+    return (
+      <div className="flex h-full w-full items-center justify-center overflow-hidden bg-[var(--av2-surface)] p-2.5">
+        <p className="line-clamp-3 text-center text-xs leading-4 break-words text-[var(--av2-text-2)]">
+          {text}
+        </p>
+      </div>
+    );
+  }
+
   if (type === "NOTE") {
     const title = typeof item.title === "string" ? item.title : "";
     const body = typeof item.body === "string" ? item.body : "";
+    const color = typeof item.color === "string" ? item.color : undefined;
     return (
-      <div className="h-full w-full overflow-hidden bg-[var(--av2-attention-from)] p-2.5">
-        <p className="line-clamp-3 text-xs leading-4 break-words text-[var(--av2-text-2)]">
+      <div
+        className={`h-full w-full overflow-hidden p-2.5 ${color ? "text-[#292827]" : "bg-[var(--av2-attention-from)]"}`}
+        style={color ? { backgroundColor: color } : undefined}
+      >
+        <p
+          className={`line-clamp-3 text-xs leading-4 break-words ${color ? "" : "text-[var(--av2-text-2)]"}`}
+        >
           {title || body || "Empty note"}
         </p>
       </div>

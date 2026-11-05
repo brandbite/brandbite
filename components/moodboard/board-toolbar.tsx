@@ -1,30 +1,51 @@
 "use client";
 
-import React from "react";
-import { DRAW_COLORS, DRAW_SIZES } from "@/lib/moodboard";
+import React, { useRef, useState } from "react";
+import {
+  DRAW_COLORS,
+  DRAW_SIZES,
+  STICKY_COLORS,
+  type PenKind,
+  type ShapeKind,
+} from "@/lib/moodboard";
 
-export type ToolMode = "select" | "arrow" | "draw" | "eraser";
+import { ShapeOutline } from "./shape-card";
+
+export type ToolMode = "select" | "hand" | "arrow" | "draw" | "eraser";
+
+export type CreatableKind =
+  | "note"
+  | "shape"
+  | "text"
+  | "color"
+  | "todo"
+  | "image"
+  | "link"
+  | "file"
+  | "video";
 
 type BoardToolbarProps = {
-  onAddNote: () => void;
-  onAddImage: () => void;
-  onAddColor: () => void;
-  onAddLink: () => void;
-  onAddFile: () => void;
-  onAddTodo: () => void;
-  onAddEmbed: () => void;
+  isPhone?: boolean;
+  moreOpen?: boolean;
+  onSetMoreOpen?: (open: boolean) => void;
+  /** Out of the way while the on-screen keyboard is open. */
+  hidden?: boolean;
   toolMode: ToolMode;
+  /** The object waiting to be placed with the next click on the canvas. */
+  placing: CreatableKind | null;
   onSetToolMode: (mode: ToolMode) => void;
+  /** Clicked or tapped in the dock. */
+  onPick: (kind: CreatableKind) => void;
+  /** Dragged out of the dock and let go at this point on screen. */
+  onDropAt: (kind: CreatableKind, clientX: number, clientY: number) => void;
+  penKind: PenKind;
   drawColor: string;
   drawSize: number;
+  shapeKind: ShapeKind;
+  onSetPenKind: (kind: PenKind) => void;
   onSetDrawColor: (color: string) => void;
   onSetDrawSize: (size: number) => void;
-};
-
-type ToolItem = {
-  label: string;
-  onClick: () => void;
-  icon: React.ReactNode;
+  onSetShapeKind: (kind: ShapeKind) => void;
 };
 
 function SelectIcon() {
@@ -214,11 +235,74 @@ function VideoIcon() {
   );
 }
 
-const TOOL_BUTTON =
-  "flex min-h-14 min-w-16 flex-col items-center justify-center gap-1 rounded-xl px-3 py-1.5 text-xs font-medium focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none";
+function HandIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <path
+        d="M6 10V4.5a1.25 1.25 0 012.5 0V9m0-.5V3.25a1.25 1.25 0 012.5 0V9m0-.5V4.25a1.25 1.25 0 012.5 0V10m0-3.5a1.25 1.25 0 012.5 0V12a6 6 0 01-6 6h-.8a5 5 0 01-3.9-1.9L3 12.2a1.3 1.3 0 012-1.6l1 1"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
-function toolClass(active: boolean) {
-  return `${TOOL_BUTTON} ${
+function HighlighterIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <path d="M3 17h14" stroke="currentColor" strokeWidth="3" strokeLinecap="round" opacity=".4" />
+      <path
+        d="M6 13l1-4 6-6 3 3-6 6-4 1z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function TextIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <path
+        d="M4 5V3.5h12V5M10 3.5v13M7.5 16.5h5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ShapeIcon({ kind }: { kind: ShapeKind }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      {kind === "rect" && (
+        <rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" />
+      )}
+      {kind === "ellipse" && (
+        <circle cx="10" cy="10" r="7.5" stroke="currentColor" strokeWidth="1.5" />
+      )}
+      {kind === "diamond" && (
+        <path
+          d="M10 2l8 8-8 8-8-8 8-8z"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+      )}
+    </svg>
+  );
+}
+
+const BUTTON =
+  "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none";
+
+function buttonClass(active: boolean) {
+  return `${BUTTON} ${
     active
       ? "bg-[var(--av2-selected)] text-[var(--av2-link)]"
       : "text-[var(--av2-text)] hover:bg-[var(--av2-bg)]"
@@ -226,141 +310,334 @@ function toolClass(active: boolean) {
 }
 
 function Divider() {
-  return <div aria-hidden className="mx-1 h-10 w-px shrink-0 self-center bg-[var(--av2-border)]" />;
+  return <div aria-hidden className="mx-1 h-7 w-px shrink-0 self-center bg-[var(--av2-border)]" />;
+}
+
+const DRAG_THRESHOLD = 4;
+
+const SHAPE_NAMES: Record<ShapeKind, string> = {
+  rect: "Square",
+  ellipse: "Circle",
+  diamond: "Diamond",
+};
+
+/** What follows the pointer while dragging out of the dock. */
+function DragGhost({ kind, shapeKind }: { kind: CreatableKind; shapeKind: ShapeKind }) {
+  if (kind === "note") {
+    return (
+      <div
+        className="h-32 w-32 rounded-[4px] shadow-lg"
+        style={{ backgroundColor: STICKY_COLORS[0] }}
+      />
+    );
+  }
+  if (kind === "shape") {
+    return (
+      <div className="relative h-28 w-28">
+        <ShapeOutline kind={shapeKind} fill="#FFFFFF" />
+      </div>
+    );
+  }
+  const labels: Partial<Record<CreatableKind, string>> = {
+    text: "Text",
+    color: "Color",
+    todo: "Checklist",
+    image: "Image",
+    link: "Link",
+    file: "File",
+    video: "Video",
+  };
+  return (
+    <div className="rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] px-4 py-3 text-sm font-medium text-[var(--av2-text)] shadow-lg">
+      {labels[kind]}
+    </div>
+  );
 }
 
 export function BoardToolbar({
-  onAddNote,
-  onAddImage,
-  onAddColor,
-  onAddLink,
-  onAddFile,
-  onAddTodo,
-  onAddEmbed,
+  isPhone = false,
+  moreOpen = false,
+  onSetMoreOpen,
+  hidden = false,
   toolMode,
+  placing,
   onSetToolMode,
+  onPick,
+  onDropAt,
+  penKind,
   drawColor,
   drawSize,
+  shapeKind,
+  onSetPenKind,
   onSetDrawColor,
   onSetDrawSize,
+  onSetShapeKind,
 }: BoardToolbarProps) {
-  const content: ToolItem[] = [
-    { label: "Note", onClick: onAddNote, icon: <NoteIcon /> },
-    { label: "Image", onClick: onAddImage, icon: <ImageIcon /> },
-    { label: "Color", onClick: onAddColor, icon: <ColorIcon /> },
-    { label: "Link", onClick: onAddLink, icon: <LinkIcon /> },
-    { label: "File", onClick: onAddFile, icon: <FileIcon /> },
-  ];
-  const lists: ToolItem[] = [
-    { label: "Checklist", onClick: onAddTodo, icon: <TodoIcon /> },
-    { label: "Video", onClick: onAddEmbed, icon: <VideoIcon /> },
-  ];
+  const [ghost, setGhost] = useState<{ kind: CreatableKind; x: number; y: number } | null>(null);
+  const justDragged = useRef(false);
 
-  const toggle = (mode: ToolMode) => onSetToolMode(toolMode === mode ? "select" : mode);
-  const add = (tool: ToolItem) => (
-    <button key={tool.label} type="button" onClick={tool.onClick} className={toolClass(false)}>
-      {tool.icon}
-      {tool.label}
+  const penOpen = toolMode === "draw" || toolMode === "eraser";
+
+  if (hidden) return null;
+
+  // Mouse only: on touch, a drag along the dock scrolls it, and a tap still works.
+  function startDrag(e: React.PointerEvent, kind: CreatableKind) {
+    // A drag dropped on the canvas sends no click to this button, so reset here.
+    justDragged.current = false;
+    if (e.pointerType === "touch" || e.button !== 0) return;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let dragging = false;
+
+    const onMove = (ev: PointerEvent) => {
+      if (!dragging && Math.hypot(ev.clientX - startX, ev.clientY - startY) < DRAG_THRESHOLD)
+        return;
+      dragging = true;
+      setGhost({ kind, x: ev.clientX, y: ev.clientY });
+    };
+    const onUp = (ev: PointerEvent) => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      setGhost(null);
+      if (!dragging) return;
+      justDragged.current = true;
+      onDropAt(kind, ev.clientX, ev.clientY);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }
+
+  function pick(kind: CreatableKind) {
+    // The click that ends a drag isn't a click on the button.
+    if (justDragged.current) {
+      justDragged.current = false;
+      return;
+    }
+    onPick(kind);
+  }
+
+  const creator = (
+    kind: CreatableKind,
+    label: string,
+    icon: React.ReactNode,
+    shortcut?: string,
+  ) => (
+    <button
+      key={kind}
+      type="button"
+      aria-label={label}
+      aria-pressed={placing === kind}
+      title={
+        shortcut ? `${label} (${shortcut}) · click to place, or drag` : `${label} · click or drag`
+      }
+      onPointerDown={(e) => startDrag(e, kind)}
+      onClick={() => pick(kind)}
+      className={buttonClass(placing === kind)}
+    >
+      {icon}
+    </button>
+  );
+
+  const tool = (mode: ToolMode, label: string, icon: React.ReactNode, shortcut: string) => (
+    <button
+      type="button"
+      aria-label={label}
+      aria-pressed={toolMode === mode && !placing}
+      title={`${label} (${shortcut})`}
+      onClick={() => onSetToolMode(mode)}
+      className={buttonClass(toolMode === mode && !placing)}
+    >
+      {icon}
     </button>
   );
 
   return (
-    <div className="relative rounded-2xl border border-[var(--av2-border)] bg-[var(--av2-surface)]">
+    <>
       <div
-        role="toolbar"
-        aria-label="Moodboard tools"
-        className="relative flex items-stretch gap-1 overflow-x-auto p-2 [scrollbar-width:none]"
+        data-mb-dock
+        className="absolute bottom-[calc(1rem+env(safe-area-inset-bottom))] left-1/2 z-30 flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 flex-col items-center gap-2"
       >
-        <button
-          type="button"
-          aria-pressed={toolMode === "select"}
-          onClick={() => onSetToolMode("select")}
-          className={toolClass(toolMode === "select")}
-          title="Select (V)"
+        {penOpen && (
+          <div className="flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-1 shadow-md">
+            <div role="group" aria-label="Pen type" className="flex items-center">
+              <button
+                type="button"
+                aria-label="Marker"
+                aria-pressed={toolMode === "draw" && penKind === "marker"}
+                title="Marker (M)"
+                onClick={() => {
+                  onSetPenKind("marker");
+                  onSetToolMode("draw");
+                }}
+                className={buttonClass(toolMode === "draw" && penKind === "marker")}
+              >
+                <DrawIcon />
+              </button>
+              <button
+                type="button"
+                aria-label="Highlighter"
+                aria-pressed={toolMode === "draw" && penKind === "highlighter"}
+                title="Highlighter"
+                onClick={() => {
+                  onSetPenKind("highlighter");
+                  onSetToolMode("draw");
+                }}
+                className={buttonClass(toolMode === "draw" && penKind === "highlighter")}
+              >
+                <HighlighterIcon />
+              </button>
+              <button
+                type="button"
+                aria-label="Eraser"
+                aria-pressed={toolMode === "eraser"}
+                title="Eraser (E)"
+                onClick={() => onSetToolMode("eraser")}
+                className={buttonClass(toolMode === "eraser")}
+              >
+                <EraserIcon />
+              </button>
+            </div>
+            <Divider />
+            <div role="group" aria-label="Pen color" className="flex items-center">
+              {DRAW_COLORS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  aria-pressed={drawColor === c}
+                  aria-label={`Color ${c}`}
+                  onClick={() => onSetDrawColor(c)}
+                  className="flex h-10 w-9 items-center justify-center rounded-lg hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
+                >
+                  <span
+                    className={`h-5 w-5 rounded-full ${drawColor === c ? "ring-2 ring-[var(--av2-accent)] ring-offset-2 ring-offset-[var(--av2-surface)]" : ""}`}
+                    style={{ backgroundColor: c }}
+                  />
+                </button>
+              ))}
+            </div>
+            <Divider />
+            <div role="group" aria-label="Pen size" className="flex items-center">
+              {DRAW_SIZES.map((size) => (
+                <button
+                  key={size}
+                  type="button"
+                  aria-pressed={drawSize === size}
+                  aria-label={`Size ${size}`}
+                  onClick={() => onSetDrawSize(size)}
+                  className={`flex h-10 w-9 items-center justify-center rounded-lg focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none ${
+                    drawSize === size ? "bg-[var(--av2-selected)]" : "hover:bg-[var(--av2-bg)]"
+                  }`}
+                >
+                  <span
+                    className="rounded-full"
+                    style={{ width: size + 3, height: size + 3, backgroundColor: drawColor }}
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {placing === "shape" && (
+          <div
+            role="group"
+            aria-label="Shape"
+            className="flex items-center rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-1 shadow-md"
+          >
+            {(Object.keys(SHAPE_NAMES) as ShapeKind[]).map((kind) => (
+              <button
+                key={kind}
+                type="button"
+                aria-label={SHAPE_NAMES[kind]}
+                aria-pressed={shapeKind === kind}
+                onClick={() => onSetShapeKind(kind)}
+                className={buttonClass(shapeKind === kind)}
+              >
+                <ShapeIcon kind={kind} />
+              </button>
+            ))}
+          </div>
+        )}
+
+        {isPhone && moreOpen && (
+          <div
+            role="group"
+            aria-label="More items"
+            className="flex max-w-full items-center gap-0.5 overflow-x-auto rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-1 shadow-md [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            onClick={() => onSetMoreOpen?.(false)}
+          >
+            {creator("image", "Image", <ImageIcon />)}
+            {creator("color", "Color", <ColorIcon />)}
+            {creator("todo", "Checklist", <TodoIcon />)}
+            {creator("link", "Link", <LinkIcon />)}
+            {creator("file", "File", <FileIcon />)}
+            {creator("video", "Video", <VideoIcon />)}
+          </div>
+        )}
+
+        <div
+          role="toolbar"
+          aria-label="Moodboard tools"
+          style={{ touchAction: "pan-x" }}
+          className="flex max-w-full items-center gap-0.5 overflow-x-auto rounded-2xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-1 shadow-lg [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
-          <SelectIcon />
-          Select
-        </button>
-        <Divider />
-        {content.map(add)}
-        <Divider />
-        {lists.map(add)}
-        <Divider />
-        <button
-          type="button"
-          aria-pressed={toolMode === "arrow"}
-          onClick={() => toggle("arrow")}
-          className={toolClass(toolMode === "arrow")}
-          title="Arrow (L)"
-        >
-          <ArrowIcon />
-          Arrow
-        </button>
-        <button
-          type="button"
-          aria-pressed={toolMode === "draw"}
-          onClick={() => toggle("draw")}
-          className={toolClass(toolMode === "draw")}
-          title="Draw (M)"
-        >
-          <DrawIcon />
-          Draw
-        </button>
-        <button
-          type="button"
-          aria-pressed={toolMode === "eraser"}
-          onClick={() => toggle("eraser")}
-          className={toolClass(toolMode === "eraser")}
-          title="Eraser (E)"
-        >
-          <EraserIcon />
-          Eraser
-        </button>
+          {tool("select", "Select", <SelectIcon />, "V")}
+          {!isPhone && tool("hand", "Hand", <HandIcon />, "H")}
+          {!isPhone && <Divider />}
+          <button
+            type="button"
+            aria-label="Marker"
+            aria-pressed={penOpen}
+            title="Marker (M)"
+            onClick={() => onSetToolMode(penOpen ? "select" : "draw")}
+            className={buttonClass(penOpen)}
+          >
+            <DrawIcon />
+          </button>
+          {creator("note", "Sticky note", <NoteIcon />, "S")}
+          {creator("shape", "Shape", <ShapeIcon kind={shapeKind} />, "R")}
+          {creator("text", "Text", <TextIcon />, "T")}
+          {tool("arrow", "Arrow", <ArrowIcon />, "L")}
+          {isPhone ? (
+            <button
+              type="button"
+              aria-label="More items"
+              aria-expanded={moreOpen}
+              onClick={() => onSetMoreOpen?.(!moreOpen)}
+              className={buttonClass(moreOpen)}
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden>
+                <path
+                  d="M10 4v12M4 10h12"
+                  stroke="currentColor"
+                  strokeWidth="1.75"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          ) : (
+            <>
+              <Divider />
+              {creator("image", "Image", <ImageIcon />)}
+              {creator("color", "Color", <ColorIcon />)}
+              {creator("todo", "Checklist", <TodoIcon />)}
+              {creator("link", "Link", <LinkIcon />)}
+              {creator("file", "File", <FileIcon />)}
+              {creator("video", "Video", <VideoIcon />)}
+            </>
+          )}
+        </div>
       </div>
 
-      {toolMode === "draw" && (
-        // Floats over the canvas: pushing it down would make every card jump.
-        <div className="absolute top-full left-2 z-30 mt-3 flex max-w-[calc(100%-1rem)] flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-1 shadow-sm">
-          <div role="group" aria-label="Pen color" className="flex items-center gap-1">
-            {DRAW_COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                aria-pressed={drawColor === c}
-                aria-label={`Color ${c}`}
-                onClick={() => onSetDrawColor(c)}
-                className="flex h-10 w-10 items-center justify-center rounded-lg hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
-              >
-                <span
-                  className={`h-6 w-6 rounded-full border-2 ${
-                    drawColor === c ? "border-[var(--av2-accent)]" : "border-[var(--av2-border)]"
-                  }`}
-                  style={{ backgroundColor: c }}
-                />
-              </button>
-            ))}
-          </div>
-          <div role="group" aria-label="Pen size" className="flex items-center gap-1">
-            {DRAW_SIZES.map((size) => (
-              <button
-                key={size}
-                type="button"
-                aria-pressed={drawSize === size}
-                aria-label={`${size} pixel stroke`}
-                onClick={() => onSetDrawSize(size)}
-                className={`flex h-10 w-10 items-center justify-center rounded-lg focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none ${
-                  drawSize === size ? "bg-[var(--av2-selected)]" : "hover:bg-[var(--av2-bg)]"
-                }`}
-              >
-                <span
-                  className="rounded-full"
-                  style={{ width: size + 2, height: size + 2, backgroundColor: drawColor }}
-                />
-              </button>
-            ))}
-          </div>
+      {ghost && (
+        <div
+          aria-hidden
+          className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-1/2 opacity-80"
+          style={{ left: ghost.x, top: ghost.y }}
+        >
+          <DragGhost kind={ghost.kind} shapeKind={shapeKind} />
         </div>
       )}
-    </div>
+    </>
   );
 }

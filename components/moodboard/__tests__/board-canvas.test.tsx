@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MoodboardConnection, MoodboardItemClient } from "@/lib/moodboard";
 
 import { BoardCanvas } from "../board-canvas";
+import type { CreatableKind, ToolMode } from "../board-toolbar";
 
 function note(id: string, body = `Body ${id}`, x = 100, y = 100): MoodboardItemClient {
   return {
@@ -18,10 +19,19 @@ function note(id: string, body = `Body ${id}`, x = 100, y = 100): MoodboardItemC
 }
 
 function setup(
-  overrides: { connections?: MoodboardConnection[]; items?: MoodboardItemClient[] } = {},
+  overrides: {
+    connections?: MoodboardConnection[];
+    items?: MoodboardItemClient[];
+    placing?: CreatableKind | null;
+    toolMode?: ToolMode;
+  } = {},
 ) {
   const handlers = {
     onSetToolMode: vi.fn(),
+    onPlace: vi.fn(),
+    onPick: vi.fn(),
+    onCancelPlacing: vi.fn(),
+    onRemoveEmpty: vi.fn(),
     onUpdateItem: vi.fn(),
     onDeleteItem: vi.fn(),
     onMoveItem: vi.fn(),
@@ -35,7 +45,9 @@ function setup(
     <BoardCanvas
       items={overrides.items ?? [note("a")]}
       connections={overrides.connections ?? []}
-      toolMode="select"
+      toolMode={overrides.toolMode ?? "select"}
+      placing={overrides.placing ?? null}
+      drawOpacity={1}
       drawColor="#000000"
       drawSize={4}
       {...handlers}
@@ -95,15 +107,15 @@ describe("BoardCanvas selection", () => {
   it("selects on the first click without opening the card", () => {
     setup();
     click(body());
-    expect(screen.getByRole("button", { name: "Delete Note" })).toBeInTheDocument();
-    expect(screen.queryByPlaceholderText("Write something...")).toBeNull();
+    expect(screen.getByRole("button", { name: "Delete Sticky note" })).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Note text" })).toBeNull();
   });
 
   it("opens the card for editing on a click once it's selected", () => {
     setup();
     click(body());
     click(body());
-    expect(screen.getByPlaceholderText("Write something...")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Note text" })).toBeInTheDocument();
   });
 
   it("clears the selection when pressing the empty canvas or Escape", () => {
@@ -111,11 +123,11 @@ describe("BoardCanvas selection", () => {
     click(body());
     press(screen.getByTestId("moodboard-viewport"));
     release(200, 200);
-    expect(screen.queryByRole("button", { name: "Delete Note" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Delete Sticky note" })).toBeNull();
 
     click(body());
     fireEvent.keyDown(window, { key: "Escape" });
-    expect(screen.queryByRole("button", { name: "Delete Note" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Delete Sticky note" })).toBeNull();
   });
 });
 
@@ -148,7 +160,7 @@ describe("BoardCanvas moving cards", () => {
     move(260, 230);
     release(260, 230);
     fireEvent.click(body());
-    expect(screen.queryByPlaceholderText("Write something...")).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "Note text" })).toBeNull();
   });
 
   it("leaves checkboxes working on the first click, without dragging", () => {
@@ -192,7 +204,7 @@ describe("BoardCanvas deleting", () => {
     expect(onDeleteItem).toHaveBeenCalledWith("a");
 
     click(body());
-    fireEvent.click(screen.getByRole("button", { name: "Delete Note" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete Sticky note" }));
     expect(onDeleteItem).toHaveBeenCalledTimes(2);
   });
 
@@ -203,7 +215,7 @@ describe("BoardCanvas deleting", () => {
 
     click(body());
     click(body());
-    fireEvent.keyDown(screen.getByPlaceholderText("Write something..."), { key: "Backspace" });
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Note text" }), { key: "Backspace" });
     expect(onDeleteItem).not.toHaveBeenCalled();
   });
 
@@ -239,7 +251,7 @@ describe("BoardCanvas keyboard", () => {
     onSetToolMode.mockClear();
     click(body());
     click(body());
-    fireEvent.keyDown(screen.getByPlaceholderText("Write something..."), { key: "l" });
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Note text" }), { key: "l" });
     expect(onSetToolMode).not.toHaveBeenCalled();
   });
 });
@@ -249,5 +261,202 @@ describe("BoardCanvas empty board", () => {
     setup({ items: [] });
     expect(screen.getByText("Your moodboard is empty")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Fit to content" })).toBeDisabled();
+  });
+});
+
+describe("BoardCanvas placing objects", () => {
+  it("places the picked object where the canvas is clicked", () => {
+    const { onPlace, onMoveItem } = setup({ placing: "note" });
+    press(screen.getByTestId("moodboard-viewport"), 300, 200);
+    release(300, 200);
+    expect(onPlace).toHaveBeenCalledTimes(1);
+    expect(onPlace.mock.calls[0][0]).toBe("note");
+    expect(onMoveItem).not.toHaveBeenCalled();
+  });
+
+  it("picks sticky, shape and text by letter", () => {
+    const { onPick } = setup();
+    fireEvent.keyDown(window, { key: "s" });
+    expect(onPick).toHaveBeenLastCalledWith("note");
+    fireEvent.keyDown(window, { key: "r" });
+    expect(onPick).toHaveBeenLastCalledWith("shape");
+    fireEvent.keyDown(window, { key: "t" });
+    expect(onPick).toHaveBeenLastCalledWith("text");
+  });
+
+  it("cancels placing with Escape", () => {
+    const { onCancelPlacing } = setup({ placing: "note" });
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onCancelPlacing).toHaveBeenCalled();
+  });
+});
+
+describe("BoardCanvas editing", () => {
+  it("opens the selected note with Enter, ready to type", () => {
+    setup();
+    click(body());
+    fireEvent.keyDown(window, { key: "Enter" });
+    expect(screen.getByRole("textbox", { name: "Note text" })).toHaveFocus();
+  });
+
+  it("changes a sticky's color from its toolbar, without opening it", () => {
+    const { onUpdateItem } = setup();
+    click(body());
+    fireEvent.click(screen.getByRole("button", { name: "Color #B9DCFF" }));
+    expect(onUpdateItem).toHaveBeenCalledWith("a", expect.objectContaining({ color: "#B9DCFF" }));
+    expect(screen.queryByRole("textbox", { name: "Note text" })).toBeNull();
+  });
+
+  it("types directly on a shape, and removes text left empty", () => {
+    const { onUpdateItem, onRemoveEmpty } = setup({
+      items: [
+        { ...note("s"), type: "SHAPE", data: { kind: "rect", text: "", fill: "#FFFFFF" } },
+        { ...note("t"), type: "TEXT", data: { text: "Hello" }, x: 600 },
+      ] as unknown as MoodboardItemClient[],
+    });
+
+    const shape = card("s").querySelector("svg")!;
+    click(shape);
+    click(shape);
+    const box = screen.getByRole("textbox", { name: "Shape text" });
+    fireEvent.change(box, { target: { value: "On the shape" } });
+    fireEvent.blur(box);
+    expect(onUpdateItem).toHaveBeenCalledWith(
+      "s",
+      expect.objectContaining({ text: "On the shape" }),
+    );
+
+    const text = screen.getByText("Hello");
+    click(text);
+    click(text);
+    const field = screen.getByRole("textbox", { name: "Text" });
+    fireEvent.change(field, { target: { value: "  " } });
+    fireEvent.blur(field);
+    expect(onRemoveEmpty).toHaveBeenCalledWith("t");
+  });
+});
+
+describe("BoardCanvas arrows from objects", () => {
+  function pullFromDot(side: string) {
+    click(body("a"));
+    const dot = card("a").querySelector(`[data-mb-connector="${side}"]`)!;
+    press(dot, 200, 200);
+  }
+
+  it("shows a connector on each side of the selected object", () => {
+    setup();
+    click(body());
+    expect(card().querySelectorAll("[data-mb-connector]")).toHaveLength(4);
+  });
+
+  it("keeps the toolbar's padding from covering the top connector", () => {
+    setup();
+    click(body());
+    const wrapper = card().querySelector("[data-mb-card-toolbar]")!;
+    expect(wrapper).toHaveClass("pointer-events-none");
+    expect(wrapper.firstElementChild).toHaveClass("pointer-events-auto");
+  });
+
+  it("connects when the arrow is dropped on another object", () => {
+    const { onAddConnection, onSetToolMode } = setup({
+      items: [note("a"), note("b", "Body b", 600, 100)],
+    });
+    pullFromDot("right");
+    document.elementFromPoint = vi.fn(() => body("b"));
+    move(500, 200);
+    release(500, 200);
+    expect(onAddConnection).toHaveBeenCalledWith("a", "b");
+    expect(onSetToolMode).toHaveBeenCalledWith("select");
+  });
+
+  it("does nothing when dropped on empty canvas or back on itself", () => {
+    const { onAddConnection } = setup({ items: [note("a"), note("b", "Body b", 600, 100)] });
+    pullFromDot("right");
+    document.elementFromPoint = vi.fn(() => screen.getByTestId("moodboard-viewport"));
+    move(500, 200);
+    release(500, 200);
+    expect(onAddConnection).not.toHaveBeenCalled();
+
+    pullFromDot("left");
+    document.elementFromPoint = vi.fn(() => body("a"));
+    move(210, 210);
+    release(210, 210);
+    expect(onAddConnection).not.toHaveBeenCalled();
+  });
+
+  it("connects two objects with two clicks using the Arrow tool", () => {
+    const { onAddConnection } = setup({
+      toolMode: "arrow",
+      items: [note("a"), note("b", "Body b", 600, 100)],
+    });
+    document.elementFromPoint = vi.fn(() => body("a"));
+    press(body("a"), 200, 200);
+    release(200, 200);
+    expect(onAddConnection).not.toHaveBeenCalled();
+
+    document.elementFromPoint = vi.fn(() => body("b"));
+    press(body("b"), 600, 200);
+    release(600, 200);
+    expect(onAddConnection).toHaveBeenCalledWith("a", "b");
+  });
+});
+
+describe("BoardCanvas eraser", () => {
+  const drawing = (id: string) =>
+    ({
+      id,
+      type: "DRAWING",
+      data: { pathData: "M 0 0 L 10 10", strokeColor: "#000000", strokeWidth: 4 },
+      x: 0,
+      y: 0,
+      width: 10,
+      height: 10,
+    }) as unknown as MoodboardItemClient;
+
+  const hitPath = (id: string) => document.querySelector(`[data-mb-drawing-id="${id}"]`)!;
+  const svgOf = (id: string) => hitPath(id).closest("svg")!;
+
+  function setupEraser() {
+    const view = setup({ toolMode: "eraser", items: [drawing("d1"), drawing("d2")] });
+    const svg = svgOf("d1");
+    svg.setPointerCapture = vi.fn();
+    svg.hasPointerCapture = vi.fn(() => true);
+    svg.releasePointerCapture = vi.fn();
+    return { ...view, svg };
+  }
+
+  it("erases what's under the press, with no hover first, as on a touch screen", () => {
+    const { onDeleteItem, svg } = setupEraser();
+    document.elementFromPoint = vi.fn(() => hitPath("d1"));
+    fireEvent.pointerDown(svg, { pointerId: 1, pointerType: "touch", clientX: 5, clientY: 5 });
+    expect(onDeleteItem).toHaveBeenCalledWith("d1");
+    expect(onDeleteItem).toHaveBeenCalledTimes(1);
+  });
+
+  it("erases each stroke a swipe crosses, once, including ones it jumps over", () => {
+    const { onDeleteItem, svg } = setupEraser();
+    document.elementFromPoint = vi.fn((x: number) => {
+      if (x < 30) return svg as unknown as Element;
+      if (x < 60) return hitPath("d1");
+      return hitPath("d2");
+    });
+    fireEvent.pointerDown(svg, { pointerId: 1, clientX: 0, clientY: 0 });
+    expect(onDeleteItem).not.toHaveBeenCalled();
+    fireEvent.pointerMove(svg, { pointerId: 1, clientX: 200, clientY: 0 });
+    expect(onDeleteItem.mock.calls.map((c) => c[0])).toEqual(["d1", "d2"]);
+  });
+
+  it("only points at strokes until pressed", () => {
+    const { onDeleteItem, svg } = setupEraser();
+    document.elementFromPoint = vi.fn(() => hitPath("d1"));
+    fireEvent.pointerMove(svg, { pointerId: 1, clientX: 5, clientY: 5 });
+    expect(onDeleteItem).not.toHaveBeenCalled();
+
+    fireEvent.pointerDown(svg, { pointerId: 1, clientX: 5, clientY: 5 });
+    fireEvent.pointerUp(svg, { pointerId: 1, clientX: 5, clientY: 5 });
+    onDeleteItem.mockClear();
+    document.elementFromPoint = vi.fn(() => hitPath("d2"));
+    fireEvent.pointerMove(svg, { pointerId: 1, clientX: 50, clientY: 5 });
+    expect(onDeleteItem).not.toHaveBeenCalled();
   });
 });

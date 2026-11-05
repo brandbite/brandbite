@@ -815,26 +815,36 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Use the toolbar above the canvas. New items appear in the middle of what you're looking at.",
+            text: "Everything is in the toolbar at the bottom of the canvas. Drag an item out of it and drop it where you want, or click it and then click the canvas. Notes, shapes and text are ready to type on straight away.",
+          },
+          {
+            type: "p",
+            text: "On a phone the board fills the screen. Tap an item in the toolbar and then tap the canvas. The **+** button holds images, colors, checklists, links, files and videos.",
           },
           {
             type: "list",
             items: [
-              { term: "Note", text: "a title and some text." },
+              { term: "Sticky note", text: "a colored note. Pick the color when it's selected." },
+              { term: "Shape", text: "a square, circle or diamond you can type on." },
+              { term: "Text", text: "free text with no box around it." },
               { term: "Image", text: "upload an image from your device (4 MB max)." },
-              { term: "Color", text: "a hex colour with an optional name, or a preset swatch." },
+              { term: "Color", text: "a color swatch. Click it twice to change the hex code." },
+              { term: "Checklist", text: "a list with as many items as you like." },
               {
                 term: "Link",
                 text: "paste a URL. Its title and description are filled in for you.",
               },
               { term: "File", text: "upload any file (4 MB max)." },
-              { term: "Checklist", text: "a checklist with as many items as you like." },
               { term: "Video", text: "paste a YouTube, Vimeo or Loom link." },
             ],
           },
           {
             type: "p",
-            text: "You can also **Draw** freehand, picking the colour and size under the toolbar, and connect two cards with an **Arrow**: click the first card, then the second.",
+            text: "The **Marker** opens its own options above the toolbar: marker, highlighter and eraser, with colors and sizes.",
+          },
+          {
+            type: "p",
+            text: "To connect two items, select one and drag a dot on its edge onto the other. The **Arrow** tool does the same: click the first item, then the second.",
           },
         ],
       },
@@ -844,15 +854,15 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           {
             type: "list",
             items: [
-              "Click a card to select it, and click it again to edit it. Double-clicking does both.",
-              "Drag a card from anywhere on it to move it. With a card selected, drag a corner to resize it or use the arrow keys to nudge it.",
-              "Scroll, drag the empty canvas, or hold **Space** and drag to move around. The canvas has no edges.",
+              "Click an item to select it. Click it again or press **Enter** to edit it. Double-clicking does both.",
+              "Drag an item from anywhere on it to move it. With an item selected, drag a corner to resize it or use the arrow keys to nudge it.",
+              "Scroll, drag the empty canvas, use the **Hand** tool, or hold **Space** and drag to move around. The canvas has no edges.",
               "**Ctrl** + scroll (**⌘** + scroll on a Mac) or pinch to zoom, or use the zoom buttons, including **Fit to content**.",
             ],
           },
           {
             type: "p",
-            text: "Shortcuts: **V** Select, **L** Arrow, **M** Draw, **E** Eraser, **Shift** + **1** fit to content, **Ctrl** + **0** back to 100%.",
+            text: "Shortcuts: **V** Select, **H** Hand, **S** Sticky note, **R** Shape, **T** Text, **L** Arrow, **M** Marker, **E** Eraser, **Shift** + **1** fit to content, **Ctrl** + **0** back to 100%.",
           },
         ],
       },

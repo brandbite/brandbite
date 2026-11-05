@@ -29,13 +29,18 @@ import { ImageCard } from "@/components/moodboard/image-card";
 import { LinkCard } from "@/components/moodboard/link-card";
 import { NoteCard } from "@/components/moodboard/note-card";
 import { TodoCard } from "@/components/moodboard/todo-card";
+import { ShapeCard } from "@/components/moodboard/shape-card";
+import { TextCard } from "@/components/moodboard/text-card";
 import { useCanvasTransform } from "@/components/moodboard/use-canvas-transform";
-import type { ToolMode } from "@/components/moodboard/board-toolbar";
+import type { CreatableKind, ToolMode } from "@/components/moodboard/board-toolbar";
 import type {
   DrawingCardData,
   MoodboardConnection,
   MoodboardItemClient,
   MoodboardItemData,
+  NoteCardData,
+  ShapeCardData,
+  ShapeKind,
 } from "@/lib/moodboard";
 import {
   CANVAS_DEFAULTS,
@@ -45,7 +50,11 @@ import {
   isImageData,
   isLinkData,
   isNoteData,
+  isShapeData,
+  isTextData,
   isTodoData,
+  SHAPE_FILLS,
+  STICKY_COLORS,
 } from "@/lib/moodboard";
 
 import { resizeFromCorner, zoomAtPoint, type CanvasRect } from "./canvas-math";
@@ -64,7 +73,9 @@ export type Selection = { kind: "card" | "drawing" | "connection"; id: string } 
 
 export type BoardCanvasHandle = {
   viewCenter: () => { x: number; y: number };
-  selectCard: (id: string) => void;
+  /** The canvas point under this spot on screen, or null if it's off the canvas. */
+  clientToCanvas: (clientX: number, clientY: number) => { x: number; y: number } | null;
+  selectCard: (id: string, options?: { edit?: boolean }) => void;
 };
 
 type BoardCanvasProps = {
@@ -73,8 +84,18 @@ type BoardCanvasProps = {
   toolMode: ToolMode;
   drawColor: string;
   drawSize: number;
+  drawOpacity: number;
+  placing: CreatableKind | null;
+  isPhone?: boolean;
+  keyboardOpen?: boolean;
+  /** Another row is using that spot above the toolbar. */
+  hideObjectToolbar?: boolean;
   handleRef?: React.RefObject<BoardCanvasHandle | null>;
   onSetToolMode: (mode: ToolMode) => void;
+  onPlace: (kind: CreatableKind, point: { x: number; y: number }) => void;
+  onPick: (kind: CreatableKind) => void;
+  onCancelPlacing: () => void;
+  onRemoveEmpty: (itemId: string) => void;
   onUpdateItem: (itemId: string, data: MoodboardItemData) => void;
   onDeleteItem: (itemId: string) => void;
   onMoveItem: (itemId: string, x: number, y: number) => void;
@@ -89,6 +110,14 @@ type BoardCanvasProps = {
 };
 
 type Gesture =
+  | {
+      kind: "connect";
+      pointerId: number;
+      sourceId: string;
+      startX: number;
+      startY: number;
+      moved: boolean;
+    }
   | { kind: "pan"; pointerId: number; startX: number; startY: number; panX: number; panY: number }
   | {
       kind: "pinch";
@@ -123,21 +152,111 @@ type Gesture =
 
 function CardContent({
   item,
+  editRequest,
   onUpdateItem,
+  onRemoveEmpty,
 }: {
   item: MoodboardItemClient;
+  editRequest: number;
   onUpdateItem: (id: string, data: MoodboardItemData) => void;
+  onRemoveEmpty: (id: string) => void;
 }) {
   const { id, type, data } = item;
   const update = (next: MoodboardItemData) => onUpdateItem(id, next);
 
-  if (isNoteData(type, data)) return <NoteCard data={data} onUpdate={update} />;
+  if (isNoteData(type, data)) {
+    return <NoteCard data={data} onUpdate={update} editRequest={editRequest} />;
+  }
+  if (isShapeData(type, data)) {
+    return <ShapeCard data={data} onUpdate={update} editRequest={editRequest} />;
+  }
+  if (isTextData(type, data)) {
+    return (
+      <TextCard
+        data={data}
+        onUpdate={update}
+        onEmpty={() => onRemoveEmpty(id)}
+        editRequest={editRequest}
+      />
+    );
+  }
   if (isImageData(type, data)) return <ImageCard data={data} onUpdate={update} />;
   if (isColorData(type, data)) return <ColorCard data={data} onUpdate={update} />;
   if (isLinkData(type, data)) return <LinkCard data={data} />;
   if (isFileData(type, data)) return <FileCard data={data} />;
   if (isTodoData(type, data)) return <TodoCard data={data} onUpdate={update} />;
   if (isEmbedData(type, data)) return <EmbedCard data={data} />;
+  return null;
+}
+
+/** Color and shape controls in the selected object's floating toolbar. */
+function ObjectControls({
+  item,
+  onUpdateItem,
+}: {
+  item: MoodboardItemClient;
+  onUpdateItem: (id: string, data: MoodboardItemData) => void;
+}) {
+  const swatch = (color: string, active: boolean, onClick: () => void) => (
+    <button
+      key={color}
+      type="button"
+      aria-label={`Color ${color}`}
+      aria-pressed={active}
+      onClick={onClick}
+      className="flex h-9 w-8 items-center justify-center rounded-lg hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
+    >
+      <span
+        className={`h-5 w-5 rounded-full border border-black/10 ${active ? "ring-2 ring-[var(--av2-accent)] ring-offset-1 ring-offset-[var(--av2-surface)]" : ""}`}
+        style={{ backgroundColor: color }}
+      />
+    </button>
+  );
+
+  if (isNoteData(item.type, item.data)) {
+    const data: NoteCardData = item.data;
+    const current = data.color ?? STICKY_COLORS[0];
+    return (
+      <>
+        {STICKY_COLORS.map((c) =>
+          swatch(c, c === current, () => onUpdateItem(item.id, { ...data, color: c })),
+        )}
+      </>
+    );
+  }
+
+  if (isShapeData(item.type, item.data)) {
+    const data: ShapeCardData = item.data;
+    const kinds: { kind: ShapeKind; label: string }[] = [
+      { kind: "rect", label: "Square" },
+      { kind: "ellipse", label: "Circle" },
+      { kind: "diamond", label: "Diamond" },
+    ];
+    return (
+      <>
+        {SHAPE_FILLS.map((c) =>
+          swatch(c, c === data.fill, () => onUpdateItem(item.id, { ...data, fill: c })),
+        )}
+        <div aria-hidden className="mx-1 h-5 w-px bg-[var(--av2-border)]" />
+        {kinds.map(({ kind, label }) => (
+          <button
+            key={kind}
+            type="button"
+            aria-pressed={data.kind === kind}
+            onClick={() => onUpdateItem(item.id, { ...data, kind })}
+            className={`flex h-9 items-center rounded-lg px-2 text-sm font-medium focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none ${
+              data.kind === kind
+                ? "bg-[var(--av2-selected)] text-[var(--av2-link)]"
+                : "text-[var(--av2-text)] hover:bg-[var(--av2-bg)]"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </>
+    );
+  }
+
   return null;
 }
 
@@ -151,13 +270,17 @@ function isTyping(target: EventTarget | null) {
 
 function cardLabel(item: MoodboardItemClient) {
   const names: Record<string, string> = {
-    NOTE: "Note",
+    NOTE: "Sticky note",
+    SHAPE: "Shape",
+    TEXT: "Text",
     IMAGE: "Image",
     COLOR: "Color",
     LINK: "Link",
+    FILE: "File",
+    TODO: "Checklist",
+    EMBED: "Video",
   };
-  const extra: Record<string, string> = { FILE: "File", TODO: "Checklist", EMBED: "Video" };
-  return names[item.type] ?? extra[item.type] ?? "Card";
+  return names[item.type] ?? "Card";
 }
 
 export function BoardCanvas({
@@ -166,8 +289,17 @@ export function BoardCanvas({
   toolMode,
   drawColor,
   drawSize,
+  drawOpacity,
+  placing,
+  isPhone = false,
+  keyboardOpen = false,
+  hideObjectToolbar = false,
   handleRef,
   onSetToolMode,
+  onPlace,
+  onPick,
+  onCancelPlacing,
+  onRemoveEmpty,
   onUpdateItem,
   onDeleteItem,
   onMoveItem,
@@ -187,6 +319,8 @@ export function BoardCanvas({
   const [selection, setSelection] = useState<Selection>(null);
   const [arrowSourceId, setArrowSourceId] = useState<string | null>(null);
   const [pendingTarget, setPendingTarget] = useState<{ x: number; y: number } | null>(null);
+  const [pendingTargetId, setPendingTargetId] = useState<string | null>(null);
+  const [editRequest, setEditRequest] = useState<{ id: string; nonce: number } | null>(null);
   const [prevToolMode, setPrevToolMode] = useState(toolMode);
   const [measuredHeights, setMeasuredHeights] = useState<Map<string, number>>(new Map());
 
@@ -196,7 +330,14 @@ export function BoardCanvas({
     items,
     selection,
     toolMode,
+    placing,
+    arrowSourceId,
     onSetToolMode,
+    onPlace,
+    onPick,
+    onCancelPlacing,
+    onAddConnection,
+    onRemoveEmpty,
     onUpdateItem,
     onDeleteItem,
     onMoveItem,
@@ -209,7 +350,14 @@ export function BoardCanvas({
       items,
       selection,
       toolMode,
+      placing,
+      arrowSourceId,
       onSetToolMode,
+      onPlace,
+      onPick,
+      onCancelPlacing,
+      onAddConnection,
+      onRemoveEmpty,
       onUpdateItem,
       onDeleteItem,
       onMoveItem,
@@ -223,6 +371,10 @@ export function BoardCanvas({
     (id: string, data: MoodboardItemData) => latest.current.onUpdateItem(id, data),
     [],
   );
+  const removeEmpty = useCallback((id: string) => {
+    latest.current.onRemoveEmpty(id);
+    setSelection(null);
+  }, []);
   const deleteCard = useCallback((id: string) => {
     latest.current.onDeleteItem(id);
     setSelection(null);
@@ -279,9 +431,28 @@ export function BoardCanvas({
     if (toolMode !== "arrow") {
       setArrowSourceId(null);
       setPendingTarget(null);
+      setPendingTargetId(null);
     }
     if (toolMode !== "select") setSelection(null);
   }
+
+  useEffect(() => {
+    if (!keyboardOpen || selection?.kind !== "card") return;
+    const frame = requestAnimationFrame(() => {
+      const viewport = viewportRef.current?.getBoundingClientRect();
+      const card = viewportRef.current
+        ?.querySelector(`[data-mb-card-id="${selection.id}"]`)
+        ?.getBoundingClientRect();
+      if (!viewport || !card) return;
+      // Up far enough to clear the keyboard, but never under the floating header.
+      const overflow = card.bottom - viewport.bottom + 16;
+      if (overflow <= 0) return;
+      const shift = Math.max(-overflow, viewport.top + 72 - card.top);
+      const current = canvas.getTransform();
+      if (shift) canvas.animateTo({ ...current, panY: current.panY + shift });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [keyboardOpen, selection, canvas]);
 
   // Fit once, on opening. This is a passive effect because the page sets the
   // canvas height in its own layout effect, which runs after a child's. A board
@@ -300,9 +471,24 @@ export function BoardCanvas({
     if (!handleRef) return;
     handleRef.current = {
       viewCenter: canvas.viewCenter,
-      selectCard: (id) => {
+      clientToCanvas: (clientX, clientY) => {
+        const rect = viewportRef.current?.getBoundingClientRect();
+        if (
+          !rect ||
+          clientX < rect.left ||
+          clientX > rect.right ||
+          clientY < rect.top ||
+          clientY > rect.bottom
+        ) {
+          return null;
+        }
+        const { panX, panY, zoom } = canvas.getTransform();
+        return { x: (clientX - rect.left - panX) / zoom, y: (clientY - rect.top - panY) / zoom };
+      },
+      selectCard: (id, options) => {
         onSetToolMode("select");
         setSelection({ kind: "card", id });
+        if (options?.edit) setEditRequest({ id, nonce: Date.now() });
       },
     };
     return () => {
@@ -326,7 +512,9 @@ export function BoardCanvas({
 
   const idleCursor = useCallback(() => {
     if (spaceHeld.current) return "grab";
+    if (latest.current.placing) return "crosshair";
     const mode = latest.current.toolMode;
+    if (mode === "hand") return "grab";
     if (mode === "arrow" || mode === "draw") return "crosshair";
     if (mode === "eraser") return "none";
     return "default";
@@ -334,7 +522,7 @@ export function BoardCanvas({
 
   useEffect(() => {
     setCursor(idleCursor());
-  }, [toolMode, setCursor, idleCursor]);
+  }, [toolMode, placing, setCursor, idleCursor]);
 
   const startPan = useCallback(
     (e: React.PointerEvent) => {
@@ -402,10 +590,60 @@ export function BoardCanvas({
     const target = e.target as Element;
     const mode = latest.current.toolMode;
 
+    if (target.closest("[data-mb-canvas-ui], [data-mb-card-toolbar]")) return;
+
+    const placingKind = latest.current.placing;
+    if (placingKind) {
+      const rect = viewportRef.current!.getBoundingClientRect();
+      const { panX, panY, zoom } = canvas.getTransform();
+      latest.current.onPlace(placingKind, {
+        x: (e.clientX - rect.left - panX) / zoom,
+        y: (e.clientY - rect.top - panY) / zoom,
+      });
+      suppressClick.current = true;
+      return;
+    }
+
+    if (mode === "hand") {
+      startPan(e);
+      setCursor("grabbing");
+      return;
+    }
+
     const cardEl = target.closest<HTMLElement>("[data-mb-card-id]");
 
+    const beginConnect = (sourceId: string) => {
+      suppressClick.current = true;
+      setArrowSourceId(sourceId);
+      gesture.current = {
+        kind: "connect",
+        pointerId: e.pointerId,
+        sourceId,
+        startX: e.clientX,
+        startY: e.clientY,
+        moved: false,
+      };
+    };
+
+    // Pulling a dot on a selected object's edge starts an arrow from it.
+    const connector = target.closest("[data-mb-connector]");
+    if (connector && cardEl?.dataset.mbCardId) {
+      e.stopPropagation();
+      beginConnect(cardEl.dataset.mbCardId);
+      return;
+    }
+
+    if (mode === "arrow" && cardEl?.dataset.mbCardId) {
+      beginConnect(latest.current.arrowSourceId ?? cardEl.dataset.mbCardId);
+      return;
+    }
+
     if (!cardEl) {
-      if (target.closest("[data-mb-canvas-ui]")) return;
+      if (mode === "arrow") {
+        setArrowSourceId(null);
+        setPendingTarget(null);
+        setPendingTargetId(null);
+      }
       setSelection(null);
       (document.activeElement as HTMLElement | null)?.blur?.();
       startPan(e);
@@ -464,12 +702,38 @@ export function BoardCanvas({
 
   // Writes the latest pointer state to the DOM, at most once per frame.
   const pointer = useRef({ x: 0, y: 0 });
+  /** The object under this spot on screen, other than the arrow's own source. */
+  const objectAt = useCallback((clientX: number, clientY: number, sourceId: string | null) => {
+    const el = document.elementFromPoint(clientX, clientY);
+    const id = el?.closest<HTMLElement>("[data-mb-card-id]")?.dataset.mbCardId ?? null;
+    return id && id !== sourceId ? id : null;
+  }, []);
+
+  const updatePendingArrow = useCallback(
+    (clientX: number, clientY: number, sourceId: string) => {
+      if (!viewportRef.current) return;
+      const rect = viewportRef.current.getBoundingClientRect();
+      const { panX, panY, zoom } = canvas.getTransform();
+      setPendingTarget({
+        x: (clientX - rect.left - panX) / zoom,
+        y: (clientY - rect.top - panY) / zoom,
+      });
+      setPendingTargetId(objectAt(clientX, clientY, sourceId));
+    },
+    [canvas, objectAt],
+  );
+
   const paintGesture = useCallback(() => {
     frame.current = null;
     const g = gesture.current;
     if (!g) return;
     const { x, y } = pointer.current;
     const { zoom } = canvas.getTransform();
+
+    if (g.kind === "connect") {
+      updatePendingArrow(x, y, g.sourceId);
+      return;
+    }
 
     if (g.kind === "pan") {
       canvas.setTransform({
@@ -498,7 +762,7 @@ export function BoardCanvas({
       g.el.style.height = `${next.height}px`;
       overrides.set({ id: g.id, x: next.x, y: next.y, width: next.width, height: next.height });
     }
-  }, [canvas, overrides]);
+  }, [canvas, overrides, updatePendingArrow]);
 
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
@@ -536,6 +800,11 @@ export function BoardCanvas({
 
       if (e.pointerId !== g.pointerId) return;
       pointer.current = { x: e.clientX, y: e.clientY };
+
+      if (g.kind === "connect" && !g.moved) {
+        if (Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < DRAG_THRESHOLD) return;
+        g.moved = true;
+      }
 
       if (g.kind === "card" && !g.moved) {
         if (Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < DRAG_THRESHOLD) return;
@@ -576,6 +845,25 @@ export function BoardCanvas({
         gesture.current = g;
         cancelCardGesture();
         gesture.current = null;
+        return;
+      }
+
+      if (g.kind === "connect") {
+        const targetId = objectAt(e.clientX, e.clientY, g.sourceId);
+        if (targetId) {
+          latest.current.onAddConnection(g.sourceId, targetId);
+          setArrowSourceId(null);
+          setPendingTarget(null);
+          setPendingTargetId(null);
+          latest.current.onSetToolMode("select");
+        } else if (!g.moved && latest.current.toolMode === "arrow") {
+          // A click with the Arrow tool picks the start; the next click picks the end.
+          updatePendingArrow(e.clientX, e.clientY, g.sourceId);
+        } else {
+          setArrowSourceId(null);
+          setPendingTarget(null);
+          setPendingTargetId(null);
+        }
         return;
       }
 
@@ -625,7 +913,16 @@ export function BoardCanvas({
       window.removeEventListener("pointerup", onEnd);
       window.removeEventListener("pointercancel", onEnd);
     };
-  }, [canvas, cancelCardGesture, idleCursor, overrides, paintGesture, setCursor]);
+  }, [
+    canvas,
+    cancelCardGesture,
+    idleCursor,
+    objectAt,
+    overrides,
+    paintGesture,
+    setCursor,
+    updatePendingArrow,
+  ]);
 
   // Swallows the click that ends a drag, or the first click that only selects.
   const onClickCapture = (e: React.MouseEvent) => {
@@ -684,10 +981,18 @@ export function BoardCanvas({
 
       const current = latest.current.selection;
 
+      if (e.key === "Enter" && current?.kind === "card") {
+        e.preventDefault();
+        setEditRequest({ id: current.id, nonce: Date.now() });
+        return;
+      }
+
       if (e.key === "Escape") {
         setSelection(null);
         setArrowSourceId(null);
         setPendingTarget(null);
+        setPendingTargetId(null);
+        latest.current.onCancelPlacing();
         if (latest.current.toolMode !== "select") latest.current.onSetToolMode("select");
         return;
       }
@@ -712,9 +1017,21 @@ export function BoardCanvas({
       }
 
       if (mod || e.altKey) return;
-      const tools: Record<string, ToolMode> = { v: "select", l: "arrow", m: "draw", e: "eraser" };
-      const tool = tools[e.key.toLowerCase()];
-      if (tool) latest.current.onSetToolMode(tool);
+      const key = e.key.toLowerCase();
+      const tools: Record<string, ToolMode> = {
+        v: "select",
+        h: "hand",
+        l: "arrow",
+        m: "draw",
+        e: "eraser",
+      };
+      const creators: Record<string, CreatableKind> = { s: "note", r: "shape", t: "text" };
+      if (tools[key]) {
+        latest.current.onCancelPlacing();
+        latest.current.onSetToolMode(tools[key]);
+      } else if (creators[key]) {
+        latest.current.onPick(creators[key]);
+      }
     };
 
     const onKeyUp = (e: KeyboardEvent) => {
@@ -736,24 +1053,10 @@ export function BoardCanvas({
   // ---------------------------------------------------------------------------
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (toolMode !== "arrow" || !arrowSourceId || !viewportRef.current) return;
-    const rect = viewportRef.current.getBoundingClientRect();
-    const { panX, panY, zoom } = canvas.getTransform();
-    setPendingTarget({
-      x: (e.clientX - rect.left - panX) / zoom,
-      y: (e.clientY - rect.top - panY) / zoom,
-    });
+    // Only between the two clicks; while dragging, the gesture handles this.
+    if (toolMode !== "arrow" || !arrowSourceId || gesture.current) return;
+    updatePendingArrow(e.clientX, e.clientY, arrowSourceId);
   };
-
-  function handleArrowCardClick(itemId: string) {
-    if (!arrowSourceId) {
-      setArrowSourceId(itemId);
-    } else if (arrowSourceId !== itemId) {
-      onAddConnection(arrowSourceId, itemId);
-      setArrowSourceId(null);
-      setPendingTarget(null);
-    }
-  }
 
   const handleFit = useCallback(() => {
     canvas.fit(latest.current.items, { animate: true });
@@ -791,7 +1094,11 @@ export function BoardCanvas({
     <div
       ref={viewportRef}
       data-testid="moodboard-viewport"
-      className="relative min-h-0 flex-1 overflow-hidden rounded-2xl border border-[var(--av2-border)] bg-[var(--av2-surface)] select-none [&_input]:select-text [&_textarea]:select-text"
+      className={`relative min-h-0 flex-1 overflow-hidden bg-[var(--av2-surface)] select-none [&_input]:select-text [&_textarea]:select-text ${
+        isPhone
+          ? "[&_input]:text-base! [&_textarea]:text-base!"
+          : "rounded-2xl border border-[var(--av2-border)]"
+      }`}
       style={{ touchAction: "none" }}
       onPointerDownCapture={onPointerDownCapture}
       onPointerDown={onPointerDown}
@@ -824,11 +1131,23 @@ export function BoardCanvas({
             width={item.width}
             height={item.height}
             selected={selection?.kind === "card" && selection.id === item.id}
+            bare={item.type === "NOTE" || item.type === "SHAPE" || item.type === "TEXT"}
             label={cardLabel(item)}
             registerCard={registerCard}
+            toolbar={
+              selection?.kind === "card" && selection.id === item.id ? (
+                <ObjectControls item={item} onUpdateItem={updateItem} />
+              ) : undefined
+            }
+            hideToolbar={isPhone}
             onDelete={deleteCard}
           >
-            <MemoCardContent item={item} onUpdateItem={updateItem} />
+            <MemoCardContent
+              item={item}
+              editRequest={editRequest?.id === item.id ? editRequest.nonce : 0}
+              onUpdateItem={updateItem}
+              onRemoveEmpty={removeEmpty}
+            />
           </CardWrapper>
         ))}
 
@@ -838,6 +1157,7 @@ export function BoardCanvas({
           eraserActive={toolMode === "eraser"}
           strokeColor={drawColor}
           strokeWidth={drawSize}
+          strokeOpacity={drawOpacity}
           getTransform={canvas.getTransform}
           viewportRef={viewportRef}
           onStrokeComplete={onAddDrawing}
@@ -858,28 +1178,22 @@ export function BoardCanvas({
           onDeleteConnection={deleteConnection}
           pendingSourceId={arrowSourceId}
           pendingTarget={pendingTarget}
+          pendingTargetId={pendingTargetId}
         />
 
-        {toolMode === "arrow" &&
-          enrichedCardItems.map((item) => (
+        {enrichedCardItems
+          .filter((item) => item.id === arrowSourceId || item.id === pendingTargetId)
+          .map((item) => (
             <div
-              key={`arrow-target-${item.id}`}
-              className={`absolute rounded-2xl border-2 transition-colors ${
-                arrowSourceId === item.id
-                  ? "border-[var(--av2-accent)] bg-[var(--av2-accent)]/10"
-                  : "border-transparent hover:border-[var(--av2-accent)]/50 hover:bg-[var(--av2-accent)]/5"
-              }`}
+              key={`arrow-end-${item.id}`}
+              aria-hidden
+              className="pointer-events-none absolute z-40 rounded-2xl bg-[var(--av2-accent)]/10"
               style={{
                 left: item.x,
                 top: item.y,
                 width: item.width,
                 height: item.height || 200,
-                zIndex: 100,
-                cursor: "crosshair",
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleArrowCardClick(item.id);
+                boxShadow: "0 0 0 calc(2px * var(--mb-inverse-zoom, 1)) var(--av2-accent)",
               }}
             />
           ))}
@@ -891,13 +1205,40 @@ export function BoardCanvas({
             Your moodboard is empty
           </h2>
           <p className="mt-1 text-sm text-[var(--av2-text-2)]">
-            Use the toolbar to add notes, images, colors and more.
+            Drag something from the toolbar below, or click one and then click here.
           </p>
         </div>
       )}
 
+      {isPhone &&
+        !keyboardOpen &&
+        !hideObjectToolbar &&
+        selection?.kind === "card" &&
+        (() => {
+          const item = cardItems.find((i) => i.id === selection.id);
+          if (!item) return null;
+          return (
+            <div
+              data-mb-canvas-ui
+              className="absolute bottom-[calc(5rem+env(safe-area-inset-bottom))] left-1/2 z-30 flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-1 whitespace-nowrap shadow-md [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
+              <ObjectControls item={item} onUpdateItem={updateItem} />
+              <button
+                type="button"
+                onClick={() => deleteCard(item.id)}
+                aria-label={`Delete ${cardLabel(item)}`}
+                className="flex h-9 shrink-0 items-center rounded-lg px-3 text-sm font-medium text-[var(--av2-error-text)]"
+              >
+                Delete
+              </button>
+            </div>
+          );
+        })()}
+
       <div data-mb-canvas-ui>
-        <CanvasControls canvas={canvas} onFitToContent={handleFit} hasItems={items.length > 0} />
+        {!keyboardOpen && (
+          <CanvasControls canvas={canvas} onFitToContent={handleFit} hasItems={items.length > 0} />
+        )}
       </div>
     </div>
   );
