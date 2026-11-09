@@ -1,118 +1,213 @@
 // -----------------------------------------------------------------------------
 // @file: lib/brand-kit/font-faces.ts
-// @purpose: Google Fonts used by the brand kit and font pairing pages, loaded
-//           with next/font so they are downloaded at build time and served
-//           from our own domain. Visitors' browsers never contact Google
-//           (which matters for EU visitors under GDPR).
+// @purpose: Fonts used by the brand kit and font pairing pages, loaded with
+//           next/font/local from files in assets/brand-kit-fonts (latin
+//           subset, from the Fontsource packages of these Google Fonts, all
+//           under the SIL Open Font License). Nothing is fetched from Google,
+//           neither by visitors (GDPR) nor at build time: next/font/google
+//           failed a Vercel build when one download didn't arrive.
 //
 //           preload is off: a page only downloads the fonts it actually uses.
 //           next/font needs literal options at module level, so each font is
 //           declared on its own.
 // -----------------------------------------------------------------------------
 
-import {
-  Archivo_Black,
-  Bebas_Neue,
-  Bricolage_Grotesque,
-  Cormorant_Garamond,
-  DM_Sans,
-  DM_Serif_Display,
-  Fraunces,
-  Fredoka,
-  IBM_Plex_Sans,
-  Inter,
-  Karla,
-  Lato,
-  Lexend,
-  Libre_Baskerville,
-  Lora,
-  Manrope,
-  Merriweather,
-  Montserrat,
-  Nunito,
-  Open_Sans,
-  Outfit,
-  Playfair_Display,
-  Poppins,
-  Sora,
-  Source_Sans_3,
-  Space_Grotesk,
-  Syne,
-  Work_Sans,
-} from "next/font/google";
+import localFont from "next/font/local";
 
-const archivoBlack = Archivo_Black({
-  subsets: ["latin"],
-  display: "swap",
-  preload: false,
-  weight: "400",
-});
-const bebasNeue = Bebas_Neue({
-  subsets: ["latin"],
-  display: "swap",
-  preload: false,
-  weight: "400",
-});
-const bricolageGrotesque = Bricolage_Grotesque({
-  subsets: ["latin"],
+const archivoBlack = localFont({
+  src: [
+    {
+      path: "../../assets/brand-kit-fonts/archivo-black-400.woff2",
+      weight: "400",
+      style: "normal",
+    },
+  ],
   display: "swap",
   preload: false,
 });
-const cormorantGaramond = Cormorant_Garamond({
-  subsets: ["latin"],
+const bebasNeue = localFont({
+  src: [
+    { path: "../../assets/brand-kit-fonts/bebas-neue-400.woff2", weight: "400", style: "normal" },
+  ],
   display: "swap",
   preload: false,
-  weight: ["500", "700"],
 });
-const dmSans = DM_Sans({ subsets: ["latin"], display: "swap", preload: false });
-const dmSerifDisplay = DM_Serif_Display({
-  subsets: ["latin"],
+const bricolageGrotesque = localFont({
+  src: "../../assets/brand-kit-fonts/bricolage-grotesque.woff2",
+  weight: "100 900",
   display: "swap",
   preload: false,
-  weight: "400",
 });
-const fraunces = Fraunces({ subsets: ["latin"], display: "swap", preload: false });
-const fredoka = Fredoka({ subsets: ["latin"], display: "swap", preload: false });
-const ibmPlexSans = IBM_Plex_Sans({
-  subsets: ["latin"],
+const cormorantGaramond = localFont({
+  src: "../../assets/brand-kit-fonts/cormorant-garamond.woff2",
+  weight: "100 900",
   display: "swap",
   preload: false,
-  weight: ["400", "600"],
 });
-const inter = Inter({ subsets: ["latin"], display: "swap", preload: false });
-const karla = Karla({ subsets: ["latin"], display: "swap", preload: false });
-const lato = Lato({ subsets: ["latin"], display: "swap", preload: false, weight: ["400", "700"] });
-const lexend = Lexend({ subsets: ["latin"], display: "swap", preload: false });
-const libreBaskerville = Libre_Baskerville({
-  subsets: ["latin"],
+const dmSans = localFont({
+  src: "../../assets/brand-kit-fonts/dm-sans.woff2",
+  weight: "100 900",
   display: "swap",
   preload: false,
-  weight: ["400", "700"],
 });
-const lora = Lora({ subsets: ["latin"], display: "swap", preload: false });
-const manrope = Manrope({ subsets: ["latin"], display: "swap", preload: false });
-const merriweather = Merriweather({
-  subsets: ["latin"],
+const dmSerifDisplay = localFont({
+  src: [
+    {
+      path: "../../assets/brand-kit-fonts/dm-serif-display-400.woff2",
+      weight: "400",
+      style: "normal",
+    },
+  ],
   display: "swap",
   preload: false,
-  weight: ["400", "700"],
 });
-const montserrat = Montserrat({ subsets: ["latin"], display: "swap", preload: false });
-const nunito = Nunito({ subsets: ["latin"], display: "swap", preload: false });
-const openSans = Open_Sans({ subsets: ["latin"], display: "swap", preload: false });
-const outfit = Outfit({ subsets: ["latin"], display: "swap", preload: false });
-const playfairDisplay = Playfair_Display({ subsets: ["latin"], display: "swap", preload: false });
-const poppins = Poppins({
-  subsets: ["latin"],
+const fraunces = localFont({
+  src: "../../assets/brand-kit-fonts/fraunces.woff2",
+  weight: "100 900",
   display: "swap",
   preload: false,
-  weight: ["400", "600", "700"],
 });
-const sora = Sora({ subsets: ["latin"], display: "swap", preload: false });
-const sourceSans3 = Source_Sans_3({ subsets: ["latin"], display: "swap", preload: false });
-const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], display: "swap", preload: false });
-const syne = Syne({ subsets: ["latin"], display: "swap", preload: false });
-const workSans = Work_Sans({ subsets: ["latin"], display: "swap", preload: false });
+const fredoka = localFont({
+  src: "../../assets/brand-kit-fonts/fredoka.woff2",
+  weight: "100 900",
+  display: "swap",
+  preload: false,
+});
+const ibmPlexSans = localFont({
+  src: "../../assets/brand-kit-fonts/ibm-plex-sans.woff2",
+  weight: "100 900",
+  display: "swap",
+  preload: false,
+});
+const inter = localFont({
+  src: "../../assets/brand-kit-fonts/inter.woff2",
+  weight: "100 900",
+  display: "swap",
+  preload: false,
+});
+const karla = localFont({
+  src: "../../assets/brand-kit-fonts/karla.woff2",
+  weight: "100 900",
+  display: "swap",
+  preload: false,
+});
+const lato = localFont({
+  src: [
+    { path: "../../assets/brand-kit-fonts/lato-400.woff2", weight: "400", style: "normal" },
+    { path: "../../assets/brand-kit-fonts/lato-700.woff2", weight: "700", style: "normal" },
+  ],
+  display: "swap",
+  preload: false,
+});
+const lexend = localFont({
+  src: "../../assets/brand-kit-fonts/lexend.woff2",
+  weight: "100 900",
+  display: "swap",
+  preload: false,
+});
+const libreBaskerville = localFont({
+  src: [
+    {
+      path: "../../assets/brand-kit-fonts/libre-baskerville-400.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../../assets/brand-kit-fonts/libre-baskerville-700.woff2",
+      weight: "700",
+      style: "normal",
+    },
+  ],
+  display: "swap",
+  preload: false,
+});
+const lora = localFont({
+  src: "../../assets/brand-kit-fonts/lora.woff2",
+  weight: "100 900",
+  display: "swap",
+  preload: false,
+});
+const manrope = localFont({
+  src: "../../assets/brand-kit-fonts/manrope.woff2",
+  weight: "100 900",
+  display: "swap",
+  preload: false,
+});
+const merriweather = localFont({
+  src: "../../assets/brand-kit-fonts/merriweather.woff2",
+  weight: "100 900",
+  display: "swap",
+  preload: false,
+});
+const montserrat = localFont({
+  src: "../../assets/brand-kit-fonts/montserrat.woff2",
+  weight: "100 900",
+  display: "swap",
+  preload: false,
+});
+const nunito = localFont({
+  src: "../../assets/brand-kit-fonts/nunito.woff2",
+  weight: "100 900",
+  display: "swap",
+  preload: false,
+});
+const openSans = localFont({
+  src: "../../assets/brand-kit-fonts/open-sans.woff2",
+  weight: "100 900",
+  display: "swap",
+  preload: false,
+});
+const outfit = localFont({
+  src: "../../assets/brand-kit-fonts/outfit.woff2",
+  weight: "100 900",
+  display: "swap",
+  preload: false,
+});
+const playfairDisplay = localFont({
+  src: "../../assets/brand-kit-fonts/playfair-display.woff2",
+  weight: "100 900",
+  display: "swap",
+  preload: false,
+});
+const poppins = localFont({
+  src: [
+    { path: "../../assets/brand-kit-fonts/poppins-400.woff2", weight: "400", style: "normal" },
+    { path: "../../assets/brand-kit-fonts/poppins-600.woff2", weight: "600", style: "normal" },
+    { path: "../../assets/brand-kit-fonts/poppins-700.woff2", weight: "700", style: "normal" },
+  ],
+  display: "swap",
+  preload: false,
+});
+const sora = localFont({
+  src: "../../assets/brand-kit-fonts/sora.woff2",
+  weight: "100 900",
+  display: "swap",
+  preload: false,
+});
+const sourceSans3 = localFont({
+  src: "../../assets/brand-kit-fonts/source-sans-3.woff2",
+  weight: "100 900",
+  display: "swap",
+  preload: false,
+});
+const spaceGrotesk = localFont({
+  src: "../../assets/brand-kit-fonts/space-grotesk.woff2",
+  weight: "100 900",
+  display: "swap",
+  preload: false,
+});
+const syne = localFont({
+  src: "../../assets/brand-kit-fonts/syne.woff2",
+  weight: "100 900",
+  display: "swap",
+  preload: false,
+});
+const workSans = localFont({
+  src: "../../assets/brand-kit-fonts/work-sans.woff2",
+  weight: "100 900",
+  display: "swap",
+  preload: false,
+});
 
 /** The CSS font-family value for each font id, as next/font generated it. */
 export const FONT_FAMILY: Record<string, string> = {
