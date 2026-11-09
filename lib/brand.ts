@@ -44,7 +44,7 @@ export function copyrightYears(now: Date = new Date()): string {
     : `${COPYRIGHT_START_YEAR}`;
 }
 
-/** Full copyright line used in every footer. */
+/** Full copyright line used in every footer: "© 2026 Brandbite FZE. All rights reserved." */
 export function copyrightLine(now: Date = new Date()): string {
-  return `© All rights reserved. Copyright ${COMPANY_LEGAL_NAME} © ${copyrightYears(now)}`;
+  return `© ${copyrightYears(now)} ${COMPANY_LEGAL_NAME}. All rights reserved.`;
 }

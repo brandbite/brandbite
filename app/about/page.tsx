@@ -14,7 +14,6 @@ import Image from "next/image";
 
 import { HomeFooter } from "@/components/marketing/home-footer";
 import { HomeHeader } from "@/components/marketing/home-header";
-import { ReadyBand } from "@/components/marketing/ready-band";
 import { pageMetadata } from "@/lib/seo/metadata";
 
 export const metadata: Metadata = pageMetadata({
@@ -118,8 +117,6 @@ export default function AboutPage() {
             ))}
           </div>
         </section>
-
-        <ReadyBand />
         <HomeFooter />
         <div className="h-5" />
       </main>
