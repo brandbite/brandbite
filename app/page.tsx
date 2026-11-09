@@ -8,11 +8,23 @@
 // @lastUpdate: 2026-07-12
 // -----------------------------------------------------------------------------
 
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 
 import { HomeFooter } from "@/components/marketing/home-footer";
 import { HomeHeader } from "@/components/marketing/home-header";
+import { JsonLd } from "@/components/seo/json-ld";
+import { pageMetadata } from "@/lib/seo/metadata";
+import { organizationJsonLd, websiteJsonLd } from "@/lib/seo/structured-data";
+
+export const metadata: Metadata = pageMetadata({
+  title: "brandbite | Creative and Design Subscription for Growing Teams",
+  absoluteTitle: true,
+  description:
+    "Unlimited creative requests, 1-2 day turnaround and top creative talent for one simple subscription. Skip the freelancer hunt and pause anytime.",
+  path: "/",
+});
 
 // The design sets all display type in ExtraBold.
 const displayFont = "font-[family-name:var(--font-jakarta)]";
@@ -70,6 +82,7 @@ export default function HomePage() {
         id="main-content"
         className="mx-auto w-full max-w-[1140px] overflow-hidden bg-[#F7F4F1]"
       >
+        <JsonLd data={[organizationJsonLd(), websiteJsonLd()]} />
         <HomeHeader />
 
         {/* Hero */}

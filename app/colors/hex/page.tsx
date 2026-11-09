@@ -11,13 +11,14 @@ import { StudioShell, WorkspacePanel } from "@/components/colors/studio/studio-s
 import { describeColor, formatHex } from "@/lib/colors";
 import { COLOR_FAMILIES } from "@/lib/colors/color-families";
 import { NAMED_COLORS } from "@/lib/colors/named-colors";
+import { pageMetadata } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Color Names and Hex Codes",
   description:
     "Browse color names with their hex codes, shades, contrast and pairings, grouped by color family.",
-  alternates: { canonical: "/colors/hex" },
-};
+  path: "/colors/hex",
+});
 
 export default function ColorLibraryPage() {
   const groups = COLOR_FAMILIES.map((family) => ({

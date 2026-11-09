@@ -6,7 +6,9 @@
 
 import { ColorMeaningsView } from "@/components/colors/studio/color-meanings-view";
 import { StudioShell } from "@/components/colors/studio/studio-shell";
+import { JsonLd } from "@/components/seo/json-ld";
 import { getColorMeanings } from "@/lib/colors/content";
+import { breadcrumbJsonLd } from "@/lib/seo/structured-data";
 
 // Next.js needs a literal here: CMS changes show up within 5 minutes.
 export const revalidate = 300;
@@ -20,6 +22,12 @@ export default async function ColorMeaningsHubPage() {
       blurb="Explore the associations behind a shade, then put it to work."
       ctaBlurb="Turn color insights into on-brand palettes, shades, and more with brandbite."
     >
+      <JsonLd
+        data={breadcrumbJsonLd([
+          { name: "Color Studio", path: "/colors" },
+          { name: "Color Meanings", path: "/colors/color-meanings" },
+        ])}
+      />
       <ColorMeaningsView meanings={meanings} />
     </StudioShell>
   );

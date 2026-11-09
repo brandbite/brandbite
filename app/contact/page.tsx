@@ -16,11 +16,13 @@ import { ContactForm } from "@/components/marketing/contact-form";
 import { HomeFooter } from "@/components/marketing/home-footer";
 import { HomeHeader } from "@/components/marketing/home-header";
 import { COMPANY_ADDRESS_LINES, COMPANY_LEGAL_NAME, CONTACT_EMAIL } from "@/lib/brand";
+import { pageMetadata } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Contact",
   description: "Have a project in mind? A question? Drop us a message. We'll get back to you ASAP.",
-};
+  path: "/contact",
+});
 
 const displayFont = "font-[family-name:var(--font-jakarta)]";
 

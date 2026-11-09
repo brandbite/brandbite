@@ -11,10 +11,13 @@ import { notFound } from "next/navigation";
 import { PaletteActions, PaletteSwatches } from "@/components/colors/studio/color-page-actions";
 import { PalettePreview } from "@/components/colors/studio/palette-preview";
 import { StudioShell, WorkspacePanel } from "@/components/colors/studio/studio-shell";
+import { JsonLd } from "@/components/seo/json-ld";
 import { formatHex, normalizeHex, type StudioPalette } from "@/lib/colors";
 import { getPaletteIdea, getPaletteIdeas, type PaletteIdea } from "@/lib/colors/content";
 import { findNamedColor } from "@/lib/colors/named-colors";
 import { PALETTE_IDEA_CATALOG } from "@/lib/colors/palette-idea-catalog";
+import { pageMetadata } from "@/lib/seo/metadata";
+import { breadcrumbJsonLd } from "@/lib/seo/structured-data";
 
 // Next.js needs a literal here: CMS changes show up within 5 minutes.
 export const revalidate = 300;
@@ -29,11 +32,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const idea = await getPaletteIdea((await params).slug);
   if (!idea) return { title: "Palette not found", robots: { index: false, follow: false } };
   const hexes = idea.colors.map((hex) => formatHex(hex)).join(", ");
-  return {
+  return pageMetadata({
     title: `${idea.title} Color Palette`,
     description: `${idea.summary ?? `The ${idea.title} color palette.`} Hex codes: ${hexes}.`,
-    alternates: { canonical: `/colors/palettes/${idea.slug}` },
-  };
+    path: `/colors/palettes/${idea.slug}`,
+    image: `/colors/palettes/${idea.slug}/opengraph-image`,
+  });
 }
 
 function toPalette(idea: PaletteIdea): StudioPalette {
@@ -72,6 +76,13 @@ export default async function PalettePage({ params }: PageProps) {
       blurb={idea.summary ?? "A curated color palette to make your own."}
       breadcrumb="Palette ideas"
     >
+      <JsonLd
+        data={breadcrumbJsonLd([
+          { name: "Color Studio", path: "/colors" },
+          { name: "Color Palette Ideas", path: "/colors/color-palette-ideas" },
+          { name: idea.title, path: `/colors/palettes/${idea.slug}` },
+        ])}
+      />
       <WorkspacePanel>
         <PaletteSwatches hexes={hexes} />
         <PaletteActions palette={palette} />

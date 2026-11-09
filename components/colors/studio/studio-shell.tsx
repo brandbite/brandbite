@@ -1,6 +1,7 @@
 // -----------------------------------------------------------------------------
 // @file: components/colors/studio/studio-shell.tsx
-// @purpose: Page frame shared by every Color Studio page: HomeHeader, ToolNav,
+// @purpose: Page frame shared by every Color Studio and size guide page:
+//           HomeHeader, a section menu (ToolNav),
 //           PageIntro, the page's panels, CompactCTA and HomeFooter. The 1312px
 //           wrapper minus HomeHeader's 56px padding gives the 1200px content
 //           width, so content lines up with the header and footer edges.
@@ -28,6 +29,7 @@ export function PageIntro({
   blurb,
   breadcrumb,
   aside,
+  label = "COLOR STUDIO",
 }: {
   /** Dark part of the headline. */
   title: string;
@@ -38,13 +40,15 @@ export function PageIntro({
   breadcrumb?: string;
   /** Decorative art beside the headline. Hidden on small screens. */
   aside?: ReactNode;
+  /** Section pill above the headline. */
+  label?: string;
 }) {
   return (
     <div className="flex items-center justify-between gap-8 pt-4 pb-8">
       <div className="min-w-0">
         <div className="mb-4 flex flex-wrap items-center gap-2 text-sm leading-5">
           <span className="rounded-full bg-[var(--cs-soft)] px-3 py-1 font-semibold text-[var(--cs-soft-text)]">
-            COLOR STUDIO
+            {label}
           </span>
           {breadcrumb ? (
             <>
@@ -85,14 +89,18 @@ export function WorkspacePanel({
 
 export function CompactCTA({
   blurb = "Turn your palette into something real with brandbite.",
+  heading = "Good colors.",
+  headingAccent = "Better creative.",
 }: {
   blurb?: string;
+  heading?: string;
+  headingAccent?: string;
 }) {
   return (
     <section className="relative mt-8 flex min-h-[200px] items-center overflow-hidden rounded-2xl bg-[var(--cs-soft)] px-8 py-8 max-[767px]:px-5">
       <div className="relative z-10 max-w-[560px] max-[639px]:max-w-none">
         <h2 className="text-2xl leading-8 font-semibold">
-          Good colors. <span className="text-[var(--cs-soft-text)]">Better creative.</span>
+          {heading} <span className="text-[var(--cs-soft-text)]">{headingAccent}</span>
         </h2>
         <p className="mt-2 text-base leading-6">{blurb}</p>
         <Link href="/meet" className={`mt-4 ${studioButtonClasses("primary")}`}>
@@ -117,7 +125,11 @@ export function StudioShell({
   blurb,
   breadcrumb,
   ctaBlurb,
+  ctaHeading,
+  ctaHeadingAccent,
   aside,
+  label,
+  nav,
   children,
 }: {
   title: string;
@@ -125,7 +137,13 @@ export function StudioShell({
   blurb: string;
   breadcrumb?: string;
   ctaBlurb?: string;
+  ctaHeading?: string;
+  ctaHeadingAccent?: string;
   aside?: ReactNode;
+  /** Section pill above the headline; Color Studio by default. */
+  label?: string;
+  /** Section menu; the Color Studio tool menu by default, none with null. */
+  nav?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -133,16 +151,17 @@ export function StudioShell({
       <main id="main-content" className="mx-auto w-full max-w-[1312px]">
         <HomeHeader />
         <div className={`pt-6 ${CONTENT_GUTTER}`}>
-          <ToolNav />
+          {nav === undefined ? <ToolNav /> : nav}
           <PageIntro
             title={title}
             accent={accent}
             blurb={blurb}
             breadcrumb={breadcrumb}
             aside={aside}
+            label={label}
           />
           <div className="flex flex-col gap-6">{children}</div>
-          <CompactCTA blurb={ctaBlurb} />
+          <CompactCTA blurb={ctaBlurb} heading={ctaHeading} headingAccent={ctaHeadingAccent} />
         </div>
         <div className="mt-8">
           <HomeFooter />

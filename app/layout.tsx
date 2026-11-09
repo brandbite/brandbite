@@ -23,28 +23,29 @@ import { CookieConsentBanner } from "@/components/analytics/cookie-consent-banne
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
+// Fallback copy for any page without its own description. Written for buyers
+// (startups and marketing teams in the US and EU), not for signed-in users.
+const defaultDescription =
+  "brandbite is a creative subscription: unlimited design requests, top creative talent and fast turnaround for one simple monthly plan.";
+
 export const metadata: Metadata = {
   title: {
     default: "brandbite",
     template: "%s | brandbite",
   },
-  description:
-    "Creative-as-a-service platform. Submit requests, track progress, and manage your creative pipeline.",
+  description: defaultDescription,
   metadataBase: new URL(appUrl),
   openGraph: {
     title: "brandbite",
-    description:
-      "Creative-as-a-service platform. Submit requests, track progress, and manage your creative pipeline.",
-    url: appUrl,
+    description: defaultDescription,
     siteName: "brandbite",
     type: "website",
     locale: "en_US",
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "brandbite",
-    description:
-      "Creative-as-a-service platform. Submit requests, track progress, and manage your creative pipeline.",
+    description: defaultDescription,
   },
   robots: {
     index: true,

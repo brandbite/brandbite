@@ -92,12 +92,23 @@ const PUBLIC_PATHS = [
   // 307 to /login instead of the sitemap/robots payloads.
   "/sitemap.xml",
   "/robots.txt",
+  // Default share image (app/opengraph-image.tsx). It has no file extension, so
+  // the matcher doesn't skip it; social crawlers carry no cookie either.
+  "/opengraph-image",
   "/api/health", // uptime monitors (BetterStack / Upptime / Vercel); route returns 200 or 503
   // Public color-tools marketing pages (wheel, palette generator, ideas,
   // meanings). Only the pages are public; the authed /api/colors/palettes
   // save/list endpoint is deliberately NOT listed, so the proxy gates it
   // behind a session cookie.
   "/colors",
+  // Public social media and ad size guide (static pages, no API).
+  "/sizes",
+  // Free creative brief generator (client-side tool, no API).
+  "/brief-generator",
+  // Free brand kit generator and font pairing pages.
+  "/brand-kit",
+  // Free design cost calculator (client-side, no API).
+  "/design-cost-calculator",
   // Public CMS reads for the color tools (published content only; admin
   // mutations live behind /api/admin/*).
   "/api/palette-ideas",

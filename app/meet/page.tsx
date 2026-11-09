@@ -12,14 +12,16 @@ import type { ReactNode } from "react";
 import { HomeFooter } from "@/components/marketing/home-footer";
 import { HomeHeader } from "@/components/marketing/home-header";
 import { MeetingBooking, VideoIcon } from "@/components/marketing/meeting-booking";
+import { pageMetadata } from "@/lib/seo/metadata";
 
 import "@/components/marketing/meet.css";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Meet brandbite",
   description:
     "Book a free 30-minute video call to talk through your brand and see how brandbite can help.",
-};
+  path: "/meet",
+});
 
 const GUTTER = "px-14 max-[1179px]:px-8 max-[767px]:px-4";
 

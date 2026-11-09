@@ -8,11 +8,13 @@ import Image from "next/image";
 
 import { OverviewView } from "@/components/colors/studio/overview-view";
 import { StudioShell } from "@/components/colors/studio/studio-shell";
+import { pageMetadata } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
-  title: "Color Tools",
+export const metadata: Metadata = pageMetadata({
+  title: "Free Color Tools for Brands",
   description: "Tools and palettes that keep your brand bold, consistent, and unmistakably yours.",
-};
+  path: "/colors",
+});
 
 export default function ColorsHubPage() {
   return (

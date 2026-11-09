@@ -26,8 +26,8 @@ const PILL_IDLE =
 const PILL_ACTIVE = "bg-[var(--cs-text)] text-white";
 
 /** Overview only matches exactly; a tool also owns its nested pages. */
-function isActive(pathname: string, href: string): boolean {
-  return href === "/colors"
+function isActive(pathname: string, href: string, overviewHref: string): boolean {
+  return href === overviewHref
     ? pathname === href
     : pathname === href || pathname.startsWith(`${href}/`);
 }
@@ -36,10 +36,17 @@ export function ToolNav({
   items = STUDIO_NAV,
   moreTools = STUDIO_MORE_TOOLS,
   saved = STUDIO_SAVED_LINK,
+  overviewHref = "/colors",
+  ariaLabel,
+  moreLabel = "More tools",
 }: {
   items?: StudioNavItem[];
   moreTools?: StudioNavItem[];
   saved?: StudioNavItem | null;
+  /** The section's overview link, which is only active on its own page. */
+  overviewHref?: string;
+  ariaLabel?: string;
+  moreLabel?: string;
 }) {
   const pathname = usePathname();
   const menuId = useId();
@@ -66,12 +73,15 @@ export function ToolNav({
     };
   }, [menuOpen]);
 
-  const moreActive = moreTools.some((tool) => isActive(pathname, tool.href));
+  const moreActive = moreTools.some((tool) => isActive(pathname, tool.href, overviewHref));
 
   return (
-    <nav aria-label="Color Studio tools" className="flex min-h-14 flex-wrap items-center gap-2">
+    <nav
+      aria-label={ariaLabel ?? "Color Studio tools"}
+      className="flex min-h-14 flex-wrap items-center gap-2"
+    >
       {items.map((item) => {
-        const active = isActive(pathname, item.href);
+        const active = isActive(pathname, item.href, overviewHref);
         return (
           <Link
             key={item.href}
@@ -94,7 +104,7 @@ export function ToolNav({
             onClick={() => setMenuOpen((open) => !open)}
             className={`${PILL} ${moreActive ? PILL_ACTIVE : PILL_IDLE}`}
           >
-            More tools
+            {moreLabel}
             <ChevronDownIcon />
           </button>
           <ul
@@ -106,7 +116,7 @@ export function ToolNav({
               <li key={tool.href}>
                 <Link
                   href={tool.href}
-                  aria-current={isActive(pathname, tool.href) ? "page" : undefined}
+                  aria-current={isActive(pathname, tool.href, overviewHref) ? "page" : undefined}
                   onClick={() => setMenuOpen(false)}
                   className="flex h-11 items-center rounded-[10px] px-3 text-sm leading-5 font-medium whitespace-nowrap hover:bg-[var(--cs-soft)] aria-[current=page]:bg-[var(--cs-soft)]"
                 >
@@ -121,9 +131,9 @@ export function ToolNav({
       {saved ? (
         <Link
           href={saved.href}
-          aria-current={isActive(pathname, saved.href) ? "page" : undefined}
+          aria-current={isActive(pathname, saved.href, overviewHref) ? "page" : undefined}
           className={`${PILL} ${
-            isActive(pathname, saved.href)
+            isActive(pathname, saved.href, overviewHref)
               ? "bg-[var(--cs-soft)] text-[var(--cs-soft-text)]"
               : PILL_IDLE
           }`}

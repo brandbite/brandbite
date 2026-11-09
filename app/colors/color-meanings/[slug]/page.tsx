@@ -10,12 +10,15 @@ import { notFound } from "next/navigation";
 
 import { MeaningPanel } from "@/components/colors/studio/color-meanings-view";
 import { StudioShell, WorkspacePanel } from "@/components/colors/studio/studio-shell";
+import { JsonLd } from "@/components/seo/json-ld";
 import { CMS_ALLOWED_ATTR, CMS_ALLOWED_TAGS, SafeHtml } from "@/components/ui/safe-html";
 import { describeColor, formatHex, suggestPairings } from "@/lib/colors";
 import { COLOR_FAMILIES } from "@/lib/colors/color-families";
 import { getColorMeaning } from "@/lib/colors/content";
 import { isBuiltInMeaning } from "@/lib/colors/meaning-types";
 import { NAMED_COLORS } from "@/lib/colors/named-colors";
+import { pageMetadata } from "@/lib/seo/metadata";
+import { breadcrumbJsonLd } from "@/lib/seo/structured-data";
 
 // Next.js needs a literal here: CMS changes show up within 5 minutes.
 export const revalidate = 300;
@@ -30,14 +33,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { slug } = await params;
   const meaning = await getColorMeaning(slug);
   if (!meaning) return { title: "Color not found", robots: { index: false, follow: false } };
-  return {
-    // The parent layout's plain title turns off the site's "| Brandbite" template.
-    title: { absolute: meaning.metaTitle || `${meaning.name} Color Meaning | brandbite` },
+  // The parent layout's plain title turns off the site's "| brandbite" template.
+  return pageMetadata({
+    title: meaning.metaTitle || `${meaning.name} Color Meaning | brandbite`,
+    absoluteTitle: true,
     description:
       meaning.metaDescription ||
       `What ${meaning.name.toLowerCase()} can communicate: ${meaning.summary ?? meaning.associations.join(", ")}`,
-    alternates: { canonical: `/colors/color-meanings/${meaning.slug}` },
-  };
+    path: `/colors/color-meanings/${meaning.slug}`,
+    image: `/colors/color-meanings/${meaning.slug}/opengraph-image`,
+  });
 }
 
 export default async function ColorMeaningDetailPage({ params }: PageProps) {
@@ -55,6 +60,13 @@ export default async function ColorMeaningDetailPage({ params }: PageProps) {
       blurb="What this color can communicate, and the shades that belong to it."
       breadcrumb={meaning.name}
     >
+      <JsonLd
+        data={breadcrumbJsonLd([
+          { name: "Color Studio", path: "/colors" },
+          { name: "Color Meanings", path: "/colors/color-meanings" },
+          { name: meaning.name, path: `/colors/color-meanings/${meaning.slug}` },
+        ])}
+      />
       <WorkspacePanel>
         <div className="grid grid-cols-[minmax(0,7fr)_minmax(0,5fr)] items-start gap-8 max-[1023px]:grid-cols-1">
           <article className="min-w-0">

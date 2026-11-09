@@ -19,11 +19,13 @@ import { HomeHeader } from "@/components/marketing/home-header";
 import { QuestionsBand } from "@/components/marketing/questions-band";
 import { CREATIVE_FAQ_CATEGORY } from "@/lib/faq/audience";
 import { prisma } from "@/lib/prisma";
+import { pageMetadata } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "FAQ",
   description: "Everything you need to know about brandbite. No jargon, no tiny-print drama.",
-};
+  path: "/faq",
+});
 
 // Render per-request: the FAQ list comes from the database, which isn't
 // reachable during CI's static prerender pass. Runtime SSR also means

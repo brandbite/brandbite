@@ -11,6 +11,7 @@ import { notFound } from "next/navigation";
 
 import { ColorActions, ColorValues } from "@/components/colors/studio/color-page-actions";
 import { StudioShell, WorkspacePanel } from "@/components/colors/studio/studio-shell";
+import { JsonLd } from "@/components/seo/json-ld";
 import {
   describeColor,
   evaluateContrast,
@@ -28,6 +29,8 @@ import {
 import { COLOR_FAMILIES } from "@/lib/colors/color-families";
 import { findNamedColor, NAMED_COLORS } from "@/lib/colors/named-colors";
 import { MEANING_GUIDANCE } from "@/lib/colors/meaning-guidance";
+import { pageMetadata } from "@/lib/seo/metadata";
+import { breadcrumbJsonLd } from "@/lib/seo/structured-data";
 
 type PageProps = { params: Promise<{ hex: string }> };
 
@@ -54,12 +57,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (!color) return { title: "Color not found", robots: { index: false, follow: false } };
 
   const rgb = formatRgb(hexToRgb(color.hex));
-  return {
+  return pageMetadata({
     title: `${color.name} Hex Code ${color.label}`,
     description: `${color.name} is ${color.label}, or ${rgb}. See its shades, contrast with white and black, colors that pair with it, and what it can communicate.`,
-    alternates: { canonical: `/colors/hex/${color.hex.slice(1)}` },
-    robots: color.isNamed ? undefined : { index: false, follow: true },
-  };
+    path: `/colors/hex/${color.hex.slice(1)}`,
+    image: `/colors/hex/${color.hex.slice(1)}/opengraph-image`,
+    noindex: !color.isNamed,
+  });
 }
 
 function Verdict({ label, ratio, passes }: { label: string; ratio: string; passes: boolean }) {
@@ -95,6 +99,15 @@ export default async function ColorPage({ params }: PageProps) {
       blurb={`${color.name} has the HEX code ${color.label}, RGB value ${rgb} and HSL value ${hsl}.`}
       breadcrumb="Color library"
     >
+      {color.isNamed ? (
+        <JsonLd
+          data={breadcrumbJsonLd([
+            { name: "Color Studio", path: "/colors" },
+            { name: "Color Names and Hex Codes", path: "/colors/hex" },
+            { name: color.name, path: `/colors/hex/${color.hex.slice(1)}` },
+          ])}
+        />
+      ) : null}
       <WorkspacePanel>
         <div className="grid grid-cols-2 gap-6 max-[767px]:grid-cols-1">
           <div

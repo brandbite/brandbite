@@ -17,12 +17,14 @@ import { HomeHeader } from "@/components/marketing/home-header";
 import { COMPANY_ADDRESS, COMPANY_LEGAL_NAME, CONTACT_EMAIL } from "@/lib/brand";
 import { QuestionsBand } from "@/components/marketing/questions-band";
 import { CookieSettingsButton } from "@/components/analytics/cookie-consent-banner";
+import { pageMetadata } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Privacy Policy",
   description:
     "How Brandbite collects, uses, and protects your information. Privacy, kept clear and simple.",
-};
+  path: "/privacy",
+});
 
 const displayFont = "font-[family-name:var(--font-jakarta)]";
 
