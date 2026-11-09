@@ -103,6 +103,8 @@ const PUBLIC_PATHS = [
   "/colors",
   // Public social media and ad size guide (static pages, no API).
   "/sizes",
+  // Free templates: the pages and the downloadable files in public/templates.
+  "/templates",
   // Free creative brief generator (client-side tool, no API).
   "/brief-generator",
   // Free brand kit generator and font pairing pages.

@@ -19,6 +19,7 @@ import { NAMED_COLORS } from "@/lib/colors/named-colors";
 import { prisma } from "@/lib/prisma";
 import { absoluteUrl } from "@/lib/seo/structured-data";
 import { SIZE_PLATFORMS } from "@/lib/sizes";
+import { TEMPLATES } from "@/lib/templates";
 import { guideMeta } from "@/lib/guides";
 import { getEffectiveGuides } from "@/lib/support/effective";
 
@@ -74,6 +75,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...MARKETING_PATHS.map((path) => entry(path, 0.8)),
     ...COLOR_TOOL_PATHS.map((path) => entry(path, 0.8)),
     entry("/sizes", 0.8),
+    entry("/templates", 0.8),
+    ...TEMPLATES.map((template) =>
+      entry(`/templates/${template.slug}`, 0.7, new Date(`${template.updatedOn}T00:00:00Z`)),
+    ),
     entry("/brief-generator", 0.8),
     entry("/brand-kit", 0.8),
     entry("/design-cost-calculator", 0.8),
