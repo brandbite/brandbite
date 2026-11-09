@@ -69,10 +69,17 @@ function GuideGrid({ role, guides }: { role: HelpRole; guides: SupportGuide[] })
   );
 }
 
-export function SupportCenter({ role }: { role: HelpRole }) {
-  const guides = useMemo(() => getGuides(role), [role]);
+export function SupportCenter({
+  role,
+  guides: source,
+}: {
+  role: HelpRole;
+  /** The role's guides with the CMS layer applied; code guides when absent. */
+  guides?: SupportGuide[];
+}) {
+  const guides = useMemo(() => getGuides(role, { source }), [role, source]);
   const groups = useMemo(() => groupGuides(role, guides), [role, guides]);
-  const popular = useMemo(() => popularGuides(role), [role]);
+  const popular = useMemo(() => popularGuides(role, { source }), [role, source]);
   const [query, setQuery] = useState("");
   const [topic, setTopic] = useState(groups[0]?.category ?? "");
 

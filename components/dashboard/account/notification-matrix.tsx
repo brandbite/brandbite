@@ -21,7 +21,8 @@ export type NotificationType =
   | "PIN_RESOLVED"
   | "WITHDRAWAL_UPDATED"
   | "CREATIVE_SCHEDULE_UPDATED"
-  | "MOODBOARD_SHARED";
+  | "MOODBOARD_SHARED"
+  | "SUPPORT_GUIDE_CHANGED";
 
 export type NotificationPreference = {
   type: NotificationType;
@@ -73,6 +74,10 @@ export const NOTIFICATION_LABELS: Record<NotificationType, { title: string; desc
       title: "Shared moodboards",
       description: "Your creative shared a moodboard on one of your requests.",
     },
+    SUPPORT_GUIDE_CHANGED: {
+      title: "Support guide changes",
+      description: "A release changed or removed a Support guide that an admin had edited.",
+    },
   };
 
 /** Types that only make sense for one role; others are shown to everyone. */
@@ -80,6 +85,7 @@ const NOTIFICATION_ROLE_ONLY: Partial<Record<NotificationType, AccountRole[]>> =
   WITHDRAWAL_UPDATED: ["DESIGNER"],
   CREATIVE_SCHEDULE_UPDATED: ["SITE_OWNER", "SITE_ADMIN"],
   MOODBOARD_SHARED: ["CUSTOMER"],
+  SUPPORT_GUIDE_CHANGED: ["SITE_OWNER", "SITE_ADMIN"],
 };
 
 export function notificationAppliesTo(type: NotificationType, role: AccountRole): boolean {
@@ -99,6 +105,7 @@ export const NOTIFICATION_ORDER: NotificationType[] = [
   "WITHDRAWAL_UPDATED",
   "CREATIVE_SCHEDULE_UPDATED",
   "MOODBOARD_SHARED",
+  "SUPPORT_GUIDE_CHANGED",
 ];
 
 export function notificationEventsFor(role: AccountRole): NotificationType[] {

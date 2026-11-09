@@ -23,6 +23,7 @@ const ALL_TYPES: NotificationType[] = [
   "WITHDRAWAL_UPDATED",
   "CREATIVE_SCHEDULE_UPDATED",
   "MOODBOARD_SHARED",
+  "SUPPORT_GUIDE_CHANGED",
 ];
 
 // ---------------------------------------------------------------------------

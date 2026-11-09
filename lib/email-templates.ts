@@ -34,6 +34,7 @@ const SUBJECT_MAP: Record<NotificationType, string> = {
   WITHDRAWAL_UPDATED: "Withdrawal update",
   CREATIVE_SCHEDULE_UPDATED: "A creative changed their working hours",
   MOODBOARD_SHARED: "Your creative shared a moodboard",
+  SUPPORT_GUIDE_CHANGED: "A Support guide you edited changed in code",
 };
 
 export function getSubjectForType(type: NotificationType, title: string): string {
@@ -65,6 +66,9 @@ function getCTAUrl(
     return `${baseUrl}/creative/board`;
   }
 
+  if (type === "SUPPORT_GUIDE_CHANGED" && recipientRole === "admin") {
+    return `${baseUrl}/admin/support-content?filter=review`;
+  }
   if (type === "CREATIVE_SCHEDULE_UPDATED" && recipientRole === "admin") {
     return `${baseUrl}/admin/users`;
   }
@@ -88,6 +92,7 @@ const CTA_LABELS: Record<NotificationType, string> = {
   WITHDRAWAL_UPDATED: "View Withdrawals",
   CREATIVE_SCHEDULE_UPDATED: "View Users",
   MOODBOARD_SHARED: "View Request",
+  SUPPORT_GUIDE_CHANGED: "Review the guide",
 };
 
 // ---------------------------------------------------------------------------
@@ -104,6 +109,7 @@ const TYPE_EMOJI: Record<NotificationType, string> = {
   WITHDRAWAL_UPDATED: "\u{1F4B8}",
   CREATIVE_SCHEDULE_UPDATED: "\u{1F552}",
   MOODBOARD_SHARED: "\u{1F3A8}",
+  SUPPORT_GUIDE_CHANGED: "\u{1F4D8}",
 };
 
 // ---------------------------------------------------------------------------

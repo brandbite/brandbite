@@ -82,6 +82,9 @@ if (shouldMigrate) {
 
   console.log("\n[vercel-build] Applying Prisma migrations (production deploy)");
   run(["npx", "prisma", "migrate", "deploy"]);
+  // Tell admins about Support guides this release changed after they edited
+  // them. Never fails the build (the script swallows its own errors).
+  run(["node", "scripts/sync-support-guides.mjs"]);
 } else {
   const reason = !hasDatabaseUrl
     ? "no DATABASE_URL"

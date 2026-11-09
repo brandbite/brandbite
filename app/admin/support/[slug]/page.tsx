@@ -4,24 +4,26 @@
 // -----------------------------------------------------------------------------
 
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { SupportGuideView } from "@/components/support/support-ui";
 import { getCurrentUser } from "@/lib/auth";
 import { isSiteOwnerRole } from "@/lib/roles";
-import { getGuide } from "@/lib/support";
+import { supportBasePath } from "@/lib/support";
+import { getEffectiveGuide } from "@/lib/support/effective";
 
 type Props = { params: Promise<{ slug: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const guide = getGuide("admin", slug);
+  const { guide } = await getEffectiveGuide("admin", slug);
   return { title: guide ? `${guide.title} · Support` : "Support" };
 }
 
 export default async function AdminSupportGuidePage({ params }: Props) {
   const { slug } = await params;
-  const guide = getGuide("admin", slug);
+  const { guide, hidden, all } = await getEffectiveGuide("admin", slug);
+  if (hidden) redirect(supportBasePath("admin"));
   if (!guide) notFound();
 
   // Owner-only guides mirror ownerOnly nav items — hide them from SITE_ADMIN.
@@ -29,5 +31,5 @@ export default async function AdminSupportGuidePage({ params }: Props) {
   const isSiteOwner = !!user && isSiteOwnerRole(user.role);
   if (guide.ownerOnly && !isSiteOwner) notFound();
 
-  return <SupportGuideView role="admin" guide={guide} isSiteOwner={isSiteOwner} />;
+  return <SupportGuideView role="admin" guide={guide} guides={all} isSiteOwner={isSiteOwner} />;
 }

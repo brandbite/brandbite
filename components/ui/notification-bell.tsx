@@ -49,6 +49,7 @@ const TYPE_ICONS: Record<string, string> = {
   WITHDRAWAL_UPDATED: "\u{1F4B8}",
   CREATIVE_SCHEDULE_UPDATED: "\u{1F552}",
   MOODBOARD_SHARED: "\u{1F3A8}",
+  SUPPORT_GUIDE_CHANGED: "\u{1F4D8}",
 };
 
 // ---------------------------------------------------------------------------
@@ -179,6 +180,13 @@ export function NotificationBell({
       if (notif.type === "WITHDRAWAL_UPDATED" && role === "creative") {
         setOpen(false);
         router.push("/creative/withdrawals");
+        return;
+      }
+
+      // A code change to a guide an admin edited: open the review queue.
+      if (notif.type === "SUPPORT_GUIDE_CHANGED" && role === "admin") {
+        setOpen(false);
+        router.push("/admin/support-content?filter=review");
         return;
       }
 

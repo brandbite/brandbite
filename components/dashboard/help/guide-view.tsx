@@ -150,12 +150,21 @@ function OnThisPage({
   );
 }
 
-export function GuideView({ role, guide }: { role: HelpRole; guide: SupportGuide }) {
+export function GuideView({
+  role,
+  guide,
+  guides,
+}: {
+  role: HelpRole;
+  guide: SupportGuide;
+  /** The role's guides with the CMS layer applied; code guides when absent. */
+  guides?: SupportGuide[];
+}) {
   const sections = useMemo(
     () => guide.sections.map((s) => ({ ...s, id: toAnchor(s.heading) })),
     [guide],
   );
-  const related = relatedGuides(role, guide);
+  const related = relatedGuides(role, guide, { source: guides });
   const openHref = primaryRoute(guide);
   const showOpen = openHref && openHref !== supportBasePath(role);
   const showToc = sections.length >= 2;

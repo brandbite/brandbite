@@ -138,12 +138,15 @@ export function SupportGuideView({
   role,
   guide,
   isSiteOwner = false,
+  guides,
 }: {
   role: SupportRole;
   guide: SupportGuide;
   isSiteOwner?: boolean;
+  /** The role's guides with the CMS layer applied; code guides when absent. */
+  guides?: SupportGuide[];
 }) {
-  const related = relatedGuides(role, guide, { isSiteOwner });
+  const related = relatedGuides(role, guide, { isSiteOwner, source: guides });
   const openHref = primaryRoute(guide);
   const showOpen = openHref && openHref !== supportBasePath(role);
   const showToc = guide.sections.length >= 3;

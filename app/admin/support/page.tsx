@@ -7,9 +7,11 @@
 import type { Metadata } from "next";
 
 import { SupportHub } from "@/components/support/support-hub";
+import { getEffectiveGuides } from "@/lib/support/effective";
 
 export const metadata: Metadata = { title: "Support" };
 
-export default function AdminSupportPage() {
-  return <SupportHub role="admin" />;
+export default async function AdminSupportPage() {
+  const { guides } = await getEffectiveGuides("admin");
+  return <SupportHub role="admin" guides={guides} />;
 }
