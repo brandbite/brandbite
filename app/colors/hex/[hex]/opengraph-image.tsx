@@ -4,12 +4,17 @@
 // -----------------------------------------------------------------------------
 
 import { describeColor, formatHex, parseOpaqueHex, tailwindScale } from "@/lib/colors";
-import { findNamedColor } from "@/lib/colors/named-colors";
+import { findNamedColor, NAMED_COLORS } from "@/lib/colors/named-colors";
 import { OG_CONTENT_TYPE, OG_SIZE, renderOgCard } from "@/lib/seo/og-image";
 
 export const alt = "Color swatch and shades";
 export const size = OG_SIZE;
 export const contentType = OG_CONTENT_TYPE;
+
+// Built at deploy time for every indexed color, so shares don't run a function.
+export function generateStaticParams() {
+  return NAMED_COLORS.map((color) => ({ hex: color.hex.slice(1) }));
+}
 
 type ImageProps = { params: Promise<{ hex: string }> };
 
