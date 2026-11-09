@@ -11,6 +11,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { MOODBOARD_ACCESS_SELECT, moodboardAccess } from "@/lib/moodboard-access";
 import { createNotification } from "@/lib/notifications";
+import { purgeDeletedMoodboardItems } from "@/lib/moodboard-items";
 import { resolveAssetUrl, deleteR2Objects } from "@/lib/r2";
 import type { MoodboardItemType } from "@prisma/client";
 
@@ -38,6 +39,11 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
 
     const { moodboardId } = await params;
 
+    // Housekeeping, never worth failing the page over.
+    await purgeDeletedMoodboardItems().catch((err) => {
+      console.error("[moodboards] purge error:", err);
+    });
+
     const moodboard = await prisma.moodboard.findUnique({
       where: { id: moodboardId },
       include: {
@@ -46,6 +52,7 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
           select: { id: true, title: true, ...MOODBOARD_ACCESS_SELECT.ticket.select },
         },
         items: {
+          where: { deletedAt: null },
           orderBy: { position: "asc" },
           select: {
             id: true,

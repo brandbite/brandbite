@@ -35,11 +35,18 @@ function setup(
     onUpdateItem: vi.fn(),
     onDeleteItem: vi.fn(),
     onMoveItem: vi.fn(),
+    onMoveItems: vi.fn(),
+    onDeleteItems: vi.fn(),
+    onDuplicateItems: vi.fn(),
+    onCopyItems: vi.fn(() => "copied"),
+    onPasteText: vi.fn(() => true),
+    onPasteLastCopy: vi.fn(),
     onResizeItem: vi.fn(),
     onAddConnection: vi.fn(),
     onDeleteConnection: vi.fn(),
     onAddDrawing: vi.fn(),
-    onUndoDelete: vi.fn(),
+    onUndo: vi.fn(),
+    onRedo: vi.fn(),
   };
   const view = render(
     <BoardCanvas
@@ -187,12 +194,12 @@ describe("BoardCanvas moving cards", () => {
   });
 
   it("nudges the selected card with the arrow keys", () => {
-    const { onMoveItem } = setup();
+    const { onMoveItems } = setup();
     click(body());
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    expect(onMoveItem).toHaveBeenLastCalledWith("a", 110, 100);
+    expect(onMoveItems).toHaveBeenLastCalledWith([{ id: "a", x: 110, y: 100 }], { nudge: true });
     fireEvent.keyDown(window, { key: "ArrowUp", shiftKey: true });
-    expect(onMoveItem).toHaveBeenLastCalledWith("a", 100, 50);
+    expect(onMoveItems).toHaveBeenLastCalledWith([{ id: "a", x: 100, y: 50 }], { nudge: true });
   });
 });
 
@@ -234,9 +241,12 @@ describe("BoardCanvas deleting", () => {
   });
 
   it("offers undo through the keyboard", () => {
-    const { onUndoDelete } = setup();
+    const { onUndo, onRedo } = setup();
     fireEvent.keyDown(window, { key: "z", ctrlKey: true });
-    expect(onUndoDelete).toHaveBeenCalled();
+    expect(onUndo).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(window, { key: "z", ctrlKey: true, shiftKey: true });
+    fireEvent.keyDown(window, { key: "y", ctrlKey: true });
+    expect(onRedo).toHaveBeenCalledTimes(2);
   });
 });
 

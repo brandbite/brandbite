@@ -10,18 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { MOODBOARD_ACCESS_SELECT, moodboardAccess } from "@/lib/moodboard-access";
-import { deleteR2Objects } from "@/lib/r2";
-
-/** Pull the R2 storage key out of an IMAGE/FILE item's data blob, if any. */
-function itemStorageKey(item: { type: string; data: unknown }): string | null {
-  if (item.type !== "IMAGE" && item.type !== "FILE") return null;
-  const data = item.data;
-  if (data && typeof data === "object" && "storageKey" in data) {
-    const key = (data as { storageKey?: unknown }).storageKey;
-    return typeof key === "string" ? key : null;
-  }
-  return null;
-}
+import { storageKeyAllowed } from "@/lib/moodboard-items";
 
 type RouteParams = {
   params: Promise<{ moodboardId: string; itemId: string }>;
@@ -77,6 +66,9 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       if (!raw.data || typeof raw.data !== "object") {
         return NextResponse.json({ error: "Item data must be an object" }, { status: 400 });
       }
+      if (!storageKeyAllowed(moodboardId, raw.data)) {
+        return NextResponse.json({ error: "That file isn't on this moodboard" }, { status: 400 });
+      }
       data.data = raw.data;
     }
 
@@ -114,6 +106,11 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
         return NextResponse.json({ error: "height must be >= 0" }, { status: 400 });
       }
       data.height = raw.height;
+    }
+
+    // Undo of a delete.
+    if (raw.restore === true) {
+      data.deletedAt = null;
     }
 
     if (Object.keys(data).length === 0) {
@@ -188,13 +185,12 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams) {
       );
     }
 
-    await prisma.moodboardItem.delete({
+    // Hidden, not removed, so undo can bring it back with its file.
+    // purgeDeletedMoodboardItems removes it for good later.
+    await prisma.moodboardItem.update({
       where: { id: itemId },
+      data: { deletedAt: new Date() },
     });
-
-    // Best-effort R2 cleanup so a deleted image/file doesn't linger in the
-    // bucket (and stay reachable via its public URL) after its row is gone.
-    await deleteR2Objects([itemStorageKey(item)]);
 
     return NextResponse.json({ success: true });
   } catch (err: any) {

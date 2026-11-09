@@ -6,6 +6,7 @@
 // @lastUpdate: 2026-03-09
 // -----------------------------------------------------------------------------
 
+import { storageKeyAllowed } from "@/lib/moodboard-items";
 import { NextRequest, NextResponse } from "next/server";
 import { MoodboardItemType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -63,6 +64,10 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         { error: "Item data is required and must be an object" },
         { status: 400 },
       );
+    }
+
+    if (!storageKeyAllowed(moodboardId, data)) {
+      return NextResponse.json({ error: "That file isn't on this moodboard" }, { status: 400 });
     }
 
     const colSpan =

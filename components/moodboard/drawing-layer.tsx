@@ -25,10 +25,10 @@ type DrawingLayerProps = {
     data: DrawingCardData,
     bounds: { x: number; y: number; w: number; h: number },
   ) => void;
-  /** Called when a drawing item is clicked (for deletion in select mode). */
-  onSelectDrawing?: (itemId: string) => void;
-  /** ID of the currently selected drawing (for highlight). */
+  /** ID of the drawing selected on its own: it gets a delete button. */
   selectedDrawingId?: string | null;
+  /** Every selected drawing, for the highlight. */
+  highlightedIds?: ReadonlySet<string>;
   /** Called to delete the selected drawing. */
   onDeleteDrawing?: (itemId: string) => void;
 };
@@ -112,8 +112,8 @@ function DrawingLayerBase({
   getTransform,
   viewportRef,
   onStrokeComplete,
-  onSelectDrawing,
   selectedDrawingId,
+  highlightedIds,
   onDeleteDrawing,
 }: DrawingLayerProps) {
   const [currentPoints, setCurrentPoints] = useState<{ x: number; y: number }[]>([]);
@@ -322,11 +322,11 @@ function DrawingLayerBase({
       {/* Rendered saved drawings */}
       {drawings.map((item) => {
         const data = item.data as DrawingCardData;
-        const isSelected = selectedDrawingId === item.id;
+        const isSelected = selectedDrawingId === item.id || !!highlightedIds?.has(item.id);
         const isEraserHovered = eraserActive && eraserHoveredId === item.id;
 
         return (
-          <g key={item.id}>
+          <g key={item.id} data-mb-drawing-group={item.id}>
             {/* Invisible wider path for click/hover targeting (select + eraser modes) */}
             {(!active || eraserActive) && (
               <path
@@ -338,10 +338,6 @@ function DrawingLayerBase({
                 strokeLinejoin="round"
                 style={{ pointerEvents: "stroke", cursor: "pointer" }}
                 data-mb-drawing-id={item.id}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (!eraserActive) onSelectDrawing?.(item.id);
-                }}
               />
             )}
             {/* Visible stroke */}
@@ -362,8 +358,9 @@ function DrawingLayerBase({
               opacity={isEraserHovered ? 0.6 : isSelected ? 0.8 : (data.opacity ?? 1)}
             />
             {/* Delete button for selected drawing (select mode only) */}
-            {isSelected && !eraserActive && onDeleteDrawing && (
+            {selectedDrawingId === item.id && !eraserActive && onDeleteDrawing && (
               <g
+                data-mb-canvas-ui
                 style={{ pointerEvents: "auto", cursor: "pointer" }}
                 onClick={(e) => {
                   e.stopPropagation();

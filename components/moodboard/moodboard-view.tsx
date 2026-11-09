@@ -11,6 +11,16 @@ import { useIsPhone } from "@/components/moodboard/use-is-phone";
 import { useToast } from "@/components/ui/toast-provider";
 import { AddLinkModal } from "@/components/moodboard/add-link-modal";
 import { AddEmbedModal } from "@/components/moodboard/add-embed-modal";
+import {
+  buildClipboard,
+  diffBoards,
+  isEmptyDiff,
+  parseClipboard,
+  serializeClipboard,
+  type BoardClipboard,
+  type BoardSnapshot,
+} from "@/components/moodboard/board-history";
+import { shiftPath } from "@/components/moodboard/canvas-math";
 
 import type {
   MoodboardClient,
@@ -50,8 +60,18 @@ type Point = { x: number; y: number };
 /** How long the Undo offer stays on screen after deleting. */
 const UNDO_MS = 8000;
 const CASCADE_PX = 24;
+const MAX_HISTORY = 100;
+/** Repeats of the same small change this close together are one undo step. */
+const COALESCE_MS = 1000;
 
-type DeletedItem = { item: MoodboardItemClient; connections: MoodboardConnection[] };
+/** Kept outside the page so a copy can be pasted on another board in this tab. */
+let lastCopy: BoardClipboard | null = null;
+
+function withShiftedDrawing(item: MoodboardItemClient, x: number, y: number) {
+  if (item.type !== "DRAWING") return { x, y };
+  const data = item.data as DrawingCardData;
+  return { x, y, data: { ...data, pathData: shiftPath(data.pathData, x - item.x, y - item.y) } };
+}
 
 /** The middle of the view, stepped diagonally so new cards don't stack exactly. */
 function placeNear(
@@ -87,7 +107,8 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
   const [shapeKind, setShapeKind] = useState<ShapeKind>("rect");
   const [placing, setPlacing] = useState<CreatableKind | null>(null);
 
-  const [deleted, setDeleted] = useState<DeletedItem | null>(null);
+  const [deletedCount, setDeletedCount] = useState(0);
+  const [historySize, setHistorySize] = useState({ undo: 0, redo: 0 });
 
   const canvasHandle = useRef<BoardCanvasHandle | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -99,6 +120,23 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
     (id: string) => serverIds.current.get(id) ?? Promise.resolve(id),
     [],
   );
+  /**
+   * Writes to one object go out in order, so an undo right after a delete can't
+   * reach the server first. The arrows have a line of their own.
+   */
+  const writes = useRef(new Map<string, Promise<unknown>>());
+  const enqueue = useCallback(<T,>(key: string, write: () => Promise<T>): Promise<T> => {
+    const next = (writes.current.get(key) ?? Promise.resolve()).catch(() => {}).then(write);
+    writes.current.set(key, next);
+    return next;
+  }, []);
+
+  const boardRef = useRef<MoodboardClient | null>(null);
+  const past = useRef<BoardSnapshot[]>([]);
+  const future = useRef<BoardSnapshot[]>([]);
+  const lastRecord = useRef<{ key: string; at: number } | null>(null);
+  const pasteCount = useRef(0);
+
   /** Where the object from a file picker or dialog should land. */
   const pendingPoint = useRef<Point | null>(null);
 
@@ -109,19 +147,29 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
   // Fetch moodboard
   // ---------------------------------------------------------------------------
 
+  const clearHistory = useCallback(() => {
+    past.current = [];
+    future.current = [];
+    lastRecord.current = null;
+    setHistorySize({ undo: 0, redo: 0 });
+  }, []);
+
+  /** A fresh copy from the server replaces what's on screen, so history starts over. */
   const fetchMoodboard = useCallback(async () => {
     try {
       const res = await fetch(`/api/moodboards/${moodboardId}`);
       if (!res.ok) throw new Error("Failed to load moodboard");
 
       const json = await res.json();
+      serverIds.current.clear();
+      clearHistory();
       setMoodboard(json.moodboard);
     } catch (err) {
       console.error("[moodboard-view] fetch error:", err);
     } finally {
       setLoading(false);
     }
-  }, [moodboardId]);
+  }, [moodboardId, clearHistory]);
 
   useEffect(() => {
     fetchMoodboard();
@@ -199,10 +247,217 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
   }, [isPhone, loading]);
 
   useEffect(() => {
-    if (!deleted) return;
-    const timer = setTimeout(() => setDeleted(null), UNDO_MS);
+    if (!deletedCount) return;
+    const timer = setTimeout(() => setDeletedCount(0), UNDO_MS);
     return () => clearTimeout(timer);
-  }, [deleted]);
+  }, [deletedCount]);
+
+  useLayoutEffect(() => {
+    boardRef.current = moodboard;
+  });
+
+  // ---------------------------------------------------------------------------
+  // Undo and redo
+  // ---------------------------------------------------------------------------
+
+  /** Call just before changing the board. A key merges repeats into one step. */
+  function record(key?: string) {
+    const board = boardRef.current;
+    if (!board) return;
+    const now = Date.now();
+    if (key && lastRecord.current?.key === key && now - lastRecord.current.at < COALESCE_MS) {
+      lastRecord.current.at = now;
+      return;
+    }
+    past.current.push({ items: board.items, connections: board.connections });
+    if (past.current.length > MAX_HISTORY) past.current.shift();
+    future.current = [];
+    lastRecord.current = key ? { key, at: now } : null;
+    setHistorySize({ undo: past.current.length, redo: 0 });
+    setDeletedCount(0);
+  }
+
+  /** One request about one object, sent after any earlier ones about it. */
+  function writeItem(itemId: string, method: "PATCH" | "DELETE", body?: unknown) {
+    return enqueue(itemId, async () => {
+      const sid = await serverId(itemId);
+      const res = await fetch(`/api/moodboards/${moodboardId}/items/${sid}`, {
+        method,
+        ...(body
+          ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
+          : {}),
+      });
+      if (!res.ok) throw new Error(`${method} item failed: ${res.status}`);
+    });
+  }
+
+  function step(from: BoardSnapshot[], to: BoardSnapshot[]) {
+    const board = boardRef.current;
+    if (!board) return;
+    lastRecord.current = null;
+    setDeletedCount(0);
+
+    // A step that changes nothing on screen, like text removed for being empty, is skipped.
+    let target: BoardSnapshot | undefined;
+    let diff = null;
+    while ((target = from.pop())) {
+      diff = diffBoards(board, target);
+      if (!isEmptyDiff(diff)) break;
+      target = undefined;
+    }
+    setHistorySize({
+      undo: from === past.current ? from.length : to.length + (target ? 1 : 0),
+      redo: from === future.current ? from.length : to.length + (target ? 1 : 0),
+    });
+    if (!target || !diff) return;
+
+    to.push({ items: board.items, connections: board.connections });
+    canvasHandle.current?.clearSelection();
+    const { items, connections } = target;
+    setMoodboard((prev) => (prev ? { ...prev, items, connections } : prev));
+
+    Promise.all([
+      ...diff.remove.map((id) => writeItem(id, "DELETE")),
+      ...diff.restore.map((id) => writeItem(id, "PATCH", { restore: true })),
+      ...diff.change.map(({ id, x, y, width, height, data }) =>
+        writeItem(id, "PATCH", { x, y, width, height, data }),
+      ),
+      ...(diff.connectionsChanged ? [saveConnections(connections)] : []),
+    ]).catch((err) => {
+      console.error("[moodboard-view] undo error:", err);
+      showToast({ type: "error", title: "We couldn't undo that. The board has been reloaded." });
+      fetchMoodboard();
+    });
+  }
+
+  function handleUndo() {
+    step(past.current, future.current);
+  }
+
+  function handleRedo() {
+    step(future.current, past.current);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Copy, paste and duplicate
+  // ---------------------------------------------------------------------------
+
+  function handleCopyItems(ids: string[]) {
+    const board = boardRef.current;
+    if (!board) return "";
+    lastCopy = buildClipboard(moodboardId, board, ids);
+    pasteCount.current = 0;
+    return serializeClipboard(lastCopy);
+  }
+
+  function addCopies(clipboard: BoardClipboard, shift: (bounds: Point) => Point) {
+    // A file belongs to the board it was uploaded to.
+    const sameBoard = clipboard.moodboardId === moodboardId;
+    const sources = sameBoard
+      ? clipboard.items
+      : clipboard.items.filter((i) => i.type !== "IMAGE" && i.type !== "FILE");
+    if (sources.length < clipboard.items.length) {
+      showToast({
+        type: "warning",
+        title: "Images and files can only be copied within the same moodboard.",
+      });
+    }
+    if (sources.length === 0) return;
+
+    record();
+    const board = boardRef.current;
+    const position = board?.items.length ?? 0;
+    const now = new Date().toISOString();
+    const offset = shift({
+      x: Math.min(...sources.map((i) => i.x)),
+      y: Math.min(...sources.map((i) => i.y)),
+    });
+
+    const newIds = new Map<string, string>();
+    const copies = sources.map((source, index) => {
+      const id = `tmp_${newClientId()}`;
+      newIds.set(source.id, id);
+      return {
+        ...source,
+        ...withShiftedDrawing(
+          source as MoodboardItemClient,
+          source.x + offset.x,
+          source.y + offset.y,
+        ),
+        id,
+        position: position + index,
+        colSpan: 1,
+        createdById: "",
+        createdAt: now,
+        updatedAt: now,
+      } as MoodboardItemClient;
+    });
+    const copiedArrows = clipboard.connections
+      .filter((c) => newIds.has(c.sourceItemId) && newIds.has(c.targetItemId))
+      .map((c) => ({
+        ...c,
+        id: newClientId(),
+        sourceItemId: newIds.get(c.sourceItemId)!,
+        targetItemId: newIds.get(c.targetItemId)!,
+      }));
+    const nextConnections = [...(board?.connections ?? []), ...copiedArrows];
+
+    setMoodboard((prev) =>
+      prev ? { ...prev, items: [...prev.items, ...copies], connections: nextConnections } : prev,
+    );
+    requestAnimationFrame(() => canvasHandle.current?.selectItems(copies.map((c) => c.id)));
+
+    for (const copy of copies) {
+      const { type, data, x, y, width, height } = copy;
+      const saved = fetch(`/api/moodboards/${moodboardId}/items`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, data, x, y, width, height }),
+      }).then(async (res) => {
+        if (!res.ok) throw new Error("Failed to add copy");
+        return (await res.json()).item.id as string;
+      });
+      serverIds.current.set(copy.id, saved);
+      saved.catch((err) => {
+        console.error("[moodboard-view] copy error:", err);
+        showToast({ type: "error", title: "We couldn't save that copy. Please try again." });
+        fetchMoodboard();
+      });
+    }
+    if (copiedArrows.length > 0) {
+      saveConnections(nextConnections).catch((err) => {
+        console.error("[moodboard-view] copy arrows error:", err);
+        fetchMoodboard();
+      });
+    }
+  }
+
+  function pasteClipboard(clipboard: BoardClipboard) {
+    pasteCount.current += 1;
+    const step = CASCADE_PX * pasteCount.current;
+    addCopies(clipboard, (corner) => {
+      if (clipboard.moodboardId === moodboardId) return { x: step, y: step };
+      const center = canvasHandle.current?.viewCenter() ?? { x: 400, y: 260 };
+      return { x: center.x - corner.x + step, y: center.y - corner.y + step };
+    });
+  }
+
+  function handlePasteText(text: string | null) {
+    const clipboard = parseClipboard(text);
+    if (!clipboard) return false;
+    pasteClipboard(clipboard);
+    return true;
+  }
+
+  function handlePasteLastCopy() {
+    if (lastCopy) pasteClipboard(lastCopy);
+  }
+
+  function handleDuplicateItems(ids: string[]) {
+    const board = boardRef.current;
+    if (!board) return;
+    addCopies(buildClipboard(moodboardId, board, ids), () => ({ x: CASCADE_PX, y: CASCADE_PX }));
+  }
 
   // ---------------------------------------------------------------------------
   // Add item (with canvas position)
@@ -218,6 +473,7 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
     const center = opts.at ?? canvasHandle.current?.viewCenter() ?? { x: 400, y: 260 };
     const { x, y } = placeNear(center, items, width, height);
 
+    record();
     const id = `tmp_${newClientId()}`;
     const now = new Date().toISOString();
     const item = {
@@ -330,6 +586,7 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
 
   async function handleUpdateItem(itemId: string, data: MoodboardItemData) {
     if (!moodboard?.access.canEdit) return;
+    record(`data:${itemId}`);
     setMoodboard((prev) => {
       if (!prev) return prev;
       return {
@@ -339,14 +596,7 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
     });
 
     try {
-      const sid = await serverId(itemId);
-      const res = await fetch(`/api/moodboards/${moodboardId}/items/${sid}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data }),
-      });
-
-      if (!res.ok) throw new Error("Failed to update item");
+      await writeItem(itemId, "PATCH", { data });
     } catch (err) {
       console.error("[moodboard-view] update item error:", err);
       fetchMoodboard();
@@ -357,39 +607,43 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
   // Delete item
   // ---------------------------------------------------------------------------
 
-  async function handleDeleteItem(itemId: string) {
-    const item = moodboard?.items.find((i) => i.id === itemId);
+  function handleDeleteItem(itemId: string) {
+    handleDeleteItems([itemId]);
+  }
 
-    // Also remove any connections referencing this item
-    const orphanedConns = (moodboard?.connections ?? []).filter(
-      (c) => c.sourceItemId === itemId || c.targetItemId === itemId,
+  async function handleDeleteItems(itemIds: string[]) {
+    const board = boardRef.current;
+    if (!board) return;
+    const chosen = new Set(itemIds);
+    const remaining = board.connections.filter(
+      (c) => !chosen.has(c.sourceItemId) && !chosen.has(c.targetItemId),
     );
-    const cleanedConnections = (moodboard?.connections ?? []).filter(
-      (c) => c.sourceItemId !== itemId && c.targetItemId !== itemId,
-    );
+    const orphaned = remaining.length !== board.connections.length;
 
-    setMoodboard((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        items: prev.items.filter((item) => item.id !== itemId),
-        connections: cleanedConnections,
-      };
-    });
-    if (item) setDeleted({ item, connections: orphanedConns });
+    // Strokes erased in one swipe come back together.
+    const onlyDrawings = board.items
+      .filter((i) => chosen.has(i.id))
+      .every((i) => i.type === "DRAWING");
+    record(onlyDrawings && itemIds.length === 1 ? "erase" : undefined);
+
+    setMoodboard((prev) =>
+      prev
+        ? {
+            ...prev,
+            items: prev.items.filter((item) => !chosen.has(item.id)),
+            connections: prev.connections.filter(
+              (c) => !chosen.has(c.sourceItemId) && !chosen.has(c.targetItemId),
+            ),
+          }
+        : prev,
+    );
+    setDeletedCount(itemIds.length);
 
     try {
-      const sid = await serverId(itemId);
-      const res = await fetch(`/api/moodboards/${moodboardId}/items/${sid}`, {
-        method: "DELETE",
-      });
-
-      if (!res.ok) throw new Error("Failed to delete item");
-
-      // If connections were cleaned up, persist that too
-      if (orphanedConns.length > 0) {
-        await saveConnections(cleanedConnections);
-      }
+      await Promise.all([
+        ...itemIds.map((id) => writeItem(id, "DELETE")),
+        ...(orphaned ? [saveConnections(remaining)] : []),
+      ]);
     } catch (err) {
       console.error("[moodboard-view] delete item error:", err);
       fetchMoodboard();
@@ -402,53 +656,9 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
       prev ? { ...prev, items: prev.items.filter((i) => i.id !== itemId) } : prev,
     );
     try {
-      const sid = await serverId(itemId);
-      await fetch(`/api/moodboards/${moodboardId}/items/${sid}`, { method: "DELETE" });
+      await writeItem(itemId, "DELETE");
     } catch (err) {
       console.error("[moodboard-view] remove empty item error:", err);
-    }
-  }
-
-  // Deleting is one key away on the canvas, so the last delete can be taken back.
-  // The card comes back as a new row, with its arrows pointed at the new id.
-  async function handleUndoDelete() {
-    if (!deleted) return;
-    const { item, connections } = deleted;
-    setDeleted(null);
-
-    try {
-      const res = await fetch(`/api/moodboards/${moodboardId}/items`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: item.type,
-          data: item.data,
-          x: item.x,
-          y: item.y,
-          width: item.width,
-          height: item.height,
-        }),
-      });
-      if (!res.ok) throw new Error("Failed to restore item");
-      const restored: MoodboardItemClient = (await res.json()).item;
-
-      const relinked = connections.map((c) => ({
-        ...c,
-        sourceItemId: c.sourceItemId === item.id ? restored.id : c.sourceItemId,
-        targetItemId: c.targetItemId === item.id ? restored.id : c.targetItemId,
-      }));
-      const nextConnections = [...(moodboard?.connections ?? []), ...relinked];
-
-      setMoodboard((prev) =>
-        prev ? { ...prev, items: [...prev.items, restored], connections: nextConnections } : prev,
-      );
-
-      if (relinked.length > 0) {
-        await saveConnections(nextConnections);
-      }
-    } catch (err) {
-      console.error("[moodboard-view] undo delete error:", err);
-      fetchMoodboard();
     }
   }
 
@@ -456,24 +666,39 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
   // Move item (canvas drag)
   // ---------------------------------------------------------------------------
 
-  async function handleMoveItem(itemId: string, x: number, y: number) {
-    setMoodboard((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        items: prev.items.map((item) => (item.id === itemId ? { ...item, x, y } : item)),
-      };
+  function handleMoveItem(itemId: string, x: number, y: number) {
+    handleMoveItems([{ id: itemId, x, y }]);
+  }
+
+  async function handleMoveItems(
+    moves: { id: string; x: number; y: number }[],
+    options?: { nudge?: boolean },
+  ) {
+    const board = boardRef.current;
+    if (!board) return;
+    record(options?.nudge ? `nudge:${moves.map((m) => m.id).join()}` : undefined);
+
+    // A drawing's path holds its own coordinates, so they move with it.
+    const updates = moves.flatMap(({ id, x, y }) => {
+      const item = board.items.find((i) => i.id === id);
+      return item ? [{ id, change: withShiftedDrawing(item, x, y) }] : [];
     });
+    const byId = new Map(updates.map((u) => [u.id, u.change]));
+
+    setMoodboard((prev) =>
+      prev
+        ? {
+            ...prev,
+            items: prev.items.map((item) => {
+              const change = byId.get(item.id);
+              return change ? ({ ...item, ...change } as MoodboardItemClient) : item;
+            }),
+          }
+        : prev,
+    );
 
     try {
-      const sid = await serverId(itemId);
-      const res = await fetch(`/api/moodboards/${moodboardId}/items/${sid}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ x, y }),
-      });
-
-      if (!res.ok) throw new Error("Failed to move item");
+      await Promise.all(updates.map(({ id, change }) => writeItem(id, "PATCH", change)));
     } catch (err) {
       console.error("[moodboard-view] move item error:", err);
       fetchMoodboard();
@@ -491,6 +716,7 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
     width: number,
     height: number,
   ) {
+    record();
     setMoodboard((prev) => {
       if (!prev) return prev;
       return {
@@ -502,14 +728,7 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
     });
 
     try {
-      const sid = await serverId(itemId);
-      const res = await fetch(`/api/moodboards/${moodboardId}/items/${sid}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ x, y, width, height }),
-      });
-
-      if (!res.ok) throw new Error("Failed to resize item");
+      await writeItem(itemId, "PATCH", { x, y, width, height });
     } catch (err) {
       console.error("[moodboard-view] resize item error:", err);
       fetchMoodboard();
@@ -575,7 +794,13 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error(`Request failed: ${res.status}`);
-      await fetchMoodboard();
+      // Sharing doesn't touch the canvas, so what's on it and its undo history stay.
+      const fresh = await fetch(`/api/moodboards/${moodboardId}`);
+      if (!fresh.ok) throw new Error(`Request failed: ${fresh.status}`);
+      const { moodboard: next } = await fresh.json();
+      setMoodboard((prev) =>
+        prev ? { ...next, items: prev.items, connections: prev.connections } : next,
+      );
     } catch (err) {
       console.error("[moodboard-view] sharing error:", err);
       showToast({ type: "error", title: "We couldn't update sharing. Please try again." });
@@ -583,22 +808,26 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
   }
 
   /** Saved with server ids, since temporary ones mean nothing after a reload. */
-  async function saveConnections(connections: MoodboardConnection[]) {
-    const resolved = await Promise.all(
-      connections.map(async (c) => ({
-        ...c,
-        sourceItemId: await serverId(c.sourceItemId),
-        targetItemId: await serverId(c.targetItemId),
-      })),
-    );
-    return fetch(`/api/moodboards/${moodboardId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ connections: resolved }),
+  function saveConnections(connections: MoodboardConnection[]) {
+    return enqueue("connections", async () => {
+      const resolved = await Promise.all(
+        connections.map(async (c) => ({
+          ...c,
+          sourceItemId: await serverId(c.sourceItemId),
+          targetItemId: await serverId(c.targetItemId),
+        })),
+      );
+      const res = await fetch(`/api/moodboards/${moodboardId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ connections: resolved }),
+      });
+      if (!res.ok) throw new Error(`Saving arrows failed: ${res.status}`);
     });
   }
 
   async function handleAddConnection(sourceId: string, targetId: string) {
+    record();
     const newConn = createConnection(sourceId, targetId);
     const updatedConnections = [...(moodboard?.connections ?? []), newConn];
 
@@ -610,9 +839,7 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
 
     // Persist to API
     try {
-      const res = await saveConnections(updatedConnections);
-
-      if (!res.ok) throw new Error("Failed to save connection");
+      await saveConnections(updatedConnections);
     } catch (err) {
       console.error("[moodboard-view] add connection error:", err);
       fetchMoodboard();
@@ -620,6 +847,7 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
   }
 
   async function handleDeleteConnection(connectionId: string) {
+    record();
     const updatedConnections = (moodboard?.connections ?? []).filter((c) => c.id !== connectionId);
 
     // Optimistic update
@@ -630,9 +858,7 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
 
     // Persist to API
     try {
-      const res = await saveConnections(updatedConnections);
-
-      if (!res.ok) throw new Error("Failed to delete connection");
+      await saveConnections(updatedConnections);
     } catch (err) {
       console.error("[moodboard-view] delete connection error:", err);
       fetchMoodboard();
@@ -647,6 +873,7 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
     data: DrawingCardData,
     bounds: { x: number; y: number; w: number; h: number },
   ) {
+    record();
     const id = `tmp_${newClientId()}`;
     const now = new Date().toISOString();
     const item = {
@@ -831,11 +1058,20 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
         onUpdateItem={handleUpdateItem}
         onDeleteItem={handleDeleteItem}
         onMoveItem={handleMoveItem}
+        onMoveItems={handleMoveItems}
+        onDeleteItems={handleDeleteItems}
+        onDuplicateItems={handleDuplicateItems}
+        onCopyItems={handleCopyItems}
+        onPasteText={handlePasteText}
+        onPasteLastCopy={handlePasteLastCopy}
         onResizeItem={handleResizeItem}
         onAddConnection={handleAddConnection}
         onDeleteConnection={handleDeleteConnection}
         onAddDrawing={handleAddDrawing}
-        onUndoDelete={handleUndoDelete}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        canUndo={historySize.undo > 0}
+        canRedo={historySize.redo > 0}
       />
 
       {isPhone && placing && (
@@ -889,15 +1125,15 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
         />
       )}
 
-      {deleted && (
+      {deletedCount > 0 && (
         <div
           role="status"
           className="absolute top-16 left-3 z-30 flex items-center gap-3 rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] py-1 pr-1 pl-4 text-sm text-[var(--av2-text)] shadow-sm"
         >
-          Deleted
+          {deletedCount > 1 ? `${deletedCount} deleted` : "Deleted"}
           <button
             type="button"
-            onClick={handleUndoDelete}
+            onClick={handleUndo}
             className="flex min-h-10 items-center rounded-lg px-3 font-semibold text-[var(--av2-link)] hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
           >
             Undo

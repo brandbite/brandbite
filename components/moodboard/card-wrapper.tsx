@@ -21,6 +21,8 @@ type CardWrapperProps = {
   width: number;
   height: number;
   selected: boolean;
+  /** Selected along with others: outlined, with no controls of its own. */
+  inGroup?: boolean;
   /** Stickies, shapes and text draw themselves, with no card around them. */
   bare: boolean;
   label: string;
@@ -30,6 +32,7 @@ type CardWrapperProps = {
   /** Phones show the toolbar pinned to the screen, since it wouldn't fit here. */
   hideToolbar?: boolean;
   onDelete: (id: string) => void;
+  onDuplicate?: (id: string) => void;
   children: React.ReactNode;
 };
 
@@ -63,12 +66,14 @@ function CardWrapperBase({
   width,
   height,
   selected,
+  inGroup = false,
   bare,
   label,
   registerCard,
   toolbar,
   hideToolbar = false,
   onDelete,
+  onDuplicate,
   children,
 }: CardWrapperProps) {
   return (
@@ -78,7 +83,7 @@ function CardWrapperBase({
       role="group"
       aria-label={label}
       tabIndex={0}
-      className={`group absolute cursor-default outline-none ${selected ? "z-30" : ""} ${bare ? "" : "rounded-2xl"}`}
+      className={`group absolute cursor-default outline-none ${selected || inGroup ? "z-30" : ""} ${bare ? "" : "rounded-2xl"}`}
       style={{ left: x, top: y, width, ...(height > 0 ? { height } : {}) }}
     >
       <div
@@ -94,6 +99,17 @@ function CardWrapperBase({
       >
         {children}
       </div>
+
+      {inGroup && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            borderRadius: bare ? 4 : 16,
+            boxShadow: `0 0 0 calc(2px * ${INVERSE}) var(--av2-accent)`,
+          }}
+        />
+      )}
 
       {selected && (
         <>
@@ -148,6 +164,16 @@ function CardWrapperBase({
             >
               <div className="pointer-events-auto flex items-center gap-1 rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-1 whitespace-nowrap shadow-md">
                 {toolbar}
+                {onDuplicate && (
+                  <button
+                    type="button"
+                    onClick={() => onDuplicate(id)}
+                    aria-label={`Duplicate ${label}`}
+                    className="flex h-9 items-center rounded-lg px-3 text-sm font-medium text-[var(--av2-text)] hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
+                  >
+                    Duplicate
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => onDelete(id)}
