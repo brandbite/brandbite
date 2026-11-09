@@ -142,7 +142,7 @@ export function StudioShell({
   aside?: ReactNode;
   /** Section pill above the headline; Color Studio by default. */
   label?: string;
-  /** Section menu; the Color Studio tool menu by default. */
+  /** Section menu; the Color Studio tool menu by default, none with null. */
   nav?: ReactNode;
   children: ReactNode;
 }) {
@@ -151,7 +151,7 @@ export function StudioShell({
       <main id="main-content" className="mx-auto w-full max-w-[1312px]">
         <HomeHeader />
         <div className={`pt-6 ${CONTENT_GUTTER}`}>
-          {nav ?? <ToolNav />}
+          {nav === undefined ? <ToolNav /> : nav}
           <PageIntro
             title={title}
             accent={accent}

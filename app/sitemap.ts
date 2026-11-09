@@ -67,6 +67,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...MARKETING_PATHS.map((path) => entry(path, 0.8)),
     ...COLOR_TOOL_PATHS.map((path) => entry(path, 0.8)),
     entry("/sizes", 0.8),
+    entry("/brief-generator", 0.8),
     ...SIZE_PLATFORMS.map((platform) => entry(`/sizes/${platform.slug}`, 0.8)),
     ...posts.map((post) => entry(`/blog/${post.slug}`, 0.7, post.updatedAt)),
     ...paletteIdeas.map((idea) => entry(`/colors/palettes/${idea.slug}`, 0.6)),

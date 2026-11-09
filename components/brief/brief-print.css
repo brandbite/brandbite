@@ -1,0 +1,28 @@
+/* "Save as PDF" prints only the brief preview, on white. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .brief-print,
+  .brief-print * {
+    visibility: visible;
+  }
+  /* The preview sits in a sticky, scrolling panel; let it out for printing. */
+  .brief-print-frame {
+    position: static !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  .brief-print {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    padding: 0;
+    color: #000;
+    font-size: 12pt;
+    line-height: 1.5;
+  }
+  @page {
+    margin: 18mm;
+  }
+}

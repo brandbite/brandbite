@@ -103,6 +103,8 @@ const PUBLIC_PATHS = [
   "/colors",
   // Public social media and ad size guide (static pages, no API).
   "/sizes",
+  // Free creative brief generator (client-side tool, no API).
+  "/brief-generator",
   // Public CMS reads for the color tools (published content only; admin
   // mutations live behind /api/admin/*).
   "/api/palette-ideas",
