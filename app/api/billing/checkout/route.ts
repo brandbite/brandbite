@@ -15,6 +15,8 @@ import { hasLiveSubscription } from "@/lib/billing/subscription";
 
 type CheckoutRequestBody = {
   planId?: string;
+  /** The saved request to offer again on the way back from Stripe. */
+  returnDraftId?: string | null;
 };
 
 export async function POST(req: NextRequest) {
@@ -48,6 +50,11 @@ export async function POST(req: NextRequest) {
 
     const body = (await req.json()) as CheckoutRequestBody;
     const planId = body.planId;
+    // Only ever echoed back into our own URL, so its shape is all that matters.
+    const draftParam =
+      typeof body.returnDraftId === "string" && /^[a-z0-9]{1,64}$/i.test(body.returnDraftId)
+        ? `&draft=${body.returnDraftId}`
+        : "";
 
     if (!planId) {
       return NextResponse.json({ error: "planId is required." }, { status: 400 });
@@ -113,8 +120,8 @@ export async function POST(req: NextRequest) {
           quantity: 1,
         },
       ],
-      success_url: `${baseUrl}/customer/settings?billing=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${baseUrl}/customer/settings?billing=cancelled`,
+      success_url: `${baseUrl}/customer/settings?billing=success&session_id={CHECKOUT_SESSION_ID}${draftParam}`,
+      cancel_url: `${baseUrl}/customer/settings?billing=cancelled${draftParam}`,
       metadata: {
         planId: plan.id,
         companyId: user.activeCompanyId,

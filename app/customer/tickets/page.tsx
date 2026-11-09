@@ -10,6 +10,7 @@
 "use client";
 
 import Link from "next/link";
+import { DraftsLink } from "@/components/dashboard/tickets/drafts-link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -333,9 +334,12 @@ export default function CustomerTicketsPage() {
         }
         actions={
           canCreateNewTicket ? (
-            <ButtonLink href="/customer/tickets/new" variant="primary">
-              + New request
-            </ButtonLink>
+            <>
+              <DraftsLink />
+              <ButtonLink href="/customer/tickets/new" variant="primary">
+                + New request
+              </ButtonLink>
+            </>
           ) : null
         }
       />

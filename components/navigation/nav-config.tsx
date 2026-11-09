@@ -90,6 +90,7 @@ export const ADMIN_NAV: NavConfig = {
         { href: "/admin/consultations", label: "Consultations", icon: IconConsultations },
         { href: "/admin/meetings", label: "Meetings", icon: IconConsultations },
         { href: "/admin/moodboards", label: "Moodboards", icon: IconMoodboards },
+        { href: "/admin/ticket-drafts", label: "Request drafts", icon: IconContent },
       ],
     },
     {
