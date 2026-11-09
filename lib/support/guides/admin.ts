@@ -1689,8 +1689,9 @@ export const ADMIN_GUIDES: SupportGuide[] = [
           },
           {
             type: "p",
-            text: "Filter by action and outcome, and select a row for the full details. Entries can never be changed or deleted.",
+            text: "Filter by action and outcome, and choose how many entries a page shows. **View details** opens the full record: the actor's email, what changed, any error message, the IP address and user agent, and the IDs. **About audit log** explains what an entry records. Entries can never be changed or deleted.",
           },
+          { type: "figure", caption: "The audit log with an entry's details open" },
         ],
       },
     ],

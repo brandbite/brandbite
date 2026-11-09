@@ -156,3 +156,11 @@ export function IconExpand(p: Props) {
     </svg>
   );
 }
+
+export function IconArrowRight(p: Props) {
+  return (
+    <svg {...base} width={18} height={18} {...p}>
+      <path d="M5 12h14M13 6l6 6-6 6" />
+    </svg>
+  );
+}
