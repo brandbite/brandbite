@@ -1,9 +1,23 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- standalone CommonJS generator, run with node outside the app */
 // Builds public/templates/brandbite-creative-brief-template.docx
 const fs = require("fs");
 const path = require("path");
 const {
-  AlignmentType, BorderStyle, Document, Footer, Header, HeadingLevel, LevelFormat, Packer,
-  Paragraph, ShadingType, Table, TableCell, TableRow, TextRun, WidthType,
+  AlignmentType,
+  BorderStyle,
+  Document,
+  Footer,
+  Header,
+  HeadingLevel,
+  LevelFormat,
+  Packer,
+  Paragraph,
+  ShadingType,
+  Table,
+  TableCell,
+  TableRow,
+  TextRun,
+  WidthType,
 } = require("docx");
 
 const OUT = process.argv[2];
@@ -24,7 +38,16 @@ const borders = { top: border, bottom: border, left: border, right: border };
 const p = (text, opts = {}) =>
   new Paragraph({
     spacing: { before: 0, after: opts.after ?? 80 },
-    children: [new TextRun({ text, font: FONT, size: opts.size ?? 20, color: opts.color ?? INK, bold: opts.bold, italics: opts.italics })],
+    children: [
+      new TextRun({
+        text,
+        font: FONT,
+        size: opts.size ?? 20,
+        color: opts.color ?? INK,
+        bold: opts.bold,
+        italics: opts.italics,
+      }),
+    ],
   });
 
 const hint = (text) => p(text, { color: MUTED, italics: true, size: 18, after: 40 });
@@ -46,13 +69,17 @@ function fieldTable(rows) {
   return new Table({
     width: { size: CONTENT_W, type: WidthType.DXA },
     columnWidths: [left, right],
-    rows: rows.map(([label, help, lines = 1]) =>
-      new TableRow({
-        children: [
-          cell([p(label, { bold: true, after: 0 })], left, { fill: SOFT }),
-          cell([hint(help), ...Array.from({ length: lines }, () => p(" ", { after: 60 }))], right),
-        ],
-      }),
+    rows: rows.map(
+      ([label, help, lines = 1]) =>
+        new TableRow({
+          children: [
+            cell([p(label, { bold: true, after: 0 })], left, { fill: SOFT }),
+            cell(
+              [hint(help), ...Array.from({ length: lines }, () => p(" ", { after: 60 }))],
+              right,
+            ),
+          ],
+        }),
     ),
   });
 }
@@ -64,10 +91,17 @@ function gridTable(headers, widths, blankRows) {
     rows: [
       new TableRow({
         tableHeader: true,
-        children: headers.map((h, i) => cell([p(h, { bold: true, after: 0, size: 18 })], widths[i], { fill: SOFT })),
+        children: headers.map((h, i) =>
+          cell([p(h, { bold: true, after: 0, size: 18 })], widths[i], { fill: SOFT }),
+        ),
       }),
-      ...blankRows.map((row) =>
-        new TableRow({ children: widths.map((w, i) => cell([p(row[i] ?? " ", { color: MUTED, italics: !!row[i], size: 18, after: 0 })], w)) }),
+      ...blankRows.map(
+        (row) =>
+          new TableRow({
+            children: widths.map((w, i) =>
+              cell([p(row[i] ?? " ", { color: MUTED, italics: !!row[i], size: 18, after: 0 })], w),
+            ),
+          }),
       ),
     ],
   });
@@ -99,44 +133,122 @@ const doc = new Document({
   styles: {
     default: { document: { run: { font: FONT, size: 20, color: INK } } },
     paragraphStyles: [
-      { id: "Title", name: "Title", basedOn: "Normal", run: { font: FONT, size: 48, bold: true, color: INK }, paragraph: { spacing: { before: 0, after: 80 }, keepNext: true } },
-      { id: "Heading1", name: "Heading 1", basedOn: "Normal", next: "Normal", quickFormat: true, run: { font: FONT, size: 26, bold: true, color: INK }, paragraph: { spacing: { before: 200, after: 60 }, keepNext: true, outlineLevel: 0 } },
+      {
+        id: "Title",
+        name: "Title",
+        basedOn: "Normal",
+        run: { font: FONT, size: 48, bold: true, color: INK },
+        paragraph: { spacing: { before: 0, after: 80 }, keepNext: true },
+      },
+      {
+        id: "Heading1",
+        name: "Heading 1",
+        basedOn: "Normal",
+        next: "Normal",
+        quickFormat: true,
+        run: { font: FONT, size: 26, bold: true, color: INK },
+        paragraph: { spacing: { before: 200, after: 60 }, keepNext: true, outlineLevel: 0 },
+      },
     ],
   },
   numbering: {
-    config: [{ reference: "bullets", levels: [{ level: 0, format: LevelFormat.BULLET, text: "•", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 360, hanging: 240 } } } }] }],
+    config: [
+      {
+        reference: "bullets",
+        levels: [
+          {
+            level: 0,
+            format: LevelFormat.BULLET,
+            text: "•",
+            alignment: AlignmentType.LEFT,
+            style: { paragraph: { indent: { left: 360, hanging: 240 } } },
+          },
+        ],
+      },
+    ],
   },
   sections: [
     {
-      properties: { page: { size: { width: PAGE_W, height: 15840 }, margin: { top: 900, bottom: 900, left: MARGIN, right: MARGIN } } },
+      properties: {
+        page: {
+          size: { width: PAGE_W, height: 15840 },
+          margin: { top: 900, bottom: 900, left: MARGIN, right: MARGIN },
+        },
+      },
       headers: {
         default: new Header({
-          children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: "brand", font: FONT, bold: true, size: 18, color: INK }), new TextRun({ text: "bite", font: FONT, bold: true, size: 18, color: ORANGE })] })],
+          children: [
+            new Paragraph({
+              alignment: AlignmentType.RIGHT,
+              children: [
+                new TextRun({ text: "brand", font: FONT, bold: true, size: 18, color: INK }),
+                new TextRun({ text: "bite", font: FONT, bold: true, size: 18, color: ORANGE }),
+              ],
+            }),
+          ],
         }),
       },
       footers: {
         default: new Footer({
-          children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Free template by brandbite. Write one online at brandbite.studio/brief-generator", font: FONT, size: 16, color: MUTED })] })],
+          children: [
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              children: [
+                new TextRun({
+                  text: "Free template by brandbite. Write one online at brandbite.studio/brief-generator",
+                  font: FONT,
+                  size: 16,
+                  color: MUTED,
+                }),
+              ],
+            }),
+          ],
         }),
       },
       children: [
-        new Paragraph({ style: "Title", children: [new TextRun({ text: "Creative brief", font: FONT })] }),
-        p("Fill in every gray prompt, then delete the prompts. Keep it to one or two pages.", { color: MUTED, after: 200 }),
-        gridTable(["Project name", "Prepared by", "Date"], [4200, 3480, 2400], [["A short name everyone will use", "Your name and role", "Today"]]),
+        new Paragraph({
+          style: "Title",
+          children: [new TextRun({ text: "Creative brief", font: FONT })],
+        }),
+        p("Fill in every gray prompt, then delete the prompts. Keep it to one or two pages.", {
+          color: MUTED,
+          after: 200,
+        }),
+        gridTable(
+          ["Project name", "Prepared by", "Date"],
+          [4200, 3480, 2400],
+          [["A short name everyone will use", "Your name and role", "Today"]],
+        ),
 
-        ...section("1", "The project", "What you need, in a summary a designer could repeat back to you."),
+        ...section(
+          "1",
+          "The project",
+          "What you need, in a summary a designer could repeat back to you.",
+        ),
         fieldTable([
           ["What we need", "e.g. Social campaign, logo, landing page, pitch deck."],
-          ["Summary", "One or two sentences. Example: Six Instagram posts and six stories announcing our team plan, running for two weeks from March 3.", 2],
+          [
+            "Summary",
+            "One or two sentences. Example: Six Instagram posts and six stories announcing our team plan, running for two weeks from March 3.",
+            2,
+          ],
         ]),
 
         ...section("2", "Background", "Who you are and who the work is for."),
         fieldTable([
           ["Company or brand", "Name, and what you do in plain words."],
-          ["Audience", "Describe them as people: what they care about, what they think of you today, what would make them stop scrolling.", 2],
+          [
+            "Audience",
+            "Describe them as people: what they care about, what they think of you today, what would make them stop scrolling.",
+            2,
+          ],
         ]),
 
-        ...section("3", "The goal", "What should change because of this work, and how you'll know."),
+        ...section(
+          "3",
+          "The goal",
+          "What should change because of this work, and how you'll know.",
+        ),
         fieldTable([
           ["Objective", "Be specific. Example: 300 free trials in two weeks.", 2],
           ["How we'll measure it", "Example: sign-ups from campaign links, saves on Instagram."],
@@ -150,13 +262,21 @@ const doc = new Document({
           ["Avoid", "Anything to stay away from, and why."],
         ]),
 
-        ...section("5", "Deliverables", "Every file you expect. Exact sizes save a revision round."),
+        ...section(
+          "5",
+          "Deliverables",
+          "Every file you expect. Exact sizes save a revision round.",
+        ),
         gridTable(
           ["Deliverable", "Size (px)", "Format", "Due"],
           [3780, 2100, 2100, 2100],
           [["Instagram post", "1080 × 1350", "PNG + source", "Mar 3"], [], [], []],
         ),
-        p("Not sure of the sizes? See brandbite.studio/sizes", { color: MUTED, size: 16, after: 0 }),
+        p("Not sure of the sizes? See brandbite.studio/sizes", {
+          color: MUTED,
+          size: 16,
+          after: 0,
+        }),
 
         ...section("6", "Brand"),
         fieldTable([
