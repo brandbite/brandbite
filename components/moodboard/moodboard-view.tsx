@@ -24,6 +24,7 @@ import {
 import { shiftPath } from "@/components/moodboard/canvas-math";
 import { nextPosition, restack } from "@/components/moodboard/stacking";
 import { exportFileName, type ExportFormat } from "@/components/moodboard/export-board";
+import { CommentsPanel } from "@/components/moodboard/comments-panel";
 
 import type {
   MoodboardClient,
@@ -37,6 +38,8 @@ import type {
   MoodboardConnection,
   PenKind,
   ShapeKind,
+  CommentThreadClient,
+  CommentViewer,
 } from "@/lib/moodboard";
 import {
   createConnection,
@@ -180,6 +183,69 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
   useEffect(() => {
     fetchMoodboard();
   }, [fetchMoodboard]);
+
+  // ---------------------------------------------------------------------------
+  // Comments
+  // ---------------------------------------------------------------------------
+
+  const [threads, setThreads] = useState<CommentThreadClient[]>([]);
+  const [commentViewer, setCommentViewer] = useState<CommentViewer | null>(null);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [commentFocus, setCommentFocus] = useState<string | null>(null);
+
+  /** Sends a comment request; the reply carries the board's threads as they now are. */
+  const commentRequest = useCallback(
+    async (path: string, init?: RequestInit): Promise<boolean> => {
+      try {
+        const res = await fetch(`/api/moodboards/${moodboardId}/comments${path}`, {
+          ...init,
+          headers: init?.body ? { "Content-Type": "application/json" } : undefined,
+        });
+        const json = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(json?.error ?? `Comments request failed: ${res.status}`);
+        setThreads(json.threads ?? []);
+        setCommentViewer(json.viewer ?? null);
+        return true;
+      } catch (err) {
+        console.error("[moodboard-view] comments error:", err);
+        showToast({
+          type: "error",
+          title: err instanceof Error && err.message ? err.message : "Comments didn't load.",
+        });
+        return false;
+      }
+    },
+    [moodboardId, showToast],
+  );
+
+  const loadComments = useCallback(async () => {
+    setCommentsLoading(true);
+    await commentRequest("");
+    setCommentsLoading(false);
+  }, [commentRequest]);
+
+  useEffect(() => {
+    void loadComments();
+    // A notification link opens the board with its comments showing.
+    if (new URLSearchParams(window.location.search).get("comments")) setCommentsOpen(true);
+  }, [loadComments]);
+
+  /** Comments in open threads, per object, for the badges on the board. */
+  const commentCounts = React.useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const t of threads) {
+      if (t.resolvedAt) continue;
+      counts.set(t.itemId, (counts.get(t.itemId) ?? 0) + 1 + t.replies.length);
+    }
+    return counts;
+  }, [threads]);
+
+  function openComments(itemId: string | null) {
+    setCommentsOpen(true);
+    setCommentFocus(itemId);
+    void loadComments();
+  }
 
   // The canvas fills the rest of the window, so the page itself never scrolls and
   // can't compete with the canvas. Measured, because banners change where it starts.
@@ -1254,7 +1320,42 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
         onRedo={handleRedo}
         canUndo={historySize.undo > 0}
         canRedo={historySize.redo > 0}
+        commentCounts={commentCounts}
+        commentsOpen={commentsOpen}
+        onOpenComments={openComments}
       />
+
+      {commentsOpen && (
+        <CommentsPanel
+          threads={threads}
+          items={moodboard.items}
+          viewer={commentViewer}
+          focusItemId={commentFocus}
+          loading={commentsLoading}
+          onClose={() => {
+            setCommentsOpen(false);
+            setCommentFocus(null);
+          }}
+          onShowAll={() => setCommentFocus(null)}
+          onFocusItem={(itemId) => {
+            setCommentFocus(itemId);
+            if (canEdit) canvasHandle.current?.selectCard(itemId);
+          }}
+          onStart={(itemId, body) =>
+            commentRequest("", { method: "POST", body: JSON.stringify({ itemId, body }) })
+          }
+          onReply={(threadId, body) =>
+            commentRequest("", { method: "POST", body: JSON.stringify({ threadId, body }) })
+          }
+          onResolve={(threadId, resolved) =>
+            void commentRequest(`/${threadId}`, {
+              method: "PATCH",
+              body: JSON.stringify({ resolved }),
+            })
+          }
+          onDelete={(commentId) => void commentRequest(`/${commentId}`, { method: "DELETE" })}
+        />
+      )}
 
       {isPhone && placing && (
         <div
@@ -1279,6 +1380,9 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
         onBack={() => router.push(basePath)}
         onDelete={handleDeleteBoard}
         onExport={handleExport}
+        commentCount={threads.filter((t) => !t.resolvedAt).length}
+        commentsOpen={commentsOpen}
+        onToggleComments={() => (commentsOpen ? setCommentsOpen(false) : openComments(null))}
       />
 
       {canEdit && (

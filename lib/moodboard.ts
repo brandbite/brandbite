@@ -407,3 +407,25 @@ export const COLOR_PRESETS = [
   { hex: "#FF2E58", name: "Radical Red" },
   { hex: "#2576F4", name: "Dodger Blue" },
 ];
+
+// ---------------------------------------------------------------------------
+// Comments
+// ---------------------------------------------------------------------------
+
+export type CommentClient = {
+  id: string;
+  body: string;
+  author: { id: string; name: string };
+  createdAt: string;
+  /** Edited after posting. */
+  edited: boolean;
+};
+
+export type CommentThreadClient = CommentClient & {
+  itemId: string;
+  resolvedAt: string | null;
+  replies: CommentClient[];
+};
+
+/** Who is reading the comments: their own can be edited; admins can delete any. */
+export type CommentViewer = { id: string; canModerate: boolean };

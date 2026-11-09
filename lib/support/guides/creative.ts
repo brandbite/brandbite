@@ -857,6 +857,10 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
             text: "Drag across the empty canvas to select several items, or **Shift**-click them, then move, duplicate or delete them together. On a phone, press and hold an item to start picking several, then tap others to add or remove them. Tap the empty canvas to stop. **Ctrl/⌘ + G** groups the selected items so a click picks them all and they move together; **Ctrl/⌘ + Shift + G** ungroups them. Double-click a grouped item to edit it on its own. **Lock** in the toolbar (**Ctrl/⌘ + Shift + L**) keeps an item from being moved, resized or deleted, handy for a background picture; dragging across it selects what's on top of it. **Ctrl/⌘ + Z** undoes and **Ctrl/⌘ + Shift + Z** redoes, or use the buttons at the top right. **Ctrl/⌘ + C**, **X**, **V** and **D** copy, cut, paste and duplicate.",
           },
           {
+            type: "p",
+            text: "Select an item and click **Comment** in its toolbar, or open **Comments** at the top of the board. Comments stay on that item, and anyone who can see the board can reply. Items with open comments show a number in their corner; click it to read them. **Resolve** closes a thread once it's sorted, and a reply opens it again. Tick **Show resolved** to see closed threads. The person who made the board, and everyone else in a thread, is notified about new comments. You can delete your own comments.",
+          },
+          {
             type: "warning",
             text: "A moodboard you haven't shared is visible only to you and the brandbite team.",
           },

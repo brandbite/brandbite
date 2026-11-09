@@ -40,6 +40,9 @@ type CardWrapperProps = {
   connectors?: boolean;
   /** Locked: no resize handles, and a lock badge while selected. */
   locked?: boolean;
+  /** Comments in open threads on this object, shown as a badge. */
+  commentCount?: number;
+  onOpenComments?: (id: string) => void;
   onDelete: (id: string) => void;
   onDuplicate?: (id: string) => void;
   children: React.ReactNode;
@@ -84,6 +87,8 @@ function CardWrapperBase({
   passThrough = false,
   connectors = true,
   locked = false,
+  commentCount = 0,
+  onOpenComments,
   onDelete,
   onDuplicate,
   children,
@@ -111,6 +116,19 @@ function CardWrapperBase({
       >
         {children}
       </div>
+
+      {commentCount > 0 && onOpenComments && (
+        <button
+          type="button"
+          data-mb-canvas-ui
+          onClick={() => onOpenComments(id)}
+          aria-label={`${commentCount} ${commentCount === 1 ? "comment" : "comments"} on ${label}`}
+          className="pointer-events-auto absolute top-0 right-0 z-20 flex h-7 min-w-7 items-center justify-center gap-1 rounded-full rounded-bl-sm border-2 border-[var(--av2-surface)] bg-[var(--av2-accent-strong)] px-1.5 text-xs font-semibold text-white shadow-md"
+          style={{ transform: `translate(40%, -60%) scale(${INVERSE})` }}
+        >
+          {commentCount}
+        </button>
+      )}
 
       {inGroup && (
         <div

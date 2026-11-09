@@ -50,6 +50,37 @@ function note(id: string, x: number, y = 100, width = 200, height = 200) {
   } as unknown as MoodboardItemClient;
 }
 
+/** The handler props every canvas needs, as mocks. */
+function setupHandlers() {
+  return {
+    onSetToolMode: vi.fn(),
+    onPlace: vi.fn(),
+    onPick: vi.fn(),
+    onCancelPlacing: vi.fn(),
+    onRemoveEmpty: vi.fn(),
+    onUpdateItem: vi.fn(),
+    onDeleteItem: vi.fn(),
+    onMoveItem: vi.fn(),
+    onMoveItems: vi.fn(),
+    onDeleteItems: vi.fn(),
+    onDuplicateItems: vi.fn(),
+    onCopyItems: vi.fn(() => ""),
+    onPasteText: vi.fn(() => true),
+    onPasteLastCopy: vi.fn(),
+    onAddFiles: vi.fn(),
+    onReorderItems: vi.fn(),
+    onSetLocked: vi.fn(),
+    onGroup: vi.fn(),
+    onUngroup: vi.fn(),
+    onResizeItem: vi.fn(),
+    onAddConnection: vi.fn(),
+    onDeleteConnection: vi.fn(),
+    onAddDrawing: vi.fn(),
+    onUndo: vi.fn(),
+    onRedo: vi.fn(),
+  };
+}
+
 function setup(items = [note("a", 100), note("b", 400), note("c", 700)]) {
   const handlers = {
     onSetToolMode: vi.fn(),
@@ -142,6 +173,14 @@ describe("Selecting several objects", () => {
     pointer("pointermove", 1500, 950);
     await nextFrame();
     expect(screen.getByRole("status")).toHaveTextContent("2 selected");
+    pointer("pointerup", 1500, 950);
+    expect(screen.getByRole("status")).toHaveTextContent("2 selected");
+  });
+
+  it("still selects when the box is let go before a frame is drawn", () => {
+    setup();
+    press(viewport(), 1000, 800);
+    pointer("pointermove", 1500, 950);
     pointer("pointerup", 1500, 950);
     expect(screen.getByRole("status")).toHaveTextContent("2 selected");
   });
@@ -369,6 +408,55 @@ describe("Stacking order", () => {
     fireEvent.keyDown(window, { key: "a", ctrlKey: true });
     fireEvent.click(screen.getByRole("button", { name: "Send to back" }));
     expect(onReorderItems).toHaveBeenCalledWith(["a", "b", "c"], "back");
+  });
+});
+
+describe("Comment badges", () => {
+  it("shows open comments on an object and opens them", () => {
+    const onOpenComments = vi.fn();
+    render(
+      <BoardCanvas
+        items={[note("a", 100), note("b", 400)]}
+        connections={[]}
+        toolMode="select"
+        placing={null}
+        drawOpacity={1}
+        drawColor="#000000"
+        drawSize={4}
+        commentCounts={new Map([["a", 3]])}
+        onOpenComments={onOpenComments}
+        {...(Object.fromEntries(
+          Object.keys(setupHandlers()).map((k) => [k, vi.fn()]),
+        ) as unknown as ReturnType<typeof setupHandlers>)}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "3 comments on Sticky note" }));
+    expect(onOpenComments).toHaveBeenCalledWith("a");
+    expect(screen.getAllByRole("button", { name: /comments? on/ })).toHaveLength(1);
+  });
+
+  it("lets a viewer pick an object to comment on while comments are open", () => {
+    const onOpenComments = vi.fn();
+    render(
+      <BoardCanvas
+        items={[note("a", 100)]}
+        connections={[]}
+        toolMode="select"
+        placing={null}
+        drawOpacity={1}
+        drawColor="#000000"
+        drawSize={4}
+        readOnly
+        commentsOpen
+        onOpenComments={onOpenComments}
+        {...(Object.fromEntries(
+          Object.keys(setupHandlers()).map((k) => [k, vi.fn()]),
+        ) as unknown as ReturnType<typeof setupHandlers>)}
+      />,
+    );
+    press(screen.getByText("Body a"), 200, 200);
+    pointer("pointerup", 200, 200);
+    expect(onOpenComments).toHaveBeenCalledWith("a");
   });
 });
 

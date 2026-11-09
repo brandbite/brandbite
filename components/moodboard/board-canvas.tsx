@@ -148,6 +148,12 @@ type BoardCanvasProps = {
   onSetLocked: (itemIds: string[], locked: boolean) => void;
   onGroup: (itemIds: string[]) => void;
   onUngroup: (itemIds: string[]) => void;
+  /** Comments in open threads per object, for the badges. */
+  commentCounts?: Map<string, number>;
+  /** The comments panel is open: a viewer's tap on an object picks it for commenting. */
+  commentsOpen?: boolean;
+  /** Opens the comments for one object. */
+  onOpenComments?: (itemId: string) => void;
   onResizeItem: (itemId: string, x: number, y: number, width: number, height: number) => void;
   onAddConnection: (sourceId: string, targetId: string) => void;
   onDeleteConnection: (id: string) => void;
@@ -186,6 +192,8 @@ type Gesture =
       panY: number;
       /** Pressed on a locked object: a tap without moving selects it. */
       lockedId?: string;
+      /** A viewer pressed an object while comments are open: a tap comments on it. */
+      tapId?: string;
     }
   | {
       kind: "pinch";
@@ -378,6 +386,23 @@ function LockButton({
   );
 }
 
+/** Opens this object's comments. */
+function CommentButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label="Comment"
+      title="Comment"
+      onClick={onClick}
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--av2-text)] hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
+    >
+      <svg {...orderGlyph}>
+        <path d="M4 5h16v11H9l-5 4V5z" />
+      </svg>
+    </button>
+  );
+}
+
 /** Whether ObjectControls shows anything for this object. */
 function hasObjectControls(item: MoodboardItemClient) {
   return (
@@ -537,6 +562,9 @@ export function BoardCanvas({
   onSetLocked,
   onGroup,
   onUngroup,
+  commentCounts,
+  commentsOpen = false,
+  onOpenComments,
   onResizeItem,
   onAddConnection,
   onDeleteConnection,
@@ -595,6 +623,8 @@ export function BoardCanvas({
     onSetLocked,
     onGroup,
     onUngroup,
+    commentsOpen,
+    onOpenComments,
     onResizeItem,
     onDeleteConnection,
     onUndo,
@@ -629,6 +659,8 @@ export function BoardCanvas({
       onSetLocked,
       onGroup,
       onUngroup,
+      commentsOpen,
+      onOpenComments,
       onResizeItem,
       onDeleteConnection,
       onUndo,
@@ -908,7 +940,7 @@ export function BoardCanvas({
   }, [toolMode, placing, setCursor, idleCursor]);
 
   const startPan = useCallback(
-    (e: React.PointerEvent, lockedId?: string) => {
+    (e: React.PointerEvent, lockedId?: string, tapId?: string) => {
       const { panX, panY } = canvas.getTransform();
       gesture.current = {
         kind: "pan",
@@ -918,6 +950,7 @@ export function BoardCanvas({
         panX,
         panY,
         lockedId,
+        tapId,
       };
     },
     [canvas],
@@ -987,7 +1020,10 @@ export function BoardCanvas({
 
     // Viewers can only move around. A link still opens, unless the press became a pan.
     if (latest.current.readOnly) {
-      startPan(e);
+      const tapId = latest.current.commentsOpen
+        ? target.closest<HTMLElement>("[data-mb-card-id]")?.dataset.mbCardId
+        : undefined;
+      startPan(e, undefined, tapId);
       return;
     }
 
@@ -1558,6 +1594,13 @@ export function BoardCanvas({
       }
 
       if (g.kind === "marquee") {
+        // A quick flick can end before a frame was drawn: pick from where it ended.
+        if (g.moved) {
+          pointer.current = { x: e.clientX, y: e.clientY, free: false };
+          gesture.current = g;
+          paintGesture();
+          gesture.current = null;
+        }
         if (marqueeRef.current) marqueeRef.current.style.display = "none";
         if (!g.moved && g.lockedId) {
           selectIds([g.lockedId]);
@@ -1567,8 +1610,12 @@ export function BoardCanvas({
       }
 
       if (g.kind === "pan") {
-        if (g.lockedId && Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < DRAG_THRESHOLD) {
+        const tapped = Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < DRAG_THRESHOLD;
+        if (tapped && g.lockedId) {
           selectIds([g.lockedId]);
+          suppressClick.current = true;
+        } else if (tapped && g.tapId) {
+          latest.current.onOpenComments?.(g.tapId);
           suppressClick.current = true;
         }
         return;
@@ -2059,6 +2106,8 @@ export function BoardCanvas({
             }
             passThrough={item.type === "SECTION"}
             locked={!!item.locked}
+            commentCount={commentCounts?.get(item.id) ?? 0}
+            onOpenComments={onOpenComments}
             connectors={item.type !== "SECTION"}
             label={cardLabel(item)}
             registerCard={registerCard}
@@ -2072,6 +2121,7 @@ export function BoardCanvas({
                     divider={hasObjectControls(item)}
                   />
                   <LockButton ids={[item.id]} locked={!!item.locked} onSetLocked={setLocked} />
+                  {onOpenComments && <CommentButton onClick={() => onOpenComments(item.id)} />}
                 </>
               ) : undefined
             }
@@ -2262,6 +2312,7 @@ export function BoardCanvas({
               <ObjectControls item={item} onUpdateItem={updateItem} />
               <OrderButtons ids={[item.id]} onReorder={reorder} divider={hasObjectControls(item)} />
               <LockButton ids={[item.id]} locked={!!item.locked} onSetLocked={setLocked} />
+              {onOpenComments && <CommentButton onClick={() => onOpenComments(item.id)} />}
               <button
                 type="button"
                 onClick={() => duplicateCard(item.id)}

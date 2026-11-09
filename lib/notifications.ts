@@ -23,6 +23,7 @@ const ALL_TYPES: NotificationType[] = [
   "WITHDRAWAL_UPDATED",
   "CREATIVE_SCHEDULE_UPDATED",
   "MOODBOARD_SHARED",
+  "MOODBOARD_COMMENT",
   "SUPPORT_GUIDE_CHANGED",
 ];
 
@@ -36,6 +37,8 @@ type CreateNotificationInput = {
   title: string;
   message: string;
   ticketId?: string;
+  /** For moodboard notifications: the board the link opens. */
+  moodboardId?: string;
   actorId?: string;
 };
 
@@ -70,6 +73,7 @@ export async function createNotification(input: CreateNotificationInput): Promis
           title: input.title,
           message: input.message,
           ticketId: input.ticketId ?? null,
+          moodboardId: input.moodboardId ?? null,
           actorId: input.actorId ?? null,
         },
       });
@@ -123,6 +127,7 @@ async function sendEmailForNotification(input: CreateNotificationInput): Promise
     title: input.title,
     message: input.message,
     ticketId: input.ticketId ?? null,
+    moodboardId: input.moodboardId ?? null,
     actorName,
     recipientRole,
   });
@@ -163,6 +168,7 @@ export async function getNotifications(userId: string, opts: GetNotificationsOpt
       title: true,
       message: true,
       ticketId: true,
+      moodboardId: true,
       read: true,
       createdAt: true,
       actor: {

@@ -910,6 +910,23 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         ],
       },
       {
+        heading: "Comments",
+        blocks: [
+          {
+            type: "p",
+            text: "Select an item and click **Comment** in its toolbar, or open **Comments** at the top of the board. Comments stay on that item, and anyone who can see the board can reply.",
+          },
+          {
+            type: "p",
+            text: "Items with open comments show a number in their corner; click it to read them. **Resolve** closes a thread once it's sorted, and a reply opens it again. Tick **Show resolved** to see closed threads.",
+          },
+          {
+            type: "p",
+            text: "The person who made the board, and everyone else in a thread, is notified about new comments. You can delete your own comments.",
+          },
+        ],
+      },
+      {
         heading: "Deleting",
         blocks: [
           {
@@ -1400,6 +1417,10 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
               "a creative resolved one of your pin notes,",
               "the request was completed.",
             ],
+          },
+          {
+            type: "p",
+            text: "You're also told when your creative shares a moodboard on one of your requests, and when someone comments on a moodboard you made or replies in a comment thread you're in.",
           },
         ],
       },

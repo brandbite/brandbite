@@ -119,6 +119,7 @@ enum NotificationType {
   WITHDRAWAL_UPDATED // Creative's withdrawal approved, rejected or paid
   CREATIVE_SCHEDULE_UPDATED // A creative changed their own working hours
   MOODBOARD_SHARED // A creative shared a moodboard with the customer
+  MOODBOARD_COMMENT // Someone commented on a moodboard you made or a thread you're in
   SUPPORT_GUIDE_CHANGED // Code changed or removed a guide an admin had edited
 }
 
@@ -315,8 +316,9 @@ model UserAccount {
   aiGenerations AiGeneration[]
 
   // Moodboards
-  createdMoodboards     Moodboard[]     @relation("MoodboardCreatedBy")
-  createdMoodboardItems MoodboardItem[] @relation("MoodboardItemCreatedBy")
+  createdMoodboards     Moodboard[]        @relation("MoodboardCreatedBy")
+  moodboardComments     MoodboardComment[] @relation("MoodboardCommentAuthor")
+  createdMoodboardItems MoodboardItem[]    @relation("MoodboardItemCreatedBy")
 
   // Color tools
   savedPalettes SavedPalette[] @relation("SavedPaletteCreatedBy")
@@ -1365,6 +1367,10 @@ model Notification {
   ticketId String?
   ticket   Ticket? @relation(fields: [ticketId], references: [id])
 
+  /// The moodboard a moodboard notification is about, for its link. Not a
+  /// relation: a deleted board just leaves a link that no longer opens.
+  moodboardId String?
+
   /// The user who triggered this notification (creative or customer)
   actorId String?
   actor   UserAccount? @relation("NotificationActor", fields: [actorId], references: [id])
@@ -2059,7 +2065,8 @@ model Moodboard {
   sharedWithCustomer Boolean @default(false)
 
   items       MoodboardItem[]
-  connections Json            @default("[]")
+  comments    MoodboardComment[]
+  connections Json               @default("[]")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2155,8 +2162,42 @@ model MoodboardItem {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  comments MoodboardComment[]
+
   @@index([moodboardId, position])
   @@index([deletedAt])
+}
+
+/// A comment on a moodboard object. The first comment of a thread names the
+/// object (itemId) and can be resolved; replies point at it (threadId).
+model MoodboardComment {
+  id String @id @default(cuid())
+
+  moodboardId String
+  moodboard   Moodboard @relation(fields: [moodboardId], references: [id], onDelete: Cascade)
+
+  itemId String?
+  item   MoodboardItem? @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  threadId String?
+  thread   MoodboardComment?  @relation("MoodboardCommentReplies", fields: [threadId], references: [id], onDelete: Cascade)
+  replies  MoodboardComment[] @relation("MoodboardCommentReplies")
+
+  authorId String
+  author   UserAccount @relation("MoodboardCommentAuthor", fields: [authorId], references: [id])
+
+  body String
+
+  /// Set on the first comment when someone marks the thread resolved.
+  resolvedAt   DateTime?
+  resolvedById String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([moodboardId, createdAt])
+  @@index([threadId])
+  @@index([itemId])
 }
 
 // -----------------------------------------------------------------------------
