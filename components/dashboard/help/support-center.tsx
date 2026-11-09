@@ -114,7 +114,7 @@ function PageButtons({
   pageCount: number;
   onPage: (page: number) => void;
 }) {
-  const arrow = "h-10 w-10 px-0";
+  const arrow = "h-10 w-10 px-0!";
   return (
     <nav aria-label="Guide pages" className="flex items-center gap-2">
       <button

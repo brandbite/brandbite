@@ -297,7 +297,54 @@ export default function AdminAuditLogPage() {
           )
         ) : (
           <>
-            <div aria-busy={loading} className={loading ? "opacity-60" : undefined}>
+            {/* Narrow screens: one card per entry, so nothing scrolls sideways. */}
+            <ul
+              aria-label="Audit log entries"
+              aria-busy={loading}
+              className={`divide-y divide-[var(--av2-border)] lg:hidden ${loading ? "opacity-60" : ""}`}
+            >
+              {entries.map((e) => (
+                <li key={e.id}>
+                  <button
+                    type="button"
+                    onClick={() => setOpenEntry(e)}
+                    aria-label={`View details: ${actionLabel(e.action)}, ${formatDay(e.createdAt)} ${formatTime(e.createdAt)}`}
+                    className="flex w-full items-start gap-3 px-5 py-4 text-left hover:bg-[var(--av2-bg)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--av2-accent)]"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                        <span className="text-base leading-6 font-semibold">
+                          {actionLabel(e.action)}
+                        </span>
+                        <OutcomeBadge outcome={e.outcome} />
+                      </span>
+                      {e.errorMessage && (
+                        <span className="mt-1 line-clamp-2 block text-xs text-[var(--av2-error-text)]">
+                          {e.errorMessage}
+                        </span>
+                      )}
+                      <span className="mt-1.5 block text-sm text-[var(--av2-text-2)]">
+                        <span className="font-medium text-[var(--av2-text)]">
+                          {e.actor.name ?? e.actor.email}
+                        </span>{" "}
+                        · {roleLabel(e.actor.role)}
+                      </span>
+                      <span className="mt-0.5 block text-sm text-[var(--av2-text-2)] tabular-nums">
+                        {formatDay(e.createdAt)} · {formatTime(e.createdAt)}
+                      </span>
+                      {e.target && (
+                        <span className="mt-3 block">
+                          <TargetChip type={e.target.type} />
+                        </span>
+                      )}
+                    </span>
+                    <IconArrowRight className="mt-1 shrink-0 text-[var(--av2-text-2)]" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+
+            <div aria-busy={loading} className={`max-lg:hidden ${loading ? "opacity-60" : ""}`}>
               <Table label="Audit log entries">
                 <thead>
                   <tr>
@@ -376,26 +423,28 @@ export default function AdminAuditLogPage() {
                     ))}
                   </Select>
                 </label>
-                <span className="tabular-nums">
-                  Page {page} of {pageCount}
-                </span>
-                <div className="flex gap-2">
-                  <Button
-                    aria-label="Previous page"
-                    className="w-10 px-0"
-                    disabled={page <= 1 || loading}
-                    onClick={() => goToPage(page - 1)}
-                  >
-                    <IconArrowLeft />
-                  </Button>
-                  <Button
-                    aria-label="Next page"
-                    className="w-10 px-0"
-                    disabled={page >= pageCount || loading}
-                    onClick={() => goToPage(page + 1)}
-                  >
-                    <IconArrowRight />
-                  </Button>
+                <div className="flex items-center gap-4">
+                  <span className="tabular-nums">
+                    Page {page} of {pageCount}
+                  </span>
+                  <div className="flex gap-2">
+                    <Button
+                      aria-label="Previous page"
+                      className="w-10 px-0!"
+                      disabled={page <= 1 || loading}
+                      onClick={() => goToPage(page - 1)}
+                    >
+                      <IconArrowLeft />
+                    </Button>
+                    <Button
+                      aria-label="Next page"
+                      className="w-10 px-0!"
+                      disabled={page >= pageCount || loading}
+                      onClick={() => goToPage(page + 1)}
+                    >
+                      <IconArrowRight />
+                    </Button>
+                  </div>
                 </div>
               </div>
             </TableFooter>
