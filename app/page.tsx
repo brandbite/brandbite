@@ -245,48 +245,6 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Ready CTA */}
-        <section className="relative h-[309px] w-full overflow-hidden bg-[#B696FF] max-[767px]:flex max-[767px]:h-auto max-[767px]:flex-col max-[767px]:gap-6 max-[767px]:px-5 max-[767px]:pt-10">
-          <div className="absolute top-[60px] left-[54px] flex w-[400px] flex-col items-start gap-6 max-[767px]:static max-[767px]:w-auto">
-            <h2 className={`${displayFont} text-4xl leading-9 font-extrabold text-[#2B2D33]`}>
-              Ready to feed your brand better creative?
-            </h2>
-            <p className="text-sm leading-5 text-[#5E616E]">
-              Send your first request and let brandbite turn it into something worth shipping.
-            </p>
-            <Link
-              href="/meet"
-              className="flex flex-row items-center gap-[9px] transition-opacity hover:opacity-85"
-            >
-              <span className="text-base leading-6 font-bold whitespace-nowrap text-white">
-                Get Started
-              </span>
-              <Image
-                src="/home/arrow-orange.svg"
-                alt=""
-                width={22.4}
-                height={17.58}
-                className="mt-0.5"
-              />
-            </Link>
-          </div>
-          <Image
-            src="/home/paper-plane.png"
-            alt=""
-            width={230}
-            height={230}
-            className="absolute top-[190px] left-[276px] w-[230px] max-[1023px]:hidden"
-          />
-          <div className="absolute top-0 left-[45%] h-[309px] w-[350px] bg-[url('/home/unicorn-wave.webp')] [background-size:119.857%_135.761%] [background-position:50%_18.552%] bg-no-repeat max-[1023px]:right-0 max-[1023px]:left-auto max-[767px]:static max-[767px]:order-5 max-[767px]:h-[265px] max-[767px]:w-[300px] max-[767px]:self-center" />
-          <Image
-            src="/home/ready-note.png"
-            alt=""
-            width={205}
-            height={205}
-            className="absolute top-[82px] right-[55px] w-[205px] max-[1023px]:hidden max-[767px]:static max-[767px]:block max-[767px]:w-60"
-          />
-        </section>
-
         <HomeFooter />
         <div className="h-5" />
       </main>
