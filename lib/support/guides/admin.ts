@@ -358,11 +358,28 @@ export const ADMIN_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "A read-only view of requests in **Backlog**, **In progress**, **In review** and **Done**. Filter by company, creative (including **Unassigned**) and priority, toggle **Overdue**, or search. Click a card to open its detail page.",
+            text: "Requests in **Backlog**, **In progress**, **In review** and **Done**. Filter by company, creative (including **Unassigned**) and priority, toggle **Overdue**, or search. Click a card to open its detail page.",
           },
           {
             type: "p",
             text: "**Re-run auto-assign** tries to assign every unassigned Backlog request across all companies that have auto-assign on. It runs straight away, without a confirmation.",
+          },
+        ],
+      },
+      {
+        heading: "Moving a request on the Board",
+        blocks: [
+          {
+            type: "p",
+            text: "Drag a card to another column and confirm. The window says what the move does before anything changes. Everyone on the request is notified, and the move is recorded in the audit log.",
+          },
+          {
+            type: "warning",
+            text: "Dragging to **Done** completes the request and pays the assigned creative straight away, without customer approval. If nobody is assigned, nobody is paid. Other moves skip the usual customer and creative steps, and no tokens are charged or refunded. Done cards can't be dragged.",
+          },
+          {
+            type: "p",
+            text: "Dragging needs a mouse. On a phone or tablet, use **Set status** in the Tickets table.",
           },
         ],
       },

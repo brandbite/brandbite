@@ -14,6 +14,7 @@
 
 import { NextResponse } from "next/server";
 
+import { CREATIVE_FAQ_CATEGORY } from "@/lib/faq/audience";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -21,7 +22,7 @@ export const runtime = "nodejs";
 export async function GET() {
   try {
     const rows = await prisma.faq.findMany({
-      where: { isActive: true },
+      where: { isActive: true, category: { not: CREATIVE_FAQ_CATEGORY } },
       orderBy: [{ category: "asc" }, { position: "asc" }],
       select: {
         id: true,
