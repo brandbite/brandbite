@@ -120,3 +120,47 @@ export function IconSearch(p: Props) {
     </svg>
   );
 }
+
+export function IconChevronRight(p: Props) {
+  return (
+    <svg {...base} width={18} height={18} {...p}>
+      <path d="m9 6 6 6-6 6" />
+    </svg>
+  );
+}
+
+export function IconArrowLeft(p: Props) {
+  return (
+    <svg {...base} width={18} height={18} {...p}>
+      <path d="M19 12H5M11 18l-6-6 6-6" />
+    </svg>
+  );
+}
+
+/** A picture: frame, sun and hill. Marks screenshots and visual guides. */
+export function IconImage(p: Props) {
+  return (
+    <svg {...base} {...p}>
+      <rect x="3" y="4" width="18" height="16" rx="2.5" />
+      <circle cx="9" cy="9.5" r="1.75" />
+      <path d="m21 16-4.5-4.5L7 20" />
+    </svg>
+  );
+}
+
+/** Two diagonal arrows: open something full size. */
+export function IconExpand(p: Props) {
+  return (
+    <svg {...base} width={18} height={18} {...p}>
+      <path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7" />
+    </svg>
+  );
+}
+
+export function IconArrowRight(p: Props) {
+  return (
+    <svg {...base} width={18} height={18} {...p}>
+      <path d="M5 12h14M13 6l6 6-6 6" />
+    </svg>
+  );
+}

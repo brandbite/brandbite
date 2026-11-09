@@ -18,7 +18,14 @@ export type GuideBlock =
   /** Helpful aside. */
   | { type: "tip"; text: string }
   /** Something that can't be undone, costs tokens/money, or surprises people. */
-  | { type: "warning"; text: string };
+  | { type: "warning"; text: string }
+  /**
+   * A screenshot or picture. Without `image` it is a slot waiting for one:
+   * admin guides show a placeholder (so admins can see where a screenshot
+   * goes), other pages show nothing until an admin adds the image in
+   * Support content.
+   */
+  | { type: "figure"; caption: string; image?: string; alt?: string };
 
 export type GuideSection = {
   heading: string;

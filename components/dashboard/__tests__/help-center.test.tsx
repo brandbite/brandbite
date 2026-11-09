@@ -2,9 +2,10 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FaqExplorer } from "@/components/dashboard/help/faq-explorer";
+import { toAnchor } from "@/components/dashboard/help/guide-meta";
 import { GuideView } from "@/components/dashboard/help/guide-view";
-import { SupportCenter } from "@/components/dashboard/help/support-center";
-import { getGuide, getGuides, groupGuides, guideHref } from "@/lib/support";
+import { PAGE_SIZE, SupportCenter } from "@/components/dashboard/help/support-center";
+import { getGuide, getGuides, groupGuides, guideHref, type SupportGuide } from "@/lib/support";
 
 const faq = (id: number, category: string, question = `Question ${id}?`) => ({
   id: String(id),
@@ -87,25 +88,74 @@ describe("FAQ explorer", () => {
   });
 });
 
+function topicButtons() {
+  return within(screen.getByRole("group", { name: "Topics" })).getAllByRole("button");
+}
+
+/** The open topic's card (its heading is the only h3 on the page). */
+function topicList() {
+  return within(screen.getByRole("heading", { level: 3 }).closest("section")!);
+}
+
+const titleLink = (title: string) => ({ name: new RegExp(`^${title}`) });
+
 describe("Support center", () => {
-  it("offers one tab per topic and every guide is reachable from its tab", async () => {
+  it("offers one pill per topic and every guide is reachable from its topic", () => {
     render(<SupportCenter role="customer" />);
     const groups = groupGuides("customer", getGuides("customer"));
-    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(
-      groups.map((g) => g.category),
-    );
+    expect(topicButtons().map((b) => b.textContent)).toEqual(groups.map((g) => g.category));
 
     for (const group of groups) {
-      fireEvent.click(screen.getByRole("tab", { name: group.category }));
-      for (const guide of group.items) {
-        // Inside the panel, because a popular guide is also listed above the tabs.
-        const panel = within(screen.getByRole("tabpanel"));
-        expect(panel.getByRole("link", { name: new RegExp(guide.title) })).toHaveAttribute(
-          "href",
-          guideHref("customer", guide.slug),
-        );
+      fireEvent.click(screen.getByRole("button", { name: group.category }));
+      expect(screen.getByRole("button", { name: group.category })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      for (let page = 0; page * PAGE_SIZE < group.items.length; page++) {
+        if (page > 0) fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+        for (const guide of group.items.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)) {
+          expect(topicList().getByRole("link", titleLink(guide.title))).toHaveAttribute(
+            "href",
+            guideHref("customer", guide.slug),
+          );
+        }
       }
     }
+  });
+
+  it("pages a long topic six guides at a time", () => {
+    render(<SupportCenter role="admin" isSiteOwner />);
+    const workspace = groupGuides("admin", getGuides("admin", { isSiteOwner: true })).find(
+      (g) => g.category === "Workspace",
+    )!;
+    expect(workspace.items.length).toBeGreaterThan(PAGE_SIZE);
+    const total = workspace.items.length;
+    const last = workspace.items[total - 1];
+
+    fireEvent.click(screen.getByRole("button", { name: "Workspace" }));
+    expect(screen.getByText(`Showing 1–${PAGE_SIZE} of ${total}`)).toBeInTheDocument();
+    expect(topicList().queryByRole("link", titleLink(last.title))).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Page 2" }));
+    expect(screen.getByRole("button", { name: "Page 2" })).toHaveAttribute("aria-current", "page");
+    expect(topicList().getByRole("link", titleLink(last.title))).toBeInTheDocument();
+
+    // Another topic, and back: the list starts on its first page again.
+    fireEvent.click(screen.getByRole("button", { name: "Catalog" }));
+    fireEvent.click(screen.getByRole("button", { name: "Workspace" }));
+    expect(screen.getByText(`Showing 1–${PAGE_SIZE} of ${total}`)).toBeInTheDocument();
+  });
+
+  it("lists owner-only admin guides for site owners only", () => {
+    const ownerOnly = getGuides("admin", { isSiteOwner: true }).find((g) => g.ownerOnly)!;
+    const { unmount } = render(<SupportCenter role="admin" />);
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: ownerOnly.title } });
+    expect(screen.queryByRole("link", titleLink(ownerOnly.title))).toBeNull();
+    unmount();
+
+    render(<SupportCenter role="admin" isSiteOwner />);
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: ownerOnly.title } });
+    expect(screen.getByRole("link", titleLink(ownerOnly.title))).toBeInTheDocument();
   });
 
   it("searches across topics, for the viewer's role only", () => {
@@ -113,7 +163,7 @@ describe("Support center", () => {
     fireEvent.change(screen.getByRole("searchbox", { name: "Search support guides" }), {
       target: { value: "withdrawal" },
     });
-    expect(screen.queryByRole("tab")).toBeNull();
+    expect(screen.queryByRole("group", { name: "Topics" })).toBeNull();
     expect(screen.getByRole("link", { name: /Withdraw/ })).toHaveAttribute(
       "href",
       guideHref("creative", "withdrawals"),
@@ -131,7 +181,22 @@ describe("Support center", () => {
   it("opens the topic named in the URL", () => {
     window.location.hash = "#account";
     render(<SupportCenter role="customer" />);
-    expect(screen.getByRole("tab", { name: "Account" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Account" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("marks guides that have screenshots", () => {
+    const base = getGuide("customer", "moodboards")!;
+    const withImage: SupportGuide = {
+      ...base,
+      sections: [
+        { heading: "Look", blocks: [{ type: "figure", caption: "Board", image: "/x.png" }] },
+      ],
+    };
+    const others = getGuides("customer").filter((g) => g.slug !== base.slug);
+    render(<SupportCenter role="customer" guides={[withImage, ...others]} />);
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: base.title } });
+    const row = screen.getByRole("link", titleLink(base.title));
+    expect(within(row).getByText("Visual guide")).toBeInTheDocument();
   });
 });
 
@@ -147,33 +212,82 @@ describe("Guide view", () => {
     }
   });
 
-  it("starts with the first section open and opens the one picked in the navigation", async () => {
+  it("shows the first two sections and folds the rest until one is picked", () => {
+    expect(guide.sections.length).toBeGreaterThan(3);
     const { container } = render(<GuideView role="customer" guide={guide} />);
     const details = () => [...container.querySelectorAll("details")];
-    expect(details().map((d) => d.open)).toEqual(guide.sections.map((_, i) => i === 0));
+    expect(details().map((d) => d.id)).toEqual(
+      guide.sections.slice(2).map((s) => toAnchor(s.heading)),
+    );
+    expect(details().some((d) => d.open)).toBe(false);
 
     const nav = screen.getAllByRole("navigation", { name: "On this page" })[0];
     fireEvent.click(within(nav).getByRole("link", { name: "Deleting" }));
     expect(container.querySelector<HTMLDetailsElement>("details#deleting")?.open).toBe(true);
   });
 
-  it("can open and close all sections", async () => {
-    const { container } = render(<GuideView role="customer" guide={guide} />);
-    fireEvent.click(screen.getByRole("button", { name: "Expand all" }));
-    expect([...container.querySelectorAll("details")].every((d) => d.open)).toBe(true);
-    fireEvent.click(screen.getByRole("button", { name: "Collapse all" }));
-    expect([...container.querySelectorAll("details")].some((d) => d.open)).toBe(false);
+  it("shows short guides in full", () => {
+    const short = { ...guide, sections: guide.sections.slice(0, 3) };
+    const { container } = render(<GuideView role="customer" guide={short} />);
+    expect(container.querySelectorAll("details")).toHaveLength(0);
   });
 
   it("links back to the guide's topic and to the page it documents", () => {
     render(<GuideView role="customer" guide={guide} />);
-    expect(screen.getByRole("link", { name: /Back to support/ })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /All guides/ })).toHaveAttribute(
       "href",
       "/customer/support#workspace",
     );
-    expect(screen.getByRole("link", { name: /Open this page/ })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /Open Moodboards/ })).toHaveAttribute(
       "href",
       "/customer/moodboards",
     );
+  });
+
+  it("names the admin page a guide opens", () => {
+    render(<GuideView role="admin" guide={getGuide("admin", "board-and-tickets")!} />);
+    expect(screen.getByRole("link", { name: /Open Board/ })).toHaveAttribute(
+      "href",
+      "/admin/board",
+    );
+  });
+
+  describe("screenshots", () => {
+    const withBlocks = (blocks: SupportGuide["sections"][number]["blocks"]): SupportGuide => ({
+      ...guide,
+      sections: [{ heading: "Look", blocks }],
+    });
+
+    it("numbers the screenshots that have an image", () => {
+      render(
+        <GuideView
+          role="customer"
+          guide={withBlocks([
+            { type: "figure", caption: "First", image: "/a.png" },
+            { type: "figure", caption: "Missing" },
+            { type: "figure", caption: "Second", image: "/b.png", alt: "Two columns" },
+          ])}
+        />,
+      );
+      expect(screen.getByText("Figure 1. First")).toBeInTheDocument();
+      expect(screen.getByText("Figure 2. Second")).toBeInTheDocument();
+      expect(screen.getByRole("img", { name: "Two columns" })).toHaveAttribute("src", "/b.png");
+    });
+
+    it("hides empty screenshot slots from customers and creatives", () => {
+      render(
+        <GuideView role="customer" guide={withBlocks([{ type: "figure", caption: "Gap" }])} />,
+      );
+      expect(screen.queryByText("Gap")).toBeNull();
+    });
+
+    it("shows admins where a screenshot is missing and where to add it", () => {
+      render(<GuideView role="admin" guide={getGuide("admin", "board-and-tickets")!} />);
+      const slot = screen.getByRole("figure", { name: /Board columns and filters/ });
+      expect(within(slot).getByRole("link", { name: "Add it" })).toHaveAttribute(
+        "href",
+        "/admin/support-content/admin/board-and-tickets",
+      );
+    });
   });
 });

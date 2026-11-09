@@ -337,6 +337,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             type: "p",
             text: "The Board shows all your requests in four columns: **Backlog**, **In progress**, **In review** and **Done**. Inside each column, cards are sorted by priority (Urgent first), then oldest first. You can't reorder cards by hand.",
           },
+          { type: "figure", caption: "Your Board with its four columns" },
           {
             type: "p",
             text: "Each card shows the ticket code, the priority, the title, a short description, a thumbnail, the due date (red when overdue) and a green **Assigned** badge once a creative has picked it up.",
@@ -451,6 +452,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
               "Check the **Cost summary**, then click **Create request**.",
             ],
           },
+          { type: "figure", caption: "The new request form" },
         ],
       },
       {
@@ -587,6 +589,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
               "Click **Send all notes**. The request goes back to **In progress** with your notes.",
             ],
           },
+          { type: "figure", caption: "A pinned note on a design" },
           {
             type: "tip",
             text: "Your creative marks each pin as resolved as they work through it, and you are notified.",
@@ -834,6 +837,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             type: "p",
             text: "Everything is in the toolbar at the bottom of the canvas. Drag an item out of it and drop it where you want, or click it and then click the canvas. Notes, shapes and text are ready to type on straight away.",
           },
+          { type: "figure", caption: "A moodboard with images and notes" },
           {
             type: "p",
             text: "On a phone the board fills the screen. Tap an item in the toolbar and then tap the canvas. The **+** button holds images, colors, checklists, links, files and videos.",
@@ -1064,6 +1068,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
               },
             ],
           },
+          { type: "figure", caption: "Your token balance" },
           {
             type: "p",
             text: "This page is for viewing only. Plans and top-ups are in **Settings**.",

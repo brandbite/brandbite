@@ -1,7 +1,8 @@
 // -----------------------------------------------------------------------------
 // @file: components/dashboard/help/guide-meta.tsx
-// @purpose: Presentation helpers shared by the customer and creative help center:
-//           the icon for each guide, anchors and the "still stuck" copy.
+// @purpose: Presentation helpers shared by the Support pages of all three
+//           dashboards: the icon for each guide, the name of the page a guide
+//           opens, anchors and the "still stuck" copy.
 // -----------------------------------------------------------------------------
 
 import type { ReactNode } from "react";
@@ -14,23 +15,35 @@ import {
   IconUsers,
   IconWallet,
 } from "@/components/admin/v2/icons";
+import { getAdminPageIndex } from "@/components/admin/v2/admin-nav";
 import type { Tone } from "@/components/admin/v2/ui";
+import { getDashboardPageIndex } from "@/components/dashboard/dashboard-nav";
 import {
+  IconAiSettings,
   IconAiTools,
   IconBalance,
   IconBell,
   IconBoard,
+  IconCatalog,
+  IconCompanies,
   IconConsultation,
+  IconConsultations,
+  IconContent,
+  IconDashboard,
+  IconFaq,
+  IconFinance,
   IconMembers,
   IconMoodboards,
   IconOverview,
+  IconPeople,
   IconPortfolio,
   IconServices,
   IconSettings,
   IconWithdrawals,
 } from "@/components/navigation/nav-icons";
+import type { SupportRole } from "@/lib/support";
 
-export type HelpRole = "customer" | "creative";
+export type HelpRole = SupportRole;
 
 const S = { width: 22, height: 22 };
 
@@ -66,10 +79,54 @@ const GUIDE_ICONS: Record<string, ReactNode> = {
   settings: <IconSettings {...S} />,
 };
 
-const TONES: Tone[] = ["peach", "lavender", "green"];
+/** Admin guides whose slug means something else (or nothing) elsewhere. */
+const ADMIN_GUIDE_ICONS: Record<string, ReactNode> = {
+  "roles-and-safeguards": <IconUsers {...S} />,
+  dashboard: <IconDashboard {...S} />,
+  companies: <IconCoins {...S} />,
+  "request-drafts": <IconDocument {...S} />,
+  "board-and-tickets": <IconBoard {...S} />,
+  "ticket-detail": <IconTicket {...S} />,
+  consultations: <IconConsultations {...S} />,
+  meetings: <IconConsultations {...S} />,
+  "consultation-settings": <IconSettings {...S} />,
+  plans: <IconCatalog {...S} />,
+  "plan-assignment": <IconCompanies {...S} />,
+  "job-types": <IconCatalog {...S} />,
+  "job-type-categories": <IconCatalog {...S} />,
+  payouts: <IconFinance {...S} />,
+  withdrawals: <IconWallet {...S} />,
+  ledger: <IconFinance {...S} />,
+  "completed-jobs": <IconCoins {...S} />,
+  creatives: <IconPeople {...S} />,
+  "talent-applications": <IconPeople {...S} />,
+  "content-overview": <IconContent {...S} />,
+  faq: <IconFaq {...S} />,
+  "support-content": <IconFaq {...S} />,
+  "blog-news-showcase": <IconContent {...S} />,
+  docs: <IconDocument {...S} />,
+  "color-content": <IconContent {...S} />,
+  "site-and-pages": <IconContent {...S} />,
+  "ai-settings": <IconAiSettings {...S} />,
+  inboxes: <IconFaq {...S} />,
+  "audit-log": <IconSettings {...S} />,
+  "two-factor": <IconSettings {...S} />,
+  profile: <IconMembers {...S} />,
+};
 
-export function guideIcon(slug: string): ReactNode {
-  return GUIDE_ICONS[slug] ?? <IconDocument {...S} />;
+const TONES: Tone[] = ["lavender", "peach", "green"];
+
+export function guideIcon(slug: string, role?: SupportRole): ReactNode {
+  return (
+    (role === "admin" ? ADMIN_GUIDE_ICONS[slug] : undefined) ??
+    GUIDE_ICONS[slug] ?? <IconDocument {...S} />
+  );
+}
+
+/** The sidebar name of a dashboard page, e.g. /admin/board → "Board". */
+export function pageLabel(role: SupportRole, href: string): string | undefined {
+  const pages = role === "admin" ? getAdminPageIndex(true) : getDashboardPageIndex(role);
+  return pages.find((p) => p.href === href)?.label;
 }
 
 /** Cycles tile colours by position so a row of cards reads as a set. */

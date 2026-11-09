@@ -115,6 +115,30 @@ describe("parseGuideContent", () => {
     });
   });
 
+  it("keeps screenshots with a caption and drops unsafe image addresses", () => {
+    const parsed = parseGuideContent({
+      title: "T",
+      sections: [
+        {
+          heading: "One",
+          blocks: [
+            { type: "figure", caption: " Board ", image: "https://media.brandbite.studio/a.png" },
+            { type: "figure", caption: "Slot" },
+            { type: "figure", caption: "Script", image: "javascript:alert(1)", alt: " Alt " },
+            { type: "figure", caption: "Protocol-relative", image: "//evil.example/a.png" },
+            { type: "figure", caption: "  ", image: "/a.png" },
+          ],
+        },
+      ],
+    });
+    expect(parsed?.sections[0].blocks).toEqual([
+      { type: "figure", caption: "Board", image: "https://media.brandbite.studio/a.png" },
+      { type: "figure", caption: "Slot" },
+      { type: "figure", caption: "Script", alt: "Alt" },
+      { type: "figure", caption: "Protocol-relative" },
+    ]);
+  });
+
   it("rejects content with no title or no sections", () => {
     expect(parseGuideContent(null)).toBeNull();
     expect(parseGuideContent({ title: "", sections: [] })).toBeNull();
@@ -142,8 +166,10 @@ describe("code hashes and status", () => {
   });
 
   it("round-trips a real guide through parsing unchanged", () => {
-    for (const real of codeGuides("customer")) {
-      expect(parseGuideContent(contentOf(real))).toEqual(contentOf(real));
+    for (const role of ["customer", "creative", "admin"] as const) {
+      for (const real of codeGuides(role)) {
+        expect(parseGuideContent(contentOf(real))).toEqual(contentOf(real));
+      }
     }
   });
 });

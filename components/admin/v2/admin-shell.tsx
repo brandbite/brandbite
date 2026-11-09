@@ -11,6 +11,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import {
+  BreadcrumbDetailProvider,
+  withDetailLabel,
+} from "@/components/navigation/breadcrumb-detail";
 import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { NotificationBell } from "@/components/ui/notification-bell";
@@ -89,7 +93,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const pendingWithdrawals = usePendingWithdrawals(pathname);
-  const crumbs = getBreadcrumb(pathname);
+  const [detailLabel, setDetailLabel] = useState<string | null>(null);
+  const crumbs = withDetailLabel(getBreadcrumb(pathname), detailLabel);
 
   useEffect(() => setMobileOpen(false), [pathname]);
 
@@ -215,7 +220,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
         </header>
 
         <main id="main-content" className="px-4 py-6 md:p-8">
-          {children}
+          <BreadcrumbDetailProvider setLabel={setDetailLabel}>{children}</BreadcrumbDetailProvider>
         </main>
       </div>
 

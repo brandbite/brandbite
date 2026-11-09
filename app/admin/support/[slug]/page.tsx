@@ -6,7 +6,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
-import { SupportGuideView } from "@/components/support/support-ui";
+import { GuideView } from "@/components/dashboard/help/guide-view";
 import { getCurrentUser } from "@/lib/auth";
 import { isSiteOwnerRole } from "@/lib/roles";
 import { supportBasePath } from "@/lib/support";
@@ -31,5 +31,5 @@ export default async function AdminSupportGuidePage({ params }: Props) {
   const isSiteOwner = !!user && isSiteOwnerRole(user.role);
   if (guide.ownerOnly && !isSiteOwner) notFound();
 
-  return <SupportGuideView role="admin" guide={guide} guides={all} isSiteOwner={isSiteOwner} />;
+  return <GuideView role="admin" guide={guide} guides={all} isSiteOwner={isSiteOwner} />;
 }

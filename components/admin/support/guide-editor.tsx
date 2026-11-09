@@ -1,7 +1,8 @@
 // -----------------------------------------------------------------------------
 // @file: components/admin/support/guide-editor.tsx
 // @purpose: Edits one Support guide: title, summary, category, search words and
-//           sections of blocks (paragraph, steps, list, tip, warning). For a
+//           sections of blocks (paragraph, steps, list, tip, warning,
+//           screenshot). For a
 //           code guide it also shows what code says, and when code changed
 //           after an edit, both versions side by side to resolve.
 // -----------------------------------------------------------------------------
@@ -29,6 +30,7 @@ import {
   TextInput,
 } from "@/components/admin/v2/ui";
 import { RichText } from "@/components/support/support-ui";
+import { CmsImageUpload } from "@/components/ui/cms-image-upload";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast-provider";
 import type { GuideContent } from "@/lib/support/merge";
@@ -67,6 +69,7 @@ const BLOCK_LABEL: Record<GuideBlock["type"], string> = {
   list: "Bulleted list",
   tip: "Tip",
   warning: "Warning",
+  figure: "Screenshot",
 };
 
 // --- Blocks as editable text ------------------------------------------------
@@ -75,6 +78,7 @@ const BLOCK_LABEL: Record<GuideBlock["type"], string> = {
 const TERM_SEPARATOR = " — ";
 
 function blockToText(block: GuideBlock): string {
+  if (block.type === "figure") return block.caption;
   if (block.type === "p" || block.type === "tip" || block.type === "warning") return block.text;
   if (block.type === "steps") return block.items.join("\n");
   return block.items
@@ -82,7 +86,13 @@ function blockToText(block: GuideBlock): string {
     .join("\n");
 }
 
-function textToBlock(type: GuideBlock["type"], text: string): GuideBlock {
+function textToBlock({ type, text, image, alt }: DraftBlock): GuideBlock {
+  if (type === "figure") {
+    const figure: GuideBlock = { type, caption: text.trim() };
+    if (image) figure.image = image;
+    if (alt?.trim()) figure.alt = alt.trim();
+    return figure;
+  }
   if (type === "p" || type === "tip" || type === "warning") return { type, text };
   const lines = text
     .split("\n")
@@ -100,7 +110,8 @@ function textToBlock(type: GuideBlock["type"], text: string): GuideBlock {
   };
 }
 
-type DraftBlock = { type: GuideBlock["type"]; text: string };
+/** `text` is the block's text, or a screenshot's caption. */
+type DraftBlock = { type: GuideBlock["type"]; text: string; image?: string; alt?: string };
 type DraftSection = { heading: string; blocks: DraftBlock[] };
 type Draft = {
   title: string;
@@ -118,7 +129,12 @@ function toDraft(content: GuideContent): Draft {
     keywords: content.keywords.join(", "),
     sections: content.sections.map((section) => ({
       heading: section.heading,
-      blocks: section.blocks.map((block) => ({ type: block.type, text: blockToText(block) })),
+      blocks: section.blocks.map(
+        (block): DraftBlock =>
+          block.type === "figure"
+            ? { type: block.type, text: block.caption, image: block.image, alt: block.alt }
+            : { type: block.type, text: blockToText(block) },
+      ),
     })),
   };
 }
@@ -136,9 +152,7 @@ function fromDraft(draft: Draft): GuideContent {
       .map(
         (section): GuideSection => ({
           heading: section.heading.trim(),
-          blocks: section.blocks
-            .filter((block) => block.text.trim())
-            .map((block) => textToBlock(block.type, block.text)),
+          blocks: section.blocks.filter((block) => block.text.trim()).map(textToBlock),
         }),
       )
       .filter((section) => section.heading && section.blocks.length > 0),
@@ -152,6 +166,54 @@ const EMPTY_DRAFT: Draft = {
   keywords: "",
   sections: [{ heading: "", blocks: [{ type: "p", text: "" }] }],
 };
+
+// --- Screenshot block ---------------------------------------------------------
+
+function FigureFields({
+  id,
+  block,
+  onChange,
+}: {
+  id: string;
+  block: DraftBlock;
+  onChange: (patch: Partial<DraftBlock>) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      <Field
+        label="Caption"
+        htmlFor={`${id}-caption`}
+        hint="Says what the screenshot shows, e.g. “Board columns and filters”."
+      >
+        <TextInput
+          id={`${id}-caption`}
+          value={block.text}
+          onChange={(e) => onChange({ text: e.target.value })}
+        />
+      </Field>
+      <CmsImageUpload
+        type="support"
+        label="Screenshot"
+        value={block.image ? { storageKey: "", url: block.image } : null}
+        onChange={(value) => onChange({ image: value?.url })}
+      />
+      <Field
+        label="Alt text"
+        htmlFor={`${id}-alt`}
+        hint="What a screen reader says instead of the picture. Leave empty to use the caption."
+      >
+        <TextInput
+          id={`${id}-alt`}
+          value={block.alt ?? ""}
+          onChange={(e) => onChange({ alt: e.target.value })}
+        />
+      </Field>
+      <p className="text-xs text-[var(--av2-text-2)]">
+        Until a screenshot is added, admin guides show an empty slot and other guides show nothing.
+      </p>
+    </div>
+  );
+}
 
 // --- Read-only rendering, for comparing versions ----------------------------
 
@@ -191,6 +253,11 @@ function ContentPreview({ content }: { content: GuideContent }) {
                     </li>
                   ))}
                 </ul>
+              ) : block.type === "figure" ? (
+                <p>
+                  <strong>{BLOCK_LABEL.figure}: </strong>
+                  {block.caption} {block.image ? "(image added)" : "(no image yet)"}
+                </p>
               ) : (
                 <p>
                   {block.type !== "p" ? <strong>{BLOCK_LABEL[block.type]}: </strong> : null}
@@ -595,22 +662,32 @@ export function GuideEditor({ role, slug }: { role: Role; slug: string | null })
                     Remove block
                   </Button>
                 </div>
-                <label htmlFor={`block-${si}-${bi}`} className="sr-only">
-                  {BLOCK_LABEL[block.type]} text
-                </label>
-                <TextArea
-                  id={`block-${si}-${bi}`}
-                  value={block.text}
-                  rows={block.type === "p" ? 3 : 5}
-                  onChange={(e) => updateBlock(si, bi, { text: e.target.value })}
-                />
-                <p className="text-xs text-[var(--av2-text-2)]">
-                  {block.type === "steps"
-                    ? "One step per line."
-                    : block.type === "list"
-                      ? `One item per line. Write "Term${TERM_SEPARATOR}what it means" for a definition.`
-                      : "Use **double asterisks** for bold."}
-                </p>
+                {block.type === "figure" ? (
+                  <FigureFields
+                    id={`block-${si}-${bi}`}
+                    block={block}
+                    onChange={(patch) => updateBlock(si, bi, patch)}
+                  />
+                ) : (
+                  <>
+                    <label htmlFor={`block-${si}-${bi}`} className="sr-only">
+                      {BLOCK_LABEL[block.type]} text
+                    </label>
+                    <TextArea
+                      id={`block-${si}-${bi}`}
+                      value={block.text}
+                      rows={block.type === "p" ? 3 : 5}
+                      onChange={(e) => updateBlock(si, bi, { text: e.target.value })}
+                    />
+                    <p className="text-xs text-[var(--av2-text-2)]">
+                      {block.type === "steps"
+                        ? "One step per line."
+                        : block.type === "list"
+                          ? `One item per line. Write "Term${TERM_SEPARATOR}what it means" for a definition.`
+                          : "Use **double asterisks** for bold."}
+                    </p>
+                  </>
+                )}
               </div>
             ))}
             <div>
