@@ -9,6 +9,7 @@ import { LinkJobModal } from "@/components/moodboard/link-job-modal";
 import { BoardCanvas, type BoardCanvasHandle } from "@/components/moodboard/board-canvas";
 import { useIsPhone } from "@/components/moodboard/use-is-phone";
 import { useToast } from "@/components/ui/toast-provider";
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_LABEL } from "@/lib/upload-helpers";
 import { AddLinkModal } from "@/components/moodboard/add-link-modal";
 import { AddEmbedModal } from "@/components/moodboard/add-embed-modal";
 import {
@@ -60,6 +61,8 @@ type Point = { x: number; y: number };
 /** How long the Undo offer stays on screen after deleting. */
 const UNDO_MS = 8000;
 const CASCADE_PX = 24;
+/** Most files added by one drop or paste. */
+const MAX_FILES_AT_ONCE = 10;
 const MAX_HISTORY = 100;
 /** Repeats of the same small change this close together are one undo step. */
 const COALESCE_MS = 1000;
@@ -921,7 +924,11 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
   // File upload (image or file)
   // ---------------------------------------------------------------------------
 
-  async function handleUploadFile(file: File, type: "IMAGE" | "FILE") {
+  async function handleUploadFile(
+    file: File,
+    type: "IMAGE" | "FILE",
+    at: Point | null = pendingPoint.current,
+  ) {
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -944,7 +951,7 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
           mimeType: mimeType ?? file.type,
           bytes: bytes ?? file.size,
         };
-        handleAddItem("IMAGE", data, { width: 280, height: 0, at: pendingPoint.current });
+        handleAddItem("IMAGE", data, { width: 280, height: 0, at });
       } else {
         const data: FileCardData = {
           url: url ?? "",
@@ -953,10 +960,43 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
           mimeType: mimeType ?? file.type,
           bytes: bytes ?? file.size,
         };
-        handleAddItem("FILE", data, { width: 280, height: 0, at: pendingPoint.current });
+        handleAddItem("FILE", data, { width: 280, height: 0, at });
       }
     } catch (err) {
       console.error("[moodboard-view] upload error:", err);
+      showToast({ type: "error", title: `We couldn't upload ${file.name || "that file"}.` });
+    }
+  }
+
+  /** Files dropped on the board or pasted: images become pictures, the rest files. */
+  async function handleAddFiles(files: File[], at: Point | null) {
+    if (!moodboard?.access.canEdit || files.length === 0) return;
+    const batch = files.slice(0, MAX_FILES_AT_ONCE);
+    if (files.length > batch.length) {
+      showToast({
+        type: "warning",
+        title: `Only the first ${MAX_FILES_AT_ONCE} files were added. Add the rest in another go.`,
+      });
+    }
+    const tooBig = batch.filter((f) => f.size > MAX_UPLOAD_BYTES);
+    if (tooBig.length > 0) {
+      showToast({
+        type: "error",
+        title:
+          tooBig.length === 1
+            ? `${tooBig[0].name || "That file"} is over ${MAX_UPLOAD_LABEL}.`
+            : `${tooBig.length} files are over ${MAX_UPLOAD_LABEL} and were skipped.`,
+      });
+    }
+    const uploads = batch.filter((f) => f.size <= MAX_UPLOAD_BYTES);
+    if (uploads.length === 0) return;
+    showToast({
+      type: "info",
+      title: uploads.length === 1 ? "Uploading 1 file…" : `Uploading ${uploads.length} files…`,
+    });
+    // One at a time, so each lands beside the one before instead of on top.
+    for (const file of uploads) {
+      await handleUploadFile(file, file.type.startsWith("image/") ? "IMAGE" : "FILE", at);
     }
   }
 
@@ -1064,6 +1104,7 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
         onCopyItems={handleCopyItems}
         onPasteText={handlePasteText}
         onPasteLastCopy={handlePasteLastCopy}
+        onAddFiles={handleAddFiles}
         onResizeItem={handleResizeItem}
         onAddConnection={handleAddConnection}
         onDeleteConnection={handleDeleteConnection}

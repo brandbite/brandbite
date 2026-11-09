@@ -65,6 +65,7 @@ function setup(items = [note("a", 100), note("b", 400), note("c", 700)]) {
     onCopyItems: vi.fn((ids: string[]) => `copied:${ids.join()}`),
     onPasteText: vi.fn(() => true),
     onPasteLastCopy: vi.fn(),
+    onAddFiles: vi.fn(),
     onResizeItem: vi.fn(),
     onAddConnection: vi.fn(),
     onDeleteConnection: vi.fn(),
@@ -242,6 +243,106 @@ describe("Clipboard events", () => {
     fireEvent.keyDown(window, { key: "v", ctrlKey: true });
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(onPasteLastCopy).toHaveBeenCalled();
+  });
+});
+
+describe("Lining objects up while moving", () => {
+  const guides = () => document.querySelectorAll("[data-mb-guide]");
+
+  it("snaps to a neighbour's edge, shows a guide, and saves the lined-up spot", async () => {
+    const { onMoveItem } = setup();
+    press(screen.getByText("Body b"), 200, 200);
+    // 4px off the row's top edge: close enough to line up.
+    pointer("pointermove", 230, 204);
+    await nextFrame();
+    expect(card("b").style.translate).toBe("30px 0px");
+    expect(guides().length).toBeGreaterThan(0);
+
+    pointer("pointerup", 230, 204);
+    expect(onMoveItem).toHaveBeenCalledWith("b", 430, 100);
+    expect(guides()).toHaveLength(0);
+  });
+
+  it("leaves far-off positions alone", async () => {
+    const { onMoveItem } = setup();
+    press(screen.getByText("Body b"), 200, 200);
+    pointer("pointermove", 230, 260);
+    await nextFrame();
+    expect(guides()).toHaveLength(0);
+    pointer("pointerup", 230, 260);
+    expect(onMoveItem).toHaveBeenCalledWith("b", 430, 160);
+  });
+
+  it("moves freely while Ctrl is held", async () => {
+    const { onMoveItem } = setup();
+    press(screen.getByText("Body b"), 200, 200);
+    act(() => {
+      window.dispatchEvent(
+        new PointerEvent("pointermove", {
+          pointerId: 1,
+          clientX: 230,
+          clientY: 204,
+          ctrlKey: true,
+        }),
+      );
+    });
+    await nextFrame();
+    expect(guides()).toHaveLength(0);
+    act(() => {
+      window.dispatchEvent(
+        new PointerEvent("pointerup", { pointerId: 1, clientX: 230, clientY: 204, ctrlKey: true }),
+      );
+    });
+    expect(onMoveItem).toHaveBeenCalledWith("b", 430, 104);
+  });
+});
+
+describe("Adding files from the computer", () => {
+  const image = () => new File(["png"], "shot.png", { type: "image/png" });
+
+  it("adds a pasted screenshot", () => {
+    const handlers = setup();
+    handlers.onPasteText.mockReturnValue(false);
+    const file = image();
+    const event = new Event("paste", { bubbles: true, cancelable: true });
+    Object.assign(event, { clipboardData: { getData: () => "", setData: vi.fn(), files: [file] } });
+    window.dispatchEvent(event);
+    expect(handlers.onAddFiles).toHaveBeenCalledWith([file], null);
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it("pastes board objects rather than a file when the clipboard holds both", () => {
+    const handlers = setup();
+    const event = new Event("paste", { bubbles: true, cancelable: true });
+    Object.assign(event, {
+      clipboardData: { getData: () => "board", setData: vi.fn(), files: [image()] },
+    });
+    window.dispatchEvent(event);
+    expect(handlers.onAddFiles).not.toHaveBeenCalled();
+  });
+
+  it("shows where dropped files go and adds them at the drop point", () => {
+    const { onAddFiles } = setup();
+    const file = image();
+    const dataTransfer = { types: ["Files"], files: [file], dropEffect: "none" };
+    fireEvent.dragOver(viewport(), { dataTransfer });
+    expect(screen.getByText("Drop to add to the board")).toBeInTheDocument();
+
+    fireEvent.drop(viewport(), { dataTransfer, clientX: 1100, clientY: 900 });
+    expect(onAddFiles).toHaveBeenCalledWith([file], {
+      x: expect.any(Number),
+      y: expect.any(Number),
+    });
+    expect(screen.queryByText("Drop to add to the board")).toBeNull();
+  });
+
+  it("ignores text and links dragged in from elsewhere", () => {
+    const { onAddFiles } = setup();
+    const dataTransfer = { types: ["text/plain"], files: [] };
+    fireEvent.dragOver(viewport(), { dataTransfer });
+    expect(screen.queryByText("Drop to add to the board")).toBeNull();
+    fireEvent.drop(viewport(), { dataTransfer });
+    expect(onAddFiles).not.toHaveBeenCalled();
   });
 });
 

@@ -803,6 +803,9 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
       "inspiration",
       "canvas",
       "references",
+      "screenshot",
+      "drag and drop",
+      "align",
       "note",
       "image",
       "color",
@@ -836,6 +839,10 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           {
             type: "p",
             text: "Everything is in the toolbar at the bottom of the canvas. Drag an item out of it and drop it where you want, or click it and then click the canvas. Notes, shapes and text are ready to type on straight away.",
+          },
+          {
+            type: "p",
+            text: "You can also drag images and files from your computer onto the board, or paste a screenshot with **Ctrl/⌘ + V**. Images become pictures and everything else becomes a file, up to 10 at a time and 4 MB each.",
           },
           { type: "figure", caption: "A moodboard with images and notes" },
           {
@@ -877,6 +884,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             items: [
               "Click an item to select it. Click it again or press **Enter** to edit it. Double-clicking does both.",
               "Drag an item from anywhere on it to move it. With an item selected, drag a corner to resize it or use the arrow keys to nudge it.",
+              "While you move something, it lines up with the edges and centres of nearby items and an orange guide shows where. Hold **Ctrl** (**⌘** on a Mac) to move it freely.",
               "Scroll, use the **Hand** tool, or hold **Space** and drag to move around. On a phone, drag with one finger. The canvas has no edges.",
               "Drag across the empty canvas to select several objects, or **Shift**-click them. Then move, duplicate or delete them together.",
               "**Ctrl/⌘ + Z** undoes and **Ctrl/⌘ + Shift + Z** redoes, or use the buttons at the top right. **Ctrl/⌘ + C**, **X**, **V** and **D** copy, cut, paste and duplicate.",

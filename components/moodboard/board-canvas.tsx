@@ -59,6 +59,7 @@ import {
 
 import { rectsIntersect, resizeFromCorner, zoomAtPoint, type CanvasRect } from "./canvas-math";
 import { createCardOverrideStore } from "./card-override-store";
+import { SNAP_SCREEN_PX, snapBox, unionBox, type Box, type Guide } from "./snapping";
 
 const { MIN_WIDTH, MIN_HEIGHT } = CANVAS_DEFAULTS;
 
@@ -124,6 +125,8 @@ type BoardCanvasProps = {
   onPasteText: (text: string | null) => boolean;
   /** The last copy, for browsers that don't report a paste with nothing to paste into. */
   onPasteLastCopy: () => void;
+  /** Files dropped on the board or pasted (screenshots); `at` is where, in canvas units. */
+  onAddFiles: (files: File[], at: { x: number; y: number } | null) => void;
   onResizeItem: (itemId: string, x: number, y: number, width: number, height: number) => void;
   onAddConnection: (sourceId: string, targetId: string) => void;
   onDeleteConnection: (id: string) => void;
@@ -138,6 +141,11 @@ type BoardCanvasProps = {
 };
 
 export type ItemMove = { id: string; x: number; y: number };
+
+/** True when a drag from outside the page carries files (not text or a link). */
+function hasFiles(transfer: DataTransfer | null): boolean {
+  return !!transfer && Array.from(transfer.types).includes("Files");
+}
 
 type Gesture =
   | {
@@ -165,6 +173,7 @@ type Gesture =
       origin: { x: number; y: number };
       moved: boolean;
       wasSelected: boolean;
+      /** Offset so far in canvas units, after snapping. */
       dx: number;
       dy: number;
     }
@@ -371,6 +380,7 @@ export function BoardCanvas({
   onCopyItems,
   onPasteText,
   onPasteLastCopy,
+  onAddFiles,
   onResizeItem,
   onAddConnection,
   onDeleteConnection,
@@ -395,6 +405,9 @@ export function BoardCanvas({
   const [editRequest, setEditRequest] = useState<{ id: string; nonce: number } | null>(null);
   const [prevToolMode, setPrevToolMode] = useState(toolMode);
   const [measuredHeights, setMeasuredHeights] = useState<Map<string, number>>(new Map());
+  /** Alignment guides shown while objects are being moved. */
+  const [guides, setGuides] = useState<Guide[]>([]);
+  const guidesKey = useRef("");
 
   // Handlers change on every parent render; going through a ref keeps the
   // callbacks stable, so memoized cards don't re-render.
@@ -421,6 +434,7 @@ export function BoardCanvas({
     onCopyItems,
     onPasteText,
     onPasteLastCopy,
+    onAddFiles,
     onResizeItem,
     onDeleteConnection,
     onUndo,
@@ -450,6 +464,7 @@ export function BoardCanvas({
       onCopyItems,
       onPasteText,
       onPasteLastCopy,
+      onAddFiles,
       onResizeItem,
       onDeleteConnection,
       onUndo,
@@ -613,6 +628,28 @@ export function BoardCanvas({
   const spaceHeld = useRef(false);
   const suppressClick = useRef(false);
   const pasteSeen = useRef(false);
+  /** Last mouse position over the board, so a pasted screenshot lands there. */
+  const hoverClient = useRef<{ x: number; y: number } | null>(null);
+  const [dropActive, setDropActive] = useState(false);
+
+  /** A screen point as canvas units, or null when it's outside the board. */
+  const toCanvas = useCallback(
+    (clientX: number, clientY: number) => {
+      const rect = viewportRef.current?.getBoundingClientRect();
+      if (
+        !rect ||
+        clientX < rect.left ||
+        clientX > rect.right ||
+        clientY < rect.top ||
+        clientY > rect.bottom
+      ) {
+        return null;
+      }
+      const { panX, panY, zoom } = canvas.getTransform();
+      return { x: (clientX - rect.left - panX) / zoom, y: (clientY - rect.top - panY) / zoom };
+    },
+    [canvas],
+  );
   const touches = useRef(new Map<number, { x: number; y: number }>());
   const frame = useRef<number | null>(null);
 
@@ -651,6 +688,8 @@ export function BoardCanvas({
 
   /** Abandon a card gesture, as when a second finger turns it into a pinch. */
   const cancelCardGesture = useCallback(() => {
+    guidesKey.current = "";
+    setGuides([]);
     const g = gesture.current;
     if (g?.kind === "group") {
       for (const member of g.members) moveMember(member, 0, 0);
@@ -891,7 +930,45 @@ export function BoardCanvas({
   };
 
   // Writes the latest pointer state to the DOM, at most once per frame.
-  const pointer = useRef({ x: 0, y: 0 });
+  const pointer = useRef({ x: 0, y: 0, free: false });
+
+  const showGuides = useCallback((next: Guide[]) => {
+    const key = next.map((g) => `${g.axis}${g.at}:${g.from}-${g.to}`).join("|");
+    if (key === guidesKey.current) return;
+    guidesKey.current = key;
+    setGuides(next);
+  }, []);
+
+  /**
+   * Where a moved card or group lands for this pointer position, in canvas
+   * units: the pointer's travel, lined up with nearby objects unless Ctrl or
+   * Cmd is held (free).
+   */
+  const dragOffset = useCallback(
+    (ids: string[], startX: number, startY: number, x: number, y: number, free: boolean) => {
+      const { zoom } = canvas.getTransform();
+      const dx = (x - startX) / zoom;
+      const dy = (y - startY) / zoom;
+      if (free) return { dx, dy, guides: [] as Guide[] };
+      const { items: all, measuredHeights: heights } = latest.current;
+      const boxOf = (i: (typeof all)[number]): Box => ({
+        x: i.x,
+        y: i.y,
+        width: i.width,
+        height: i.height || heights.get(i.id) || 100,
+      });
+      const moving = unionBox(all.filter((i) => ids.includes(i.id)).map(boxOf));
+      if (!moving) return { dx, dy, guides: [] as Guide[] };
+      const others = all.filter((i) => !ids.includes(i.id)).map(boxOf);
+      const snap = snapBox(
+        { ...moving, x: moving.x + dx, y: moving.y + dy },
+        others,
+        SNAP_SCREEN_PX / zoom,
+      );
+      return { dx: dx + snap.dx, dy: dy + snap.dy, guides: snap.guides };
+    },
+    [canvas],
+  );
   /** The object under this spot on screen, other than the arrow's own source. */
   const objectAt = useCallback((clientX: number, clientY: number, sourceId: string | null) => {
     const el = document.elementFromPoint(clientX, clientY);
@@ -932,13 +1009,23 @@ export function BoardCanvas({
         zoom,
       });
     } else if (g.kind === "card" && g.moved) {
-      g.dx = (x - g.startX) / zoom;
-      g.dy = (y - g.startY) / zoom;
+      const at = dragOffset([g.id], g.startX, g.startY, x, y, pointer.current.free);
+      g.dx = at.dx;
+      g.dy = at.dy;
+      showGuides(at.guides);
       g.el.style.translate = `${g.dx}px ${g.dy}px`;
       overrides.set([{ id: g.id, x: g.origin.x + g.dx, y: g.origin.y + g.dy }]);
     } else if (g.kind === "group" && g.moved) {
-      const dx = (x - g.startX) / zoom;
-      const dy = (y - g.startY) / zoom;
+      const at = dragOffset(
+        g.members.map((m) => m.id),
+        g.startX,
+        g.startY,
+        x,
+        y,
+        pointer.current.free,
+      );
+      const { dx, dy } = at;
+      showGuides(at.guides);
       for (const member of g.members) moveMember(member, dx, dy);
       overrides.set(g.members.map((m) => ({ id: m.id, x: m.x + dx, y: m.y + dy })));
     } else if (g.kind === "marquee" && g.moved) {
@@ -991,7 +1078,7 @@ export function BoardCanvas({
       g.el.style.height = `${next.height}px`;
       overrides.set([{ id: g.id, x: next.x, y: next.y, width: next.width, height: next.height }]);
     }
-  }, [canvas, overrides, selectIds, updatePendingArrow]);
+  }, [canvas, dragOffset, overrides, selectIds, showGuides, updatePendingArrow]);
 
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
@@ -1028,7 +1115,7 @@ export function BoardCanvas({
       }
 
       if (e.pointerId !== g.pointerId) return;
-      pointer.current = { x: e.clientX, y: e.clientY };
+      pointer.current = { x: e.clientX, y: e.clientY, free: e.ctrlKey || e.metaKey };
 
       if (g.kind === "connect" && !g.moved) {
         if (Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < DRAG_THRESHOLD) return;
@@ -1079,6 +1166,7 @@ export function BoardCanvas({
         frame.current = null;
       }
       setCursor(idleCursor());
+      showGuides([]);
 
       if (e.type === "pointercancel") {
         gesture.current = g;
@@ -1121,9 +1209,16 @@ export function BoardCanvas({
           return;
         }
         suppressClick.current = true;
-        const { zoom } = canvas.getTransform();
-        const dx = Math.round((e.clientX - g.startX) / zoom);
-        const dy = Math.round((e.clientY - g.startY) / zoom);
+        const at = dragOffset(
+          g.members.map((m) => m.id),
+          g.startX,
+          g.startY,
+          e.clientX,
+          e.clientY,
+          e.ctrlKey || e.metaKey,
+        );
+        const dx = Math.round(at.dx);
+        const dy = Math.round(at.dy);
         for (const member of g.members) {
           moveMember(member, 0, 0);
           if (!member.isDrawing) {
@@ -1143,9 +1238,16 @@ export function BoardCanvas({
           return;
         }
         suppressClick.current = true;
-        const { zoom } = canvas.getTransform();
-        const x = Math.round(g.origin.x + (e.clientX - g.startX) / zoom);
-        const y = Math.round(g.origin.y + (e.clientY - g.startY) / zoom);
+        const at = dragOffset(
+          [g.id],
+          g.startX,
+          g.startY,
+          e.clientX,
+          e.clientY,
+          e.ctrlKey || e.metaKey,
+        );
+        const x = Math.round(g.origin.x + at.dx);
+        const y = Math.round(g.origin.y + at.dy);
         // Cleared here and committed in the same tick, so nothing paints in between.
         g.el.style.translate = "";
         g.el.style.zIndex = "";
@@ -1185,12 +1287,14 @@ export function BoardCanvas({
   }, [
     canvas,
     cancelCardGesture,
+    dragOffset,
     idleCursor,
     objectAt,
     overrides,
     paintGesture,
     selectIds,
     setCursor,
+    showGuides,
     updatePendingArrow,
   ]);
 
@@ -1378,6 +1482,16 @@ export function BoardCanvas({
       if (!boardHasFocus(e)) return;
       if (latest.current.onPasteText(e.clipboardData?.getData("text/plain") ?? null)) {
         e.preventDefault();
+        return;
+      }
+      // A screenshot or copied file lands where the mouse is, or mid-screen.
+      const files = Array.from(e.clipboardData?.files ?? []);
+      if (files.length > 0) {
+        e.preventDefault();
+        const at = hoverClient.current
+          ? toCanvas(hoverClient.current.x, hoverClient.current.y)
+          : null;
+        latest.current.onAddFiles(files, at);
       }
     };
 
@@ -1393,13 +1507,14 @@ export function BoardCanvas({
       window.removeEventListener("cut", onCut);
       window.removeEventListener("paste", onPaste);
     };
-  }, [canvas, idleCursor, selectIds, setCursor]);
+  }, [canvas, idleCursor, selectIds, setCursor, toCanvas]);
 
   // ---------------------------------------------------------------------------
   // Arrow tool
   // ---------------------------------------------------------------------------
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    hoverClient.current = { x: e.clientX, y: e.clientY };
     // Only between the two clicks; while dragging, the gesture handles this.
     if (toolMode !== "arrow" || !arrowSourceId || gesture.current) return;
     updatePendingArrow(e.clientX, e.clientY, arrowSourceId);
@@ -1465,6 +1580,24 @@ export function BoardCanvas({
       onMouseMove={handleMouseMove}
       onFocus={onFocus}
       onDragStart={(e) => e.preventDefault()}
+      onMouseLeave={() => {
+        hoverClient.current = null;
+      }}
+      onDragOver={(e) => {
+        if (readOnly || !hasFiles(e.dataTransfer)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+        if (!dropActive) setDropActive(true);
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropActive(false);
+      }}
+      onDrop={(e) => {
+        if (readOnly || !hasFiles(e.dataTransfer)) return;
+        e.preventDefault();
+        setDropActive(false);
+        latest.current.onAddFiles(Array.from(e.dataTransfer.files), toCanvas(e.clientX, e.clientY));
+      }}
     >
       <div
         ref={gridRef}
@@ -1542,6 +1675,32 @@ export function BoardCanvas({
           pendingTargetId={pendingTargetId}
         />
 
+        {guides.map((guide) => (
+          <div
+            key={`${guide.axis}-${guide.at}`}
+            aria-hidden
+            data-mb-guide
+            className="pointer-events-none absolute z-50 bg-[var(--av2-accent)]"
+            style={
+              guide.axis === "x"
+                ? {
+                    left: guide.at,
+                    top: guide.from,
+                    height: guide.to - guide.from,
+                    width: "calc(1px * var(--mb-inverse-zoom, 1))",
+                    translate: "-50% 0",
+                  }
+                : {
+                    top: guide.at,
+                    left: guide.from,
+                    width: guide.to - guide.from,
+                    height: "calc(1px * var(--mb-inverse-zoom, 1))",
+                    translate: "0 -50%",
+                  }
+            }
+          />
+        ))}
+
         {enrichedCardItems
           .filter((item) => item.id === arrowSourceId || item.id === pendingTargetId)
           .map((item) => (
@@ -1570,6 +1729,17 @@ export function BoardCanvas({
               ? "Nothing has been added yet."
               : "Drag something from the toolbar below, or click one and then click here."}
           </p>
+        </div>
+      )}
+
+      {dropActive && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-3 z-40 flex items-center justify-center rounded-2xl border-2 border-dashed border-[var(--av2-accent)] bg-[var(--av2-accent)]/5"
+        >
+          <span className="rounded-full bg-[var(--av2-surface)] px-4 py-2 text-sm font-semibold shadow-md">
+            Drop to add to the board
+          </span>
         </div>
       )}
 

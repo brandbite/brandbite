@@ -816,7 +816,18 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
       "Collect references and develop ideas on a canvas, see the boards customers attach to your jobs, and share yours when you're ready.",
     category: "Work",
     routes: ["/creative/moodboards"],
-    keywords: ["canvas", "references", "inspiration", "ideas", "share", "sticky note", "arrow"],
+    keywords: [
+      "canvas",
+      "references",
+      "inspiration",
+      "ideas",
+      "share",
+      "sticky note",
+      "arrow",
+      "screenshot",
+      "drag and drop",
+      "align",
+    ],
     related: ["ticket-details"],
     sections: [
       {
@@ -829,6 +840,10 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
           {
             type: "p",
             text: "Select an item and drag a dot on its edge onto another item to connect them with an arrow. Scroll or pinch to move around. On a phone, drag with one finger.",
+          },
+          {
+            type: "p",
+            text: "You can also drag images and files from your computer onto the board, or paste a screenshot with **Ctrl/⌘ + V**. Images become pictures and everything else becomes a file, up to 10 at a time and 4 MB each. While you move something, it lines up with the edges and centres of nearby items and an orange guide shows where. Hold **Ctrl** (**⌘** on a Mac) to move it freely.",
           },
           {
             type: "p",
