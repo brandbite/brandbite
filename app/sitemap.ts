@@ -70,6 +70,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     entry("/sizes", 0.8),
     entry("/brief-generator", 0.8),
     entry("/brand-kit", 0.8),
+    entry("/design-cost-calculator", 0.8),
     entry("/brand-kit/font-pairings", 0.8),
     ...FONT_PAIRINGS.map((pairing) => entry(`/brand-kit/font-pairings/${pairing.slug}`, 0.6)),
     ...SIZE_PLATFORMS.map((platform) => entry(`/sizes/${platform.slug}`, 0.8)),

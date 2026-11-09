@@ -107,6 +107,8 @@ const PUBLIC_PATHS = [
   "/brief-generator",
   // Free brand kit generator and font pairing pages.
   "/brand-kit",
+  // Free design cost calculator (client-side, no API).
+  "/design-cost-calculator",
   // Public CMS reads for the color tools (published content only; admin
   // mutations live behind /api/admin/*).
   "/api/palette-ideas",
