@@ -4,12 +4,21 @@
 // -----------------------------------------------------------------------------
 
 import { normalizeHex, tailwindScale } from "@/lib/colors";
+import { COLOR_FAMILIES } from "@/lib/colors/color-families";
 import { getColorMeaning } from "@/lib/colors/content";
 import { OG_CONTENT_TYPE, OG_SIZE, renderOgCard } from "@/lib/seo/og-image";
 
 export const alt = "Color meaning";
 export const size = OG_SIZE;
 export const contentType = OG_CONTENT_TYPE;
+
+// Built at deploy time for the built-in families; CMS entries render once and
+// are cached for a day. Next.js needs a literal here.
+export const revalidate = 86400;
+
+export function generateStaticParams() {
+  return COLOR_FAMILIES.map((family) => ({ slug: family.slug }));
+}
 
 type ImageProps = { params: Promise<{ slug: string }> };
 
