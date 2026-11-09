@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
+import { FEEDBACK_PILL_CLEARANCE } from "@/components/feedback/feedback-widget";
 import {
   Badge,
   Button,
@@ -646,7 +647,9 @@ export function GuideEditor({ role, slug }: { role: Role; slug: string | null })
         </Callout>
       ) : null}
 
-      <div className="sticky bottom-0 z-10 -mx-1 rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-3">
+      <div
+        className={`sticky bottom-0 z-10 -mx-1 rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-3 ${FEEDBACK_PILL_CLEARANCE}`}
+      >
         <SaveBar dirty={dirty}>
           {!isNew && detail ? (
             <>
