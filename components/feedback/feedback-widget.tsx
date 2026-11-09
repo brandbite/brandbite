@@ -19,6 +19,13 @@
 
 "use client";
 
+/**
+ * Right padding for anything pinned to the bottom of the screen (sticky save
+ * bars), so its buttons never sit under this pill at any screen width. The
+ * pill is fixed at right-4 / bottom-4 and about 110px wide.
+ */
+export const FEEDBACK_PILL_CLEARANCE = "pr-32";
+
 import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
