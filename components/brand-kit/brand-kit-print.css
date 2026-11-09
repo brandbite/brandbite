@@ -1,0 +1,26 @@
+/* "Save as PDF" prints the kit (colors, fonts, previews) without the controls. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .brand-kit-print,
+  .brand-kit-print * {
+    visibility: visible;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  .brand-kit-print {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+  }
+  .brand-kit-print .brand-kit-controls {
+    display: none !important;
+  }
+  .brand-kit-print section {
+    break-inside: avoid;
+  }
+  @page {
+    margin: 12mm;
+  }
+}

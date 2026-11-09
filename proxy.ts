@@ -105,6 +105,8 @@ const PUBLIC_PATHS = [
   "/sizes",
   // Free creative brief generator (client-side tool, no API).
   "/brief-generator",
+  // Free brand kit generator and font pairing pages.
+  "/brand-kit",
   // Public CMS reads for the color tools (published content only; admin
   // mutations live behind /api/admin/*).
   "/api/palette-ideas",
