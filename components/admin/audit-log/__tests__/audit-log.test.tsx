@@ -82,10 +82,25 @@ describe("Audit log page", () => {
     expect(screen.getByText("2 recorded entries")).toBeInTheDocument();
   });
 
+  it("shows each entry as a card for narrow screens, opening the same record", async () => {
+    mockLog([entry(), entry({ id: "entry-2", outcome: "ERROR", errorMessage: "Timed out." })]);
+    render(<AdminAuditLogPage />);
+
+    const list = await screen.findByRole("list", { name: "Audit log entries" });
+    const cards = within(list).getAllByRole("button");
+    expect(cards).toHaveLength(2);
+    expect(within(cards[0]).getByText("Consultation pricing edited")).toBeInTheDocument();
+    expect(within(cards[0]).getByText("Consultation")).toBeInTheDocument();
+    expect(within(cards[1]).getByText("Timed out.")).toBeInTheDocument();
+
+    fireEvent.click(cards[1]);
+    expect(screen.getByRole("dialog", { name: "Audit entry" })).toBeInTheDocument();
+  });
+
   it("opens an entry's full record and closes it again", async () => {
     mockLog([entry()]);
     render(<AdminAuditLogPage />);
-    fireEvent.click(await screen.findByRole("button", { name: /View details/ }));
+    fireEvent.click((await screen.findAllByRole("button", { name: /View details/ }))[0]);
 
     const dialog = screen.getByRole("dialog", { name: "Audit entry" });
     expect(within(dialog).getByText("owner@example.com")).toBeInTheDocument();
@@ -100,7 +115,7 @@ describe("Audit log page", () => {
   it("explains why a blocked attempt was stopped", async () => {
     mockLog([entry({ outcome: "BLOCKED", errorMessage: "Only site owners can do this." })]);
     render(<AdminAuditLogPage />);
-    fireEvent.click(await screen.findByRole("button", { name: /View details/ }));
+    fireEvent.click((await screen.findAllByRole("button", { name: /View details/ }))[0]);
     const dialog = screen.getByRole("dialog", { name: "Audit entry" });
     expect(within(dialog).getByText("Why it was blocked")).toBeInTheDocument();
     expect(within(dialog).getByText("Only site owners can do this.")).toBeInTheDocument();
