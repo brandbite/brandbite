@@ -101,6 +101,8 @@ const PUBLIC_PATHS = [
   // save/list endpoint is deliberately NOT listed, so the proxy gates it
   // behind a session cookie.
   "/colors",
+  // Public social media and ad size guide (static pages, no API).
+  "/sizes",
   // Public CMS reads for the color tools (published content only; admin
   // mutations live behind /api/admin/*).
   "/api/palette-ideas",

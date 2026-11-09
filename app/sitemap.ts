@@ -17,6 +17,7 @@ import { getPaletteIdeas } from "@/lib/colors/content";
 import { NAMED_COLORS } from "@/lib/colors/named-colors";
 import { prisma } from "@/lib/prisma";
 import { absoluteUrl } from "@/lib/seo/structured-data";
+import { SIZE_PLATFORMS } from "@/lib/sizes";
 
 // Rebuilt at most hourly, so newly published posts show up without a deploy.
 export const revalidate = 3600;
@@ -65,6 +66,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     entry("/", 1),
     ...MARKETING_PATHS.map((path) => entry(path, 0.8)),
     ...COLOR_TOOL_PATHS.map((path) => entry(path, 0.8)),
+    entry("/sizes", 0.8),
+    ...SIZE_PLATFORMS.map((platform) => entry(`/sizes/${platform.slug}`, 0.8)),
     ...posts.map((post) => entry(`/blog/${post.slug}`, 0.7, post.updatedAt)),
     ...paletteIdeas.map((idea) => entry(`/colors/palettes/${idea.slug}`, 0.6)),
     ...COLOR_FAMILIES.map((family) => entry(`/colors/color-meanings/${family.slug}`, 0.6)),
