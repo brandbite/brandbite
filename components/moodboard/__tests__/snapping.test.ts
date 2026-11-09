@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { rectInside } from "../canvas-math";
-import { snapBox, unionBox } from "../snapping";
+import { snapBox, snapResize, unionBox } from "../snapping";
 
 const box = (x: number, y: number, width = 100, height = 100) => ({ x, y, width, height });
 
@@ -47,3 +47,36 @@ describe("rectInside", () => {
     expect(rectInside(box(60, 10, 50, 50), box(0, 0, 100, 100))).toBe(false);
   });
 });
+
+describe("snapResize", () => {
+  it("pulls the dragged right and bottom edges onto a neighbour's lines", () => {
+    // Asked for 0..204 × 0..97; the neighbour's left is at 200 and its top at 100.
+    const { box, guides } = snapResize(
+      box0(0, 0, 204, 97),
+      "se",
+      [box0(200, 100, 50, 50)],
+      6,
+      40,
+      40,
+    );
+    expect(box).toEqual(box0(0, 0, 200, 100));
+    expect(guides.map((g) => [g.axis, g.at])).toEqual([
+      ["x", 200],
+      ["y", 100],
+    ]);
+  });
+
+  it("moves the left edge for a left-side corner, keeping the right edge put", () => {
+    const { box } = snapResize(box0(103, 0, 97, 100), "sw", [box0(100, 300, 50, 50)], 6, 40, 40);
+    expect(box).toEqual(box0(100, 0, 100, 100));
+  });
+
+  it("never snaps below the minimum size", () => {
+    const { box } = snapResize(box0(0, 0, 44, 44), "se", [box0(36, 36, 2, 2)], 6, 40, 40);
+    expect(box).toEqual(box0(0, 0, 44, 44));
+  });
+});
+
+function box0(x: number, y: number, width: number, height: number) {
+  return { x, y, width, height };
+}

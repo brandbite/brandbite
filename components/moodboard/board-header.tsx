@@ -17,6 +17,10 @@ type BoardHeaderProps = {
   onToggleShared?: () => void;
   /** Download the board; open to everyone who can see it. */
   onExport?: (format: "png" | "pdf") => Promise<void>;
+  /** Open threads, shown on the Comments button. */
+  commentCount?: number;
+  commentsOpen?: boolean;
+  onToggleComments?: () => void;
 };
 
 const CONTROL =
@@ -39,6 +43,9 @@ export function BoardHeader({
   onPickJob,
   onToggleShared,
   onExport,
+  commentCount = 0,
+  commentsOpen = false,
+  onToggleComments,
 }: BoardHeaderProps) {
   const [value, setValue] = useState(title);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -137,8 +144,36 @@ export function BoardHeader({
         </span>
       )}
 
+      {onToggleComments && (
+        <button
+          type="button"
+          onClick={onToggleComments}
+          aria-pressed={commentsOpen}
+          className={`${CONTROL} md:ml-auto ${commentsOpen ? "border-[var(--av2-accent)] bg-[var(--av2-selected)]" : ""}`}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.75"
+            strokeLinejoin="round"
+            aria-hidden
+          >
+            <path d="M4 5h16v11H9l-5 4V5z" />
+          </svg>
+          <span className="max-md:sr-only">Comments</span>
+          {commentCount > 0 && (
+            <span className="rounded-full bg-[var(--av2-accent-strong)] px-1.5 text-xs leading-5 font-semibold text-white tabular-nums">
+              {commentCount}
+            </span>
+          )}
+        </button>
+      )}
+
       {(canDelete || canShare || onExport) && (
-        <div ref={menuRef} className="relative md:ml-auto">
+        <div ref={menuRef} className={`relative ${onToggleComments ? "" : "md:ml-auto"}`}>
           <button
             type="button"
             aria-haspopup="menu"

@@ -18,6 +18,7 @@ type NotificationItem = {
   title: string;
   message: string;
   ticketId: string | null;
+  moodboardId?: string | null;
   read: boolean;
   createdAt: string;
   actor: { id: string; name: string | null } | null;
@@ -49,6 +50,7 @@ const TYPE_ICONS: Record<string, string> = {
   WITHDRAWAL_UPDATED: "\u{1F4B8}",
   CREATIVE_SCHEDULE_UPDATED: "\u{1F552}",
   MOODBOARD_SHARED: "\u{1F3A8}",
+  MOODBOARD_COMMENT: "\u{1F4AC}",
   SUPPORT_GUIDE_CHANGED: "\u{1F4D8}",
 };
 
@@ -180,6 +182,13 @@ export function NotificationBell({
       if (notif.type === "WITHDRAWAL_UPDATED" && role === "creative") {
         setOpen(false);
         router.push("/creative/withdrawals");
+        return;
+      }
+
+      // A comment opens the board with its comments showing.
+      if (notif.type === "MOODBOARD_COMMENT" && notif.moodboardId) {
+        setOpen(false);
+        router.push(`/${role}/moodboards/${notif.moodboardId}?comments=1`);
         return;
       }
 

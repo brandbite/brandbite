@@ -168,6 +168,10 @@ export type MoodboardItemClient = {
   id: string;
   type: MoodboardItemType;
   position: number;
+  /** Can't be moved, resized or deleted until unlocked. */
+  locked?: boolean;
+  /** Objects sharing this are picked and moved as one. */
+  groupId?: string | null;
   colSpan: number;
   x: number;
   y: number;
@@ -403,3 +407,25 @@ export const COLOR_PRESETS = [
   { hex: "#FF2E58", name: "Radical Red" },
   { hex: "#2576F4", name: "Dodger Blue" },
 ];
+
+// ---------------------------------------------------------------------------
+// Comments
+// ---------------------------------------------------------------------------
+
+export type CommentClient = {
+  id: string;
+  body: string;
+  author: { id: string; name: string };
+  createdAt: string;
+  /** Edited after posting. */
+  edited: boolean;
+};
+
+export type CommentThreadClient = CommentClient & {
+  itemId: string;
+  resolvedAt: string | null;
+  replies: CommentClient[];
+};
+
+/** Who is reading the comments: their own can be edited; admins can delete any. */
+export type CommentViewer = { id: string; canModerate: boolean };

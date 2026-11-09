@@ -80,6 +80,11 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     const y = typeof raw.y === "number" ? raw.y : 0;
     const width = typeof raw.width === "number" && raw.width > 0 ? raw.width : 280;
     const height = typeof raw.height === "number" && raw.height >= 0 ? raw.height : 0;
+    // Copies of grouped objects arrive already in their own new group.
+    const groupId =
+      typeof raw.groupId === "string" && raw.groupId.length > 0 && raw.groupId.length <= 64
+        ? raw.groupId
+        : null;
 
     // Determine next position (used for z-index ordering)
     const lastItem = await prisma.moodboardItem.findFirst({
@@ -96,6 +101,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         type: type as MoodboardItemType,
         position,
         colSpan,
+        groupId,
         x,
         y,
         width,
@@ -116,6 +122,8 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
           y: item.y,
           width: item.width,
           height: item.height,
+          locked: item.locked,
+          groupId: item.groupId,
           data: item.data,
           createdById: item.createdById,
           createdAt: item.createdAt.toISOString(),

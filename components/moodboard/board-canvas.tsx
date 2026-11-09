@@ -69,10 +69,13 @@ import {
   type CanvasRect,
 } from "./canvas-math";
 import { createCardOverrideStore } from "./card-override-store";
-import { SNAP_SCREEN_PX, snapBox, unionBox, type Box, type Guide } from "./snapping";
+import { SNAP_SCREEN_PX, snapBox, snapResize, unionBox, type Box, type Guide } from "./snapping";
 import { exportBounds, renderBoard, type ExportFormat } from "./export-board";
 
 const { MIN_WIDTH, MIN_HEIGHT } = CANVAS_DEFAULTS;
+
+/** How long a finger rests on an object before it starts picking several. */
+const LONG_PRESS_MS = 450;
 
 /** Pointer travel before a press becomes a drag, in screen pixels. */
 const DRAG_THRESHOLD = 4;
@@ -142,6 +145,15 @@ type BoardCanvasProps = {
   onAddFiles: (files: File[], at: { x: number; y: number } | null) => void;
   /** Puts objects above or below everything else, for good. */
   onReorderItems: (itemIds: string[], where: "front" | "back") => void;
+  onSetLocked: (itemIds: string[], locked: boolean) => void;
+  onGroup: (itemIds: string[]) => void;
+  onUngroup: (itemIds: string[]) => void;
+  /** Comments in open threads per object, for the badges. */
+  commentCounts?: Map<string, number>;
+  /** The comments panel is open: a viewer's tap on an object picks it for commenting. */
+  commentsOpen?: boolean;
+  /** Opens the comments for one object. */
+  onOpenComments?: (itemId: string) => void;
   onResizeItem: (itemId: string, x: number, y: number, width: number, height: number) => void;
   onAddConnection: (sourceId: string, targetId: string) => void;
   onDeleteConnection: (id: string) => void;
@@ -171,7 +183,18 @@ type Gesture =
       startY: number;
       moved: boolean;
     }
-  | { kind: "pan"; pointerId: number; startX: number; startY: number; panX: number; panY: number }
+  | {
+      kind: "pan";
+      pointerId: number;
+      startX: number;
+      startY: number;
+      panX: number;
+      panY: number;
+      /** Pressed on a locked object: a tap without moving selects it. */
+      lockedId?: string;
+      /** A viewer pressed an object while comments are open: a tap comments on it. */
+      tapId?: string;
+    }
   | {
       kind: "pinch";
       distance: number;
@@ -200,6 +223,10 @@ type Gesture =
       startX: number;
       startY: number;
       moved: boolean;
+      /** Phone selection mode: a tap takes the object out instead of narrowing to it. */
+      tapToggles?: boolean;
+      /** A whole group is selected: a click keeps it rather than narrowing to one member. */
+      keepSelection?: boolean;
     }
   | {
       kind: "marquee";
@@ -209,6 +236,8 @@ type Gesture =
       /** Already selected, when Shift adds to a selection. */
       base: string[];
       moved: boolean;
+      /** Pressed on a locked object: a click without moving selects it. */
+      lockedId?: string;
     }
   | {
       kind: "resize";
@@ -323,6 +352,54 @@ function OrderButtons({
         </svg>
       </button>
     </>
+  );
+}
+
+/** Lock or unlock one object or a selection. */
+function LockButton({
+  ids,
+  locked,
+  onSetLocked,
+}: {
+  ids: string[];
+  locked: boolean;
+  onSetLocked: (ids: string[], locked: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={locked ? "Unlock" : "Lock"}
+      aria-pressed={locked}
+      title={`${locked ? "Unlock" : "Lock"} (Ctrl+Shift+L)`}
+      onClick={() => onSetLocked(ids, !locked)}
+      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none ${
+        locked
+          ? "bg-[var(--av2-selected)] text-[var(--av2-link)]"
+          : "text-[var(--av2-text)] hover:bg-[var(--av2-bg)]"
+      }`}
+    >
+      <svg {...orderGlyph}>
+        <rect x="5" y="11" width="14" height="10" rx="2" />
+        <path d={locked ? "M8 11V8a4 4 0 0 1 8 0v3" : "M8 11V8a4 4 0 0 1 7.5-2"} />
+      </svg>
+    </button>
+  );
+}
+
+/** Opens this object's comments. */
+function CommentButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label="Comment"
+      title="Comment"
+      onClick={onClick}
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--av2-text)] hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
+    >
+      <svg {...orderGlyph}>
+        <path d="M4 5h16v11H9l-5 4V5z" />
+      </svg>
+    </button>
   );
 }
 
@@ -482,6 +559,12 @@ export function BoardCanvas({
   onPasteLastCopy,
   onAddFiles,
   onReorderItems,
+  onSetLocked,
+  onGroup,
+  onUngroup,
+  commentCounts,
+  commentsOpen = false,
+  onOpenComments,
   onResizeItem,
   onAddConnection,
   onDeleteConnection,
@@ -537,6 +620,11 @@ export function BoardCanvas({
     onPasteLastCopy,
     onAddFiles,
     onReorderItems,
+    onSetLocked,
+    onGroup,
+    onUngroup,
+    commentsOpen,
+    onOpenComments,
     onResizeItem,
     onDeleteConnection,
     onUndo,
@@ -568,6 +656,11 @@ export function BoardCanvas({
       onPasteLastCopy,
       onAddFiles,
       onReorderItems,
+      onSetLocked,
+      onGroup,
+      onUngroup,
+      commentsOpen,
+      onOpenComments,
       onResizeItem,
       onDeleteConnection,
       onUndo,
@@ -595,6 +688,30 @@ export function BoardCanvas({
   const reorder = useCallback((ids: string[], where: "front" | "back") => {
     latest.current.onReorderItems(ids, where);
   }, []);
+
+  const setLocked = useCallback((ids: string[], locked: boolean) => {
+    latest.current.onSetLocked(ids, locked);
+  }, []);
+
+  /** These objects plus every other member of the groups they're in. */
+  const withGroups = useCallback((ids: string[]) => {
+    const all = latest.current.items;
+    const groups = new Set(
+      all.filter((i) => ids.includes(i.id) && i.groupId).map((i) => i.groupId),
+    );
+    if (groups.size === 0) return ids;
+    return [
+      ...new Set([
+        ...ids,
+        ...all.filter((i) => i.groupId && groups.has(i.groupId)).map((i) => i.id),
+      ]),
+    ];
+  }, []);
+
+  const unlockedIds = useCallback(
+    (ids: string[]) => ids.filter((id) => !latest.current.items.find((i) => i.id === id)?.locked),
+    [],
+  );
 
   /** One id is an ordinary selection, with that object's own controls. */
   const selectIds = useCallback((ids: string[]) => {
@@ -764,6 +881,21 @@ export function BoardCanvas({
   const spaceHeld = useRef(false);
   const suppressClick = useRef(false);
   const pasteSeen = useRef(false);
+  /**
+   * Phones: a long press on an object starts picking several. While on, a tap
+   * adds or removes an object; a tap on the empty canvas ends it.
+   */
+  const touchPicking = useRef(false);
+  const longPress = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(
+    null,
+  );
+  const cancelLongPress = useCallback(() => {
+    if (longPress.current) clearTimeout(longPress.current.timer);
+    longPress.current = null;
+  }, []);
+  useEffect(() => {
+    if (!selection) touchPicking.current = false;
+  }, [selection]);
   /** Last mouse position over the board, so a pasted screenshot lands there. */
   const hoverClient = useRef<{ x: number; y: number } | null>(null);
   const [dropActive, setDropActive] = useState(false);
@@ -808,7 +940,7 @@ export function BoardCanvas({
   }, [toolMode, placing, setCursor, idleCursor]);
 
   const startPan = useCallback(
-    (e: React.PointerEvent) => {
+    (e: React.PointerEvent, lockedId?: string, tapId?: string) => {
       const { panX, panY } = canvas.getTransform();
       gesture.current = {
         kind: "pan",
@@ -817,6 +949,8 @@ export function BoardCanvas({
         startY: e.clientY,
         panX,
         panY,
+        lockedId,
+        tapId,
       };
     },
     [canvas],
@@ -852,6 +986,7 @@ export function BoardCanvas({
     if (e.pointerType === "touch") {
       touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (touches.current.size === 2) {
+        cancelLongPress();
         cancelCardGesture();
         const [a, b] = [...touches.current.values()];
         const rect = viewportRef.current!.getBoundingClientRect();
@@ -885,7 +1020,10 @@ export function BoardCanvas({
 
     // Viewers can only move around. A link still opens, unless the press became a pan.
     if (latest.current.readOnly) {
-      startPan(e);
+      const tapId = latest.current.commentsOpen
+        ? target.closest<HTMLElement>("[data-mb-card-id]")?.dataset.mbCardId
+        : undefined;
+      startPan(e, undefined, tapId);
       return;
     }
 
@@ -936,9 +1074,16 @@ export function BoardCanvas({
     }
 
     /** Starts moving everything selected, or just this object if it's on its own. */
-    const beginGroup = (clickedId: string, ids: string[]) => {
+    const beginGroup = (
+      clickedId: string,
+      ids: string[],
+      tapToggles = false,
+      keepSelection = false,
+    ) => {
       const members = ids.flatMap((id) => {
         const item = latest.current.items.find((i) => i.id === id);
+        // Locked objects stay where they are, even when what's around them moves.
+        if (item?.locked) return [];
         const isDrawing = item?.type === "DRAWING";
         const el = viewportRef.current?.querySelector(
           isDrawing ? `[data-mb-drawing-group="${id}"]` : `[data-mb-card-id="${id}"]`,
@@ -953,13 +1098,18 @@ export function BoardCanvas({
         startX: e.clientX,
         startY: e.clientY,
         moved: false,
+        tapToggles,
+        keepSelection,
       };
     };
 
     /** Shift adds an object to the selection, or takes it back out. */
     const toggle = (id: string) => {
       const ids = selectedItemIds(latest.current.selection);
-      selectIds(ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
+      const whole = withGroups([id]);
+      selectIds(
+        ids.includes(id) ? ids.filter((x) => !whole.includes(x)) : [...new Set([...ids, ...whole])],
+      );
       suppressClick.current = true;
     };
 
@@ -979,12 +1129,24 @@ export function BoardCanvas({
       return;
     }
 
-    if (!cardEl) {
+    // A locked object stays put: pressing it works like the empty canvas (so a box can
+    // start on a locked background picture), and a click without moving selects it.
+    const pressedId = cardEl?.dataset.mbCardId;
+    const lockedId =
+      pressedId &&
+      mode === "select" &&
+      !e.shiftKey &&
+      latest.current.items.find((i) => i.id === pressedId)?.locked
+        ? pressedId
+        : undefined;
+
+    if (!cardEl || lockedId) {
       if (mode === "arrow") {
         setArrowSourceId(null);
         setPendingTarget(null);
         setPendingTargetId(null);
       }
+      touchPicking.current = false;
       const base = e.shiftKey ? selectedItemIds(latest.current.selection) : [];
       if (!e.shiftKey) setSelection(null);
       (document.activeElement as HTMLElement | null)?.blur?.();
@@ -997,10 +1159,11 @@ export function BoardCanvas({
           startY: e.clientY,
           base,
           moved: false,
+          lockedId,
         };
         return;
       }
-      startPan(e);
+      startPan(e, lockedId);
       return;
     }
 
@@ -1015,10 +1178,54 @@ export function BoardCanvas({
       return;
     }
 
+    const isTouch = e.pointerType === "touch";
+    const picked = selectedItemIds(latest.current.selection);
+
+    if (isTouch && touchPicking.current) {
+      // A tap adds an object; one already picked moves the lot, or leaves with a tap.
+      if (!picked.includes(id)) {
+        toggle(id);
+        return;
+      }
+      beginGroup(id, picked, true);
+      return;
+    }
+
+    // One member of a group picks the whole group, and moves it.
+    const whole = withGroups([id]);
+    if (whole.length > 1) {
+      const already = whole.every((x) => picked.includes(x));
+      const ids = already ? picked : whole;
+      if (!already) selectIds(whole);
+      beginGroup(id, ids, false, ids.length === whole.length);
+      return;
+    }
+
     const selected = latest.current.selection;
     if (selected?.kind === "multi" && selected.ids.includes(id)) {
       beginGroup(id, selected.ids);
       return;
+    }
+
+    if (isTouch && !target.closest(INTERACTIVE)) {
+      // Holding a finger still on an object starts picking several.
+      cancelLongPress();
+      const pointerId = e.pointerId;
+      longPress.current = {
+        x: e.clientX,
+        y: e.clientY,
+        timer: setTimeout(() => {
+          longPress.current = null;
+          const g = gesture.current;
+          if (!g || g.kind !== "card" || g.pointerId !== pointerId || g.moved) return;
+          gesture.current = null;
+          suppressClick.current = true;
+          touchPicking.current = true;
+          // The press has already selected this object on its own; picking starts from it.
+          selectIds([id]);
+          navigator.vibrate?.(10);
+        }, LONG_PRESS_MS),
+      };
     }
 
     const handle = target.closest<HTMLElement>("[data-mb-handle]");
@@ -1214,14 +1421,16 @@ export function BoardCanvas({
             width: i.width,
             height: i.height || heights.get(i.id) || 100,
           };
+          if (i.locked) return false;
           // A box drawn inside a section picks its contents, not the section.
           return i.type === "SECTION" ? rectInside(box, area) : rectsIntersect(area, box);
         })
         .map((i) => i.id);
-      const next = [...new Set([...g.base, ...hits])];
+      const grouped = withGroups(hits);
+      const next = [...new Set([...g.base, ...grouped])];
       if (next.join() !== selectedItemIds(now).join()) selectIds(next);
     } else if (g.kind === "resize") {
-      const next = resizeFromCorner(
+      const asked = resizeFromCorner(
         g.origin,
         g.corner,
         (x - g.startX) / zoom,
@@ -1229,6 +1438,30 @@ export function BoardCanvas({
         MIN_WIDTH,
         MIN_HEIGHT,
       );
+      let next = asked;
+      if (pointer.current.free) {
+        showGuides([]);
+      } else {
+        const { items: all, measuredHeights: heights } = latest.current;
+        const others = all
+          .filter((i) => i.id !== g.id)
+          .map((i) => ({
+            x: i.x,
+            y: i.y,
+            width: i.width,
+            height: i.height || heights.get(i.id) || 100,
+          }));
+        const snap = snapResize(
+          asked,
+          g.corner,
+          others,
+          SNAP_SCREEN_PX / zoom,
+          MIN_WIDTH,
+          MIN_HEIGHT,
+        );
+        next = snap.box;
+        showGuides(snap.guides);
+      }
       g.next = next;
       g.el.style.left = `${next.x}px`;
       g.el.style.top = `${next.y}px`;
@@ -1274,6 +1507,13 @@ export function BoardCanvas({
 
       if (e.pointerId !== g.pointerId) return;
       pointer.current = { x: e.clientX, y: e.clientY, free: e.ctrlKey || e.metaKey };
+      if (
+        longPress.current &&
+        Math.hypot(e.clientX - longPress.current.x, e.clientY - longPress.current.y) >=
+          DRAG_THRESHOLD
+      ) {
+        cancelLongPress();
+      }
 
       if (g.kind === "connect" && !g.moved) {
         if (Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < DRAG_THRESHOLD) return;
@@ -1309,6 +1549,7 @@ export function BoardCanvas({
 
     const onEnd = (e: PointerEvent) => {
       touches.current.delete(e.pointerId);
+      cancelLongPress();
       const g = gesture.current;
       if (!g) return;
 
@@ -1353,12 +1594,45 @@ export function BoardCanvas({
       }
 
       if (g.kind === "marquee") {
+        // A quick flick can end before a frame was drawn: pick from where it ended.
+        if (g.moved) {
+          pointer.current = { x: e.clientX, y: e.clientY, free: false };
+          gesture.current = g;
+          paintGesture();
+          gesture.current = null;
+        }
         if (marqueeRef.current) marqueeRef.current.style.display = "none";
+        if (!g.moved && g.lockedId) {
+          selectIds([g.lockedId]);
+          suppressClick.current = true;
+        }
+        return;
+      }
+
+      if (g.kind === "pan") {
+        const tapped = Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < DRAG_THRESHOLD;
+        if (tapped && g.lockedId) {
+          selectIds([g.lockedId]);
+          suppressClick.current = true;
+        } else if (tapped && g.tapId) {
+          latest.current.onOpenComments?.(g.tapId);
+          suppressClick.current = true;
+        }
         return;
       }
 
       if (g.kind === "group") {
         if (!g.moved) {
+          if (g.tapToggles) {
+            const out = withGroups([g.clickedId]);
+            selectIds(g.members.map((m) => m.id).filter((x) => !out.includes(x)));
+            suppressClick.current = true;
+            return;
+          }
+          if (g.keepSelection) {
+            suppressClick.current = true;
+            return;
+          }
           // A plain click on one of several narrows the selection to it.
           if (g.members.length > 1) {
             selectIds([g.clickedId]);
@@ -1445,6 +1719,7 @@ export function BoardCanvas({
   }, [
     canvas,
     cancelCardGesture,
+    cancelLongPress,
     dragOffset,
     idleCursor,
     objectAt,
@@ -1570,14 +1845,34 @@ export function BoardCanvas({
 
       if ((e.key === "Delete" || e.key === "Backspace") && current) {
         e.preventDefault();
-        if (current.kind === "connection") latest.current.onDeleteConnection(current.id);
-        else if (current.kind === "multi") latest.current.onDeleteItems(current.ids);
-        else latest.current.onDeleteItem(current.id);
+        if (current.kind === "connection") {
+          latest.current.onDeleteConnection(current.id);
+          setSelection(null);
+          return;
+        }
+        // Locked objects survive Delete until they're unlocked.
+        const doomed = unlockedIds(selectedItemIds(current));
+        if (doomed.length === 0) return;
+        if (doomed.length === 1) latest.current.onDeleteItem(doomed[0]);
+        else latest.current.onDeleteItems(doomed);
         setSelection(null);
         return;
       }
 
-      const nudged = selectedItemIds(current);
+      const chosen = selectedItemIds(current);
+      if (mod && e.key.toLowerCase() === "g" && chosen.length > 0) {
+        e.preventDefault();
+        if (e.shiftKey) latest.current.onUngroup(chosen);
+        else latest.current.onGroup(chosen);
+        return;
+      }
+      if (mod && e.shiftKey && e.key.toLowerCase() === "l" && chosen.length > 0) {
+        e.preventDefault();
+        latest.current.onSetLocked(chosen, unlockedIds(chosen).length > 0);
+        return;
+      }
+
+      const nudged = unlockedIds(chosen);
       if (nudged.length > 0 && e.key.startsWith("Arrow")) {
         e.preventDefault();
         const step = e.shiftKey ? NUDGE_LARGE_PX : NUDGE_PX;
@@ -1592,9 +1887,9 @@ export function BoardCanvas({
         return;
       }
 
-      if (!mod && !e.altKey && (e.key === "]" || e.key === "[") && nudged.length > 0) {
+      if (!mod && !e.altKey && (e.key === "]" || e.key === "[") && chosen.length > 0) {
         e.preventDefault();
-        latest.current.onReorderItems(nudged, e.key === "]" ? "front" : "back");
+        latest.current.onReorderItems(chosen, e.key === "]" ? "front" : "back");
         return;
       }
 
@@ -1752,6 +2047,16 @@ export function BoardCanvas({
       onMouseLeave={() => {
         hoverClient.current = null;
       }}
+      onDoubleClick={(e) => {
+        // A click picks the whole group; a double-click goes into one member to edit it.
+        if (readOnly || latest.current.toolMode !== "select") return;
+        const id = (e.target as Element).closest<HTMLElement>("[data-mb-card-id]")?.dataset
+          .mbCardId;
+        const item = id ? latest.current.items.find((i) => i.id === id) : undefined;
+        if (!item?.groupId || item.locked) return;
+        setSelection({ kind: "card", id: item.id });
+        setEditRequest({ id: item.id, nonce: Date.now() });
+      }}
       onDragOver={(e) => {
         if (readOnly || !hasFiles(e.dataTransfer)) return;
         e.preventDefault();
@@ -1800,6 +2105,9 @@ export function BoardCanvas({
               item.type === "SECTION"
             }
             passThrough={item.type === "SECTION"}
+            locked={!!item.locked}
+            commentCount={commentCounts?.get(item.id) ?? 0}
+            onOpenComments={onOpenComments}
             connectors={item.type !== "SECTION"}
             label={cardLabel(item)}
             registerCard={registerCard}
@@ -1812,6 +2120,8 @@ export function BoardCanvas({
                     onReorder={reorder}
                     divider={hasObjectControls(item)}
                   />
+                  <LockButton ids={[item.id]} locked={!!item.locked} onSetLocked={setLocked} />
+                  {onOpenComments && <CommentButton onClick={() => onOpenComments(item.id)} />}
                 </>
               ) : undefined
             }
@@ -1944,6 +2254,29 @@ export function BoardCanvas({
           </span>
           <div aria-hidden className="mx-1 h-5 w-px bg-[var(--av2-border)]" />
           <OrderButtons ids={selection.ids} onReorder={reorder} divider={false} />
+          {(() => {
+            const chosen = items.filter((i) => selection.ids.includes(i.id));
+            const oneGroup =
+              !!chosen[0]?.groupId && chosen.every((i) => i.groupId === chosen[0].groupId);
+            const allLocked = chosen.every((i) => i.locked);
+            return (
+              <>
+                <LockButton ids={selection.ids} locked={allLocked} onSetLocked={setLocked} />
+                <button
+                  type="button"
+                  onClick={() =>
+                    oneGroup
+                      ? latest.current.onUngroup(selection.ids)
+                      : latest.current.onGroup(selection.ids)
+                  }
+                  title={oneGroup ? "Ungroup (Ctrl+Shift+G)" : "Group (Ctrl+G)"}
+                  className="flex h-9 items-center rounded-lg px-3 text-sm font-medium text-[var(--av2-text)] hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
+                >
+                  {oneGroup ? "Ungroup" : "Group"}
+                </button>
+              </>
+            );
+          })()}
           <button
             type="button"
             onClick={() => latest.current.onDuplicateItems(selection.ids)}
@@ -1978,6 +2311,8 @@ export function BoardCanvas({
             >
               <ObjectControls item={item} onUpdateItem={updateItem} />
               <OrderButtons ids={[item.id]} onReorder={reorder} divider={hasObjectControls(item)} />
+              <LockButton ids={[item.id]} locked={!!item.locked} onSetLocked={setLocked} />
+              {onOpenComments && <CommentButton onClick={() => onOpenComments(item.id)} />}
               <button
                 type="button"
                 onClick={() => duplicateCard(item.id)}

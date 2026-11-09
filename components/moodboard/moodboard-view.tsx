@@ -24,6 +24,7 @@ import {
 import { shiftPath } from "@/components/moodboard/canvas-math";
 import { nextPosition, restack } from "@/components/moodboard/stacking";
 import { exportFileName, type ExportFormat } from "@/components/moodboard/export-board";
+import { CommentsPanel } from "@/components/moodboard/comments-panel";
 
 import type {
   MoodboardClient,
@@ -37,6 +38,8 @@ import type {
   MoodboardConnection,
   PenKind,
   ShapeKind,
+  CommentThreadClient,
+  CommentViewer,
 } from "@/lib/moodboard";
 import {
   createConnection,
@@ -180,6 +183,69 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
   useEffect(() => {
     fetchMoodboard();
   }, [fetchMoodboard]);
+
+  // ---------------------------------------------------------------------------
+  // Comments
+  // ---------------------------------------------------------------------------
+
+  const [threads, setThreads] = useState<CommentThreadClient[]>([]);
+  const [commentViewer, setCommentViewer] = useState<CommentViewer | null>(null);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [commentFocus, setCommentFocus] = useState<string | null>(null);
+
+  /** Sends a comment request; the reply carries the board's threads as they now are. */
+  const commentRequest = useCallback(
+    async (path: string, init?: RequestInit): Promise<boolean> => {
+      try {
+        const res = await fetch(`/api/moodboards/${moodboardId}/comments${path}`, {
+          ...init,
+          headers: init?.body ? { "Content-Type": "application/json" } : undefined,
+        });
+        const json = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(json?.error ?? `Comments request failed: ${res.status}`);
+        setThreads(json.threads ?? []);
+        setCommentViewer(json.viewer ?? null);
+        return true;
+      } catch (err) {
+        console.error("[moodboard-view] comments error:", err);
+        showToast({
+          type: "error",
+          title: err instanceof Error && err.message ? err.message : "Comments didn't load.",
+        });
+        return false;
+      }
+    },
+    [moodboardId, showToast],
+  );
+
+  const loadComments = useCallback(async () => {
+    setCommentsLoading(true);
+    await commentRequest("");
+    setCommentsLoading(false);
+  }, [commentRequest]);
+
+  useEffect(() => {
+    void loadComments();
+    // A notification link opens the board with its comments showing.
+    if (new URLSearchParams(window.location.search).get("comments")) setCommentsOpen(true);
+  }, [loadComments]);
+
+  /** Comments in open threads, per object, for the badges on the board. */
+  const commentCounts = React.useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const t of threads) {
+      if (t.resolvedAt) continue;
+      counts.set(t.itemId, (counts.get(t.itemId) ?? 0) + 1 + t.replies.length);
+    }
+    return counts;
+  }, [threads]);
+
+  function openComments(itemId: string | null) {
+    setCommentsOpen(true);
+    setCommentFocus(itemId);
+    void loadComments();
+  }
 
   // The canvas fills the rest of the window, so the page itself never scrolls and
   // can't compete with the canvas. Measured, because banners change where it starts.
@@ -325,8 +391,17 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
     Promise.all([
       ...diff.remove.map((id) => writeItem(id, "DELETE")),
       ...diff.restore.map((id) => writeItem(id, "PATCH", { restore: true })),
-      ...diff.change.map(({ id, x, y, width, height, data, position }) =>
-        writeItem(id, "PATCH", { x, y, width, height, data, position }),
+      ...diff.change.map(({ id, x, y, width, height, data, position, locked, groupId }) =>
+        writeItem(id, "PATCH", {
+          x,
+          y,
+          width,
+          height,
+          data,
+          position,
+          locked: locked ?? false,
+          groupId: groupId ?? null,
+        }),
       ),
       ...(diff.connectionsChanged ? [saveConnections(connections)] : []),
     ]).catch((err) => {
@@ -380,6 +455,13 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
     });
 
     const newIds = new Map<string, string>();
+    // Copies of a group form a group of their own.
+    const newGroups = new Map<string, string>();
+    const copyGroup = (groupId: string | null | undefined) => {
+      if (!groupId) return null;
+      if (!newGroups.has(groupId)) newGroups.set(groupId, newClientId());
+      return newGroups.get(groupId)!;
+    };
     const copies = sources.map((source, index) => {
       const id = `tmp_${newClientId()}`;
       newIds.set(source.id, id);
@@ -392,6 +474,8 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
         ),
         id,
         position: position + index,
+        locked: false,
+        groupId: copyGroup(source.groupId),
         colSpan: 1,
         createdById: "",
         createdAt: now,
@@ -414,11 +498,11 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
     requestAnimationFrame(() => canvasHandle.current?.selectItems(copies.map((c) => c.id)));
 
     for (const copy of copies) {
-      const { type, data, x, y, width, height } = copy;
+      const { type, data, x, y, width, height, groupId } = copy;
       const saved = fetch(`/api/moodboards/${moodboardId}/items`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, data, x, y, width, height }),
+        body: JSON.stringify({ type, data, x, y, width, height, groupId }),
       }).then(async (res) => {
         if (!res.ok) throw new Error("Failed to add copy");
         return (await res.json()).item.id as string;
@@ -716,6 +800,64 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
       console.error("[moodboard-view] move item error:", err);
       fetchMoodboard();
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Lock and group
+  // ---------------------------------------------------------------------------
+
+  /** Saves the same few fields on several objects as one undo step. */
+  async function patchItems(changes: Map<string, Pick<MoodboardItemClient, "locked" | "groupId">>) {
+    if (changes.size === 0) return;
+    record();
+    setMoodboard((prev) =>
+      prev
+        ? {
+            ...prev,
+            items: prev.items.map((item) =>
+              changes.has(item.id) ? { ...item, ...changes.get(item.id) } : item,
+            ),
+          }
+        : prev,
+    );
+    try {
+      await Promise.all([...changes].map(([id, change]) => writeItem(id, "PATCH", change)));
+    } catch (err) {
+      console.error("[moodboard-view] lock/group error:", err);
+      fetchMoodboard();
+    }
+  }
+
+  function handleSetLocked(ids: string[], locked: boolean) {
+    const items = boardRef.current?.items ?? [];
+    const changes = new Map<string, { locked: boolean }>();
+    for (const item of items) {
+      if (ids.includes(item.id) && (item.locked ?? false) !== locked) {
+        changes.set(item.id, { locked });
+      }
+    }
+    patchItems(changes);
+  }
+
+  function handleGroup(ids: string[]) {
+    if (ids.length < 2) return;
+    const groupId = newClientId();
+    patchItems(new Map(ids.map((id) => [id, { groupId }])));
+  }
+
+  /** Ungroups every group the selection touches, wholly. */
+  function handleUngroup(ids: string[]) {
+    const items = boardRef.current?.items ?? [];
+    const groups = new Set(
+      items.filter((i) => ids.includes(i.id) && i.groupId).map((i) => i.groupId),
+    );
+    patchItems(
+      new Map(
+        items
+          .filter((i) => i.groupId && groups.has(i.groupId))
+          .map((i) => [i.id, { groupId: null }]),
+      ),
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -1167,6 +1309,9 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
         onPasteLastCopy={handlePasteLastCopy}
         onAddFiles={handleAddFiles}
         onReorderItems={handleReorderItems}
+        onSetLocked={handleSetLocked}
+        onGroup={handleGroup}
+        onUngroup={handleUngroup}
         onResizeItem={handleResizeItem}
         onAddConnection={handleAddConnection}
         onDeleteConnection={handleDeleteConnection}
@@ -1175,7 +1320,42 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
         onRedo={handleRedo}
         canUndo={historySize.undo > 0}
         canRedo={historySize.redo > 0}
+        commentCounts={commentCounts}
+        commentsOpen={commentsOpen}
+        onOpenComments={openComments}
       />
+
+      {commentsOpen && (
+        <CommentsPanel
+          threads={threads}
+          items={moodboard.items}
+          viewer={commentViewer}
+          focusItemId={commentFocus}
+          loading={commentsLoading}
+          onClose={() => {
+            setCommentsOpen(false);
+            setCommentFocus(null);
+          }}
+          onShowAll={() => setCommentFocus(null)}
+          onFocusItem={(itemId) => {
+            setCommentFocus(itemId);
+            if (canEdit) canvasHandle.current?.selectCard(itemId);
+          }}
+          onStart={(itemId, body) =>
+            commentRequest("", { method: "POST", body: JSON.stringify({ itemId, body }) })
+          }
+          onReply={(threadId, body) =>
+            commentRequest("", { method: "POST", body: JSON.stringify({ threadId, body }) })
+          }
+          onResolve={(threadId, resolved) =>
+            void commentRequest(`/${threadId}`, {
+              method: "PATCH",
+              body: JSON.stringify({ resolved }),
+            })
+          }
+          onDelete={(commentId) => void commentRequest(`/${commentId}`, { method: "DELETE" })}
+        />
+      )}
 
       {isPhone && placing && (
         <div
@@ -1200,6 +1380,9 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
         onBack={() => router.push(basePath)}
         onDelete={handleDeleteBoard}
         onExport={handleExport}
+        commentCount={threads.filter((t) => !t.resolvedAt).length}
+        commentsOpen={commentsOpen}
+        onToggleComments={() => (commentsOpen ? setCommentsOpen(false) : openComments(null))}
       />
 
       {canEdit && (
