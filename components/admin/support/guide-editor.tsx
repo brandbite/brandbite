@@ -33,7 +33,7 @@ import { useToast } from "@/components/ui/toast-provider";
 import type { GuideContent } from "@/lib/support/merge";
 import type { GuideBlock, GuideSection } from "@/lib/support/types";
 
-type Role = "customer" | "creative" | "admin";
+type Role = "customer" | "creative" | "admin" | "public";
 type Status = "IN_SYNC" | "CODE_CHANGED" | "CODE_REMOVED";
 type State = "code" | "edited" | "cms" | "hidden";
 
@@ -52,7 +52,13 @@ const ROLE_LABEL: Record<Role, string> = {
   customer: "Customer",
   creative: "Creative",
   admin: "Admin",
+  public: "Public",
 };
+
+/** Where a guide lives on the site. */
+function guidePath(role: Role, slug: string): string {
+  return role === "public" ? `/guides/${slug}` : `/${role}/support/${slug}`;
+}
 
 const BLOCK_LABEL: Record<GuideBlock["type"], string> = {
   p: "Paragraph",
@@ -309,7 +315,7 @@ export function GuideEditor({ role, slug }: { role: Role; slug: string | null })
       return { ...d, sections };
     });
 
-  const siteHref = useMemo(() => `/${role}/support/${slug}`, [role, slug]);
+  const siteHref = useMemo(() => guidePath(role, slug ?? ""), [role, slug]);
 
   if (loadError) {
     return (
@@ -339,7 +345,7 @@ export function GuideEditor({ role, slug }: { role: Role; slug: string | null })
         title={isNew ? "New guide" : draft.title || slug}
         description={
           isNew
-            ? "A guide that exists only here. It shows in the Support hub and search."
+            ? "A guide that exists only here. It shows with the other guides and in search."
             : `${ROLE_LABEL[role]} guide · ${isCode ? (edited ? "edited here, written in code" : "written in code") : "added here"}`
         }
         meta={
@@ -450,7 +456,7 @@ export function GuideEditor({ role, slug }: { role: Role; slug: string | null })
               <Field
                 label="Address"
                 htmlFor="guide-slug"
-                hint={`Shown as /${newRole}/support/${newSlug || "your-guide"}. Lowercase letters, numbers and dashes.`}
+                hint={`Shown as ${guidePath(newRole, newSlug || "your-guide")}. Lowercase letters, numbers and dashes.`}
               >
                 <TextInput
                   id="guide-slug"

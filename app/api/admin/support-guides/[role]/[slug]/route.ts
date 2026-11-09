@@ -13,25 +13,25 @@ import {
   applyGuideAction,
   getGuideDetail,
   GuideAdminError,
-  isSupportRole,
+  isGuideOwner,
   removeGuideEntry,
   saveGuide,
   type GuideAction,
+  type GuideOwner,
 } from "@/lib/support/admin";
-import type { SupportRole } from "@/lib/support/types";
 
-import { guideErrorResponse } from "../../errors";
+import { guideErrorResponse, refreshPublicGuide } from "../../errors";
 
 type Ctx = { params: Promise<{ role: string; slug: string }> };
 
 const ACTIONS: GuideAction[] = ["hide", "show", "keep-mine", "keep-as-cms"];
 
 /** Checks the caller and the guide; owner-only guides are for the site owner. */
-async function authorize(ctx: Ctx): Promise<{ role: SupportRole; slug: string; userId: string }> {
+async function authorize(ctx: Ctx): Promise<{ role: GuideOwner; slug: string; userId: string }> {
   const user = await getCurrentUserOrThrow();
   if (!isSiteAdminRole(user.role)) throw new GuideAdminError("FORBIDDEN", "Admins only.");
   const { role, slug } = await ctx.params;
-  if (!isSupportRole(role)) throw new GuideAdminError("NOT_FOUND", "Guide not found.");
+  if (!isGuideOwner(role)) throw new GuideAdminError("NOT_FOUND", "Guide not found.");
   const detail = await getGuideDetail(role, slug);
   if (!detail) throw new GuideAdminError("NOT_FOUND", "Guide not found.");
   if (detail.ownerOnly && !isSiteOwnerRole(user.role)) {
@@ -54,6 +54,7 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
     const { role, slug, userId } = await authorize(ctx);
     const body = (await req.json().catch(() => null)) as { content?: unknown } | null;
     await saveGuide(role, slug, body?.content, userId);
+    refreshPublicGuide(role, slug);
     return NextResponse.json({ guide: await getGuideDetail(role, slug) });
   } catch (err) {
     return guideErrorResponse(err, "PUT");
@@ -67,6 +68,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     const action = ACTIONS.find((candidate) => candidate === body?.action);
     if (!action) throw new GuideAdminError("INVALID", "Unknown action.");
     await applyGuideAction(role, slug, action, userId);
+    refreshPublicGuide(role, slug);
     return NextResponse.json({ guide: await getGuideDetail(role, slug) });
   } catch (err) {
     return guideErrorResponse(err, "PATCH");
@@ -77,6 +79,7 @@ export async function DELETE(_req: NextRequest, ctx: Ctx) {
   try {
     const { role, slug } = await authorize(ctx);
     await removeGuideEntry(role, slug);
+    refreshPublicGuide(role, slug);
     return NextResponse.json({ guide: await getGuideDetail(role, slug) });
   } catch (err) {
     return guideErrorResponse(err, "DELETE");

@@ -16,6 +16,9 @@ export default defineConfig({
     exclude: ["**/node_modules/**", "**/.next/**", "tests/integration/**"],
   },
   resolve: {
-    alias: { "@": path.resolve(__dirname, ".") },
+    alias: {
+      "@": path.resolve(__dirname, "."),
+      "server-only": path.resolve(__dirname, "tests/stubs/server-only.ts"),
+    },
   },
 });

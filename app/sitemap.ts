@@ -19,6 +19,8 @@ import { NAMED_COLORS } from "@/lib/colors/named-colors";
 import { prisma } from "@/lib/prisma";
 import { absoluteUrl } from "@/lib/seo/structured-data";
 import { SIZE_PLATFORMS } from "@/lib/sizes";
+import { guideMeta } from "@/lib/guides";
+import { getEffectiveGuides } from "@/lib/support/effective";
 
 // Rebuilt at most hourly, so newly published posts show up without a deploy.
 export const revalidate = 3600;
@@ -61,7 +63,11 @@ async function publishedPosts() {
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [paletteIdeas, posts] = await Promise.all([getPaletteIdeas(), publishedPosts()]);
+  const [paletteIdeas, posts, guides] = await Promise.all([
+    getPaletteIdeas(),
+    publishedPosts(),
+    getEffectiveGuides("public"),
+  ]);
 
   return [
     entry("/", 1),
@@ -75,6 +81,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...FONT_PAIRINGS.map((pairing) => entry(`/brand-kit/font-pairings/${pairing.slug}`, 0.6)),
     ...SIZE_PLATFORMS.map((platform) => entry(`/sizes/${platform.slug}`, 0.8)),
     ...posts.map((post) => entry(`/blog/${post.slug}`, 0.7, post.updatedAt)),
+    entry("/guides", 0.8),
+    ...guides.guides.map((guide) =>
+      entry(`/guides/${guide.slug}`, 0.7, new Date(`${guideMeta(guide.slug).updatedOn}T00:00:00Z`)),
+    ),
     ...paletteIdeas.map((idea) => entry(`/colors/palettes/${idea.slug}`, 0.6)),
     ...COLOR_FAMILIES.map((family) => entry(`/colors/color-meanings/${family.slug}`, 0.6)),
     ...NAMED_COLORS.map((color) => entry(`/colors/hex/${color.hex.slice(1)}`, 0.5)),

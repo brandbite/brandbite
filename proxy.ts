@@ -109,6 +109,8 @@ const PUBLIC_PATHS = [
   "/brand-kit",
   // Free design cost calculator (client-side, no API).
   "/design-cost-calculator",
+  // Public guides (/guides and /guides/[slug]).
+  "/guides",
   // Public CMS reads for the color tools (published content only; admin
   // mutations live behind /api/admin/*).
   "/api/palette-ideas",

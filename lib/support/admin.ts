@@ -3,7 +3,7 @@
 // @purpose: What the admin "Support content" screens do: list every guide with
 //           its CMS state, open one with its code version beside the edit,
 //           save, hide, show, resolve code changes and add CMS-only guides.
-//           Server only; the API routes in app/api/admin/support-guides call it.
+//           Covers the dashboard roles and the public /guides. Server only; the API routes in app/api/admin/support-guides call it.
 // -----------------------------------------------------------------------------
 
 import "server-only";
@@ -12,9 +12,14 @@ import type { GuideAudience, Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 
-import { AUDIENCE_FOR_ROLE } from "./effective";
+import {
+  AUDIENCE_FOR_OWNER,
+  codeGuidesFor,
+  GUIDE_OWNERS,
+  isGuideOwner,
+  type GuideOwner,
+} from "./code-sources";
 import { guideCodeHash } from "./hash";
-import { codeGuides } from "./index";
 import {
   codeStatusFor,
   contentOf,
@@ -22,20 +27,16 @@ import {
   type GuideCodeStatus,
   type GuideContent,
 } from "./merge";
-import type { SupportGuide, SupportRole } from "./types";
+import type { SupportGuide } from "./types";
 
-export const SUPPORT_ROLES: SupportRole[] = ["customer", "creative", "admin"];
-
-export function isSupportRole(value: string): value is SupportRole {
-  return (SUPPORT_ROLES as string[]).includes(value);
-}
+export { isGuideOwner, type GuideOwner };
 
 export const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export type GuideState = "code" | "edited" | "cms" | "hidden";
 
 export type GuideRow = {
-  role: SupportRole;
+  role: GuideOwner;
   slug: string;
   title: string;
   category: string;
@@ -66,8 +67,8 @@ const ENTRY_SELECT = {
   updatedAt: true,
 } as const;
 
-function codeGuide(role: SupportRole, slug: string): SupportGuide | undefined {
-  return codeGuides(role).find((guide) => guide.slug === slug);
+function codeGuide(role: GuideOwner, slug: string): SupportGuide | undefined {
+  return codeGuidesFor(role).find((guide) => guide.slug === slug);
 }
 
 function stateOf(entry: EntryRow | undefined): GuideState {
@@ -80,13 +81,13 @@ function stateOf(entry: EntryRow | undefined): GuideState {
 /** Every guide for every role, with its CMS state. Owner-only guides need the owner. */
 export async function listGuideRows(isSiteOwner: boolean): Promise<GuideRow[]> {
   const rows: GuideRow[] = [];
-  for (const role of SUPPORT_ROLES) {
+  for (const role of GUIDE_OWNERS) {
     const entries: EntryRow[] = await prisma.guideEntry.findMany({
-      where: { audience: AUDIENCE_FOR_ROLE[role] },
+      where: { audience: AUDIENCE_FOR_OWNER[role] },
       select: ENTRY_SELECT,
     });
     const bySlug = new Map(entries.map((entry) => [entry.slug, entry]));
-    for (const guide of codeGuides(role)) {
+    for (const guide of codeGuidesFor(role)) {
       if (guide.ownerOnly && !isSiteOwner) continue;
       const entry = bySlug.get(guide.slug);
       const content = entry ? parseGuideContent(entry.content) : null;
@@ -121,7 +122,7 @@ export async function listGuideRows(isSiteOwner: boolean): Promise<GuideRow[]> {
 }
 
 export type GuideDetail = {
-  role: SupportRole;
+  role: GuideOwner;
   slug: string;
   state: GuideState;
   status: GuideCodeStatus;
@@ -133,14 +134,14 @@ export type GuideDetail = {
   ownerOnly: boolean;
 };
 
-async function findEntry(role: SupportRole, slug: string): Promise<EntryRow | null> {
+async function findEntry(role: GuideOwner, slug: string): Promise<EntryRow | null> {
   return prisma.guideEntry.findUnique({
-    where: { audience_slug: { audience: AUDIENCE_FOR_ROLE[role], slug } },
+    where: { audience_slug: { audience: AUDIENCE_FOR_OWNER[role], slug } },
     select: ENTRY_SELECT,
   });
 }
 
-export async function getGuideDetail(role: SupportRole, slug: string): Promise<GuideDetail | null> {
+export async function getGuideDetail(role: GuideOwner, slug: string): Promise<GuideDetail | null> {
   const code = codeGuide(role, slug);
   const entry = await findEntry(role, slug);
   if (!code && !entry) return null;
@@ -165,13 +166,13 @@ export class GuideAdminError extends Error {
   }
 }
 
-function audience(role: SupportRole): GuideAudience {
-  return AUDIENCE_FOR_ROLE[role];
+function audience(role: GuideOwner): GuideAudience {
+  return AUDIENCE_FOR_OWNER[role];
 }
 
 /** Saves an admin's text. For a code guide, records which code version it was based on. */
 export async function saveGuide(
-  role: SupportRole,
+  role: GuideOwner,
   slug: string,
   rawContent: unknown,
   userId: string,
@@ -208,7 +209,7 @@ export async function saveGuide(
 export type GuideAction = "hide" | "show" | "keep-mine" | "keep-as-cms";
 
 export async function applyGuideAction(
-  role: SupportRole,
+  role: GuideOwner,
   slug: string,
   action: GuideAction,
   userId: string,
@@ -276,14 +277,14 @@ export async function applyGuideAction(
 }
 
 /** Removes the CMS row: a code guide goes back to its code text; a CMS guide is deleted. */
-export async function removeGuideEntry(role: SupportRole, slug: string): Promise<void> {
+export async function removeGuideEntry(role: GuideOwner, slug: string): Promise<void> {
   const entry = await findEntry(role, slug);
   if (!entry) throw new GuideAdminError("NOT_FOUND", "Nothing to remove.");
   await prisma.guideEntry.delete({ where: { id: entry.id } });
 }
 
 export async function createCmsGuide(
-  role: SupportRole,
+  role: GuideOwner,
   slug: string,
   rawContent: unknown,
   userId: string,

@@ -7,7 +7,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { GuideEditor } from "@/components/admin/support/guide-editor";
-import { isSupportRole } from "@/lib/support/admin";
+import { isGuideOwner } from "@/lib/support/admin";
 
 export const metadata: Metadata = { title: "Edit guide · Support content" };
 
@@ -15,6 +15,6 @@ type Props = { params: Promise<{ role: string; slug: string }> };
 
 export default async function EditSupportGuidePage({ params }: Props) {
   const { role, slug } = await params;
-  if (!isSupportRole(role)) notFound();
+  if (!isGuideOwner(role)) notFound();
   return <GuideEditor role={role} slug={slug} />;
 }

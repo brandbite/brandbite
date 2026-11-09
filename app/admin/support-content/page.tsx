@@ -32,7 +32,7 @@ import {
 } from "@/components/admin/v2/ui";
 import { IconFaq } from "@/components/navigation/nav-icons";
 
-type Role = "customer" | "creative" | "admin";
+type Role = "customer" | "creative" | "admin" | "public";
 type State = "code" | "edited" | "cms" | "hidden";
 type Status = "IN_SYNC" | "CODE_CHANGED" | "CODE_REMOVED";
 
@@ -53,6 +53,7 @@ const ROLE_TABS: { value: Role; label: string }[] = [
   { value: "customer", label: "Customer" },
   { value: "creative", label: "Creative" },
   { value: "admin", label: "Admin" },
+  { value: "public", label: "Public guides" },
 ];
 
 const STATE_BADGE: Record<State, { label: string; tone: Tone }> = {

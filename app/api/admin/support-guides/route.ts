@@ -9,9 +9,15 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { isSiteAdminRole, isSiteOwnerRole } from "@/lib/roles";
-import { createCmsGuide, GuideAdminError, isSupportRole, listGuideRows } from "@/lib/support/admin";
+import {
+  createCmsGuide,
+  GuideAdminError,
+  isGuideOwner,
+  listGuideRows,
+  type GuideOwner,
+} from "@/lib/support/admin";
 
-import { guideErrorResponse } from "./errors";
+import { guideErrorResponse, refreshPublicGuide } from "./errors";
 
 export async function GET() {
   try {
@@ -37,10 +43,11 @@ export async function POST(req: NextRequest) {
       slug?: string;
       content?: unknown;
     } | null;
-    if (!body || !isSupportRole(body.role ?? "") || typeof body.slug !== "string") {
+    if (!body || !isGuideOwner(body.role ?? "") || typeof body.slug !== "string") {
       throw new GuideAdminError("INVALID", "Pick who the guide is for and give it an address.");
     }
-    await createCmsGuide(body.role as "customer", body.slug.trim(), body.content, user.id);
+    await createCmsGuide(body.role as GuideOwner, body.slug.trim(), body.content, user.id);
+    refreshPublicGuide(body.role as string, body.slug.trim());
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch (err) {
     return guideErrorResponse(err, "POST");

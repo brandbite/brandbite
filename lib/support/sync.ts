@@ -10,15 +10,8 @@
 import type { GuideAudience } from "@prisma/client";
 
 import { guideCodeHash } from "./hash";
-import { codeGuides } from "./index";
+import { codeGuidesFor, OWNER_FOR_AUDIENCE } from "./code-sources";
 import { codeStatusFor, parseGuideContent, type GuideCodeStatus } from "./merge";
-import type { SupportRole } from "./types";
-
-const ROLE: Partial<Record<GuideAudience, SupportRole>> = {
-  CUSTOMER: "customer",
-  CREATIVE: "creative",
-  ADMIN: "admin",
-};
 
 const AUDIENCE_LABEL: Record<GuideAudience, string> = {
   CUSTOMER: "Customer",
@@ -59,9 +52,9 @@ export async function syncGuideEntries(store: SyncStore, notify: Notify): Promis
   const needsReview: string[] = [];
 
   for (const entry of entries) {
-    const role = ROLE[entry.audience];
-    if (!role) continue;
-    const code = codeGuides(role).find((guide) => guide.slug === entry.slug);
+    const code = codeGuidesFor(OWNER_FOR_AUDIENCE[entry.audience]).find(
+      (guide) => guide.slug === entry.slug,
+    );
     const hash = code ? guideCodeHash(code) : null;
     const status = codeStatusFor(entry, hash);
     const marker = hash ?? REMOVED;
