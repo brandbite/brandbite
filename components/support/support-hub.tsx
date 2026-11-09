@@ -17,6 +17,7 @@ import {
   guideHref,
   popularGuides,
   searchGuides,
+  type SupportGuide,
   type SupportRole,
 } from "@/lib/support";
 import { useSessionRole } from "@/lib/hooks/use-session-role";
@@ -35,15 +36,28 @@ const SEARCH_HINT: Record<SupportRole, string> = {
   admin: "Search guides, e.g. “payout rules” or “refund”",
 };
 
-export function SupportHub({ role }: { role: SupportRole }) {
+export function SupportHub({
+  role,
+  guides: source,
+}: {
+  role: SupportRole;
+  /** The role's guides with the CMS layer applied; code guides when absent. */
+  guides?: SupportGuide[];
+}) {
   const { isSiteOwner } = useSessionRole();
   const [query, setQuery] = useState("");
 
-  const guides = useMemo(() => getGuides(role, { isSiteOwner }), [role, isSiteOwner]);
+  const guides = useMemo(
+    () => getGuides(role, { isSiteOwner, source }),
+    [role, isSiteOwner, source],
+  );
   const results = useMemo(() => searchGuides(guides, query), [guides, query]);
   const searching = query.trim().length > 0;
   const groups = useMemo(() => groupGuides(role, guides), [role, guides]);
-  const popular = useMemo(() => popularGuides(role, { isSiteOwner }), [role, isSiteOwner]);
+  const popular = useMemo(
+    () => popularGuides(role, { isSiteOwner, source }),
+    [role, isSiteOwner, source],
+  );
 
   return (
     <SupportScope role={role}>

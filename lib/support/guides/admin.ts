@@ -506,6 +506,68 @@ export const ADMIN_GUIDES: SupportGuide[] = [
     ],
   },
   {
+    slug: "meetings",
+    title: "Meetings",
+    summary: "See and cancel the 30-minute calls people book from the public /meet page.",
+    category: "Workspace",
+    routes: ["/admin/meetings"],
+    keywords: ["meet", "booking", "call", "calendar", "google", "intro call", "demo"],
+    related: ["consultations", "consultation-settings"],
+    sections: [
+      {
+        heading: "What you see",
+        blocks: [
+          {
+            type: "p",
+            text: "Every call booked from the public **/meet** page, with the person's name, company, email and note. Switch between **Upcoming**, **Past** and **Canceled**, and click **Refresh** to load new bookings.",
+          },
+          {
+            type: "tip",
+            text: "Upcoming meetings have a **Join link** to the video call. The event is also in the host's Google Calendar.",
+          },
+        ],
+      },
+      {
+        heading: "Canceling a meeting",
+        blocks: [
+          {
+            type: "steps",
+            items: [
+              "Find the meeting under **Upcoming** and click **Cancel**.",
+              "Confirm with **Cancel meeting**.",
+            ],
+          },
+          {
+            type: "warning",
+            text: "The person gets a cancellation email and the event is removed from the calendar. This can't be undone; they would need to book again.",
+          },
+        ],
+      },
+      {
+        heading: "When booking stops working",
+        blocks: [
+          {
+            type: "list",
+            items: [
+              {
+                term: "Booking is off",
+                text: "Google Calendar isn't connected, so /meet shows no times. Connect it in **Consultation settings**.",
+              },
+              {
+                term: "Calendar is connected to another account",
+                text: "Bookings stay closed unless that account can see the host's free and busy times.",
+              },
+              {
+                term: "No company time zone set",
+                text: "Working hours are read as UTC until you set the time zone in **Consultation settings**.",
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
     slug: "consultation-settings",
     title: "Consultation settings and Google Calendar",
     summary:
@@ -1186,6 +1248,85 @@ export const ADMIN_GUIDES: SupportGuide[] = [
               "**Move up / Move down** reorders a question within its category and saves straight away.",
               "Creatives only see the General, Creative Process and Platform & Tools categories.",
               "**Delete FAQ** is permanent; hide a question to keep it.",
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    slug: "support-content",
+    title: "Support content",
+    summary: "Edit, hide or add Support guides, and review guides a release changed.",
+    category: "Content",
+    routes: ["/admin/support-content"],
+    keywords: ["guides", "help", "docs", "documentation", "support articles", "cms", "review"],
+    related: ["faq"],
+    sections: [
+      {
+        heading: "Where guides come from",
+        blocks: [
+          {
+            type: "p",
+            text: "Guides are written in code alongside each feature, so they change when the feature does. This page adds a layer on top: anything you edit, hide or add here is what people see.",
+          },
+          {
+            type: "list",
+            items: [
+              {
+                term: "From code",
+                text: "The text written with the feature. Nothing is stored here yet.",
+              },
+              { term: "Edited", text: "Your version replaces the code text." },
+              { term: "Added here", text: "A guide that exists only in the admin panel." },
+              {
+                term: "Hidden",
+                text: "Left out of the Support hub and search; its page goes to Support home.",
+              },
+            ],
+          },
+        ],
+      },
+      {
+        heading: "Editing a guide",
+        blocks: [
+          {
+            type: "steps",
+            items: [
+              "Pick **Customer**, **Creative** or **Admin**, then open a guide.",
+              "Change the title, summary, category or sections. Each section has blocks: paragraph, numbered steps, bulleted list, tip or warning.",
+              "Click **Save**. Your version shows right away.",
+            ],
+          },
+          {
+            type: "tip",
+            text: "**Go back to the code version** removes your edit. **New guide** adds a guide that exists only here.",
+          },
+        ],
+      },
+      {
+        heading: "When a release changes a guide you edited",
+        blocks: [
+          {
+            type: "p",
+            text: "Each release checks your edits against the new code. If code changed or removed a guide you edited, admins get a notification and the guide is marked **Code updated** or **Removed from code**. Your text stays live until you decide.",
+          },
+          {
+            type: "list",
+            items: [
+              { term: "Keep my version", text: "Your text stays and the notice clears." },
+              {
+                term: "Use the new code version",
+                text: "Your edit is removed and the new code text shows.",
+              },
+              {
+                term: "Start from the new version",
+                text: "Loads the new code text into the editor so you can add your changes again, then save.",
+              },
+              {
+                term: "Removed from code",
+                text: "Keep it as a guide added here if it still applies, or delete it.",
+              },
             ],
           },
         ],

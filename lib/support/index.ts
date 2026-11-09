@@ -40,19 +40,31 @@ export function guideHref(role: SupportRole, slug: string): string {
   return `${supportBasePath(role)}/${slug}`;
 }
 
-export function getGuides(role: SupportRole, opts: { isSiteOwner?: boolean } = {}) {
-  return GUIDES[role].filter((g) => !g.ownerOnly || opts.isSiteOwner);
+/**
+ * `source` is the role's full guide list when the CMS layer has been merged in
+ * (lib/support/effective.ts); without it, the guides written in code.
+ */
+export type GuideOpts = { isSiteOwner?: boolean; source?: SupportGuide[] };
+
+/** The guides written in code, before the CMS layer. */
+export function codeGuides(role: SupportRole): SupportGuide[] {
+  return GUIDES[role];
 }
 
-export function getGuide(role: SupportRole, slug: string): SupportGuide | undefined {
-  return GUIDES[role].find((g) => g.slug === slug);
+export function getGuides(role: SupportRole, opts: GuideOpts = {}) {
+  return (opts.source ?? GUIDES[role]).filter((g) => !g.ownerOnly || opts.isSiteOwner);
+}
+
+export function getGuide(
+  role: SupportRole,
+  slug: string,
+  source: SupportGuide[] = GUIDES[role],
+): SupportGuide | undefined {
+  return source.find((g) => g.slug === slug);
 }
 
 /** The role's popular guides that the viewer can open, in the listed order. */
-export function popularGuides(
-  role: SupportRole,
-  opts: { isSiteOwner?: boolean } = {},
-): SupportGuide[] {
+export function popularGuides(role: SupportRole, opts: GuideOpts = {}): SupportGuide[] {
   const visible = getGuides(role, opts);
   return POPULAR_SLUGS[role]
     .map((slug) => visible.find((g) => g.slug === slug))
@@ -122,7 +134,7 @@ export function primaryRoute(guide: SupportGuide): string | undefined {
 export function relatedGuides(
   role: SupportRole,
   guide: SupportGuide,
-  opts: { isSiteOwner?: boolean } = {},
+  opts: GuideOpts = {},
 ): SupportGuide[] {
   const visible = getGuides(role, opts);
   return (guide.related ?? [])

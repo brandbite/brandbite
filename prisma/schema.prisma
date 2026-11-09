@@ -119,6 +119,7 @@ enum NotificationType {
   WITHDRAWAL_UPDATED // Creative's withdrawal approved, rejected or paid
   CREATIVE_SCHEDULE_UPDATED // A creative changed their own working hours
   MOODBOARD_SHARED // A creative shared a moodboard with the customer
+  SUPPORT_GUIDE_CHANGED // Code changed or removed a guide an admin had edited
 }
 
 // --- CMS Content ---
@@ -227,11 +228,12 @@ enum TalentApplicationStatus {
 // -----------------------------------------------------------------------------
 
 model UserAccount {
-  id         String   @id @default(cuid())
-  authUserId String   @unique
-  email      String   @unique
-  name       String?
-  role       UserRole
+  guideEntriesUpdated GuideEntry[] @relation("GuideEntryUpdatedBy")
+  id                  String       @id @default(cuid())
+  authUserId          String       @unique
+  email               String       @unique
+  name                String?
+  role                UserRole
 
   /// Soft-delete timestamp. When set, the account is considered anonymized
   /// (email rewritten to a placeholder, name cleared) and auth is refused.
@@ -2753,4 +2755,54 @@ model TicketDraftAttachment {
   createdAt DateTime @default(now())
 
   @@index([draftId])
+}
+
+// -----------------------------------------------------------------------------
+// Support guides — CMS layer over the guides written in code
+// (lib/support/guides/*.ts). Code is the default; a row here edits or hides a
+// code guide (fromCode = true) or adds a guide that exists only in the CMS.
+// -----------------------------------------------------------------------------
+
+enum GuideAudience {
+  CUSTOMER
+  CREATIVE
+  ADMIN
+  PUBLIC
+}
+
+enum GuideCodeStatus {
+  /// The edit is based on the current code version.
+  IN_SYNC
+  /// Code changed the guide after an admin edited it; waiting for review.
+  CODE_CHANGED
+  /// Code no longer has this guide; the edit is hidden until reviewed.
+  CODE_REMOVED
+}
+
+model GuideEntry {
+  id       String        @id @default(cuid())
+  audience GuideAudience
+  slug     String
+
+  /// True when this row edits or hides a guide written in code.
+  fromCode Boolean @default(false)
+  hidden   Boolean @default(false)
+
+  /// { title, summary, category, keywords, sections }. Null on a code guide
+  /// that is only hidden, so the code text still shows if it is unhidden.
+  content Json?
+
+  /// Hash of the code version this edit was made against.
+  baseCodeHash     String?
+  codeStatus       GuideCodeStatus @default(IN_SYNC)
+  /// Last code hash admins were told about, so each deploy notifies once.
+  notifiedCodeHash String?
+
+  updatedById String?
+  updatedBy   UserAccount? @relation("GuideEntryUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([audience, slug])
+  @@index([codeStatus])
 }
