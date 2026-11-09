@@ -97,7 +97,9 @@ function blockWords(block: GuideBlock): number {
         ? block.items
             .map((item) => (typeof item === "string" ? item : `${item.term} ${item.text}`))
             .join(" ")
-        : block.text;
+        : block.type === "figure"
+          ? ""
+          : block.text;
   return text.split(/\s+/).filter(Boolean).length;
 }
 

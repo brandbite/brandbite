@@ -315,6 +315,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
             type: "p",
             text: "Your jobs are shown in **Backlog**, **In progress**, **In review** and **Done**. Each card shows the ticket code, the priority, the title, the customer, a short description, the version number, the payout and the due date.",
           },
+          { type: "figure", caption: "Your Board with its four columns" },
           {
             type: "p",
             text: "Cards with a **Changes requested** badge show a snippet of the customer's feedback. Use the **Changes requested** toggle in the toolbar to show only those.",
@@ -422,6 +423,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
               "Click **Send for review**.",
             ],
           },
+          { type: "figure", caption: "Sending a new version from the job page" },
           {
             type: "p",
             text: "Either way, the job moves to **In review**, a new version is added, and the customer is notified.",
@@ -501,6 +503,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
               "When you're ready, send your next version with **Upload work** on the Board or **Send for review** on the job page.",
             ],
           },
+          { type: "figure", caption: "Pin notes on a delivered design" },
           {
             type: "p",
             text: "Pins can be resolved while the job is **In progress**. Resolving can't be undone, and you don't have to resolve every pin before sending a new version.",
@@ -758,6 +761,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
               "Click **Submit withdrawal request**. It appears in your history as **Pending** and our team is notified.",
             ],
           },
+          { type: "figure", caption: "The withdrawal form" },
           {
             type: "list",
             items: [

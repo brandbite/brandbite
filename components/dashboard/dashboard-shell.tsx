@@ -9,6 +9,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import {
+  BreadcrumbDetailProvider,
+  withDetailLabel,
+} from "@/components/navigation/breadcrumb-detail";
 import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { CommandPalette } from "@/components/admin/v2/command-palette";
@@ -88,7 +92,8 @@ export function DashboardShell({ role, children }: { role: DashboardRole; childr
   const [paletteOpen, setPaletteOpen] = useState(false);
 
   const nav = getDashboardNav(role);
-  const crumbs = getDashboardBreadcrumb(role, pathname);
+  const [detailLabel, setDetailLabel] = useState<string | null>(null);
+  const crumbs = withDetailLabel(getDashboardBreadcrumb(role, pathname), detailLabel);
   const menuHrefs = { profileHref: `/${role}/profile`, settingsHref: `/${role}/settings` };
 
   useEffect(() => setMobileOpen(false), [pathname]);
@@ -321,7 +326,7 @@ export function DashboardShell({ role, children }: { role: DashboardRole; childr
         </header>
 
         <main id="main-content" className="px-4 py-6 md:p-8">
-          {children}
+          <BreadcrumbDetailProvider setLabel={setDetailLabel}>{children}</BreadcrumbDetailProvider>
         </main>
       </div>
 

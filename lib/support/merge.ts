@@ -38,7 +38,12 @@ export function contentOf(guide: SupportGuide): GuideContent {
   };
 }
 
-const BLOCK_TYPES = new Set(["p", "steps", "list", "tip", "warning"]);
+const BLOCK_TYPES = new Set(["p", "steps", "list", "tip", "warning", "figure"]);
+
+/** Figure images: an https URL (CMS uploads) or a path on this site. */
+export function isFigureImage(value: string): boolean {
+  return /^https:\/\/\S+$/.test(value) || /^\/[^/\s]\S*$/.test(value);
+}
 
 function isString(value: unknown): value is string {
   return typeof value === "string";
@@ -52,6 +57,15 @@ function parseBlock(raw: unknown): GuideBlock | null {
     return isString(block.text) && block.text.trim()
       ? { type: block.type, text: block.text }
       : null;
+  }
+  if (block.type === "figure") {
+    if (!isString(block.caption) || !block.caption.trim()) return null;
+    const figure: GuideBlock = { type: "figure", caption: block.caption.trim() };
+    if (isString(block.image) && isFigureImage(block.image.trim())) {
+      figure.image = block.image.trim();
+    }
+    if (isString(block.alt) && block.alt.trim()) figure.alt = block.alt.trim();
+    return figure;
   }
   if (!Array.isArray(block.items)) return null;
   if (block.type === "steps") {

@@ -37,6 +37,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
             type: "p",
             text: "Admin pages are grouped into **Workspace**, **Catalog**, **Finance**, **People**, **Content** and **System**. Click a group name to fold or unfold it; your choice is remembered. The group you're in always stays open.",
           },
+          { type: "figure", caption: "The admin sidebar and top bar" },
           {
             type: "p",
             text: "**Support** and **Settings** are pinned at the bottom, above your account menu. The **Withdrawals** item shows how many requests are waiting.",
@@ -188,6 +189,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
       {
         heading: "What's on the page",
         blocks: [
+          { type: "figure", caption: "The admin dashboard" },
           {
             type: "list",
             items: [
@@ -260,6 +262,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
               "Type **GRANT** or **DEBIT** to confirm, submit, and complete the security check if asked.",
             ],
           },
+          { type: "figure", caption: "Adding tokens to a company" },
           {
             type: "p",
             text: "Site owner only. The change is recorded on the ledger as an admin adjustment and in the Audit Log.",
@@ -360,6 +363,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
             type: "p",
             text: "Requests in **Backlog**, **In progress**, **In review** and **Done**. Filter by company, creative (including **Unassigned**) and priority, toggle **Overdue**, or search. Click a card to open its detail page.",
           },
+          { type: "figure", caption: "Board columns and filters" },
           {
             type: "p",
             text: "**Re-run auto-assign** tries to assign every unassigned Backlog request across all companies that have auto-assign on. It runs straight away, without a confirmation.",
@@ -393,6 +397,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
               "On the **Assignment** tab, pick a creative under **Assigned creative**. It saves immediately.",
             ],
           },
+          { type: "figure", caption: "The Assignment tab in the Tickets table" },
         ],
       },
       {
@@ -402,6 +407,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
             type: "p",
             text: "On the **Pricing** tab you can set a custom **Ticket cost** and **Creative payout**. Leave a field empty to use the default — the job type's cost, and a payout at the assigned creative's current rate — then click **Apply pricing**.",
           },
+          { type: "figure", caption: "The Pricing tab with ticket cost and creative payout" },
           {
             type: "warning",
             text: "Changing the ticket cost charges or refunds the company the difference **immediately**. A custom creative payout replaces the normal rate-based payout when the job is approved.",
@@ -435,6 +441,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
       {
         heading: "What's on the page",
         blocks: [
+          { type: "figure", caption: "A request's detail page" },
           {
             type: "list",
             items: [
@@ -450,8 +457,8 @@ export const ADMIN_GUIDES: SupportGuide[] = [
                 text: "customer, creative, token cost (with any overrides) and job type.",
               },
               {
-                term: "Activity",
-                text: "assignment history and admin actions on this request.",
+                term: "Activity card",
+                text: "beside the tabs: assignment history and admin actions on this request.",
               },
             ],
           },
@@ -865,6 +872,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
             type: "p",
             text: "Rules reward busy creatives with a higher rate. Each rule has a minimum number of completed jobs within a time window (in days) and a rate above 60%, up to 100%.",
           },
+          { type: "figure", caption: "The Payout Rules page" },
           {
             type: "steps",
             items: [
@@ -905,6 +913,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
               "Select the request again and click **Mark as paid**. Type **PAID** and pass the security check. The tokens are now taken from the creative's balance.",
             ],
           },
+          { type: "figure", caption: "A withdrawal waiting for approval" },
           {
             type: "p",
             text: "Approving and marking paid are site owner only. The creative is notified at each step.",
@@ -1058,6 +1067,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
               },
             ],
           },
+          { type: "figure", caption: "A creative's settings" },
         ],
       },
       {
@@ -1294,13 +1304,17 @@ export const ADMIN_GUIDES: SupportGuide[] = [
             type: "steps",
             items: [
               "Pick **Customer**, **Creative** or **Admin**, then open a guide.",
-              "Change the title, summary, category or sections. Each section has blocks: paragraph, numbered steps, bulleted list, tip or warning.",
+              "Change the title, summary, category or sections. Each section has blocks: paragraph, numbered steps, bulleted list, tip, warning or screenshot.",
               "Click **Save**. Your version shows right away.",
             ],
           },
           {
             type: "tip",
             text: "**Go back to the code version** removes your edit. **New guide** adds a guide that exists only here.",
+          },
+          {
+            type: "p",
+            text: "A **Screenshot** block has a caption, the picture and optional alt text. Until a picture is added, admin guides show an empty slot with an **Add it** link, and customer and creative guides show nothing. Guides with at least one picture get a **Visual guide** badge in the Support list.",
           },
         ],
       },
@@ -1311,6 +1325,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
             type: "p",
             text: "Each release checks your edits against the new code. If code changed or removed a guide you edited, admins get a notification and the guide is marked **Code updated** or **Removed from code**. Your text stays live until you decide.",
           },
+          { type: "figure", caption: "Code and edited versions side by side" },
           {
             type: "list",
             items: [

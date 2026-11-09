@@ -1,6 +1,7 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/admin/cms-upload/presign/route.ts
-// @purpose: Create presigned R2 PUT URL for uploading CMS assets (showcase/blog)
+// @purpose: Create presigned R2 PUT URL for uploading CMS assets (showcase,
+//           blog, page blocks, Support guide screenshots)
 // @version: v0.1.0
 // @status: active
 // @lastUpdate: 2026-02-23
@@ -25,7 +26,7 @@ function sanitizeFilename(name: string): string {
   return base.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
 }
 
-type UploadType = "showcase" | "blog" | "page-block";
+type UploadType = "showcase" | "blog" | "page-block" | "support";
 
 function makeStorageKey(type: UploadType, originalName?: string | null): string {
   const safeName = originalName ? sanitizeFilename(originalName) : "file";
@@ -57,7 +58,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
     }
 
-    if (type !== "showcase" && type !== "blog" && type !== "page-block") {
+    if (type !== "showcase" && type !== "blog" && type !== "page-block" && type !== "support") {
       return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
     }
 

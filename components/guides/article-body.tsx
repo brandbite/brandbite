@@ -61,6 +61,23 @@ function Block({ block }: { block: GuideBlock }) {
           </p>
         </aside>
       );
+    case "figure":
+      // An empty screenshot slot shows nothing on the public site.
+      if (!block.image) return null;
+      return (
+        <figure className="flex flex-col gap-2">
+          {/* eslint-disable-next-line @next/next/no-img-element -- CMS uploads, sizes vary */}
+          <img
+            src={block.image}
+            alt={block.alt ?? block.caption}
+            loading="lazy"
+            className="w-full rounded-xl border border-[var(--cs-border)]"
+          />
+          <figcaption className="text-sm leading-6 text-[var(--cs-muted)]">
+            {block.caption}
+          </figcaption>
+        </figure>
+      );
   }
 }
 

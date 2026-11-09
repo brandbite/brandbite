@@ -37,7 +37,7 @@ describe("GuideVote", () => {
     await waitFor(() => expect(yes()).toHaveAttribute("aria-pressed", "true"));
     const put = fetchMock.mock.calls.find(([, init]) => init?.method === "PUT");
     expect(JSON.parse(String(put?.[1]?.body))).toEqual({ slug: "tokens", helpful: true });
-    expect(await screen.findByRole("status")).toHaveTextContent("Thanks");
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Thanks"));
   });
 
   it("lets the person change their answer, and doesn't resend the same one", async () => {

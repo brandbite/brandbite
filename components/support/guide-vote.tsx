@@ -68,12 +68,23 @@ export function GuideVote({ slug }: { slug: string }) {
   return (
     <section
       aria-labelledby={headingId}
-      className="rounded-2xl border border-[var(--av2-border)] bg-[var(--av2-surface)] px-6 py-5"
+      className="rounded-2xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-5"
     >
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h2 id={headingId} className="text-base font-semibold">
-          Was this helpful?
-        </h2>
+      <h2 id={headingId} className="text-lg leading-7 font-semibold">
+        Was this helpful?
+      </h2>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+        {failed ? (
+          <p role="alert" className="min-w-0 flex-1 basis-40 text-sm text-[var(--av2-error-text)]">
+            We couldn&apos;t save your answer. Please try again.
+          </p>
+        ) : (
+          <p role="status" className="min-w-0 flex-1 basis-40 text-sm text-[var(--av2-text-2)]">
+            {vote !== null
+              ? "Thanks for letting us know. You can change your answer."
+              : "Your answer helps us improve this guide."}
+          </p>
+        )}
         <div className="flex gap-2">
           <button
             type="button"
@@ -95,15 +106,6 @@ export function GuideVote({ slug }: { slug: string }) {
           </button>
         </div>
       </div>
-      {failed ? (
-        <p role="alert" className="mt-3 text-sm text-[var(--av2-error-text)]">
-          We couldn&apos;t save your answer. Please try again.
-        </p>
-      ) : (
-        <p role="status" className="mt-3 min-h-5 text-sm text-[var(--av2-text-2)]">
-          {vote !== null && "Thanks for letting us know. You can change your answer."}
-        </p>
-      )}
     </section>
   );
 }

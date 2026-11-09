@@ -154,7 +154,14 @@ function blockText(b: GuideBlock): string {
       return b.items.join(" ");
     case "list":
       return b.items.map((i) => (typeof i === "string" ? i : `${i.term} ${i.text}`)).join(" ");
+    case "figure":
+      return b.caption;
   }
+}
+
+/** True when the guide has at least one screenshot or picture to show. */
+export function hasVisual(guide: SupportGuide): boolean {
+  return guide.sections.some((s) => s.blocks.some((b) => b.type === "figure" && !!b.image));
 }
 
 const norm = (s: string) => s.toLowerCase().replace(/\*\*/g, "");

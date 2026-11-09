@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 /* -------------------------------------------------------------------------- */
 
 type CmsImageUploadProps = {
-  type: "showcase" | "blog" | "page-block";
+  type: "showcase" | "blog" | "page-block" | "support";
   value: { storageKey: string; url: string } | null;
   onChange: (value: { storageKey: string; url: string } | null) => void;
   label?: string;
