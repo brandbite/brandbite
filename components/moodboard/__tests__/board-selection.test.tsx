@@ -46,6 +46,7 @@ function note(id: string, x: number, y = 100, width = 200, height = 200) {
     y,
     width,
     height,
+    position: 0,
   } as unknown as MoodboardItemClient;
 }
 
@@ -65,6 +66,8 @@ function setup(items = [note("a", 100), note("b", 400), note("c", 700)]) {
     onCopyItems: vi.fn((ids: string[]) => `copied:${ids.join()}`),
     onPasteText: vi.fn(() => true),
     onPasteLastCopy: vi.fn(),
+    onAddFiles: vi.fn(),
+    onReorderItems: vi.fn(),
     onResizeItem: vi.fn(),
     onAddConnection: vi.fn(),
     onDeleteConnection: vi.fn(),
@@ -242,6 +245,190 @@ describe("Clipboard events", () => {
     fireEvent.keyDown(window, { key: "v", ctrlKey: true });
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(onPasteLastCopy).toHaveBeenCalled();
+  });
+});
+
+describe("Stacking order", () => {
+  const order = () =>
+    [...document.querySelectorAll<HTMLElement>("[data-mb-card-id]")].map(
+      (el) => el.dataset.mbCardId,
+    );
+
+  it("draws objects by their stacking position, not list order", () => {
+    setup([
+      { ...note("a", 100), position: 2 },
+      { ...note("b", 400), position: 0 },
+      { ...note("c", 700), position: 1 },
+    ] as MoodboardItemClient[]);
+    expect(order()).toEqual(["b", "c", "a"]);
+  });
+
+  it("brings to front and sends to back from the toolbar and with ] and [", () => {
+    const { onReorderItems } = setup();
+    press(screen.getByText("Body b"), 200, 200);
+    pointer("pointerup", 200, 200);
+    // The browser's own click after a selecting press, which the canvas swallows.
+    fireEvent.click(screen.getByText("Body b"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Bring to front" }));
+    expect(onReorderItems).toHaveBeenLastCalledWith(["b"], "front");
+    fireEvent.click(screen.getByRole("button", { name: "Send to back" }));
+    expect(onReorderItems).toHaveBeenLastCalledWith(["b"], "back");
+
+    fireEvent.keyDown(window, { key: "]" });
+    expect(onReorderItems).toHaveBeenLastCalledWith(["b"], "front");
+    fireEvent.keyDown(window, { key: "[" });
+    expect(onReorderItems).toHaveBeenLastCalledWith(["b"], "back");
+  });
+
+  it("restacks a whole selection", () => {
+    const { onReorderItems } = setup();
+    fireEvent.keyDown(window, { key: "a", ctrlKey: true });
+    fireEvent.click(screen.getByRole("button", { name: "Send to back" }));
+    expect(onReorderItems).toHaveBeenCalledWith(["a", "b", "c"], "back");
+  });
+});
+
+describe("Sections", () => {
+  const section = {
+    id: "s",
+    type: "SECTION",
+    data: { title: "Ideas", color: "#E4E2DD" },
+    x: 50,
+    y: 50,
+    width: 500,
+    height: 300,
+    position: 9,
+  } as unknown as MoodboardItemClient;
+
+  it("sit behind everything else, whatever their stacking position", () => {
+    setup([note("a", 100), section, note("b", 400)]);
+    const order = [...document.querySelectorAll<HTMLElement>("[data-mb-card-id]")].map(
+      (el) => el.dataset.mbCardId,
+    );
+    expect(order[0]).toBe("s");
+  });
+
+  it("move with everything wholly inside them when dragged by the title", () => {
+    const { onMoveItems } = setup([note("a", 100), section, note("b", 400), note("c", 700)]);
+    press(screen.getByText("Ideas"), 200, 200);
+    pointer("pointermove", 230, 250);
+    pointer("pointerup", 230, 250);
+    expect(onMoveItems).toHaveBeenCalledWith([
+      { id: "s", x: 80, y: 100 },
+      { id: "a", x: 130, y: 150 },
+    ]);
+  });
+
+  it("let clicks through their area to the canvas", () => {
+    setup([section]);
+    expect(document.querySelector('[data-mb-card-id="s"]')).toHaveClass("pointer-events-none");
+  });
+
+  it("are added with F", () => {
+    const { onPick } = setup();
+    fireEvent.keyDown(window, { key: "f" });
+    expect(onPick).toHaveBeenCalledWith("section");
+  });
+});
+
+describe("Lining objects up while moving", () => {
+  const guides = () => document.querySelectorAll("[data-mb-guide]");
+
+  it("snaps to a neighbour's edge, shows a guide, and saves the lined-up spot", async () => {
+    const { onMoveItem } = setup();
+    press(screen.getByText("Body b"), 200, 200);
+    // 4px off the row's top edge: close enough to line up.
+    pointer("pointermove", 230, 204);
+    await nextFrame();
+    expect(card("b").style.translate).toBe("30px 0px");
+    expect(guides().length).toBeGreaterThan(0);
+
+    pointer("pointerup", 230, 204);
+    expect(onMoveItem).toHaveBeenCalledWith("b", 430, 100);
+    expect(guides()).toHaveLength(0);
+  });
+
+  it("leaves far-off positions alone", async () => {
+    const { onMoveItem } = setup();
+    press(screen.getByText("Body b"), 200, 200);
+    pointer("pointermove", 230, 260);
+    await nextFrame();
+    expect(guides()).toHaveLength(0);
+    pointer("pointerup", 230, 260);
+    expect(onMoveItem).toHaveBeenCalledWith("b", 430, 160);
+  });
+
+  it("moves freely while Ctrl is held", async () => {
+    const { onMoveItem } = setup();
+    press(screen.getByText("Body b"), 200, 200);
+    act(() => {
+      window.dispatchEvent(
+        new PointerEvent("pointermove", {
+          pointerId: 1,
+          clientX: 230,
+          clientY: 204,
+          ctrlKey: true,
+        }),
+      );
+    });
+    await nextFrame();
+    expect(guides()).toHaveLength(0);
+    act(() => {
+      window.dispatchEvent(
+        new PointerEvent("pointerup", { pointerId: 1, clientX: 230, clientY: 204, ctrlKey: true }),
+      );
+    });
+    expect(onMoveItem).toHaveBeenCalledWith("b", 430, 104);
+  });
+});
+
+describe("Adding files from the computer", () => {
+  const image = () => new File(["png"], "shot.png", { type: "image/png" });
+
+  it("adds a pasted screenshot", () => {
+    const handlers = setup();
+    handlers.onPasteText.mockReturnValue(false);
+    const file = image();
+    const event = new Event("paste", { bubbles: true, cancelable: true });
+    Object.assign(event, { clipboardData: { getData: () => "", setData: vi.fn(), files: [file] } });
+    window.dispatchEvent(event);
+    expect(handlers.onAddFiles).toHaveBeenCalledWith([file], null);
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it("pastes board objects rather than a file when the clipboard holds both", () => {
+    const handlers = setup();
+    const event = new Event("paste", { bubbles: true, cancelable: true });
+    Object.assign(event, {
+      clipboardData: { getData: () => "board", setData: vi.fn(), files: [image()] },
+    });
+    window.dispatchEvent(event);
+    expect(handlers.onAddFiles).not.toHaveBeenCalled();
+  });
+
+  it("shows where dropped files go and adds them at the drop point", () => {
+    const { onAddFiles } = setup();
+    const file = image();
+    const dataTransfer = { types: ["Files"], files: [file], dropEffect: "none" };
+    fireEvent.dragOver(viewport(), { dataTransfer });
+    expect(screen.getByText("Drop to add to the board")).toBeInTheDocument();
+
+    fireEvent.drop(viewport(), { dataTransfer, clientX: 1100, clientY: 900 });
+    expect(onAddFiles).toHaveBeenCalledWith([file], {
+      x: expect.any(Number),
+      y: expect.any(Number),
+    });
+    expect(screen.queryByText("Drop to add to the board")).toBeNull();
+  });
+
+  it("ignores text and links dragged in from elsewhere", () => {
+    const { onAddFiles } = setup();
+    const dataTransfer = { types: ["text/plain"], files: [] };
+    fireEvent.dragOver(viewport(), { dataTransfer });
+    expect(screen.queryByText("Drop to add to the board")).toBeNull();
+    fireEvent.drop(viewport(), { dataTransfer });
+    expect(onAddFiles).not.toHaveBeenCalled();
   });
 });
 

@@ -188,6 +188,7 @@ enum MoodboardItemType {
   DRAWING
   SHAPE
   TEXT
+  SECTION
 }
 
 enum TalentApplicationStatus {

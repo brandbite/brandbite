@@ -31,6 +31,7 @@ import { NoteCard } from "@/components/moodboard/note-card";
 import { TodoCard } from "@/components/moodboard/todo-card";
 import { ShapeCard } from "@/components/moodboard/shape-card";
 import { TextCard } from "@/components/moodboard/text-card";
+import { SectionCard } from "@/components/moodboard/section-card";
 import { useCanvasTransform } from "@/components/moodboard/use-canvas-transform";
 import type { CreatableKind, ToolMode } from "@/components/moodboard/board-toolbar";
 import type {
@@ -39,6 +40,7 @@ import type {
   MoodboardItemClient,
   MoodboardItemData,
   NoteCardData,
+  SectionCardData,
   ShapeCardData,
   ShapeKind,
 } from "@/lib/moodboard";
@@ -50,15 +52,25 @@ import {
   isImageData,
   isLinkData,
   isNoteData,
+  isSectionData,
   isShapeData,
   isTextData,
   isTodoData,
+  SECTION_COLORS,
   SHAPE_FILLS,
   STICKY_COLORS,
 } from "@/lib/moodboard";
 
-import { rectsIntersect, resizeFromCorner, zoomAtPoint, type CanvasRect } from "./canvas-math";
+import {
+  rectInside,
+  rectsIntersect,
+  resizeFromCorner,
+  zoomAtPoint,
+  type CanvasRect,
+} from "./canvas-math";
 import { createCardOverrideStore } from "./card-override-store";
+import { SNAP_SCREEN_PX, snapBox, unionBox, type Box, type Guide } from "./snapping";
+import { exportBounds, renderBoard, type ExportFormat } from "./export-board";
 
 const { MIN_WIDTH, MIN_HEIGHT } = CANVAS_DEFAULTS;
 
@@ -89,6 +101,8 @@ export type BoardCanvasHandle = {
   selectCard: (id: string, options?: { edit?: boolean }) => void;
   selectItems: (ids: string[]) => void;
   clearSelection: () => void;
+  /** The whole board as a picture or PDF; null when it's empty. */
+  exportImage: (format: ExportFormat) => Promise<Blob | null>;
 };
 
 type BoardCanvasProps = {
@@ -124,6 +138,10 @@ type BoardCanvasProps = {
   onPasteText: (text: string | null) => boolean;
   /** The last copy, for browsers that don't report a paste with nothing to paste into. */
   onPasteLastCopy: () => void;
+  /** Files dropped on the board or pasted (screenshots); `at` is where, in canvas units. */
+  onAddFiles: (files: File[], at: { x: number; y: number } | null) => void;
+  /** Puts objects above or below everything else, for good. */
+  onReorderItems: (itemIds: string[], where: "front" | "back") => void;
   onResizeItem: (itemId: string, x: number, y: number, width: number, height: number) => void;
   onAddConnection: (sourceId: string, targetId: string) => void;
   onDeleteConnection: (id: string) => void;
@@ -138,6 +156,11 @@ type BoardCanvasProps = {
 };
 
 export type ItemMove = { id: string; x: number; y: number };
+
+/** True when a drag from outside the page carries files (not text or a link). */
+function hasFiles(transfer: DataTransfer | null): boolean {
+  return !!transfer && Array.from(transfer.types).includes("Files");
+}
 
 type Gesture =
   | {
@@ -165,6 +188,7 @@ type Gesture =
       origin: { x: number; y: number };
       moved: boolean;
       wasSelected: boolean;
+      /** Offset so far in canvas units, after snapping. */
       dx: number;
       dy: number;
     }
@@ -203,14 +227,22 @@ function CardContent({
   editRequest,
   onUpdateItem,
   onRemoveEmpty,
+  readOnly = false,
 }: {
   item: MoodboardItemClient;
   editRequest: number;
   onUpdateItem: (id: string, data: MoodboardItemData) => void;
   onRemoveEmpty: (id: string) => void;
+  readOnly?: boolean;
 }) {
   const { id, type, data } = item;
   const update = (next: MoodboardItemData) => onUpdateItem(id, next);
+
+  if (isSectionData(type, data)) {
+    return (
+      <SectionCard data={data} onUpdate={update} editRequest={editRequest} readOnly={readOnly} />
+    );
+  }
 
   if (isNoteData(type, data)) {
     return <NoteCard data={data} onUpdate={update} editRequest={editRequest} />;
@@ -238,6 +270,71 @@ function CardContent({
 }
 
 /** Color and shape controls in the selected object's floating toolbar. */
+const orderGlyph = {
+  width: 18,
+  height: 18,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.75,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+};
+
+/** Bring to front / send to back, for one object or a selection. */
+function OrderButtons({
+  ids,
+  onReorder,
+  divider,
+}: {
+  ids: string[];
+  onReorder: (ids: string[], where: "front" | "back") => void;
+  /** A line before the buttons, when other controls come first. */
+  divider: boolean;
+}) {
+  const button =
+    "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--av2-text)] hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none";
+  return (
+    <>
+      {divider && <div aria-hidden className="mx-1 h-5 w-px bg-[var(--av2-border)]" />}
+      <button
+        type="button"
+        aria-label="Bring to front"
+        title="Bring to front ( ] )"
+        onClick={() => onReorder(ids, "front")}
+        className={button}
+      >
+        <svg {...orderGlyph}>
+          <rect x="8" y="8" width="12" height="12" rx="2" fill="currentColor" fillOpacity="0.15" />
+          <path d="M16 4H6a2 2 0 0 0-2 2v10" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        aria-label="Send to back"
+        title="Send to back ( [ )"
+        onClick={() => onReorder(ids, "back")}
+        className={button}
+      >
+        <svg {...orderGlyph}>
+          <rect x="4" y="4" width="12" height="12" rx="2" />
+          <path d="M8 20h10a2 2 0 0 0 2-2V8" />
+        </svg>
+      </button>
+    </>
+  );
+}
+
+/** Whether ObjectControls shows anything for this object. */
+function hasObjectControls(item: MoodboardItemClient) {
+  return (
+    isNoteData(item.type, item.data) ||
+    isShapeData(item.type, item.data) ||
+    isSectionData(item.type, item.data)
+  );
+}
+
 function ObjectControls({
   item,
   onUpdateItem,
@@ -268,6 +365,17 @@ function ObjectControls({
       <>
         {STICKY_COLORS.map((c) =>
           swatch(c, c === current, () => onUpdateItem(item.id, { ...data, color: c })),
+        )}
+      </>
+    );
+  }
+
+  if (isSectionData(item.type, item.data)) {
+    const data: SectionCardData = item.data;
+    return (
+      <>
+        {SECTION_COLORS.map((c) =>
+          swatch(c, c === data.color, () => onUpdateItem(item.id, { ...data, color: c })),
         )}
       </>
     );
@@ -334,6 +442,7 @@ function cardLabel(item: MoodboardItemClient) {
     NOTE: "Sticky note",
     SHAPE: "Shape",
     TEXT: "Text",
+    SECTION: "Section",
     IMAGE: "Image",
     COLOR: "Color",
     LINK: "Link",
@@ -371,6 +480,8 @@ export function BoardCanvas({
   onCopyItems,
   onPasteText,
   onPasteLastCopy,
+  onAddFiles,
+  onReorderItems,
   onResizeItem,
   onAddConnection,
   onDeleteConnection,
@@ -395,6 +506,9 @@ export function BoardCanvas({
   const [editRequest, setEditRequest] = useState<{ id: string; nonce: number } | null>(null);
   const [prevToolMode, setPrevToolMode] = useState(toolMode);
   const [measuredHeights, setMeasuredHeights] = useState<Map<string, number>>(new Map());
+  /** Alignment guides shown while objects are being moved. */
+  const [guides, setGuides] = useState<Guide[]>([]);
+  const guidesKey = useRef("");
 
   // Handlers change on every parent render; going through a ref keeps the
   // callbacks stable, so memoized cards don't re-render.
@@ -421,6 +535,8 @@ export function BoardCanvas({
     onCopyItems,
     onPasteText,
     onPasteLastCopy,
+    onAddFiles,
+    onReorderItems,
     onResizeItem,
     onDeleteConnection,
     onUndo,
@@ -450,6 +566,8 @@ export function BoardCanvas({
       onCopyItems,
       onPasteText,
       onPasteLastCopy,
+      onAddFiles,
+      onReorderItems,
       onResizeItem,
       onDeleteConnection,
       onUndo,
@@ -474,6 +592,10 @@ export function BoardCanvas({
     latest.current.onDuplicateItems([id]);
   }, []);
 
+  const reorder = useCallback((ids: string[], where: "front" | "back") => {
+    latest.current.onReorderItems(ids, where);
+  }, []);
+
   /** One id is an ordinary selection, with that object's own controls. */
   const selectIds = useCallback((ids: string[]) => {
     if (ids.length === 0) setSelection(null);
@@ -484,7 +606,18 @@ export function BoardCanvas({
     }
   }, []);
 
-  const cardItems = useMemo(() => items.filter((i) => i.type !== "DRAWING"), [items]);
+  // Drawn in stacking order: later in the list is on top. Sections always sit
+  // behind everything else, so what's in them stays visible.
+  const cardItems = useMemo(
+    () =>
+      items
+        .filter((i) => i.type !== "DRAWING")
+        .sort(
+          (a, b) =>
+            Number(b.type === "SECTION") - Number(a.type === "SECTION") || a.position - b.position,
+        ),
+    [items],
+  );
   const drawings = useMemo(() => items.filter((i) => i.type === "DRAWING"), [items]);
 
   // One observer for every card, for the arrows' sake: auto-height cards only
@@ -599,6 +732,24 @@ export function BoardCanvas({
         selectIds(ids);
       },
       clearSelection: () => setSelection(null),
+      exportImage: async (format) => {
+        const world = worldRef.current;
+        const { items: all, measuredHeights: heights } = latest.current;
+        const bounds = exportBounds(
+          all.map((i) => ({
+            x: i.x,
+            y: i.y,
+            width: i.width,
+            height: i.height || heights.get(i.id) || 100,
+          })),
+        );
+        if (!world || !bounds) return null;
+        // No selection outlines or controls in the picture.
+        setSelection(null);
+        setArrowSourceId(null);
+        await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+        return renderBoard(world, bounds, format);
+      },
     };
     return () => {
       handleRef.current = null;
@@ -613,6 +764,28 @@ export function BoardCanvas({
   const spaceHeld = useRef(false);
   const suppressClick = useRef(false);
   const pasteSeen = useRef(false);
+  /** Last mouse position over the board, so a pasted screenshot lands there. */
+  const hoverClient = useRef<{ x: number; y: number } | null>(null);
+  const [dropActive, setDropActive] = useState(false);
+
+  /** A screen point as canvas units, or null when it's outside the board. */
+  const toCanvas = useCallback(
+    (clientX: number, clientY: number) => {
+      const rect = viewportRef.current?.getBoundingClientRect();
+      if (
+        !rect ||
+        clientX < rect.left ||
+        clientX > rect.right ||
+        clientY < rect.top ||
+        clientY > rect.bottom
+      ) {
+        return null;
+      }
+      const { panX, panY, zoom } = canvas.getTransform();
+      return { x: (clientX - rect.left - panX) / zoom, y: (clientY - rect.top - panY) / zoom };
+    },
+    [canvas],
+  );
   const touches = useRef(new Map<number, { x: number; y: number }>());
   const frame = useRef<number | null>(null);
 
@@ -651,6 +824,8 @@ export function BoardCanvas({
 
   /** Abandon a card gesture, as when a second finger turns it into a pinch. */
   const cancelCardGesture = useCallback(() => {
+    guidesKey.current = "";
+    setGuides([]);
     const g = gesture.current;
     if (g?.kind === "group") {
       for (const member of g.members) moveMember(member, 0, 0);
@@ -869,6 +1044,26 @@ export function BoardCanvas({
       return;
     }
 
+    // A section carries along everything that lies wholly inside it.
+    if (item.type === "SECTION") {
+      setSelection({ kind: "card", id });
+      if (target.closest(INTERACTIVE)) return;
+      const { items: all, measuredHeights: heights } = latest.current;
+      const area = { x: item.x, y: item.y, width: item.width, height: item.height };
+      const inside = all
+        .filter(
+          (i) =>
+            i.id !== id &&
+            rectInside(
+              { x: i.x, y: i.y, width: i.width, height: i.height || heights.get(i.id) || 100 },
+              area,
+            ),
+        )
+        .map((i) => i.id);
+      beginGroup(id, [id, ...inside]);
+      return;
+    }
+
     const current = latest.current.selection;
     const wasSelected = current?.kind === "card" && current.id === id;
     setSelection({ kind: "card", id });
@@ -891,7 +1086,45 @@ export function BoardCanvas({
   };
 
   // Writes the latest pointer state to the DOM, at most once per frame.
-  const pointer = useRef({ x: 0, y: 0 });
+  const pointer = useRef({ x: 0, y: 0, free: false });
+
+  const showGuides = useCallback((next: Guide[]) => {
+    const key = next.map((g) => `${g.axis}${g.at}:${g.from}-${g.to}`).join("|");
+    if (key === guidesKey.current) return;
+    guidesKey.current = key;
+    setGuides(next);
+  }, []);
+
+  /**
+   * Where a moved card or group lands for this pointer position, in canvas
+   * units: the pointer's travel, lined up with nearby objects unless Ctrl or
+   * Cmd is held (free).
+   */
+  const dragOffset = useCallback(
+    (ids: string[], startX: number, startY: number, x: number, y: number, free: boolean) => {
+      const { zoom } = canvas.getTransform();
+      const dx = (x - startX) / zoom;
+      const dy = (y - startY) / zoom;
+      if (free) return { dx, dy, guides: [] as Guide[] };
+      const { items: all, measuredHeights: heights } = latest.current;
+      const boxOf = (i: (typeof all)[number]): Box => ({
+        x: i.x,
+        y: i.y,
+        width: i.width,
+        height: i.height || heights.get(i.id) || 100,
+      });
+      const moving = unionBox(all.filter((i) => ids.includes(i.id)).map(boxOf));
+      if (!moving) return { dx, dy, guides: [] as Guide[] };
+      const others = all.filter((i) => !ids.includes(i.id)).map(boxOf);
+      const snap = snapBox(
+        { ...moving, x: moving.x + dx, y: moving.y + dy },
+        others,
+        SNAP_SCREEN_PX / zoom,
+      );
+      return { dx: dx + snap.dx, dy: dy + snap.dy, guides: snap.guides };
+    },
+    [canvas],
+  );
   /** The object under this spot on screen, other than the arrow's own source. */
   const objectAt = useCallback((clientX: number, clientY: number, sourceId: string | null) => {
     const el = document.elementFromPoint(clientX, clientY);
@@ -932,13 +1165,23 @@ export function BoardCanvas({
         zoom,
       });
     } else if (g.kind === "card" && g.moved) {
-      g.dx = (x - g.startX) / zoom;
-      g.dy = (y - g.startY) / zoom;
+      const at = dragOffset([g.id], g.startX, g.startY, x, y, pointer.current.free);
+      g.dx = at.dx;
+      g.dy = at.dy;
+      showGuides(at.guides);
       g.el.style.translate = `${g.dx}px ${g.dy}px`;
       overrides.set([{ id: g.id, x: g.origin.x + g.dx, y: g.origin.y + g.dy }]);
     } else if (g.kind === "group" && g.moved) {
-      const dx = (x - g.startX) / zoom;
-      const dy = (y - g.startY) / zoom;
+      const at = dragOffset(
+        g.members.map((m) => m.id),
+        g.startX,
+        g.startY,
+        x,
+        y,
+        pointer.current.free,
+      );
+      const { dx, dy } = at;
+      showGuides(at.guides);
       for (const member of g.members) moveMember(member, dx, dy);
       overrides.set(g.members.map((m) => ({ id: m.id, x: m.x + dx, y: m.y + dy })));
     } else if (g.kind === "marquee" && g.moved) {
@@ -964,14 +1207,16 @@ export function BoardCanvas({
       };
       const { items: all, measuredHeights: heights, selection: now } = latest.current;
       const hits = all
-        .filter((i) =>
-          rectsIntersect(area, {
+        .filter((i) => {
+          const box = {
             x: i.x,
             y: i.y,
             width: i.width,
             height: i.height || heights.get(i.id) || 100,
-          }),
-        )
+          };
+          // A box drawn inside a section picks its contents, not the section.
+          return i.type === "SECTION" ? rectInside(box, area) : rectsIntersect(area, box);
+        })
         .map((i) => i.id);
       const next = [...new Set([...g.base, ...hits])];
       if (next.join() !== selectedItemIds(now).join()) selectIds(next);
@@ -991,7 +1236,7 @@ export function BoardCanvas({
       g.el.style.height = `${next.height}px`;
       overrides.set([{ id: g.id, x: next.x, y: next.y, width: next.width, height: next.height }]);
     }
-  }, [canvas, overrides, selectIds, updatePendingArrow]);
+  }, [canvas, dragOffset, overrides, selectIds, showGuides, updatePendingArrow]);
 
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
@@ -1028,7 +1273,7 @@ export function BoardCanvas({
       }
 
       if (e.pointerId !== g.pointerId) return;
-      pointer.current = { x: e.clientX, y: e.clientY };
+      pointer.current = { x: e.clientX, y: e.clientY, free: e.ctrlKey || e.metaKey };
 
       if (g.kind === "connect" && !g.moved) {
         if (Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < DRAG_THRESHOLD) return;
@@ -1079,6 +1324,7 @@ export function BoardCanvas({
         frame.current = null;
       }
       setCursor(idleCursor());
+      showGuides([]);
 
       if (e.type === "pointercancel") {
         gesture.current = g;
@@ -1121,9 +1367,16 @@ export function BoardCanvas({
           return;
         }
         suppressClick.current = true;
-        const { zoom } = canvas.getTransform();
-        const dx = Math.round((e.clientX - g.startX) / zoom);
-        const dy = Math.round((e.clientY - g.startY) / zoom);
+        const at = dragOffset(
+          g.members.map((m) => m.id),
+          g.startX,
+          g.startY,
+          e.clientX,
+          e.clientY,
+          e.ctrlKey || e.metaKey,
+        );
+        const dx = Math.round(at.dx);
+        const dy = Math.round(at.dy);
         for (const member of g.members) {
           moveMember(member, 0, 0);
           if (!member.isDrawing) {
@@ -1143,9 +1396,16 @@ export function BoardCanvas({
           return;
         }
         suppressClick.current = true;
-        const { zoom } = canvas.getTransform();
-        const x = Math.round(g.origin.x + (e.clientX - g.startX) / zoom);
-        const y = Math.round(g.origin.y + (e.clientY - g.startY) / zoom);
+        const at = dragOffset(
+          [g.id],
+          g.startX,
+          g.startY,
+          e.clientX,
+          e.clientY,
+          e.ctrlKey || e.metaKey,
+        );
+        const x = Math.round(g.origin.x + at.dx);
+        const y = Math.round(g.origin.y + at.dy);
         // Cleared here and committed in the same tick, so nothing paints in between.
         g.el.style.translate = "";
         g.el.style.zIndex = "";
@@ -1185,12 +1445,14 @@ export function BoardCanvas({
   }, [
     canvas,
     cancelCardGesture,
+    dragOffset,
     idleCursor,
     objectAt,
     overrides,
     paintGesture,
     selectIds,
     setCursor,
+    showGuides,
     updatePendingArrow,
   ]);
 
@@ -1330,6 +1592,12 @@ export function BoardCanvas({
         return;
       }
 
+      if (!mod && !e.altKey && (e.key === "]" || e.key === "[") && nudged.length > 0) {
+        e.preventDefault();
+        latest.current.onReorderItems(nudged, e.key === "]" ? "front" : "back");
+        return;
+      }
+
       if (mod || e.altKey) return;
       const key = e.key.toLowerCase();
       const tools: Record<string, ToolMode> = {
@@ -1339,7 +1607,12 @@ export function BoardCanvas({
         m: "draw",
         e: "eraser",
       };
-      const creators: Record<string, CreatableKind> = { s: "note", r: "shape", t: "text" };
+      const creators: Record<string, CreatableKind> = {
+        s: "note",
+        r: "shape",
+        t: "text",
+        f: "section",
+      };
       if (tools[key]) {
         latest.current.onCancelPlacing();
         latest.current.onSetToolMode(tools[key]);
@@ -1378,6 +1651,16 @@ export function BoardCanvas({
       if (!boardHasFocus(e)) return;
       if (latest.current.onPasteText(e.clipboardData?.getData("text/plain") ?? null)) {
         e.preventDefault();
+        return;
+      }
+      // A screenshot or copied file lands where the mouse is, or mid-screen.
+      const files = Array.from(e.clipboardData?.files ?? []);
+      if (files.length > 0) {
+        e.preventDefault();
+        const at = hoverClient.current
+          ? toCanvas(hoverClient.current.x, hoverClient.current.y)
+          : null;
+        latest.current.onAddFiles(files, at);
       }
     };
 
@@ -1393,13 +1676,14 @@ export function BoardCanvas({
       window.removeEventListener("cut", onCut);
       window.removeEventListener("paste", onPaste);
     };
-  }, [canvas, idleCursor, selectIds, setCursor]);
+  }, [canvas, idleCursor, selectIds, setCursor, toCanvas]);
 
   // ---------------------------------------------------------------------------
   // Arrow tool
   // ---------------------------------------------------------------------------
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    hoverClient.current = { x: e.clientX, y: e.clientY };
     // Only between the two clicks; while dragging, the gesture handles this.
     if (toolMode !== "arrow" || !arrowSourceId || gesture.current) return;
     updatePendingArrow(e.clientX, e.clientY, arrowSourceId);
@@ -1465,6 +1749,24 @@ export function BoardCanvas({
       onMouseMove={handleMouseMove}
       onFocus={onFocus}
       onDragStart={(e) => e.preventDefault()}
+      onMouseLeave={() => {
+        hoverClient.current = null;
+      }}
+      onDragOver={(e) => {
+        if (readOnly || !hasFiles(e.dataTransfer)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+        if (!dropActive) setDropActive(true);
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropActive(false);
+      }}
+      onDrop={(e) => {
+        if (readOnly || !hasFiles(e.dataTransfer)) return;
+        e.preventDefault();
+        setDropActive(false);
+        latest.current.onAddFiles(Array.from(e.dataTransfer.files), toCanvas(e.clientX, e.clientY));
+      }}
     >
       <div
         ref={gridRef}
@@ -1491,12 +1793,26 @@ export function BoardCanvas({
             height={item.height}
             selected={selection?.kind === "card" && selection.id === item.id}
             inGroup={groupIds.has(item.id)}
-            bare={item.type === "NOTE" || item.type === "SHAPE" || item.type === "TEXT"}
+            bare={
+              item.type === "NOTE" ||
+              item.type === "SHAPE" ||
+              item.type === "TEXT" ||
+              item.type === "SECTION"
+            }
+            passThrough={item.type === "SECTION"}
+            connectors={item.type !== "SECTION"}
             label={cardLabel(item)}
             registerCard={registerCard}
             toolbar={
               selection?.kind === "card" && selection.id === item.id ? (
-                <ObjectControls item={item} onUpdateItem={updateItem} />
+                <>
+                  <ObjectControls item={item} onUpdateItem={updateItem} />
+                  <OrderButtons
+                    ids={[item.id]}
+                    onReorder={reorder}
+                    divider={hasObjectControls(item)}
+                  />
+                </>
               ) : undefined
             }
             hideToolbar={isPhone}
@@ -1508,6 +1824,7 @@ export function BoardCanvas({
               editRequest={editRequest?.id === item.id ? editRequest.nonce : 0}
               onUpdateItem={updateItem}
               onRemoveEmpty={removeEmpty}
+              readOnly={readOnly}
             />
           </CardWrapper>
         ))}
@@ -1542,6 +1859,32 @@ export function BoardCanvas({
           pendingTargetId={pendingTargetId}
         />
 
+        {guides.map((guide) => (
+          <div
+            key={`${guide.axis}-${guide.at}`}
+            aria-hidden
+            data-mb-guide
+            className="pointer-events-none absolute z-50 bg-[var(--av2-accent)]"
+            style={
+              guide.axis === "x"
+                ? {
+                    left: guide.at,
+                    top: guide.from,
+                    height: guide.to - guide.from,
+                    width: "calc(1px * var(--mb-inverse-zoom, 1))",
+                    translate: "-50% 0",
+                  }
+                : {
+                    top: guide.at,
+                    left: guide.from,
+                    width: guide.to - guide.from,
+                    height: "calc(1px * var(--mb-inverse-zoom, 1))",
+                    translate: "0 -50%",
+                  }
+            }
+          />
+        ))}
+
         {enrichedCardItems
           .filter((item) => item.id === arrowSourceId || item.id === pendingTargetId)
           .map((item) => (
@@ -1573,6 +1916,17 @@ export function BoardCanvas({
         </div>
       )}
 
+      {dropActive && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-3 z-40 flex items-center justify-center rounded-2xl border-2 border-dashed border-[var(--av2-accent)] bg-[var(--av2-accent)]/5"
+        >
+          <span className="rounded-full bg-[var(--av2-surface)] px-4 py-2 text-sm font-semibold shadow-md">
+            Drop to add to the board
+          </span>
+        </div>
+      )}
+
       <div
         ref={marqueeRef}
         aria-hidden
@@ -1589,6 +1943,7 @@ export function BoardCanvas({
             {selection.ids.length} selected
           </span>
           <div aria-hidden className="mx-1 h-5 w-px bg-[var(--av2-border)]" />
+          <OrderButtons ids={selection.ids} onReorder={reorder} divider={false} />
           <button
             type="button"
             onClick={() => latest.current.onDuplicateItems(selection.ids)}
@@ -1622,6 +1977,7 @@ export function BoardCanvas({
               className="absolute bottom-[calc(5rem+env(safe-area-inset-bottom))] left-1/2 z-30 flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-1 whitespace-nowrap shadow-md [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
               <ObjectControls item={item} onUpdateItem={updateItem} />
+              <OrderButtons ids={[item.id]} onReorder={reorder} divider={hasObjectControls(item)} />
               <button
                 type="button"
                 onClick={() => duplicateCard(item.id)}

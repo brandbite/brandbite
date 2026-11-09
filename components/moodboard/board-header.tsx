@@ -15,6 +15,8 @@ type BoardHeaderProps = {
   jobTitle?: string | null;
   onPickJob?: () => void;
   onToggleShared?: () => void;
+  /** Download the board; open to everyone who can see it. */
+  onExport?: (format: "png" | "pdf") => Promise<void>;
 };
 
 const CONTROL =
@@ -36,9 +38,22 @@ export function BoardHeader({
   jobTitle = null,
   onPickJob,
   onToggleShared,
+  onExport,
 }: BoardHeaderProps) {
   const [value, setValue] = useState(title);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [exporting, setExporting] = useState<"png" | "pdf" | null>(null);
+
+  async function exportAs(format: "png" | "pdf") {
+    if (!onExport || exporting) return;
+    setExporting(format);
+    try {
+      await onExport(format);
+    } finally {
+      setExporting(null);
+      setMenuOpen(false);
+    }
+  }
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => setValue(title), [title]);
@@ -122,7 +137,7 @@ export function BoardHeader({
         </span>
       )}
 
-      {(canDelete || canShare) && (
+      {(canDelete || canShare || onExport) && (
         <div ref={menuRef} className="relative md:ml-auto">
           <button
             type="button"
@@ -139,6 +154,27 @@ export function BoardHeader({
               role="menu"
               className="absolute top-full right-0 z-40 mt-2 w-64 rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-1 shadow-lg"
             >
+              {onExport && (
+                <>
+                  {(["png", "pdf"] as const).map((format) => (
+                    <button
+                      key={format}
+                      type="button"
+                      role="menuitem"
+                      disabled={exporting !== null}
+                      onClick={() => exportAs(format)}
+                      className={`${MENU_ITEM} text-[var(--av2-text)] disabled:opacity-60`}
+                    >
+                      {exporting === format
+                        ? "Preparing download…"
+                        : `Download as ${format.toUpperCase()}`}
+                    </button>
+                  ))}
+                  {(canShare || canDelete) && (
+                    <div aria-hidden className="my-1 h-px bg-[var(--av2-border)]" />
+                  )}
+                </>
+              )}
               {canShare && (
                 <>
                   <p className="px-3 py-2 text-xs text-[var(--av2-text-2)]">

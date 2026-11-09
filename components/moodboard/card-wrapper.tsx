@@ -31,6 +31,13 @@ type CardWrapperProps = {
   toolbar?: React.ReactNode;
   /** Phones show the toolbar pinned to the screen, since it wouldn't fit here. */
   hideToolbar?: boolean;
+  /**
+   * Clicks pass through the object's area to whatever is behind it; only its
+   * own handles (and parts marked pointer-events-auto) take the pointer.
+   */
+  passThrough?: boolean;
+  /** Edge dots for pulling arrows out of this object. */
+  connectors?: boolean;
   onDelete: (id: string) => void;
   onDuplicate?: (id: string) => void;
   children: React.ReactNode;
@@ -72,6 +79,8 @@ function CardWrapperBase({
   registerCard,
   toolbar,
   hideToolbar = false,
+  passThrough = false,
+  connectors = true,
   onDelete,
   onDuplicate,
   children,
@@ -83,7 +92,7 @@ function CardWrapperBase({
       role="group"
       aria-label={label}
       tabIndex={0}
-      className={`group absolute cursor-default outline-none ${selected || inGroup ? "z-30" : ""} ${bare ? "" : "rounded-2xl"}`}
+      className={`group absolute cursor-default outline-none ${selected || inGroup ? (passThrough ? "" : "z-30") : ""} ${bare ? "" : "rounded-2xl"} ${passThrough ? "pointer-events-none" : ""}`}
       style={{ left: x, top: y, width, ...(height > 0 ? { height } : {}) }}
     >
       <div
@@ -127,7 +136,7 @@ function CardWrapperBase({
               {/* The grab area is larger than what's drawn, for fingers. */}
               <div
                 data-mb-handle={corner}
-                className="flex h-7 w-7 items-center justify-center"
+                className="pointer-events-auto flex h-7 w-7 items-center justify-center"
                 style={{ touchAction: "none", transform: `scale(${INVERSE})` }}
               >
                 <span className="h-3 w-3 rounded-[3px] border-2 border-[var(--av2-accent)] bg-[var(--av2-surface)]" />
@@ -135,21 +144,22 @@ function CardWrapperBase({
             </div>
           ))}
 
-          {CONNECTORS.map(({ side, style, shift }) => (
-            <div
-              key={side}
-              aria-hidden
-              data-mb-connector={side}
-              className="absolute z-10 flex h-7 w-7 cursor-crosshair items-center justify-center"
-              style={{
-                ...style,
-                touchAction: "none",
-                transform: `translate(${shift}) scale(${INVERSE})`,
-              }}
-            >
-              <span className="h-2.5 w-2.5 rounded-full bg-[var(--av2-accent)] transition-transform hover:scale-150" />
-            </div>
-          ))}
+          {connectors &&
+            CONNECTORS.map(({ side, style, shift }) => (
+              <div
+                key={side}
+                aria-hidden
+                data-mb-connector={side}
+                className="pointer-events-auto absolute z-10 flex h-7 w-7 cursor-crosshair items-center justify-center"
+                style={{
+                  ...style,
+                  touchAction: "none",
+                  transform: `translate(${shift}) scale(${INVERSE})`,
+                }}
+              >
+                <span className="h-2.5 w-2.5 rounded-full bg-[var(--av2-accent)] transition-transform hover:scale-150" />
+              </div>
+            ))}
 
           {!hideToolbar && (
             <div

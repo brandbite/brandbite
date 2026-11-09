@@ -9,6 +9,7 @@ import { LinkJobModal } from "@/components/moodboard/link-job-modal";
 import { BoardCanvas, type BoardCanvasHandle } from "@/components/moodboard/board-canvas";
 import { useIsPhone } from "@/components/moodboard/use-is-phone";
 import { useToast } from "@/components/ui/toast-provider";
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_LABEL } from "@/lib/upload-helpers";
 import { AddLinkModal } from "@/components/moodboard/add-link-modal";
 import { AddEmbedModal } from "@/components/moodboard/add-embed-modal";
 import {
@@ -21,6 +22,8 @@ import {
   type BoardSnapshot,
 } from "@/components/moodboard/board-history";
 import { shiftPath } from "@/components/moodboard/canvas-math";
+import { nextPosition, restack } from "@/components/moodboard/stacking";
+import { exportFileName, type ExportFormat } from "@/components/moodboard/export-board";
 
 import type {
   MoodboardClient,
@@ -43,6 +46,7 @@ import {
   HIGHLIGHTER_DEFAULT_COLOR,
   newClientId,
   PEN_PRESETS,
+  SECTION_COLORS,
   SHAPE_FILLS,
   STICKY_COLORS,
 } from "@/lib/moodboard";
@@ -60,6 +64,8 @@ type Point = { x: number; y: number };
 /** How long the Undo offer stays on screen after deleting. */
 const UNDO_MS = 8000;
 const CASCADE_PX = 24;
+/** Most files added by one drop or paste. */
+const MAX_FILES_AT_ONCE = 10;
 const MAX_HISTORY = 100;
 /** Repeats of the same small change this close together are one undo step. */
 const COALESCE_MS = 1000;
@@ -319,8 +325,8 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
     Promise.all([
       ...diff.remove.map((id) => writeItem(id, "DELETE")),
       ...diff.restore.map((id) => writeItem(id, "PATCH", { restore: true })),
-      ...diff.change.map(({ id, x, y, width, height, data }) =>
-        writeItem(id, "PATCH", { x, y, width, height, data }),
+      ...diff.change.map(({ id, x, y, width, height, data, position }) =>
+        writeItem(id, "PATCH", { x, y, width, height, data, position }),
       ),
       ...(diff.connectionsChanged ? [saveConnections(connections)] : []),
     ]).catch((err) => {
@@ -366,7 +372,7 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
 
     record();
     const board = boardRef.current;
-    const position = board?.items.length ?? 0;
+    const position = nextPosition(board?.items ?? []);
     const now = new Date().toISOString();
     const offset = shift({
       x: Math.min(...sources.map((i) => i.x)),
@@ -484,7 +490,7 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
       y,
       width,
       height,
-      position: items.length,
+      position: nextPosition(items),
       colSpan: 1,
       createdById: "",
       createdAt: now,
@@ -538,6 +544,13 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
         return;
       case "text":
         handleAddItem("TEXT", { text: "" }, { width: 280, height: 0, at, edit: true });
+        return;
+      case "section":
+        handleAddItem(
+          "SECTION",
+          { title: "Section", color: SECTION_COLORS[0] },
+          { width: 640, height: 420, at, edit: true },
+        );
         return;
       case "color":
         handleAddItem("COLOR", { hex: "#F15B2B" }, { width: 200, height: 160, at });
@@ -706,6 +719,35 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
   }
 
   // ---------------------------------------------------------------------------
+  // Stacking order
+  // ---------------------------------------------------------------------------
+
+  /** Puts these objects above or below everything else, keeping their own order. */
+  async function handleReorderItems(ids: string[], where: "front" | "back") {
+    const board = boardRef.current;
+    if (!board || ids.length === 0) return;
+    const changes = restack(board.items, ids, where);
+    if (changes.size === 0) return;
+    record();
+    setMoodboard((prev) =>
+      prev
+        ? {
+            ...prev,
+            items: prev.items.map((item) =>
+              changes.has(item.id) ? { ...item, position: changes.get(item.id)! } : item,
+            ),
+          }
+        : prev,
+    );
+    try {
+      await Promise.all([...changes].map(([id, position]) => writeItem(id, "PATCH", { position })));
+    } catch (err) {
+      console.error("[moodboard-view] reorder error:", err);
+      fetchMoodboard();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Resize item
   // ---------------------------------------------------------------------------
 
@@ -762,6 +804,28 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
   // ---------------------------------------------------------------------------
   // Delete board
   // ---------------------------------------------------------------------------
+
+  async function handleExport(format: ExportFormat) {
+    const title = boardRef.current?.title ?? "moodboard";
+    try {
+      const blob = await canvasHandle.current?.exportImage(format);
+      if (!blob) {
+        showToast({ type: "info", title: "Add something to the board first." });
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = exportFileName(title, format);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    } catch (err) {
+      console.error("[moodboard-view] export error:", err);
+      showToast({ type: "error", title: "We couldn't make the download. Please try again." });
+    }
+  }
 
   async function handleDeleteBoard() {
     const confirmed = window.confirm(
@@ -884,7 +948,7 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
       y: bounds.y,
       width: bounds.w,
       height: bounds.h,
-      position: moodboard?.items.length ?? 0,
+      position: nextPosition(moodboard?.items ?? []),
       colSpan: 1,
       createdById: "",
       createdAt: now,
@@ -921,7 +985,11 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
   // File upload (image or file)
   // ---------------------------------------------------------------------------
 
-  async function handleUploadFile(file: File, type: "IMAGE" | "FILE") {
+  async function handleUploadFile(
+    file: File,
+    type: "IMAGE" | "FILE",
+    at: Point | null = pendingPoint.current,
+  ) {
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -944,7 +1012,7 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
           mimeType: mimeType ?? file.type,
           bytes: bytes ?? file.size,
         };
-        handleAddItem("IMAGE", data, { width: 280, height: 0, at: pendingPoint.current });
+        handleAddItem("IMAGE", data, { width: 280, height: 0, at });
       } else {
         const data: FileCardData = {
           url: url ?? "",
@@ -953,10 +1021,43 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
           mimeType: mimeType ?? file.type,
           bytes: bytes ?? file.size,
         };
-        handleAddItem("FILE", data, { width: 280, height: 0, at: pendingPoint.current });
+        handleAddItem("FILE", data, { width: 280, height: 0, at });
       }
     } catch (err) {
       console.error("[moodboard-view] upload error:", err);
+      showToast({ type: "error", title: `We couldn't upload ${file.name || "that file"}.` });
+    }
+  }
+
+  /** Files dropped on the board or pasted: images become pictures, the rest files. */
+  async function handleAddFiles(files: File[], at: Point | null) {
+    if (!moodboard?.access.canEdit || files.length === 0) return;
+    const batch = files.slice(0, MAX_FILES_AT_ONCE);
+    if (files.length > batch.length) {
+      showToast({
+        type: "warning",
+        title: `Only the first ${MAX_FILES_AT_ONCE} files were added. Add the rest in another go.`,
+      });
+    }
+    const tooBig = batch.filter((f) => f.size > MAX_UPLOAD_BYTES);
+    if (tooBig.length > 0) {
+      showToast({
+        type: "error",
+        title:
+          tooBig.length === 1
+            ? `${tooBig[0].name || "That file"} is over ${MAX_UPLOAD_LABEL}.`
+            : `${tooBig.length} files are over ${MAX_UPLOAD_LABEL} and were skipped.`,
+      });
+    }
+    const uploads = batch.filter((f) => f.size <= MAX_UPLOAD_BYTES);
+    if (uploads.length === 0) return;
+    showToast({
+      type: "info",
+      title: uploads.length === 1 ? "Uploading 1 file…" : `Uploading ${uploads.length} files…`,
+    });
+    // One at a time, so each lands beside the one before instead of on top.
+    for (const file of uploads) {
+      await handleUploadFile(file, file.type.startsWith("image/") ? "IMAGE" : "FILE", at);
     }
   }
 
@@ -1064,6 +1165,8 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
         onCopyItems={handleCopyItems}
         onPasteText={handlePasteText}
         onPasteLastCopy={handlePasteLastCopy}
+        onAddFiles={handleAddFiles}
+        onReorderItems={handleReorderItems}
         onResizeItem={handleResizeItem}
         onAddConnection={handleAddConnection}
         onDeleteConnection={handleDeleteConnection}
@@ -1096,6 +1199,7 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
         onToggleShared={() => patchSharing({ sharedWithCustomer: !moodboard.sharedWithCustomer })}
         onBack={() => router.push(basePath)}
         onDelete={handleDeleteBoard}
+        onExport={handleExport}
       />
 
       {canEdit && (
