@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { rectInside } from "../canvas-math";
 import { snapBox, unionBox } from "../snapping";
 
 const box = (x: number, y: number, width = 100, height = 100) => ({ x, y, width, height });
@@ -36,5 +37,13 @@ describe("unionBox", () => {
   it("wraps every box, or gives null for none", () => {
     expect(unionBox([box(0, 0, 10, 10), box(20, 5, 10, 30)])).toEqual(box(0, 0, 30, 35));
     expect(unionBox([])).toBeNull();
+  });
+});
+
+describe("rectInside", () => {
+  it("is true only for a box wholly within another, edges included", () => {
+    expect(rectInside(box(10, 10, 50, 50), box(0, 0, 100, 100))).toBe(true);
+    expect(rectInside(box(0, 0, 100, 100), box(0, 0, 100, 100))).toBe(true);
+    expect(rectInside(box(60, 10, 50, 50), box(0, 0, 100, 100))).toBe(false);
   });
 });

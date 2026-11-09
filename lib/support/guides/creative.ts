@@ -827,6 +827,9 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
       "screenshot",
       "drag and drop",
       "align",
+      "section",
+      "download",
+      "pdf",
     ],
     related: ["ticket-details"],
     sections: [
@@ -844,6 +847,10 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
           {
             type: "p",
             text: "You can also drag images and files from your computer onto the board, or paste a screenshot with **Ctrl/⌘ + V**. Images become pictures and everything else becomes a file, up to 10 at a time and 4 MB each. While you move something, it lines up with the edges and centres of nearby items and an orange guide shows where. Hold **Ctrl** (**⌘** on a Mac) to move it freely.",
+          },
+          {
+            type: "p",
+            text: "A **Section** (**F**) is a named, tinted area for grouping things. Drag it by its name to move it together with everything inside it, double-click the name to rename it, and pick its color when it's selected. To put something on top of or behind the rest, select it and use **Bring to front** or **Send to back** in its toolbar, or press **]** or **[**. **More → Download as PNG** or **Download as PDF** saves the whole board as a picture. Videos show as empty boxes in the download.",
           },
           {
             type: "p",

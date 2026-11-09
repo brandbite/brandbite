@@ -42,6 +42,7 @@ function setup(
     onPasteText: vi.fn(() => true),
     onPasteLastCopy: vi.fn(),
     onAddFiles: vi.fn(),
+    onReorderItems: vi.fn(),
     onResizeItem: vi.fn(),
     onAddConnection: vi.fn(),
     onDeleteConnection: vi.fn(),

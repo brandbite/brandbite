@@ -34,6 +34,12 @@ export type TextCardData = {
   text: string;
 };
 
+/** A named area. `color` is one of SECTION_COLORS (6-digit hex). */
+export type SectionCardData = {
+  title: string;
+  color: string;
+};
+
 export type ImageCardData = {
   url: string;
   storageKey: string;
@@ -97,6 +103,7 @@ export type MoodboardItemData =
   | NoteCardData
   | ShapeCardData
   | TextCardData
+  | SectionCardData
   | ImageCardData
   | ColorCardData
   | LinkCardData
@@ -119,6 +126,10 @@ export function isShapeData(type: MoodboardItemType, data: unknown): data is Sha
 
 export function isTextData(type: MoodboardItemType, data: unknown): data is TextCardData {
   return type === "TEXT";
+}
+
+export function isSectionData(type: MoodboardItemType, data: unknown): data is SectionCardData {
+  return type === "SECTION";
 }
 
 export function isImageData(type: MoodboardItemType, data: unknown): data is ImageCardData {
@@ -287,6 +298,9 @@ export const STICKY_COLORS = [
   "#B9DCFF",
   "#BDEBC8",
 ] as const;
+
+/** Section tints: the area shows each at 20%, the title tab in full. */
+export const SECTION_COLORS = ["#E4E2DD", "#FFE58A", "#FFC8A8", "#C9E7CF", "#C8DDFB", "#DCD3FF"];
 
 export const SHAPE_FILLS = [
   "#FFFFFF",

@@ -46,6 +46,7 @@ function note(id: string, x: number, y = 100, width = 200, height = 200) {
     y,
     width,
     height,
+    position: 0,
   } as unknown as MoodboardItemClient;
 }
 
@@ -66,6 +67,7 @@ function setup(items = [note("a", 100), note("b", 400), note("c", 700)]) {
     onPasteText: vi.fn(() => true),
     onPasteLastCopy: vi.fn(),
     onAddFiles: vi.fn(),
+    onReorderItems: vi.fn(),
     onResizeItem: vi.fn(),
     onAddConnection: vi.fn(),
     onDeleteConnection: vi.fn(),
@@ -243,6 +245,90 @@ describe("Clipboard events", () => {
     fireEvent.keyDown(window, { key: "v", ctrlKey: true });
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(onPasteLastCopy).toHaveBeenCalled();
+  });
+});
+
+describe("Stacking order", () => {
+  const order = () =>
+    [...document.querySelectorAll<HTMLElement>("[data-mb-card-id]")].map(
+      (el) => el.dataset.mbCardId,
+    );
+
+  it("draws objects by their stacking position, not list order", () => {
+    setup([
+      { ...note("a", 100), position: 2 },
+      { ...note("b", 400), position: 0 },
+      { ...note("c", 700), position: 1 },
+    ] as MoodboardItemClient[]);
+    expect(order()).toEqual(["b", "c", "a"]);
+  });
+
+  it("brings to front and sends to back from the toolbar and with ] and [", () => {
+    const { onReorderItems } = setup();
+    press(screen.getByText("Body b"), 200, 200);
+    pointer("pointerup", 200, 200);
+    // The browser's own click after a selecting press, which the canvas swallows.
+    fireEvent.click(screen.getByText("Body b"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Bring to front" }));
+    expect(onReorderItems).toHaveBeenLastCalledWith(["b"], "front");
+    fireEvent.click(screen.getByRole("button", { name: "Send to back" }));
+    expect(onReorderItems).toHaveBeenLastCalledWith(["b"], "back");
+
+    fireEvent.keyDown(window, { key: "]" });
+    expect(onReorderItems).toHaveBeenLastCalledWith(["b"], "front");
+    fireEvent.keyDown(window, { key: "[" });
+    expect(onReorderItems).toHaveBeenLastCalledWith(["b"], "back");
+  });
+
+  it("restacks a whole selection", () => {
+    const { onReorderItems } = setup();
+    fireEvent.keyDown(window, { key: "a", ctrlKey: true });
+    fireEvent.click(screen.getByRole("button", { name: "Send to back" }));
+    expect(onReorderItems).toHaveBeenCalledWith(["a", "b", "c"], "back");
+  });
+});
+
+describe("Sections", () => {
+  const section = {
+    id: "s",
+    type: "SECTION",
+    data: { title: "Ideas", color: "#E4E2DD" },
+    x: 50,
+    y: 50,
+    width: 500,
+    height: 300,
+    position: 9,
+  } as unknown as MoodboardItemClient;
+
+  it("sit behind everything else, whatever their stacking position", () => {
+    setup([note("a", 100), section, note("b", 400)]);
+    const order = [...document.querySelectorAll<HTMLElement>("[data-mb-card-id]")].map(
+      (el) => el.dataset.mbCardId,
+    );
+    expect(order[0]).toBe("s");
+  });
+
+  it("move with everything wholly inside them when dragged by the title", () => {
+    const { onMoveItems } = setup([note("a", 100), section, note("b", 400), note("c", 700)]);
+    press(screen.getByText("Ideas"), 200, 200);
+    pointer("pointermove", 230, 250);
+    pointer("pointerup", 230, 250);
+    expect(onMoveItems).toHaveBeenCalledWith([
+      { id: "s", x: 80, y: 100 },
+      { id: "a", x: 130, y: 150 },
+    ]);
+  });
+
+  it("let clicks through their area to the canvas", () => {
+    setup([section]);
+    expect(document.querySelector('[data-mb-card-id="s"]')).toHaveClass("pointer-events-none");
+  });
+
+  it("are added with F", () => {
+    const { onPick } = setup();
+    fireEvent.keyDown(window, { key: "f" });
+    expect(onPick).toHaveBeenCalledWith("section");
   });
 });
 

@@ -22,6 +22,8 @@ import {
   type BoardSnapshot,
 } from "@/components/moodboard/board-history";
 import { shiftPath } from "@/components/moodboard/canvas-math";
+import { nextPosition, restack } from "@/components/moodboard/stacking";
+import { exportFileName, type ExportFormat } from "@/components/moodboard/export-board";
 
 import type {
   MoodboardClient,
@@ -44,6 +46,7 @@ import {
   HIGHLIGHTER_DEFAULT_COLOR,
   newClientId,
   PEN_PRESETS,
+  SECTION_COLORS,
   SHAPE_FILLS,
   STICKY_COLORS,
 } from "@/lib/moodboard";
@@ -322,8 +325,8 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
     Promise.all([
       ...diff.remove.map((id) => writeItem(id, "DELETE")),
       ...diff.restore.map((id) => writeItem(id, "PATCH", { restore: true })),
-      ...diff.change.map(({ id, x, y, width, height, data }) =>
-        writeItem(id, "PATCH", { x, y, width, height, data }),
+      ...diff.change.map(({ id, x, y, width, height, data, position }) =>
+        writeItem(id, "PATCH", { x, y, width, height, data, position }),
       ),
       ...(diff.connectionsChanged ? [saveConnections(connections)] : []),
     ]).catch((err) => {
@@ -369,7 +372,7 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
 
     record();
     const board = boardRef.current;
-    const position = board?.items.length ?? 0;
+    const position = nextPosition(board?.items ?? []);
     const now = new Date().toISOString();
     const offset = shift({
       x: Math.min(...sources.map((i) => i.x)),
@@ -487,7 +490,7 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
       y,
       width,
       height,
-      position: items.length,
+      position: nextPosition(items),
       colSpan: 1,
       createdById: "",
       createdAt: now,
@@ -541,6 +544,13 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
         return;
       case "text":
         handleAddItem("TEXT", { text: "" }, { width: 280, height: 0, at, edit: true });
+        return;
+      case "section":
+        handleAddItem(
+          "SECTION",
+          { title: "Section", color: SECTION_COLORS[0] },
+          { width: 640, height: 420, at, edit: true },
+        );
         return;
       case "color":
         handleAddItem("COLOR", { hex: "#F15B2B" }, { width: 200, height: 160, at });
@@ -709,6 +719,35 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
   }
 
   // ---------------------------------------------------------------------------
+  // Stacking order
+  // ---------------------------------------------------------------------------
+
+  /** Puts these objects above or below everything else, keeping their own order. */
+  async function handleReorderItems(ids: string[], where: "front" | "back") {
+    const board = boardRef.current;
+    if (!board || ids.length === 0) return;
+    const changes = restack(board.items, ids, where);
+    if (changes.size === 0) return;
+    record();
+    setMoodboard((prev) =>
+      prev
+        ? {
+            ...prev,
+            items: prev.items.map((item) =>
+              changes.has(item.id) ? { ...item, position: changes.get(item.id)! } : item,
+            ),
+          }
+        : prev,
+    );
+    try {
+      await Promise.all([...changes].map(([id, position]) => writeItem(id, "PATCH", { position })));
+    } catch (err) {
+      console.error("[moodboard-view] reorder error:", err);
+      fetchMoodboard();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Resize item
   // ---------------------------------------------------------------------------
 
@@ -765,6 +804,28 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
   // ---------------------------------------------------------------------------
   // Delete board
   // ---------------------------------------------------------------------------
+
+  async function handleExport(format: ExportFormat) {
+    const title = boardRef.current?.title ?? "moodboard";
+    try {
+      const blob = await canvasHandle.current?.exportImage(format);
+      if (!blob) {
+        showToast({ type: "info", title: "Add something to the board first." });
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = exportFileName(title, format);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    } catch (err) {
+      console.error("[moodboard-view] export error:", err);
+      showToast({ type: "error", title: "We couldn't make the download. Please try again." });
+    }
+  }
 
   async function handleDeleteBoard() {
     const confirmed = window.confirm(
@@ -887,7 +948,7 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
       y: bounds.y,
       width: bounds.w,
       height: bounds.h,
-      position: moodboard?.items.length ?? 0,
+      position: nextPosition(moodboard?.items ?? []),
       colSpan: 1,
       createdById: "",
       createdAt: now,
@@ -1105,6 +1166,7 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
         onPasteText={handlePasteText}
         onPasteLastCopy={handlePasteLastCopy}
         onAddFiles={handleAddFiles}
+        onReorderItems={handleReorderItems}
         onResizeItem={handleResizeItem}
         onAddConnection={handleAddConnection}
         onDeleteConnection={handleDeleteConnection}
@@ -1137,6 +1199,7 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
         onToggleShared={() => patchSharing({ sharedWithCustomer: !moodboard.sharedWithCustomer })}
         onBack={() => router.push(basePath)}
         onDelete={handleDeleteBoard}
+        onExport={handleExport}
       />
 
       {canEdit && (

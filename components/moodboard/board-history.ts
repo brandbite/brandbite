@@ -29,6 +29,7 @@ function sameItem(a: MoodboardItemClient, b: MoodboardItemClient) {
     a.y === b.y &&
     a.width === b.width &&
     a.height === b.height &&
+    a.position === b.position &&
     JSON.stringify(a.data) === JSON.stringify(b.data)
   );
 }

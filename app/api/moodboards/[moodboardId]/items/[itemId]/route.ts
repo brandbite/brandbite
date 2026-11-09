@@ -17,7 +17,7 @@ type RouteParams = {
 };
 
 // -----------------------------------------------------------------------------
-// PATCH: update an item's data or colSpan
+// PATCH: update an item's data, size, place on the canvas or stacking order
 // -----------------------------------------------------------------------------
 
 export async function PATCH(req: NextRequest, { params }: RouteParams) {
@@ -106,6 +106,15 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
         return NextResponse.json({ error: "height must be >= 0" }, { status: 400 });
       }
       data.height = raw.height;
+    }
+
+    // Stacking order: higher draws on top. Any integer, negatives included,
+    // so "send to back" needs no renumbering of the rest.
+    if (raw.position !== undefined) {
+      if (typeof raw.position !== "number" || !Number.isInteger(raw.position)) {
+        return NextResponse.json({ error: "position must be an integer" }, { status: 400 });
+      }
+      data.position = raw.position;
     }
 
     // Undo of a delete.

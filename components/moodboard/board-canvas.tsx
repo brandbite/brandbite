@@ -31,6 +31,7 @@ import { NoteCard } from "@/components/moodboard/note-card";
 import { TodoCard } from "@/components/moodboard/todo-card";
 import { ShapeCard } from "@/components/moodboard/shape-card";
 import { TextCard } from "@/components/moodboard/text-card";
+import { SectionCard } from "@/components/moodboard/section-card";
 import { useCanvasTransform } from "@/components/moodboard/use-canvas-transform";
 import type { CreatableKind, ToolMode } from "@/components/moodboard/board-toolbar";
 import type {
@@ -39,6 +40,7 @@ import type {
   MoodboardItemClient,
   MoodboardItemData,
   NoteCardData,
+  SectionCardData,
   ShapeCardData,
   ShapeKind,
 } from "@/lib/moodboard";
@@ -50,16 +52,25 @@ import {
   isImageData,
   isLinkData,
   isNoteData,
+  isSectionData,
   isShapeData,
   isTextData,
   isTodoData,
+  SECTION_COLORS,
   SHAPE_FILLS,
   STICKY_COLORS,
 } from "@/lib/moodboard";
 
-import { rectsIntersect, resizeFromCorner, zoomAtPoint, type CanvasRect } from "./canvas-math";
+import {
+  rectInside,
+  rectsIntersect,
+  resizeFromCorner,
+  zoomAtPoint,
+  type CanvasRect,
+} from "./canvas-math";
 import { createCardOverrideStore } from "./card-override-store";
 import { SNAP_SCREEN_PX, snapBox, unionBox, type Box, type Guide } from "./snapping";
+import { exportBounds, renderBoard, type ExportFormat } from "./export-board";
 
 const { MIN_WIDTH, MIN_HEIGHT } = CANVAS_DEFAULTS;
 
@@ -90,6 +101,8 @@ export type BoardCanvasHandle = {
   selectCard: (id: string, options?: { edit?: boolean }) => void;
   selectItems: (ids: string[]) => void;
   clearSelection: () => void;
+  /** The whole board as a picture or PDF; null when it's empty. */
+  exportImage: (format: ExportFormat) => Promise<Blob | null>;
 };
 
 type BoardCanvasProps = {
@@ -127,6 +140,8 @@ type BoardCanvasProps = {
   onPasteLastCopy: () => void;
   /** Files dropped on the board or pasted (screenshots); `at` is where, in canvas units. */
   onAddFiles: (files: File[], at: { x: number; y: number } | null) => void;
+  /** Puts objects above or below everything else, for good. */
+  onReorderItems: (itemIds: string[], where: "front" | "back") => void;
   onResizeItem: (itemId: string, x: number, y: number, width: number, height: number) => void;
   onAddConnection: (sourceId: string, targetId: string) => void;
   onDeleteConnection: (id: string) => void;
@@ -212,14 +227,22 @@ function CardContent({
   editRequest,
   onUpdateItem,
   onRemoveEmpty,
+  readOnly = false,
 }: {
   item: MoodboardItemClient;
   editRequest: number;
   onUpdateItem: (id: string, data: MoodboardItemData) => void;
   onRemoveEmpty: (id: string) => void;
+  readOnly?: boolean;
 }) {
   const { id, type, data } = item;
   const update = (next: MoodboardItemData) => onUpdateItem(id, next);
+
+  if (isSectionData(type, data)) {
+    return (
+      <SectionCard data={data} onUpdate={update} editRequest={editRequest} readOnly={readOnly} />
+    );
+  }
 
   if (isNoteData(type, data)) {
     return <NoteCard data={data} onUpdate={update} editRequest={editRequest} />;
@@ -247,6 +270,71 @@ function CardContent({
 }
 
 /** Color and shape controls in the selected object's floating toolbar. */
+const orderGlyph = {
+  width: 18,
+  height: 18,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.75,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+};
+
+/** Bring to front / send to back, for one object or a selection. */
+function OrderButtons({
+  ids,
+  onReorder,
+  divider,
+}: {
+  ids: string[];
+  onReorder: (ids: string[], where: "front" | "back") => void;
+  /** A line before the buttons, when other controls come first. */
+  divider: boolean;
+}) {
+  const button =
+    "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--av2-text)] hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none";
+  return (
+    <>
+      {divider && <div aria-hidden className="mx-1 h-5 w-px bg-[var(--av2-border)]" />}
+      <button
+        type="button"
+        aria-label="Bring to front"
+        title="Bring to front ( ] )"
+        onClick={() => onReorder(ids, "front")}
+        className={button}
+      >
+        <svg {...orderGlyph}>
+          <rect x="8" y="8" width="12" height="12" rx="2" fill="currentColor" fillOpacity="0.15" />
+          <path d="M16 4H6a2 2 0 0 0-2 2v10" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        aria-label="Send to back"
+        title="Send to back ( [ )"
+        onClick={() => onReorder(ids, "back")}
+        className={button}
+      >
+        <svg {...orderGlyph}>
+          <rect x="4" y="4" width="12" height="12" rx="2" />
+          <path d="M8 20h10a2 2 0 0 0 2-2V8" />
+        </svg>
+      </button>
+    </>
+  );
+}
+
+/** Whether ObjectControls shows anything for this object. */
+function hasObjectControls(item: MoodboardItemClient) {
+  return (
+    isNoteData(item.type, item.data) ||
+    isShapeData(item.type, item.data) ||
+    isSectionData(item.type, item.data)
+  );
+}
+
 function ObjectControls({
   item,
   onUpdateItem,
@@ -277,6 +365,17 @@ function ObjectControls({
       <>
         {STICKY_COLORS.map((c) =>
           swatch(c, c === current, () => onUpdateItem(item.id, { ...data, color: c })),
+        )}
+      </>
+    );
+  }
+
+  if (isSectionData(item.type, item.data)) {
+    const data: SectionCardData = item.data;
+    return (
+      <>
+        {SECTION_COLORS.map((c) =>
+          swatch(c, c === data.color, () => onUpdateItem(item.id, { ...data, color: c })),
         )}
       </>
     );
@@ -343,6 +442,7 @@ function cardLabel(item: MoodboardItemClient) {
     NOTE: "Sticky note",
     SHAPE: "Shape",
     TEXT: "Text",
+    SECTION: "Section",
     IMAGE: "Image",
     COLOR: "Color",
     LINK: "Link",
@@ -381,6 +481,7 @@ export function BoardCanvas({
   onPasteText,
   onPasteLastCopy,
   onAddFiles,
+  onReorderItems,
   onResizeItem,
   onAddConnection,
   onDeleteConnection,
@@ -435,6 +536,7 @@ export function BoardCanvas({
     onPasteText,
     onPasteLastCopy,
     onAddFiles,
+    onReorderItems,
     onResizeItem,
     onDeleteConnection,
     onUndo,
@@ -465,6 +567,7 @@ export function BoardCanvas({
       onPasteText,
       onPasteLastCopy,
       onAddFiles,
+      onReorderItems,
       onResizeItem,
       onDeleteConnection,
       onUndo,
@@ -489,6 +592,10 @@ export function BoardCanvas({
     latest.current.onDuplicateItems([id]);
   }, []);
 
+  const reorder = useCallback((ids: string[], where: "front" | "back") => {
+    latest.current.onReorderItems(ids, where);
+  }, []);
+
   /** One id is an ordinary selection, with that object's own controls. */
   const selectIds = useCallback((ids: string[]) => {
     if (ids.length === 0) setSelection(null);
@@ -499,7 +606,18 @@ export function BoardCanvas({
     }
   }, []);
 
-  const cardItems = useMemo(() => items.filter((i) => i.type !== "DRAWING"), [items]);
+  // Drawn in stacking order: later in the list is on top. Sections always sit
+  // behind everything else, so what's in them stays visible.
+  const cardItems = useMemo(
+    () =>
+      items
+        .filter((i) => i.type !== "DRAWING")
+        .sort(
+          (a, b) =>
+            Number(b.type === "SECTION") - Number(a.type === "SECTION") || a.position - b.position,
+        ),
+    [items],
+  );
   const drawings = useMemo(() => items.filter((i) => i.type === "DRAWING"), [items]);
 
   // One observer for every card, for the arrows' sake: auto-height cards only
@@ -614,6 +732,24 @@ export function BoardCanvas({
         selectIds(ids);
       },
       clearSelection: () => setSelection(null),
+      exportImage: async (format) => {
+        const world = worldRef.current;
+        const { items: all, measuredHeights: heights } = latest.current;
+        const bounds = exportBounds(
+          all.map((i) => ({
+            x: i.x,
+            y: i.y,
+            width: i.width,
+            height: i.height || heights.get(i.id) || 100,
+          })),
+        );
+        if (!world || !bounds) return null;
+        // No selection outlines or controls in the picture.
+        setSelection(null);
+        setArrowSourceId(null);
+        await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+        return renderBoard(world, bounds, format);
+      },
     };
     return () => {
       handleRef.current = null;
@@ -908,6 +1044,26 @@ export function BoardCanvas({
       return;
     }
 
+    // A section carries along everything that lies wholly inside it.
+    if (item.type === "SECTION") {
+      setSelection({ kind: "card", id });
+      if (target.closest(INTERACTIVE)) return;
+      const { items: all, measuredHeights: heights } = latest.current;
+      const area = { x: item.x, y: item.y, width: item.width, height: item.height };
+      const inside = all
+        .filter(
+          (i) =>
+            i.id !== id &&
+            rectInside(
+              { x: i.x, y: i.y, width: i.width, height: i.height || heights.get(i.id) || 100 },
+              area,
+            ),
+        )
+        .map((i) => i.id);
+      beginGroup(id, [id, ...inside]);
+      return;
+    }
+
     const current = latest.current.selection;
     const wasSelected = current?.kind === "card" && current.id === id;
     setSelection({ kind: "card", id });
@@ -1051,14 +1207,16 @@ export function BoardCanvas({
       };
       const { items: all, measuredHeights: heights, selection: now } = latest.current;
       const hits = all
-        .filter((i) =>
-          rectsIntersect(area, {
+        .filter((i) => {
+          const box = {
             x: i.x,
             y: i.y,
             width: i.width,
             height: i.height || heights.get(i.id) || 100,
-          }),
-        )
+          };
+          // A box drawn inside a section picks its contents, not the section.
+          return i.type === "SECTION" ? rectInside(box, area) : rectsIntersect(area, box);
+        })
         .map((i) => i.id);
       const next = [...new Set([...g.base, ...hits])];
       if (next.join() !== selectedItemIds(now).join()) selectIds(next);
@@ -1434,6 +1592,12 @@ export function BoardCanvas({
         return;
       }
 
+      if (!mod && !e.altKey && (e.key === "]" || e.key === "[") && nudged.length > 0) {
+        e.preventDefault();
+        latest.current.onReorderItems(nudged, e.key === "]" ? "front" : "back");
+        return;
+      }
+
       if (mod || e.altKey) return;
       const key = e.key.toLowerCase();
       const tools: Record<string, ToolMode> = {
@@ -1443,7 +1607,12 @@ export function BoardCanvas({
         m: "draw",
         e: "eraser",
       };
-      const creators: Record<string, CreatableKind> = { s: "note", r: "shape", t: "text" };
+      const creators: Record<string, CreatableKind> = {
+        s: "note",
+        r: "shape",
+        t: "text",
+        f: "section",
+      };
       if (tools[key]) {
         latest.current.onCancelPlacing();
         latest.current.onSetToolMode(tools[key]);
@@ -1624,12 +1793,26 @@ export function BoardCanvas({
             height={item.height}
             selected={selection?.kind === "card" && selection.id === item.id}
             inGroup={groupIds.has(item.id)}
-            bare={item.type === "NOTE" || item.type === "SHAPE" || item.type === "TEXT"}
+            bare={
+              item.type === "NOTE" ||
+              item.type === "SHAPE" ||
+              item.type === "TEXT" ||
+              item.type === "SECTION"
+            }
+            passThrough={item.type === "SECTION"}
+            connectors={item.type !== "SECTION"}
             label={cardLabel(item)}
             registerCard={registerCard}
             toolbar={
               selection?.kind === "card" && selection.id === item.id ? (
-                <ObjectControls item={item} onUpdateItem={updateItem} />
+                <>
+                  <ObjectControls item={item} onUpdateItem={updateItem} />
+                  <OrderButtons
+                    ids={[item.id]}
+                    onReorder={reorder}
+                    divider={hasObjectControls(item)}
+                  />
+                </>
               ) : undefined
             }
             hideToolbar={isPhone}
@@ -1641,6 +1824,7 @@ export function BoardCanvas({
               editRequest={editRequest?.id === item.id ? editRequest.nonce : 0}
               onUpdateItem={updateItem}
               onRemoveEmpty={removeEmpty}
+              readOnly={readOnly}
             />
           </CardWrapper>
         ))}
@@ -1759,6 +1943,7 @@ export function BoardCanvas({
             {selection.ids.length} selected
           </span>
           <div aria-hidden className="mx-1 h-5 w-px bg-[var(--av2-border)]" />
+          <OrderButtons ids={selection.ids} onReorder={reorder} divider={false} />
           <button
             type="button"
             onClick={() => latest.current.onDuplicateItems(selection.ids)}
@@ -1792,6 +1977,7 @@ export function BoardCanvas({
               className="absolute bottom-[calc(5rem+env(safe-area-inset-bottom))] left-1/2 z-30 flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-1 whitespace-nowrap shadow-md [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
               <ObjectControls item={item} onUpdateItem={updateItem} />
+              <OrderButtons ids={[item.id]} onReorder={reorder} divider={hasObjectControls(item)} />
               <button
                 type="button"
                 onClick={() => duplicateCard(item.id)}
