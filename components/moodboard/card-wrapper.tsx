@@ -38,6 +38,8 @@ type CardWrapperProps = {
   passThrough?: boolean;
   /** Edge dots for pulling arrows out of this object. */
   connectors?: boolean;
+  /** Locked: no resize handles, and a lock badge while selected. */
+  locked?: boolean;
   onDelete: (id: string) => void;
   onDuplicate?: (id: string) => void;
   children: React.ReactNode;
@@ -81,6 +83,7 @@ function CardWrapperBase({
   hideToolbar = false,
   passThrough = false,
   connectors = true,
+  locked = false,
   onDelete,
   onDuplicate,
   children,
@@ -131,18 +134,40 @@ function CardWrapperBase({
             }}
           />
 
-          {CORNERS.map(({ corner, className }) => (
-            <div key={corner} aria-hidden className={`absolute z-10 ${className}`}>
-              {/* The grab area is larger than what's drawn, for fingers. */}
-              <div
-                data-mb-handle={corner}
-                className="pointer-events-auto flex h-7 w-7 items-center justify-center"
-                style={{ touchAction: "none", transform: `scale(${INVERSE})` }}
+          {locked && (
+            <div
+              aria-hidden
+              className="pointer-events-none absolute top-0 left-0 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-[var(--av2-accent)] text-white"
+              style={{ transform: `translate(-50%, -50%) scale(${INVERSE})` }}
+            >
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
               >
-                <span className="h-3 w-3 rounded-[3px] border-2 border-[var(--av2-accent)] bg-[var(--av2-surface)]" />
-              </div>
+                <rect x="5" y="11" width="14" height="10" rx="2" />
+                <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+              </svg>
             </div>
-          ))}
+          )}
+
+          {!locked &&
+            CORNERS.map(({ corner, className }) => (
+              <div key={corner} aria-hidden className={`absolute z-10 ${className}`}>
+                {/* The grab area is larger than what's drawn, for fingers. */}
+                <div
+                  data-mb-handle={corner}
+                  className="pointer-events-auto flex h-7 w-7 items-center justify-center"
+                  style={{ touchAction: "none", transform: `scale(${INVERSE})` }}
+                >
+                  <span className="h-3 w-3 rounded-[3px] border-2 border-[var(--av2-accent)] bg-[var(--av2-surface)]" />
+                </div>
+              </div>
+            ))}
 
           {connectors &&
             CONNECTORS.map(({ side, style, shift }) => (

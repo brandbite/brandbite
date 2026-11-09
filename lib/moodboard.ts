@@ -168,6 +168,10 @@ export type MoodboardItemClient = {
   id: string;
   type: MoodboardItemType;
   position: number;
+  /** Can't be moved, resized or deleted until unlocked. */
+  locked?: boolean;
+  /** Objects sharing this are picked and moved as one. */
+  groupId?: string | null;
   colSpan: number;
   x: number;
   y: number;

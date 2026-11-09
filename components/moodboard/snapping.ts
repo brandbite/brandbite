@@ -58,33 +58,85 @@ export function snapBox(
   const dy = bestShift(yLines(moving), others.map(yLines), threshold) ?? 0;
   const snapped = { ...moving, x: moving.x + dx, y: moving.y + dy };
 
-  // Float noise must not hide a guide for lines that do meet.
-  const same = (a: number, b: number) => Math.abs(a - b) < 0.01;
-  const guides: Guide[] = [];
-  for (const axis of ["x", "y"] as const) {
-    const mine = axis === "x" ? xLines(snapped) : yLines(snapped);
-    for (const at of mine) {
-      const matching = others.filter((o) =>
-        (axis === "x" ? xLines(o) : yLines(o)).some((l) => same(l, at)),
-      );
-      if (matching.length === 0) continue;
-      const span = [snapped, ...matching];
-      guides.push(
-        axis === "x"
-          ? {
-              axis,
-              at,
-              from: Math.min(...span.map((b) => b.y)),
-              to: Math.max(...span.map((b) => b.y + b.height)),
-            }
-          : {
-              axis,
-              at,
-              from: Math.min(...span.map((b) => b.x)),
-              to: Math.max(...span.map((b) => b.x + b.width)),
-            },
-      );
+  const guides = [
+    ...xLines(snapped).flatMap((at) => guideAt("x", at, snapped, others)),
+    ...yLines(snapped).flatMap((at) => guideAt("y", at, snapped, others)),
+  ];
+  return { dx, dy, guides };
+}
+
+// Float noise must not hide a guide for lines that do meet.
+const same = (a: number, b: number) => Math.abs(a - b) < 0.01;
+
+/** The guide for one line of `box`, spanning it and every object on that line; none if no match. */
+function guideAt(axis: "x" | "y", at: number, box: Box, others: Box[]): Guide[] {
+  const matching = others.filter((o) =>
+    (axis === "x" ? xLines(o) : yLines(o)).some((l) => same(l, at)),
+  );
+  if (matching.length === 0) return [];
+  const span = [box, ...matching];
+  return axis === "x"
+    ? [
+        {
+          axis,
+          at,
+          from: Math.min(...span.map((b) => b.y)),
+          to: Math.max(...span.map((b) => b.y + b.height)),
+        },
+      ]
+    : [
+        {
+          axis,
+          at,
+          from: Math.min(...span.map((b) => b.x)),
+          to: Math.max(...span.map((b) => b.x + b.width)),
+        },
+      ];
+}
+
+/**
+ * Snaps the edges a resize is pulling (the dragged corner's two sides) to
+ * nearby objects' lines, never below the minimum size. `rect` is the size
+ * the pointer asks for.
+ */
+export function snapResize(
+  rect: Box,
+  corner: "nw" | "ne" | "sw" | "se",
+  others: Box[],
+  threshold: number,
+  minWidth: number,
+  minHeight: number,
+): { box: Box; guides: Guide[] } {
+  const fromLeft = corner === "nw" || corner === "sw";
+  const fromTop = corner === "nw" || corner === "ne";
+  let { x, y, width, height } = rect;
+
+  const xEdge = fromLeft ? x : x + width;
+  const sx = bestShift([xEdge], others.map(xLines), threshold);
+  if (sx !== null) {
+    const nextWidth = fromLeft ? width - sx : width + sx;
+    if (nextWidth >= minWidth) {
+      if (fromLeft) x += sx;
+      width = nextWidth;
     }
   }
-  return { dx, dy, guides };
+
+  const yEdge = fromTop ? y : y + height;
+  const sy = bestShift([yEdge], others.map(yLines), threshold);
+  if (sy !== null) {
+    const nextHeight = fromTop ? height - sy : height + sy;
+    if (nextHeight >= minHeight) {
+      if (fromTop) y += sy;
+      height = nextHeight;
+    }
+  }
+
+  const box = { x, y, width, height };
+  return {
+    box,
+    guides: [
+      ...guideAt("x", fromLeft ? x : x + width, box, others),
+      ...guideAt("y", fromTop ? y : y + height, box, others),
+    ],
+  };
 }

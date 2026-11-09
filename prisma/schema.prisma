@@ -2132,6 +2132,11 @@ model MoodboardItem {
   width  Float @default(280)
   height Float @default(0) /// 0 = auto-height (content determines)
 
+  /// Locked objects can't be moved, resized or deleted until unlocked.
+  locked  Boolean @default(false)
+  /// Objects sharing a group id are picked and moved as one. Made in the browser.
+  groupId String?
+
   /// Polymorphic JSON data — shape depends on `type`:
   /// NOTE:  { title?, body }
   /// IMAGE: { url, storageKey, caption?, width?, height?, originalName?, mimeType?, bytes? }

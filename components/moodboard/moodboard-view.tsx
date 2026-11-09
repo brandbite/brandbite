@@ -325,8 +325,17 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
     Promise.all([
       ...diff.remove.map((id) => writeItem(id, "DELETE")),
       ...diff.restore.map((id) => writeItem(id, "PATCH", { restore: true })),
-      ...diff.change.map(({ id, x, y, width, height, data, position }) =>
-        writeItem(id, "PATCH", { x, y, width, height, data, position }),
+      ...diff.change.map(({ id, x, y, width, height, data, position, locked, groupId }) =>
+        writeItem(id, "PATCH", {
+          x,
+          y,
+          width,
+          height,
+          data,
+          position,
+          locked: locked ?? false,
+          groupId: groupId ?? null,
+        }),
       ),
       ...(diff.connectionsChanged ? [saveConnections(connections)] : []),
     ]).catch((err) => {
@@ -380,6 +389,13 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
     });
 
     const newIds = new Map<string, string>();
+    // Copies of a group form a group of their own.
+    const newGroups = new Map<string, string>();
+    const copyGroup = (groupId: string | null | undefined) => {
+      if (!groupId) return null;
+      if (!newGroups.has(groupId)) newGroups.set(groupId, newClientId());
+      return newGroups.get(groupId)!;
+    };
     const copies = sources.map((source, index) => {
       const id = `tmp_${newClientId()}`;
       newIds.set(source.id, id);
@@ -392,6 +408,8 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
         ),
         id,
         position: position + index,
+        locked: false,
+        groupId: copyGroup(source.groupId),
         colSpan: 1,
         createdById: "",
         createdAt: now,
@@ -414,11 +432,11 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
     requestAnimationFrame(() => canvasHandle.current?.selectItems(copies.map((c) => c.id)));
 
     for (const copy of copies) {
-      const { type, data, x, y, width, height } = copy;
+      const { type, data, x, y, width, height, groupId } = copy;
       const saved = fetch(`/api/moodboards/${moodboardId}/items`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, data, x, y, width, height }),
+        body: JSON.stringify({ type, data, x, y, width, height, groupId }),
       }).then(async (res) => {
         if (!res.ok) throw new Error("Failed to add copy");
         return (await res.json()).item.id as string;
@@ -716,6 +734,64 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
       console.error("[moodboard-view] move item error:", err);
       fetchMoodboard();
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Lock and group
+  // ---------------------------------------------------------------------------
+
+  /** Saves the same few fields on several objects as one undo step. */
+  async function patchItems(changes: Map<string, Pick<MoodboardItemClient, "locked" | "groupId">>) {
+    if (changes.size === 0) return;
+    record();
+    setMoodboard((prev) =>
+      prev
+        ? {
+            ...prev,
+            items: prev.items.map((item) =>
+              changes.has(item.id) ? { ...item, ...changes.get(item.id) } : item,
+            ),
+          }
+        : prev,
+    );
+    try {
+      await Promise.all([...changes].map(([id, change]) => writeItem(id, "PATCH", change)));
+    } catch (err) {
+      console.error("[moodboard-view] lock/group error:", err);
+      fetchMoodboard();
+    }
+  }
+
+  function handleSetLocked(ids: string[], locked: boolean) {
+    const items = boardRef.current?.items ?? [];
+    const changes = new Map<string, { locked: boolean }>();
+    for (const item of items) {
+      if (ids.includes(item.id) && (item.locked ?? false) !== locked) {
+        changes.set(item.id, { locked });
+      }
+    }
+    patchItems(changes);
+  }
+
+  function handleGroup(ids: string[]) {
+    if (ids.length < 2) return;
+    const groupId = newClientId();
+    patchItems(new Map(ids.map((id) => [id, { groupId }])));
+  }
+
+  /** Ungroups every group the selection touches, wholly. */
+  function handleUngroup(ids: string[]) {
+    const items = boardRef.current?.items ?? [];
+    const groups = new Set(
+      items.filter((i) => ids.includes(i.id) && i.groupId).map((i) => i.groupId),
+    );
+    patchItems(
+      new Map(
+        items
+          .filter((i) => i.groupId && groups.has(i.groupId))
+          .map((i) => [i.id, { groupId: null }]),
+      ),
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -1167,6 +1243,9 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
         onPasteLastCopy={handlePasteLastCopy}
         onAddFiles={handleAddFiles}
         onReorderItems={handleReorderItems}
+        onSetLocked={handleSetLocked}
+        onGroup={handleGroup}
+        onUngroup={handleUngroup}
         onResizeItem={handleResizeItem}
         onAddConnection={handleAddConnection}
         onDeleteConnection={handleDeleteConnection}
