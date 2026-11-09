@@ -92,6 +92,9 @@ const PUBLIC_PATHS = [
   // 307 to /login instead of the sitemap/robots payloads.
   "/sitemap.xml",
   "/robots.txt",
+  // Default share image (app/opengraph-image.tsx). It has no file extension, so
+  // the matcher doesn't skip it; social crawlers carry no cookie either.
+  "/opengraph-image",
   "/api/health", // uptime monitors (BetterStack / Upptime / Vercel); route returns 200 or 503
   // Public color-tools marketing pages (wheel, palette generator, ideas,
   // meanings). Only the pages are public; the authed /api/colors/palettes

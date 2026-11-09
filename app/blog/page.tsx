@@ -18,12 +18,14 @@ import { HomeHeader } from "@/components/marketing/home-header";
 import { SubscribeBand } from "@/components/marketing/subscribe-band";
 import { formatPostDate, readMinutes } from "@/lib/blog";
 import { prisma } from "@/lib/prisma";
+import { pageMetadata } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Blog",
   description:
     "Ideas, inspiration, and practical tips on branding, design, and creative workflows. Straight from the brandbite team.",
-};
+  path: "/blog",
+});
 
 // Render per-request: posts come from the database, which isn't reachable
 // during CI's static prerender pass — and admin publishes show up instantly.

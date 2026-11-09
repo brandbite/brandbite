@@ -14,12 +14,15 @@ import Link from "next/link";
 
 import { HomeFooter } from "@/components/marketing/home-footer";
 import { HomeHeader } from "@/components/marketing/home-header";
+import { pageMetadata } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Coming Soon",
   description:
     "brandbite is putting the final bite on something bold, playful, and seriously good.",
-};
+  path: "/coming-soon",
+  noindex: true,
+});
 
 const displayFont = "font-[family-name:var(--font-jakarta)]";
 const caveat = "font-[family-name:var(--font-jakarta)]";

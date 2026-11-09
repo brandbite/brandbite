@@ -17,11 +17,13 @@ import { HomeFooter } from "@/components/marketing/home-footer";
 import { HomeHeader } from "@/components/marketing/home-header";
 import { COMPANY_ADDRESS, COMPANY_LEGAL_NAME, CONTACT_EMAIL } from "@/lib/brand";
 import { QuestionsBand } from "@/components/marketing/questions-band";
+import { pageMetadata } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Terms & Conditions",
   description: "Brandbite's terms of service. Clear terms. No fine print panic.",
-};
+  path: "/terms",
+});
 
 const displayFont = "font-[family-name:var(--font-jakarta)]";
 

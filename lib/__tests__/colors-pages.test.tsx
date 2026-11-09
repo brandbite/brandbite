@@ -141,6 +141,7 @@ describe("color page", () => {
 describe("color addresses", () => {
   it("leaves the canonical address and other paths alone", () => {
     expect(resolveHexRoute("/colors/hex/ff7f50")).toEqual({ kind: "page" });
+    expect(resolveHexRoute("/colors/hex/ff7f50/opengraph-image")).toEqual({ kind: "page" });
     expect(resolveHexRoute("/colors/hex")).toEqual({ kind: "page" });
     expect(resolveHexRoute("/colors/contrast-checker")).toEqual({ kind: "page" });
   });
@@ -149,16 +150,23 @@ describe("color addresses", () => {
     ["/colors/hex/FF7F50", "/colors/hex/ff7f50"],
     ["/colors/hex/%23ff7f50", "/colors/hex/ff7f50"],
     ["/colors/hex/f75", "/colors/hex/ff7755"],
+    ["/colors/hex/FF7F50/opengraph-image", "/colors/hex/ff7f50/opengraph-image"],
   ])("sends %s to one address", (from, to) => {
     expect(resolveHexRoute(from)).toEqual({ kind: "redirect", to });
   });
 
-  it.each(["nope", "ff642680", "12345", "%3Cscript%3E", "%E0%A4%A", "ff7f50/extra", ""])(
-    "treats %s as missing",
-    (value) => {
-      expect(resolveHexRoute(`/colors/hex/${value}`)).toEqual({ kind: "missing" });
-    },
-  );
+  it.each([
+    "nope",
+    "ff642680",
+    "12345",
+    "%3Cscript%3E",
+    "%E0%A4%A",
+    "ff7f50/extra",
+    "nope/opengraph-image",
+    "",
+  ])("treats %s as missing", (value) => {
+    expect(resolveHexRoute(`/colors/hex/${value}`)).toEqual({ kind: "missing" });
+  });
 });
 
 describe("color family page", () => {

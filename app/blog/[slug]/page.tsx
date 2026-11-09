@@ -17,9 +17,12 @@ import { notFound } from "next/navigation";
 import { HomeFooter } from "@/components/marketing/home-footer";
 import { HomeHeader } from "@/components/marketing/home-header";
 import { SubscribeBand } from "@/components/marketing/subscribe-band";
+import { JsonLd } from "@/components/seo/json-ld";
 import { CMS_ALLOWED_ATTR, CMS_ALLOWED_TAGS, SafeHtml } from "@/components/ui/safe-html";
 import { formatPostDate, readMinutes } from "@/lib/blog";
 import { prisma } from "@/lib/prisma";
+import { pageMetadata } from "@/lib/seo/metadata";
+import { blogPostingJsonLd, breadcrumbJsonLd } from "@/lib/seo/structured-data";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +43,7 @@ async function getPost(slug: string) {
       metaTitle: true,
       metaDescription: true,
       publishedAt: true,
+      updatedAt: true,
     },
   });
 }
@@ -51,11 +55,18 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const post = await getPost(slug);
-  if (!post) return { title: "Post not found" };
-  return {
+  if (!post) return { title: "Post not found", robots: { index: false, follow: false } };
+  const metadata = pageMetadata({
     title: post.metaTitle || post.title,
-    description: post.metaDescription || post.excerpt || undefined,
-  };
+    description: post.metaDescription || post.excerpt || `${post.title}, on the brandbite blog.`,
+    path: `/blog/${post.slug}`,
+    type: "article",
+  });
+  // The hero image makes a better share card than the default brand card.
+  if (post.heroUrl && metadata.openGraph) {
+    metadata.openGraph = { ...metadata.openGraph, images: [{ url: post.heroUrl }] };
+  }
+  return metadata;
 }
 
 /** Split the title so the last two words render orange, per the design. */
@@ -83,6 +94,23 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
         id="main-content"
         className="mx-auto w-full max-w-[1140px] overflow-hidden bg-[#F7F4F1]"
       >
+        <JsonLd
+          data={[
+            blogPostingJsonLd({
+              title: post.title,
+              path: `/blog/${post.slug}`,
+              description: post.metaDescription || post.excerpt,
+              imageUrl: post.heroUrl,
+              authorName: post.authorName,
+              publishedAt: post.publishedAt,
+              updatedAt: post.updatedAt,
+            }),
+            breadcrumbJsonLd([
+              { name: "Blog", path: "/blog" },
+              { name: post.title, path: `/blog/${post.slug}` },
+            ]),
+          ]}
+        />
         <HomeHeader active="Blog" />
 
         {/* Hero */}

@@ -15,12 +15,14 @@ import Image from "next/image";
 import { HomeFooter } from "@/components/marketing/home-footer";
 import { HomeHeader } from "@/components/marketing/home-header";
 import { ReadyBand } from "@/components/marketing/ready-band";
+import { pageMetadata } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "About",
   description:
     "brandbite is a team of experienced creative problem solvers making high quality work easier to access. A team with a big bite.",
-};
+  path: "/about",
+});
 
 const displayFont = "font-[family-name:var(--font-jakarta)]";
 
