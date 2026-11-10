@@ -10,6 +10,7 @@ export const runtime = "nodejs";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { deleteDropboxFile, getDropboxAccessToken } from "@/lib/integrations/dropbox";
 import { getDriveAccessToken, trashDriveFile } from "@/lib/integrations/google-drive";
 import { prisma } from "@/lib/prisma";
 import { deleteR2Objects } from "@/lib/r2";
@@ -51,6 +52,14 @@ export async function DELETE(
       } catch (error) {
         // A disconnected Drive keeps the file; we only stop listing it.
         console.warn("[source-files] Drive trash skipped", error);
+      }
+    }
+    if (file.storage === "DROPBOX" && file.externalId) {
+      try {
+        const accessToken = await getDropboxAccessToken(ticket.companyId, new URL(req.url).origin);
+        await deleteDropboxFile(accessToken, file.externalId);
+      } catch (error) {
+        console.warn("[source-files] Dropbox delete skipped", error);
       }
     }
     if (file.storage === "R2") await deleteR2Objects([file.r2Key]);

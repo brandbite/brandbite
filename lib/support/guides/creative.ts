@@ -465,7 +465,11 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
                 text: "files go straight into their Drive, with no size limit.",
               },
               {
-                term: "No Drive connected",
+                term: "Customer's Dropbox connected",
+                text: "files up to 150 MB go straight into their Dropbox; bigger ones are stored on brandbite.",
+              },
+              {
+                term: "Neither connected",
                 text: "files are stored on brandbite, up to 5 GB each, and deleted 90 days after the request is done.",
               },
               "You can remove a file you uploaded until the request is done.",

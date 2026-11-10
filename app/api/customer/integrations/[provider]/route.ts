@@ -10,6 +10,7 @@ import { NextResponse } from "next/server";
 
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { revokeToken } from "@/lib/google/oauth";
+import { getDropboxAccessToken, revokeDropboxToken } from "@/lib/integrations/dropbox";
 import {
   PROVIDER_LABELS,
   deleteCompanyIntegration,
@@ -18,7 +19,7 @@ import {
 } from "@/lib/integrations/company-integrations";
 import { canManageIntegrations, normalizeCompanyRole } from "@/lib/permissions/companyRoles";
 
-export async function DELETE(_req: Request, { params }: { params: Promise<{ provider: string }> }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ provider: string }> }) {
   try {
     const user = await getCurrentUserOrThrow();
     if (user.role !== "CUSTOMER") {
@@ -45,6 +46,13 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ prov
         () => null,
       );
       if (secrets?.refreshToken) await revokeToken(secrets.refreshToken);
+    }
+    if (provider === "DROPBOX") {
+      const token = await getDropboxAccessToken(
+        user.activeCompanyId,
+        new URL(req.url).origin,
+      ).catch(() => null);
+      if (token) await revokeDropboxToken(token);
     }
     const removed = await deleteCompanyIntegration(user.activeCompanyId, provider);
     if (!removed) {

@@ -22,6 +22,7 @@ import {
   isUsableFolder,
 } from "@/lib/integrations/google-drive";
 import { isProviderAvailable } from "@/lib/integrations/company-integrations";
+import { DROPBOX_MAX_LINK_UPLOAD_BYTES } from "@/lib/integrations/dropbox";
 
 /** Days R2 source files are kept after the request is done. */
 export const R2_SOURCE_FILE_RETENTION_DAYS = 90;
@@ -101,16 +102,26 @@ export function canRemoveSourceFile(
 
 /**
  * Where the next source file for this company goes: its Google Drive when
- * connected and working, otherwise R2. A Drive that needs reconnecting falls
- * back to R2 so delivery never blocks.
+ * connected and working, else its Dropbox (files up to 150 MB, Dropbox's
+ * limit for an upload without handing the browser a token), else R2. A
+ * connection that needs reconnecting falls back, so delivery never blocks.
+ * Without `sizeBytes` it answers for a typical file (for the "files go to…" line).
  */
-export async function chooseSourceFileStorage(companyId: string): Promise<SourceFileStorage> {
-  if (!isProviderAvailable("GOOGLE_DRIVE")) return "R2";
-  const drive = await prisma.companyIntegration.findUnique({
-    where: { companyId_provider: { companyId, provider: "GOOGLE_DRIVE" } },
-    select: { status: true },
+export async function chooseSourceFileStorage(
+  companyId: string,
+  sizeBytes?: number,
+): Promise<SourceFileStorage> {
+  const connected = await prisma.companyIntegration.findMany({
+    where: { companyId, status: "CONNECTED", provider: { in: ["GOOGLE_DRIVE", "DROPBOX"] } },
+    select: { provider: true },
   });
-  return drive?.status === "CONNECTED" ? "GOOGLE_DRIVE" : "R2";
+  const has = (p: "GOOGLE_DRIVE" | "DROPBOX") =>
+    isProviderAvailable(p) && connected.some((c) => c.provider === p);
+  if (has("GOOGLE_DRIVE")) return "GOOGLE_DRIVE";
+  if (has("DROPBOX") && (sizeBytes === undefined || sizeBytes <= DROPBOX_MAX_LINK_UPLOAD_BYTES)) {
+    return "DROPBOX";
+  }
+  return "R2";
 }
 
 /** "WEB-101 Logo redesign" */
