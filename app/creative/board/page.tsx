@@ -858,6 +858,21 @@ export default function CreativeBoardPage() {
     setDetailTicketId(ticket.id);
   };
 
+  // Coming back from a request's full page (?open=<id>): reopen its window once.
+  const reopenedRef = useRef(false);
+  useEffect(() => {
+    if (reopenedRef.current || !data) return;
+    const url = new URL(window.location.href);
+    const openId = url.searchParams.get("open");
+    if (!openId) return;
+    reopenedRef.current = true;
+    const match = data.tickets.find((t) => t.id === openId);
+    if (match) openTicketDetails(match);
+    url.searchParams.delete("open");
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+     
+  }, [data]);
+
   const closeTicketDetails = () => {
     setDetailTicketId(null);
     setDetailRevisions(null);

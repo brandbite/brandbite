@@ -328,7 +328,7 @@ describe("Card detail", () => {
     expect(await within(dialog).findByText("Looks good")).toBeInTheDocument();
     expect(within(dialog).getByRole("link", { name: /Add a comment/ })).toHaveAttribute(
       "href",
-      "/creative/tickets/t1",
+      "/creative/tickets/t1?from=board",
     );
     expect(writes(calls)).toHaveLength(0);
   });
@@ -338,7 +338,7 @@ describe("Card detail", () => {
     const dialog = await open();
     expect(within(dialog).getByRole("link", { name: /Open full page/ })).toHaveAttribute(
       "href",
-      "/creative/tickets/t1",
+      "/creative/tickets/t1?from=board",
     );
     fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog")).toBeNull();

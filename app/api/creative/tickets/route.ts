@@ -42,6 +42,7 @@ type CreativeTicket = {
     name: string;
     tokenCost: number;
     creativePayoutTokens: number;
+    estimatedHours: number | null;
   } | null;
   revisionCount: number;
   latestRevisionHasFeedback: boolean;
@@ -220,6 +221,7 @@ export async function GET(req: NextRequest) {
               name: true,
               tokenCost: true,
               creativePayoutTokens: true,
+              estimatedHours: true,
             },
           },
           revisionCount: true,
@@ -301,6 +303,7 @@ export async function GET(req: NextRequest) {
                 name: t.jobType.name,
                 tokenCost: t.jobType.tokenCost,
                 creativePayoutTokens: t.jobType.creativePayoutTokens,
+                estimatedHours: t.jobType.estimatedHours ?? null,
               }
             : null,
           revisionCount: t.revisionCount ?? 0,
