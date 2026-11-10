@@ -166,3 +166,89 @@ export async function ensureRootFolder(
 export function driveFolderUrl(folderId: string): string {
   return `https://drive.google.com/drive/folders/${encodeURIComponent(folderId)}`;
 }
+
+const DRIVE_UPLOAD_API = "https://www.googleapis.com/upload/drive/v3";
+
+/** Drive rejects nothing in names, but keep them short and on one line. */
+export function driveSafeName(name: string): string {
+  const clean = name.replace(/[\r\n\t]+/g, " ").trim();
+  return (clean || "Untitled").slice(0, 200);
+}
+
+/**
+ * Open a resumable upload session in the given folder. The browser then
+ * sends the bytes straight to Google with one PUT to the returned URL, so
+ * the file never passes through our servers. Passing the page's origin lets
+ * Google answer that browser PUT with CORS headers.
+ */
+export async function startDriveUpload(
+  accessToken: string,
+  args: { name: string; mimeType: string; sizeBytes: number; parentId: string; origin: string },
+): Promise<string> {
+  const res = await fetch(
+    `${DRIVE_UPLOAD_API}/files?uploadType=resumable&fields=id,name,size,webViewLink,parents`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json; charset=UTF-8",
+        "X-Upload-Content-Type": args.mimeType,
+        "X-Upload-Content-Length": String(args.sizeBytes),
+        Origin: args.origin,
+      },
+      body: JSON.stringify({ name: driveSafeName(args.name), parents: [args.parentId] }),
+      cache: "no-store",
+    },
+  );
+  const location = res.headers.get("Location");
+  if (!res.ok || !location) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Google Drive upload session failed (${res.status}): ${text}`);
+  }
+  return location;
+}
+
+export type DriveFileInfo = {
+  id: string;
+  name: string;
+  size: number | null;
+  webViewLink: string | null;
+  parents: string[];
+  trashed: boolean;
+};
+
+export async function getDriveFile(
+  accessToken: string,
+  fileId: string,
+): Promise<DriveFileInfo | null> {
+  const res = await driveFetch(
+    accessToken,
+    `/files/${encodeURIComponent(fileId)}?fields=id,name,size,webViewLink,parents,trashed`,
+  );
+  if (!res.ok) return null;
+  const file = (await res.json()) as {
+    id: string;
+    name: string;
+    size?: string;
+    webViewLink?: string;
+    parents?: string[];
+    trashed?: boolean;
+  };
+  return {
+    id: file.id,
+    name: file.name,
+    size: file.size ? Number(file.size) : null,
+    webViewLink: file.webViewLink ?? null,
+    parents: file.parents ?? [],
+    trashed: Boolean(file.trashed),
+  };
+}
+
+/** Move a file to the Drive trash (the customer can still restore it there). */
+export async function trashDriveFile(accessToken: string, fileId: string): Promise<boolean> {
+  const res = await driveFetch(accessToken, `/files/${encodeURIComponent(fileId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ trashed: true }),
+  });
+  return res.ok || res.status === 404;
+}

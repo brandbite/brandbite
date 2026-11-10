@@ -56,6 +56,7 @@ import { formatBoardDate } from "@/lib/board";
 import type { AssetEntry } from "@/components/ui/revision-image";
 import { RevisionCompare } from "@/components/ui/revision-compare";
 import { TicketActivityPanel } from "@/components/dashboard/ticket-activity-panel";
+import { SourceFilesPanel } from "@/components/tickets/source-files-panel";
 
 type JobTab = "delivery" | "brief" | "time" | "comments" | "activity";
 
@@ -700,6 +701,8 @@ export default function CreativeTicketDetailPage() {
                     something first.
                   </Callout>
                 ) : null}
+
+                <SourceFilesPanel ticketId={ticket.id} viewer="creative" />
               </div>
             </TabPanel>
           ) : null}
