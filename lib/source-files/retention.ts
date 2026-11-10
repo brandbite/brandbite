@@ -18,6 +18,7 @@ import { deleteR2Objects } from "@/lib/r2";
 import { buildTicketCode } from "@/lib/ticket-code";
 
 import { r2DeleteAfter } from "./source-files";
+import { notifyCompanySlack } from "@/lib/integrations/slack";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -98,6 +99,11 @@ async function remind(now: Date, days: 14 | 3): Promise<number> {
       });
       const count = group.ids.length;
       const what = count === 1 ? "1 source file" : `${count} source files`;
+      await notifyCompanySlack(
+        ticket.id,
+        "FILES_EXPIRING",
+        `${what} will be deleted from brandbite on ${formatDay(group.deleteAfter)}. Download them, or connect Google Drive or Dropbox to keep them.`,
+      );
       for (const userId of recipients) {
         await createNotification({
           userId,

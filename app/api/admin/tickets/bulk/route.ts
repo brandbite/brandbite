@@ -24,6 +24,7 @@ import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 import { createNotification } from "@/lib/notifications";
 import { AdminActionType } from "@prisma/client";
 import { autoStopTimersOnTicket } from "@/lib/tickets/auto-timer";
+import { notifyCompanySlack } from "@/lib/integrations/slack";
 
 const STATUS_LABEL: Record<string, string> = {
   TODO: "To do",
@@ -215,6 +216,7 @@ export async function POST(req: NextRequest) {
       });
       const done = data.status === TicketStatus.DONE;
       for (const t of tickets) {
+        if (done) void notifyCompanySlack(t.id, "DONE");
         const recipients = new Set([t.createdById, t.creativeId].filter((x): x is string => !!x));
         for (const userId of recipients) {
           createNotification({

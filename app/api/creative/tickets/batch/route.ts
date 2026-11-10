@@ -14,6 +14,7 @@ import { getCurrentUserOrThrow } from "@/lib/auth";
 import { createNotification } from "@/lib/notifications";
 import { creativeTransitionError } from "@/lib/tickets/creative-transitions";
 import { autoStartTimer, autoStopTimersOnTicket } from "@/lib/tickets/auto-timer";
+import { notifyCompanySlack, slackEventForStatusChange } from "@/lib/integrations/slack";
 
 type TicketStatusString = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 
@@ -251,6 +252,8 @@ export async function PATCH(req: NextRequest) {
           ticketId: ticket.id,
           actorId: user.id,
         });
+        const slackEvent = slackEventForStatusChange(ticket.status, nextStatus);
+        if (slackEvent) void notifyCompanySlack(ticket.id, slackEvent);
       } catch (err) {
         console.error(`[creative.tickets.batch] Failed to update ticket ${ticketId}`, err);
         results.push({

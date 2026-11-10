@@ -39,7 +39,8 @@ const DESCRIPTIONS: Record<IntegrationView["provider"], string> = {
     "Creatives deliver source files (PSD, AI, print files) into a brandbite folder in your Drive. They stay yours for good. brandbite only sees the folder it creates, nothing else in your Drive.",
   DROPBOX:
     "Creatives deliver source files up to 150 MB into Apps/brandbite in your Dropbox, where they stay yours for good. brandbite only sees that folder. Bigger files are kept on brandbite for 90 days; connect Google Drive too for those.",
-  SLACK: "Get request updates in a Slack channel of your choice.",
+  SLACK:
+    "Get request updates in a Slack channel you pick: work ready for review, work started, requests done, and source files about to be deleted. brandbite can only post to that channel; it can't read anything in your Slack.",
 };
 
 const formatDate = (iso: string) =>

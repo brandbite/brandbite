@@ -14,6 +14,7 @@ import { createNotification } from "@/lib/notifications";
 import { transitionCreativeTicketStatus } from "@/lib/tickets/transition-status";
 import { computeCreativePayout, evaluateCreativePayoutPercent } from "@/lib/token-engine";
 import { syncTimerWithStatus } from "@/lib/tickets/auto-timer";
+import { notifyCompanySlack, slackEventForStatusChange } from "@/lib/integrations/slack";
 
 type TicketStatusString = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 
@@ -432,6 +433,11 @@ export async function PATCH(req: NextRequest) {
       ticketId: outcome.notify.ticketId,
       actorId: outcome.notify.actorId,
     });
+    const slackEvent = slackEventForStatusChange(
+      outcome.result.previousStatus,
+      outcome.result.status,
+    );
+    if (slackEvent) void notifyCompanySlack(outcome.result.ticketId, slackEvent);
 
     return NextResponse.json(
       {
