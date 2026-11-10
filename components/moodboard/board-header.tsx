@@ -214,7 +214,7 @@ export function BoardHeader({
                 <>
                   <p className="px-3 py-2 text-xs text-[var(--av2-text-2)]">
                     {shared
-                      ? "The customer of this job can see this board, but can't change it."
+                      ? "The customer of this request can see this board, but can't change it."
                       : "Only you and the brandbite team can see this board."}
                   </p>
                   <button
@@ -227,14 +227,14 @@ export function BoardHeader({
                     className={`${MENU_ITEM} text-[var(--av2-text)]`}
                   >
                     <span className="truncate">
-                      {jobTitle ? `Job: ${jobTitle}` : "Link to a job"}
+                      {jobTitle ? `Request: ${jobTitle}` : "Link to a request"}
                     </span>
                   </button>
                   <button
                     type="button"
                     role="menuitem"
                     disabled={!jobTitle}
-                    title={jobTitle ? undefined : "Link this board to a job first"}
+                    title={jobTitle ? undefined : "Link this board to a request first"}
                     onClick={() => {
                       setMenuOpen(false);
                       onToggleShared?.();

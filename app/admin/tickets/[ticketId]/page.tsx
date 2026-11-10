@@ -343,7 +343,7 @@ function DetailBlock({
 
 function LoadingSkeleton() {
   return (
-    <div aria-busy="true" aria-label="Loading ticket">
+    <div aria-busy="true" aria-label="Loading request">
       <Skeleton className="mb-4 h-5 w-32" />
       <Skeleton className="mb-6 h-36 w-full rounded-2xl" />
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_400px] xl:grid-rows-[auto_1fr]">
@@ -351,7 +351,7 @@ function LoadingSkeleton() {
         <Skeleton className="h-96 rounded-2xl" />
       </div>
       <p className="sr-only" role="status">
-        Loading ticket…
+        Loading request…
       </p>
     </div>
   );
@@ -362,7 +362,7 @@ const BackLink = () => (
     href="/admin/tickets"
     className="mb-4 inline-flex items-center gap-1.5 rounded text-sm font-medium text-[var(--av2-text-2)] hover:text-[var(--av2-text)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
   >
-    <span aria-hidden>←</span> Back to tickets
+    <span aria-hidden>←</span> Back to requests
   </Link>
 );
 
@@ -393,7 +393,7 @@ export default function AdminTicketDetailPage() {
         setData(body as DetailResponse);
       } catch (err) {
         if (cancelled) return;
-        setError(err instanceof Error ? err.message : "Failed to load ticket");
+        setError(err instanceof Error ? err.message : "Failed to load request");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -409,7 +409,7 @@ export default function AdminTicketDetailPage() {
     return (
       <div>
         <BackLink />
-        <Callout tone="error" title="Couldn't load ticket">
+        <Callout tone="error" title="Couldn't load request">
           {error}
         </Callout>
       </div>
@@ -421,7 +421,7 @@ export default function AdminTicketDetailPage() {
         <Card>
           <EmptyState
             icon={<IconDocument width={28} height={28} />}
-            title="Ticket not found"
+            title="Request not found"
             description="No record matched that id."
           />
         </Card>
@@ -476,7 +476,7 @@ export default function AdminTicketDetailPage() {
               Read-only view
             </span>
             <ButtonLink href="/admin/tickets" variant="secondary">
-              Manage in ticket list
+              Manage in request list
               <IconArrowUpRight />
             </ButtonLink>
           </div>
@@ -488,7 +488,7 @@ export default function AdminTicketDetailPage() {
         <div className="min-w-0 xl:col-start-1 xl:row-start-1">
           <Card>
             <Tabs<TabKey>
-              label="Ticket content"
+              label="Request content"
               idPrefix={tabPrefix}
               value={tab}
               onChange={setTab}
@@ -507,7 +507,7 @@ export default function AdminTicketDetailPage() {
                   <EmptyState
                     icon={<IconDocument width={28} height={28} />}
                     title="No brief provided"
-                    description="There is no brief text or attachment on this ticket."
+                    description="There is no brief text or attachment on this request."
                   />
                 ) : (
                   <div className="pt-6">
@@ -552,7 +552,7 @@ export default function AdminTicketDetailPage() {
                   <EmptyState
                     icon={<IconLayers width={28} height={28} />}
                     title="No revisions yet"
-                    description="The creative hasn't submitted any work on this ticket."
+                    description="The creative hasn't submitted any work on this request."
                   />
                 ) : (
                   <ol className="space-y-4 pt-6">
@@ -617,7 +617,7 @@ export default function AdminTicketDetailPage() {
                   <EmptyState
                     icon={<IconChat width={28} height={28} />}
                     title="No comments yet"
-                    description="Nobody has commented on this ticket."
+                    description="Nobody has commented on this request."
                   />
                 ) : (
                   <ul className="divide-y divide-[var(--av2-border)] pt-2">
@@ -661,7 +661,7 @@ export default function AdminTicketDetailPage() {
 
         {/* ---------------- Ticket details ---------------- */}
         <Card as="div" className="xl:sticky xl:top-24 xl:col-start-2 xl:row-span-2 xl:row-start-1">
-          <h2 className="mb-5 text-xl leading-7 font-semibold">Ticket details</h2>
+          <h2 className="mb-5 text-xl leading-7 font-semibold">Request details</h2>
 
           <div>
             <DetailBlock
@@ -718,7 +718,9 @@ export default function AdminTicketDetailPage() {
               ) : (
                 <>
                   <p className="text-base font-semibold">Unassigned</p>
-                  <p className="mt-0.5 text-[var(--av2-text-2)]">No creative on this ticket yet.</p>
+                  <p className="mt-0.5 text-[var(--av2-text-2)]">
+                    No creative on this request yet.
+                  </p>
                 </>
               )}
               {ticket.completedBy && (
@@ -760,7 +762,7 @@ export default function AdminTicketDetailPage() {
             </DetailBlock>
 
             <DetailBlock
-              label="Job type"
+              label="Service"
               icon={
                 <IconTile tone="peach" round>
                   <IconBriefcase />
@@ -792,7 +794,7 @@ export default function AdminTicketDetailPage() {
                 href="/admin/tickets"
                 className="font-semibold text-[var(--av2-link)] hover:underline"
               >
-                ticket list
+                request list
               </Link>
               .
             </p>
@@ -801,7 +803,7 @@ export default function AdminTicketDetailPage() {
 
         {/* ---------------- Activity ---------------- */}
         <Card className="min-w-0 xl:col-start-1 xl:row-start-2">
-          <CardTitle description="Assignment decisions and admin actions recorded on this ticket.">
+          <CardTitle description="Assignment decisions and admin actions recorded on this request.">
             Activity
           </CardTitle>
           <div className="mt-5">
@@ -842,7 +844,7 @@ export default function AdminTicketDetailPage() {
             >
               {auditLogs.length === 0 ? (
                 <p className="text-sm text-[var(--av2-text-2)]">
-                  No admin actions have been recorded on this ticket.
+                  No admin actions have been recorded on this request.
                 </p>
               ) : (
                 <ul className="space-y-2 text-sm">

@@ -900,7 +900,7 @@ export default function NewTicketForm({
     // Billing-only users: UI-level guard (the API also enforces its own check)
     if (isLimitedAccess) {
       setError(
-        "You don't have permission to create tickets. Please ask your company owner or project manager.",
+        "You don't have permission to create requests. Please ask your company owner or project manager.",
       );
       return;
     }
@@ -933,7 +933,7 @@ export default function NewTicketForm({
 
     if (companyRole !== null && !canCreateTickets(companyRole)) {
       setError(
-        "You don't have permission to create tickets. Please ask your company owner or project manager.",
+        "You don't have permission to create requests. Please ask your company owner or project manager.",
       );
       return;
     }
@@ -987,10 +987,10 @@ export default function NewTicketForm({
         } else if (res.status === 403) {
           setError(
             json?.error ||
-              "You don't have permission to create tickets. Please ask your company owner or project manager.",
+              "You don't have permission to create requests. Please ask your company owner or project manager.",
           );
         } else {
-          setError(json?.error || "Failed to create ticket.");
+          setError(json?.error || "Failed to create request.");
         }
         return;
       }
@@ -998,7 +998,7 @@ export default function NewTicketForm({
       const createdTicket = json?.ticket ?? null;
 
       if (!createdTicket?.id) {
-        setError("Ticket was created, but the response was incomplete.");
+        setError("Request was created, but the response was incomplete.");
         return;
       }
 
@@ -1016,24 +1016,24 @@ export default function NewTicketForm({
 
       if (!draftMoved) {
         setSuccessMessage(
-          `Ticket ${code} created, but the files on your draft couldn't be added. Your draft is still in Drafts, so you can add them from the ticket page.`,
+          `Request ${code} created, but the files on your draft couldn't be added. Your draft is still in Drafts, so you can add them from the request page.`,
         );
       } else if (uploadResult.attempted > 0) {
         if (uploadResult.failed === 0) {
           setSuccessMessage(
-            `Ticket ${code} created successfully with ${uploadResult.succeeded} attachment(s).`,
+            `Request ${code} created successfully with ${uploadResult.succeeded} attachment(s).`,
           );
         } else if (uploadResult.succeeded > 0) {
           setSuccessMessage(
-            `Ticket ${code} created. Uploaded ${uploadResult.succeeded}/${uploadResult.attempted} attachment(s). You can retry the missing ones from the ticket page later.`,
+            `Request ${code} created. Uploaded ${uploadResult.succeeded}/${uploadResult.attempted} attachment(s). You can retry the missing ones from the request page later.`,
           );
         } else {
           setSuccessMessage(
-            `Ticket ${code} created, but attachments failed to upload. You can add them from the ticket page later.`,
+            `Request ${code} created, but attachments failed to upload. You can add them from the request page later.`,
           );
         }
       } else {
-        setSuccessMessage(`Ticket ${code} created successfully.`);
+        setSuccessMessage(`Request ${code} created successfully.`);
       }
 
       if (onCreated && createdTicket?.id) {
@@ -1049,7 +1049,7 @@ export default function NewTicketForm({
       }
     } catch (err) {
       console.error("New ticket submit error:", err);
-      setError("Unexpected error while creating ticket.");
+      setError("Unexpected error while creating request.");
     } finally {
       submittingRef.current = false;
       setSubmitting(false);
@@ -1162,7 +1162,7 @@ export default function NewTicketForm({
                         setBriefHint(null);
                       }}
                       disabled={isBusy}
-                      title="Paste plain text. AI structures it into Title, Brief, Job type and Priority."
+                      title="Paste plain text. AI structures it into Title, Brief, Service and Priority."
                     >
                       ✨ Fill with AI
                     </Button>
@@ -1172,7 +1172,7 @@ export default function NewTicketForm({
                 {!isLimitedAccess && briefAiOpen ? (
                   <div className="mb-3 rounded-xl border border-[var(--av2-accent)]/40 bg-[var(--av2-selected)] p-4">
                     <label htmlFor={`${ids}-ai`} className="block text-sm">
-                      Paste your request as plain text. AI fills Title, Brief, Job type, and
+                      Paste your request as plain text. AI fills Title, Brief, Service, and
                       Priority. You can edit anything before submitting.
                     </label>
                     <TextArea
@@ -1341,7 +1341,7 @@ export default function NewTicketForm({
           <div className="min-w-0 space-y-6">
             <Section title="Request details">
               <div className="space-y-4">
-                <Field label={<RequiredLabel>Job type</RequiredLabel>}>
+                <Field label={<RequiredLabel>Service</RequiredLabel>}>
                   <div className="[&>button]:min-h-10 [&>button]:rounded-lg">
                     <JobTypePicker
                       jobTypes={jobTypes}
@@ -1523,7 +1523,7 @@ export default function NewTicketForm({
                       : tokenCount(effectiveCost)
                     : selectedJobType
                       ? DASH
-                      : "Select a job type"}
+                      : "Select a service"}
                 </dd>
                 {remaining != null ? (
                   <>
@@ -1542,7 +1542,7 @@ export default function NewTicketForm({
               {insufficientTokens ? (
                 <div className="mt-3">
                   <Callout tone="error" title="Not enough tokens">
-                    Choose a different job type, save this as a draft, or{" "}
+                    Choose a different service, save this as a draft, or{" "}
                     <button
                       type="button"
                       onClick={handleTopUp}

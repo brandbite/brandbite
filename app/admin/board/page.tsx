@@ -146,7 +146,7 @@ export default function AdminBoardPage() {
     } catch (err) {
       console.error("[AdminBoardPage] load error", err);
       const message =
-        err instanceof Error ? err.message : "Failed to load tickets. Please try again.";
+        err instanceof Error ? err.message : "Failed to load requests. Please try again.";
 
       setError(message);
 
@@ -247,15 +247,15 @@ export default function AdminBoardPage() {
       }
       showToast({
         type: "success",
-        title: `Assigned ${json.assigned} of ${json.scanned} ticket(s)`,
+        title: `Assigned ${json.assigned} of ${json.scanned} request(s)`,
         description:
           json.skipped > 0
             ? `${json.skipped} skipped (auto-assign off, no eligible creative, or already claimed).${
                 json.hasMore ? " More remain — run again." : ""
               }`
             : json.hasMore
-              ? "More tickets remain — run again."
-              : "All eligible unassigned tickets processed.",
+              ? "More requests remain — run again."
+              : "All eligible unassigned requests processed.",
       });
       await load();
     } catch (err) {
@@ -416,7 +416,7 @@ export default function AdminBoardPage() {
               <span className="font-semibold text-[var(--av2-text)] tabular-nums">
                 {ready ? fmt(stats.total) : DASH}
               </span>{" "}
-              total {plural(stats.total, "ticket", "tickets")}
+              total {plural(stats.total, "request", "requests")}
             </span>
             <span aria-hidden>·</span>
             <span>
@@ -440,7 +440,7 @@ export default function AdminBoardPage() {
             <Button
               onClick={runAutoAssignBackfill}
               disabled={backfilling}
-              title="Re-run auto-assign for unassigned tickets (e.g. created before auto-assign was enabled)"
+              title="Re-run auto-assign for unassigned requests (e.g. created before auto-assign was enabled)"
             >
               {backfilling ? "Assigning…" : "Re-run auto-assign"}
             </Button>
@@ -469,8 +469,8 @@ export default function AdminBoardPage() {
         <SearchInput
           value={search}
           onChange={setSearch}
-          placeholder="Search tickets"
-          label="Search tickets"
+          placeholder="Search requests"
+          label="Search requests"
           className="w-full sm:w-64"
         />
         <div className="w-full sm:w-44">
@@ -607,7 +607,7 @@ export default function AdminBoardPage() {
                     ))
                   ) : columnTickets.length === 0 ? (
                     <li className="rounded-xl border border-dashed border-[var(--av2-border)] px-4 py-6 text-center text-sm text-[var(--av2-text-2)]">
-                      {filtersActive ? "No tickets match these filters." : "No tickets here yet."}
+                      {filtersActive ? "No requests match these filters." : "No requests here yet."}
                     </li>
                   ) : (
                     columnTickets.map((t) => (
@@ -628,7 +628,7 @@ export default function AdminBoardPage() {
 
                 {status === "DONE" && columnTickets.length > 0 && (
                   <div className="mt-auto px-2 pt-4">
-                    <TextLink href="/admin/completed-jobs">View completed jobs</TextLink>
+                    <TextLink href="/admin/completed-jobs">View completed requests</TextLink>
                   </div>
                 )}
               </section>
@@ -723,7 +723,7 @@ function BoardCard({
       <Link
         href={`/admin/tickets/${t.id}`}
         draggable={false}
-        title={canDrag ? "Open ticket detail, or drag to change status" : "Open ticket detail"}
+        title={canDrag ? "Open request detail, or drag to change status" : "Open request detail"}
         className="group block cursor-[inherit] rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-4 transition-colors hover:border-[var(--av2-accent)]/50 focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:ring-offset-1 focus-visible:outline-none"
       >
         <div className="flex items-start justify-between gap-3">

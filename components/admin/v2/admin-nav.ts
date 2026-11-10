@@ -28,8 +28,8 @@ export const DEFAULT_COLLAPSED_GROUPS = ["Catalog", "Content", "System"];
 
 /** Admin routes that exist but have no sidebar entry. [path, section, label] */
 const EXTRA_PAGES: [string, string, string][] = [
-  ["/admin/tickets", WORKSPACE_LABEL, "Tickets"],
-  ["/admin/completed-jobs", "Finance", "Completed jobs"],
+  ["/admin/tickets", WORKSPACE_LABEL, "Requests"],
+  ["/admin/completed-jobs", "Finance", "Completed requests"],
   ["/admin/consultations/settings", WORKSPACE_LABEL, "Consultation settings"],
   ["/admin/plan-assignment", "Catalog", "Plan assignment"],
   ["/admin/profile", "Account", "Profile"],

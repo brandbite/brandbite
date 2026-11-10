@@ -192,7 +192,7 @@ const canDropTicketToStatus = (
     return {
       allowed: false,
       reason:
-        "New requests in Backlog can only be picked up by your creative. You can approve or request changes once the ticket is In review.",
+        "New requests in Backlog can only be picked up by your creative. You can approve or request changes once the request is In review.",
     };
   }
 
@@ -208,7 +208,7 @@ const canDropTicketToStatus = (
     return {
       allowed: false,
       reason:
-        "This request is already marked as Done. If something is off, open a new ticket instead of reopening this one.",
+        "This request is already marked as Done. If something is off, open a new request instead of reopening this one.",
     };
   }
 
@@ -360,7 +360,7 @@ export default function CustomerBoardPage() {
     } catch (err: unknown) {
       console.error("Load customer board data error:", err);
       const message =
-        err instanceof Error ? err.message : "Failed to load your tickets. Please try again.";
+        err instanceof Error ? err.message : "Failed to load your requests. Please try again.";
 
       setLoadError(message);
 
@@ -656,7 +656,7 @@ export default function CustomerBoardPage() {
         title: "Project deleted",
         description:
           json.unlinkedTickets > 0
-            ? `${json.unlinkedTickets} ticket(s) moved to "No project".`
+            ? `${json.unlinkedTickets} request(s) moved to "No project".`
             : undefined,
       });
       void load();
@@ -1113,7 +1113,7 @@ export default function CustomerBoardPage() {
     if (status === "DONE") {
       return {
         title: "Request marked as done",
-        description: "Your creative will be paid for this job and the ticket has moved to Done.",
+        description: "Your creative will be paid for this request and it has moved to Done.",
       };
     }
 
@@ -1121,14 +1121,14 @@ export default function CustomerBoardPage() {
       return {
         title: "Changes requested",
         description:
-          "Your message has been sent to your creative and the ticket is back in progress.",
+          "Your message has been sent to your creative and the request is back in progress.",
       };
     }
 
     if (status === "IN_PROGRESS") {
       return {
         title: "Request moved back to In progress",
-        description: "This ticket is now open again for your creative.",
+        description: "This request is now open again for your creative.",
       };
     }
 
@@ -1228,7 +1228,7 @@ export default function CustomerBoardPage() {
     } catch (err: unknown) {
       console.error("Update ticket status error:", err);
       const message =
-        err instanceof Error ? err.message : "Failed to update ticket status. Please try again.";
+        err instanceof Error ? err.message : "Failed to update request status. Please try again.";
 
       setMutationError(message);
 
@@ -1342,7 +1342,7 @@ export default function CustomerBoardPage() {
       showToast({
         type: "warning",
         title: "You can't move requests",
-        description: "Your current role does not allow changing ticket status on this board.",
+        description: "Your current role does not allow changing request status on this board.",
       });
       return;
     }
@@ -1434,7 +1434,7 @@ export default function CustomerBoardPage() {
         if (!res.ok) {
           showToast({
             type: "error",
-            title: json?.error || "Failed to cancel ticket",
+            title: json?.error || "Failed to cancel request",
           });
           return;
         }
@@ -1443,8 +1443,8 @@ export default function CustomerBoardPage() {
           type: "success",
           title:
             refunded > 0
-              ? `Ticket cancelled — ${refunded.toLocaleString()} tokens refunded`
-              : "Ticket cancelled",
+              ? `Request cancelled — ${refunded.toLocaleString()} tokens refunded`
+              : "Request cancelled",
         });
         // Optimistically drop the row from local state + close the
         // detail panel. We then call load() to refresh stats + token
@@ -1456,7 +1456,7 @@ export default function CustomerBoardPage() {
         closeTicketDetails();
         void load();
       } catch {
-        showToast({ type: "error", title: "Failed to cancel ticket" });
+        showToast({ type: "error", title: "Failed to cancel request" });
       } finally {
         setCancellingTicket(false);
       }
@@ -1555,7 +1555,7 @@ export default function CustomerBoardPage() {
       setIsEditingDetail(false);
       showToast({
         type: "success",
-        title: "Ticket updated",
+        title: "Request updated",
         description: "Your changes have been saved.",
       });
     } catch (err) {
@@ -2164,7 +2164,7 @@ export default function CustomerBoardPage() {
         width="md"
         eyebrow="Brand guide"
         title={brandGuideProject?.name ?? ""}
-        subtitle="Fill these once per project. They show up on every ticket for creatives and feed AI prompts automatically."
+        subtitle="Fill these once per project. They show up on every request for creatives and feed AI prompts automatically."
         footer={
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <Button onClick={closeBrandGuide} disabled={brandGuideSaving}>
@@ -2402,7 +2402,7 @@ export default function CustomerBoardPage() {
         onClose={() => setPendingDoneTicketId(null)}
         width="md"
         title="Approve and complete this request?"
-        subtitle="Once you approve, your creative will get paid for this job and the request will move to Done."
+        subtitle="Once you approve, your creative will get paid for this request and it will move to Done."
         footer={
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <Button onClick={() => setPendingDoneTicketId(null)}>Cancel</Button>

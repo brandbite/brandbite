@@ -58,7 +58,7 @@ describe("Creative job list", () => {
     render(<CreativeTicketsPage />);
     expect(await screen.findByText("10 tokens")).toBeInTheDocument();
     expect(screen.getByText("Changes requested")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open job" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Open request" })).toHaveAttribute(
       "href",
       "/creative/tickets/t1",
     );
@@ -76,12 +76,12 @@ describe("Creative job list", () => {
     expect(screen.queryByRole("link", { name: "Logo redesign" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /^All/ }));
 
-    fireEvent.change(screen.getByLabelText("Search jobs"), { target: { value: "globex" } });
+    fireEvent.change(screen.getByLabelText("Search requests"), { target: { value: "globex" } });
     expect(screen.getByRole("link", { name: "Brochure" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Logo redesign" })).toBeNull();
 
-    fireEvent.change(screen.getByLabelText("Search jobs"), { target: { value: "nothing" } });
-    expect(screen.getByText("No jobs match these filters")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Search requests"), { target: { value: "nothing" } });
+    expect(screen.getByText("No requests match these filters")).toBeInTheDocument();
   });
 
   it("offers only the moves the shared rule allows, and none on done work", async () => {
@@ -93,7 +93,7 @@ describe("Creative job list", () => {
       "IN_PROGRESS",
     ]);
     expect(screen.queryByLabelText("Change status of Finished")).toBeNull();
-    expect(screen.getByText("This job is done and can't be moved.")).toBeInTheDocument();
+    expect(screen.getByText("This request is done and can't be moved.")).toBeInTheDocument();
   });
 });
 

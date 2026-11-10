@@ -130,7 +130,7 @@ export default function CreativeTicketsPage() {
             throw new Error("You must be signed in as a creative to view this page.");
           }
           if (err.status === 403) {
-            throw new Error("You do not have permission to view creative tickets.");
+            throw new Error("You do not have permission to view these requests.");
           }
           throw err;
         },
@@ -138,7 +138,7 @@ export default function CreativeTicketsPage() {
       setData(json);
     } catch (err: unknown) {
       console.error("Creative tickets fetch error:", err);
-      const message = err instanceof Error ? err.message : "Failed to load creative tickets.";
+      const message = err instanceof Error ? err.message : "Failed to load your requests.";
       setError(message);
     } finally {
       setLoading(false);
@@ -260,12 +260,12 @@ export default function CreativeTicketsPage() {
         throw new Error(msg);
       }
 
-      showToast({ type: "success", title: "Ticket status updated." });
+      showToast({ type: "success", title: "Request status updated." });
       await load();
     } catch (err: unknown) {
       console.error("Creative ticket update error:", err);
       const message =
-        err instanceof Error ? err.message : "Failed to update ticket. Please try again.";
+        err instanceof Error ? err.message : "Failed to update request. Please try again.";
       setError(message);
       showToast({ type: "error", title: message });
     } finally {
@@ -281,8 +281,8 @@ export default function CreativeTicketsPage() {
   return (
     <>
       <PageHeader
-        title="My jobs"
-        description="Send work for review from the job. Clients approve completion, which triggers your payout."
+        title="My requests"
+        description="Send work for review from the request. Clients approve completion, which triggers your payout."
       />
 
       <div className="space-y-4">
@@ -332,8 +332,8 @@ export default function CreativeTicketsPage() {
           <SearchInput
             value={search}
             onChange={setSearch}
-            label="Search jobs"
-            placeholder="Search jobs, project or customer…"
+            label="Search requests"
+            placeholder="Search requests, project or customer…"
             className="min-w-[240px] flex-1"
           />
           <div className="w-full sm:w-56">
@@ -353,7 +353,7 @@ export default function CreativeTicketsPage() {
         </div>
 
         {loading ? (
-          <div aria-busy="true" aria-label="Loading jobs" className="space-y-3">
+          <div aria-busy="true" aria-label="Loading requests" className="space-y-3">
             <Skeleton className="h-20" />
             <Skeleton className="h-20" />
             <Skeleton className="h-20" />
@@ -363,23 +363,23 @@ export default function CreativeTicketsPage() {
             <Card>
               {anyFilterActive ? (
                 <EmptyState
-                  title="No jobs match these filters"
+                  title="No requests match these filters"
                   description="Try a different status, project or search."
                 />
               ) : (
                 <EmptyState
-                  title="No jobs assigned yet"
-                  description="Jobs assigned to you will appear here."
+                  title="No requests assigned yet"
+                  description="Requests assigned to you will appear here."
                 />
               )}
             </Card>
           )
         ) : (
           <Card padding="none">
-            <Table label="Assigned jobs">
+            <Table label="Assigned requests">
               <thead className="max-lg:hidden">
                 <tr>
-                  <Th>Job</Th>
+                  <Th>Request</Th>
                   <Th>Project</Th>
                   <SortableTh
                     label="Status"
@@ -475,7 +475,7 @@ export default function CreativeTicketsPage() {
                             </div>
                           )}
                           <ButtonLink href={`/creative/tickets/${t.id}`} variant="primary">
-                            Open job
+                            Open request
                           </ButtonLink>
                           {isUpdating(t.id) ? (
                             <p role="status" className="w-full text-xs text-[var(--av2-text-2)]">
@@ -483,7 +483,7 @@ export default function CreativeTicketsPage() {
                             </p>
                           ) : t.status === "DONE" ? (
                             <p className="w-full text-xs text-[var(--av2-text-2)]">
-                              This job is done and can't be moved.
+                              This request is done and can't be moved.
                             </p>
                           ) : null}
                         </div>
@@ -495,7 +495,7 @@ export default function CreativeTicketsPage() {
             </Table>
             <TableFooter>
               Showing {filteredTickets.length} of {tickets.length}{" "}
-              {plural(tickets.length, "job", "jobs")}
+              {plural(tickets.length, "request", "requests")}
             </TableFooter>
           </Card>
         )}

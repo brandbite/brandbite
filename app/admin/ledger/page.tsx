@@ -13,6 +13,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { UserRole } from "@prisma/client";
+import { formatLedgerReason } from "@/lib/ledger-reason";
 import { formatRole } from "@/lib/roles";
 import {
   Badge,
@@ -102,17 +103,10 @@ function signed(n: number | null | undefined) {
   return "0";
 }
 
-/** "AI_REFUND" → "AI refund", "JOB_REQUEST_CREATED" → "Job request created". */
+/** Shared ledger wording ("JOB_COMPLETED" → "Request completed"), same as the CSV. */
 function humanizeReason(reason: string | null) {
-  if (!reason) return null;
-  const words = reason
-    .trim()
-    .split(/[_\s]+/)
-    .filter(Boolean)
-    .map((w) => (w.toUpperCase() === "AI" ? "AI" : w.toLowerCase()));
-  if (words.length === 0) return null;
-  const first = words[0] === "AI" ? "AI" : words[0].charAt(0).toUpperCase() + words[0].slice(1);
-  return [first, ...words.slice(1)].join(" ");
+  if (!reason || !reason.trim()) return null;
+  return formatLedgerReason(reason);
 }
 
 const roleLabel = (role: string) => formatRole(role as UserRole);
@@ -415,7 +409,7 @@ export default function AdminLedgerPage() {
                 <KeyValueList
                   rows={[
                     {
-                      label: "Ticket",
+                      label: "Request",
                       value: selected.ticket ? (
                         <>
                           <span className="font-mono">{selected.ticket.code ?? DASH}</span>
@@ -427,7 +421,7 @@ export default function AdminLedgerPage() {
                           )}
                           <span className="mt-2 block">
                             <TextLink href={`/admin/tickets/${selected.ticket.id}`}>
-                              Open ticket
+                              Open request
                             </TextLink>
                           </span>
                         </>
@@ -528,7 +522,7 @@ export default function AdminLedgerPage() {
           tone="red"
           label="Total debits"
           value={loading && !data ? DASH : fmt(stats?.totalDebits)}
-          hint="Jobs, withdrawals and corrections"
+          hint="Requests, withdrawals and corrections"
         />
       </div>
 
@@ -556,8 +550,8 @@ export default function AdminLedgerPage() {
                   setQuery(v);
                   setPage(1);
                 }}
-                placeholder="Search company, ticket, reason or note"
-                label="Search movements by company, ticket, reason, note or user"
+                placeholder="Search company, request, reason or note"
+                label="Search movements by company, request, reason, note or user"
               />
               <div className="w-full sm:w-48">
                 <Select
@@ -605,7 +599,7 @@ export default function AdminLedgerPage() {
               <EmptyState
                 icon={<IconCoins width={28} height={28} />}
                 title="No token movements yet"
-                description="Ledger entries appear here once companies buy plans, create jobs or creatives get paid."
+                description="Ledger entries appear here once companies buy plans, create requests or creatives get paid."
               />
             </div>
           ) : filteredEntries.length === 0 ? (

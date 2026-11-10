@@ -301,7 +301,7 @@ function renderForm(props: { initialJobTypeId?: string; role?: string } = {}) {
 describe("New request form", () => {
   it("shows no cost until a job type is chosen", async () => {
     renderForm();
-    expect(await screen.findByText("Select a job type")).toBeInTheDocument();
+    expect(await screen.findByText("Select a service")).toBeInTheDocument();
     expect(screen.getByText("3 tokens")).toBeInTheDocument();
     expect(screen.queryByText("Remaining after")).toBeNull();
   });
@@ -391,6 +391,6 @@ describe("New request form", () => {
     expect(screen.getByText("1/8")).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "Delete draft" })).toBeInTheDocument();
     // A job type that no longer exists asks to be chosen again.
-    expect(screen.getByText("Select a job type")).toBeInTheDocument();
+    expect(screen.getByText("Select a service")).toBeInTheDocument();
   });
 });

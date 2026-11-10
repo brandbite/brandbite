@@ -305,7 +305,7 @@ export function CompanyTagsCard({ canManage }: { canManage: boolean }) {
           setToDelete(null);
         }}
         title="Delete tag"
-        description="This tag will be removed from all tickets. This can't be undone."
+        description="This tag will be removed from all requests. This can't be undone."
         confirmLabel="Delete"
         loading={deletingId === toDelete}
       />

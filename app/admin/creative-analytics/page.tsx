@@ -105,7 +105,7 @@ type SortKey =
   | "ratingOverall";
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
-  { value: "completedTickets", label: "Completed tickets" },
+  { value: "completedTickets", label: "Completed requests" },
   { value: "completionRate", label: "Completion rate" },
   { value: "avgRevisionCount", label: "Avg revisions" },
   { value: "avgTurnaroundHours", label: "Turnaround time" },
@@ -353,7 +353,7 @@ export default function CreativeAnalyticsPage() {
           <KeyValueList
             rows={[
               {
-                label: "Completed tickets",
+                label: "Completed requests",
                 value: <span className="tabular-nums">{fmt(selected.completedTickets)}</span>,
               },
               {
@@ -375,7 +375,7 @@ export default function CreativeAnalyticsPage() {
                 ),
               },
               {
-                label: "Avg revisions / ticket",
+                label: "Avg revisions / request",
                 value: <span className="tabular-nums">{avgRevisions(selected)}</span>,
               },
               {
@@ -502,7 +502,7 @@ export default function CreativeAnalyticsPage() {
             {selected.tasksPerWeekCap == null
               ? "No cap configured — auto-assign does not limit this creative."
               : atCap(selected)
-                ? "Auto-assign skips this creative until an active ticket is completed."
+                ? "Auto-assign skips this creative until an active request is completed."
                 : `${fmt(selected.tasksPerWeekCap - selected.activeTickets)} ${plural(
                     selected.tasksPerWeekCap - selected.activeTickets,
                     "slot",
@@ -571,14 +571,14 @@ export default function CreativeAnalyticsPage() {
         <KpiCard
           icon={<IconCheckCircle />}
           tone="green"
-          label="Completed tickets"
+          label="Completed requests"
           value={fmt(summary?.totalCompletedTickets)}
           hint="All time, across the team"
         />
         <KpiCard
           icon={<IconDocument />}
           tone="peach"
-          label="Avg revisions / ticket"
+          label="Avg revisions / request"
           value={
             summary && summary.totalCompletedTickets > 0
               ? summary.avgPlatformRevisionRate.toFixed(1)
@@ -586,8 +586,8 @@ export default function CreativeAnalyticsPage() {
           }
           hint={
             summary && summary.totalCompletedTickets === 0
-              ? "No completed tickets yet"
-              : "Completed tickets only"
+              ? "No completed requests yet"
+              : "Completed requests only"
           }
         />
         <KpiCard
@@ -656,7 +656,7 @@ export default function CreativeAnalyticsPage() {
               <EmptyState
                 icon={<IconUsers width={28} height={28} />}
                 title="No creatives yet"
-                description="Creative performance metrics appear here once creatives are assigned to tickets."
+                description="Creative performance metrics appear here once creatives are assigned to requests."
               />
             </div>
           ) : visible.length === 0 ? (
@@ -754,13 +754,13 @@ export default function CreativeAnalyticsPage() {
             <>
               <div className="border-t border-[var(--av2-border)] px-6 py-5">
                 <Callout title="Relative load compares creatives with each other, not with their capacity">
-                  Load score adds up every active (not done) ticket as priority weight (Low 1,
-                  Medium 2, High 3, Urgent 4) × the job type&apos;s token cost. Relative load = load
+                  Load score adds up every active (not done) request as priority weight (Low 1,
+                  Medium 2, High 3, Urgent 4) × the service&apos;s token cost. Relative load = load
                   score ÷ the team peak load score
                   {maxLoad > 0 ? ` (${fmt(maxLoad)})` : ""} × 100, so the busiest creative is always
                   100%.{" "}
                   {maxLoad === 0 &&
-                    "No creative has active tickets right now, so relative load is not shown. "}
+                    "No creative has active requests right now, so relative load is not shown. "}
                   It is not capacity utilisation — concurrent task caps are set per creative in
                   their user profile.
                 </Callout>

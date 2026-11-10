@@ -677,7 +677,7 @@ export default function AdminUserDetailPage() {
           <Stat
             icon={<IconTicket />}
             tone="peach"
-            label="Active tickets"
+            label="Active requests"
             value={fmt(designer.tickets.active)}
             hint={`${fmt(designer.tickets.completedThisWeek)} done this week`}
           />
@@ -718,7 +718,7 @@ export default function AdminUserDetailPage() {
             <Stat
               icon={<IconTicket />}
               tone="lavender"
-              label="Tickets created"
+              label="Requests created"
               value={fmt(customer.ticketsCreated)}
             />
           </div>
@@ -782,7 +782,7 @@ export default function AdminUserDetailPage() {
       {user.deletedAt && (
         <div className="mb-6">
           <Callout tone="warning" title="This account is deleted">
-            The user&apos;s identity was anonymized on {formatDateTime(user.deletedAt)}. Tickets,
+            The user&apos;s identity was anonymized on {formatDateTime(user.deletedAt)}. Requests,
             ledger entries, and audit rows they&apos;re attached to are preserved. They cannot sign
             in.
           </Callout>
@@ -893,12 +893,12 @@ export default function AdminUserDetailPage() {
         <TabPanel idPrefix={tabPrefix} value="workload">
           <div className="grid items-start gap-6 lg:grid-cols-2">
             <Card>
-              <CardTitle>Workload &amp; tickets</CardTitle>
+              <CardTitle>Workload &amp; requests</CardTitle>
               <div className="mt-5">
                 <Stat
                   icon={<IconTicket />}
                   tone="peach"
-                  label="Active tickets"
+                  label="Active requests"
                   value={fmt(designer.tickets.active)}
                 />
                 <div className="mt-4 flex flex-wrap gap-2">
@@ -954,14 +954,14 @@ export default function AdminUserDetailPage() {
 
             <Card>
               <CardTitle
-                description={`${fmt(designer.skills.length)} ${plural(designer.skills.length, "job type", "job types")}`}
+                description={`${fmt(designer.skills.length)} ${plural(designer.skills.length, "service", "services")}`}
               >
                 Skills
               </CardTitle>
               <div className="mt-4">
                 {designer.skills.length === 0 ? (
                   <p className="text-sm text-[var(--av2-text-2)]">
-                    No skills assigned yet. Auto-assign won&apos;t route any tickets to this
+                    No skills assigned yet. Auto-assign won&apos;t route any requests to this
                     creative until at least one CreativeSkill is added.
                   </p>
                 ) : (
@@ -1176,7 +1176,7 @@ export default function AdminUserDetailPage() {
         <TabPanel idPrefix={tabPrefix} value="companies">
           <Card>
             <CardTitle
-              description={`${fmt(customer.ticketsCreated)} ${plural(customer.ticketsCreated, "ticket", "tickets")} created across all companies`}
+              description={`${fmt(customer.ticketsCreated)} ${plural(customer.ticketsCreated, "request", "requests")} created across all companies`}
             >
               Company memberships
             </CardTitle>

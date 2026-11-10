@@ -64,7 +64,7 @@ type StatusFilter = "ALL" | "ACTIVE" | "INACTIVE";
 /** What the "Linked job types" number counts (shown as a hint so the
  *  figure can't be confused with the category text on the Job types page). */
 const LINKED_COUNT_NOTE =
-  "Job types whose category is set to this category (active and inactive). Job types that only carry a legacy text label aren’t counted.";
+  "Services whose category is set to this category (active and inactive). Services that only carry a legacy text label aren’t counted.";
 
 type LegacyPreview = {
   unlinkedJobTypes: number;
@@ -226,7 +226,7 @@ export default function AdminJobTypeCategoriesPage() {
 
       showToast({
         type: "success",
-        title: json?.message || "Job types linked.",
+        title: json?.message || "Services linked.",
       });
 
       await load();
@@ -256,7 +256,7 @@ export default function AdminJobTypeCategoriesPage() {
 
       const msg =
         json?.unlinkedJobTypes > 0
-          ? `Category deleted. ${json.unlinkedJobTypes} job type(s) unlinked.`
+          ? `Category deleted. ${json.unlinkedJobTypes} service(s) unlinked.`
           : "Category deleted.";
       showToast({ type: "success", title: msg });
 
@@ -434,7 +434,7 @@ export default function AdminJobTypeCategoriesPage() {
                 Active
               </p>
               <p id="cat-active-hint" className="mt-0.5 text-xs text-[var(--av2-text-2)]">
-                Active categories appear in the service catalogue and the ticket creation form.
+                Active categories appear in the service catalogue and the request creation form.
               </p>
             </div>
             <Switch
@@ -448,13 +448,13 @@ export default function AdminJobTypeCategoriesPage() {
 
         {selected && (
           <PanelSection
-            title="Linked job types"
-            action={<TextLink href="/admin/job-types">Manage job types</TextLink>}
+            title="Linked services"
+            action={<TextLink href="/admin/job-types">Manage services</TextLink>}
           >
             <p className="text-[32px] leading-10 font-bold tracking-tight tabular-nums">
               {fmt(selected.jobTypeCount)}{" "}
               <span className="text-sm font-normal text-[var(--av2-text-2)]">
-                {plural(selected.jobTypeCount, "job type", "job types")}
+                {plural(selected.jobTypeCount, "service", "services")}
               </span>
             </p>
             <p className="mt-1 text-xs text-[var(--av2-text-2)]">{LINKED_COUNT_NOTE}</p>
@@ -464,7 +464,7 @@ export default function AdminJobTypeCategoriesPage() {
         {selected && (
           <PanelSection title="Danger zone">
             <p className="mb-3 text-sm text-[var(--av2-text-2)]">
-              Deleting a category unlinks its job types (they move to “Uncategorized”).
+              Deleting a category unlinks its services (they move to “Uncategorized”).
             </p>
             <Button variant="danger" onClick={() => setDeleteConfirm(selected)}>
               Delete category
@@ -482,14 +482,14 @@ export default function AdminJobTypeCategoriesPage() {
   return (
     <div>
       <PageHeader
-        title="Job type categories"
-        description="Organise job types into categories and control their order in the service catalogue and ticket creation form."
+        title="Service categories"
+        description="Organise services into categories and control their order in the service catalogue and request creation form."
         meta={
           loaded && !error ? (
             <span className="tabular-nums">
               {fmt(categories.length)} {plural(categories.length, "category", "categories")} ·{" "}
-              {fmt(activeCount)} active · {fmt(linkedTotal)} linked job{" "}
-              {plural(linkedTotal, "type", "types")}
+              {fmt(activeCount)} active · {fmt(linkedTotal)} linked{" "}
+              {plural(linkedTotal, "service", "services")}
             </span>
           ) : null
         }
@@ -518,7 +518,7 @@ export default function AdminJobTypeCategoriesPage() {
         <div className="mb-6">
           <Callout
             tone="warning"
-            title={`${legacyPreview.unlinkedJobTypes} job ${plural(legacyPreview.unlinkedJobTypes, "type isn't", "types aren't")} linked to a category`}
+            title={`${legacyPreview.unlinkedJobTypes} ${plural(legacyPreview.unlinkedJobTypes, "service isn't", "services aren't")} linked to a category`}
             action={
               <Button
                 onClick={() => setConfirmLink(true)}
@@ -529,7 +529,7 @@ export default function AdminJobTypeCategoriesPage() {
               </Button>
             }
           >
-            They show a category name from an old text field, but the catalogue counts, the job-type
+            They show a category name from an old text field, but the catalogue counts, the service
             editor and talent onboarding only use linked categories.
           </Callout>
         </div>
@@ -544,7 +544,7 @@ export default function AdminJobTypeCategoriesPage() {
         }}
         loading={migrating}
         variant="warning"
-        title="Link job types to categories?"
+        title="Link services to categories?"
         description={
           legacyPreview
             ? legacyPreview.groups
@@ -553,10 +553,10 @@ export default function AdminJobTypeCategoriesPage() {
                     ? `${g.jobTypes} → ${g.category?.name}`
                     : `${g.jobTypes} → new category “${g.label}”`,
                 )
-                .join(" · ") + ". Already linked job types and existing categories are not changed."
+                .join(" · ") + ". Already linked services and existing categories are not changed."
             : undefined
         }
-        confirmLabel="Link job types"
+        confirmLabel="Link services"
         cancelLabel="Not now"
       />
 
@@ -612,7 +612,7 @@ export default function AdminJobTypeCategoriesPage() {
               />
             </div>
           ) : (
-            <Table label="Job type categories">
+            <Table label="Service categories">
               <thead>
                 <tr>
                   <Th align="right" className="w-20">
@@ -620,7 +620,7 @@ export default function AdminJobTypeCategoriesPage() {
                   </Th>
                   <Th>Category</Th>
                   <Th align="right">
-                    <span title={LINKED_COUNT_NOTE}>Linked job types</span>
+                    <span title={LINKED_COUNT_NOTE}>Linked services</span>
                   </Th>
                   <Th>Status</Th>
                 </tr>
@@ -631,7 +631,7 @@ export default function AdminJobTypeCategoriesPage() {
                     key={cat.id}
                     selected={selected?.id === cat.id}
                     onSelect={() => handleSelect(cat)}
-                    label={`${cat.name}, order ${cat.sortOrder}, ${cat.jobTypeCount} linked job types`}
+                    label={`${cat.name}, order ${cat.sortOrder}, ${cat.jobTypeCount} linked services`}
                   >
                     <Td align="right" className="text-[var(--av2-text-2)]">
                       {fmt(cat.sortOrder)}
@@ -687,8 +687,8 @@ export default function AdminJobTypeCategoriesPage() {
             <IconDocument width={18} height={18} className="mt-px shrink-0" />
             <span>
               {selected ? "" : "Select a category to edit it. "}
-              Linked job types counts job types whose category is set to that category; job types
-              that only carry a legacy text label aren&apos;t counted.
+              Linked services counts services whose category is set to that category; services that
+              only carry a legacy text label aren&apos;t counted.
             </span>
           </p>
         )}
@@ -713,8 +713,8 @@ export default function AdminJobTypeCategoriesPage() {
               <strong className="text-[var(--av2-text)]">{deleteConfirm.name}</strong>?
             </p>
             {deleteConfirm.jobTypeCount > 0 && (
-              <Callout tone="warning" title="Linked job types will be unlinked">
-                This category has {deleteConfirm.jobTypeCount} job type
+              <Callout tone="warning" title="Linked services will be unlinked">
+                This category has {deleteConfirm.jobTypeCount} service
                 {deleteConfirm.jobTypeCount === 1 ? "" : "s"} linked. They will be unlinked (moved
                 to &quot;Uncategorized&quot;).
               </Callout>

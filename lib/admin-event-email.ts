@@ -186,14 +186,14 @@ function render(event: AdminEvent): Rendered {
     }
 
     case "NEW_TICKET": {
-      const subject = `[brandbite] New ticket: ${event.title}`;
+      const subject = `[brandbite] New request: ${event.title}`;
       const body = [
         `<p style="font-size:13px;color:#424143;margin:0 0 6px;"><strong>${escapeHtml(event.companyName)}</strong> opened a new task.</p>`,
         `<p style="font-size:14px;color:#1f2126;margin:8px 0 4px;font-weight:600;">${escapeHtml(event.title)}</p>`,
         `<p style="font-size:12px;color:#7a7a7a;margin:6px 0;">Created by ${escapeHtml(event.createdByEmail)}${event.jobTypeName ? ` · ${escapeHtml(event.jobTypeName)}` : ""}${event.ticketCode ? ` · ${escapeHtml(event.ticketCode)}` : ""}</p>`,
         ctaButton(`${ADMIN_BASE}/admin/board?ticket=${event.ticketId}`, "Open in admin board"),
       ].join("");
-      return { subject, html: shell("New ticket", body) };
+      return { subject, html: shell("New request", body) };
     }
 
     case "NEW_COMPANY": {

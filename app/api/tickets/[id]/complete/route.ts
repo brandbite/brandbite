@@ -28,7 +28,7 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
   const { id: ticketId } = await context.params;
 
   if (!ticketId) {
-    return NextResponse.json({ error: "Missing ticket id in route params" }, { status: 400 });
+    return NextResponse.json({ error: "Missing request id in route params" }, { status: 400 });
   }
 
   try {
@@ -43,7 +43,7 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
       select: { id: true, status: true },
     });
     if (!exists) {
-      return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
+      return NextResponse.json({ error: "Request not found" }, { status: 404 });
     }
 
     const result = await completeTicketAndApplyTokens(ticketId);
@@ -51,7 +51,7 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
     if (result.alreadyCompleted) {
       return NextResponse.json(
         {
-          message: "Ticket already completed or already processed for JOB_PAYMENT",
+          message: "Request already completed or already processed for JOB_PAYMENT",
           ticket: result.ticket,
           alreadyCompleted: true,
         },
@@ -77,7 +77,7 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
         createNotification({
           userId: ticketMeta.creativeId,
           type: "TICKET_COMPLETED",
-          title: "Ticket completed",
+          title: "Request completed",
           message: `"${ticketMeta.title}" has been marked as done`,
           ticketId,
         });
@@ -85,7 +85,7 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
       createNotification({
         userId: ticketMeta.createdById,
         type: "TICKET_COMPLETED",
-        title: "Ticket completed",
+        title: "Request completed",
         message: `"${ticketMeta.title}" has been marked as done`,
         ticketId,
       });
@@ -93,7 +93,7 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
 
     return NextResponse.json(
       {
-        message: "Ticket completed and tokens applied successfully",
+        message: "Request completed and tokens applied successfully",
         ticket: result.ticket,
         company: {
           ledgerEntryId: result.companyLedgerEntry?.id ?? null,

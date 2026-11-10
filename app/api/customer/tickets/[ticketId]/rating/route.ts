@@ -43,17 +43,17 @@ export async function POST(
     });
 
     if (!ticket) {
-      return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
+      return NextResponse.json({ error: "Request not found" }, { status: 404 });
     }
     if (ticket.status !== "DONE") {
       return NextResponse.json(
-        { error: "Ticket must be marked DONE before it can be rated" },
+        { error: "Request must be marked DONE before it can be rated" },
         { status: 409 },
       );
     }
     if (!ticket.creativeId) {
       return NextResponse.json(
-        { error: "Ticket has no assigned creative to rate" },
+        { error: "Request has no assigned creative to rate" },
         { status: 409 },
       );
     }
@@ -67,7 +67,7 @@ export async function POST(
       select: { id: true },
     });
     if (existing) {
-      return NextResponse.json({ error: "This ticket has already been rated" }, { status: 409 });
+      return NextResponse.json({ error: "This request has already been rated" }, { status: 409 });
     }
 
     const rating = await prisma.creativeRating.create({

@@ -129,7 +129,7 @@ describe("GET /api/creative/balance/export", () => {
     expect(debits.lines).toHaveLength(2);
     expect(debits.lines[1]).toContain('"Paid out"');
 
-    const byLabel = await exportRows({ q: "job payment" });
+    const byLabel = await exportRows({ q: "request payment" });
     expect(byLabel.lines).toHaveLength(2);
     expect(byLabel.lines[1]).toContain('"Logo"');
 

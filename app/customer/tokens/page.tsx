@@ -310,7 +310,7 @@ export default function CustomerTokensPage() {
             tone="peach"
             label="All-time debits"
             value={data ? <TokenFigure value={data.stats.totalDebits} unit={false} /> : DASH}
-            hint="All ticket work and other debits. Filters don't change this."
+            hint="All request work and other debits. Filters don't change this."
           />
         </div>
 
@@ -478,7 +478,7 @@ function LedgerDetail({ entry, onClose }: { entry: LedgerEntry; onClose: () => v
             { label: "Date", value: formatDateTime(entry.createdAt) },
             { label: "Balance before", value: <RecordedBalance value={entry.balanceBefore} /> },
             { label: "Balance after", value: <RecordedBalance value={entry.balanceAfter} /> },
-            { label: "Ticket", value: entry.ticketCode || DASH },
+            { label: "Request", value: entry.ticketCode || DASH },
             { label: "Notes", value: entry.notes || DASH },
           ]}
         />

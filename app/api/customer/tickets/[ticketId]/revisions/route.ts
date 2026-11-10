@@ -23,7 +23,7 @@ export async function GET(
 
   if (user.role !== "CUSTOMER") {
     return NextResponse.json(
-      { error: "Only customers can view ticket revision history." },
+      { error: "Only customers can view request revision history." },
       { status: 403 },
     );
   }
@@ -31,13 +31,13 @@ export async function GET(
   const { ticketId } = await params;
 
   if (!ticketId) {
-    return NextResponse.json({ error: "Ticket id is required." }, { status: 400 });
+    return NextResponse.json({ error: "Request id is required." }, { status: 400 });
   }
 
   const activeCompanyId = user.activeCompanyId;
   if (!activeCompanyId) {
     return NextResponse.json(
-      { error: "You need an active company to view ticket revisions." },
+      { error: "You need an active company to view request revisions." },
       { status: 400 },
     );
   }
@@ -51,7 +51,7 @@ export async function GET(
   });
 
   if (!ticket) {
-    return NextResponse.json({ error: "Ticket not found for your company." }, { status: 404 });
+    return NextResponse.json({ error: "Request not found for your company." }, { status: 404 });
   }
 
   const revisions = await prisma.ticketRevision.findMany({

@@ -23,7 +23,7 @@ export async function GET(_req: NextRequest) {
 
     if (!isSiteAdminRole(user.role)) {
       return NextResponse.json(
-        { error: "Only site admins can access job type categories" },
+        { error: "Only site admins can access service categories" },
         { status: 403 },
       );
     }

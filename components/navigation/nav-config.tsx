@@ -97,7 +97,7 @@ export const ADMIN_NAV: NavConfig = {
       label: "Catalog",
       items: [
         { href: "/admin/plans", label: "Plans", icon: IconCatalog },
-        { href: "/admin/job-types", label: "Job Types", icon: IconCatalog },
+        { href: "/admin/job-types", label: "Services", icon: IconCatalog },
         { href: "/admin/job-type-categories", label: "Categories", icon: IconCatalog },
       ],
     },

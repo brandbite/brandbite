@@ -92,7 +92,7 @@ export function PauseBanner() {
         showToast({
           type: "success",
           title: "Welcome back!",
-          description: "You are now accepting new tickets.",
+          description: "You are now accepting new requests.",
         });
       } else {
         showToast({
@@ -124,7 +124,7 @@ export function PauseBanner() {
 
   const message =
     status.pauseType === "MANUAL"
-      ? `Paused since ${pausedSince}. Press Continue to resume accepting new tickets.`
+      ? `Paused since ${pausedSince}. Press Continue to resume accepting new requests.`
       : remaining
         ? `Paused since ${pausedSince}. Auto-resumes in ${remaining}.`
         : "Pause expired. Press Continue to update your status.";

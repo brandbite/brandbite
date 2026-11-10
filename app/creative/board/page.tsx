@@ -65,19 +65,19 @@ const COLUMN_TINT: Record<string, string> = {
 
 const COLUMN_EMPTY: Record<string, { title: string; description: string }> = {
   TODO: {
-    title: "No jobs in backlog.",
+    title: "No requests in backlog.",
     description: "New work assigned to you will appear here.",
   },
   IN_PROGRESS: {
-    title: "No jobs in progress.",
-    description: "Jobs you start will appear here.",
+    title: "No requests in progress.",
+    description: "Requests you start will appear here.",
   },
   IN_REVIEW: {
-    title: "No jobs in review.",
+    title: "No requests in review.",
     description: "Work submitted for review will appear here.",
   },
   DONE: {
-    title: "No completed jobs.",
+    title: "No completed requests.",
     description: "Completed work will appear here.",
   },
 };
@@ -154,12 +154,12 @@ export default function CreativeBoardPage() {
       setData(json);
     } catch (err: unknown) {
       console.error("[CreativeBoard] load error", err);
-      const message = err instanceof Error ? err.message : "Failed to load creative tickets.";
+      const message = err instanceof Error ? err.message : "Failed to load your requests.";
       setError(message);
 
       showToast({
         type: "error",
-        title: "Could not load your tickets",
+        title: "Could not load your requests",
         description: message,
       });
     } finally {
@@ -370,15 +370,15 @@ export default function CreativeBoardPage() {
   const getStatusSuccessMessage = (status: TicketStatus): string => {
     switch (status) {
       case "IN_PROGRESS":
-        return "Ticket moved to In progress.";
+        return "Request moved to In progress.";
       case "IN_REVIEW":
-        return "Ticket sent to your customer for review.";
+        return "Request sent to your customer for review.";
       case "TODO":
-        return "Ticket moved back to backlog.";
+        return "Request moved back to backlog.";
       case "DONE":
-        return "Ticket marked as done.";
+        return "Request marked as done.";
       default:
-        return "Ticket status updated.";
+        return "Request status updated.";
     }
   };
 
@@ -411,7 +411,7 @@ export default function CreativeBoardPage() {
           throw new Error("You need to sign in as a creative.");
         }
         if (res.status === 403) {
-          throw new Error(json?.error || "You do not have permission to update this ticket.");
+          throw new Error(json?.error || "You do not have permission to update this request.");
         }
         const msg = json?.error || `Request failed with status ${res.status}`;
         throw new Error(msg);
@@ -429,19 +429,19 @@ export default function CreativeBoardPage() {
 
       showToast({
         type: "success",
-        title: "Ticket updated",
+        title: "Request updated",
         description: getStatusSuccessMessage(status),
       });
 
       return { revisionId: json?.revisionId ?? undefined };
     } catch (err: unknown) {
       console.error("[CreativeBoard] status update error", err);
-      const message = err instanceof Error ? err.message : "Failed to update ticket status.";
+      const message = err instanceof Error ? err.message : "Failed to update request status.";
       setMutationError(message);
 
       showToast({
         type: "error",
-        title: "Could not update ticket",
+        title: "Could not update request",
         description: message,
       });
 
@@ -551,7 +551,7 @@ export default function CreativeBoardPage() {
       }
       return {
         allowed: false,
-        reason: "You can only start a backlog ticket by moving it into In progress.",
+        reason: "You can only start a backlog request by moving it into In progress.",
       };
     }
 
@@ -562,7 +562,7 @@ export default function CreativeBoardPage() {
       return {
         allowed: false,
         reason:
-          "From In progress you can either keep working here or move the ticket into In review.",
+          "From In progress you can either keep working here or move the request into In review.",
       };
     }
 
@@ -575,14 +575,14 @@ export default function CreativeBoardPage() {
       return {
         allowed: false,
         reason:
-          "From In review you can move the ticket back to In progress if more work is needed.",
+          "From In review you can move the request back to In progress if more work is needed.",
       };
     }
 
     if (ticket.status === "DONE") {
       return {
         allowed: false,
-        reason: "This request is already completed. The customer controls Done tickets.",
+        reason: "This request is already completed. The customer controls Done requests.",
       };
     }
 
@@ -699,16 +699,16 @@ export default function CreativeBoardPage() {
           type: failCount > 0 ? "warning" : "success",
           title:
             failCount > 0
-              ? `${successCount} ticket${successCount > 1 ? "s" : ""} moved, ${failCount} failed`
-              : `${successCount} ticket${successCount > 1 ? "s" : ""} moved to ${statusLabel}`,
+              ? `${successCount} request${successCount > 1 ? "s" : ""} moved, ${failCount} failed`
+              : `${successCount} request${successCount > 1 ? "s" : ""} moved to ${statusLabel}`,
           description:
-            failCount > 0 ? "Some tickets could not be updated due to restrictions." : undefined,
+            failCount > 0 ? "Some requests could not be updated due to restrictions." : undefined,
         });
       } else {
         showToast({
           type: "error",
-          title: "No tickets updated",
-          description: "All selected tickets could not be moved.",
+          title: "No requests updated",
+          description: "All selected requests could not be moved.",
         });
       }
 
@@ -977,7 +977,7 @@ export default function CreativeBoardPage() {
     <>
       <PageHeader
         title="Your assigned work"
-        description="Tickets currently assigned to you across all customer projects."
+        description="Requests currently assigned to you across all customer projects."
       />
 
       <PauseBanner />
@@ -992,7 +992,7 @@ export default function CreativeBoardPage() {
 
       {mutationError && (
         <div className="mb-4">
-          <Callout tone="warning" title="That job didn't move">
+          <Callout tone="warning" title="That request didn't move">
             {mutationError}
           </Callout>
         </div>
@@ -1172,7 +1172,7 @@ export default function CreativeBoardPage() {
                     {columnTickets.length === 0 && !isActiveDrop && (
                       <EmptyState
                         icon={<IconDocument width={24} height={24} />}
-                        title={filtersActive ? "No matching jobs." : empty.title}
+                        title={filtersActive ? "No matching requests." : empty.title}
                         description={
                           filtersActive
                             ? "Try another project, search or filter."
@@ -1188,7 +1188,7 @@ export default function CreativeBoardPage() {
 
           <p role="status" className="mt-4 text-sm text-[var(--av2-text-2)]">
             Showing {fmt(filteredTickets.length)} of {fmt(tickets.length)}{" "}
-            {plural(tickets.length, "job", "jobs")}
+            {plural(tickets.length, "request", "requests")}
           </p>
         </>
       ) : null}
@@ -1201,7 +1201,8 @@ export default function CreativeBoardPage() {
           className="fixed inset-x-4 bottom-4 z-40 flex flex-wrap items-center justify-center gap-2 rounded-2xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-3 shadow-lg sm:right-auto sm:left-1/2 sm:-translate-x-1/2 sm:flex-nowrap"
         >
           <span className="px-2 text-sm font-semibold whitespace-nowrap">
-            {selectedTicketIds.size} {plural(selectedTicketIds.size, "ticket", "tickets")} selected
+            {selectedTicketIds.size} {plural(selectedTicketIds.size, "request", "requests")}{" "}
+            selected
           </span>
 
           {bulkTargetStatuses.includes("TODO") && (

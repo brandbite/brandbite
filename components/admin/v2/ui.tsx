@@ -17,7 +17,10 @@
 import Link from "next/link";
 import {
   forwardRef,
+  useEffect,
   useId,
+  useRef,
+  useState,
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
   type KeyboardEvent,
@@ -78,7 +81,7 @@ export function Card({
   return (
     <Tag
       className={cx(
-        "rounded-2xl border border-[var(--av2-border)] bg-[var(--av2-surface)]",
+        "min-w-0 rounded-2xl border border-[var(--av2-border)] bg-[var(--av2-surface)]",
         padding === "md" && "p-6",
         padding === "sm" && "p-4",
         className,
@@ -525,7 +528,7 @@ export function SegmentedControl<T extends string>({
       {options.map((o) => {
         const active = o.value === value;
         const cls = cx(
-          "inline-flex h-8 items-center rounded-full px-4 text-sm font-medium transition-colors",
+          "inline-flex h-8 items-center rounded-full px-4 text-sm font-medium transition-colors max-sm:h-10",
           active
             ? "bg-[var(--av2-text)] text-[var(--av2-surface)]"
             : "text-[var(--av2-text-2)] hover:text-[var(--av2-text)]",
@@ -611,6 +614,51 @@ export function Tabs<T extends string>({
 }) {
   const autoId = useId();
   const prefix = idPrefix ?? autoId;
+  const listRef = useRef<HTMLDivElement>(null);
+  // On narrow screens the row scrolls sideways; fade the edge(s) that hide
+  // more tabs so people can tell there is more to swipe to.
+  const [fade, setFade] = useState<{ left: boolean; right: boolean }>({
+    left: false,
+    right: false,
+  });
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const update = () => {
+      const left = el.scrollLeft > 1;
+      const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+      setFade((f) => (f.left === left && f.right === right ? f : { left, right }));
+    };
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
+    observer?.observe(el);
+    return () => {
+      el.removeEventListener("scroll", update);
+      observer?.disconnect();
+    };
+  }, []);
+
+  // Keep the selected tab in view when it changes.
+  useEffect(() => {
+    const list = listRef.current;
+    const tab = document.getElementById(`${prefix}-tab-${value}`);
+    if (!list || !tab || list.scrollWidth <= list.clientWidth) return;
+    const start = tab.offsetLeft - list.offsetLeft;
+    if (start < list.scrollLeft || start + tab.offsetWidth > list.scrollLeft + list.clientWidth)
+      list.scrollTo({ left: start - 24, behavior: "smooth" });
+  }, [prefix, value]);
+
+  const mask =
+    fade.left && fade.right
+      ? "linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent)"
+      : fade.right
+        ? "linear-gradient(to right, #000 calc(100% - 32px), transparent)"
+        : fade.left
+          ? "linear-gradient(to right, transparent, #000 32px)"
+          : undefined;
+
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
     const i = tabs.findIndex((t) => t.value === value);
@@ -620,9 +668,11 @@ export function Tabs<T extends string>({
   };
   return (
     <div
+      ref={listRef}
       role="tablist"
       aria-label={label}
       onKeyDown={onKey}
+      style={mask ? { maskImage: mask, WebkitMaskImage: mask } : undefined}
       // The line is a shadow, not a border: tabs draw over it without overflowing the
       // row, which is what used to show a vertical scrollbar next to the tabs.
       className="flex gap-6 overflow-x-auto overflow-y-hidden shadow-[inset_0_-1px_0_var(--av2-border)]"
@@ -878,11 +928,83 @@ export function SaveBar({
 // Tables
 // ---------------------------------------------------------------------------
 
+/**
+ * Copies each column header's visible text onto the matching body cells as
+ * `data-label`, so the phone layout below can name every value. Re-runs when
+ * rows change (paging, filtering, live updates). Header text that is only
+ * for screen readers (an "Open" column, say) gives an empty label.
+ */
+function labelCellsFromHeaders(table: HTMLTableElement) {
+  const headRow = table.tHead?.rows[0];
+  if (!headRow) return;
+  const labels = Array.from(headRow.cells).map((th) => {
+    const text = (th.textContent ?? "").trim();
+    const hidden = Array.from(th.querySelectorAll(".sr-only"))
+      .map((el) => (el.textContent ?? "").trim())
+      .join("");
+    return text === hidden ? "" : text;
+  });
+  for (const body of Array.from(table.tBodies)) {
+    for (const row of Array.from(body.rows)) {
+      let col = 0;
+      let primaryFound = false;
+      for (const cell of Array.from(row.cells)) {
+        const label = cell.colSpan > 1 ? "" : (labels[col] ?? "");
+        if (cell.getAttribute("data-label") !== label) cell.setAttribute("data-label", label);
+        // Keep columns the page already hides on phones hidden in the cards too.
+        const phoneHidden = Array.from(cell.classList).some(
+          (c) => c === "hidden" || (c.startsWith("max-") && c.endsWith(":hidden")),
+        );
+        cell.toggleAttribute("data-phone-hidden", phoneHidden);
+        // The first labelled column (ticket, company, user...) is the card's title.
+        const primary = !primaryFound && !phoneHidden && label !== "";
+        if (primary) primaryFound = true;
+        cell.toggleAttribute("data-primary", primary);
+        col += cell.colSpan;
+      }
+    }
+  }
+}
+
+/**
+ * Below 640px every row becomes a card: the first cell is the title, the
+ * rest stack as "Label  value" lines, so phones never scroll sideways. The
+ * first labelled column becomes the card's title.
+ */
+const PHONE_TABLE = [
+  "max-[639px]:block max-[639px]:[&_tbody]:block max-[639px]:[&_thead]:hidden",
+  "max-[639px]:[&_tbody>tr]:flex max-[639px]:[&_tbody>tr]:flex-col max-[639px]:[&_tbody>tr]:gap-1.5 max-[639px]:[&_tbody>tr]:px-5 max-[639px]:[&_tbody>tr]:py-4",
+  // Label in the first column, everything the cell holds stacked in the second.
+  "max-[639px]:[&_tbody_td]:grid max-[639px]:[&_tbody_td]:min-w-0 max-[639px]:[&_tbody_td]:grid-cols-[auto_minmax(0,1fr)] max-[639px]:[&_tbody_td]:items-center max-[639px]:[&_tbody_td]:gap-x-4 max-[639px]:[&_tbody_td]:gap-y-1 max-[639px]:[&_tbody_td]:p-0! max-[639px]:[&_tbody_td]:text-right!",
+  "max-[639px]:[&_tbody_td:not([data-primary],:first-child,[colspan])>*]:col-start-2 max-[639px]:[&_tbody_td:not([data-primary],:first-child,[colspan])>*]:min-w-0 max-[639px]:[&_tbody_td:not([data-primary],:first-child,[colspan])>*]:justify-self-end max-[639px]:[&_tbody_td]:before:col-start-1 max-[639px]:[&_tbody_td]:before:row-start-1",
+  "max-[639px]:[&_tbody_td]:before:shrink-0 max-[639px]:[&_tbody_td]:before:text-left max-[639px]:[&_tbody_td]:before:text-xs max-[639px]:[&_tbody_td]:before:font-medium max-[639px]:[&_tbody_td]:before:tracking-[0.08em] max-[639px]:[&_tbody_td]:before:text-[var(--av2-text-2)] max-[639px]:[&_tbody_td]:before:uppercase max-[639px]:[&_tbody_td]:before:content-[attr(data-label)]",
+  "max-[639px]:[&_tbody_td:first-child]:block max-[639px]:[&_tbody_td:first-child]:pb-1 max-[639px]:[&_tbody_td:first-child]:text-left! max-[639px]:[&_tbody_td:first-child]:before:hidden",
+  "max-[639px]:[&_tbody_td[colspan]]:block max-[639px]:[&_tbody_td[colspan]]:text-center! max-[639px]:[&_tbody_td[colspan]]:before:hidden",
+  "max-[639px]:[&_tbody_td[data-label='']]:before:hidden",
+  "max-[639px]:[&_tbody_td[data-phone-hidden]]:hidden!",
+  "max-[639px]:[&_tbody_td[data-primary]]:block max-[639px]:[&_tbody_td[data-primary]]:text-left! max-[639px]:[&_tbody_td[data-primary]]:text-base max-[639px]:[&_tbody_td[data-primary]]:before:hidden",
+].join(" ");
+
 export function Table({ children, label }: { children: ReactNode; label?: string }) {
+  const tableRef = useRef<HTMLTableElement>(null);
+
+  useEffect(() => {
+    const table = tableRef.current;
+    if (!table) return;
+    labelCellsFromHeaders(table);
+    const observer = new MutationObserver(() => labelCellsFromHeaders(table));
+    observer.observe(table, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
+  }, []);
+
   return (
     // relative: keeps sr-only header text inside this scroller, not the page's width.
     <div className="relative overflow-x-auto">
-      <table aria-label={label} className="w-full border-collapse text-left text-sm">
+      <table
+        ref={tableRef}
+        aria-label={label}
+        className={`w-full border-collapse text-left text-sm ${PHONE_TABLE}`}
+      >
         {children}
       </table>
     </div>

@@ -176,7 +176,7 @@ export async function backfillAutoAssign(companyId?: string): Promise<BackfillRe
     void createNotification({
       userId: creativeId,
       type: "TICKET_ASSIGNED",
-      title: "New ticket assigned",
+      title: "New request assigned",
       message: `${code} "${ticket.title}" was assigned to you`,
       ticketId: ticket.id,
     });

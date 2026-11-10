@@ -323,7 +323,7 @@ export default function CustomerTicketDetailPage() {
       });
       const body = await res.json().catch(() => null);
       if (!res.ok) {
-        setCancelError(body?.error || "Failed to cancel ticket");
+        setCancelError(body?.error || "Failed to cancel request");
         return;
       }
       // Send the user back to the list / board with the refund
@@ -332,7 +332,7 @@ export default function CustomerTicketDetailPage() {
       setCancelOpen(false);
       router.push(fromBoard ? "/customer/board" : "/customer/tickets");
     } catch {
-      setCancelError("Failed to cancel ticket");
+      setCancelError("Failed to cancel request");
     } finally {
       setCancelling(false);
     }
@@ -388,7 +388,7 @@ export default function CustomerTicketDetailPage() {
         if (!cancelled) {
           setState({
             status: "error",
-            message: "Unexpected error while loading ticket detail.",
+            message: "Unexpected error while loading request details.",
           });
         }
       }
@@ -943,14 +943,14 @@ export default function CustomerTicketDetailPage() {
                         ))}
                       </Select>
                     </Field>
-                    <Field label="Job type" htmlFor="edit-job-type">
+                    <Field label="Service" htmlFor="edit-job-type">
                       <Select
                         id="edit-job-type"
                         value={editForm.jobTypeId}
                         onChange={(e) => setEditForm((f) => ({ ...f, jobTypeId: e.target.value }))}
                         disabled={editSaving || !editMeta}
                       >
-                        <option value="">Choose a job type</option>
+                        <option value="">Choose a service</option>
                         {(editMeta?.jobTypes ?? []).map((jt) => (
                           <option key={jt.id} value={jt.id}>
                             {jt.name}
@@ -1015,7 +1015,7 @@ export default function CustomerTicketDetailPage() {
                       { label: "Status", value: <StatusBadge status={ticket.status} /> },
                       { label: "Priority", value: <PriorityBadge priority={ticket.priority} /> },
                       { label: "Project", value: ticket.project?.name || DASH },
-                      { label: "Job type", value: ticket.jobType?.name || DASH },
+                      { label: "Service", value: ticket.jobType?.name || DASH },
                       ...(ticket.effectiveCost != null
                         ? [
                             {
@@ -1442,7 +1442,7 @@ export default function CustomerTicketDetailPage() {
       <Modal open={showDoneModal} onClose={() => setShowDoneModal(false)} size="md" scrollable>
         <ModalHeader
           title="Approve and complete this request?"
-          subtitle="Once you approve this request, your creative will get paid for this job, and it will move to Done."
+          subtitle="Once you approve this request, your creative will get paid for it, and it will move to Done."
         />
 
         <div className="rounded-xl bg-[var(--av2-bg)] p-3 text-sm">
@@ -1451,7 +1451,7 @@ export default function CustomerTicketDetailPage() {
             <p className="mt-1 text-[var(--av2-text-2)]">Project: {ticket.project.name}</p>
           ) : null}
           {ticket.jobType?.name ? (
-            <p className="mt-0.5 text-[var(--av2-text-2)]">Job type: {ticket.jobType.name}</p>
+            <p className="mt-0.5 text-[var(--av2-text-2)]">Service: {ticket.jobType.name}</p>
           ) : null}
         </div>
 
@@ -1490,11 +1490,11 @@ export default function CustomerTicketDetailPage() {
           }
         }}
         onConfirm={handleCancel}
-        title="Cancel this ticket?"
+        title="Cancel this request?"
         description={
           cancelError
             ? cancelError
-            : "The ticket will be removed from your board and the full token cost will be refunded to your company. Brief uploads stay on file. This can't be undone."
+            : "The request will be removed from your board and the full token cost will be refunded to your company. Brief uploads stay on file. This can't be undone."
         }
         confirmLabel="Cancel & refund"
         loading={cancelling}

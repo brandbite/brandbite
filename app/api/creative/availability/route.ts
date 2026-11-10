@@ -136,9 +136,9 @@ export async function PATCH(req: NextRequest) {
           userId: user.id,
           type: "TICKET_STATUS_CHANGED",
           title: "You paused working",
-          message: `You paused with ${activeTicketCount} active ticket${
+          message: `You paused with ${activeTicketCount} active request${
             activeTicketCount > 1 ? "s" : ""
-          }. No new tickets will be assigned until you resume.`,
+          }. No new requests will be assigned until you resume.`,
           actorId: user.id,
         }).catch(() => {});
       }

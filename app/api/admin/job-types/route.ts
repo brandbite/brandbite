@@ -23,7 +23,7 @@ export async function GET(_req: NextRequest) {
     const user = await getCurrentUserOrThrow();
 
     if (!isSiteAdminRole(user.role)) {
-      return NextResponse.json({ error: "Only site admins can access job types" }, { status: 403 });
+      return NextResponse.json({ error: "Only site admins can access services" }, { status: 403 });
     }
 
     const jobTypes = await prisma.jobType.findMany({
@@ -68,7 +68,7 @@ export async function GET(_req: NextRequest) {
     }
 
     console.error("[admin.job-types] GET error", error);
-    return NextResponse.json({ error: "Failed to load job types" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to load services" }, { status: 500 });
   }
 }
 
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
     const user = await getCurrentUserOrThrow();
 
     if (!isSiteAdminRole(user.role)) {
-      return NextResponse.json({ error: "Only site admins can create job types" }, { status: 403 });
+      return NextResponse.json({ error: "Only site admins can create services" }, { status: 403 });
     }
 
     const parsed = await parseBody(req, createJobTypeSchema);
@@ -159,7 +159,7 @@ export async function POST(req: NextRequest) {
     }
 
     console.error("[admin.job-types] POST error", error);
-    return NextResponse.json({ error: "Failed to create job type" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to create service" }, { status: 500 });
   }
 }
 
@@ -172,7 +172,7 @@ export async function PATCH(req: NextRequest) {
     const user = await getCurrentUserOrThrow();
 
     if (!isSiteAdminRole(user.role)) {
-      return NextResponse.json({ error: "Only site admins can update job types" }, { status: 403 });
+      return NextResponse.json({ error: "Only site admins can update services" }, { status: 403 });
     }
 
     const parsed = await parseBody(req, updateJobTypeSchema);
@@ -237,6 +237,6 @@ export async function PATCH(req: NextRequest) {
     }
 
     console.error("[admin.job-types] PATCH error", error);
-    return NextResponse.json({ error: "Failed to update job type" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to update service" }, { status: 500 });
   }
 }

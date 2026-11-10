@@ -93,7 +93,7 @@ export default async function AssignmentLogDebugPage() {
             This page is only available to site owners and admins.
           </p>
           <InlineAlert variant="error" className="mt-4">
-            You don&apos;t have permission to view ticket assignment logs.
+            You don&apos;t have permission to view request assignment logs.
           </InlineAlert>
         </div>
       </div>
@@ -144,7 +144,7 @@ export default async function AssignmentLogDebugPage() {
             <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--bb-text-muted)] uppercase">
               Debug panel
             </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">Ticket assignment log</h1>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight">Request assignment log</h1>
             <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
               Last 50 assignment events across all workspaces: auto-assign, fallback and future
               strategies.
@@ -159,7 +159,7 @@ export default async function AssignmentLogDebugPage() {
         {logs.length === 0 && (
           <EmptyState
             title="No assignment events yet."
-            description="Once customers start creating tickets and the auto-assign engine runs, events will appear here for debugging."
+            description="Once customers start creating requests and the auto-assign engine runs, events will appear here for debugging."
           />
         )}
 
@@ -219,7 +219,7 @@ export default async function AssignmentLogDebugPage() {
                       <p className="text-[11px] font-medium text-[var(--bb-secondary)]">
                         {code} ·{" "}
                         <span className="text-[var(--bb-text-secondary)]">
-                          {ticket?.title ?? "Unknown ticket"}
+                          {ticket?.title ?? "Unknown request"}
                         </span>
                       </p>
                       <p className="mt-0.5 text-[11px] text-[var(--bb-text-tertiary)]">

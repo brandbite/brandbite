@@ -124,7 +124,7 @@ export function AdminSidebar({
           type="button"
           onClick={onCloseMobile}
           aria-label="Close navigation"
-          className="ml-auto flex h-9 w-9 items-center justify-center rounded-lg hover:bg-[var(--av2-bg)] md:hidden"
+          className="ml-auto flex h-10 w-10 items-center justify-center rounded-lg hover:bg-[var(--av2-bg)] md:hidden"
         >
           <IconX width={18} height={18} />
         </button>
@@ -152,7 +152,7 @@ export function AdminSidebar({
                       aria-expanded={open}
                       aria-controls={listId}
                       disabled={hasActive}
-                      className="flex w-full items-center justify-between rounded-md px-3 py-1 text-[11px] font-semibold tracking-[0.14em] text-[var(--av2-text-2)] uppercase hover:text-[var(--av2-text)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none disabled:cursor-default disabled:hover:text-[var(--av2-text-2)]"
+                      className="flex w-full items-center justify-between rounded-md px-3 py-1 text-[11px] font-semibold tracking-[0.14em] text-[var(--av2-text-2)] uppercase hover:text-[var(--av2-text)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none disabled:cursor-default disabled:hover:text-[var(--av2-text-2)] max-md:py-3"
                     >
                       {label}
                       <IconChevronDown

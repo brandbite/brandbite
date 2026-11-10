@@ -107,7 +107,7 @@ const ROLE_TONES: Record<string, Tone> = {
 const ROLE_HINTS: Record<string, string> = {
   SITE_OWNER: "Full access, including owner-only money-moving actions.",
   SITE_ADMIN: "Runs the admin workspace. No owner-only money actions.",
-  DESIGNER: "Works on assigned tickets in the creative workspace.",
+  DESIGNER: "Works on assigned requests in the creative workspace.",
   CUSTOMER: "Uses the customer portal for their companies.",
 };
 
@@ -654,7 +654,7 @@ export default function AdminUsersPage() {
             {/* Tombstone — auth is revoked and the identity is anonymized,
               so every action here would 400. Show when it happened instead. */}
             <Callout tone="info" title={`Deleted ${formatDate(selected.deletedAt)}`}>
-              This account was anonymized. Its tickets, ledger entries and audit rows are kept, but
+              This account was anonymized. Its requests, ledger entries and audit rows are kept, but
               it can no longer be edited.
             </Callout>
           </PanelSection>
@@ -711,7 +711,7 @@ export default function AdminUsersPage() {
                 <IconTicket width={20} height={20} />
               </IconTile>
               <div className="min-w-0">
-                <p className="text-xs text-[var(--av2-text-2)]">Assigned tickets</p>
+                <p className="text-xs text-[var(--av2-text-2)]">Assigned requests</p>
                 <p className="text-xl leading-7 font-bold tabular-nums">
                   {fmt(selected.assignedTickets)}
                 </p>
@@ -752,7 +752,7 @@ export default function AdminUsersPage() {
               <Field
                 label="Open task cap"
                 htmlFor="user-cap"
-                hint="Auto-assign skips this creative once their open tickets reach the cap. 1–40, empty for no cap."
+                hint="Auto-assign skips this creative once their open requests reach the cap. 1–40, empty for no cap."
               >
                 <div className="flex gap-2">
                   <div className="w-28">
@@ -922,7 +922,7 @@ export default function AdminUsersPage() {
                       Companies
                     </Th>
                     <Th align="right" className="hidden md:table-cell">
-                      Tickets
+                      Requests
                     </Th>
                     <Th className="hidden md:table-cell">Joined</Th>
                     {!selected && (
@@ -1088,9 +1088,9 @@ export default function AdminUsersPage() {
                 {ROLE_LABELS[pendingDelete.targetRole] || pendingDelete.targetRole}).
               </p>
               <p>
-                Their auth credentials are revoked, their identity is anonymized, and any tickets or
-                audit rows they were attached to remain — labelled as a deleted account. This cannot
-                be undone.
+                Their auth credentials are revoked, their identity is anonymized, and any requests
+                or audit rows they were attached to remain — labelled as a deleted account. This
+                cannot be undone.
               </p>
             </div>
           ) : null

@@ -36,7 +36,7 @@ export async function GET(_req: NextRequest) {
 
     if (user.role !== "SITE_OWNER" && user.role !== "SITE_ADMIN") {
       return NextResponse.json(
-        { error: "Only site owners and site admins can access completed jobs." },
+        { error: "Only site owners and site admins can access completed requests." },
         { status: 403 },
       );
     }
@@ -146,6 +146,6 @@ export async function GET(_req: NextRequest) {
     }
 
     console.error("[admin.completed-jobs] GET error", error);
-    return NextResponse.json({ error: "Failed to load completed jobs" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to load completed requests" }, { status: 500 });
   }
 }

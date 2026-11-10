@@ -171,7 +171,7 @@ export function JobCard({
 
       {!selectionMode && (
         <Button variant="primary" className="mt-3 w-full" onClick={onOpen}>
-          Open job
+          Open request
           <span className="sr-only">: {ticket.title}</span>
           <IconArrowUpRight />
         </Button>

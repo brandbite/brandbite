@@ -829,7 +829,7 @@ async function main() {
     data: [
       {
         name: "Silver Tier",
-        description: "Complete 50 tickets in 90 days to earn 65% payout",
+        description: "Complete 50 requests in 90 days to earn 65% payout",
         minCompletedTickets: 50,
         timeWindowDays: 90,
         payoutPercent: 65,
@@ -838,7 +838,7 @@ async function main() {
       },
       {
         name: "Gold Tier",
-        description: "Complete 100 tickets in 180 days to earn 70% payout",
+        description: "Complete 100 requests in 180 days to earn 70% payout",
         minCompletedTickets: 100,
         timeWindowDays: 180,
         payoutPercent: 70,
@@ -847,7 +847,7 @@ async function main() {
       },
       {
         name: "Platinum Tier",
-        description: "Complete 200 tickets in 180 days to earn 75% payout",
+        description: "Complete 200 requests in 180 days to earn 75% payout",
         minCompletedTickets: 200,
         timeWindowDays: 180,
         payoutPercent: 75,

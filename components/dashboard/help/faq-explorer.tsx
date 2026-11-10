@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { IconChevronDown } from "@/components/admin/v2/icons";
+import { linkifyFaqAnswer } from "@/components/faq/faq-answer-text";
 import {
   Badge,
   Button,
@@ -32,7 +33,14 @@ const ALL = "All";
 const PAGE_SIZE = 6;
 
 function Answer({ faq }: { faq: Faq }) {
-  return <p className="text-base leading-7 whitespace-pre-line">{faq.answer}</p>;
+  return (
+    <p className="text-base leading-7 whitespace-pre-line">
+      {linkifyFaqAnswer(
+        faq.answer,
+        "font-medium text-[var(--av2-link)] underline underline-offset-2 hover:no-underline",
+      )}
+    </p>
+  );
 }
 
 export function FaqExplorer({

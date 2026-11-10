@@ -21,7 +21,7 @@ const EXTRA_PAGES: Record<DashboardRole, PageEntry[]> = {
     { href: "/customer/tickets", section: "Workspace", label: "My requests" },
     { href: "/customer/tickets/new", section: "Workspace", label: "New request" },
   ],
-  creative: [{ href: "/creative/tickets", section: "Workspace", label: "My jobs" }],
+  creative: [{ href: "/creative/tickets", section: "Workspace", label: "My requests" }],
 };
 
 export function getDashboardNav(role: DashboardRole): NavConfig {

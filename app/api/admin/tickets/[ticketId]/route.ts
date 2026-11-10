@@ -59,7 +59,7 @@ export async function GET(
       },
     });
     if (!ticket) {
-      return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
+      return NextResponse.json({ error: "Request not found" }, { status: 404 });
     }
 
     // ---- parallel reads for the meatier collections -----------------
@@ -247,6 +247,6 @@ export async function GET(
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
     console.error("[GET /api/admin/tickets/[ticketId]] error", err);
-    return NextResponse.json({ error: "Failed to load ticket" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to load request" }, { status: 500 });
   }
 }

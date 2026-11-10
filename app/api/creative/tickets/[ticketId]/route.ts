@@ -95,7 +95,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
       return NextResponse.json(
         {
           error:
-            "Ticket not found for this creative. It may belong to another creative or not exist.",
+            "Request not found for this creative. It may belong to another creative or not exist.",
         },
         { status: 404 },
       );
@@ -146,6 +146,6 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
     }
 
     console.error("[GET /api/creative/tickets/[ticketId]] error", error);
-    return NextResponse.json({ error: "Failed to load ticket detail" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to load request detail" }, { status: 500 });
   }
 }

@@ -41,23 +41,23 @@ export const NOTIFICATION_LABELS: Record<NotificationType, { title: string; desc
   {
     REVISION_SUBMITTED: {
       title: "Revision submitted",
-      description: "A creative submitted a new revision for one of your tickets.",
+      description: "A creative submitted a new revision for one of your requests.",
     },
     FEEDBACK_SUBMITTED: {
       title: "Feedback submitted",
       description: "A customer left feedback (pins or comments) on a revision.",
     },
     TICKET_COMPLETED: {
-      title: "Ticket completed",
-      description: "A ticket you're attached to has been marked as Done.",
+      title: "Request completed",
+      description: "A request you're attached to has been marked as Done.",
     },
     TICKET_ASSIGNED: {
-      title: "Ticket assigned",
-      description: "A new ticket has been auto-assigned to you.",
+      title: "Request assigned",
+      description: "A new request has been auto-assigned to you.",
     },
     TICKET_STATUS_CHANGED: {
       title: "Status changed",
-      description: "Any other status transition on a ticket you're attached to.",
+      description: "Any other status transition on a request you're attached to.",
     },
     PIN_RESOLVED: {
       title: "Pin resolved",

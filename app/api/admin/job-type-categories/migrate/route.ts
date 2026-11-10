@@ -103,7 +103,7 @@ async function requireSiteAdmin() {
     return {
       user,
       denied: NextResponse.json(
-        { error: "Only site admins can link job type categories" },
+        { error: "Only site admins can link service categories" },
         { status: 403 },
       ),
     };
@@ -198,8 +198,8 @@ export async function POST(_req: NextRequest) {
       ...result,
       message:
         result.linked === 0 && result.created === 0
-          ? "Every job type is already linked to a category."
-          : `Linked ${result.linked} job type${result.linked === 1 ? "" : "s"}` +
+          ? "Every service is already linked to a category."
+          : `Linked ${result.linked} service${result.linked === 1 ? "" : "s"}` +
             (result.created
               ? ` and created ${result.created} categor${result.created === 1 ? "y" : "ies"}.`
               : "."),

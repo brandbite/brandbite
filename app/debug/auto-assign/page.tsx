@@ -208,7 +208,7 @@ export default function AutoAssignDebugPage() {
               Auto-assign configuration
             </h1>
             <p className="mt-1 text-xs text-[var(--bb-text-tertiary)]">
-              Manage how tickets are automatically assigned to creatives on each workspace and
+              Manage how requests are automatically assigned to creatives on each workspace and
               project. Only visible to site owners and admins.
             </p>
           </div>

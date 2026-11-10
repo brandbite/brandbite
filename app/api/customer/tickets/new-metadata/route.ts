@@ -16,7 +16,7 @@ export async function GET(_req: NextRequest) {
     const user = await getCurrentUserOrThrow();
 
     if (user.role !== "CUSTOMER") {
-      return NextResponse.json({ error: "Only customers can create tickets" }, { status: 403 });
+      return NextResponse.json({ error: "Only customers can create requests" }, { status: 403 });
     }
 
     if (!user.activeCompanyId) {
@@ -100,6 +100,6 @@ export async function GET(_req: NextRequest) {
 
     console.error("[customer.tickets.new-metadata] GET error", error);
 
-    return NextResponse.json({ error: "Failed to load ticket metadata" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to load request metadata" }, { status: 500 });
   }
 }

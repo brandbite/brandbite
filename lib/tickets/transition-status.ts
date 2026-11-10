@@ -75,7 +75,8 @@ export async function transitionCreativeTicketStatus(
     return {
       success: false,
       code: "FORBIDDEN_DONE",
-      message: "Creatives cannot mark tickets as DONE. Please ask the client to close the ticket.",
+      message:
+        "Creatives cannot mark requests as DONE. Please ask the client to close the request.",
     };
   }
 
@@ -98,13 +99,13 @@ export async function transitionCreativeTicketStatus(
     },
   });
   if (!ticket) {
-    return { success: false, code: "NOT_FOUND", message: "Ticket not found." };
+    return { success: false, code: "NOT_FOUND", message: "Request not found." };
   }
   if (ticket.status === TicketStatus.DONE) {
     return {
       success: false,
       code: "ALREADY_DONE",
-      message: "This ticket is already marked as DONE and cannot be changed by a creative.",
+      message: "This request is already marked as DONE and cannot be changed by a creative.",
     };
   }
 
@@ -139,7 +140,7 @@ export async function transitionCreativeTicketStatus(
       return {
         success: false,
         code: "CONCURRENCY_LIMIT",
-        message: "This company has reached its limit for active tickets in progress.",
+        message: "This company has reached its limit for active requests in progress.",
         details: {
           plan: typeof planData?.name === "string" ? planData.name : "current plan",
           maxConcurrentInProgress: maxConcurrent,
@@ -220,7 +221,7 @@ export async function transitionCreativeTicketStatus(
     : {
         recipientUserId: ticket.createdById,
         notificationType: "TICKET_STATUS_CHANGED",
-        title: "Ticket status updated",
+        title: "Request status updated",
         message: `"${ticket.title}" was moved to ${String(updated.status).replace("_", " ").toLowerCase()}`,
         ticketId: ticket.id,
         actorId: creativeUserId,

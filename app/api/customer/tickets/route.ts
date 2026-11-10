@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
 
     if (user.role !== "CUSTOMER") {
       return NextResponse.json(
-        { error: "Only customers can access customer tickets" },
+        { error: "Only customers can access customer requests" },
         { status: 403 },
       );
     }
@@ -216,7 +216,7 @@ export async function GET(req: NextRequest) {
     }
 
     console.error("[customer.tickets] GET error", error);
-    return NextResponse.json({ error: "Failed to load customer tickets" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to load customer requests" }, { status: 500 });
   }
 }
 
@@ -229,7 +229,7 @@ export async function POST(req: NextRequest) {
     const user = await getCurrentUserOrThrow();
 
     if (user.role !== "CUSTOMER") {
-      return NextResponse.json({ error: "Only customers can create tickets" }, { status: 403 });
+      return NextResponse.json({ error: "Only customers can create requests" }, { status: 403 });
     }
     if (!user.activeCompanyId) {
       return NextResponse.json({ error: "User has no active company" }, { status: 400 });
@@ -238,7 +238,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "You don't have permission to create tickets for this company. Please ask your company owner or project manager.",
+            "You don't have permission to create requests for this company. Please ask your company owner or project manager.",
         },
         { status: 403 },
       );
@@ -269,7 +269,7 @@ export async function POST(req: NextRequest) {
       const aiMode = await getAiTicketsMode();
       if (!isAiTicketsAllowed(aiMode)) {
         return NextResponse.json(
-          { error: "AI-generated tickets aren't available yet." },
+          { error: "AI-generated requests aren't available yet." },
           { status: 403 },
         );
       }
@@ -306,7 +306,7 @@ export async function POST(req: NextRequest) {
         return insufficientTokensResponse({
           required: outcome.required,
           balance: outcome.balance,
-          action: "this job",
+          action: "this request",
         });
       }
       // NO_REQUESTER, PROJECT_NOT_FOUND, JOB_TYPE_NOT_FOUND all map to 400.
@@ -342,7 +342,7 @@ export async function POST(req: NextRequest) {
       createNotification({
         userId: ticket.creativeId,
         type: "TICKET_ASSIGNED",
-        title: "New ticket assigned",
+        title: "New request assigned",
         message: `${code} "${ticket.title}" was assigned to you`,
         ticketId: ticket.id,
         actorId: user.id,
@@ -401,6 +401,6 @@ export async function POST(req: NextRequest) {
     }
 
     console.error("[customer.tickets] POST error", error);
-    return NextResponse.json({ error: "Failed to create customer ticket" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to create customer request" }, { status: 500 });
   }
 }

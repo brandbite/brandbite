@@ -150,7 +150,7 @@ export default async function FontPairingPage({ params }: PageProps) {
           <p className="mt-2 text-base leading-7">
             Both fonts are free on Google Fonts under open licenses that allow commercial use.
           </p>
-          <pre className="mt-3 overflow-x-auto rounded-xl bg-[var(--cs-background)] p-4 text-sm leading-6">
+          <pre className="mt-3 overflow-x-auto rounded-xl bg-[var(--cs-background)] p-4 text-sm leading-6 break-words whitespace-pre-wrap">
             <code>{css}</code>
           </pre>
           <div className="mt-4 flex flex-wrap gap-2">

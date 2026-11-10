@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const createJobTypeSchema = z.object({
-  name: z.string().trim().min(1, "Job type name is required"),
+  name: z.string().trim().min(1, "Service name is required"),
   category: z
     .string()
     .trim()
@@ -43,8 +43,8 @@ export const createJobTypeSchema = z.object({
 });
 
 export const updateJobTypeSchema = z.object({
-  id: z.string().min(1, "Job type id is required"),
-  name: z.string().trim().min(1, "Job type name cannot be empty").optional(),
+  id: z.string().min(1, "Service id is required"),
+  name: z.string().trim().min(1, "Service name cannot be empty").optional(),
   category: z
     .string()
     .trim()

@@ -124,7 +124,7 @@ export default async function CustomerNewTicketPage({
       <BackLink href="/customer/tickets">Back to requests</BackLink>
       <PageHeader
         title={draftRow ? "Continue your draft" : "Create a new request"}
-        description="Describe what you need, pick a project and a job type. We will route this request to your creative team."
+        description="Describe what you need, pick a project and a service. We will route this request to your creative team."
         meta={
           <>
             Company <span className="font-medium text-[var(--av2-text)]">{company.name}</span>

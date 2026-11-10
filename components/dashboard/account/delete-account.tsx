@@ -76,8 +76,8 @@ export function DeleteAccountCard({
         <ModalHeader title="Delete your account?" onClose={() => setOpen(false)} />
         <div className="space-y-3 px-6 pb-4 text-sm text-[var(--av2-text-2)]">
           <p>
-            This is permanent. Your sign-in credentials are removed immediately. Historical tickets,
-            ratings, and ledger entries are kept but <strong>anonymized</strong>.
+            This is permanent. Your sign-in credentials are removed immediately. Historical
+            requests, ratings, and ledger entries are kept but <strong>anonymized</strong>.
           </p>
           <p>
             To confirm, type your account email: <strong>{email ?? ""}</strong>

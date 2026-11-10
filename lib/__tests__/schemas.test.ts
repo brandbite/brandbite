@@ -18,7 +18,7 @@ describe("createTicketSchema jobTypeId", () => {
     const result = createTicketSchema.safeParse({ ...base, jobTypeId: "" });
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues[0]?.message).toBe("Please select a job type.");
+      expect(result.error.issues[0]?.message).toBe("Please select a service.");
     }
   });
 

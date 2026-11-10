@@ -96,7 +96,7 @@ describe("Creative board", () => {
     expect(card.getByText("WEB-101")).toBeInTheDocument();
     expect(card.getByText(/2999/)).toBeInTheDocument();
     expect(screen.queryByText(/sample/i)).toBeNull();
-    expect(screen.getByText("Showing 1 of 1 job")).toBeInTheDocument();
+    expect(screen.getByText("Showing 1 of 1 request")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /next/i })).toBeNull();
   });
 
@@ -145,7 +145,7 @@ describe("Creative board", () => {
     const project = screen.getByRole("combobox", { name: "Filter by project" });
     fireEvent.change(project, { target: { value: "Onboarding" } });
     expect(screen.queryByText("Logo redesign")).toBeNull();
-    expect(screen.getByText("Showing 1 of 2 jobs")).toBeInTheDocument();
+    expect(screen.getByText("Showing 1 of 2 requests")).toBeInTheDocument();
     fireEvent.change(project, { target: { value: "ALL" } });
 
     fireEvent.change(screen.getByRole("searchbox", { name: "Search board" }), {
@@ -185,7 +185,7 @@ describe("Moving tickets", () => {
     render(<CreativeBoardPage />);
     await screen.findByText("Logo redesign");
     drag("Logo redesign", "In review");
-    expect(await screen.findByText(/You can only start a backlog ticket/)).toBeInTheDocument();
+    expect(await screen.findByText(/You can only start a backlog request/)).toBeInTheDocument();
     expect(writes(calls)).toHaveLength(0);
   });
 
@@ -237,7 +237,7 @@ describe("Bulk select", () => {
     const box = screen.getByRole("checkbox", { name: /Logo redesign/ });
     fireEvent.click(box);
     expect(box).toBeChecked();
-    expect(screen.getByText("1 ticket selected")).toBeInTheDocument();
+    expect(screen.getByText("1 request selected")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Start working" }));
     await waitFor(() => expect(writes(calls)).toHaveLength(1));
@@ -270,7 +270,7 @@ describe("Card detail", () => {
   const open = async (title = "Logo redesign") => {
     render(<CreativeBoardPage />);
     await screen.findByText(title);
-    fireEvent.click(screen.getByRole("button", { name: new RegExp(`Open job.*${title}`) }));
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(`Open request.*${title}`) }));
     return screen.findByRole("dialog", { name: title });
   };
 

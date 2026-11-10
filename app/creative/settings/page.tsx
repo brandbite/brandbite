@@ -247,7 +247,7 @@ export default function CreativeSettingsPage() {
               <DeleteAccountCard
                 endpoint="/api/creative/account"
                 email={accountEmail}
-                description="Delete your brandbite account permanently. Completed tickets, ratings, and ledger entries are retained in anonymized form for audit purposes; your email is freed up for future sign-ups."
+                description="Delete your brandbite account permanently. Completed requests, ratings, and ledger entries are retained in anonymized form for audit purposes; your email is freed up for future sign-ups."
               />
             </KeptTabPanel>
           </>

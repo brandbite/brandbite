@@ -217,7 +217,7 @@ export default function CreativeTicketDetailPage() {
         if (!cancelled) {
           setState({
             status: "error",
-            message: "Unexpected error while loading ticket detail.",
+            message: "Unexpected error while loading request detail.",
           });
         }
       }
@@ -402,11 +402,11 @@ export default function CreativeTicketDetailPage() {
         setStatusError(json?.error || `Request failed with status ${res.status}`);
         return;
       }
-      showToast({ type: "success", title: "Job status updated." });
+      showToast({ type: "success", title: "Request status updated." });
       setRefreshCounter((c) => c + 1);
     } catch (err) {
       console.error("Creative ticket status error:", err);
-      setStatusError("Failed to update this job. Please try again.");
+      setStatusError("Failed to update this request. Please try again.");
     } finally {
       setStatusBusy(false);
     }
@@ -453,22 +453,22 @@ export default function CreativeTicketDetailPage() {
   const tracking = useTimeTracking(ticketIdFromData, ticket?.jobType?.estimatedHours ?? null);
 
   if (state.status === "loading") {
-    return <DetailSkeleton label="Loading job" />;
+    return <DetailSkeleton label="Loading request" />;
   }
 
   const backHref = fromBoard ? "/creative/board" : "/creative/tickets";
-  const backLabel = fromBoard ? "Back to board" : "Back to jobs";
+  const backLabel = fromBoard ? "Back to board" : "Back to requests";
 
   if (error || !ticket) {
     return (
       <>
         <BackLink href={backHref}>{backLabel}</BackLink>
         {error ? (
-          <Callout tone="error" title="We couldn't load this job">
+          <Callout tone="error" title="We couldn't load this request">
             {error}
           </Callout>
         ) : (
-          <Callout tone="warning" title="Job could not be loaded" />
+          <Callout tone="warning" title="Request could not be loaded" />
         )}
       </>
     );
@@ -561,7 +561,7 @@ export default function CreativeTicketDetailPage() {
         <TimeStrip tracking={tracking} />
 
         <Tabs
-          label="Job sections"
+          label="Request sections"
           idPrefix={TAB_PREFIX}
           tabs={tabs}
           value={tab}
@@ -572,12 +572,12 @@ export default function CreativeTicketDetailPage() {
           rail={
             <>
               <Card>
-                <h2 className="mb-4 text-xl leading-7 font-semibold">Job summary</h2>
+                <h2 className="mb-4 text-xl leading-7 font-semibold">Request summary</h2>
                 <KeyValueList
                   rows={[
                     { label: "Project", value: project?.name || DASH },
                     { label: "Project code", value: project?.code || DASH },
-                    { label: "Job type", value: ticket.jobType?.name || DASH },
+                    { label: "Service", value: ticket.jobType?.name || DASH },
                     {
                       label: "Payout",
                       value:
@@ -680,7 +680,7 @@ export default function CreativeTicketDetailPage() {
                   <Card>
                     <EmptyState
                       title="No versions yet"
-                      description="Versions appear here once you've sent this job for review."
+                      description="Versions appear here once you've sent this request for review."
                     />
                   </Card>
                 )}
@@ -692,7 +692,7 @@ export default function CreativeTicketDetailPage() {
                   />
                 ) : ticket.status === "TODO" ? (
                   <Callout tone="info" title="Start work to send a version">
-                    You can upload files and send them for review once this job is In progress.
+                    You can upload files and send them for review once this request is In progress.
                   </Callout>
                 ) : ticket.status === "IN_REVIEW" ? (
                   <Callout tone="info" title="This version is with the customer">
@@ -713,7 +713,7 @@ export default function CreativeTicketDetailPage() {
                     <SafeHtml html={ticket.description} className="mt-2 text-base" />
                   ) : (
                     <p className="mt-2 text-sm text-[var(--av2-text-2)]">
-                      No description was provided for this job.
+                      No description was provided for this request.
                     </p>
                   )}
 

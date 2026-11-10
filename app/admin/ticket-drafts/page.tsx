@@ -169,7 +169,7 @@ export default function AdminTicketDraftsPage() {
                 value={query}
                 onChange={setQuery}
                 placeholder="Search drafts"
-                label="Search drafts by title, company, person or job type"
+                label="Search drafts by title, company, person or service"
               />
             </FilterBar>
           </div>
@@ -200,7 +200,7 @@ export default function AdminTicketDraftsPage() {
                     <Th>Draft</Th>
                     <Th>Company</Th>
                     <Th>Written by</Th>
-                    <Th>Job type</Th>
+                    <Th>Service</Th>
                     <Th align="right">Files</Th>
                     <Th>Updated</Th>
                   </tr>

@@ -117,7 +117,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Every request (also called a ticket) moves through four statuses. You see them as the four columns of your Board:",
+            text: "Every request moves through four statuses. You see them as the four columns of your Board:",
           },
           {
             type: "list",
@@ -206,7 +206,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
               },
               {
                 term: "Billing manager",
-                text: "looks after the plan and token purchases. Can see the board, tickets and token history, but cannot create, edit or move requests.",
+                text: "looks after the plan and token purchases. Can see the board, requests and token history, but cannot create, edit or move requests.",
               },
             ],
           },
@@ -255,7 +255,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
                 text: "Owner, Billing manager.",
               },
               {
-                term: "View the board, tickets and token history",
+                term: "View the board, requests and token history",
                 text: "everyone.",
               },
             ],
@@ -340,7 +340,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           { type: "figure", caption: "Your Board with its four columns" },
           {
             type: "p",
-            text: "Each card shows the ticket code, the priority, the title, a short description, a thumbnail, the due date (red when overdue) and a green **Assigned** badge once a creative has picked it up.",
+            text: "Each card shows the request code, the priority, the title, a short description, a thumbnail, the due date (red when overdue) and a green **Assigned** badge once a creative has picked it up.",
           },
         ],
       },
@@ -352,7 +352,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             items: [
               {
                 term: "Search requests",
-                text: "filters cards by ticket code, title or description. Press **/** anywhere on the Board to jump to the search box.",
+                text: "filters cards by request code, title or description. Press **/** anywhere on the Board to jump to the search box.",
               },
               {
                 term: "All projects",
@@ -447,7 +447,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
               "Click **+ New request** on Overview or **My requests**, **New request** on the Board, or **Create request** on a service in **Services**.",
               "Write a **Title**. This is the line your creative sees on the board.",
               "Describe what you need in the **Brief**: links, context and requirements.",
-              "Pick a **Job type** with **Choose a service type…**. Search or browse by category, click a service, then press **Select**.",
+              "Pick a **Service** with **Choose a service…**. Search or browse by category, click a service, then press **Select**.",
               "Optionally set **Priority**, **Due date**, **Project**, attach files or a moodboard.",
               "Check the **Cost summary**, then click **Create request**.",
             ],
@@ -500,8 +500,8 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
                 text: "optional. Groups related requests and lets you filter the Board.",
               },
               {
-                term: "Job type",
-                text: "required. Sets the token cost. Some job types also have a **quantity** (1 to 10), which multiplies the cost.",
+                term: "Service",
+                text: "required. Sets the token cost. Some services also have a **quantity** (1 to 10), which multiplies the cost.",
               },
               {
                 term: "Attach moodboard",
@@ -529,7 +529,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "**✨ Fill with AI** above the brief lets you paste a rough description (at least 10 characters). It fills in the title, brief, job type and priority for you to check and adjust before submitting.",
+            text: "**✨ Fill with AI** above the brief lets you paste a rough description (at least 10 characters). It fills in the title, brief, service and priority for you to check and adjust before submitting.",
           },
           {
             type: "warning",
@@ -621,7 +621,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             items: [
               "Click **Approve & complete**, or drag the card to **Done** on the Board.",
               "Check the final files in the window. You can download them from here.",
-              "Confirm in the window. Your creative is paid for the job and the request moves to **Done**.",
+              "Confirm in the window. Your creative is paid for the request and it moves to **Done**.",
               "Rate the request on Quality, Communication and Speed, or **Skip**. Notes in the rating are for our team, not shared with the creative.",
             ],
           },
@@ -652,7 +652,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             items: [
               {
                 term: "Edit request",
-                text: "change the title, brief, priority, project, job type or due date while the request is in **Backlog**.",
+                text: "change the title, brief, priority, project, service or due date while the request is in **Backlog**.",
               },
               {
                 term: "Add files",
@@ -706,7 +706,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             items: [
               {
                 term: "Search",
-                text: "matches the title, project name or job type. To find a request by its code, use the Board's search.",
+                text: "matches the title, project name or service. To find a request by its code, use the Board's search.",
               },
               {
                 term: "Filters",
@@ -948,7 +948,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "When you create a request, choose the moodboard under **Attach moodboard**. Your creative can then open it from their job, but can't change it. A moodboard can be attached to one request.",
+            text: "When you create a request, choose the moodboard under **Attach moodboard**. Your creative can then open it from the request, but can't change it. A moodboard can be attached to one request.",
           },
           {
             type: "p",
@@ -1060,7 +1060,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Services lists every type of job you can request. Choose a category to see its services, or use **Search all services** to look through all of them.",
+            text: "Services lists everything you can request. Choose a category to see its services, or use **Search all services** to look through all of them.",
           },
           {
             type: "p",
@@ -1117,12 +1117,12 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "The ledger shows all your movements, newest first, with the date, amount and reason. Use **All / Credits / Debits**, **Search ledger** or the **From** and **To** dates to narrow it, and click a row for the ticket code and your balance before and after. **Export CSV** downloads every movement that matches your filters, not only the page on screen. Common reasons:",
+            text: "The ledger shows all your movements, newest first, with the date, amount and reason. Use **All / Credits / Debits**, **Search ledger** or the **From** and **To** dates to narrow it, and click a row for the request code and your balance before and after. **Export CSV** downloads every movement that matches your filters, not only the page on screen. Common reasons:",
           },
           {
             type: "list",
             items: [
-              { term: "Job request created", text: "a request was created." },
+              { term: "Request created", text: "a request was created." },
               { term: "Refund", text: "a request was cancelled." },
               {
                 term: "AI generation / AI refund",

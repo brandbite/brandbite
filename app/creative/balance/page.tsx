@@ -185,7 +185,7 @@ export default function CreativeBalancePage() {
     <>
       <PageHeader
         title="My token balance"
-        description="Tokens you have earned from completed jobs and other adjustments."
+        description="Tokens you have earned from completed requests and other adjustments."
         meta={
           creative ? (
             <>
@@ -236,7 +236,7 @@ export default function CreativeBalancePage() {
             tone="lavender"
             label="Total credits"
             value={loading || !data ? DASH : <TokenFigure value={totalCredits} />}
-            hint="Tokens you have earned from jobs and adjustments."
+            hint="Tokens you have earned from requests and adjustments."
           />
           <KpiCard
             icon={<IconWallet />}

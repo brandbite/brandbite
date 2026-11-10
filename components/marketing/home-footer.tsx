@@ -83,7 +83,7 @@ export const FOOTER_COLUMNS: { title: string; links: FooterLink[] }[] = [
 
 function Socials() {
   return (
-    <div className="flex flex-row items-center gap-8">
+    <div className="flex flex-row items-center gap-8 max-[767px]:gap-3">
       {FOOTER_SOCIAL_LINKS.map((social) => (
         <a
           key={social.label}
@@ -138,7 +138,7 @@ export function HomeFooter({ variant = "home" }: { variant?: "home" | "coming-so
                   alt="brandbite"
                   width={170}
                   height={36}
-                  className="max-[767px]:w-[140px]"
+                  className="max-[767px]:w-[140px] max-[359px]:w-[110px]"
                 />
               </Link>
               <div className="hidden max-[767px]:block">

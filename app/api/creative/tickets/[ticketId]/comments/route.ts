@@ -31,7 +31,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
 
     if (user.role !== "DESIGNER") {
       return NextResponse.json(
-        { error: "Only creatives can view ticket comments on this endpoint" },
+        { error: "Only creatives can view request comments on this endpoint" },
         { status: 403 },
       );
     }
@@ -55,7 +55,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
       return NextResponse.json(
         {
           error:
-            "Ticket not found for this creative. It may belong to another creative or not exist.",
+            "Request not found for this creative. It may belong to another creative or not exist.",
         },
         { status: 404 },
       );
@@ -141,7 +141,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       return NextResponse.json(
         {
           error:
-            "Ticket not found for this creative. It may belong to another creative or not exist.",
+            "Request not found for this creative. It may belong to another creative or not exist.",
         },
         { status: 404 },
       );

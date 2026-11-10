@@ -201,7 +201,7 @@ describe("Creative overview", () => {
     render(<CreativeDashboardPage />);
     expect(await screen.findByRole("link", { name: "Backlog job" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Finished job" })).toBeNull();
-    const chips = screen.getByRole("group", { name: "Filter next jobs by status" });
+    const chips = screen.getByRole("group", { name: "Filter next requests by status" });
     fireEvent.click(within(chips).getByRole("button", { name: /In progress/ }));
     expect(screen.getByRole("link", { name: "Active job" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Backlog job" })).toBeNull();
@@ -244,7 +244,7 @@ describe("Creative balance", () => {
     mockApi();
     render(<CreativeBalancePage />);
     expect((await screen.findAllByText("Not recorded")).length).toBeGreaterThan(0);
-    expect(screen.getByText("Job completed")).toBeInTheDocument();
+    expect(screen.getByText("Request completed")).toBeInTheDocument();
     expect(screen.getByText("+10 tokens")).toBeInTheDocument();
   });
 
@@ -499,6 +499,6 @@ describe("Creative portfolio", () => {
   it("explains an empty portfolio", async () => {
     mockApi({ portfolioItems: [] });
     render(<CreativePortfolioPage />);
-    expect(await screen.findByText(/haven't completed any tickets yet/)).toBeInTheDocument();
+    expect(await screen.findByText(/haven't completed any requests yet/)).toBeInTheDocument();
   });
 });

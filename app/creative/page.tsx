@@ -255,8 +255,7 @@ export default function CreativeDashboardPage() {
 
         if (!ticketsRes.ok) {
           const message =
-            (ticketsJson as any)?.error ||
-            `Tickets request failed with status ${ticketsRes.status}`;
+            (ticketsJson as any)?.error || `Requests fetch failed with status ${ticketsRes.status}`;
           throw new Error(message);
         }
 
@@ -379,25 +378,25 @@ export default function CreativeDashboardPage() {
             <section className="rounded-2xl border border-[var(--av2-attention-border)] bg-gradient-to-r from-[var(--av2-attention-from)] to-[var(--av2-attention-to)] p-6">
               <h2 className="text-xl leading-7 font-semibold">Welcome to brandbite!</h2>
               <p className="mt-1 text-base text-[var(--av2-text-2)]">
-                Set up your profile to start receiving ticket assignments:
+                Set up your profile to start receiving request assignments:
               </p>
               <ol className="mt-4 space-y-3 text-sm">
                 <SetupStep step={1} active>
                   <Link href="/creative/settings" className={SETUP_LINK}>
                     Select your skills
                   </Link>{" "}
-                  so we can match you with the right tickets
+                  so we can match you with the right requests
                 </SetupStep>
                 <SetupStep step={2}>
-                  Wait for ticket assignments to appear on your{" "}
+                  Wait for request assignments to appear on your{" "}
                   <Link href="/creative/board" className={SETUP_LINK}>
                     board
                   </Link>
                 </SetupStep>
                 <SetupStep step={3}>
-                  Complete tickets, earn tokens, and request{" "}
+                  Complete requests, earn tokens, and{" "}
                   <Link href="/creative/withdrawals" className={SETUP_LINK}>
-                    withdrawals
+                    withdraw your earnings
                   </Link>
                 </SetupStep>
               </ol>
@@ -432,7 +431,7 @@ export default function CreativeDashboardPage() {
             <MoneyStat
               icon={<IconTicket />}
               tone="lavender"
-              label="Active jobs"
+              label="Active requests"
               action={
                 <TextLink href="/creative/board" arrow={false}>
                   Open board
@@ -519,7 +518,7 @@ export default function CreativeDashboardPage() {
                       </span>
                       <p className="mt-2 text-xs text-[var(--av2-text-2)] tabular-nums">
                         {fmt(nextTier.completedInWindow)}/{fmt(nextTier.minCompletedTickets)}{" "}
-                        tickets
+                        requests
                       </p>
                     </>
                   ) : (
@@ -534,7 +533,7 @@ export default function CreativeDashboardPage() {
           {ticketStats && totalTickets > 0 ? (
             <div className="grid gap-6 lg:grid-cols-2">
               <Card>
-                <CardTitle description="All your jobs by workflow stage.">Workflow</CardTitle>
+                <CardTitle description="All your requests by workflow stage.">Workflow</CardTitle>
                 <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {STATUS_ORDER.map((s) => (
                     <CountTile
@@ -548,7 +547,7 @@ export default function CreativeDashboardPage() {
                 </dl>
               </Card>
               <Card>
-                <CardTitle description="All your jobs by priority, including done ones.">
+                <CardTitle description="All your requests by priority, including done ones.">
                   Priority breakdown
                 </CardTitle>
                 <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -573,9 +572,9 @@ export default function CreativeDashboardPage() {
                     <IconDocument />
                   </IconTile>
                   <div className="min-w-0">
-                    <h2 className="text-xl leading-7 font-semibold">Your next jobs</h2>
+                    <h2 className="text-xl leading-7 font-semibold">Your next requests</h2>
                     <p className="text-sm text-[var(--av2-text-2)]">
-                      Your assigned jobs with due dates, soonest first.
+                      Your assigned requests with due dates, soonest first.
                     </p>
                   </div>
                 </div>
@@ -591,7 +590,7 @@ export default function CreativeDashboardPage() {
                 <>
                   <div className="px-6 pt-4 pb-4">
                     <FilterChips
-                      label="Filter next jobs by status"
+                      label="Filter next requests by status"
                       options={[
                         { value: "ALL" as NextJobsFilter, label: "All", count: dueJobs.length },
                         ...OPEN_STATUSES.map((s) => ({
@@ -605,13 +604,13 @@ export default function CreativeDashboardPage() {
                     />
                   </div>
                   {nextJobs.length === 0 ? (
-                    <EmptyState title="No jobs with a due date in this status." />
+                    <EmptyState title="No requests with a due date in this status." />
                   ) : (
-                    <Table label="Your next jobs">
+                    <Table label="Your next requests">
                       <thead>
                         <tr>
                           <Th className="max-sm:hidden">ID</Th>
-                          <Th>Job</Th>
+                          <Th>Request</Th>
                           <Th className="max-md:hidden">Status</Th>
                           <Th className="max-md:hidden">Priority</Th>
                           <Th>Due date</Th>
@@ -732,8 +731,8 @@ export default function CreativeDashboardPage() {
                 <div className="min-w-[200px] flex-1">
                   {band ? <p className="text-xl leading-7 font-semibold">{band.label}</p> : null}
                   <p className="mt-1 text-sm text-[var(--av2-text-2)]">
-                    Weighted from the priority and token cost of your open jobs. Below 50 is light,
-                    50-80 is moderate, above 80 is heavy.
+                    Weighted from the priority and token cost of your open requests. Below 50 is
+                    light, 50-80 is moderate, above 80 is heavy.
                   </p>
                 </div>
               </div>

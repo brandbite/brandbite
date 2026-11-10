@@ -56,7 +56,7 @@ export async function GET(_req: NextRequest, context: RouteContext) {
     const { ticketId } = await resolveParams(context);
 
     if (!ticketId) {
-      return NextResponse.json({ error: "Ticket id is required." }, { status: 400 });
+      return NextResponse.json({ error: "Request id is required." }, { status: 400 });
     }
 
     // Verify this ticket belongs to the current creative
@@ -71,7 +71,7 @@ export async function GET(_req: NextRequest, context: RouteContext) {
     });
 
     if (!ticket) {
-      return NextResponse.json({ error: "Ticket not found for this creative." }, { status: 404 });
+      return NextResponse.json({ error: "Request not found for this creative." }, { status: 404 });
     }
 
     const revisions = await prisma.ticketRevision.findMany({

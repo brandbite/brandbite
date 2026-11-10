@@ -48,7 +48,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Only customers or site administrators can update ticket status from this endpoint.",
+            "Only customers or site administrators can update request status from this endpoint.",
         },
         { status: 403 },
       );
@@ -66,7 +66,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (!isValidTicketStatus(requestedStatus)) {
-      return NextResponse.json({ error: "Invalid ticket status." }, { status: 400 });
+      return NextResponse.json({ error: "Invalid request status." }, { status: 400 });
     }
 
     const nextStatus = requestedStatus as TicketStatus;
@@ -100,7 +100,7 @@ export async function PATCH(req: NextRequest) {
     });
 
     if (!ticket) {
-      return NextResponse.json({ error: "Ticket not found." }, { status: 404 });
+      return NextResponse.json({ error: "Request not found." }, { status: 404 });
     }
 
     const currentStatus = ticket.status;
@@ -128,7 +128,7 @@ export async function PATCH(req: NextRequest) {
       if (!canMoveTicketsOnBoard(normalizedCompanyRole)) {
         return NextResponse.json(
           {
-            error: "You don't have permission to move tickets on the board for this company.",
+            error: "You don't have permission to move requests on the board for this company.",
           },
           { status: 403 },
         );
@@ -151,7 +151,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Only your creative team can move tickets into review. Ask your creative to send the ticket for review.",
+            "Only your creative team can move requests into review. Ask your creative to send the request for review.",
         },
         { status: 400 },
       );
@@ -165,7 +165,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Tickets can only be moved back into In progress from review. To start work on a ticket, your creative needs to pick it up.",
+            "Requests can only be moved back into In progress from review. To start work on a request, your creative needs to pick it up.",
         },
         { status: 400 },
       );
@@ -178,7 +178,7 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json(
           {
             error:
-              "Please add a short message about what needs to be changed before sending this ticket back to In progress.",
+              "Please add a short message about what needs to be changed before sending this request back to In progress.",
           },
           { status: 400 },
         );
@@ -192,7 +192,7 @@ export async function PATCH(req: NextRequest) {
     if (isDoneTransition && currentStatus !== TicketStatus.IN_REVIEW) {
       return NextResponse.json(
         {
-          error: "This ticket must be in review before you can mark it as done.",
+          error: "This request must be in review before you can mark it as done.",
         },
         { status: 400 },
       );
@@ -206,7 +206,7 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json(
           {
             error:
-              "You don't have permission to mark this ticket as DONE. Please ask your company owner or project manager.",
+              "You don't have permission to mark this request as DONE. Please ask your company owner or project manager.",
           },
           { status: 403 },
         );
@@ -246,7 +246,7 @@ export async function PATCH(req: NextRequest) {
         if (currentInProgressCount >= plan.maxConcurrentInProgressTickets) {
           return NextResponse.json(
             {
-              error: "This company has reached its limit for active tickets in progress.",
+              error: "This company has reached its limit for active requests in progress.",
               details: {
                 plan: plan.name,
                 maxConcurrentInProgress: plan.maxConcurrentInProgressTickets,
@@ -293,7 +293,7 @@ export async function PATCH(req: NextRequest) {
         void createNotification({
           userId: ticket.creativeId,
           type: "TICKET_COMPLETED",
-          title: "Ticket approved",
+          title: "Request approved",
           message: `"${ticket.title}" was approved and marked done.`,
           ticketId: ticket.id,
         });
@@ -358,6 +358,6 @@ export async function PATCH(req: NextRequest) {
     }
 
     console.error("[PATCH /api/customer/tickets/status] error", error);
-    return NextResponse.json({ error: "Failed to update ticket status" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to update request status" }, { status: 500 });
   }
 }

@@ -244,7 +244,7 @@ export function NotificationBell({
         ref={buttonRef}
         type="button"
         onClick={handleToggle}
-        className="relative flex h-8 w-8 items-center justify-center rounded-lg text-[var(--bb-text-secondary)] transition-colors hover:bg-[var(--bb-bg-card)] hover:text-[var(--bb-secondary)]"
+        className="relative flex h-8 w-8 items-center justify-center rounded-lg text-[var(--bb-text-secondary)] transition-colors hover:bg-[var(--bb-bg-card)] hover:text-[var(--bb-secondary)] max-md:h-10 max-md:w-10"
         aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
         aria-expanded={open}
         aria-haspopup="true"

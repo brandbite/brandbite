@@ -27,7 +27,7 @@ export type ActivityItem = {
   summary: string;
 };
 
-const NOUN = { customer: "request", creative: "job", admin: "ticket" } as const;
+const NOUN = { customer: "request", creative: "request", admin: "request" } as const;
 
 const STATUS_LABELS: Record<string, string> = {
   TODO: "Backlog",
@@ -50,7 +50,7 @@ const FIELD_LABELS: Record<TicketDetailField, string> = {
   priority: "priority",
   dueDate: "due date",
   project: "project",
-  jobType: "job type",
+  jobType: "service",
 };
 
 type Person = { id: string; name: string | null; email: string; role: string };
