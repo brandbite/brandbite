@@ -43,8 +43,8 @@ export function isProviderAvailable(
   switch (provider) {
     case "GOOGLE_DRIVE":
       return Boolean(
-        env.GOOGLE_OAUTH_CLIENT_ID &&
-        env.GOOGLE_OAUTH_CLIENT_SECRET &&
+        env.GOOGLE_DRIVE_CLIENT_ID &&
+        env.GOOGLE_DRIVE_CLIENT_SECRET &&
         env.GOOGLE_DRIVE_ENABLED === "true",
       );
     case "DROPBOX":

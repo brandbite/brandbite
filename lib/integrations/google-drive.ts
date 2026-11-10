@@ -3,8 +3,9 @@
 // @purpose: Google Drive for source-file delivery. Uses the `drive.file`
 //           scope only: brandbite can see and change the files and folders it
 //           created (the "brandbite" folder and what goes in it), nothing
-//           else in the customer's Drive. Same OAuth client as the
-//           consultation calendar (GOOGLE_OAUTH_CLIENT_ID / _SECRET).
+//           else in the customer's Drive. Its own Google Cloud project and
+//           OAuth client (GOOGLE_DRIVE_CLIENT_ID / _SECRET), so customers see
+//           brandbite on Google's consent screen.
 // -----------------------------------------------------------------------------
 
 import { refreshAccessToken, type GoogleOauthConfig } from "@/lib/google/oauth";
@@ -46,11 +47,10 @@ export function readDriveOauthConfig(
   origin: string,
   env: NodeJS.ProcessEnv = process.env,
 ): GoogleOauthConfig | { error: string } {
-  // Only the client id/secret are shared with the calendar; the callback is ours.
-  const clientId = env.GOOGLE_OAUTH_CLIENT_ID;
-  const clientSecret = env.GOOGLE_OAUTH_CLIENT_SECRET;
+  const clientId = env.GOOGLE_DRIVE_CLIENT_ID;
+  const clientSecret = env.GOOGLE_DRIVE_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
-    return { error: "Missing env var(s): GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET" };
+    return { error: "Missing env var(s): GOOGLE_DRIVE_CLIENT_ID, GOOGLE_DRIVE_CLIENT_SECRET" };
   }
   return {
     clientId,

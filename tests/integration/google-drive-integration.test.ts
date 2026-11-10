@@ -112,8 +112,8 @@ const resultOf = (res: Response) => {
 beforeEach(async () => {
   await resetDatabase();
   process.env.INTEGRATIONS_ENCRYPTION_KEY = randomBytes(32).toString("base64");
-  process.env.GOOGLE_OAUTH_CLIENT_ID = "client-id";
-  process.env.GOOGLE_OAUTH_CLIENT_SECRET = "client-secret";
+  process.env.GOOGLE_DRIVE_CLIENT_ID = "client-id";
+  process.env.GOOGLE_DRIVE_CLIENT_SECRET = "client-secret";
   process.env.GOOGLE_DRIVE_ENABLED = "true";
   const company = await createCompany();
   const owner = await createUser();
