@@ -1605,7 +1605,10 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
               },
               "When you connect, source files we were keeping on brandbite move into it automatically (big ones can take a few minutes) and are no longer deleted after 90 days.",
               "**Disconnect** keeps the files already in your Drive or Dropbox.",
-              "Slack is coming soon.",
+              {
+                term: "Slack",
+                text: "**Connect Slack** and pick a channel on Slack's screen. brandbite posts there when work is ready for your review, when your creative starts, when a request is done and when source files are about to be deleted. It can only post to that channel, nothing else in your Slack. To change the channel, disconnect and connect again.",
+              },
             ],
           },
         ],
