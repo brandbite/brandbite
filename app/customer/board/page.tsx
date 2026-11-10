@@ -72,6 +72,7 @@ import { TicketDetailDialog } from "@/components/dashboard/customer-board/ticket
 import NewTicketForm from "@/app/customer/tickets/new/NewTicketForm";
 import { DraftsLink } from "@/components/dashboard/tickets/drafts-link";
 import { RateCreativeModal } from "@/components/ratings/rate-creative-modal";
+import { useLiveRefresh } from "@/lib/hooks/use-live-refresh";
 
 type BoardStats = {
   total: number;
@@ -346,8 +347,8 @@ export default function CustomerBoardPage() {
   // Load board data
   // ---------------------------------------------------------------------------
 
-  const load = async () => {
-    setLoading(true);
+  const load = async ({ silent = false }: { silent?: boolean } = {}) => {
+    if (!silent) setLoading(true);
     setLoadError(null);
     try {
       // All pages — the API returns the 50 newest by default, which used to
@@ -358,6 +359,7 @@ export default function CustomerBoardPage() {
         stats: computeStats(json.tickets),
       });
     } catch (err: unknown) {
+      if (silent) return; // background refresh: keep what's on screen
       console.error("Load customer board data error:", err);
       const message =
         err instanceof Error ? err.message : "Failed to load your requests. Please try again.";
@@ -681,6 +683,17 @@ export default function CustomerBoardPage() {
       cancelled = true;
     };
   }, []);
+
+  // Stay current without a reload: on return to the tab and every 30s while visible.
+  useLiveRefresh(() => load({ silent: true }), {
+    paused: Boolean(
+      draggingTicketId ||
+      updatingTicketId ||
+      pendingDoneTicketId ||
+      pendingRevisionTicketId ||
+      newTicketModalOpen,
+    ),
+  });
 
   useEffect(() => {
     let cancelled = false;

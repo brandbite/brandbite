@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 
 import {
@@ -49,6 +49,7 @@ import {
 } from "@/components/dashboard/money/money-ui";
 import { formatDueDateCountdown, isDueDateOverdue, isDueDateSoon } from "@/lib/board";
 import { buildTicketCode } from "@/lib/ticket-code";
+import { useLiveRefresh } from "@/lib/hooks/use-live-refresh";
 
 const NEXT_JOBS_LIMIT = 5;
 
@@ -221,11 +222,14 @@ export default function CreativeDashboardPage() {
   const [state, setState] = useState<DashboardState>({ status: "loading" });
   const [jobsFilter, setJobsFilter] = useState<NextJobsFilter>("ALL");
 
+  const [liveTick, setLiveTick] = useState(0);
+  const liveRef = useRef(false);
+
   useEffect(() => {
     let cancelled = false;
 
     const load = async () => {
-      setState({ status: "loading" });
+      if (!liveRef.current) setState({ status: "loading" });
 
       try {
         const [balanceRes, ticketsRes, withdrawalsRes, payoutTierRes, skillsRes] =
@@ -281,6 +285,7 @@ export default function CreativeDashboardPage() {
           },
         });
       } catch (err: any) {
+        if (liveRef.current) return; // background refresh: keep what's on screen
         console.error("[CreativeDashboard] load error", err);
         if (!cancelled) {
           setState({
@@ -296,7 +301,13 @@ export default function CreativeDashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [liveTick]);
+
+  // Stay current without a reload: on return to the tab and every 30s while visible.
+  useLiveRefresh(() => {
+    liveRef.current = true;
+    setLiveTick((t) => t + 1);
+  });
 
   const data = state.status === "ready" ? state.data : null;
 

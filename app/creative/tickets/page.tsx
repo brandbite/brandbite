@@ -43,6 +43,7 @@ import { fetchAllTickets } from "@/lib/fetch-all-tickets";
 import { allowedCreativeTargets } from "@/lib/tickets/creative-transitions";
 import { useToast } from "@/components/ui/toast-provider";
 import { STATUS_ORDER, PRIORITY_ORDER } from "@/lib/board";
+import { useLiveRefresh } from "@/lib/hooks/use-live-refresh";
 
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -117,8 +118,8 @@ export default function CreativeTicketsPage() {
   const [search, setSearch] = useState("");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
-  const load = async () => {
-    setLoading(true);
+  const load = async ({ silent = false }: { silent?: boolean } = {}) => {
+    if (!silent) setLoading(true);
     setError(null);
 
     try {
@@ -137,6 +138,7 @@ export default function CreativeTicketsPage() {
       );
       setData(json);
     } catch (err: unknown) {
+      if (silent) return; // background refresh: keep what's on screen
       console.error("Creative tickets fetch error:", err);
       const message = err instanceof Error ? err.message : "Failed to load your requests.";
       setError(message);
@@ -159,6 +161,9 @@ export default function CreativeTicketsPage() {
       cancelled = true;
     };
   }, []);
+
+  // Stay current without a reload: on return to the tab and every 30s while visible.
+  useLiveRefresh(() => load({ silent: true }), { paused: Boolean(updatingId) });
 
   const tickets = data?.tickets ?? [];
 

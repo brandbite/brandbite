@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { AdminActionType, UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { recordTicketEvent } from "@/lib/tickets/ticket-events";
+import { notifyCreativeAssigned } from "@/lib/tickets/assignment-notification";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 import { canOverrideTicketFinancials } from "@/lib/roles";
@@ -469,6 +470,9 @@ export async function PATCH(req: NextRequest) {
         type: "CREATIVE_CHANGED",
         metadata: { toCreativeId: creativeId },
       });
+      if (creativeId) {
+        await notifyCreativeAssigned({ ticketId: updated.id, creativeId, actorId: user.id });
+      }
     }
 
     // Log only financial-override changes. Assignment-only or other

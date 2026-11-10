@@ -7,6 +7,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useLiveRefresh } from "@/lib/hooks/use-live-refresh";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -101,9 +102,11 @@ export function NotificationBell({
 
   useEffect(() => {
     fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 30_000);
-    return () => clearInterval(interval);
   }, [fetchUnreadCount]);
+
+  // On return to the tab and every 30s while it's visible; a hidden tab
+  // doesn't poll. An open panel refreshes its list too.
+  useLiveRefresh(() => (open ? fetchNotificationsRef.current() : fetchUnreadCount()));
 
   // Fetch full list when dropdown opens
   const fetchNotifications = useCallback(async () => {
@@ -121,6 +124,11 @@ export function NotificationBell({
       setLoading(false);
     }
   }, []);
+
+  const fetchNotificationsRef = useRef(fetchNotifications);
+  useEffect(() => {
+    fetchNotificationsRef.current = fetchNotifications;
+  });
 
   const handleToggle = useCallback(() => {
     setOpen((prev) => {

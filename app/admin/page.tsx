@@ -11,7 +11,7 @@
 
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import {
@@ -34,6 +34,7 @@ import {
   IconUsers,
   IconWallet,
 } from "@/components/admin/v2/icons";
+import { useLiveRefresh } from "@/lib/hooks/use-live-refresh";
 
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -136,11 +137,14 @@ function AttentionItem({
 export default function AdminDashboardPage() {
   const [state, setState] = useState<DashboardState>({ status: "loading" });
 
+  const [liveTick, setLiveTick] = useState(0);
+  const liveRef = useRef(false);
+
   useEffect(() => {
     let cancelled = false;
 
     const load = async () => {
-      setState({ status: "loading" });
+      if (!liveRef.current) setState({ status: "loading" });
 
       try {
         const res = await fetch("/api/admin/dashboard", { cache: "no-store" });
@@ -156,6 +160,7 @@ export default function AdminDashboardPage() {
 
         setState({ status: "ready", data: json as AdminDashboardResponse });
       } catch (err: any) {
+        if (liveRef.current) return; // background refresh: keep what's on screen
         console.error("[AdminDashboard] load error", err);
         if (!cancelled) {
           setState({
@@ -171,7 +176,13 @@ export default function AdminDashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [liveTick]);
+
+  // Stay current without a reload: on return to the tab and every 30s while visible.
+  useLiveRefresh(() => {
+    liveRef.current = true;
+    setLiveTick((t) => t + 1);
+  });
 
   const isLoading = state.status === "loading";
   const data = state.status === "ready" ? state.data : null;

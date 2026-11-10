@@ -49,6 +49,7 @@ import {
   isOutputMimeAllowed,
   validateFileSize,
 } from "@/lib/upload-helpers";
+import { useLiveRefresh } from "@/lib/hooks/use-live-refresh";
 
 const VIEW_OPTIONS = [
   { value: "board", label: "Kanban", href: "/creative/board" },
@@ -138,8 +139,8 @@ export default function CreativeBoardPage() {
   // Data load
   // ---------------------------------------------------------------------------
 
-  const load = async () => {
-    setLoading(true);
+  const load = async ({ silent = false }: { silent?: boolean } = {}) => {
+    if (!silent) setLoading(true);
     setError(null);
 
     try {
@@ -153,6 +154,7 @@ export default function CreativeBoardPage() {
       );
       setData(json);
     } catch (err: unknown) {
+      if (silent) return; // background refresh: keep what's on screen
       console.error("[CreativeBoard] load error", err);
       const message = err instanceof Error ? err.message : "Failed to load your requests.";
       setError(message);
@@ -182,6 +184,11 @@ export default function CreativeBoardPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Stay current without a reload: on return to the tab and every 30s while visible.
+  useLiveRefresh(() => load({ silent: true }), {
+    paused: Boolean(draggingTicketId || updatingTicketId || reviewModal || reviewUploading),
+  });
 
   // ---------------------------------------------------------------------------
   // "/" keyboard shortcut — focus the search bar

@@ -16,6 +16,7 @@ import { TicketStatus } from "@prisma/client";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { recordTicketEvent } from "@/lib/tickets/ticket-events";
+import { notifyCreativeAssigned } from "@/lib/tickets/assignment-notification";
 import { parseBody } from "@/lib/schemas/helpers";
 import { bulkTicketsSchema, type BulkTicketsInput } from "@/lib/schemas/bulk-tickets.schemas";
 import { completeTicketAndApplyTokens } from "@/lib/token-engine";
@@ -101,6 +102,13 @@ export async function POST(req: NextRequest) {
               type: "CREATIVE_CHANGED",
               metadata: { toCreativeId: data.creativeId },
             });
+            if (data.creativeId) {
+              await notifyCreativeAssigned({
+                ticketId: id,
+                creativeId: data.creativeId,
+                actorId: user.id,
+              });
+            }
           }
         } else if (data.op === "status") {
           // Admin override — no transition guards here by design. If the
