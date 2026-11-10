@@ -1,8 +1,0 @@
--- Slack notifications are built; the integrations answer no longer
--- says "coming soon". Only applies while the answer is still the text
--- shipped in 20261111100000_faq_integrations, so admin edits stay.
-UPDATE "Faq" SET
-  "answer" = $$Yes. Connect Google Drive or Dropbox under Settings › Integrations, and the layered, print-ready files your creative delivers go straight into your own storage, in a folder for each project and request. brandbite only sees the folder it creates. Dropbox takes files up to 150 MB; bigger ones are kept on brandbite for 90 days after the request is done. Connect Slack and pick a channel to get updates there when work is ready for review, when your creative starts and when a request is done. Everything else happens in your brandbite dashboard, with in-app and email notifications as your requests move. If there's a tool you'd like us to connect with, tell us at hello@brandbite.studio.$$,
-  "updatedAt" = NOW()
-WHERE "id" = 'faq_seed_pla_03'
-  AND "answer" = $$Yes, for your source files. Connect Google Drive or Dropbox under Settings › Integrations, and the layered, print-ready files your creative delivers go straight into your own storage, in a folder for each project and request. brandbite only sees the folder it creates. Dropbox takes files up to 150 MB; bigger ones are kept on brandbite for 90 days after the request is done. Slack notifications are coming soon. Everything else happens in your brandbite dashboard, with in-app and email notifications as your requests move. If there's a tool you'd like us to connect with, tell us at hello@brandbite.studio.$$;

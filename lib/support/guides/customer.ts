@@ -1604,10 +1604,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
                 text: "**Connect Dropbox** so files up to 150 MB land in **Apps › brandbite** in your Dropbox; brandbite only sees that folder. Bigger files are kept on brandbite for 90 days, or go to Google Drive if you connect it too.",
               },
               "**Disconnect** keeps the files already in your Drive or Dropbox.",
-              {
-                term: "Slack",
-                text: "**Connect Slack** and pick a channel on Slack's screen. brandbite posts there when work is ready for your review, when your creative starts, when a request is done and when source files are about to be deleted. It can only post to that channel, nothing else in your Slack. To change the channel, disconnect and connect again.",
-              },
+              "Slack is coming soon.",
             ],
           },
         ],
