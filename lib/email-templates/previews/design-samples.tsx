@@ -66,8 +66,8 @@ export function CustomerSample() {
         2 source files on WEB-101 will be deleted from brandbite on Feb 8, 2027.
       </Notice>
       <Body16>
-        Download them before then, or connect Google Drive or Dropbox so future source files land in
-        your own storage and stay yours for good.
+        Download them before then, or connect Google Drive or Dropbox: we move these files there,
+        future ones land there too, and they stay yours for good.
       </Body16>
       <Card role="customer" icon="file" title="Source files">
         <Tiles

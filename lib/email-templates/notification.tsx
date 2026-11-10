@@ -125,8 +125,8 @@ function SourceFilesBody(
         {`${what}${ticket ? ` on ${ticket.code}` : ""} will be deleted from brandbite on ${when}.`}
       </Notice>
       <Body16>
-        Download them before then, or connect Google Drive or Dropbox so future source files land in
-        your own storage and stay yours for good.
+        Download them before then, or connect Google Drive or Dropbox: we move these files there,
+        future ones land there too, and they stay yours for good.
       </Body16>
       <Card role={recipientRole} icon="file" title="Source files">
         <Tiles

@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { listCompanyIntegrations } from "@/lib/integrations/company-integrations";
+import { countFilesToMove } from "@/lib/source-files/move-to-connected-storage";
 import { canManageIntegrations, normalizeCompanyRole } from "@/lib/permissions/companyRoles";
 
 export async function GET() {
@@ -26,6 +27,9 @@ export async function GET() {
     const integrations = await listCompanyIntegrations(user.activeCompanyId);
     return NextResponse.json({
       integrations,
+      // Source files still on brandbite storage that will move into a
+      // connected Drive or Dropbox.
+      filesToMove: await countFilesToMove(user.activeCompanyId),
       canManage: canManageIntegrations(normalizeCompanyRole(user.companyRole)),
     });
   } catch (error: unknown) {

@@ -291,3 +291,29 @@ export async function findDriveFileInFolder(
     trashed: Boolean(file.trashed),
   };
 }
+
+/**
+ * Server-side upload into a resumable session (used when moving
+ * brandbite-stored files into a newly connected Drive). Streams the bytes
+ * in one PUT; Drive needs the exact length up front.
+ */
+export async function uploadToDriveSession(
+  sessionUrl: string,
+  stream: ReadableStream<Uint8Array>,
+  sizeBytes: number,
+): Promise<{ id: string; name: string; webViewLink: string | null }> {
+  const res = await fetch(sessionUrl, {
+    method: "PUT",
+    headers: { "Content-Length": String(sizeBytes) },
+    body: stream,
+    // Node needs this to send a streamed body.
+    duplex: "half",
+    cache: "no-store",
+  } as RequestInit & { duplex: "half" });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Google Drive upload failed (${res.status}): ${text}`);
+  }
+  const file = (await res.json()) as { id: string; name: string; webViewLink?: string };
+  return { id: file.id, name: file.name, webViewLink: file.webViewLink ?? null };
+}

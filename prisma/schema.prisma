@@ -2984,6 +2984,9 @@ model TicketSourceFile {
   /// When the "deleted in 14 days" / "in 3 days" reminders went out.
   reminder14SentAt DateTime?
   reminder3SentAt  DateTime?
+  /// Moving an R2 file into a drive connected later: tries so far and the last error.
+  copyAttempts     Int       @default(0)
+  copyError        String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
