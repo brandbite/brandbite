@@ -53,6 +53,7 @@ export function IntegrationsCard({
   const { showToast } = useToast();
   const [items, setItems] = useState<IntegrationView[] | null>(null);
   const [canManage, setCanManage] = useState(false);
+  const [filesToMove, setFilesToMove] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<IntegrationView | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
@@ -66,6 +67,7 @@ export function IntegrationsCard({
       if (!res.ok) throw new Error(json?.error || "Could not load integrations.");
       setItems(json.integrations);
       setCanManage(Boolean(json.canManage));
+      setFilesToMove(typeof json.filesToMove === "number" ? json.filesToMove : 0);
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : "Could not load integrations.");
     }
@@ -200,6 +202,16 @@ export function IntegrationsCard({
             </li>
           ))}
         </ul>
+      ) : null}
+
+      {items &&
+      filesToMove > 0 &&
+      items.some((i) => i.status === "CONNECTED" && i.provider !== "SLACK") ? (
+        <p className="mt-4 text-sm text-[var(--av2-text-2)]">
+          Moving {filesToMove === 1 ? "1 source file" : `${filesToMove} source files`} from
+          brandbite storage into your connected storage. Once moved, they&apos;re yours for good and
+          no longer have a deletion date.
+        </p>
       ) : null}
 
       {items && !canManage && (

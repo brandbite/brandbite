@@ -22,8 +22,12 @@ import {
   readOAuthState,
 } from "@/lib/integrations/oauth-state";
 import { canManageIntegrations, normalizeCompanyRole } from "@/lib/permissions/companyRoles";
+import { scheduleMoveAfterConnect } from "@/lib/source-files/move-to-connected-storage";
 
 const SLUG = "dropbox";
+
+// Leaves time for moving files in the background after the redirect.
+export const maxDuration = 300;
 
 export async function GET(req: NextRequest) {
   const finish = (result: "connected" | "error", message?: string) => {
@@ -72,6 +76,10 @@ export async function GET(req: NextRequest) {
         accessTokenExpiresAt: new Date(Date.now() + tokens.expires_in * 1000),
       },
     });
+
+    // Move source files we were keeping on brandbite storage into the new
+    // drive, after the redirect so the customer isn't kept waiting.
+    scheduleMoveAfterConnect(companyId, new URL(req.url).origin);
 
     return finish("connected", email ?? undefined);
   } catch (error: unknown) {

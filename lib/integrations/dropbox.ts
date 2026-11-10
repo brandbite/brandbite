@@ -284,3 +284,128 @@ export async function deleteDropboxFile(accessToken: string, idOrPath: string): 
     throw error;
   }
 }
+
+const CONTENT = "https://content.dropboxapi.com/2";
+/** Chunk size for upload sessions (Dropbox allows up to 150 MB per call). */
+const SESSION_CHUNK_BYTES = 64 * 1024 * 1024;
+
+type DropboxUploadResult = { id: string; name: string; path_display: string; size: number };
+
+/** JSON for the Dropbox-API-Arg header: headers must be ASCII, so escape the rest. */
+export function dropboxHeaderJson(arg: unknown): string {
+  return JSON.stringify(arg).replace(
+    /[\u007f-￿]/g,
+    (c) => "\\u" + c.charCodeAt(0).toString(16).padStart(4, "0"),
+  );
+}
+
+async function contentCall<T>(
+  accessToken: string,
+  path: string,
+  arg: unknown,
+  body: BodyInit | Uint8Array,
+): Promise<T> {
+  const res = await fetch(`${CONTENT}${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/octet-stream",
+      // Header values must be ASCII: escape non-ASCII characters in the JSON.
+      "Dropbox-API-Arg": dropboxHeaderJson(arg),
+    },
+    body: body as BodyInit,
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Dropbox ${path} failed (${res.status}): ${text}`);
+  }
+  const text = await res.text();
+  return (text ? JSON.parse(text) : null) as T;
+}
+
+/** Read exactly `size` bytes (or what's left) from a stream reader. */
+async function readChunk(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  carry: { buf: Uint8Array | null },
+  size: number,
+): Promise<Uint8Array | null> {
+  const parts: Uint8Array[] = [];
+  let total = 0;
+  if (carry.buf) {
+    parts.push(carry.buf);
+    total += carry.buf.byteLength;
+    carry.buf = null;
+  }
+  while (total < size) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    parts.push(value);
+    total += value.byteLength;
+  }
+  if (total === 0) return null;
+  const all = new Uint8Array(total);
+  let offset = 0;
+  for (const part of parts) {
+    all.set(part, offset);
+    offset += part.byteLength;
+  }
+  if (total > size) {
+    carry.buf = all.slice(size);
+    return all.slice(0, size);
+  }
+  return all;
+}
+
+/**
+ * Server-side upload (used when moving brandbite-stored files into a newly
+ * connected Dropbox). Streams the bytes in 64 MB upload-session chunks, so
+ * any size works and memory stays bounded.
+ */
+export async function uploadDropboxFile(
+  accessToken: string,
+  path: string,
+  stream: ReadableStream<Uint8Array>,
+): Promise<DropboxFileInfo> {
+  const reader = stream.getReader();
+  const carry = { buf: null as Uint8Array | null };
+  const commit = { path, mode: "add", autorename: true, mute: true };
+  let chunk = await readChunk(reader, carry, SESSION_CHUNK_BYTES);
+  const first = chunk ?? new Uint8Array(0);
+  const next = await readChunk(reader, carry, SESSION_CHUNK_BYTES);
+
+  let result: DropboxUploadResult;
+  if (!next) {
+    result = await contentCall<DropboxUploadResult>(accessToken, "/files/upload", commit, first);
+  } else {
+    const { session_id } = await contentCall<{ session_id: string }>(
+      accessToken,
+      "/files/upload_session/start",
+      { close: false },
+      first,
+    );
+    let offset = first.byteLength;
+    chunk = next;
+    for (;;) {
+      const after = await readChunk(reader, carry, SESSION_CHUNK_BYTES);
+      if (!after) {
+        result = await contentCall<DropboxUploadResult>(
+          accessToken,
+          "/files/upload_session/finish",
+          { cursor: { session_id, offset }, commit },
+          chunk,
+        );
+        break;
+      }
+      await contentCall(
+        accessToken,
+        "/files/upload_session/append_v2",
+        { cursor: { session_id, offset }, close: false },
+        chunk,
+      );
+      offset += chunk.byteLength;
+      chunk = after;
+    }
+  }
+  return { id: result.id, name: result.name, pathDisplay: result.path_display, size: result.size };
+}
