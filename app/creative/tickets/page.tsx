@@ -43,6 +43,7 @@ import { fetchAllTickets } from "@/lib/fetch-all-tickets";
 import { allowedCreativeTargets } from "@/lib/tickets/creative-transitions";
 import { useToast } from "@/components/ui/toast-provider";
 import { STATUS_ORDER, PRIORITY_ORDER } from "@/lib/board";
+import { autoTimerMessage } from "@/components/dashboard/tickets/time-tracking";
 
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -260,7 +261,11 @@ export default function CreativeTicketsPage() {
         throw new Error(msg);
       }
 
-      showToast({ type: "success", title: "Request status updated." });
+      showToast({
+        type: "success",
+        title: "Request status updated.",
+        description: autoTimerMessage(json?.timer) ?? undefined,
+      });
       await load();
     } catch (err: unknown) {
       console.error("Creative ticket update error:", err);

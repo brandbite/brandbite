@@ -49,6 +49,10 @@ import {
   isOutputMimeAllowed,
   validateFileSize,
 } from "@/lib/upload-helpers";
+import {
+  MULTI_START_TIMER_HINT,
+  autoTimerMessage,
+} from "@/components/dashboard/tickets/time-tracking";
 
 const VIEW_OPTIONS = [
   { value: "board", label: "Kanban", href: "/creative/board" },
@@ -427,10 +431,13 @@ export default function CreativeBoardPage() {
         };
       });
 
+      const timerNote = autoTimerMessage(json?.timer);
       showToast({
         type: "success",
         title: "Request updated",
-        description: getStatusSuccessMessage(status),
+        description: timerNote
+          ? `${getStatusSuccessMessage(status)} ${timerNote}`
+          : getStatusSuccessMessage(status),
       });
 
       return { revisionId: json?.revisionId ?? undefined };
@@ -702,7 +709,12 @@ export default function CreativeBoardPage() {
               ? `${successCount} request${successCount > 1 ? "s" : ""} moved, ${failCount} failed`
               : `${successCount} request${successCount > 1 ? "s" : ""} moved to ${statusLabel}`,
           description:
-            failCount > 0 ? "Some requests could not be updated due to restrictions." : undefined,
+            failCount > 0
+              ? "Some requests could not be updated due to restrictions."
+              : targetStatus === "IN_PROGRESS"
+                ? (autoTimerMessage((json as any).timer) ??
+                  (successCount > 1 ? MULTI_START_TIMER_HINT : undefined))
+                : undefined,
         });
       } else {
         showToast({

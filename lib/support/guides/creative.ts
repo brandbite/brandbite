@@ -146,7 +146,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
             type: "steps",
             items: [
               "A request is assigned to you and appears in **Backlog**. You get a **New request assigned** notification.",
-              "Read the brief, then drag it to **In progress**, or click **Start work** on the request page.",
+              "Read the brief, then drag it to **In progress**, or click **Start work** on the request page. Your timer starts too; stop it if you're not working on it yet.",
               "When a version is ready, send it with **Upload work** on the Board or **Send for review** on the request page. The request moves to **In review**.",
               "The customer either asks for changes, which sends the request back to **In progress** with their feedback, or approves it.",
               "When they approve, the request moves to **Done** and your payout is added to your balance straight away.",
@@ -557,7 +557,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
             items: [
               {
                 term: "Start work",
-                text: "at the top of the page while the request is in Backlog. It moves the request to **In progress**.",
+                text: "at the top of the page while the request is in Backlog. It moves the request to **In progress** and starts your timer.",
               },
               {
                 term: "Upload new version",
@@ -577,7 +577,10 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
           {
             type: "list",
             items: [
-              "**Start timer** and **Stop timer** are at the top of the page, with your logged time and the estimate.",
+              "Your timer starts on its own when you move a request to **In progress** (**Start work**, dragging it on the Board, or pulling a version back), and stops when you send a version for review or the request leaves In progress.",
+              "Starting several requests at once doesn't start a timer; start it on the one you're working on.",
+              "When the customer asks for changes, the timer doesn't start by itself. Press **Start timer** when you begin.",
+              "**Start timer** and **Stop timer** are at the top of the page, with your logged time and the estimate. Stop it whenever you take a break.",
               "Only one timer runs at a time. Starting one on another request stops this one.",
               "On the **Time tracking** tab, **Delete** removes an entry after you confirm. This can't be undone.",
             ],

@@ -252,7 +252,10 @@ export function DeliveryForm({ ticketId, onSent }: { ticketId: string; onSent: (
 
       <div className="mt-4 flex flex-wrap items-center justify-end gap-3">
         <p role="status" className="min-w-0 flex-1 text-sm text-[var(--av2-text-2)]">
-          {progress ?? (files.length === 0 ? "Add at least one file to send this version." : "")}
+          {progress ??
+            (files.length === 0
+              ? "Add at least one file to send this version."
+              : "Sending this version stops your timer.")}
         </p>
         <Button variant="primary" disabled={sending || files.length === 0} onClick={send}>
           {sending ? "Sending…" : "Send for review"}
