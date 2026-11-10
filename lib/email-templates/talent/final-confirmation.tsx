@@ -72,6 +72,8 @@ export function TalentFinalConfirmationEmailTemplate({
 
   return (
     <BaseLayout
+      role={null}
+      reason={"You received this email because you booked an interview with brandbite."}
       previewText="Your brandbite interview is booked. Here are the details."
       hero={
         <HeroBand>

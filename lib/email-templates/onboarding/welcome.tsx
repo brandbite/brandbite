@@ -72,6 +72,8 @@ export function WelcomeEmailTemplate({
 
   return (
     <BaseLayout
+      role={"customer"}
+      reason={"You received this email because you created a brandbite account."}
       previewText="You're in. Your first design request takes about a minute."
       hero={
         <HeroBand>

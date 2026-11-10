@@ -28,7 +28,11 @@ export function VerifyEmailTemplate({ name, url }: VerifyEmailProps) {
   const greeting = name ? `Welcome, ${name}` : "Welcome to brandbite";
 
   return (
-    <BaseLayout previewText="Confirm your email to finish setting up your brandbite account.">
+    <BaseLayout
+      role={null}
+      reason={"You received this email because someone signed up for brandbite with this address."}
+      previewText="Confirm your email to finish setting up your brandbite account."
+    >
       <Heading>{greeting}</Heading>
       <Paragraph>
         Thanks for signing up. Confirm your email address to finish setting up your account. You

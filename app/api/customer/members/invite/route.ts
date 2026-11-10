@@ -6,6 +6,7 @@
 // @lastUpdate: 2025-11-17
 // -----------------------------------------------------------------------------
 
+import { renderTeamInviteEmail } from "@/lib/email-templates/account";
 import { NextRequest, NextResponse } from "next/server";
 import { InviteStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -105,32 +106,9 @@ export async function POST(req: NextRequest) {
     const companyName = company?.name || "a team";
     const inviterName = user.name || user.email;
 
-    sendNotificationEmail(
-      email,
-      `You've been invited to join ${companyName} on brandbite`,
-      [
-        "<div style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto;\">",
-        '<div style="background: #f15b2b; padding: 20px 24px; border-radius: 12px 12px 0 0;">',
-        '<span style="font-size: 20px; font-weight: 700; color: #fff;">brandbite</span>',
-        "</div>",
-        '<div style="background: #fff; padding: 28px 24px; border: 1px solid #e3e1dc; border-top: none;">',
-        `<p style="margin: 0 0 16px; font-size: 14px; color: #424143;">Hi,</p>`,
-        `<p style="margin: 0 0 16px; font-size: 14px; color: #424143;"><strong>${inviterName}</strong> has invited you to join <strong>${companyName}</strong> on brandbite as a ${roleInCompany.toLowerCase()}.</p>`,
-        '<table role="presentation" cellpadding="0" cellspacing="0" style="margin: 24px 0;">',
-        "<tr>",
-        '<td style="border-radius: 8px; background: #f15b2b;">',
-        `<a href="${inviteUrl}" target="_blank" style="display: inline-block; padding: 12px 28px; font-size: 14px; font-weight: 600; color: #fff; text-decoration: none; border-radius: 8px;">Accept Invite</a>`,
-        "</td>",
-        "</tr>",
-        "</table>",
-        '<p style="margin: 0; font-size: 13px; color: #7a7a7a;">If you weren\'t expecting this invitation, you can safely ignore this email.</p>',
-        "</div>",
-        '<div style="background: #faf9f7; padding: 16px 24px; border-radius: 0 0 12px 12px; border: 1px solid #e3e1dc; border-top: none;">',
-        '<p style="margin: 0; font-size: 11px; color: #9a9892; text-align: center;">brandbite &mdash; Creative-as-a-service platform</p>',
-        "</div>",
-        "</div>",
-      ].join("\n"),
-    );
+    void renderTeamInviteEmail({ inviterName, companyName, roleInCompany, inviteUrl })
+      .then(({ subject, html }) => sendNotificationEmail(email, subject, html))
+      .catch((err) => console.error("[invite] email failed", err));
 
     return NextResponse.json(
       {

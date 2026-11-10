@@ -23,6 +23,8 @@
 
 import { getAppSetting } from "@/lib/app-settings";
 import { sendNotificationEmail } from "@/lib/email";
+import { ADMIN_SUBJECT_PREFIX } from "@/lib/email-templates";
+import { renderSimpleEmail } from "@/lib/email-templates/simple";
 import { prisma } from "@/lib/prisma";
 
 const ADMIN_BASE = process.env.NEXT_PUBLIC_APP_URL || "https://brandbite.studio";
@@ -127,41 +129,20 @@ async function eventEmailsEnabled(): Promise<boolean> {
 
 type Rendered = { subject: string; html: string };
 
-function shell(title: string, body: string): string {
-  return [
-    "<div style=\"font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:520px;margin:0 auto;\">",
-    '<div style="background:#f15b2b;padding:20px 24px;border-radius:12px 12px 0 0;">',
-    '<span style="font-size:20px;font-weight:700;color:#fff;">brandbite</span>',
-    "</div>",
-    '<div style="background:#fff;padding:24px;border:1px solid #e3e1dc;border-top:none;">',
-    `<h2 style="margin:0 0 12px;font-size:16px;color:#1f2126;">${title}</h2>`,
-    body,
-    "</div>",
-    '<div style="background:#faf9f7;padding:14px 24px;border-radius:0 0 12px 12px;border:1px solid #e3e1dc;border-top:none;">',
-    '<p style="margin:0;font-size:11px;color:#9a9892;">Sent automatically because you\'re a brandbite SITE_OWNER. Mute everything via /admin/settings → ADMIN_EVENT_EMAILS_ENABLED.</p>',
-    "</div></div>",
-  ].join("");
+const REASON =
+  "You received this email because you're a brandbite site owner. Turn these off in Admin settings (ADMIN_EVENT_EMAILS_ENABLED).";
+
+function subjectLine(text: string): string {
+  return `${ADMIN_SUBJECT_PREFIX} ${text}`;
 }
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function ctaButton(href: string, label: string): string {
-  return [
-    '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:18px 0;">',
-    '<tr><td style="border-radius:8px;background:#f15b2b;">',
-    `<a href="${href}" target="_blank" style="display:inline-block;padding:11px 22px;font-size:13px;font-weight:600;color:#fff;text-decoration:none;border-radius:8px;">${label}</a>`,
-    "</td></tr></table>",
-  ].join("");
-}
-
-function render(event: AdminEvent): Rendered {
+/** Exported for previews and tests. */
+export async function renderAdminEventEmail(event: AdminEvent): Promise<Rendered> {
+  const base = {
+    role: "admin" as const,
+    reason: REASON,
+    preferencesUrl: `${ADMIN_BASE}/admin/settings`,
+  };
   switch (event.kind) {
     case "NEW_FEEDBACK": {
       const typeLabel = {
@@ -170,108 +151,221 @@ function render(event: AdminEvent): Rendered {
         PRAISE: "Praise",
         QUESTION: "Question",
       }[event.type];
-      const subject = `[brandbite] New ${typeLabel.toLowerCase()} from ${event.submitterEmail}`;
-      const body = [
-        `<p style="font-size:13px;color:#424143;margin:0 0 6px;"><strong>${typeLabel}</strong> from ${escapeHtml(event.submitterEmail)} (${escapeHtml(event.submitterRole)})</p>`,
-        event.subject
-          ? `<p style="font-size:14px;color:#1f2126;margin:8px 0 4px;font-weight:600;">${escapeHtml(event.subject)}</p>`
-          : "",
-        `<p style="font-size:13px;color:#424143;white-space:pre-wrap;margin:6px 0;">${escapeHtml(event.message)}</p>`,
-        event.pageUrl
-          ? `<p style="font-size:11px;color:#7a7a7a;margin:10px 0 0;">From <code style="font-size:11px;background:#faf9f7;padding:1px 4px;border-radius:3px;">${escapeHtml(event.pageUrl)}</code></p>`
-          : "",
-        ctaButton(`${ADMIN_BASE}/admin/feedback`, "Open feedback queue"),
-      ].join("");
-      return { subject, html: shell(typeLabel, body) };
+      return {
+        subject: subjectLine(`New ${typeLabel.toLowerCase()} from ${event.submitterEmail}`),
+        html: await renderSimpleEmail({
+          ...base,
+          previewText: event.subject ?? event.message.slice(0, 90),
+          title: `New ${typeLabel.toLowerCase()}`,
+          intro: [`${event.submitterEmail} (${event.submitterRole}) sent feedback.`],
+          cards: [
+            {
+              icon: "message",
+              label: typeLabel,
+              title: event.subject || "Feedback",
+              rows: [
+                { label: "Message", value: event.message },
+                ...(event.pageUrl ? [{ label: "Page", value: event.pageUrl }] : []),
+              ],
+            },
+          ],
+          action: { href: `${ADMIN_BASE}/admin/feedback`, label: "Open feedback queue" },
+        }),
+      };
     }
 
     case "NEW_TICKET": {
-      const subject = `[brandbite] New request: ${event.title}`;
-      const body = [
-        `<p style="font-size:13px;color:#424143;margin:0 0 6px;"><strong>${escapeHtml(event.companyName)}</strong> opened a new task.</p>`,
-        `<p style="font-size:14px;color:#1f2126;margin:8px 0 4px;font-weight:600;">${escapeHtml(event.title)}</p>`,
-        `<p style="font-size:12px;color:#7a7a7a;margin:6px 0;">Created by ${escapeHtml(event.createdByEmail)}${event.jobTypeName ? ` · ${escapeHtml(event.jobTypeName)}` : ""}${event.ticketCode ? ` · ${escapeHtml(event.ticketCode)}` : ""}</p>`,
-        ctaButton(`${ADMIN_BASE}/admin/board?ticket=${event.ticketId}`, "Open in admin board"),
-      ].join("");
-      return { subject, html: shell("New request", body) };
+      return {
+        subject: subjectLine(`New request: ${event.title}`),
+        html: await renderSimpleEmail({
+          ...base,
+          previewText: `${event.companyName} opened a new request.`,
+          title: "New request",
+          intro: [`${event.companyName} opened a new request.`],
+          cards: [
+            {
+              icon: "ticket",
+              label: "Request",
+              title: [event.ticketCode, event.title].filter(Boolean).join(" "),
+              tiles: [
+                { label: "Company", value: event.companyName },
+                ...(event.jobTypeName ? [{ label: "Service", value: event.jobTypeName }] : []),
+                { label: "Created by", value: event.createdByEmail },
+              ],
+            },
+          ],
+          action: {
+            href: `${ADMIN_BASE}/admin/board?ticket=${event.ticketId}`,
+            label: "Open in admin board",
+          },
+        }),
+      };
     }
 
     case "NEW_COMPANY": {
-      const subject = `[brandbite] New company signed up: ${event.companyName}`;
-      const body = [
-        `<p style="font-size:13px;color:#424143;margin:0 0 6px;">A new customer just finished onboarding.</p>`,
-        `<p style="font-size:14px;color:#1f2126;margin:8px 0 4px;font-weight:600;">${escapeHtml(event.companyName)}</p>`,
-        `<p style="font-size:12px;color:#7a7a7a;margin:6px 0;">Owner: ${escapeHtml(event.ownerEmail)}</p>`,
-        ctaButton(`${ADMIN_BASE}/admin/companies/${event.companyId}`, "Open company"),
-      ].join("");
-      return { subject, html: shell("New company", body) };
+      return {
+        subject: subjectLine(`New company signed up: ${event.companyName}`),
+        html: await renderSimpleEmail({
+          ...base,
+          previewText: `${event.companyName} finished onboarding.`,
+          title: "New company",
+          intro: ["A new customer just finished onboarding."],
+          cards: [
+            {
+              icon: "user",
+              label: "Company",
+              title: event.companyName,
+              tiles: [{ label: "Owner", value: event.ownerEmail }],
+            },
+          ],
+          action: {
+            href: `${ADMIN_BASE}/admin/companies/${event.companyId}`,
+            label: "Open company",
+          },
+        }),
+      };
     }
 
     case "NEW_PAYMENT": {
-      const subject = `[brandbite] Payment received: ${event.amountFormatted}`;
-      const body = [
-        `<p style="font-size:13px;color:#424143;margin:0 0 6px;"><strong>${escapeHtml(event.companyName)}</strong> just paid.</p>`,
-        `<p style="font-size:14px;color:#1f2126;margin:8px 0 4px;font-weight:600;">${escapeHtml(event.amountFormatted)}${event.planName ? ` · ${escapeHtml(event.planName)}` : ""}</p>`,
-        event.stripeCustomerEmail
-          ? `<p style="font-size:12px;color:#7a7a7a;margin:6px 0;">Stripe customer: ${escapeHtml(event.stripeCustomerEmail)}</p>`
-          : "",
-        ctaButton(`${ADMIN_BASE}/admin/companies`, "View companies"),
-      ].join("");
-      return { subject, html: shell("Payment received", body) };
+      return {
+        subject: subjectLine(`Payment received: ${event.amountFormatted}`),
+        html: await renderSimpleEmail({
+          ...base,
+          previewText: `${event.companyName} paid ${event.amountFormatted}.`,
+          title: "Payment received",
+          intro: [`${event.companyName} just paid.`],
+          cards: [
+            {
+              icon: "coins",
+              label: "Payment",
+              title: event.amountFormatted,
+              pill: "Success",
+              filled: true,
+              tiles: [
+                { label: "Company", value: event.companyName },
+                ...(event.planName ? [{ label: "Plan", value: event.planName }] : []),
+                ...(event.stripeCustomerEmail
+                  ? [{ label: "Stripe customer", value: event.stripeCustomerEmail }]
+                  : []),
+              ],
+            },
+          ],
+          action: { href: `${ADMIN_BASE}/admin/companies`, label: "View companies" },
+        }),
+      };
     }
 
     case "NEW_TALENT_APPLICATION": {
-      const subject = `[brandbite] New talent application from ${event.candidateName}`;
-      const body = [
-        `<p style="font-size:13px;color:#424143;margin:0 0 6px;">A new candidate applied at /talent.</p>`,
-        `<p style="font-size:14px;color:#1f2126;margin:8px 0 4px;font-weight:600;">${escapeHtml(event.candidateName)}</p>`,
-        `<p style="font-size:12px;color:#7a7a7a;margin:6px 0;">${escapeHtml(event.candidateEmail)} · ${escapeHtml(event.country)}</p>`,
-        ctaButton(`${ADMIN_BASE}/admin/talent-applications`, "Open talent queue"),
-      ].join("");
-      return { subject, html: shell("New talent application", body) };
+      return {
+        subject: subjectLine(`New talent application from ${event.candidateName}`),
+        html: await renderSimpleEmail({
+          ...base,
+          previewText: `${event.candidateName} applied to work with brandbite.`,
+          title: "New talent application",
+          intro: ["A new candidate applied on the talent page."],
+          cards: [
+            {
+              icon: "user",
+              label: "Candidate",
+              title: event.candidateName,
+              tiles: [
+                { label: "Email", value: event.candidateEmail },
+                { label: "Country", value: event.country },
+              ],
+            },
+          ],
+          action: { href: `${ADMIN_BASE}/admin/talent-applications`, label: "Open talent queue" },
+        }),
+      };
     }
 
     case "NEW_WITHDRAWAL_REQUEST": {
-      const subject = `[brandbite] Withdrawal request: ${event.amountTokens.toLocaleString()} tokens`;
-      const body = [
-        `<p style="font-size:13px;color:#424143;margin:0 0 6px;"><strong>${escapeHtml(event.creativeEmail)}</strong> requested a payout.</p>`,
-        `<p style="font-size:14px;color:#1f2126;margin:8px 0 4px;font-weight:600;">${event.amountTokens.toLocaleString()} tokens</p>`,
-        ctaButton(`${ADMIN_BASE}/admin/withdrawals`, "Open withdrawals queue"),
-      ].join("");
-      return { subject, html: shell("Withdrawal request", body) };
+      const amount = `${event.amountTokens.toLocaleString("en-US")} tokens`;
+      return {
+        subject: subjectLine(`Withdrawal request: ${amount}`),
+        html: await renderSimpleEmail({
+          ...base,
+          previewText: `${event.creativeEmail} requested a ${amount} payout.`,
+          title: "Withdrawal request",
+          intro: [`${event.creativeEmail} requested a payout.`],
+          cards: [
+            {
+              icon: "coins",
+              label: "Amount",
+              title: amount,
+              filled: true,
+              tiles: [{ label: "Creative", value: event.creativeEmail }],
+            },
+          ],
+          action: { href: `${ADMIN_BASE}/admin/withdrawals`, label: "Open withdrawals queue" },
+        }),
+      };
     }
 
     case "NEW_CONTACT_MESSAGE": {
-      const subject = `[brandbite] New contact message from ${event.name}`;
-      const metaLine = [event.email, event.company, event.topic]
-        .filter(Boolean)
-        .map((v) => escapeHtml(v as string))
-        .join(" · ");
-      const body = [
-        `<p style="font-size:13px;color:#424143;margin:0 0 6px;">Someone reached out via /contact.</p>`,
-        `<p style="font-size:14px;color:#1f2126;margin:8px 0 4px;font-weight:600;">${escapeHtml(event.name)}</p>`,
-        `<p style="font-size:12px;color:#7a7a7a;margin:6px 0;">${metaLine}</p>`,
-        `<p style="font-size:13px;color:#424143;white-space:pre-wrap;margin:6px 0;">${escapeHtml(event.message)}</p>`,
-        ctaButton(`${ADMIN_BASE}/admin/contact`, "Open contact inbox"),
-        `<p style="font-size:12px;color:#7a7a7a;margin:6px 0;">Or reply directly: <a href="mailto:${escapeHtml(event.email)}">${escapeHtml(event.email)}</a></p>`,
-      ].join("");
-      return { subject, html: shell("New contact message", body) };
+      return {
+        subject: subjectLine(`New contact message from ${event.name}`),
+        html: await renderSimpleEmail({
+          ...base,
+          previewText: event.message.slice(0, 90),
+          title: "New contact message",
+          intro: ["Someone wrote in through the contact page."],
+          cards: [
+            {
+              icon: "message",
+              label: "From",
+              title: event.name,
+              rows: [
+                { label: "Email", value: event.email },
+                ...(event.company ? [{ label: "Company", value: event.company }] : []),
+                ...(event.topic ? [{ label: "Topic", value: event.topic }] : []),
+                { label: "Message", value: event.message },
+              ],
+            },
+          ],
+          action: { href: `${ADMIN_BASE}/admin/contact`, label: "Open contact inbox" },
+          secondary: { href: `mailto:${event.email}`, label: `Reply to ${event.email}` },
+        }),
+      };
     }
 
     case "GOOGLE_CALENDAR_DISCONNECTED": {
-      const subject = `[brandbite] Google Calendar connection BROKEN — bookings can't be scheduled`;
-      const body = [
-        `<p style="font-size:13px;color:#424143;margin:0 0 6px;">Google permanently rejected the stored refresh token (revoked, expired, or the account password was reset). Until someone reconnects, consultation bookings and talent interview bookings cannot create calendar events.</p>`,
-        event.googleAccountEmail
-          ? `<p style="font-size:12px;color:#7a7a7a;margin:6px 0;">Previously connected as <strong>${escapeHtml(event.googleAccountEmail)}</strong> — reconnect with the same account so events land on the same calendar.</p>`
-          : "",
-        event.errorDetail
-          ? `<p style="font-size:11px;color:#7a7a7a;margin:6px 0;"><code style="font-size:11px;background:#faf9f7;padding:1px 4px;border-radius:3px;">${escapeHtml(event.errorDetail)}</code></p>`
-          : "",
-        `<p style="font-size:12px;color:#7a7a7a;margin:6px 0;">Detected by: ${escapeHtml(event.detectedBy)}. You'll get this email once per outage — the admin panel shows a banner until the connection is restored.</p>`,
-        ctaButton(`${ADMIN_BASE}/admin/consultations/settings`, "Reconnect Google Calendar"),
-      ].join("");
-      return { subject, html: shell("Google Calendar disconnected", body) };
+      return {
+        subject: subjectLine("Google Calendar disconnected: bookings can't be scheduled"),
+        html: await renderSimpleEmail({
+          ...base,
+          previewText: "Reconnect Google Calendar so bookings can be scheduled again.",
+          title: "Google Calendar disconnected",
+          warning:
+            "Until someone reconnects, consultation and talent interview bookings can't create calendar events.",
+          intro: [
+            "Google rejected the stored access (it was revoked or expired, or the account password changed).",
+          ],
+          cards: [
+            {
+              icon: "calendar",
+              title: "Connection details",
+              tone: "neutral",
+              rows: [
+                ...(event.googleAccountEmail
+                  ? [{ label: "Connected as", value: event.googleAccountEmail }]
+                  : []),
+                { label: "Noticed by", value: event.detectedBy },
+                ...(event.errorDetail ? [{ label: "Error", value: event.errorDetail }] : []),
+              ],
+            },
+          ],
+          note: {
+            text: event.googleAccountEmail
+              ? `Reconnect with ${event.googleAccountEmail} so events land on the same calendar. You get this email once per outage; the admin panel shows a banner until it's fixed.`
+              : "You get this email once per outage; the admin panel shows a banner until it's fixed.",
+          },
+          action: {
+            href: `${ADMIN_BASE}/admin/consultations/settings`,
+            label: "Reconnect Google Calendar",
+          },
+        }),
+      };
     }
   }
 }
@@ -305,7 +399,7 @@ export async function notifySiteOwnersOfEvent(event: AdminEvent): Promise<void> 
 
   let rendered: Rendered;
   try {
-    rendered = render(event);
+    rendered = await renderAdminEventEmail(event);
   } catch (err) {
     console.error("[admin-event-email] template render failed", event.kind, err);
     return;

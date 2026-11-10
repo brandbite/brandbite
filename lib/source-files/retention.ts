@@ -103,7 +103,7 @@ async function remind(now: Date, days: 14 | 3): Promise<number> {
           userId,
           type: "SOURCE_FILES_EXPIRING",
           title: days === 14 ? "Source files deleted in 14 days" : "Source files deleted in 3 days",
-          message: `${what} on ${code} "${ticket.title}" will be deleted from brandbite on ${formatDay(group.deleteAfter)}. Download them, or connect Google Drive to keep future files for good.`,
+          message: `${what} on ${code} "${ticket.title}" will be deleted from brandbite on ${formatDay(group.deleteAfter)}. Download them, or connect Google Drive or Dropbox to keep future files for good.`,
           ticketId: ticket.id,
         });
         sent += 1;

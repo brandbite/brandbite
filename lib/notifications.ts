@@ -7,7 +7,18 @@
 import { prisma } from "@/lib/prisma";
 import type { NotificationType, UserRole } from "@prisma/client";
 import { sendNotificationEmail } from "@/lib/email";
-import { buildNotificationEmailHtml, getSubjectForType } from "@/lib/email-templates";
+import {
+  buildNotificationEmailHtml,
+  getSubjectForType,
+  type NotificationSourceFilesContext,
+  type NotificationTicketContext,
+} from "@/lib/email-templates";
+import { buildTicketCode } from "@/lib/ticket-code";
+import {
+  computeCreativePayout,
+  evaluateCreativePayoutPercent,
+  getEffectiveTokenValues,
+} from "@/lib/token-engine";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -121,8 +132,15 @@ async function sendEmailForNotification(input: CreateNotificationInput): Promise
   }
 
   const recipientRole = roleToRecipientRole(recipient.role);
-  const subject = getSubjectForType(input.type, input.title);
-  const html = buildNotificationEmailHtml({
+  const subject = getSubjectForType(input.type, input.title, recipientRole);
+  const ticket = input.ticketId
+    ? await loadTicketContext(input.ticketId, input.userId, recipientRole).catch(() => null)
+    : null;
+  const sourceFiles =
+    input.type === "SOURCE_FILES_EXPIRING" && input.ticketId
+      ? await loadExpiringFiles(input.ticketId).catch(() => null)
+      : null;
+  const html = await buildNotificationEmailHtml({
     recipientName: recipient.name,
     type: input.type,
     title: input.title,
@@ -131,9 +149,85 @@ async function sendEmailForNotification(input: CreateNotificationInput): Promise
     moodboardId: input.moodboardId ?? null,
     actorName,
     recipientRole,
+    ticket,
+    sourceFiles,
   });
 
   await sendNotificationEmail(recipient.email, subject, html);
+}
+
+/** The facts the email's request card shows. Best effort: null on any miss. */
+async function loadTicketContext(
+  ticketId: string,
+  recipientId: string,
+  recipientRole: "customer" | "creative" | "admin",
+): Promise<NotificationTicketContext | null> {
+  const ticket = await prisma.ticket.findUnique({
+    where: { id: ticketId },
+    select: {
+      id: true,
+      title: true,
+      dueDate: true,
+      quantity: true,
+      tokenCostOverride: true,
+      creativePayoutOverride: true,
+      companyTicketNumber: true,
+      project: { select: { code: true } },
+      company: { select: { name: true } },
+      jobType: { select: { name: true, tokenCost: true, creativePayoutTokens: true } },
+    },
+  });
+  if (!ticket) return null;
+  let tokens: number | null = null;
+  if (ticket.jobType) {
+    if (recipientRole === "creative") {
+      const { payoutPercent } = await evaluateCreativePayoutPercent(recipientId);
+      tokens = computeCreativePayout({
+        tokenCost: ticket.jobType.tokenCost,
+        quantity: ticket.quantity,
+        creativePayoutOverride: ticket.creativePayoutOverride,
+        payoutPercent,
+      });
+    } else {
+      tokens = getEffectiveTokenValues(ticket).effectiveCost;
+    }
+  }
+  return {
+    code: buildTicketCode({
+      projectCode: ticket.project?.code,
+      companyTicketNumber: ticket.companyTicketNumber,
+      ticketId: ticket.id,
+    }),
+    title: ticket.title,
+    companyName: ticket.company?.name ?? null,
+    serviceName: ticket.jobType?.name ?? null,
+    dueDate: ticket.dueDate,
+    tokens,
+  };
+}
+
+/** Source files on brandbite storage that are due to be deleted. */
+async function loadExpiringFiles(ticketId: string): Promise<NotificationSourceFilesContext | null> {
+  const files = await prisma.ticketSourceFile.findMany({
+    where: {
+      ticketId,
+      storage: "R2",
+      status: "READY",
+      deletedAt: null,
+      deleteAfter: { not: null },
+    },
+    select: { name: true, sizeBytes: true, deleteAfter: true },
+    orderBy: { deleteAfter: "asc" },
+  });
+  const first = files[0]?.deleteAfter;
+  if (!first) return null;
+  return {
+    deleteAfter: first,
+    files: files.map((f) => ({
+      name: f.name,
+      sizeBytes: f.sizeBytes == null ? null : Number(f.sizeBytes),
+    })),
+  };
 }
 
 // ---------------------------------------------------------------------------

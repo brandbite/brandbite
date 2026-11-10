@@ -50,6 +50,8 @@ export function TalentDeclinePostInterviewEmailTemplate({
 
   return (
     <BaseLayout
+      role={null}
+      reason={"You received this email because you applied to work with brandbite."}
       previewText="An update on your brandbite application after the interview."
       hero={
         <HeroBand>
