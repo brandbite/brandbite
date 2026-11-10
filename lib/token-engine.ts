@@ -529,7 +529,7 @@ export async function completeTicketAndApplyTokens(
           amount: effectivePayout,
           reason: "JOB_PAYMENT",
           // Legacy note: reason kept as "DESIGNER_JOB_PAYOUT" would break existing data
-          notes: `Creative payout for ticket ${ticket.id}`,
+          notes: `Creative payout for request ${ticket.id}`,
           metadata: {
             ...(ticket.jobTypeId ? { jobTypeId: ticket.jobTypeId } : {}),
             tokenCost: ticket.jobType.tokenCost,

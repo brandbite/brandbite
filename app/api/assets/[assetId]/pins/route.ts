@@ -205,13 +205,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ assetId: strin
       }
       if (asset.ticket.id !== ticketId) {
         return NextResponse.json(
-          { error: "Asset does not belong to the specified ticket." },
+          { error: "Asset does not belong to the specified request." },
           { status: 400 },
         );
       }
       if (asset.ticket.status !== TicketStatus.IN_REVIEW) {
         return NextResponse.json(
-          { error: "Ticket must be IN_REVIEW to submit revision feedback." },
+          { error: "Request must be IN_REVIEW to submit revision feedback." },
           { status: 400 },
         );
       }
@@ -237,7 +237,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ assetId: strin
         if (currentInProgress >= plan.maxConcurrentInProgressTickets) {
           return NextResponse.json(
             {
-              error: "Your company has reached its limit for active tickets in progress.",
+              error: "Your company has reached its limit for active requests in progress.",
             },
             { status: 400 },
           );

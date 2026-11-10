@@ -275,7 +275,7 @@ export function TimeEntriesPanel({ tracking }: { tracking: TimeTracking }) {
           {summary.entries.length === 0 ? (
             <EmptyState
               title="No time logged yet"
-              description="Use Start timer above to begin tracking this job."
+              description="Use Start timer above to begin tracking this request."
             />
           ) : (
             <ul className="mt-3 divide-y divide-[var(--av2-border)]">

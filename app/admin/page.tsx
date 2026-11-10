@@ -242,7 +242,7 @@ export default function AdminDashboardPage() {
             <KpiCard
               icon={<IconTicket />}
               tone="lavender"
-              label="Tickets"
+              label="Requests"
               value={fmt(platform?.totalTickets)}
               hint={`${fmt(platform?.ticketsCreatedLast30Days)} created · ${fmt(
                 platform?.ticketsCompletedLast30Days,
@@ -280,19 +280,19 @@ export default function AdminDashboardPage() {
                 icon={<IconClock />}
                 iconClass="bg-[#fde3e1] text-[var(--av2-error)] dark:bg-[#3a1715]"
                 count={health?.overdueTickets ?? null}
-                title="Overdue tickets"
+                title="Overdue requests"
                 description="Past due and not completed"
                 href="/admin/board"
-                linkLabel="View tickets"
+                linkLabel="View requests"
               />
               <AttentionItem
                 icon={<IconAlertCircle />}
                 iconClass="bg-[#feead3] text-[#b25e09] dark:bg-[#37250f] dark:text-[#f2a33a]"
                 count={health?.staleTickets ?? null}
-                title="Stale tickets"
+                title="Stale requests"
                 description="In progress, no update for over 7 days"
                 href="/admin/board"
-                linkLabel="Review tickets"
+                linkLabel="Review requests"
               />
               <AttentionItem
                 icon={<IconWallet />}
@@ -311,10 +311,10 @@ export default function AdminDashboardPage() {
             <Card>
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h2 className="text-xl leading-7 font-semibold">Ticket workflow</h2>
+                  <h2 className="text-xl leading-7 font-semibold">Request workflow</h2>
                   <p className="mt-0.5 text-sm text-[var(--av2-text-2)]">
                     {platform
-                      ? `${fmt(totalTickets)} ${plural(totalTickets, "ticket", "tickets")} across all stages`
+                      ? `${fmt(totalTickets)} ${plural(totalTickets, "request", "requests")} across all stages`
                       : DASH}
                   </p>
                 </div>
@@ -325,8 +325,8 @@ export default function AdminDashboardPage() {
                 role="img"
                 aria-label={
                   platform
-                    ? `Ticket workflow: ${statusRows.map((s) => `${s.label} ${s.count}`).join(", ")}`
-                    : "Ticket workflow loading"
+                    ? `Request workflow: ${statusRows.map((s) => `${s.label} ${s.count}`).join(", ")}`
+                    : "Request workflow loading"
                 }
                 className="mt-6 flex h-7 w-full gap-[3px] overflow-hidden rounded-lg bg-[var(--av2-track)]"
               >
@@ -443,7 +443,9 @@ export default function AdminDashboardPage() {
                       <span className="text-2xl leading-8 font-bold tabular-nums">
                         {fmt(platform?.avgRevisionCount)}
                       </span>
-                      <span className="text-sm text-[var(--av2-text-2)]">per completed ticket</span>
+                      <span className="text-sm text-[var(--av2-text-2)]">
+                        per completed request
+                      </span>
                     </dd>
                   </div>
                 </div>

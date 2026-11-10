@@ -89,14 +89,14 @@ export function PayoutTiersCard({ data, error }: { data: PayoutData | null; erro
         description={
           data ? (
             <>
-              Complete more tickets to unlock higher payout rates. Your current rate is{" "}
+              Complete more requests to unlock higher payout rates. Your current rate is{" "}
               <span className="font-semibold text-[var(--av2-text)]">
                 {data.currentPayoutPercent}%
               </span>
               {data.currentTierName ? ` (${data.currentTierName})` : ""}.
             </>
           ) : (
-            "Complete more tickets to unlock higher payout rates."
+            "Complete more requests to unlock higher payout rates."
           )
         }
       >
@@ -135,7 +135,7 @@ export function PayoutTiersCard({ data, error }: { data: PayoutData | null; erro
                     {tier.qualified && <Badge tone="peach">Active</Badge>}
                   </p>
                   <p className="mt-0.5 text-sm text-[var(--av2-text-2)]">
-                    {tier.minCompletedTickets.toLocaleString()} tickets in{" "}
+                    {tier.minCompletedTickets.toLocaleString()} requests in{" "}
                     {tierWindowLabel(tier.timeWindowDays)}
                   </p>
                 </div>

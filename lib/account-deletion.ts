@@ -166,7 +166,7 @@ export async function findSelfDeletionBlocker(
       where: { creativeId: accountId, status: { in: [...OPEN_TICKET_STATUSES] } },
     });
     if (openTickets > 0) {
-      return `You still have ${openTickets} open job${openTickets === 1 ? "" : "s"} assigned to you. Finish ${openTickets === 1 ? "it" : "them"}, or contact us so we can reassign ${openTickets === 1 ? "it" : "them"}, before deleting your account.`;
+      return `You still have ${openTickets} open request${openTickets === 1 ? "" : "s"} assigned to you. Finish ${openTickets === 1 ? "it" : "them"}, or contact us so we can reassign ${openTickets === 1 ? "it" : "them"}, before deleting your account.`;
     }
     const inFlight = await db.withdrawal.count({
       where: { creativeId: accountId, status: { in: [...IN_FLIGHT_WITHDRAWAL_STATUSES] } },

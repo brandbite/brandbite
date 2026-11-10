@@ -162,7 +162,7 @@ export async function POST(req: NextRequest) {
           select: { id: true },
         });
         if (!ticket) {
-          return NextResponse.json({ error: "Job not found" }, { status: 400 });
+          return NextResponse.json({ error: "Request not found" }, { status: 400 });
         }
       }
     } else {
@@ -195,7 +195,10 @@ export async function POST(req: NextRequest) {
           select: { id: true },
         });
         if (!ticket) {
-          return NextResponse.json({ error: "Ticket not found for this company" }, { status: 400 });
+          return NextResponse.json(
+            { error: "Request not found for this company" },
+            { status: 400 },
+          );
         }
       }
     }

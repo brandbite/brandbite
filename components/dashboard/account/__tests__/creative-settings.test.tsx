@@ -174,7 +174,7 @@ describe("Creative settings: availability", () => {
 
     fireEvent.click(within(panel).getByRole("button", { name: "Pause working" }));
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText(/You have 2 active tickets/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/You have 2 active requests/)).toBeInTheDocument();
     expect(writes).toEqual([]);
   });
 

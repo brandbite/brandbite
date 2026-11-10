@@ -97,7 +97,7 @@ describe("findSelfDeletionBlocker — creatives", () => {
       status: "IN_PROGRESS",
     });
 
-    expect(await findSelfDeletionBlocker(creative.id, "DESIGNER")).toMatch(/1 open job/);
+    expect(await findSelfDeletionBlocker(creative.id, "DESIGNER")).toMatch(/1 open request/);
   });
 
   it("does not count finished jobs", async () => {

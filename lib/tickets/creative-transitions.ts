@@ -42,11 +42,11 @@ export function creativeTransitionError(
 ): string | null {
   if (from === to) return null;
   if (ALLOWED[from].includes(to)) return null;
-  if (from === "DONE") return "This ticket is done and can't be moved.";
-  if (from === "CANCELED") return "This ticket was cancelled.";
-  if (to === "DONE") return "Only the customer can mark a ticket as done.";
+  if (from === "DONE") return "This request is done and can't be moved.";
+  if (from === "CANCELED") return "This request was cancelled.";
+  if (to === "DONE") return "Only the customer can mark a request as done.";
   if (from === "TODO" && to === "IN_REVIEW") {
-    return "Start the ticket first: move it to In progress, then send your work with Upload work.";
+    return "Start the request first: move it to In progress, then send your work with Upload work.";
   }
   if (from === "IN_REVIEW" && to === "TODO") {
     return "This version is with the customer. Pull it back to In progress instead.";

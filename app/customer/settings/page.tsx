@@ -1068,7 +1068,7 @@ export default function CustomerSettingsPage() {
                 <DeleteAccountCard
                   endpoint="/api/customer/account"
                   email={user.email}
-                  description="Delete your brandbite account permanently. Your ledger history and existing tickets are retained in anonymized form for audit purposes; your email is freed up for future sign-ups."
+                  description="Delete your brandbite account permanently. Your ledger history and existing requests are retained in anonymized form for audit purposes; your email is freed up for future sign-ups."
                 />
               </div>
             </KeptTabPanel>
@@ -1086,7 +1086,7 @@ export default function CustomerSettingsPage() {
         />
         <div className="space-y-3 px-6 pb-4 text-sm text-[var(--av2-text-2)]">
           <p>
-            You&apos;ll lose access to this workspace&apos;s projects, tickets, and members. Your
+            You&apos;ll lose access to this workspace&apos;s projects, requests, and members. Your
             account stays active and you keep any other workspace memberships. An owner can
             re-invite you later.
           </p>

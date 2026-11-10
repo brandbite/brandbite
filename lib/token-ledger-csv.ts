@@ -18,7 +18,7 @@ const HEADER = [
   "Type",
   "Amount",
   "Reason",
-  "Ticket",
+  "Request",
   "Notes",
   "Balance before",
   "Balance after",

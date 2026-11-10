@@ -33,7 +33,7 @@ export async function POST(_req: NextRequest, ctx: RouteContext) {
 
     if (user.role !== "CUSTOMER") {
       return NextResponse.json(
-        { error: "Only customers can cancel their own tickets." },
+        { error: "Only customers can cancel their own requests." },
         { status: 403 },
       );
     }
@@ -49,7 +49,7 @@ export async function POST(_req: NextRequest, ctx: RouteContext) {
     if (!isCompanyAdminRole(companyRole)) {
       return NextResponse.json(
         {
-          error: "Only company owners or project managers can cancel tickets.",
+          error: "Only company owners or project managers can cancel requests.",
         },
         { status: 403 },
       );
@@ -79,14 +79,14 @@ export async function POST(_req: NextRequest, ctx: RouteContext) {
     });
 
     if (!ticket) {
-      return NextResponse.json({ error: "Ticket not found." }, { status: 404 });
+      return NextResponse.json({ error: "Request not found." }, { status: 404 });
     }
 
     if (ticket.status !== TicketStatus.TODO) {
       return NextResponse.json(
         {
           error:
-            "Only tickets still in TODO can be cancelled. Once a creative has started work, please contact support.",
+            "Only requests still in TODO can be cancelled. Once a creative has started work, please contact support.",
           status: ticket.status,
         },
         { status: 409 },
@@ -99,7 +99,7 @@ export async function POST(_req: NextRequest, ctx: RouteContext) {
     if (ticket.creativeId) {
       return NextResponse.json(
         {
-          error: "This ticket has already been assigned to a creative. Please contact support.",
+          error: "This request has already been assigned to a creative. Please contact support.",
         },
         { status: 409 },
       );
@@ -159,7 +159,7 @@ export async function POST(_req: NextRequest, ctx: RouteContext) {
             direction: LedgerDirection.CREDIT,
             amount: effectiveCost,
             reason: "REFUND",
-            notes: `Customer cancelled ticket: ${ticket.title}`,
+            notes: `Customer cancelled request: ${ticket.title}`,
             metadata: {
               cancelledByUserId: user.id,
               cancelledByEmail: user.email,
@@ -196,12 +196,12 @@ export async function POST(_req: NextRequest, ctx: RouteContext) {
       // can refresh state instead of retrying blindly.
       return NextResponse.json(
         {
-          error: "This ticket was just updated by someone else. Please refresh and try again.",
+          error: "This request was just updated by someone else. Please refresh and try again.",
         },
         { status: 409 },
       );
     }
     console.error("[customer.tickets.cancel] POST error", error);
-    return NextResponse.json({ error: "Failed to cancel ticket." }, { status: 500 });
+    return NextResponse.json({ error: "Failed to cancel request." }, { status: 500 });
   }
 }

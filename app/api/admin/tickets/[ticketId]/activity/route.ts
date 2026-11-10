@@ -23,7 +23,7 @@ export async function GET(
 
     const activity = await buildTicketActivity(ticketId, { kind: "admin", userId: user.id });
     if (!activity) {
-      return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
+      return NextResponse.json({ error: "Request not found" }, { status: 404 });
     }
 
     return NextResponse.json(activity);

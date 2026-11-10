@@ -258,7 +258,7 @@ export function JobTypePicker({ jobTypes, value, onChange, disabled = false }: J
         type="button"
         onClick={handleOpen}
         disabled={disabled}
-        aria-label="Select job type"
+        aria-label="Select a service"
         className={`flex w-full items-center justify-between gap-2 rounded-md border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-2 text-left text-sm transition-colors outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)] disabled:cursor-not-allowed disabled:opacity-50 ${selectedJobType ? "text-[var(--bb-secondary)]" : "text-[var(--bb-text-muted)]"} `}
       >
         <div className="min-w-0 flex-1">
@@ -277,7 +277,7 @@ export function JobTypePicker({ jobTypes, value, onChange, disabled = false }: J
               </div>
             </>
           ) : (
-            <span>Choose a service type&hellip;</span>
+            <span>Choose a service&hellip;</span>
           )}
         </div>
 
@@ -301,7 +301,7 @@ export function JobTypePicker({ jobTypes, value, onChange, disabled = false }: J
       <Modal open={open} onClose={handleClose} size="full">
         {/* Header */}
         <ModalHeader
-          title="Choose a service type"
+          title="Choose a service"
           subtitle={`${jobTypes.length} services across ${categories.length} categories`}
           onClose={handleClose}
         />

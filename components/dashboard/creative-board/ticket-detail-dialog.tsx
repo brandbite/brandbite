@@ -123,7 +123,7 @@ function RevisionsStatus({
       <EmptyState
         icon={<IconDocument width={24} height={24} />}
         title="No versions yet."
-        description="Once you send this job for review, each version and its feedback will appear here."
+        description="Once you send this request for review, each version and its feedback will appear here."
       />
     );
   }
@@ -237,7 +237,7 @@ export function TicketDetailDialog({
 
             <div className="mt-4 [&_[role=tab]]:min-h-10">
               <Tabs<DetailTab>
-                label="Job details"
+                label="Request details"
                 idPrefix={tabsId}
                 value={tab}
                 onChange={onTabChange}
@@ -323,7 +323,7 @@ export function TicketDetailDialog({
                           />
                         ) : (
                           <p className="text-sm text-[var(--av2-text-2)]">
-                            No description was added to this job.
+                            No description was added to this request.
                           </p>
                         )}
 
@@ -427,7 +427,7 @@ export function TicketDetailDialog({
                     </dd>
                   </div>
                   <Detail label="Project">{ticket.project?.name || DASH}</Detail>
-                  <Detail label="Job type">{ticket.jobType?.name || DASH}</Detail>
+                  <Detail label="Service">{ticket.jobType?.name || DASH}</Detail>
                   <Detail label="Payout">{formatPayout(ticket.estimatedPayout)}</Detail>
                   <Detail label="Due date">
                     <span className={overdue ? "text-[var(--av2-error-text)]" : ""}>
@@ -465,7 +465,7 @@ export function TicketDetailDialog({
               </Button>
             ) : (
               <ButtonLink href={fullPageHref} variant="primary">
-                Open job
+                Open request
                 <IconArrowUpRight />
               </ButtonLink>
             )}

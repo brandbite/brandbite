@@ -431,7 +431,7 @@ export default function AdminPayoutRulesPage() {
       title="Payout example"
       action={
         <span className="text-xs text-[var(--av2-text-2)] tabular-nums">
-          Illustration · {fmt(EXAMPLE_JOB_TOKENS)}-token job
+          Illustration · {fmt(EXAMPLE_JOB_TOKENS)}-token request
         </span>
       }
     >
@@ -497,7 +497,7 @@ export default function AdminPayoutRulesPage() {
             , not {fmt(topRule.payoutPercent + secondRule.payoutPercent)}%.
           </li>
         )}
-        <li>A per-ticket payout override, when set, takes precedence over every rule.</li>
+        <li>A per-request payout override, when set, takes precedence over every rule.</li>
       </ul>
     </PanelSection>
   );
@@ -592,9 +592,9 @@ export default function AdminPayoutRulesPage() {
           <div className="space-y-5">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field
-                label="Min. completed tickets"
+                label="Min. completed requests"
                 htmlFor="rule-min-tickets"
-                hint="Tickets completed within the window."
+                hint="Requests completed within the window."
               >
                 <TextInput
                   id="rule-min-tickets"
@@ -605,7 +605,7 @@ export default function AdminPayoutRulesPage() {
                   onChange={(e) => setFormMinTickets(e.target.value)}
                   required
                   placeholder="e.g. 100"
-                  suffix="tickets"
+                  suffix="requests"
                 />
               </Field>
 
@@ -669,7 +669,7 @@ export default function AdminPayoutRulesPage() {
               />
               <p id="rule-active-hint" className="mt-1.5 text-xs text-[var(--av2-text-2)]">
                 {formIsActive
-                  ? "Active — evaluated when a creative's ticket is completed."
+                  ? "Active — evaluated when a creative's request is completed."
                   : "Inactive — ignored when payouts are calculated."}
               </p>
             </div>
@@ -814,7 +814,7 @@ export default function AdminPayoutRulesPage() {
               <thead>
                 <tr>
                   <Th>Rule</Th>
-                  <Th align="right">Completed tickets</Th>
+                  <Th align="right">Completed requests</Th>
                   <Th align="right">Window</Th>
                   <Th align="right">Payout</Th>
                   <Th>Status</Th>
@@ -832,13 +832,13 @@ export default function AdminPayoutRulesPage() {
                       <div className="font-semibold">{r.name}</div>
                       <div className="mt-0.5 text-xs text-[var(--av2-text-2)]">
                         {r.description ||
-                          `Complete ${fmt(r.minCompletedTickets)} ${plural(r.minCompletedTickets, "ticket", "tickets")} in ${formatTimeWindow(r.timeWindowDays)} to earn ${r.payoutPercent}%.`}
+                          `Complete ${fmt(r.minCompletedTickets)} ${plural(r.minCompletedTickets, "request", "requests")} in ${formatTimeWindow(r.timeWindowDays)} to earn ${r.payoutPercent}%.`}
                       </div>
                     </Td>
                     <Td align="right" className="whitespace-nowrap">
                       {fmt(r.minCompletedTickets)}
                       <span className="ml-1 text-xs text-[var(--av2-text-2)]">
-                        {plural(r.minCompletedTickets, "ticket", "tickets")}
+                        {plural(r.minCompletedTickets, "request", "requests")}
                       </span>
                     </Td>
                     <Td align="right" className="whitespace-nowrap">
@@ -880,7 +880,7 @@ export default function AdminPayoutRulesPage() {
         title="Delete this payout rule?"
         description={
           selected
-            ? `"${selected.name}" will be removed immediately and stop applying to new completed tickets.`
+            ? `"${selected.name}" will be removed immediately and stop applying to new completed requests.`
             : undefined
         }
         confirmLabel="Delete rule"

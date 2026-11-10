@@ -148,7 +148,7 @@ export async function createCustomerTicket(input: CreateTicketInput): Promise<Cr
       select: { id: true, tokenCost: true },
     });
     if (!jobType) {
-      return { success: false, code: "JOB_TYPE_NOT_FOUND", message: "Job type not found." };
+      return { success: false, code: "JOB_TYPE_NOT_FOUND", message: "Service not found." };
     }
   }
 
@@ -401,7 +401,7 @@ export async function createCustomerTicket(input: CreateTicketInput): Promise<Cr
             direction: LedgerDirection.DEBIT,
             amount: effectiveCost,
             reason: "JOB_REQUEST_CREATED",
-            notes: `New ticket created: ${createdTicket.title}`,
+            notes: `New request created: ${createdTicket.title}`,
             metadata: {
               jobTypeId: jobType.id,
               unitCost: jobType.tokenCost,

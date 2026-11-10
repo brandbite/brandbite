@@ -69,7 +69,7 @@ export function JobMoodboards({ ticketId }: { ticketId: string }) {
 
       {failed ? (
         <p role="alert" className="text-sm text-[var(--av2-error-text)]">
-          We couldn&apos;t load this job&apos;s moodboards.
+          We couldn&apos;t load this request&apos;s moodboards.
         </p>
       ) : boards === null ? (
         <p role="status" className="text-sm text-[var(--av2-text-2)]">
@@ -77,7 +77,7 @@ export function JobMoodboards({ ticketId }: { ticketId: string }) {
         </p>
       ) : boards.length === 0 ? (
         <p className="text-sm text-[var(--av2-text-2)]">
-          No moodboards on this job yet. Start one to collect references and ideas.
+          No moodboards on this request yet. Start one to collect references and ideas.
         </p>
       ) : (
         <ul className="space-y-2">
@@ -106,7 +106,7 @@ export function JobMoodboards({ ticketId }: { ticketId: string }) {
 
       <div className="mt-4">
         <Button onClick={createBoard} disabled={creating} aria-busy={creating}>
-          {creating ? "Creating..." : "+ New moodboard for this job"}
+          {creating ? "Creating..." : "+ New moodboard for this request"}
         </Button>
         {createFailed && (
           <p role="alert" className="mt-2 text-sm text-[var(--av2-error-text)]">

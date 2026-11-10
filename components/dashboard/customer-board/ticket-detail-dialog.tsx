@@ -405,7 +405,7 @@ export function TicketDetailDialog({
       open
       onClose={onClose}
       width="detail"
-      eyebrow="Ticket"
+      eyebrow="Request"
       title={
         <>
           {ticket.code ? (
@@ -665,7 +665,7 @@ export function TicketDetailDialog({
                     ))}
                   </Select>
                 </Field>
-                <Field label="Job type" htmlFor={`${formId}-job-type`}>
+                <Field label="Service" htmlFor={`${formId}-job-type`}>
                   <Select
                     id={`${formId}-job-type`}
                     value={editForm.jobTypeId}
@@ -675,7 +675,7 @@ export function TicketDetailDialog({
                     }}
                     disabled={editSaving || !metadata}
                   >
-                    <option value="">Choose a job type</option>
+                    <option value="">Choose a service</option>
                     {(metadata?.jobTypes ?? []).map((jobType) => (
                       <option key={jobType.id} value={jobType.id}>
                         {jobType.name}
@@ -687,7 +687,7 @@ export function TicketDetailDialog({
             ) : (
               <>
                 <DetailRow label="Project">{ticket.projectName || DASH}</DetailRow>
-                <DetailRow label="Job type">{ticket.jobTypeName || DASH}</DetailRow>
+                <DetailRow label="Service">{ticket.jobTypeName || DASH}</DetailRow>
               </>
             )}
             {extras?.effectiveCost != null ? (

@@ -618,7 +618,7 @@ export default function AdminPlanAssignmentPage() {
                   <Th>Current plan</Th>
                   <Th align="right">Balance</Th>
                   <Th align="right">Projects</Th>
-                  <Th align="right">Tickets</Th>
+                  <Th align="right">Requests</Th>
                   <Th align="right">
                     <span className="sr-only">Open</span>
                   </Th>

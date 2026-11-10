@@ -96,7 +96,7 @@ export function TalentOnboardedEmailTemplate({
       </FeatureList>
 
       <Paragraph>
-        Tickets matching your categories will start landing in your dashboard as customer requests
+        Requests matching your categories will start landing in your dashboard as customer requests
         come in. You can pause new assignments at any point from your settings (vacation, busy week,
         end-of-quarter crunch — it&apos;s built in).
       </Paragraph>

@@ -331,7 +331,7 @@ export async function GET(req: NextRequest) {
     }
 
     console.error("[creative.tickets] GET error", error);
-    return NextResponse.json({ error: "Failed to load creative tickets" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to load creative requests" }, { status: 500 });
   }
 }
 
@@ -362,7 +362,7 @@ export async function PATCH(req: NextRequest) {
 
     if (user.role !== "DESIGNER") {
       return NextResponse.json(
-        { error: "Only creatives can update these tickets." },
+        { error: "Only creatives can update these requests." },
         { status: 403 },
       );
     }
@@ -375,7 +375,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Both id and status are required." }, { status: 400 });
     }
     if (!isValidTicketStatus(requestedStatus)) {
-      return NextResponse.json({ error: "Invalid ticket status." }, { status: 400 });
+      return NextResponse.json({ error: "Invalid request status." }, { status: 400 });
     }
 
     const outcome = await transitionCreativeTicketStatus({
@@ -433,6 +433,6 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
     console.error("[creative.tickets] PATCH error", error);
-    return NextResponse.json({ error: "Failed to update ticket" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to update request" }, { status: 500 });
   }
 }

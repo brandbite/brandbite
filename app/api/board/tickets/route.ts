@@ -87,6 +87,6 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
     console.error("[board.tickets] GET error", error);
-    return NextResponse.json({ error: "Failed to load board tickets" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to load board requests" }, { status: 500 });
   }
 }

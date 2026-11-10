@@ -108,7 +108,7 @@ export function useCreativeAvailability() {
         showToast({
           type: "info",
           title: "Paused",
-          description: "No new tickets will be assigned to you.",
+          description: "No new requests will be assigned to you.",
         });
       } else {
         const err = await res.json().catch(() => null);
@@ -149,7 +149,7 @@ export function useCreativeAvailability() {
         showToast({
           type: "success",
           title: "Welcome back!",
-          description: "You are now accepting new tickets.",
+          description: "You are now accepting new requests.",
         });
       } else {
         showToast({
@@ -252,7 +252,7 @@ export function AvailabilityPanel({ availability }: { availability: Availability
 
   return (
     <Card>
-      <CardTitle description="Pause to stop receiving new ticket assignments. Your existing work is not affected.">
+      <CardTitle description="Pause to stop receiving new request assignments. Your existing work is not affected.">
         Availability
       </CardTitle>
 
@@ -330,8 +330,8 @@ export function AvailabilityPanel({ availability }: { availability: Availability
         open={showConfirm}
         onClose={() => setShowConfirm(false)}
         onConfirm={() => void executePause()}
-        title="Pause with active tickets?"
-        description={`You have ${activeCount} active ticket${
+        title="Pause with active requests?"
+        description={`You have ${activeCount} active request${
           activeCount > 1 ? "s" : ""
         }. Pausing will prevent new assignments but won't affect your current work. Continue?`}
         confirmLabel="Pause"

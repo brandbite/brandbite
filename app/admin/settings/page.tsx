@@ -97,21 +97,21 @@ const SETTING_META: Record<string, SettingMeta> = {
   ADMIN_EVENT_EMAILS_ENABLED: {
     label: "Email site owners on system events",
     description:
-      "When on, every SITE_OWNER receives an email when a meaningful event happens — new feedback submitted, new ticket created, new company finishes onboarding, new payment received, new talent application, new withdrawal request. Default on. Mute globally with this toggle when the inbox gets noisy.",
+      "When on, every SITE_OWNER receives an email when a meaningful event happens — new feedback submitted, new request created, new company finishes onboarding, new payment received, new talent application, new withdrawal request. Default on. Mute globally with this toggle when the inbox gets noisy.",
     type: "boolean",
     section: "notifications",
   },
   TAGS_ENABLED: {
-    label: "Ticket tags",
+    label: "Request tags",
     description:
-      "Per-company tagging system on tickets. When off, the TagMultiSelect is hidden on the new-ticket form, the tag-management section is hidden in /customer/settings, and tag chips don't render on any board card or detail page. Existing tag data is preserved — flipping back on restores everything instantly. Currently shipped off until the board filter UI lands.",
+      "Per-company tagging system on requests. When off, the TagMultiSelect is hidden on the new-request form, the tag-management section is hidden in /customer/settings, and tag chips don't render on any board card or detail page. Existing tag data is preserved — flipping back on restores everything instantly. Currently shipped off until the board filter UI lands.",
     type: "boolean",
     section: "features",
   },
   AI_TICKETS_MODE: {
-    label: "AI ticket mode (Work with AI)",
+    label: "AI request mode (Work with AI)",
     description:
-      "Controls the 'Work with AI' option on the new-ticket form and the AI generation endpoints. Off = hidden for everyone (default — there's no working AI generation API yet). Test = visible to site admins only, so you can validate the AI provider before launch. On = available to all customers.",
+      "Controls the 'Work with AI' option on the new-request form and the AI generation endpoints. Off = hidden for everyone (default — there's no working AI generation API yet). Test = visible to site admins only, so you can validate the AI provider before launch. On = available to all customers.",
     type: "select",
     section: "features",
     defaultValue: "off",
@@ -173,11 +173,11 @@ const QUICK_LINKS: { href: string; title: string; description: string; ownerOnly
   {
     href: "/admin/payout-rules",
     title: "Payout rules",
-    description: "Per-job-type creative payout percentages.",
+    description: "Per-service creative payout percentages.",
   },
   {
     href: "/admin/job-types",
-    title: "Job types & categories",
+    title: "Services & categories",
     description: "Catalog of work the platform supports + token costs.",
   },
   {

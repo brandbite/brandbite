@@ -67,7 +67,7 @@ export const updateAdminSettingSchema = z
         ctx.addIssue({
           code: "custom",
           path: ["value"],
-          message: "AI ticket mode must be off or on.",
+          message: "AI request mode must be off or on.",
         });
       }
     }

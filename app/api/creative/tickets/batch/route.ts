@@ -38,7 +38,7 @@ export async function PATCH(req: NextRequest) {
     const user = await getCurrentUserOrThrow();
 
     if (user.role !== "DESIGNER") {
-      return NextResponse.json({ error: "Only creatives can update tickets." }, { status: 403 });
+      return NextResponse.json({ error: "Only creatives can update requests." }, { status: 403 });
     }
 
     const body = await req.json();
@@ -54,13 +54,13 @@ export async function PATCH(req: NextRequest) {
 
     if (ticketIds.length > 50) {
       return NextResponse.json(
-        { error: "Cannot update more than 50 tickets at once." },
+        { error: "Cannot update more than 50 requests at once." },
         { status: 400 },
       );
     }
 
     if (!isValidTicketStatus(requestedStatus)) {
-      return NextResponse.json({ error: "Invalid ticket status." }, { status: 400 });
+      return NextResponse.json({ error: "Invalid request status." }, { status: 400 });
     }
 
     const nextStatus = requestedStatus as TicketStatus;
@@ -68,7 +68,7 @@ export async function PATCH(req: NextRequest) {
     // Creatives cannot mark tickets as DONE or send to IN_REVIEW via bulk
     if (nextStatus === TicketStatus.DONE) {
       return NextResponse.json(
-        { error: "Creatives cannot mark tickets as DONE." },
+        { error: "Creatives cannot mark requests as DONE." },
         { status: 403 },
       );
     }
@@ -162,7 +162,7 @@ export async function PATCH(req: NextRequest) {
         results.push({
           ticketId,
           success: false,
-          error: "Ticket not found or not assigned to you.",
+          error: "Request not found or not assigned to you.",
         });
         continue;
       }
@@ -181,7 +181,7 @@ export async function PATCH(req: NextRequest) {
         results.push({
           ticketId,
           success: false,
-          error: "Ticket is already DONE and cannot be changed.",
+          error: "Request is already DONE and cannot be changed.",
         });
         continue;
       }
@@ -205,7 +205,7 @@ export async function PATCH(req: NextRequest) {
           results.push({
             ticketId,
             success: false,
-            error: `Company has reached its limit (${limits.max}) for active tickets in progress.`,
+            error: `Company has reached its limit (${limits.max}) for active requests in progress.`,
           });
           continue;
         }
@@ -235,7 +235,7 @@ export async function PATCH(req: NextRequest) {
         createNotification({
           userId: ticket.createdById,
           type: "TICKET_STATUS_CHANGED",
-          title: "Ticket status updated",
+          title: "Request status updated",
           message: `"${ticket.title}" was moved to ${nextStatus.replace("_", " ").toLowerCase()}`,
           ticketId: ticket.id,
           actorId: user.id,
@@ -245,7 +245,7 @@ export async function PATCH(req: NextRequest) {
         results.push({
           ticketId,
           success: false,
-          error: "Failed to update ticket.",
+          error: "Failed to update request.",
         });
       }
     }
@@ -260,6 +260,6 @@ export async function PATCH(req: NextRequest) {
     }
 
     console.error("[creative.tickets.batch] PATCH error", error);
-    return NextResponse.json({ error: "Failed to batch update tickets" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to batch update requests" }, { status: 500 });
   }
 }

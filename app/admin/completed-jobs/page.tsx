@@ -164,7 +164,8 @@ export default function AdminCompletedJobsPage() {
         }
         if (res.status === 403) {
           throw new Error(
-            (json as any)?.error || "You do not have access to completed jobs in this workspace.",
+            (json as any)?.error ||
+              "You do not have access to completed requests in this workspace.",
           );
         }
         const msg = (json as any)?.error || `Request failed with status ${res.status}`;
@@ -175,7 +176,7 @@ export default function AdminCompletedJobsPage() {
       setLoaded(true);
     } catch (err: unknown) {
       console.error("[AdminCompletedJobs] load error", err);
-      const message = err instanceof Error ? err.message : "Failed to load completed jobs.";
+      const message = err instanceof Error ? err.message : "Failed to load completed requests.";
       setError(message);
     } finally {
       setLoading(false);
@@ -258,9 +259,9 @@ export default function AdminCompletedJobsPage() {
 
   const panel = selected ? (
     <DetailPanel
-      title="Job details"
+      title="Request details"
       onClose={() => setSelectedId(null)}
-      closeLabel="Close job details"
+      closeLabel="Close request details"
     >
       <p className="text-2xl leading-8 font-bold break-words">{selected.title}</p>
       <div className="mt-2 flex flex-wrap items-center gap-3">
@@ -271,7 +272,7 @@ export default function AdminCompletedJobsPage() {
       </div>
 
       <div className="mt-6">
-        <PanelSection title="Job">
+        <PanelSection title="Request">
           <KeyValueList
             rows={[
               { label: "Company", value: selected.companyName ?? DASH },
@@ -289,7 +290,7 @@ export default function AdminCompletedJobsPage() {
                   </>
                 ),
               },
-              { label: "Job type", value: selected.jobTypeName ?? DASH },
+              { label: "Service", value: selected.jobTypeName ?? DASH },
               {
                 label: "Completed",
                 value: <span className="tabular-nums">{formatDateTime(selected.completedAt)}</span>,
@@ -303,8 +304,8 @@ export default function AdminCompletedJobsPage() {
             ]}
           />
           <p className="mt-3 text-xs text-[var(--av2-text-2)]">
-            Payout tokens are the amount on the creative&apos;s payout ledger entry. Jobs without an
-            entry show none.
+            Payout tokens are the amount on the creative&apos;s payout ledger entry. Requests
+            without an entry show none.
           </p>
         </PanelSection>
 
@@ -329,7 +330,7 @@ export default function AdminCompletedJobsPage() {
               <div className="min-w-0 text-sm">
                 <p className="font-semibold">No ledger entry found</p>
                 <p className="mt-0.5 text-[var(--av2-text-2)]">
-                  No payout entry is linked to this ticket. Check the token ledger before
+                  No payout entry is linked to this request. Check the token ledger before
                   reconciling — this alone doesn&apos;t mean the creative wasn&apos;t paid.
                 </p>
               </div>
@@ -343,7 +344,7 @@ export default function AdminCompletedJobsPage() {
               View token ledger
             </ButtonLink>
             <ButtonLink href={`/admin/tickets/${selected.ticketId}`} className="flex-1">
-              Open ticket
+              Open request
             </ButtonLink>
           </div>
         </PanelSection>
@@ -358,7 +359,7 @@ export default function AdminCompletedJobsPage() {
   return (
     <>
       <PageHeader
-        title="Completed jobs"
+        title="Completed requests"
         description="Review finished work and match it to creative payout ledger entries."
         actions={<ButtonLink href="/admin/board">Back to board</ButtonLink>}
       />
@@ -379,16 +380,16 @@ export default function AdminCompletedJobsPage() {
           <KpiCard
             icon={<IconTicket />}
             tone="lavender"
-            label="Completed jobs"
+            label="Completed requests"
             value={showStats ? fmt(stats.total) : DASH}
-            hint="Most recent 100 Done tickets"
+            hint="Most recent 100 Done requests"
           />
           <KpiCard
             icon={<IconDocument />}
             tone="green"
             label="Ledger entry found"
             value={showStats ? fmt(stats.withPayout) : DASH}
-            hint="Payout entry linked to the ticket"
+            hint="Payout entry linked to the request"
           />
           <KpiCard
             icon={<IconAlertCircle />}
@@ -404,8 +405,8 @@ export default function AdminCompletedJobsPage() {
             value={showStats ? fmt(stats.totalTokens) : DASH}
             hint={
               showStats && stats.unpriced > 0
-                ? `${fmt(stats.unpriced)} ${plural(stats.unpriced, "job", "jobs")} without a payout value`
-                : "From job type settings"
+                ? `${fmt(stats.unpriced)} ${plural(stats.unpriced, "request", "requests")} without a payout value`
+                : "From service settings"
             }
           />
         </div>
@@ -418,7 +419,8 @@ export default function AdminCompletedJobsPage() {
             <div className="min-w-0 flex-1">
               <p className="text-base font-semibold">
                 {fmt(stats.withoutPayout)} completed{" "}
-                {plural(stats.withoutPayout, "job has", "jobs have")} no matching ledger entry
+                {plural(stats.withoutPayout, "request has", "requests have")} no matching ledger
+                entry
               </p>
               <p className="mt-0.5 text-sm text-[var(--av2-text-2)]">
                 Review {plural(stats.withoutPayout, "it", "them")} against the token ledger before
@@ -429,7 +431,7 @@ export default function AdminCompletedJobsPage() {
               <Button onClick={() => setLedgerFilter("NOT_FOUND")}>Show these only</Button>
             ) : (
               <Button variant="ghost" onClick={() => setLedgerFilter("ALL")}>
-                Show all jobs
+                Show all requests
               </Button>
             )}
           </div>
@@ -450,8 +452,8 @@ export default function AdminCompletedJobsPage() {
                 className="min-w-[220px] flex-1"
                 value={search}
                 onChange={setSearch}
-                placeholder="Search ticket, company or creative"
-                label="Search by ticket code, title, company, project or creative"
+                placeholder="Search request, company or creative"
+                label="Search by request code, title, company, project or creative"
               />
               <div className="w-full sm:w-52">
                 <Select
@@ -469,7 +471,7 @@ export default function AdminCompletedJobsPage() {
 
           {loading && !loaded ? (
             <div className="space-y-3 border-t border-[var(--av2-border)] px-6 py-5" role="status">
-              <span className="sr-only">Loading completed jobs…</span>
+              <span className="sr-only">Loading completed requests…</span>
               {[0, 1, 2, 3].map((i) => (
                 <Skeleton key={i} className="h-12 w-full" />
               ))}
@@ -477,7 +479,7 @@ export default function AdminCompletedJobsPage() {
           ) : !loaded ? (
             <div className="border-t border-[var(--av2-border)]">
               <EmptyState
-                title="Completed jobs couldn't be loaded"
+                title="Completed requests couldn't be loaded"
                 description="See the error above, then reload the page."
               />
             </div>
@@ -485,23 +487,23 @@ export default function AdminCompletedJobsPage() {
             <div className="border-t border-[var(--av2-border)]">
               <EmptyState
                 icon={<IconTicket width={28} height={28} />}
-                title="No completed jobs yet"
-                description="Tickets appear here once a customer marks them as Done."
+                title="No completed requests yet"
+                description="Requests appear here once a customer marks them as Done."
               />
             </div>
           ) : filteredJobs.length === 0 ? (
             <div className="border-t border-[var(--av2-border)]">
               <EmptyState
-                title="No completed jobs match these filters"
+                title="No completed requests match these filters"
                 description="Try a different search or ledger status."
                 action={<Button onClick={resetFilters}>Clear filters</Button>}
               />
             </div>
           ) : (
-            <Table label="Completed jobs">
+            <Table label="Completed requests">
               <thead>
                 <tr>
-                  <Th>Ticket</Th>
+                  <Th>Request</Th>
                   <Th className="max-2xl:hidden">Company</Th>
                   <Th>Creative</Th>
                   <Th className={hideWhenPanel}>Completed</Th>
@@ -579,7 +581,7 @@ export default function AdminCompletedJobsPage() {
             <TableFooter>
               <span className="tabular-nums">
                 Showing {fmt(filteredJobs.length)} of {fmt(data.length)} completed{" "}
-                {plural(data.length, "job", "jobs")}
+                {plural(data.length, "request", "requests")}
               </span>
               {filtersActive && (
                 <Button size="sm" variant="ghost" onClick={resetFilters}>
@@ -593,16 +595,16 @@ export default function AdminCompletedJobsPage() {
         <div className="mt-6">
           <Callout tone="info" title="About ledger matching">
             This view looks for a creative payout entry (JOB_PAYMENT or DESIGNER_JOB_PAYOUT) linked
-            to each ticket. A missing entry doesn&apos;t by itself prove the creative wasn&apos;t
+            to each request. A missing entry doesn&apos;t by itself prove the creative wasn&apos;t
             paid — check the token ledger and withdrawals before acting. Completed dates use the
-            ticket&apos;s last update.
+            request&apos;s last update.
           </Callout>
         </div>
 
         {!selected && loaded && data.length > 0 && (
           <p className="mt-6 flex items-center gap-2 text-sm text-[var(--av2-text-2)]">
             <IconDocument width={18} height={18} className="shrink-0" />
-            Select a job to review its completion and ledger details.
+            Select a request to review its completion and ledger details.
           </p>
         )}
       </SplitView>

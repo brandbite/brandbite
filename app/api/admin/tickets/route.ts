@@ -233,7 +233,7 @@ export async function GET(req: NextRequest) {
     }
 
     console.error("[GET /api/admin/tickets] error", error);
-    return NextResponse.json({ error: "Failed to load tickets" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to load requests" }, { status: 500 });
   }
 }
 
@@ -246,7 +246,7 @@ export async function PATCH(req: NextRequest) {
     if (!isSiteAdmin) {
       return NextResponse.json(
         {
-          error: "Only site owners or admins can modify tickets.",
+          error: "Only site owners or admins can modify requests.",
         },
         { status: 403 },
       );
@@ -279,7 +279,7 @@ export async function PATCH(req: NextRequest) {
     });
 
     if (!ticket) {
-      return NextResponse.json({ error: "Ticket not found." }, { status: 404 });
+      return NextResponse.json({ error: "Request not found." }, { status: 404 });
     }
 
     // -----------------------------------------------------------------------
@@ -339,12 +339,12 @@ export async function PATCH(req: NextRequest) {
             ? body.creativePayoutOverride
             : undefined,
         },
-        errorMessage: "Only site owners can override a ticket's token cost or creative payout.",
+        errorMessage: "Only site owners can override a request's token cost or creative payout.",
         context: extractAuditContext(req),
       });
       return NextResponse.json(
         {
-          error: "Only site owners can override a ticket's token cost or creative payout.",
+          error: "Only site owners can override a request's token cost or creative payout.",
         },
         { status: 403 },
       );
@@ -366,7 +366,7 @@ export async function PATCH(req: NextRequest) {
       if (raw > TOKEN_OVERRIDE_MAX) {
         return {
           ok: false,
-          error: `${fieldName} cannot exceed ${TOKEN_OVERRIDE_MAX.toLocaleString()}. Negotiate larger jobs off-platform or split them into multiple tickets.`,
+          error: `${fieldName} cannot exceed ${TOKEN_OVERRIDE_MAX.toLocaleString()}. Negotiate larger requests off-platform or split them into several smaller ones.`,
         };
       }
       return { ok: true, value: raw };
@@ -502,6 +502,6 @@ export async function PATCH(req: NextRequest) {
     }
 
     console.error("[PATCH /api/admin/tickets] error", error);
-    return NextResponse.json({ error: "Failed to update ticket" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to update request" }, { status: 500 });
   }
 }

@@ -246,7 +246,7 @@ export default function AdminTokenAnalyticsPage() {
           tone="red"
           label="Total debits"
           value={pending ? DASH : fmt(stats?.globalDebits)}
-          hint="Tokens spent on jobs and corrections"
+          hint="Tokens spent on requests and corrections"
         />
         <KpiCard
           icon={<IconBuilding />}
@@ -416,7 +416,7 @@ export default function AdminTokenAnalyticsPage() {
             <div className="min-w-0">
               <h2 className="text-xl leading-7 font-semibold">Company ledger scope</h2>
               <p className="mt-2 text-sm text-[var(--av2-text-2)]">
-                These totals cover company token movements only. Creative wallet movements (job
+                These totals cover company token movements only. Creative wallet movements (request
                 payouts and withdrawals) are excluded here; the global ledger shows both.
               </p>
               <div className="mt-3">

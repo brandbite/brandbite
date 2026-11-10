@@ -41,7 +41,7 @@ export const DEMO_PERSONAS: DemoPersona[] = [
     id: "site-admin",
     label: "Site admin",
     description:
-      "Platform admin with similar privileges as the site owner. Manages job types, payouts, and tickets.",
+      "Platform admin with similar privileges as the site owner. Manages services, payouts, and requests.",
     redirectTo: "/admin",
     email: "admin@brandbite-demo.com",
     role: "SITE_ADMIN",
@@ -59,7 +59,7 @@ export const DEMO_PERSONAS: DemoPersona[] = [
     id: "customer-owner",
     label: "Customer • Company owner",
     description:
-      "Owner of the Acme Studio demo workspace. Has full access to settings, billing and tickets.",
+      "Owner of the Acme Studio demo workspace. Has full access to settings, billing and requests.",
     redirectTo: "/customer/tokens",
     email: "owner@acme-demo.com",
     role: "CUSTOMER",
@@ -67,7 +67,7 @@ export const DEMO_PERSONAS: DemoPersona[] = [
   {
     id: "customer-pm",
     label: "Customer • Project manager",
-    description: "Project manager for Acme Studio demo projects. Creates and manages tickets.",
+    description: "Project manager for Acme Studio demo projects. Creates and manages requests.",
     redirectTo: "/customer/tickets",
     email: "pm@acme-demo.com",
     role: "CUSTOMER",
@@ -76,7 +76,7 @@ export const DEMO_PERSONAS: DemoPersona[] = [
     id: "customer-billing",
     label: "Customer • Billing",
     description:
-      "Billing contact for the Acme Studio demo workspace. Has limited access to tickets.",
+      "Billing contact for the Acme Studio demo workspace. Has limited access to requests.",
     redirectTo: "/customer/settings",
     email: "billing@acme-demo.com",
     role: "CUSTOMER",
@@ -85,7 +85,7 @@ export const DEMO_PERSONAS: DemoPersona[] = [
     id: "creative-ada",
     label: "Creative · Ada",
     description:
-      "Creative working on demo tickets such as Website revamp. Used to test creative auto-assignment.",
+      "Creative working on demo requests such as Website revamp. Used to test creative auto-assignment.",
     redirectTo: "/creative/balance",
     email: "ada.creative@demo.com",
     role: "DESIGNER",
@@ -94,7 +94,7 @@ export const DEMO_PERSONAS: DemoPersona[] = [
     id: "creative-liam",
     label: "Creative · Liam",
     description:
-      "Creative working on demo tickets such as onboarding visuals. Also participates in auto-assign load-balancing.",
+      "Creative working on demo requests such as onboarding visuals. Also participates in auto-assign load-balancing.",
     redirectTo: "/creative/balance",
     email: "liam.creative@demo.com",
     role: "DESIGNER",

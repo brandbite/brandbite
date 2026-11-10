@@ -243,7 +243,7 @@ export default function AdminJobTypesPage() {
     formIsActive !== baseline.isActive;
   const confirmDiscard = useUnsavedChanges(
     dirty,
-    selected ? `Job type: ${selected.name}` : "New job type",
+    selected ? `Service: ${selected.name}` : "New service",
   );
 
   // Duplicate detection — check when name changes
@@ -260,7 +260,7 @@ export default function AdminJobTypesPage() {
 
     if (existing) {
       setDuplicateWarning(
-        `A job type named "${existing.name}" already exists${
+        `A service named "${existing.name}" already exists${
           existing.isActive ? "" : " (inactive)"
         }.`,
       );
@@ -318,7 +318,7 @@ export default function AdminJobTypesPage() {
           throw new Error("You must be signed in as an admin to view this page.");
         }
         if (jtRes.status === 403) {
-          throw new Error("You do not have permission to manage job types.");
+          throw new Error("You do not have permission to manage services.");
         }
         const msg = jtJson?.error || `Request failed with status ${jtRes.status}`;
         throw new Error(msg);
@@ -328,7 +328,7 @@ export default function AdminJobTypesPage() {
       setCategoryOptions((catJson?.categories ?? []) as CategoryOption[]);
     } catch (err: any) {
       console.error("Admin job types fetch error:", err);
-      setError(err?.message || "Failed to load job types.");
+      setError(err?.message || "Failed to load services.");
     } finally {
       setLoading(false);
     }
@@ -432,7 +432,7 @@ export default function AdminJobTypesPage() {
         throw new Error(msg);
       }
 
-      const msg = isEditing ? "Job type updated successfully." : "Job type created successfully.";
+      const msg = isEditing ? "Service updated successfully." : "Service created successfully.";
       setSaveSuccess(msg);
       showToast({ type: "success", title: msg });
 
@@ -443,7 +443,7 @@ export default function AdminJobTypesPage() {
       }
     } catch (err: any) {
       console.error("Admin job types save error:", err);
-      const errMsg = err?.message || "Failed to save job type.";
+      const errMsg = err?.message || "Failed to save service.";
       setSaveError(errMsg);
       showToast({ type: "error", title: errMsg });
     } finally {
@@ -492,7 +492,7 @@ export default function AdminJobTypesPage() {
         disabled={!dirty || saving}
         aria-busy={saving}
       >
-        {saving ? "Saving…" : selected ? "Save job type" : "Create job type"}
+        {saving ? "Saving…" : selected ? "Save service" : "Create service"}
       </Button>
     </SaveBar>
   );
@@ -501,7 +501,7 @@ export default function AdminJobTypesPage() {
     <DetailPanel
       title={
         <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="break-words">{selected ? selected.name : "New job type"}</span>
+          <span className="break-words">{selected ? selected.name : "New service"}</span>
           {selected && (
             <Badge tone={selected.isActive ? "green" : "neutral"}>
               {selected.isActive ? "Active" : "Inactive"}
@@ -606,7 +606,7 @@ export default function AdminJobTypesPage() {
                 onChange={(e) => setFormDescription(e.target.value)}
                 rows={2}
                 className="min-h-20"
-                placeholder="What does this job include?"
+                placeholder="What does this service include?"
               />
             </Field>
 
@@ -616,7 +616,7 @@ export default function AdminJobTypesPage() {
                   Active
                 </p>
                 <p id="job-active-hint" className="mt-0.5 text-xs text-[var(--av2-text-2)]">
-                  Active job types are available to customers.
+                  Active services are available to customers.
                 </p>
               </div>
               <Switch
@@ -682,7 +682,7 @@ export default function AdminJobTypesPage() {
                   <>
                     {" "}
                     Prices are per unit — at the default quantity of {fmt(previewQuantity)}, a
-                    ticket costs {fmt(derivedTokenCost * previewQuantity)} tokens.
+                    request costs {fmt(derivedTokenCost * previewQuantity)} tokens.
                   </>
                 )}
               </p>
@@ -749,7 +749,7 @@ export default function AdminJobTypesPage() {
               </>
             }
             htmlFor="job-ai-prompt"
-            hint="Appended to every AI image generation for tickets of this job type. Composes with the project-level brand guide when set."
+            hint="Appended to every AI image generation for requests of this service. Composes with the project-level brand guide when set."
           >
             <TextArea
               id="job-ai-prompt"
@@ -774,12 +774,12 @@ export default function AdminJobTypesPage() {
   return (
     <div>
       <PageHeader
-        title="Job types"
+        title="Services"
         description="Define the work, estimate effort and review token pricing."
         meta={
           data ? (
             <span className="tabular-nums">
-              {fmt(jobTypes.length)} {plural(jobTypes.length, "job type", "job types")} ·{" "}
+              {fmt(jobTypes.length)} {plural(jobTypes.length, "service", "services")} ·{" "}
               {fmt(activeCount)} active · {fmt(inactiveCount)} inactive
             </span>
           ) : null
@@ -789,7 +789,7 @@ export default function AdminJobTypesPage() {
             <span aria-hidden className="text-lg leading-none">
               +
             </span>
-            New job type
+            New service
           </Button>
         }
       />
@@ -807,15 +807,15 @@ export default function AdminJobTypesPage() {
         <Card padding="none">
           <div className="px-6 pt-5">
             <div className="mb-4">
-              <h2 className="text-xl leading-7 font-semibold">Job catalogue</h2>
+              <h2 className="text-xl leading-7 font-semibold">Service catalogue</h2>
             </div>
             <FilterBar>
               <SearchInput
                 className="w-full min-w-[200px] flex-1"
                 value={searchQuery}
                 onChange={setSearchQuery}
-                placeholder="Search job types…"
-                label="Search job types by name, description or category"
+                placeholder="Search services…"
+                label="Search services by name, description or category"
               />
               <div className="w-full sm:w-52">
                 <Select
@@ -849,7 +849,7 @@ export default function AdminJobTypesPage() {
 
           {loading && !data ? (
             <div className="space-y-3 border-t border-[var(--av2-border)] px-6 py-5" role="status">
-              <span className="sr-only">Loading job types…</span>
+              <span className="sr-only">Loading services…</span>
               {[0, 1, 2, 3, 4].map((i) => (
                 <Skeleton key={i} className="h-12 w-full" />
               ))}
@@ -858,8 +858,8 @@ export default function AdminJobTypesPage() {
             <div className="border-t border-[var(--av2-border)]">
               <EmptyState
                 icon={<IconServices width={28} height={28} />}
-                title="No job types yet"
-                description="Create the first job type with the editor on the right."
+                title="No services yet"
+                description="Create the first service with the editor on the right."
               />
             </div>
           ) : filteredJobTypes.length === 0 ? (
@@ -867,15 +867,15 @@ export default function AdminJobTypesPage() {
               <EmptyState
                 title={
                   searchQuery.trim()
-                    ? "No job types match your search"
-                    : "No job types match these filters"
+                    ? "No services match your search"
+                    : "No services match these filters"
                 }
                 description="Try a different search, category or status."
                 action={<Button onClick={resetFilters}>Clear filters</Button>}
               />
             </div>
           ) : (
-            <Table label="Job types">
+            <Table label="Services">
               <thead>
                 <tr>
                   <Th>Name</Th>
@@ -976,7 +976,7 @@ export default function AdminJobTypesPage() {
         {!selected && data && jobTypes.length > 0 && (
           <p className="mt-6 flex items-center gap-2 text-sm text-[var(--av2-text-2)]">
             <IconDocument width={18} height={18} className="shrink-0" />
-            Select a job type to edit its settings, or use the editor to create a new one.
+            Select a service to edit its settings, or use the editor to create a new one.
           </p>
         )}
       </SplitView>

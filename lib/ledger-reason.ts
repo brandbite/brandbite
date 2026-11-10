@@ -7,6 +7,13 @@
 
 const REASON_LABELS: Record<string, string> = {
   ADMIN_ADJUSTMENT: "Adjustment",
+  DESIGNER_JOB_PAYOUT: "Request payout",
+  JOB_COMPLETED: "Request completed",
+  JOB_IN_REVIEW: "Request in review",
+  JOB_PAYMENT: "Request payment",
+  JOB_REQUEST_ADJUSTMENT: "Request adjustment",
+  JOB_REQUEST_CREATED: "Request created",
+  JOB_STARTED: "Request started",
   TOKEN_TOPUP: "Token top-up",
   WITHDRAW: "Withdrawal",
 };

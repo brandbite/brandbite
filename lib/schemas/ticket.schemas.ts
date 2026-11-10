@@ -17,7 +17,7 @@ export const createTicketSchema = z.object({
   // the token cost and the creative payout, and we report on it system-wide.
   // A ticket without one can't be charged — which previously let tickets slip
   // through free and left creatives unpaid.
-  jobTypeId: z.string().trim().min(1, "Please select a job type."),
+  jobTypeId: z.string().trim().min(1, "Please select a service."),
   quantity: z.coerce.number().int().min(1).max(10).optional().default(1).catch(1),
   priority: z
     .string()

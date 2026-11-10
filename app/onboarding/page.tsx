@@ -49,13 +49,13 @@ const SETUP_ITEMS: { title: string; text: string; tone: Tone; icon: ReactNode }[
   },
   {
     title: "Invite your team",
-    text: "Add team members so they can submit tickets and review creative work.",
+    text: "Add team members so they can submit requests and review creative work.",
     tone: "lavender",
     icon: <IconUsers />,
   },
   {
     title: "Create your first project",
-    text: "Organize tickets by brand, campaign, or client.",
+    text: "Organize requests by brand, campaign, or client.",
     tone: "green",
     icon: <IconMoodboards width={24} height={24} />,
   },
@@ -375,7 +375,7 @@ export default function OnboardingPage() {
                   Invite your team
                 </h1>
                 <p className="mt-2 text-sm text-[var(--av2-text-2)]">
-                  Add team members so they can submit tickets and review creative work. You can
+                  Add team members so they can submit requests and review creative work. You can
                   always invite more people later.
                 </p>
 
@@ -453,7 +453,7 @@ export default function OnboardingPage() {
                   Create your first project
                 </h1>
                 <p className="mt-2 text-sm text-[var(--av2-text-2)]">
-                  Projects help you organize tickets by brand, campaign, or client. You can always
+                  Projects help you organize requests by brand, campaign, or client. You can always
                   create more later.
                 </p>
 
@@ -478,7 +478,7 @@ export default function OnboardingPage() {
                   <Field
                     htmlFor="onb-project-code"
                     label="Project Code"
-                    hint="3-letter code for ticket IDs (e.g. WEB-101)"
+                    hint="3-letter code for request IDs (e.g. WEB-101)"
                   >
                     <TextInput
                       id="onb-project-code"

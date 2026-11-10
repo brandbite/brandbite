@@ -141,19 +141,19 @@ const STEPS: { n: number; tone: Tone; title: string; body: string }[] = [
     n: 1,
     tone: "lavender",
     title: "Logged hours",
-    body: "Time creatives record on each ticket with the ticket timer.",
+    body: "Time creatives record on each request with the request timer.",
   },
   {
     n: 2,
     tone: "peach",
     title: "Estimated hours",
-    body: "The job type's estimate per unit, multiplied by the ticket quantity.",
+    body: "The service's estimate per unit, multiplied by the request quantity.",
   },
   {
     n: 3,
     tone: "green",
     title: "Variance",
-    body: "Logged minus estimated. A ticket is overrunning when logged time exceeds the estimate.",
+    body: "Logged minus estimated. A request is overrunning when logged time exceeds the estimate.",
   },
 ];
 
@@ -179,7 +179,7 @@ function HowItWorks() {
       </ol>
       <p className="mt-2 flex items-start gap-2 border-t border-[var(--av2-border)] pt-4 text-sm text-[var(--av2-text-2)]">
         <IconAlertCircle width={18} height={18} className="mt-px shrink-0" />
-        Tickets whose job type has no estimate show “—” and are left out of the variance and the
+        Requests whose service has no estimate show “—” and are left out of the variance and the
         overrun count.
       </p>
     </Card>
@@ -271,8 +271,8 @@ export default function AdminTimeTrackingPage() {
     <>
       <PageHeader
         title="Time tracking"
-        description="Compare logged hours with job-type estimates to spot overruns and retune token pricing."
-        meta="Only tickets with recorded time are listed."
+        description="Compare logged hours with service estimates to spot overruns and retune token pricing."
+        meta="Only requests with recorded time are listed."
       />
 
       {error && (
@@ -299,7 +299,7 @@ export default function AdminTimeTrackingPage() {
           <KpiCard
             icon={<IconTicket />}
             tone="lavender"
-            label="Tickets with logged time"
+            label="Requests with logged time"
             value={pending ? DASH : fmt(stats?.ticketCount)}
             hint={stats && stats.ticketCount >= 200 ? "Capped at the top 200 by hours" : undefined}
           />
@@ -318,8 +318,8 @@ export default function AdminTimeTrackingPage() {
               !hasRows
                 ? "Available after time is logged"
                 : estimatedCount === rows.length
-                  ? "For the logged tickets"
-                  : `${fmt(estimatedCount)} of ${fmt(rows.length)} logged tickets have an estimate`
+                  ? "For the logged requests"
+                  : `${fmt(estimatedCount)} of ${fmt(rows.length)} logged requests have an estimate`
             }
           />
           <KpiCard
@@ -331,7 +331,7 @@ export default function AdminTimeTrackingPage() {
               !hasRows
                 ? "Available after time is logged"
                 : estimatedCount === 0
-                  ? "No logged ticket has an estimate"
+                  ? "No logged request has an estimate"
                   : "Logged time above the estimate"
             }
           />
@@ -356,16 +356,16 @@ export default function AdminTimeTrackingPage() {
               description={
                 data.migrationPending
                   ? "Time logging is unavailable until the migration above has run."
-                  : "Creatives log time from the timer on a ticket. Once they do, this view compares their hours with the job-type estimates."
+                  : "Creatives log time from the timer on a request. Once they do, this view compares their hours with the service estimates."
               }
               action={
                 <div className="flex flex-wrap justify-center gap-3">
                   <ButtonLink href="/admin/tickets" variant="primary">
-                    View tickets
+                    View requests
                     <IconArrowUpRight />
                   </ButtonLink>
                   <ButtonLink href="/admin/job-types">
-                    Review job estimates
+                    Review service estimates
                     <IconArrowUpRight />
                   </ButtonLink>
                 </div>
@@ -379,7 +379,7 @@ export default function AdminTimeTrackingPage() {
           <Card padding="none">
             <div className="px-6 pt-5">
               <div className="mb-4">
-                <CardTitle description="Estimated hours scale with ticket quantity.">
+                <CardTitle description="Estimated hours scale with request quantity.">
                   Hours vs estimate
                 </CardTitle>
               </div>
@@ -389,10 +389,10 @@ export default function AdminTimeTrackingPage() {
                   value={search}
                   onChange={setSearch}
                   placeholder="Search title, creative, company…"
-                  label="Search tickets by title, code, creative, company or job type"
+                  label="Search requests by title, code, creative, company or service"
                 />
                 <SegmentedControl
-                  label="Sort tickets"
+                  label="Sort requests"
                   value={sort}
                   onChange={setSort}
                   options={[
@@ -407,17 +407,17 @@ export default function AdminTimeTrackingPage() {
             {filtered.length === 0 ? (
               <div className="border-t border-[var(--av2-border)]">
                 <EmptyState
-                  title="No tickets match this search"
-                  description="Try a different title, creative, company or job type."
+                  title="No requests match this search"
+                  description="Try a different title, creative, company or service."
                   action={<Button onClick={() => setSearch("")}>Clear search</Button>}
                 />
               </div>
             ) : (
-              <Table label="Logged hours versus estimate per ticket">
+              <Table label="Logged hours versus estimate per request">
                 <thead>
                   <tr>
-                    <Th>Ticket</Th>
-                    <Th className="hidden xl:table-cell">Job type</Th>
+                    <Th>Request</Th>
+                    <Th className="hidden xl:table-cell">Service</Th>
                     <Th className="hidden xl:table-cell">Creative</Th>
                     <Th align="right">Estimated</Th>
                     <Th align="right">Logged</Th>
@@ -446,7 +446,7 @@ export default function AdminTimeTrackingPage() {
                             {row.company && ` · ${row.company.name}`}
                           </div>
                           <div className="text-xs text-[var(--av2-text-2)] xl:hidden">
-                            {row.jobType?.name ?? "No job type"} ·{" "}
+                            {row.jobType?.name ?? "No service"} ·{" "}
                             {row.creative?.name || row.creative?.email || "Unassigned"}
                           </div>
                         </Td>
@@ -503,7 +503,7 @@ export default function AdminTimeTrackingPage() {
             <TableFooter>
               <span className="tabular-nums">
                 Showing {fmt(filtered.length)} of {fmt(rows.length)}{" "}
-                {plural(rows.length, "ticket", "tickets")}
+                {plural(rows.length, "request", "requests")}
               </span>
               {search && (
                 <Button size="sm" variant="ghost" onClick={() => setSearch("")}>

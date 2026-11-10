@@ -121,7 +121,7 @@ export function SkillsPicker({
 
   return (
     <Card>
-      <CardTitle description="Select the job types you can handle. You will only be auto-assigned tickets that match your skills.">
+      <CardTitle description="Select the services you can handle. You will only be auto-assigned requests that match your skills.">
         Active skills
       </CardTitle>
 
@@ -167,7 +167,7 @@ export function SkillsPicker({
           </Callout>
         </div>
       ) : skills.length === 0 ? (
-        <EmptyState title="No job types available yet." />
+        <EmptyState title="No services available yet." />
       ) : filtered.length === 0 ? (
         <EmptyState
           title="No skills match these filters."
@@ -274,7 +274,7 @@ export function SelectionSummary({
       </CardTitle>
       {count === 0 ? (
         <p className="mt-3 text-sm text-[var(--av2-text-2)]">
-          No skills selected yet. With no skills ticked, you won&apos;t be matched to jobs.
+          No skills selected yet. With no skills ticked, you won&apos;t be matched to requests.
         </p>
       ) : (
         <div className="mt-4 space-y-4">

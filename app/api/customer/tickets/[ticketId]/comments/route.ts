@@ -31,7 +31,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
 
     if (user.role !== "CUSTOMER") {
       return NextResponse.json(
-        { error: "Only customers can view ticket comments on this endpoint" },
+        { error: "Only customers can view request comments on this endpoint" },
         { status: 403 },
       );
     }
@@ -56,7 +56,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
     });
 
     if (!ticket) {
-      return NextResponse.json({ error: "Ticket not found for current company" }, { status: 404 });
+      return NextResponse.json({ error: "Request not found for current company" }, { status: 404 });
     }
 
     const comments = await prismaAny.ticketComment.findMany({
@@ -140,7 +140,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     });
 
     if (!ticket) {
-      return NextResponse.json({ error: "Ticket not found for current company" }, { status: 404 });
+      return NextResponse.json({ error: "Request not found for current company" }, { status: 404 });
     }
 
     const created = await prismaAny.ticketComment.create({

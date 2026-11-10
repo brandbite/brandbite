@@ -43,7 +43,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
 
     if (user.role !== "CUSTOMER") {
       return NextResponse.json(
-        { error: "Only customers can access customer tickets" },
+        { error: "Only customers can access customer requests" },
         { status: 403 },
       );
     }
@@ -114,7 +114,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
     });
 
     if (!ticket) {
-      return NextResponse.json({ error: "Ticket not found for current company" }, { status: 404 });
+      return NextResponse.json({ error: "Request not found for current company" }, { status: 404 });
     }
 
     const code = buildTicketCode({
@@ -208,7 +208,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
     }
 
     console.error("[GET /api/customer/tickets/[ticketId]] error", error);
-    return NextResponse.json({ error: "Failed to load ticket" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to load request" }, { status: 500 });
   }
 }
 
@@ -223,7 +223,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
 
     // Only users with the CUSTOMER role can update tickets
     if (user.role !== "CUSTOMER") {
-      return NextResponse.json({ error: "Only customers can update tickets" }, { status: 403 });
+      return NextResponse.json({ error: "Only customers can update requests" }, { status: 403 });
     }
 
     if (!user.activeCompanyId) {
@@ -233,7 +233,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     if (!user.companyRole || !ALLOWED_UPDATE_ROLES.includes(user.companyRole as CompanyRole)) {
       return NextResponse.json(
         {
-          error: "Only company owners, project managers or members can update tickets",
+          error: "Only company owners, project managers or members can update requests",
         },
         { status: 403 },
       );
@@ -292,7 +292,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     });
 
     if (!existing) {
-      return NextResponse.json({ error: "Ticket not found for current company" }, { status: 404 });
+      return NextResponse.json({ error: "Request not found for current company" }, { status: 404 });
     }
 
     // -----------------------------------------------------------------------
@@ -305,7 +305,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
       if (existing.status === "CANCELED") {
         return NextResponse.json(
           {
-            error: "Cancelled tickets are read-only. Create a new ticket instead.",
+            error: "Cancelled requests are read-only. Create a new request instead.",
           },
           { status: 409 },
         );
@@ -328,7 +328,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
       // ticket done while silently leaving the creative unpaid. Refuse it.
       if (targetStatus === TicketStatus.DONE) {
         return NextResponse.json(
-          { error: "Approve tickets from the board — this endpoint can't mark a ticket done." },
+          { error: "Approve requests from the board — this endpoint can't mark a request done." },
           { status: 400 },
         );
       }
@@ -375,7 +375,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
         return NextResponse.json(
           {
             error:
-              "Ticket can only be edited while in To do status. Once a creative starts working, the ticket is locked.",
+              "Request can only be edited while in To do status. Once a creative starts working, the request is locked.",
           },
           { status: 403 },
         );
@@ -433,14 +433,14 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
           // Model 2: every ticket must carry a job type (that's how it's
           // priced and how the creative is paid). Clearing it would strand
           // the original charge with nothing to refund on cancel.
-          return NextResponse.json({ error: "A job type is required." }, { status: 400 });
+          return NextResponse.json({ error: "A service is required." }, { status: 400 });
         }
         const jt = await prisma.jobType.findUnique({
           where: { id: fields.jobTypeId },
           select: { id: true, tokenCost: true },
         });
         if (!jt) {
-          return NextResponse.json({ error: "Job type not found" }, { status: 400 });
+          return NextResponse.json({ error: "Service not found" }, { status: 400 });
         }
         updateData.jobTypeId = jt.id;
         newJobTypeCost = jt.tokenCost;
@@ -469,7 +469,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
           return insufficientTokensResponse({
             required: costDelta,
             balance: company.tokenBalance,
-            action: "job type change",
+            action: "service change",
           });
         }
       }
@@ -591,7 +591,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
               direction: costDelta > 0 ? LedgerDirection.DEBIT : LedgerDirection.CREDIT,
               amount: Math.abs(costDelta),
               reason: costDelta > 0 ? "JOB_REQUEST_ADJUSTMENT" : "REFUND",
-              notes: `Job type changed on ticket ${ticketId}`,
+              notes: `Service changed on request ${ticketId}`,
               metadata: {
                 changedByUserId: user.id,
                 previousJobTypeId: existing.jobTypeId,
@@ -689,12 +689,12 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     if ((error as Error)?.message === "INSUFFICIENT_ADJUSTMENT") {
       // Lost the race on the extra charge for a costlier job type.
       return NextResponse.json(
-        { error: "Not enough tokens to change to a higher-cost job type. Please refresh." },
+        { error: "Not enough tokens to change to a higher-cost service. Please refresh." },
         { status: 402 },
       );
     }
 
     console.error("[PATCH /api/customer/tickets/[ticketId]] error", error);
-    return NextResponse.json({ error: "Failed to update ticket" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to update request" }, { status: 500 });
   }
 }

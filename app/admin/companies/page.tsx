@@ -228,7 +228,7 @@ export default function AdminCompaniesPage() {
       if (backfill && json?.backfill) {
         const b = json.backfill;
         setAutoAssignNotice(
-          `Auto-assign enabled for ${c.name} — assigned ${b.assigned} of ${b.scanned} unassigned ticket(s)` +
+          `Auto-assign enabled for ${c.name} — assigned ${b.assigned} of ${b.scanned} unassigned request(s)` +
             (b.skipped ? `, ${b.skipped} skipped (project off / no eligible creative)` : "") +
             (b.hasMore ? ". More remain — run again from the board." : "."),
         );
@@ -480,7 +480,7 @@ export default function AdminCompaniesPage() {
             {[
               { label: "Members", value: selected.counts.members },
               { label: "Projects", value: selected.counts.projects },
-              { label: "Tickets", value: selected.counts.tickets },
+              { label: "Requests", value: selected.counts.tickets },
             ].map((m) => (
               <div key={m.label} className="px-4 first:pl-0">
                 <dt className="text-sm text-[var(--av2-text-2)]">{m.label}</dt>
@@ -506,8 +506,8 @@ export default function AdminCompaniesPage() {
           />
           <p className="mt-2 text-sm text-[var(--av2-text-2)]">
             {selected.autoAssignDefaultEnabled
-              ? "New tickets are auto-assigned to a matching creative."
-              : "New tickets land unassigned for manual triage."}
+              ? "New requests are auto-assigned to a matching creative."
+              : "New requests land unassigned for manual triage."}
           </p>
           <Button
             size="sm"
@@ -604,7 +604,7 @@ export default function AdminCompaniesPage() {
           <KpiCard
             icon={<IconFolder />}
             tone="lavender"
-            label="Projects / tickets"
+            label="Projects / requests"
             value={totalProjects === null ? DASH : `${fmt(totalProjects)} / ${fmt(totalTickets)}`}
             hint="Across all companies"
           />
@@ -746,7 +746,7 @@ export default function AdminCompaniesPage() {
                     </Td>
                     <Td className="whitespace-nowrap text-[var(--av2-text-2)] tabular-nums">
                       <div>
-                        {fmt(c.counts.tickets)} {plural(c.counts.tickets, "ticket", "tickets")}
+                        {fmt(c.counts.tickets)} {plural(c.counts.tickets, "request", "requests")}
                       </div>
                       <div className="text-xs">
                         {fmt(c.counts.members)} {plural(c.counts.members, "member", "members")}
@@ -955,15 +955,15 @@ export default function AdminCompaniesPage() {
         />
         <div className="space-y-3">
           <p className="text-sm text-[var(--av2-text-2)]">
-            New tickets will be auto-assigned to a matching creative. This company also has{" "}
+            New requests will be auto-assigned to a matching creative. This company also has{" "}
             <strong className="text-[var(--av2-text)] tabular-nums">
               {autoAssignConfirm?.unassignedCount}
             </strong>{" "}
-            unassigned to-do ticket{autoAssignConfirm?.unassignedCount === 1 ? "" : "s"} already in
+            unassigned to-do request{autoAssignConfirm?.unassignedCount === 1 ? "" : "s"} already in
             the backlog. Assign those now too?
           </p>
           <p className="text-xs text-[var(--av2-text-2)]">
-            Tickets in projects with auto-assign turned off, or with no eligible creative, are left
+            Requests in projects with auto-assign turned off, or with no eligible creative, are left
             unassigned.
           </p>
           <ModalFooter>

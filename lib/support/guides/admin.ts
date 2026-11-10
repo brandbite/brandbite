@@ -57,7 +57,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
               { term: "Breadcrumb", text: "shows which section and page you're on." },
               {
                 term: "Search workspace",
-                text: "jumps to any admin page by name, including pages without a sidebar entry (Tickets, Completed jobs, Consultation settings, Plan assignment). Press **Ctrl K** (**⌘K** on a Mac) from anywhere. It searches page names, not data.",
+                text: "jumps to any admin page by name, including pages without a sidebar entry (Requests, Completed requests, Consultation settings, Plan assignment). Press **Ctrl K** (**⌘K** on a Mac) from anywhere. It searches page names, not data.",
               },
               {
                 term: "Help",
@@ -118,7 +118,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
             type: "list",
             items: [
               "approve withdrawals and mark them paid,",
-              "grant or revoke company tokens and override ticket pricing,",
+              "grant or revoke company tokens and override request pricing,",
               "create and edit plans and assign them to companies,",
               "create, edit and delete payout rules,",
               "change AI tool prices and rate limits,",
@@ -194,20 +194,20 @@ export const ADMIN_GUIDES: SupportGuide[] = [
             type: "list",
             items: [
               {
-                term: "Companies, Creatives, Tickets, Token balance",
-                text: "headline totals. A company counts as active if it created a ticket in the last 30 days.",
+                term: "Companies, Creatives, Requests, Token balance",
+                text: "headline totals. A company counts as active if it created a request in the last 30 days.",
               },
               {
                 term: "Needs attention",
-                text: "overdue tickets (past due, not Done), stale tickets (In progress with no update for over 7 days) and low-balance companies (under 5 tokens).",
+                text: "overdue requests (past due, not Done), stale requests (In progress with no update for over 7 days) and low-balance companies (under 5 tokens).",
               },
               {
-                term: "Ticket workflow and Priority breakdown",
-                text: "where tickets are and how urgent they are.",
+                term: "Request workflow and Priority breakdown",
+                text: "where requests are and how urgent they are.",
               },
               {
                 term: "Token economy",
-                text: "credits, debits, net flow, average revisions per completed ticket and total paid out.",
+                text: "credits, debits, net flow, average revisions per completed request and total paid out.",
               },
               {
                 term: "Withdrawal queue",
@@ -278,7 +278,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
           },
           {
             type: "p",
-            text: "**Turn off auto-assign** takes effect immediately; new requests then wait for you to assign them on the Tickets page.",
+            text: "**Turn off auto-assign** takes effect immediately; new requests then wait for you to assign them on the Requests page.",
           },
         ],
       },
@@ -298,7 +298,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "The list shows every board with who it belongs to, who created it and its job. Search by title, company, person or job, and use the filter to see **Customer boards** or **Creative boards**.",
+            text: "The list shows every board with who it belongs to, who created it and its request. Search by title, company, person or request, and use the filter to see **Customer boards** or **Creative boards**.",
           },
           {
             type: "p",
@@ -326,11 +326,11 @@ export const ADMIN_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "The list shows every draft with its company, who wrote it, its job type and when it last changed. Click a row to read the brief and open its files.",
+            text: "The list shows every draft with its company, who wrote it, its service and when it last changed. Click a row to read the brief and open its files.",
           },
           {
             type: "p",
-            text: "It's view only. A draft has no ticket number, costs no tokens and hasn't reached anyone. It stays until the customer creates the request or deletes it, and nothing removes it automatically.",
+            text: "It's view only. A draft has no request number, costs no tokens and hasn't reached anyone. It stays until the customer creates the request or deletes it, and nothing removes it automatically.",
           },
         ],
       },
@@ -338,7 +338,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
   },
   {
     slug: "board-and-tickets",
-    title: "Board and Tickets",
+    title: "Board and Requests",
     summary: "See every request, assign creatives, override pricing and make bulk changes.",
     category: "Workspace",
     routes: ["/admin/board", "/admin/tickets"],
@@ -383,7 +383,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
           },
           {
             type: "p",
-            text: "Dragging needs a mouse. On a phone or tablet, use **Set status** in the Tickets table.",
+            text: "Dragging needs a mouse. On a phone or tablet, use **Set status** in the Requests table.",
           },
         ],
       },
@@ -393,11 +393,11 @@ export const ADMIN_GUIDES: SupportGuide[] = [
           {
             type: "steps",
             items: [
-              "Switch to **Table** (or open Tickets) and select a request.",
+              "Switch to **Table** (or open Requests) and select a request.",
               "On the **Assignment** tab, pick a creative under **Assigned creative**. It saves immediately.",
             ],
           },
-          { type: "figure", caption: "The Assignment tab in the Tickets table" },
+          { type: "figure", caption: "The Assignment tab in the Requests table" },
         ],
       },
       {
@@ -405,12 +405,12 @@ export const ADMIN_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "On the **Pricing** tab you can set a custom **Ticket cost** and **Creative payout**. Leave a field empty to use the default — the job type's cost, and a payout at the assigned creative's current rate — then click **Apply pricing**.",
+            text: "On the **Pricing** tab you can set a custom **Request cost** and **Creative payout**. Leave a field empty to use the default — the service's cost, and a payout at the assigned creative's current rate — then click **Apply pricing**.",
           },
-          { type: "figure", caption: "The Pricing tab with ticket cost and creative payout" },
+          { type: "figure", caption: "The Pricing tab with request cost and creative payout" },
           {
             type: "warning",
-            text: "Changing the ticket cost charges or refunds the company the difference **immediately**. A custom creative payout replaces the normal rate-based payout when the job is approved.",
+            text: "Changing the request cost charges or refunds the company the difference **immediately**. A custom creative payout replaces the normal rate-based payout when the request is approved.",
           },
         ],
       },
@@ -423,7 +423,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
           },
           {
             type: "warning",
-            text: "Bulk status changes ask you to confirm first. **Set status → Done** completes the jobs and pays the creatives straight away. Other status changes skip the usual customer and creative steps, so no tokens are charged or refunded. Done requests can't be moved back in bulk. The customer and creative are notified, and each batch is recorded in the Audit Log. Prefer letting customers and creatives move requests themselves.",
+            text: "Bulk status changes ask you to confirm first. **Set status → Done** completes the requests and pays the creatives straight away. Other status changes skip the usual customer and creative steps, so no tokens are charged or refunded. Done requests can't be moved back in bulk. The customer and creative are notified, and each batch is recorded in the Audit Log. Prefer letting customers and creatives move requests themselves.",
           },
         ],
       },
@@ -431,7 +431,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
   },
   {
     slug: "ticket-detail",
-    title: "Ticket detail",
+    title: "Request detail",
     summary: "Everything about one request: brief, versions, comments, pricing and history.",
     category: "Workspace",
     routes: ["/admin/tickets/[ticketId]"],
@@ -450,11 +450,11 @@ export const ADMIN_GUIDES: SupportGuide[] = [
               { term: "Comments", text: "the conversation on the request." },
               {
                 term: "Activity",
-                text: "what happened on the ticket, when and by whom, newest first. Older tickets may show only part of their history.",
+                text: "what happened on the request, when and by whom, newest first. Older requests may show only part of their history.",
               },
               {
-                term: "Ticket details",
-                text: "customer, creative, token cost (with any overrides) and job type.",
+                term: "Request details",
+                text: "customer, creative, token cost (with any overrides) and service.",
               },
               {
                 term: "Activity card",
@@ -464,7 +464,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
           },
           {
             type: "p",
-            text: "This page is read-only. Change the assignment or pricing from the **Tickets** table.",
+            text: "This page is read-only. Change the assignment or pricing from the **Requests** table.",
           },
         ],
       },
@@ -746,7 +746,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
   },
   {
     slug: "job-types",
-    title: "Job types",
+    title: "Services",
     summary:
       "The services customers can request: pricing by estimated hours, categories, quantities and AI prompts.",
     category: "Catalog",
@@ -763,17 +763,17 @@ export const ADMIN_GUIDES: SupportGuide[] = [
     related: ["job-type-categories", "payouts"],
     sections: [
       {
-        heading: "Creating or editing a job type",
+        heading: "Creating or editing a service",
         blocks: [
           {
             type: "steps",
             items: [
-              "Click **+ New job type**, or select one.",
-              "**Details**: name, category, description, and **Active** (inactive job types are hidden from customers).",
+              "Click **+ New service**, or select one.",
+              "**Details**: name, category, description, and **Active** (inactive services are hidden from customers).",
               "**Pricing**: set **Estimated hours**. One estimated hour costs the customer one token.",
-              "Turn on **Per-unit pricing** for jobs ordered in quantities, and set the quantity label and default.",
-              "Optionally add an **AI prompt template**, used for AI image generation on this job type.",
-              "Click **Create job type** or **Save job type**.",
+              "Turn on **Per-unit pricing** for services ordered in quantities, and set the quantity label and default.",
+              "Optionally add an **AI prompt template**, used for AI image generation on this service.",
+              "Click **Create service** or **Save service**.",
             ],
           },
         ],
@@ -785,12 +785,12 @@ export const ADMIN_GUIDES: SupportGuide[] = [
             type: "list",
             items: [
               "Customer cost = estimated hours × quantity, charged when the request is created.",
-              "The creative is paid a percentage of that cost when the job is approved — see **How creative payouts work**.",
+              "The creative is paid a percentage of that cost when the request is approved — see **How creative payouts work**.",
             ],
           },
           {
             type: "warning",
-            text: "Changing the estimated hours also changes what creatives are paid on open jobs of that type, because payouts use the cost at approval time.",
+            text: "Changing the estimated hours also changes what creatives are paid on open requests for that service, because payouts use the cost at approval time.",
           },
         ],
       },
@@ -798,7 +798,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
   },
   {
     slug: "job-type-categories",
-    title: "Job type categories",
+    title: "Service categories",
     summary: "Group and order services in the catalog and the new request form.",
     category: "Catalog",
     routes: ["/admin/job-type-categories"],
@@ -814,7 +814,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
               "**+ New category**: name, emoji icon and **Display order** (lower first).",
               "**Active** categories appear in the service catalog and the new request form.",
               "Renaming a category updates its slug automatically.",
-              "**Delete category** is permanent; its job types become uncategorised.",
+              "**Delete category** is permanent; its services become uncategorised.",
             ],
           },
         ],
@@ -824,7 +824,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "If some job types only have an old text category, a banner offers **Review & link**. It links them to matching categories, creating any that are missing. It's safe to run more than once.",
+            text: "If some services only have an old text category, a banner offers **Review & link**. It links them to matching categories, creating any that are missing. It's safe to run more than once.",
           },
         ],
       },
@@ -837,7 +837,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
   {
     slug: "payouts",
     title: "How creative payouts work",
-    summary: "The base rate, payout rules, per-ticket overrides and when creatives are paid.",
+    summary: "The base rate, payout rules, per-request overrides and when creatives are paid.",
     category: "Finance",
     routes: ["/admin/payout-rules"],
     keywords: [
@@ -857,11 +857,11 @@ export const ADMIN_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "When a customer approves a job, the creative is paid: the job's token cost × quantity × their **payout rate**, rounded to whole tokens. If an owner set a custom creative payout on the ticket, that exact amount is paid instead.",
+            text: "When a customer approves a request, the creative is paid: the request's token cost × quantity × their **payout rate**, rounded to whole tokens. If an owner set a custom creative payout on the request, that exact amount is paid instead.",
           },
           {
             type: "p",
-            text: "Everyone starts on the **base rate of 60%**. Payouts happen once per job, at approval.",
+            text: "Everyone starts on the **base rate of 60%**. Payouts happen once per request, at approval.",
           },
         ],
       },
@@ -870,14 +870,14 @@ export const ADMIN_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Rules reward busy creatives with a higher rate. Each rule has a minimum number of completed jobs within a time window (in days) and a rate above 60%, up to 100%.",
+            text: "Rules reward busy creatives with a higher rate. Each rule has a minimum number of completed requests within a time window (in days) and a rate above 60%, up to 100%.",
           },
           { type: "figure", caption: "The Payout Rules page" },
           {
             type: "steps",
             items: [
               "Click **New rule**, give it a name and an optional description (creatives see it).",
-              "Set **Min. completed tickets**, **Time window** and **Payout rate**, and switch **Rule active** on.",
+              "Set **Min. completed requests**, **Time window** and **Payout rate**, and switch **Rule active** on.",
               "Click **Create rule**. Site owner only.",
             ],
           },
@@ -967,7 +967,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "A read-only list of token movements — plan credits, top-ups, job charges, refunds, payouts and withdrawals — for companies and creatives. Search by company, ticket, reason or note, filter by company and direction, and select a row for the balance before and after, references and metadata.",
+            text: "A read-only list of token movements — plan credits, top-ups, request charges, refunds, payouts and withdrawals — for companies and creatives. Search by company, request, reason or note, filter by company and direction, and select a row for the balance before and after, references and metadata.",
           },
           {
             type: "p",
@@ -988,7 +988,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
   },
   {
     slug: "completed-jobs",
-    title: "Completed jobs",
+    title: "Completed requests",
     summary: "Check that finished work has a matching creative payout on the ledger.",
     category: "Finance",
     routes: ["/admin/completed-jobs"],
@@ -1000,11 +1000,11 @@ export const ADMIN_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Open it from the Board's **View completed jobs** link or the search. It lists the 100 most recent Done requests and whether each has a creative payout entry on the ledger.",
+            text: "Open it from the Board's **View completed requests** link or the search. It lists the 100 most recent Done requests and whether each has a creative payout entry on the ledger.",
           },
           {
             type: "p",
-            text: "The payout shown is the amount actually credited to the creative. If the banner says some jobs have **no matching ledger entry**, click **Show these only** and open each ticket to investigate. Jobs without a job type are never paid, so they show no entry.",
+            text: "The payout shown is the amount actually credited to the creative. If the banner says some requests have **no matching ledger entry**, click **Show these only** and open each request to investigate. Requests without a service are never paid, so they show no entry.",
           },
         ],
       },
@@ -1059,7 +1059,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
               },
               {
                 term: "Open task cap",
-                text: "the most open jobs (1–40) the creative can hold before auto-assign skips them.",
+                text: "the most open requests (1–40) the creative can hold before auto-assign skips them.",
               },
               {
                 term: "Working hours",
@@ -1075,7 +1075,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "warning",
-            text: "Site owner only. **Delete user** needs **DELETE** and a security check. The person's sign-in is removed and their details anonymised; their tickets and ledger history stay. It can't be undone, and site owners can't be deleted (change their role first).",
+            text: "Site owner only. **Delete user** needs **DELETE** and a security check. The person's sign-in is removed and their details anonymised; their requests and ledger history stay. It can't be undone, and site owners can't be deleted (change their role first).",
           },
           {
             type: "p",
@@ -1109,11 +1109,11 @@ export const ADMIN_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Compare creatives by completed jobs, completion rate, revisions, turnaround, load, earnings and customer rating. Select one for their current work, workload against their cap, and tokens earned. Ratings are visible to admins only.",
+            text: "Compare creatives by completed requests, completion rate, revisions, turnaround, load, earnings and customer rating. Select one for their current work, workload against their cap, and tokens earned. Ratings are visible to admins only.",
           },
           {
             type: "p",
-            text: "**Load score** adds up priority × token cost over the creative's active jobs; **Relative load** compares it with the busiest creative.",
+            text: "**Load score** adds up priority × token cost over the creative's active requests; **Relative load** compares it with the busiest creative.",
           },
         ],
       },
@@ -1122,7 +1122,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Requests where creatives logged time, with logged hours against the job type's estimate. Sort by **Overruns first** to find jobs that took longer than estimated — a sign the estimate (and so the price) may need adjusting.",
+            text: "Requests where creatives logged time, with logged hours against the service's estimate. Sort by **Overruns first** to find requests that took longer than estimated — a sign the estimate (and so the price) may need adjusting.",
           },
         ],
       },
@@ -1551,14 +1551,14 @@ export const ADMIN_GUIDES: SupportGuide[] = [
               },
               {
                 term: "Email site owners on system events",
-                text: "one switch for every owner email: feedback, new tickets and companies, payments, talent applications, withdrawal requests, contact messages and Google Calendar alerts.",
+                text: "one switch for every owner email: feedback, new requests and companies, payments, talent applications, withdrawal requests, contact messages and Google Calendar alerts.",
               },
               {
-                term: "Ticket tags",
+                term: "Request tags",
                 text: "shows or hides tags for customers (off by default; existing tags are kept).",
               },
               {
-                term: "AI ticket mode",
+                term: "AI request mode",
                 text: 'controls the "Work with AI" option on new requests. Leave it **Off** — it isn\'t ready for customers yet.',
               },
             ],

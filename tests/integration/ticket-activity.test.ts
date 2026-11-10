@@ -176,11 +176,11 @@ describe("history from existing tables", () => {
     const ticket = await seedHistory();
     const t = await timeline(creativeActivity, ticket.id, asCreative);
     expect(lines(t)).toEqual([
-      "Ana Owner marked this job as Done",
+      "Ana Owner marked this request as Done",
       "Ana Owner requested changes on version 1",
       "You submitted version 1",
       "brandbite assigned you",
-      "Ana Owner created this job",
+      "Ana Owner created this request",
     ]);
   });
 

@@ -22,7 +22,7 @@ describe("creativeTransitionError", () => {
   });
 
   it("refuses skipping straight to review", () => {
-    expect(creativeTransitionError("TODO", "IN_REVIEW")).toMatch(/Start the ticket first/);
+    expect(creativeTransitionError("TODO", "IN_REVIEW")).toMatch(/Start the request first/);
   });
 
   it("refuses sending delivered work back to To do", () => {

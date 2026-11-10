@@ -47,7 +47,7 @@ export const updateTicketFieldsSchema = z
     // Job type is required on every ticket (model 2), so an edit may change it
     // but never clear it: omit the field to leave it unchanged; a null / empty
     // value is rejected.
-    jobTypeId: z.string().trim().min(1, "Please select a job type.").optional(),
+    jobTypeId: z.string().trim().min(1, "Please select a service.").optional(),
     tagIds: z.array(z.string().min(1)).max(5).optional(),
   })
   .refine(

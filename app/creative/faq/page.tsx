@@ -12,7 +12,7 @@ export default function CreativeFaqPage() {
     <>
       <PageHeader
         title="Frequently Asked Questions"
-        description="How brandbite works from the creative side: getting jobs, delivering work and getting paid."
+        description="How brandbite works from the creative side: getting requests, delivering work and getting paid."
       />
       <FaqExplorer
         endpoint="/api/creative/faq"

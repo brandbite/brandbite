@@ -84,8 +84,8 @@ export function AiTicketControls({
       {isFirstGeneration ? (
         <div className="space-y-3">
           <p className="text-[11px] text-[var(--bb-text-muted)]">
-            Generate the first AI design for this ticket. The prompt is built from the ticket title
-            and description.
+            Generate the first AI design for this request. The prompt is built from the request
+            title and description.
           </p>
           <div className="flex gap-3">
             <div className="flex-1">
@@ -168,7 +168,7 @@ export function AiTicketControls({
             </p>
           )}
           <p className="text-[11px] text-[var(--bb-success-text)]">
-            Image saved to ticket revisions. Refresh to see it in the revision history.
+            Image saved to the request&apos;s revisions. Refresh to see it in the revision history.
           </p>
         </div>
       )}

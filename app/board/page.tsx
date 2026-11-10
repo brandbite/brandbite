@@ -146,10 +146,10 @@ export default function BoardPage() {
         {/* Page header */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Tickets board</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">Requests board</h1>
             <p className="mt-1 text-sm text-[var(--bb-text-secondary)]">
               Visual overview of all active creative requests. This view is now powered by real
-              Ticket records from the database.
+              request records from the database.
             </p>
           </div>
         </div>
@@ -170,7 +170,7 @@ export default function BoardPage() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by ticket, project, company, creative..."
+              placeholder="Search by request, project, company, creative..."
               className="w-full rounded-md border border-[var(--bb-border-input)] bg-[var(--bb-bg-page)] px-3 py-2 text-sm text-[var(--bb-secondary)] outline-none focus:border-[var(--bb-primary)] focus:ring-1 focus:ring-[var(--bb-primary)]"
             />
           </div>
@@ -194,7 +194,7 @@ export default function BoardPage() {
         {/* Loading state */}
         {loading && (
           <div className="rounded-2xl border border-dashed border-[var(--bb-border)] bg-[var(--bb-bg-page)] px-5 py-6 text-sm text-[var(--bb-text-secondary)]">
-            Loading board tickets…
+            Loading board requests…
           </div>
         )}
 
@@ -226,7 +226,7 @@ export default function BoardPage() {
                   <div className="flex min-h-[320px] flex-1 flex-col gap-3 rounded-2xl bg-[var(--bb-bg-page)] p-3">
                     {columnTickets.length === 0 ? (
                       <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-[var(--bb-border)] bg-[var(--bb-bg-page)]/60 px-3 py-4 text-center text-xs text-[var(--bb-text-muted)]">
-                        No tickets in this column.
+                        No requests in this column.
                       </div>
                     ) : (
                       columnTickets.map((ticket) => (

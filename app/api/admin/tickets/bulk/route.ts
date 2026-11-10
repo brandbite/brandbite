@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
           },
         });
         if (!existing) {
-          result.failed.push({ id, error: "Ticket not found" });
+          result.failed.push({ id, error: "Request not found" });
           continue;
         }
 
@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
             result.failed.push({
               id,
               error:
-                "Done tickets can't be moved back in bulk — the creative has already been paid.",
+                "Done requests can't be moved back in bulk — the creative has already been paid.",
             });
             continue;
           }
@@ -209,7 +209,7 @@ export async function POST(req: NextRequest) {
           createNotification({
             userId,
             type: done ? "TICKET_COMPLETED" : "TICKET_STATUS_CHANGED",
-            title: done ? "Ticket completed" : "Ticket status updated",
+            title: done ? "Request completed" : "Request status updated",
             message: `"${t.title}" was moved to ${STATUS_LABEL[data.status] ?? data.status} by the brandbite team.`,
             ticketId: t.id,
             actorId: user.id,

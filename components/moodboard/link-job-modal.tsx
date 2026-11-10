@@ -49,17 +49,17 @@ export function LinkJobModal({ open, currentTicketId, onClose, onPick }: LinkJob
 
   return (
     <Modal open={open} onClose={onClose} size="md">
-      <ModalHeader title="Link to a job" onClose={onClose} />
+      <ModalHeader title="Link to a request" onClose={onClose} />
       {failed ? (
         <p role="alert" className="text-sm text-[var(--av2-error-text)]">
-          We couldn&apos;t load your jobs. Please try again.
+          We couldn&apos;t load your requests. Please try again.
         </p>
       ) : jobs === null ? (
         <p role="status" className="text-sm text-[var(--av2-text-2)]">
-          Loading your jobs…
+          Loading your requests…
         </p>
       ) : jobs.length === 0 ? (
-        <p className="text-sm text-[var(--av2-text-2)]">You don&apos;t have any jobs yet.</p>
+        <p className="text-sm text-[var(--av2-text-2)]">You don&apos;t have any requests yet.</p>
       ) : (
         <ul className="max-h-80 space-y-1 overflow-y-auto">
           {jobs.map((job) => (

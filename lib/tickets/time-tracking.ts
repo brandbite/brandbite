@@ -99,12 +99,12 @@ async function assertCreativeOwnsTicket(
     select: { id: true, creativeId: true },
   });
   if (!ticket) {
-    throw new TimeEntryError("TICKET_NOT_FOUND", "Ticket not found.");
+    throw new TimeEntryError("TICKET_NOT_FOUND", "Request not found.");
   }
   if (ticket.creativeId !== creativeId) {
     throw new TimeEntryError(
       "NOT_ASSIGNED_TO_CREATIVE",
-      "You are not the assigned creative for this ticket.",
+      "You are not the assigned creative for this request.",
     );
   }
 }

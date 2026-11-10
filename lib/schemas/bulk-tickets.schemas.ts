@@ -11,8 +11,8 @@ import { TicketPriority, TicketStatus } from "@prisma/client";
 
 const ticketIdsSchema = z
   .array(z.string().min(1))
-  .min(1, "Select at least one ticket.")
-  .max(100, "Bulk ops are capped at 100 tickets per request.");
+  .min(1, "Select at least one request.")
+  .max(100, "Bulk ops are capped at 100 requests at a time.");
 
 export const bulkReassignSchema = z.object({
   op: z.literal("reassign"),

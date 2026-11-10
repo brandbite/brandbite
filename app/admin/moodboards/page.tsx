@@ -124,7 +124,7 @@ export default function AdminMoodboardsPage() {
               value={query}
               onChange={setQuery}
               placeholder="Search moodboards"
-              label="Search moodboards by title, company, person or job"
+              label="Search moodboards by title, company, person or request"
             />
             <div className="w-full sm:w-48">
               <Select
@@ -166,7 +166,7 @@ export default function AdminMoodboardsPage() {
                   <Th>Moodboard</Th>
                   <Th>Belongs to</Th>
                   <Th>Created by</Th>
-                  <Th>Job</Th>
+                  <Th>Request</Th>
                   <Th align="right">Items</Th>
                   <Th>Updated</Th>
                 </tr>

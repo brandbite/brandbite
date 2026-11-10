@@ -181,7 +181,7 @@ export default function CustomerTicketsPage() {
     } catch (err: any) {
       if (id !== fetchIdRef.current) return;
       console.error("Customer tickets fetch error:", err);
-      setError(err?.message || "Failed to load tickets.");
+      setError(err?.message || "Failed to load requests.");
     } finally {
       if (id === fetchIdRef.current) {
         setLoading(false);
@@ -378,7 +378,7 @@ export default function CustomerTicketsPage() {
             value={search}
             onChange={setSearch}
             label="Search requests"
-            placeholder="Search by request, project or job type…"
+            placeholder="Search by request, project or service…"
             className="min-w-[240px] flex-1"
           />
           <div className="w-full sm:w-52">
@@ -472,7 +472,7 @@ export default function CustomerTicketsPage() {
                     direction={sortDirection("priority")}
                     onSort={() => handleSort("priority")}
                   />
-                  <Th className="max-xl:hidden">Job type</Th>
+                  <Th className="max-xl:hidden">Service</Th>
                   <Th>Assigned</Th>
                   <SortableTh
                     label="Created"

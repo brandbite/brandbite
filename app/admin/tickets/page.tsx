@@ -249,7 +249,7 @@ export default function AdminTicketsPage() {
             throw new Error("You need to sign in as an admin to view this page.");
           }
           if (err.status === 403) {
-            throw new Error("Only site owners or admins can manage tickets from this screen.");
+            throw new Error("Only site owners or admins can manage requests from this screen.");
           }
           throw err;
         },
@@ -258,7 +258,7 @@ export default function AdminTicketsPage() {
       setCreatives(json.creatives);
     } catch (err) {
       console.error("[AdminTicketsPage] load error", err);
-      setError(err instanceof Error ? err.message : "Failed to load tickets. Please try again.");
+      setError(err instanceof Error ? err.message : "Failed to load requests. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -287,7 +287,7 @@ export default function AdminTicketsPage() {
 
       if (!res.ok) {
         if (res.status === 401) {
-          throw new Error("You need to sign in as an admin to update tickets.");
+          throw new Error("You need to sign in as an admin to update requests.");
         }
         if (res.status === 403) {
           throw new Error(json?.error || "Only site owners or admins can assign creatives.");
@@ -357,13 +357,13 @@ export default function AdminTicketsPage() {
       }
       if (costVal !== "" && (costNum as number) > TOKEN_OVERRIDE_MAX) {
         setError(
-          `Cost override cannot exceed ${TOKEN_OVERRIDE_MAX.toLocaleString()}. Split larger jobs into multiple tickets.`,
+          `Cost override cannot exceed ${TOKEN_OVERRIDE_MAX.toLocaleString()}. Split larger work into multiple requests.`,
         );
         return;
       }
       if (payoutVal !== "" && (payoutNum as number) > TOKEN_OVERRIDE_MAX) {
         setError(
-          `Payout override cannot exceed ${TOKEN_OVERRIDE_MAX.toLocaleString()}. Split larger jobs into multiple tickets.`,
+          `Payout override cannot exceed ${TOKEN_OVERRIDE_MAX.toLocaleString()}. Split larger work into multiple requests.`,
         );
         return;
       }
@@ -474,7 +474,7 @@ export default function AdminTicketsPage() {
       const bad = json?.failed?.length ?? 0;
       setBulkMessage(
         bad === 0
-          ? `Updated ${ok} ticket${ok === 1 ? "" : "s"}.`
+          ? `Updated ${ok} request${ok === 1 ? "" : "s"}.`
           : `Updated ${ok}, failed ${bad}. First error: ${json?.failed?.[0]?.error ?? "unknown"}`,
       );
 
@@ -567,7 +567,7 @@ export default function AdminTicketsPage() {
       }),
     [editingOverrides, tickets],
   );
-  useUnsavedChanges(pricingDirty, "Ticket pricing");
+  useUnsavedChanges(pricingDirty, "Request pricing");
 
   const openTicket = (id: string) => {
     setActiveTicketId(id);
@@ -589,7 +589,7 @@ export default function AdminTicketsPage() {
   const summary =
     loading && tickets.length === 0 ? null : (
       <p className="text-sm text-[var(--av2-text-2)] tabular-nums">
-        {fmt(tickets.length)} {plural(tickets.length, "ticket", "tickets")}
+        {fmt(tickets.length)} {plural(tickets.length, "request", "requests")}
         {STATUS_KEYS.map((s) => (
           <span key={s}>
             {" · "}
@@ -623,7 +623,7 @@ export default function AdminTicketsPage() {
       <Card className="xl:sticky xl:top-24">
         <EmptyState
           icon={<IconTicket width={28} height={28} />}
-          title="Select a ticket"
+          title="Select a request"
           description="Pick a row to assign a creative or review its token pricing."
         />
       </Card>
@@ -633,8 +633,8 @@ export default function AdminTicketsPage() {
   return (
     <div>
       <PageHeader
-        title="Tickets"
-        description="Assign creatives and review ticket pricing."
+        title="Requests"
+        description="Assign creatives and review request pricing."
         actions={
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             {summary}
@@ -672,8 +672,8 @@ export default function AdminTicketsPage() {
             <SearchInput
               value={search}
               onChange={setSearch}
-              placeholder="Search tickets"
-              label="Search tickets"
+              placeholder="Search requests"
+              label="Search requests"
               className="w-full sm:w-auto sm:min-w-[160px] sm:flex-1"
             />
             <div className="w-full sm:w-36">
@@ -833,13 +833,13 @@ export default function AdminTicketsPage() {
 
           {/* Table */}
           <Card padding="none">
-            <Table label="Tickets">
+            <Table label="Requests">
               <thead>
                 <tr>
                   <Th className="w-12">
                     <input
                       type="checkbox"
-                      aria-label="Select all visible tickets"
+                      aria-label="Select all visible requests"
                       checked={allVisibleSelected}
                       disabled={visibleTickets.length === 0}
                       onChange={(e) => {
@@ -854,7 +854,7 @@ export default function AdminTicketsPage() {
                       className={CHECKBOX}
                     />
                   </Th>
-                  <Th>Ticket</Th>
+                  <Th>Request</Th>
                   <Th>Status</Th>
                   <Th align="right">Cost</Th>
                   <Th align="right">Payout</Th>
@@ -879,13 +879,13 @@ export default function AdminTicketsPage() {
                       {tickets.length === 0 ? (
                         <EmptyState
                           icon={<IconTicket width={28} height={28} />}
-                          title="No tickets yet"
-                          description="Once tickets are created, they will appear here for creative assignment."
+                          title="No requests yet"
+                          description="Once requests are created, they will appear here for creative assignment."
                         />
                       ) : (
                         <EmptyState
-                          title="No tickets match these filters"
-                          description="Try a different search, or clear the filters to see every ticket."
+                          title="No requests match these filters"
+                          description="Try a different search, or clear the filters to see every request."
                           action={<Button onClick={clearFilters}>Clear filters</Button>}
                         />
                       )}
@@ -912,12 +912,12 @@ export default function AdminTicketsPage() {
                         key={t.id}
                         selected={t.id === activeTicketId}
                         onSelect={() => openTicket(t.id)}
-                        label={`Manage ticket ${t.title}`}
+                        label={`Manage request ${t.title}`}
                       >
                         <Td>
                           <input
                             type="checkbox"
-                            aria-label={`Select ticket ${t.title}`}
+                            aria-label={`Select request ${t.title}`}
                             checked={selectedIds.has(t.id)}
                             onChange={() => toggleSelected(t.id)}
                             onClick={(e) => e.stopPropagation()}
@@ -951,7 +951,7 @@ export default function AdminTicketsPage() {
                         </Td>
                         <Td align="right">
                           <span className="flex items-center justify-end gap-1.5 font-medium">
-                            {payoutExceeds && <IconWarning label="Payout exceeds ticket cost" />}
+                            {payoutExceeds && <IconWarning label="Payout exceeds request cost" />}
                             {fmt(effectivePayout)}
                           </span>
                           {t.creativePayoutOverride != null && (
@@ -982,10 +982,10 @@ export default function AdminTicketsPage() {
                   <p className="text-[var(--av2-text)]">
                     Showing <span className="tabular-nums">{visibleTickets.length}</span> of{" "}
                     <span className="tabular-nums">{tickets.length}</span>{" "}
-                    {plural(tickets.length, "ticket", "tickets")}
+                    {plural(tickets.length, "request", "requests")}
                   </p>
                   <p className="mt-0.5">
-                    Select tickets to reassign, change status or priority in bulk.
+                    Select requests to reassign, change status or priority in bulk.
                   </p>
                 </div>
               </TableFooter>
@@ -1008,15 +1008,15 @@ export default function AdminTicketsPage() {
         variant={bulkStatus === "DONE" ? "danger" : "warning"}
         title={
           bulkStatus === "DONE"
-            ? `Complete ${selectedIds.size} ${plural(selectedIds.size, "ticket", "tickets")} and pay creatives?`
-            : `Move ${selectedIds.size} ${plural(selectedIds.size, "ticket", "tickets")} to ${bulkStatus ? TICKET_STATUS[bulkStatus].label : ""}?`
+            ? `Complete ${selectedIds.size} ${plural(selectedIds.size, "request", "requests")} and pay creatives?`
+            : `Move ${selectedIds.size} ${plural(selectedIds.size, "request", "requests")} to ${bulkStatus ? TICKET_STATUS[bulkStatus].label : ""}?`
         }
         description={
           bulkStatus === "DONE"
-            ? "Each ticket is marked done and its creative is paid now, without waiting for the customer to approve. This can't be undone."
-            : "This skips the usual customer and creative steps: no tokens are charged or refunded. The customer and creative are notified. Done tickets are left as they are."
+            ? "Each request is marked done and its creative is paid now, without waiting for the customer to approve. This can't be undone."
+            : "This skips the usual customer and creative steps: no tokens are charged or refunded. The customer and creative are notified. Done requests are left as they are."
         }
-        confirmLabel={bulkStatus === "DONE" ? "Complete & pay" : "Move tickets"}
+        confirmLabel={bulkStatus === "DONE" ? "Complete & pay" : "Move requests"}
       />
     </div>
   );
@@ -1079,10 +1079,10 @@ function ManageTicketPanel({
   const currentCreative = t.creative ? t.creative.name || t.creative.email : null;
 
   const jobDetails = (
-    <PanelSection title="Job details">
+    <PanelSection title="Request details">
       <KeyValueList
         rows={[
-          { label: "Job type", value: t.jobType?.name ?? DASH },
+          { label: "Service", value: t.jobType?.name ?? DASH },
           { label: "Quantity", value: <span className="tabular-nums">×{qty}</span> },
           {
             label: "Default cost",
@@ -1121,7 +1121,7 @@ function ManageTicketPanel({
     ) : null;
 
   return (
-    <DetailPanel title="Manage ticket" onClose={onClose} footer={footer}>
+    <DetailPanel title="Manage request" onClose={onClose} footer={footer}>
       <div className="mb-5">
         <h3 className="text-2xl leading-8 font-bold break-words">{t.title}</h3>
         <p className="mt-0.5 text-base text-[var(--av2-text-2)]">{t.company?.name ?? DASH}</p>
@@ -1133,12 +1133,12 @@ function ManageTicketPanel({
           ) : (
             <span className="text-sm">{t.status}</span>
           )}
-          <TextLink href={`/admin/tickets/${t.id}`}>Open full ticket</TextLink>
+          <TextLink href={`/admin/tickets/${t.id}`}>Open full request</TextLink>
         </div>
       </div>
 
       <Tabs
-        label="Manage ticket sections"
+        label="Manage request sections"
         idPrefix={PANEL_ID}
         value={tab}
         onChange={onTab}
@@ -1179,7 +1179,7 @@ function ManageTicketPanel({
               <Field
                 label="Assigned creative"
                 htmlFor="manage-ticket-creative"
-                hint={saving ? "Saving…" : "Choose who works on this ticket. Saves immediately."}
+                hint={saving ? "Saving…" : "Choose who works on this request. Saves immediately."}
               >
                 <Select
                   id="manage-ticket-creative"
@@ -1206,11 +1206,11 @@ function ManageTicketPanel({
               <PanelSection title="Token pricing">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field
-                    label="Ticket cost"
+                    label="Request cost"
                     htmlFor="manage-ticket-cost"
                     hint={
                       draft.costOverride.trim() === ""
-                        ? `Job-type default (${fmt(defaultCost)})`
+                        ? `Service default (${fmt(defaultCost)})`
                         : undefined
                     }
                   >
@@ -1267,9 +1267,9 @@ function ManageTicketPanel({
 
                 {payoutExceeds && (
                   <div className="mt-4">
-                    <Callout tone="warning" title="Payout exceeds ticket cost">
+                    <Callout tone="warning" title="Payout exceeds request cost">
                       The creative would earn {fmt(draftPayout)} tokens on a {fmt(draftCost)}
-                      -token ticket. Review this amount before applying further changes.
+                      -token request. Review this amount before applying further changes.
                     </Callout>
                   </div>
                 )}
@@ -1281,18 +1281,18 @@ function ManageTicketPanel({
                     onClick={() => onOverrideChange({ costOverride: "", payoutOverride: "" })}
                     className="mt-4 rounded text-sm font-semibold text-[var(--av2-link)] underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none disabled:opacity-50"
                   >
-                    Reset to job-type defaults
+                    Reset to service defaults
                   </button>
                 )}
                 <p className="mt-3 text-xs text-[var(--av2-text-2)]">
-                  Leave a field empty to use the job-type default. Changing the cost debits or
+                  Leave a field empty to use the service default. Changing the cost debits or
                   credits the company immediately.
                 </p>
               </PanelSection>
             ) : (
               <PanelSection>
-                <Callout title="No job type">
-                  This ticket has no job type, so there is no token pricing to override.
+                <Callout title="No service">
+                  This request has no service, so there is no token pricing to override.
                 </Callout>
               </PanelSection>
             )}

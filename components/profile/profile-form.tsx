@@ -1498,7 +1498,7 @@ function ProfileFormBody({ layout, dashboard }: { layout: ProfileFormLayout; das
               <div>
                 <h2 className={T.h2}>Identity</h2>
                 <p className={T.desc}>
-                  Your name appears on tickets, comments, and the emails we send about your work.
+                  Your name appears on requests, comments, and the emails we send about your work.
                 </p>
               </div>
               <PBadge variant="neutral">{ROLE_LABELS[user.role]}</PBadge>
@@ -1702,7 +1702,7 @@ function ProfileFormBody({ layout, dashboard }: { layout: ProfileFormLayout; das
               <div className="mb-4">
                 <h2 className={T.h2}>Workload</h2>
                 <p className={T.desc}>
-                  When you&apos;re available and how many tickets you&apos;re willing to hold at
+                  When you&apos;re available and how many requests you&apos;re willing to hold at
                   once. Auto-assign uses the cap to skip you when you&apos;re already at capacity;
                   admins use your working hours when planning work.
                 </p>
@@ -1781,7 +1781,7 @@ function ProfileFormBody({ layout, dashboard }: { layout: ProfileFormLayout; das
                     )}
                   </div>
                   <p className={T.hint}>
-                    Auto-assign skips you when your open ticket count reaches this number. Empty
+                    Auto-assign skips you when your open request count reaches this number. Empty
                     means no cap (the legacy behavior). Admin can also adjust this.
                   </p>
                 </div>
@@ -2247,7 +2247,7 @@ function ProfileFormBody({ layout, dashboard }: { layout: ProfileFormLayout; das
                     : "mt-0.5 text-xs text-red-700/80 dark:text-red-300/80"
                 }
               >
-                Permanently anonymize your account. Tickets and ledger entries you&apos;re attached
+                Permanently anonymize your account. Requests and ledger entries you&apos;re attached
                 to stay for our financial records, but your name, email, and login credentials are
                 removed. This cannot be undone.
               </p>

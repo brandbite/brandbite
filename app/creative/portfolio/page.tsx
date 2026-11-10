@@ -167,7 +167,7 @@ export default function CreativePortfolioPage() {
           <EmptyState
             icon={<IconDocument />}
             title="Nothing here yet"
-            description="You haven't completed any tickets yet. Once a ticket is approved and marked done, it will appear here automatically."
+            description="You haven't completed any requests yet. Once a request is approved and marked done, it will appear here automatically."
           />
         </Card>
       </>
@@ -180,7 +180,7 @@ export default function CreativePortfolioPage() {
         {...HEADER}
         meta={
           <>
-            {fmt(data.totalCount)} completed {plural(data.totalCount, "ticket", "tickets")}
+            {fmt(data.totalCount)} completed {plural(data.totalCount, "request", "requests")}
           </>
         }
       />
@@ -273,7 +273,7 @@ function AboutPortfolio() {
         <div className="min-w-0">
           <h2 className="text-xl leading-7 font-semibold">Built from approved work</h2>
           <p className="mt-1 text-base text-[var(--av2-text-2)]">
-            Every ticket that is approved and marked done appears here automatically, with the
+            Every request that is approved and marked done appears here automatically, with the
             images from its final revision.
           </p>
         </div>
@@ -289,7 +289,7 @@ function PortfolioCard({ item }: { item: PortfolioItem }) {
   return (
     <Link
       href={`/creative/tickets/${item.ticketId}`}
-      aria-label={`Open job: ${item.title}`}
+      aria-label={`Open request: ${item.title}`}
       className="group flex h-full flex-col gap-5 rounded-2xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-6 transition-colors hover:border-[var(--av2-accent)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:ring-offset-1 focus-visible:outline-none sm:flex-row"
     >
       {/* Cover image */}
@@ -338,7 +338,7 @@ function PortfolioCard({ item }: { item: PortfolioItem }) {
           </Badge>
         </div>
         <span className={`${buttonClass("primary")} mt-auto self-start max-sm:mt-4 sm:mt-4`}>
-          Open job
+          Open request
           <IconArrowUpRight />
         </span>
       </div>
@@ -352,7 +352,7 @@ function PortfolioTable({ items }: { items: PortfolioItem[] }) {
       <thead>
         <tr>
           <Th className="max-sm:hidden">ID</Th>
-          <Th>Job</Th>
+          <Th>Request</Th>
           <Th className="max-md:hidden">Service</Th>
           <Th className="max-lg:hidden">Company</Th>
           <Th>Completed</Th>

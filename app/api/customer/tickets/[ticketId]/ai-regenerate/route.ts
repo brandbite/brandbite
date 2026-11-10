@@ -55,7 +55,7 @@ export async function POST(
     });
 
     if (!ticket) {
-      return NextResponse.json({ error: "AI ticket not found" }, { status: 404 });
+      return NextResponse.json({ error: "AI request not found" }, { status: 404 });
     }
 
     const body = await req.json();

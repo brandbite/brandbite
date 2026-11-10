@@ -201,7 +201,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
             select: { id: true },
           });
           if (!ticket) {
-            return NextResponse.json({ error: "Job not found" }, { status: 400 });
+            return NextResponse.json({ error: "Request not found" }, { status: 400 });
           }
         }
         data.ticketId = ticketId;
@@ -217,7 +217,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
             : moodboard.sharedWithCustomer;
       if (shared && !ticketId) {
         return NextResponse.json(
-          { error: "Link this moodboard to a job before sharing it" },
+          { error: "Link this moodboard to a request before sharing it" },
           { status: 400 },
         );
       }
