@@ -9,13 +9,13 @@
 
 "use client";
 
-import React, { useState, type ReactNode } from "react";
+import React, { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { copyrightLine } from "@/lib/brand";
 import { useRouter } from "next/navigation";
 import { generateAbbreviation } from "@/lib/abbreviation";
-import { IconBuilding, IconUsers } from "@/components/admin/v2/icons";
+import { IconBuilding, IconDocument, IconUsers } from "@/components/admin/v2/icons";
 import {
   Button,
   Callout,
@@ -59,7 +59,19 @@ const SETUP_ITEMS: { title: string; text: string; tone: Tone; icon: ReactNode }[
     tone: "green",
     icon: <IconMoodboards width={24} height={24} />,
   },
+  {
+    title: "Choose where files go",
+    text: "Connect Google Drive or Dropbox so source files land in your own storage.",
+    tone: "blue",
+    icon: <IconDocument />,
+  },
 ];
+
+type StorageOption = {
+  provider: "GOOGLE_DRIVE" | "DROPBOX";
+  label: string;
+  slug: string;
+};
 
 function SummaryRow({ title, detail }: { title: string; detail: string }) {
   return (
@@ -78,9 +90,10 @@ function SummaryRow({ title, detail }: { title: string; detail: string }) {
 export default function OnboardingPage() {
   const router = useRouter();
 
-  // Step state — 1: company, 2: invite team, 3: create project, 4: done
+  // Step state — 1: company, 2: invite team, 3: create project,
+  // 4: where source files go, 5: done
   const [step, setStep] = useState(1);
-  const TOTAL_STEPS = 4;
+  const TOTAL_STEPS = 5;
 
   // Step 1 — Company
   const [companyName, setCompanyName] = useState("");
@@ -104,8 +117,36 @@ export default function OnboardingPage() {
   const [projectLoading, setProjectLoading] = useState(false);
   const [projectCreated, setProjectCreated] = useState<string | null>(null);
 
-  // Step 4 — finishing
+  // Step 4 — source files (Google Drive / Dropbox, when we offer them)
+  const [storageOptions, setStorageOptions] = useState<StorageOption[] | null>(null);
+  const [connecting, setConnecting] = useState<string | null>(null);
+  const [keptOnBrandbite, setKeptOnBrandbite] = useState(false);
+
+  // Step 5 — finishing
   const [finishLoading, setFinishLoading] = useState(false);
+
+  useEffect(() => {
+    if (step !== 4 || storageOptions) return;
+    let cancelled = false;
+    fetch("/api/customer/integrations", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (cancelled) return;
+        const options: StorageOption[] = (json?.integrations ?? []).filter(
+          (i: StorageOption & { available?: boolean }) =>
+            (i.provider === "GOOGLE_DRIVE" || i.provider === "DROPBOX") && i.available,
+        );
+        setStorageOptions(options);
+        // Nothing to offer: skip the step.
+        if (options.length === 0) setStep(5);
+      })
+      .catch(() => {
+        if (!cancelled) setStep(5);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [step, storageOptions]);
 
   // ---------------------------------------------------------------------------
   // Handlers
@@ -196,6 +237,18 @@ export default function OnboardingPage() {
     }
   };
 
+  // Connecting leaves for Google / Dropbox and comes back to Settings ›
+  // Integrations, so finish onboarding first.
+  const handleConnect = async (option: StorageOption) => {
+    setConnecting(option.provider);
+    try {
+      await fetch("/api/customer/onboarding", { method: "PATCH" });
+    } catch {
+      // The connect flow still works; onboarding can be finished later.
+    }
+    window.location.href = `/api/customer/integrations/${option.slug}/connect`;
+  };
+
   const handleFinish = async () => {
     setFinishLoading(true);
     try {
@@ -210,7 +263,7 @@ export default function OnboardingPage() {
   // Stepper
   // ---------------------------------------------------------------------------
 
-  const stepLabels = ["Company", "Team", "Project", "Done"];
+  const stepLabels = ["Company", "Team", "Project", "Files", "Done"];
 
   // ---------------------------------------------------------------------------
   // Render
@@ -518,8 +571,69 @@ export default function OnboardingPage() {
               </div>
             )}
 
-            {/* ----- Step 4: All Set ----- */}
+            {/* ----- Step 4: Source files ----- */}
             {step === 4 && (
+              <div className="flex flex-col">
+                <h1 className="text-[32px] leading-10 font-bold tracking-tight">
+                  Where should we deliver source files?
+                </h1>
+                <p className="mt-2 text-sm text-[var(--av2-text-2)]">
+                  Source files are the layered, print-ready files behind your designs (PSD, AI,
+                  video projects). Connect your own storage and they land there, in a folder for
+                  each project and request. brandbite only sees the folder it creates.
+                </p>
+
+                <div className="mt-6 space-y-3">
+                  {(storageOptions ?? []).map((option, index) => (
+                    <div
+                      key={option.provider}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--av2-border)] px-4 py-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-semibold">{option.label}</p>
+                        <p className="text-sm text-[var(--av2-text-2)]">
+                          {option.provider === "DROPBOX"
+                            ? "Files up to 150 MB go into Apps › brandbite. Bigger ones stay on brandbite for 90 days."
+                            : "Every source file goes into a brandbite folder in your Drive, kept for good."}
+                        </p>
+                      </div>
+                      <Button
+                        variant={index === 0 ? "primary" : "secondary"}
+                        disabled={connecting !== null}
+                        aria-busy={connecting === option.provider}
+                        onClick={() => handleConnect(option)}
+                      >
+                        {connecting === option.provider ? "Opening…" : `Connect ${option.label}`}
+                      </Button>
+                    </div>
+                  ))}
+                  {storageOptions === null ? (
+                    <p className="text-sm text-[var(--av2-text-2)]">Loading options…</p>
+                  ) : null}
+                </div>
+
+                <p className="mt-4 text-sm text-[var(--av2-text-2)]">
+                  Not now? We keep source files on brandbite for 90 days after a request is done,
+                  and you can connect later under Settings › Integrations. Files we&apos;re keeping
+                  then move into your storage.
+                </p>
+
+                {stepActions(
+                  <Button
+                    disabled={connecting !== null}
+                    onClick={() => {
+                      setKeptOnBrandbite(true);
+                      setStep(5);
+                    }}
+                  >
+                    Keep them on brandbite for now
+                  </Button>,
+                )}
+              </div>
+            )}
+
+            {/* ----- Step 5: All Set ----- */}
+            {step === 5 && (
               <div className="flex flex-col">
                 <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--av2-success-bg)]">
                   <CheckGlyph className="h-7 w-7" />
@@ -543,6 +657,12 @@ export default function OnboardingPage() {
                     />
                   )}
                   {projectCreated && <SummaryRow title="Project created" detail={projectCreated} />}
+                  {keptOnBrandbite && (
+                    <SummaryRow
+                      title="Source files on brandbite"
+                      detail="Kept 90 days after each request is done. Connect your storage anytime in Settings."
+                    />
+                  )}
                 </div>
 
                 {stepActions(
