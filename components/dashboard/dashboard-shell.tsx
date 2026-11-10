@@ -164,7 +164,7 @@ export function DashboardShell({ role, children }: { role: DashboardRole; childr
             type="button"
             onClick={() => setMobileOpen(false)}
             aria-label="Close navigation"
-            className="ml-auto flex h-9 w-9 items-center justify-center rounded-lg hover:bg-[var(--av2-bg)] md:hidden"
+            className="ml-auto flex h-10 w-10 items-center justify-center rounded-lg hover:bg-[var(--av2-bg)] md:hidden"
           >
             <IconX width={18} height={18} />
           </button>
@@ -252,7 +252,7 @@ export function DashboardShell({ role, children }: { role: DashboardRole; childr
             onClick={() => setMobileOpen(true)}
             aria-label="Open navigation"
             aria-expanded={mobileOpen}
-            className="flex h-10 w-10 items-center justify-center rounded-lg hover:bg-[var(--av2-surface)] md:hidden"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg hover:bg-[var(--av2-surface)] md:hidden"
           >
             <IconMenu width={20} height={20} />
           </button>

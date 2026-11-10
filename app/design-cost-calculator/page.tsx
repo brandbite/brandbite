@@ -9,6 +9,7 @@ import type { Metadata } from "next";
 import { StudioShell } from "@/components/colors/studio/studio-shell";
 import { CostCalculator } from "@/components/cost/cost-calculator";
 import { JsonLd } from "@/components/seo/json-ld";
+import { stackedTable as st } from "@/components/ui/stacked-table";
 import { formatMoney, formatRange, PRODUCTIVE_HOURS_PER_MONTH } from "@/lib/cost/calculate";
 import {
   CHECKED_ON,
@@ -80,11 +81,15 @@ export default function DesignCostCalculatorPage() {
         </p>
 
         <div className="mt-6 overflow-x-auto rounded-xl border border-[var(--cs-border)]">
-          <table className="w-full min-w-[560px] border-collapse text-left text-sm leading-5">
-            <caption className="px-5 pt-5 pb-3 text-left text-lg leading-7 font-semibold">
+          <table
+            className={`w-full min-w-[560px] border-collapse text-left text-sm leading-5 ${st.table}`}
+          >
+            <caption
+              className={`px-5 pt-5 pb-3 text-left text-lg leading-7 font-semibold ${st.caption}`}
+            >
               Typical rates ({CHECKED})
             </caption>
-            <thead>
+            <thead className={st.head}>
               <tr className="border-y border-[var(--cs-border)] text-[var(--cs-muted)]">
                 <th scope="col" className="px-5 py-3 font-medium">
                   Option
@@ -97,27 +102,39 @@ export default function DesignCostCalculatorPage() {
                 </th>
               </tr>
             </thead>
-            <tbody>
-              <tr className="border-b border-[var(--cs-border)]">
-                <th scope="row" className="px-5 py-3 font-medium">
+            <tbody className={st.body}>
+              <tr className={`border-b border-[var(--cs-border)] ${st.row}`}>
+                <th scope="row" className={`px-5 py-3 font-medium ${st.rowHeader}`}>
                   Freelance designer, per hour
                 </th>
-                <td className="px-5 py-3">{formatRange(us.freelancerHourly, "USD")}</td>
-                <td className="px-5 py-3">{formatRange(eu.freelancerHourly, "EUR")}</td>
+                <td data-label="United States" className={`px-5 py-3 ${st.cell}`}>
+                  {formatRange(us.freelancerHourly, "USD")}
+                </td>
+                <td data-label="Western Europe" className={`px-5 py-3 ${st.cell}`}>
+                  {formatRange(eu.freelancerHourly, "EUR")}
+                </td>
               </tr>
-              <tr className="border-b border-[var(--cs-border)]">
-                <th scope="row" className="px-5 py-3 font-medium">
+              <tr className={`border-b border-[var(--cs-border)] ${st.row}`}>
+                <th scope="row" className={`px-5 py-3 font-medium ${st.rowHeader}`}>
                   Design agency, per hour
                 </th>
-                <td className="px-5 py-3">{formatRange(us.agencyHourly, "USD")}</td>
-                <td className="px-5 py-3">{formatRange(eu.agencyHourly, "EUR")}</td>
+                <td data-label="United States" className={`px-5 py-3 ${st.cell}`}>
+                  {formatRange(us.agencyHourly, "USD")}
+                </td>
+                <td data-label="Western Europe" className={`px-5 py-3 ${st.cell}`}>
+                  {formatRange(eu.agencyHourly, "EUR")}
+                </td>
               </tr>
-              <tr>
-                <th scope="row" className="px-5 py-3 font-medium">
+              <tr className={st.row}>
+                <th scope="row" className={`px-5 py-3 font-medium ${st.rowHeader}`}>
                   In-house designer, median salary per year
                 </th>
-                <td className="px-5 py-3">{formatMoney(us.inHouseSalary, "USD")}</td>
-                <td className="px-5 py-3">{formatMoney(eu.inHouseSalary, "EUR")}</td>
+                <td data-label="United States" className={`px-5 py-3 ${st.cell}`}>
+                  {formatMoney(us.inHouseSalary, "USD")}
+                </td>
+                <td data-label="Western Europe" className={`px-5 py-3 ${st.cell}`}>
+                  {formatMoney(eu.inHouseSalary, "EUR")}
+                </td>
               </tr>
             </tbody>
           </table>

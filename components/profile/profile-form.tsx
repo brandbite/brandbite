@@ -2421,7 +2421,7 @@ function AccountSummary({
     },
   ];
   return (
-    <aside className="rounded-2xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-6">
+    <aside className="min-w-0 rounded-2xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-6">
       <h2 className="text-xl leading-7 font-semibold">Account</h2>
       <div className="mt-4 flex items-center gap-4 border-b border-[var(--av2-border)] pb-5">
         <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--av2-selected)] text-lg font-semibold text-[var(--av2-link)]">

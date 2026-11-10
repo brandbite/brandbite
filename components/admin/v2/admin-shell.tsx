@@ -152,7 +152,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
             onClick={() => setMobileOpen(true)}
             aria-label="Open navigation"
             aria-expanded={mobileOpen}
-            className="flex h-10 w-10 items-center justify-center rounded-lg hover:bg-[var(--av2-surface)] md:hidden"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg hover:bg-[var(--av2-surface)] md:hidden"
           >
             <IconMenu width={20} height={20} />
           </button>

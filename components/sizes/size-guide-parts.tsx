@@ -8,6 +8,7 @@
 import Link from "next/link";
 
 import { ToolNav } from "@/components/colors/studio/tool-nav";
+import { stackedTable as st } from "@/components/ui/stacked-table";
 import { SIZE_NAV, SIZE_NAV_MORE } from "@/lib/sizes";
 import type { SizeFormat, SizePlatform } from "@/lib/sizes/types";
 
@@ -52,11 +53,15 @@ export function SizeTable({
 }) {
   return (
     <div className="overflow-x-auto rounded-2xl border border-[var(--cs-border)] bg-[var(--cs-surface)]">
-      <table className="w-full min-w-[520px] border-collapse text-left text-sm leading-5">
-        <caption className="px-5 pt-5 pb-3 text-left text-lg leading-7 font-semibold">
+      <table
+        className={`w-full min-w-[520px] border-collapse text-left text-sm leading-5 ${st.table}`}
+      >
+        <caption
+          className={`px-5 pt-5 pb-3 text-left text-lg leading-7 font-semibold ${st.caption}`}
+        >
           {caption}
         </caption>
-        <thead>
+        <thead className={st.head}>
           <tr className="border-y border-[var(--cs-border)] text-[var(--cs-muted)]">
             {showPlatform ? (
               <th scope="col" className="px-5 py-3 font-medium">
@@ -74,16 +79,16 @@ export function SizeTable({
             </th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className={st.body}>
           {rows.map(({ platform, format }) => {
             const href = platform ? `/sizes/${platform.slug}#${format.id}` : `#${format.id}`;
             return (
               <tr
                 key={`${platform?.slug ?? ""}-${format.id}`}
-                className="border-b border-[var(--cs-border)] last:border-b-0"
+                className={`border-b border-[var(--cs-border)] last:border-b-0 ${st.row}`}
               >
                 {showPlatform && platform ? (
-                  <td className="px-5 py-3">
+                  <td data-label="Platform" className={`px-5 py-3 ${st.cell}`}>
                     <Link
                       href={`/sizes/${platform.slug}`}
                       className="font-medium text-[var(--cs-brand-strong)] hover:underline"
@@ -92,15 +97,17 @@ export function SizeTable({
                     </Link>
                   </td>
                 ) : null}
-                <th scope="row" className="px-5 py-3 font-medium">
+                <th scope="row" className={`px-5 py-3 font-medium ${st.rowHeader}`}>
                   <Link href={href} className="hover:underline">
                     {format.name}
                   </Link>
                 </th>
-                <td className="px-5 py-3 whitespace-nowrap">
+                <td data-label="Size (px)" className={`px-5 py-3 whitespace-nowrap ${st.cell}`}>
                   {format.width} × {format.height}
                 </td>
-                <td className="px-5 py-3">{format.ratio}</td>
+                <td data-label="Ratio" className={`px-5 py-3 ${st.cell}`}>
+                  {format.ratio}
+                </td>
               </tr>
             );
           })}
