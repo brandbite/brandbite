@@ -16,6 +16,8 @@ export type EmailTemplateParams = {
   title: string;
   message: string;
   ticketId: string | null;
+  /** Moodboard notifications link to the board. */
+  moodboardId?: string | null;
   actorName: string | null;
   recipientRole: "customer" | "creative" | "admin";
 };
@@ -34,6 +36,7 @@ const SUBJECT_MAP: Record<NotificationType, string> = {
   WITHDRAWAL_UPDATED: "Withdrawal update",
   CREATIVE_SCHEDULE_UPDATED: "A creative changed their working hours",
   MOODBOARD_SHARED: "Your creative shared a moodboard",
+  MOODBOARD_COMMENT: "New moodboard comment",
   SUPPORT_GUIDE_CHANGED: "A Support guide you edited changed in code",
 };
 
@@ -51,7 +54,12 @@ function getCTAUrl(
   type: NotificationType,
   ticketId: string | null,
   recipientRole: "customer" | "creative" | "admin",
+  moodboardId: string | null = null,
 ): string {
+  if (type === "MOODBOARD_COMMENT" && moodboardId) {
+    return `${baseUrl}/${recipientRole}/moodboards/${moodboardId}?comments=1`;
+  }
+
   // Customer-facing notifications link to the ticket detail
   if (ticketId && recipientRole === "customer") {
     return `${baseUrl}/customer/tickets/${ticketId}`;
@@ -92,6 +100,7 @@ const CTA_LABELS: Record<NotificationType, string> = {
   WITHDRAWAL_UPDATED: "View Withdrawals",
   CREATIVE_SCHEDULE_UPDATED: "View Users",
   MOODBOARD_SHARED: "View Request",
+  MOODBOARD_COMMENT: "View the comment",
   SUPPORT_GUIDE_CHANGED: "Review the guide",
 };
 
@@ -109,6 +118,7 @@ const TYPE_EMOJI: Record<NotificationType, string> = {
   WITHDRAWAL_UPDATED: "\u{1F4B8}",
   CREATIVE_SCHEDULE_UPDATED: "\u{1F552}",
   MOODBOARD_SHARED: "\u{1F3A8}",
+  MOODBOARD_COMMENT: "\u{1F4AC}",
   SUPPORT_GUIDE_CHANGED: "\u{1F4D8}",
 };
 
@@ -133,7 +143,7 @@ export function buildNotificationEmailHtml(params: EmailTemplateParams): string 
 
   const greeting = recipientName ? `Hi ${recipientName},` : "Hi,";
   const emoji = TYPE_EMOJI[type] || "";
-  const ctaUrl = getCTAUrl(baseUrl, type, ticketId, recipientRole);
+  const ctaUrl = getCTAUrl(baseUrl, type, ticketId, recipientRole, params.moodboardId ?? null);
   const ctaLabel = CTA_LABELS[type] || "View in brandbite";
   const settingsUrl = getSettingsUrl(baseUrl, recipientRole);
   const actorLine = actorName

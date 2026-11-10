@@ -803,6 +803,14 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
       "inspiration",
       "canvas",
       "references",
+      "screenshot",
+      "drag and drop",
+      "align",
+      "section",
+      "frame",
+      "download",
+      "export",
+      "pdf",
       "note",
       "image",
       "color",
@@ -837,6 +845,10 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             type: "p",
             text: "Everything is in the toolbar at the bottom of the canvas. Drag an item out of it and drop it where you want, or click it and then click the canvas. Notes, shapes and text are ready to type on straight away.",
           },
+          {
+            type: "p",
+            text: "You can also drag images and files from your computer onto the board, or paste a screenshot with **Ctrl/⌘ + V**. Images become pictures and everything else becomes a file, up to 10 at a time and 4 MB each.",
+          },
           { type: "figure", caption: "A moodboard with images and notes" },
           {
             type: "p",
@@ -848,6 +860,10 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
               { term: "Sticky note", text: "a colored note. Pick the color when it's selected." },
               { term: "Shape", text: "a square, circle or diamond you can type on." },
               { term: "Text", text: "free text with no box around it." },
+              {
+                term: "Section",
+                text: "a named area that groups what's inside it. Drag it by its name to move everything in it.",
+              },
               { term: "Image", text: "upload an image from your device (4 MB max)." },
               { term: "Color", text: "a color swatch. Click it twice to change the hex code." },
               { term: "Checklist", text: "a list with as many items as you like." },
@@ -877,8 +893,12 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             items: [
               "Click an item to select it. Click it again or press **Enter** to edit it. Double-clicking does both.",
               "Drag an item from anywhere on it to move it. With an item selected, drag a corner to resize it or use the arrow keys to nudge it.",
+              "While you move or resize something, it lines up with the edges and centres of nearby items and an orange guide shows where. Hold **Ctrl** (**⌘** on a Mac) to move it freely.",
+              "To put something on top of or behind the rest, select it and use **Bring to front** or **Send to back** in its toolbar, or press **]** or **[**.",
+              "**More → Download as PNG** or **Download as PDF** saves the whole board as a picture. Videos show as empty boxes in the download.",
               "Scroll, use the **Hand** tool, or hold **Space** and drag to move around. On a phone, drag with one finger. The canvas has no edges.",
-              "Drag across the empty canvas to select several objects, or **Shift**-click them. Then move, duplicate or delete them together.",
+              "Drag across the empty canvas to select several objects, or **Shift**-click them. Then move, duplicate or delete them together. On a phone, press and hold an item to start picking several, then tap others to add or remove them. Tap the empty canvas to stop.",
+              "**Ctrl/⌘ + G** groups the selected items so a click picks them all and they move together; **Ctrl/⌘ + Shift + G** ungroups them. Double-click a grouped item to edit it on its own. **Lock** in the toolbar (**Ctrl/⌘ + Shift + L**) keeps an item from being moved, resized or deleted, handy for a background picture; dragging across it selects what's on top of it.",
               "**Ctrl/⌘ + Z** undoes and **Ctrl/⌘ + Shift + Z** redoes, or use the buttons at the top right. **Ctrl/⌘ + C**, **X**, **V** and **D** copy, cut, paste and duplicate.",
               "**Ctrl** + scroll (**⌘** + scroll on a Mac) or pinch to zoom, or use the zoom buttons, including **Fit to content**.",
             ],
@@ -886,6 +906,23 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           {
             type: "p",
             text: "Shortcuts: **V** Select, **H** Hand, **S** Sticky note, **R** Shape, **T** Text, **L** Arrow, **M** Marker, **E** Eraser, **Shift** + **1** fit to content, **Ctrl** + **0** back to 100%.",
+          },
+        ],
+      },
+      {
+        heading: "Comments",
+        blocks: [
+          {
+            type: "p",
+            text: "Select an item and click **Comment** in its toolbar, or open **Comments** at the top of the board. Comments stay on that item, and anyone who can see the board can reply.",
+          },
+          {
+            type: "p",
+            text: "Items with open comments show a number in their corner; click it to read them. **Resolve** closes a thread once it's sorted, and a reply opens it again. Tick **Show resolved** to see closed threads.",
+          },
+          {
+            type: "p",
+            text: "The person who made the board, and everyone else in a thread, is notified about new comments. You can delete your own comments.",
           },
         ],
       },
@@ -1380,6 +1417,10 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
               "a creative resolved one of your pin notes,",
               "the request was completed.",
             ],
+          },
+          {
+            type: "p",
+            text: "You're also told when your creative shares a moodboard on one of your requests, and when someone comments on a moodboard you made or replies in a comment thread you're in.",
           },
         ],
       },

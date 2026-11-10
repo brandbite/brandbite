@@ -31,6 +31,7 @@ import { NoteCard } from "@/components/moodboard/note-card";
 import { TodoCard } from "@/components/moodboard/todo-card";
 import { ShapeCard } from "@/components/moodboard/shape-card";
 import { TextCard } from "@/components/moodboard/text-card";
+import { SectionCard } from "@/components/moodboard/section-card";
 import { useCanvasTransform } from "@/components/moodboard/use-canvas-transform";
 import type { CreatableKind, ToolMode } from "@/components/moodboard/board-toolbar";
 import type {
@@ -39,6 +40,7 @@ import type {
   MoodboardItemClient,
   MoodboardItemData,
   NoteCardData,
+  SectionCardData,
   ShapeCardData,
   ShapeKind,
 } from "@/lib/moodboard";
@@ -50,17 +52,30 @@ import {
   isImageData,
   isLinkData,
   isNoteData,
+  isSectionData,
   isShapeData,
   isTextData,
   isTodoData,
+  SECTION_COLORS,
   SHAPE_FILLS,
   STICKY_COLORS,
 } from "@/lib/moodboard";
 
-import { rectsIntersect, resizeFromCorner, zoomAtPoint, type CanvasRect } from "./canvas-math";
+import {
+  rectInside,
+  rectsIntersect,
+  resizeFromCorner,
+  zoomAtPoint,
+  type CanvasRect,
+} from "./canvas-math";
 import { createCardOverrideStore } from "./card-override-store";
+import { SNAP_SCREEN_PX, snapBox, snapResize, unionBox, type Box, type Guide } from "./snapping";
+import { exportBounds, renderBoard, type ExportFormat } from "./export-board";
 
 const { MIN_WIDTH, MIN_HEIGHT } = CANVAS_DEFAULTS;
+
+/** How long a finger rests on an object before it starts picking several. */
+const LONG_PRESS_MS = 450;
 
 /** Pointer travel before a press becomes a drag, in screen pixels. */
 const DRAG_THRESHOLD = 4;
@@ -89,6 +104,8 @@ export type BoardCanvasHandle = {
   selectCard: (id: string, options?: { edit?: boolean }) => void;
   selectItems: (ids: string[]) => void;
   clearSelection: () => void;
+  /** The whole board as a picture or PDF; null when it's empty. */
+  exportImage: (format: ExportFormat) => Promise<Blob | null>;
 };
 
 type BoardCanvasProps = {
@@ -124,6 +141,19 @@ type BoardCanvasProps = {
   onPasteText: (text: string | null) => boolean;
   /** The last copy, for browsers that don't report a paste with nothing to paste into. */
   onPasteLastCopy: () => void;
+  /** Files dropped on the board or pasted (screenshots); `at` is where, in canvas units. */
+  onAddFiles: (files: File[], at: { x: number; y: number } | null) => void;
+  /** Puts objects above or below everything else, for good. */
+  onReorderItems: (itemIds: string[], where: "front" | "back") => void;
+  onSetLocked: (itemIds: string[], locked: boolean) => void;
+  onGroup: (itemIds: string[]) => void;
+  onUngroup: (itemIds: string[]) => void;
+  /** Comments in open threads per object, for the badges. */
+  commentCounts?: Map<string, number>;
+  /** The comments panel is open: a viewer's tap on an object picks it for commenting. */
+  commentsOpen?: boolean;
+  /** Opens the comments for one object. */
+  onOpenComments?: (itemId: string) => void;
   onResizeItem: (itemId: string, x: number, y: number, width: number, height: number) => void;
   onAddConnection: (sourceId: string, targetId: string) => void;
   onDeleteConnection: (id: string) => void;
@@ -139,6 +169,11 @@ type BoardCanvasProps = {
 
 export type ItemMove = { id: string; x: number; y: number };
 
+/** True when a drag from outside the page carries files (not text or a link). */
+function hasFiles(transfer: DataTransfer | null): boolean {
+  return !!transfer && Array.from(transfer.types).includes("Files");
+}
+
 type Gesture =
   | {
       kind: "connect";
@@ -148,7 +183,18 @@ type Gesture =
       startY: number;
       moved: boolean;
     }
-  | { kind: "pan"; pointerId: number; startX: number; startY: number; panX: number; panY: number }
+  | {
+      kind: "pan";
+      pointerId: number;
+      startX: number;
+      startY: number;
+      panX: number;
+      panY: number;
+      /** Pressed on a locked object: a tap without moving selects it. */
+      lockedId?: string;
+      /** A viewer pressed an object while comments are open: a tap comments on it. */
+      tapId?: string;
+    }
   | {
       kind: "pinch";
       distance: number;
@@ -165,6 +211,7 @@ type Gesture =
       origin: { x: number; y: number };
       moved: boolean;
       wasSelected: boolean;
+      /** Offset so far in canvas units, after snapping. */
       dx: number;
       dy: number;
     }
@@ -176,6 +223,10 @@ type Gesture =
       startX: number;
       startY: number;
       moved: boolean;
+      /** Phone selection mode: a tap takes the object out instead of narrowing to it. */
+      tapToggles?: boolean;
+      /** A whole group is selected: a click keeps it rather than narrowing to one member. */
+      keepSelection?: boolean;
     }
   | {
       kind: "marquee";
@@ -185,6 +236,8 @@ type Gesture =
       /** Already selected, when Shift adds to a selection. */
       base: string[];
       moved: boolean;
+      /** Pressed on a locked object: a click without moving selects it. */
+      lockedId?: string;
     }
   | {
       kind: "resize";
@@ -203,14 +256,22 @@ function CardContent({
   editRequest,
   onUpdateItem,
   onRemoveEmpty,
+  readOnly = false,
 }: {
   item: MoodboardItemClient;
   editRequest: number;
   onUpdateItem: (id: string, data: MoodboardItemData) => void;
   onRemoveEmpty: (id: string) => void;
+  readOnly?: boolean;
 }) {
   const { id, type, data } = item;
   const update = (next: MoodboardItemData) => onUpdateItem(id, next);
+
+  if (isSectionData(type, data)) {
+    return (
+      <SectionCard data={data} onUpdate={update} editRequest={editRequest} readOnly={readOnly} />
+    );
+  }
 
   if (isNoteData(type, data)) {
     return <NoteCard data={data} onUpdate={update} editRequest={editRequest} />;
@@ -238,6 +299,119 @@ function CardContent({
 }
 
 /** Color and shape controls in the selected object's floating toolbar. */
+const orderGlyph = {
+  width: 18,
+  height: 18,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.75,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+};
+
+/** Bring to front / send to back, for one object or a selection. */
+function OrderButtons({
+  ids,
+  onReorder,
+  divider,
+}: {
+  ids: string[];
+  onReorder: (ids: string[], where: "front" | "back") => void;
+  /** A line before the buttons, when other controls come first. */
+  divider: boolean;
+}) {
+  const button =
+    "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--av2-text)] hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none";
+  return (
+    <>
+      {divider && <div aria-hidden className="mx-1 h-5 w-px bg-[var(--av2-border)]" />}
+      <button
+        type="button"
+        aria-label="Bring to front"
+        title="Bring to front ( ] )"
+        onClick={() => onReorder(ids, "front")}
+        className={button}
+      >
+        <svg {...orderGlyph}>
+          <rect x="8" y="8" width="12" height="12" rx="2" fill="currentColor" fillOpacity="0.15" />
+          <path d="M16 4H6a2 2 0 0 0-2 2v10" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        aria-label="Send to back"
+        title="Send to back ( [ )"
+        onClick={() => onReorder(ids, "back")}
+        className={button}
+      >
+        <svg {...orderGlyph}>
+          <rect x="4" y="4" width="12" height="12" rx="2" />
+          <path d="M8 20h10a2 2 0 0 0 2-2V8" />
+        </svg>
+      </button>
+    </>
+  );
+}
+
+/** Lock or unlock one object or a selection. */
+function LockButton({
+  ids,
+  locked,
+  onSetLocked,
+}: {
+  ids: string[];
+  locked: boolean;
+  onSetLocked: (ids: string[], locked: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={locked ? "Unlock" : "Lock"}
+      aria-pressed={locked}
+      title={`${locked ? "Unlock" : "Lock"} (Ctrl+Shift+L)`}
+      onClick={() => onSetLocked(ids, !locked)}
+      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none ${
+        locked
+          ? "bg-[var(--av2-selected)] text-[var(--av2-link)]"
+          : "text-[var(--av2-text)] hover:bg-[var(--av2-bg)]"
+      }`}
+    >
+      <svg {...orderGlyph}>
+        <rect x="5" y="11" width="14" height="10" rx="2" />
+        <path d={locked ? "M8 11V8a4 4 0 0 1 8 0v3" : "M8 11V8a4 4 0 0 1 7.5-2"} />
+      </svg>
+    </button>
+  );
+}
+
+/** Opens this object's comments. */
+function CommentButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label="Comment"
+      title="Comment"
+      onClick={onClick}
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--av2-text)] hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
+    >
+      <svg {...orderGlyph}>
+        <path d="M4 5h16v11H9l-5 4V5z" />
+      </svg>
+    </button>
+  );
+}
+
+/** Whether ObjectControls shows anything for this object. */
+function hasObjectControls(item: MoodboardItemClient) {
+  return (
+    isNoteData(item.type, item.data) ||
+    isShapeData(item.type, item.data) ||
+    isSectionData(item.type, item.data)
+  );
+}
+
 function ObjectControls({
   item,
   onUpdateItem,
@@ -268,6 +442,17 @@ function ObjectControls({
       <>
         {STICKY_COLORS.map((c) =>
           swatch(c, c === current, () => onUpdateItem(item.id, { ...data, color: c })),
+        )}
+      </>
+    );
+  }
+
+  if (isSectionData(item.type, item.data)) {
+    const data: SectionCardData = item.data;
+    return (
+      <>
+        {SECTION_COLORS.map((c) =>
+          swatch(c, c === data.color, () => onUpdateItem(item.id, { ...data, color: c })),
         )}
       </>
     );
@@ -334,6 +519,7 @@ function cardLabel(item: MoodboardItemClient) {
     NOTE: "Sticky note",
     SHAPE: "Shape",
     TEXT: "Text",
+    SECTION: "Section",
     IMAGE: "Image",
     COLOR: "Color",
     LINK: "Link",
@@ -371,6 +557,14 @@ export function BoardCanvas({
   onCopyItems,
   onPasteText,
   onPasteLastCopy,
+  onAddFiles,
+  onReorderItems,
+  onSetLocked,
+  onGroup,
+  onUngroup,
+  commentCounts,
+  commentsOpen = false,
+  onOpenComments,
   onResizeItem,
   onAddConnection,
   onDeleteConnection,
@@ -395,6 +589,9 @@ export function BoardCanvas({
   const [editRequest, setEditRequest] = useState<{ id: string; nonce: number } | null>(null);
   const [prevToolMode, setPrevToolMode] = useState(toolMode);
   const [measuredHeights, setMeasuredHeights] = useState<Map<string, number>>(new Map());
+  /** Alignment guides shown while objects are being moved. */
+  const [guides, setGuides] = useState<Guide[]>([]);
+  const guidesKey = useRef("");
 
   // Handlers change on every parent render; going through a ref keeps the
   // callbacks stable, so memoized cards don't re-render.
@@ -421,6 +618,13 @@ export function BoardCanvas({
     onCopyItems,
     onPasteText,
     onPasteLastCopy,
+    onAddFiles,
+    onReorderItems,
+    onSetLocked,
+    onGroup,
+    onUngroup,
+    commentsOpen,
+    onOpenComments,
     onResizeItem,
     onDeleteConnection,
     onUndo,
@@ -450,6 +654,13 @@ export function BoardCanvas({
       onCopyItems,
       onPasteText,
       onPasteLastCopy,
+      onAddFiles,
+      onReorderItems,
+      onSetLocked,
+      onGroup,
+      onUngroup,
+      commentsOpen,
+      onOpenComments,
       onResizeItem,
       onDeleteConnection,
       onUndo,
@@ -474,6 +685,34 @@ export function BoardCanvas({
     latest.current.onDuplicateItems([id]);
   }, []);
 
+  const reorder = useCallback((ids: string[], where: "front" | "back") => {
+    latest.current.onReorderItems(ids, where);
+  }, []);
+
+  const setLocked = useCallback((ids: string[], locked: boolean) => {
+    latest.current.onSetLocked(ids, locked);
+  }, []);
+
+  /** These objects plus every other member of the groups they're in. */
+  const withGroups = useCallback((ids: string[]) => {
+    const all = latest.current.items;
+    const groups = new Set(
+      all.filter((i) => ids.includes(i.id) && i.groupId).map((i) => i.groupId),
+    );
+    if (groups.size === 0) return ids;
+    return [
+      ...new Set([
+        ...ids,
+        ...all.filter((i) => i.groupId && groups.has(i.groupId)).map((i) => i.id),
+      ]),
+    ];
+  }, []);
+
+  const unlockedIds = useCallback(
+    (ids: string[]) => ids.filter((id) => !latest.current.items.find((i) => i.id === id)?.locked),
+    [],
+  );
+
   /** One id is an ordinary selection, with that object's own controls. */
   const selectIds = useCallback((ids: string[]) => {
     if (ids.length === 0) setSelection(null);
@@ -484,7 +723,18 @@ export function BoardCanvas({
     }
   }, []);
 
-  const cardItems = useMemo(() => items.filter((i) => i.type !== "DRAWING"), [items]);
+  // Drawn in stacking order: later in the list is on top. Sections always sit
+  // behind everything else, so what's in them stays visible.
+  const cardItems = useMemo(
+    () =>
+      items
+        .filter((i) => i.type !== "DRAWING")
+        .sort(
+          (a, b) =>
+            Number(b.type === "SECTION") - Number(a.type === "SECTION") || a.position - b.position,
+        ),
+    [items],
+  );
   const drawings = useMemo(() => items.filter((i) => i.type === "DRAWING"), [items]);
 
   // One observer for every card, for the arrows' sake: auto-height cards only
@@ -599,6 +849,24 @@ export function BoardCanvas({
         selectIds(ids);
       },
       clearSelection: () => setSelection(null),
+      exportImage: async (format) => {
+        const world = worldRef.current;
+        const { items: all, measuredHeights: heights } = latest.current;
+        const bounds = exportBounds(
+          all.map((i) => ({
+            x: i.x,
+            y: i.y,
+            width: i.width,
+            height: i.height || heights.get(i.id) || 100,
+          })),
+        );
+        if (!world || !bounds) return null;
+        // No selection outlines or controls in the picture.
+        setSelection(null);
+        setArrowSourceId(null);
+        await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+        return renderBoard(world, bounds, format);
+      },
     };
     return () => {
       handleRef.current = null;
@@ -613,6 +881,43 @@ export function BoardCanvas({
   const spaceHeld = useRef(false);
   const suppressClick = useRef(false);
   const pasteSeen = useRef(false);
+  /**
+   * Phones: a long press on an object starts picking several. While on, a tap
+   * adds or removes an object; a tap on the empty canvas ends it.
+   */
+  const touchPicking = useRef(false);
+  const longPress = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(
+    null,
+  );
+  const cancelLongPress = useCallback(() => {
+    if (longPress.current) clearTimeout(longPress.current.timer);
+    longPress.current = null;
+  }, []);
+  useEffect(() => {
+    if (!selection) touchPicking.current = false;
+  }, [selection]);
+  /** Last mouse position over the board, so a pasted screenshot lands there. */
+  const hoverClient = useRef<{ x: number; y: number } | null>(null);
+  const [dropActive, setDropActive] = useState(false);
+
+  /** A screen point as canvas units, or null when it's outside the board. */
+  const toCanvas = useCallback(
+    (clientX: number, clientY: number) => {
+      const rect = viewportRef.current?.getBoundingClientRect();
+      if (
+        !rect ||
+        clientX < rect.left ||
+        clientX > rect.right ||
+        clientY < rect.top ||
+        clientY > rect.bottom
+      ) {
+        return null;
+      }
+      const { panX, panY, zoom } = canvas.getTransform();
+      return { x: (clientX - rect.left - panX) / zoom, y: (clientY - rect.top - panY) / zoom };
+    },
+    [canvas],
+  );
   const touches = useRef(new Map<number, { x: number; y: number }>());
   const frame = useRef<number | null>(null);
 
@@ -635,7 +940,7 @@ export function BoardCanvas({
   }, [toolMode, placing, setCursor, idleCursor]);
 
   const startPan = useCallback(
-    (e: React.PointerEvent) => {
+    (e: React.PointerEvent, lockedId?: string, tapId?: string) => {
       const { panX, panY } = canvas.getTransform();
       gesture.current = {
         kind: "pan",
@@ -644,6 +949,8 @@ export function BoardCanvas({
         startY: e.clientY,
         panX,
         panY,
+        lockedId,
+        tapId,
       };
     },
     [canvas],
@@ -651,6 +958,8 @@ export function BoardCanvas({
 
   /** Abandon a card gesture, as when a second finger turns it into a pinch. */
   const cancelCardGesture = useCallback(() => {
+    guidesKey.current = "";
+    setGuides([]);
     const g = gesture.current;
     if (g?.kind === "group") {
       for (const member of g.members) moveMember(member, 0, 0);
@@ -677,6 +986,7 @@ export function BoardCanvas({
     if (e.pointerType === "touch") {
       touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (touches.current.size === 2) {
+        cancelLongPress();
         cancelCardGesture();
         const [a, b] = [...touches.current.values()];
         const rect = viewportRef.current!.getBoundingClientRect();
@@ -710,7 +1020,10 @@ export function BoardCanvas({
 
     // Viewers can only move around. A link still opens, unless the press became a pan.
     if (latest.current.readOnly) {
-      startPan(e);
+      const tapId = latest.current.commentsOpen
+        ? target.closest<HTMLElement>("[data-mb-card-id]")?.dataset.mbCardId
+        : undefined;
+      startPan(e, undefined, tapId);
       return;
     }
 
@@ -761,9 +1074,16 @@ export function BoardCanvas({
     }
 
     /** Starts moving everything selected, or just this object if it's on its own. */
-    const beginGroup = (clickedId: string, ids: string[]) => {
+    const beginGroup = (
+      clickedId: string,
+      ids: string[],
+      tapToggles = false,
+      keepSelection = false,
+    ) => {
       const members = ids.flatMap((id) => {
         const item = latest.current.items.find((i) => i.id === id);
+        // Locked objects stay where they are, even when what's around them moves.
+        if (item?.locked) return [];
         const isDrawing = item?.type === "DRAWING";
         const el = viewportRef.current?.querySelector(
           isDrawing ? `[data-mb-drawing-group="${id}"]` : `[data-mb-card-id="${id}"]`,
@@ -778,13 +1098,18 @@ export function BoardCanvas({
         startX: e.clientX,
         startY: e.clientY,
         moved: false,
+        tapToggles,
+        keepSelection,
       };
     };
 
     /** Shift adds an object to the selection, or takes it back out. */
     const toggle = (id: string) => {
       const ids = selectedItemIds(latest.current.selection);
-      selectIds(ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
+      const whole = withGroups([id]);
+      selectIds(
+        ids.includes(id) ? ids.filter((x) => !whole.includes(x)) : [...new Set([...ids, ...whole])],
+      );
       suppressClick.current = true;
     };
 
@@ -804,12 +1129,24 @@ export function BoardCanvas({
       return;
     }
 
-    if (!cardEl) {
+    // A locked object stays put: pressing it works like the empty canvas (so a box can
+    // start on a locked background picture), and a click without moving selects it.
+    const pressedId = cardEl?.dataset.mbCardId;
+    const lockedId =
+      pressedId &&
+      mode === "select" &&
+      !e.shiftKey &&
+      latest.current.items.find((i) => i.id === pressedId)?.locked
+        ? pressedId
+        : undefined;
+
+    if (!cardEl || lockedId) {
       if (mode === "arrow") {
         setArrowSourceId(null);
         setPendingTarget(null);
         setPendingTargetId(null);
       }
+      touchPicking.current = false;
       const base = e.shiftKey ? selectedItemIds(latest.current.selection) : [];
       if (!e.shiftKey) setSelection(null);
       (document.activeElement as HTMLElement | null)?.blur?.();
@@ -822,10 +1159,11 @@ export function BoardCanvas({
           startY: e.clientY,
           base,
           moved: false,
+          lockedId,
         };
         return;
       }
-      startPan(e);
+      startPan(e, lockedId);
       return;
     }
 
@@ -840,10 +1178,54 @@ export function BoardCanvas({
       return;
     }
 
+    const isTouch = e.pointerType === "touch";
+    const picked = selectedItemIds(latest.current.selection);
+
+    if (isTouch && touchPicking.current) {
+      // A tap adds an object; one already picked moves the lot, or leaves with a tap.
+      if (!picked.includes(id)) {
+        toggle(id);
+        return;
+      }
+      beginGroup(id, picked, true);
+      return;
+    }
+
+    // One member of a group picks the whole group, and moves it.
+    const whole = withGroups([id]);
+    if (whole.length > 1) {
+      const already = whole.every((x) => picked.includes(x));
+      const ids = already ? picked : whole;
+      if (!already) selectIds(whole);
+      beginGroup(id, ids, false, ids.length === whole.length);
+      return;
+    }
+
     const selected = latest.current.selection;
     if (selected?.kind === "multi" && selected.ids.includes(id)) {
       beginGroup(id, selected.ids);
       return;
+    }
+
+    if (isTouch && !target.closest(INTERACTIVE)) {
+      // Holding a finger still on an object starts picking several.
+      cancelLongPress();
+      const pointerId = e.pointerId;
+      longPress.current = {
+        x: e.clientX,
+        y: e.clientY,
+        timer: setTimeout(() => {
+          longPress.current = null;
+          const g = gesture.current;
+          if (!g || g.kind !== "card" || g.pointerId !== pointerId || g.moved) return;
+          gesture.current = null;
+          suppressClick.current = true;
+          touchPicking.current = true;
+          // The press has already selected this object on its own; picking starts from it.
+          selectIds([id]);
+          navigator.vibrate?.(10);
+        }, LONG_PRESS_MS),
+      };
     }
 
     const handle = target.closest<HTMLElement>("[data-mb-handle]");
@@ -869,6 +1251,26 @@ export function BoardCanvas({
       return;
     }
 
+    // A section carries along everything that lies wholly inside it.
+    if (item.type === "SECTION") {
+      setSelection({ kind: "card", id });
+      if (target.closest(INTERACTIVE)) return;
+      const { items: all, measuredHeights: heights } = latest.current;
+      const area = { x: item.x, y: item.y, width: item.width, height: item.height };
+      const inside = all
+        .filter(
+          (i) =>
+            i.id !== id &&
+            rectInside(
+              { x: i.x, y: i.y, width: i.width, height: i.height || heights.get(i.id) || 100 },
+              area,
+            ),
+        )
+        .map((i) => i.id);
+      beginGroup(id, [id, ...inside]);
+      return;
+    }
+
     const current = latest.current.selection;
     const wasSelected = current?.kind === "card" && current.id === id;
     setSelection({ kind: "card", id });
@@ -891,7 +1293,45 @@ export function BoardCanvas({
   };
 
   // Writes the latest pointer state to the DOM, at most once per frame.
-  const pointer = useRef({ x: 0, y: 0 });
+  const pointer = useRef({ x: 0, y: 0, free: false });
+
+  const showGuides = useCallback((next: Guide[]) => {
+    const key = next.map((g) => `${g.axis}${g.at}:${g.from}-${g.to}`).join("|");
+    if (key === guidesKey.current) return;
+    guidesKey.current = key;
+    setGuides(next);
+  }, []);
+
+  /**
+   * Where a moved card or group lands for this pointer position, in canvas
+   * units: the pointer's travel, lined up with nearby objects unless Ctrl or
+   * Cmd is held (free).
+   */
+  const dragOffset = useCallback(
+    (ids: string[], startX: number, startY: number, x: number, y: number, free: boolean) => {
+      const { zoom } = canvas.getTransform();
+      const dx = (x - startX) / zoom;
+      const dy = (y - startY) / zoom;
+      if (free) return { dx, dy, guides: [] as Guide[] };
+      const { items: all, measuredHeights: heights } = latest.current;
+      const boxOf = (i: (typeof all)[number]): Box => ({
+        x: i.x,
+        y: i.y,
+        width: i.width,
+        height: i.height || heights.get(i.id) || 100,
+      });
+      const moving = unionBox(all.filter((i) => ids.includes(i.id)).map(boxOf));
+      if (!moving) return { dx, dy, guides: [] as Guide[] };
+      const others = all.filter((i) => !ids.includes(i.id)).map(boxOf);
+      const snap = snapBox(
+        { ...moving, x: moving.x + dx, y: moving.y + dy },
+        others,
+        SNAP_SCREEN_PX / zoom,
+      );
+      return { dx: dx + snap.dx, dy: dy + snap.dy, guides: snap.guides };
+    },
+    [canvas],
+  );
   /** The object under this spot on screen, other than the arrow's own source. */
   const objectAt = useCallback((clientX: number, clientY: number, sourceId: string | null) => {
     const el = document.elementFromPoint(clientX, clientY);
@@ -932,13 +1372,23 @@ export function BoardCanvas({
         zoom,
       });
     } else if (g.kind === "card" && g.moved) {
-      g.dx = (x - g.startX) / zoom;
-      g.dy = (y - g.startY) / zoom;
+      const at = dragOffset([g.id], g.startX, g.startY, x, y, pointer.current.free);
+      g.dx = at.dx;
+      g.dy = at.dy;
+      showGuides(at.guides);
       g.el.style.translate = `${g.dx}px ${g.dy}px`;
       overrides.set([{ id: g.id, x: g.origin.x + g.dx, y: g.origin.y + g.dy }]);
     } else if (g.kind === "group" && g.moved) {
-      const dx = (x - g.startX) / zoom;
-      const dy = (y - g.startY) / zoom;
+      const at = dragOffset(
+        g.members.map((m) => m.id),
+        g.startX,
+        g.startY,
+        x,
+        y,
+        pointer.current.free,
+      );
+      const { dx, dy } = at;
+      showGuides(at.guides);
       for (const member of g.members) moveMember(member, dx, dy);
       overrides.set(g.members.map((m) => ({ id: m.id, x: m.x + dx, y: m.y + dy })));
     } else if (g.kind === "marquee" && g.moved) {
@@ -964,19 +1414,23 @@ export function BoardCanvas({
       };
       const { items: all, measuredHeights: heights, selection: now } = latest.current;
       const hits = all
-        .filter((i) =>
-          rectsIntersect(area, {
+        .filter((i) => {
+          const box = {
             x: i.x,
             y: i.y,
             width: i.width,
             height: i.height || heights.get(i.id) || 100,
-          }),
-        )
+          };
+          if (i.locked) return false;
+          // A box drawn inside a section picks its contents, not the section.
+          return i.type === "SECTION" ? rectInside(box, area) : rectsIntersect(area, box);
+        })
         .map((i) => i.id);
-      const next = [...new Set([...g.base, ...hits])];
+      const grouped = withGroups(hits);
+      const next = [...new Set([...g.base, ...grouped])];
       if (next.join() !== selectedItemIds(now).join()) selectIds(next);
     } else if (g.kind === "resize") {
-      const next = resizeFromCorner(
+      const asked = resizeFromCorner(
         g.origin,
         g.corner,
         (x - g.startX) / zoom,
@@ -984,6 +1438,30 @@ export function BoardCanvas({
         MIN_WIDTH,
         MIN_HEIGHT,
       );
+      let next = asked;
+      if (pointer.current.free) {
+        showGuides([]);
+      } else {
+        const { items: all, measuredHeights: heights } = latest.current;
+        const others = all
+          .filter((i) => i.id !== g.id)
+          .map((i) => ({
+            x: i.x,
+            y: i.y,
+            width: i.width,
+            height: i.height || heights.get(i.id) || 100,
+          }));
+        const snap = snapResize(
+          asked,
+          g.corner,
+          others,
+          SNAP_SCREEN_PX / zoom,
+          MIN_WIDTH,
+          MIN_HEIGHT,
+        );
+        next = snap.box;
+        showGuides(snap.guides);
+      }
       g.next = next;
       g.el.style.left = `${next.x}px`;
       g.el.style.top = `${next.y}px`;
@@ -991,7 +1469,7 @@ export function BoardCanvas({
       g.el.style.height = `${next.height}px`;
       overrides.set([{ id: g.id, x: next.x, y: next.y, width: next.width, height: next.height }]);
     }
-  }, [canvas, overrides, selectIds, updatePendingArrow]);
+  }, [canvas, dragOffset, overrides, selectIds, showGuides, updatePendingArrow]);
 
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
@@ -1028,7 +1506,14 @@ export function BoardCanvas({
       }
 
       if (e.pointerId !== g.pointerId) return;
-      pointer.current = { x: e.clientX, y: e.clientY };
+      pointer.current = { x: e.clientX, y: e.clientY, free: e.ctrlKey || e.metaKey };
+      if (
+        longPress.current &&
+        Math.hypot(e.clientX - longPress.current.x, e.clientY - longPress.current.y) >=
+          DRAG_THRESHOLD
+      ) {
+        cancelLongPress();
+      }
 
       if (g.kind === "connect" && !g.moved) {
         if (Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < DRAG_THRESHOLD) return;
@@ -1064,6 +1549,7 @@ export function BoardCanvas({
 
     const onEnd = (e: PointerEvent) => {
       touches.current.delete(e.pointerId);
+      cancelLongPress();
       const g = gesture.current;
       if (!g) return;
 
@@ -1079,6 +1565,7 @@ export function BoardCanvas({
         frame.current = null;
       }
       setCursor(idleCursor());
+      showGuides([]);
 
       if (e.type === "pointercancel") {
         gesture.current = g;
@@ -1107,12 +1594,45 @@ export function BoardCanvas({
       }
 
       if (g.kind === "marquee") {
+        // A quick flick can end before a frame was drawn: pick from where it ended.
+        if (g.moved) {
+          pointer.current = { x: e.clientX, y: e.clientY, free: false };
+          gesture.current = g;
+          paintGesture();
+          gesture.current = null;
+        }
         if (marqueeRef.current) marqueeRef.current.style.display = "none";
+        if (!g.moved && g.lockedId) {
+          selectIds([g.lockedId]);
+          suppressClick.current = true;
+        }
+        return;
+      }
+
+      if (g.kind === "pan") {
+        const tapped = Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < DRAG_THRESHOLD;
+        if (tapped && g.lockedId) {
+          selectIds([g.lockedId]);
+          suppressClick.current = true;
+        } else if (tapped && g.tapId) {
+          latest.current.onOpenComments?.(g.tapId);
+          suppressClick.current = true;
+        }
         return;
       }
 
       if (g.kind === "group") {
         if (!g.moved) {
+          if (g.tapToggles) {
+            const out = withGroups([g.clickedId]);
+            selectIds(g.members.map((m) => m.id).filter((x) => !out.includes(x)));
+            suppressClick.current = true;
+            return;
+          }
+          if (g.keepSelection) {
+            suppressClick.current = true;
+            return;
+          }
           // A plain click on one of several narrows the selection to it.
           if (g.members.length > 1) {
             selectIds([g.clickedId]);
@@ -1121,9 +1641,16 @@ export function BoardCanvas({
           return;
         }
         suppressClick.current = true;
-        const { zoom } = canvas.getTransform();
-        const dx = Math.round((e.clientX - g.startX) / zoom);
-        const dy = Math.round((e.clientY - g.startY) / zoom);
+        const at = dragOffset(
+          g.members.map((m) => m.id),
+          g.startX,
+          g.startY,
+          e.clientX,
+          e.clientY,
+          e.ctrlKey || e.metaKey,
+        );
+        const dx = Math.round(at.dx);
+        const dy = Math.round(at.dy);
         for (const member of g.members) {
           moveMember(member, 0, 0);
           if (!member.isDrawing) {
@@ -1143,9 +1670,16 @@ export function BoardCanvas({
           return;
         }
         suppressClick.current = true;
-        const { zoom } = canvas.getTransform();
-        const x = Math.round(g.origin.x + (e.clientX - g.startX) / zoom);
-        const y = Math.round(g.origin.y + (e.clientY - g.startY) / zoom);
+        const at = dragOffset(
+          [g.id],
+          g.startX,
+          g.startY,
+          e.clientX,
+          e.clientY,
+          e.ctrlKey || e.metaKey,
+        );
+        const x = Math.round(g.origin.x + at.dx);
+        const y = Math.round(g.origin.y + at.dy);
         // Cleared here and committed in the same tick, so nothing paints in between.
         g.el.style.translate = "";
         g.el.style.zIndex = "";
@@ -1185,12 +1719,15 @@ export function BoardCanvas({
   }, [
     canvas,
     cancelCardGesture,
+    cancelLongPress,
+    dragOffset,
     idleCursor,
     objectAt,
     overrides,
     paintGesture,
     selectIds,
     setCursor,
+    showGuides,
     updatePendingArrow,
   ]);
 
@@ -1308,14 +1845,34 @@ export function BoardCanvas({
 
       if ((e.key === "Delete" || e.key === "Backspace") && current) {
         e.preventDefault();
-        if (current.kind === "connection") latest.current.onDeleteConnection(current.id);
-        else if (current.kind === "multi") latest.current.onDeleteItems(current.ids);
-        else latest.current.onDeleteItem(current.id);
+        if (current.kind === "connection") {
+          latest.current.onDeleteConnection(current.id);
+          setSelection(null);
+          return;
+        }
+        // Locked objects survive Delete until they're unlocked.
+        const doomed = unlockedIds(selectedItemIds(current));
+        if (doomed.length === 0) return;
+        if (doomed.length === 1) latest.current.onDeleteItem(doomed[0]);
+        else latest.current.onDeleteItems(doomed);
         setSelection(null);
         return;
       }
 
-      const nudged = selectedItemIds(current);
+      const chosen = selectedItemIds(current);
+      if (mod && e.key.toLowerCase() === "g" && chosen.length > 0) {
+        e.preventDefault();
+        if (e.shiftKey) latest.current.onUngroup(chosen);
+        else latest.current.onGroup(chosen);
+        return;
+      }
+      if (mod && e.shiftKey && e.key.toLowerCase() === "l" && chosen.length > 0) {
+        e.preventDefault();
+        latest.current.onSetLocked(chosen, unlockedIds(chosen).length > 0);
+        return;
+      }
+
+      const nudged = unlockedIds(chosen);
       if (nudged.length > 0 && e.key.startsWith("Arrow")) {
         e.preventDefault();
         const step = e.shiftKey ? NUDGE_LARGE_PX : NUDGE_PX;
@@ -1330,6 +1887,12 @@ export function BoardCanvas({
         return;
       }
 
+      if (!mod && !e.altKey && (e.key === "]" || e.key === "[") && chosen.length > 0) {
+        e.preventDefault();
+        latest.current.onReorderItems(chosen, e.key === "]" ? "front" : "back");
+        return;
+      }
+
       if (mod || e.altKey) return;
       const key = e.key.toLowerCase();
       const tools: Record<string, ToolMode> = {
@@ -1339,7 +1902,12 @@ export function BoardCanvas({
         m: "draw",
         e: "eraser",
       };
-      const creators: Record<string, CreatableKind> = { s: "note", r: "shape", t: "text" };
+      const creators: Record<string, CreatableKind> = {
+        s: "note",
+        r: "shape",
+        t: "text",
+        f: "section",
+      };
       if (tools[key]) {
         latest.current.onCancelPlacing();
         latest.current.onSetToolMode(tools[key]);
@@ -1378,6 +1946,16 @@ export function BoardCanvas({
       if (!boardHasFocus(e)) return;
       if (latest.current.onPasteText(e.clipboardData?.getData("text/plain") ?? null)) {
         e.preventDefault();
+        return;
+      }
+      // A screenshot or copied file lands where the mouse is, or mid-screen.
+      const files = Array.from(e.clipboardData?.files ?? []);
+      if (files.length > 0) {
+        e.preventDefault();
+        const at = hoverClient.current
+          ? toCanvas(hoverClient.current.x, hoverClient.current.y)
+          : null;
+        latest.current.onAddFiles(files, at);
       }
     };
 
@@ -1393,13 +1971,14 @@ export function BoardCanvas({
       window.removeEventListener("cut", onCut);
       window.removeEventListener("paste", onPaste);
     };
-  }, [canvas, idleCursor, selectIds, setCursor]);
+  }, [canvas, idleCursor, selectIds, setCursor, toCanvas]);
 
   // ---------------------------------------------------------------------------
   // Arrow tool
   // ---------------------------------------------------------------------------
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    hoverClient.current = { x: e.clientX, y: e.clientY };
     // Only between the two clicks; while dragging, the gesture handles this.
     if (toolMode !== "arrow" || !arrowSourceId || gesture.current) return;
     updatePendingArrow(e.clientX, e.clientY, arrowSourceId);
@@ -1465,6 +2044,34 @@ export function BoardCanvas({
       onMouseMove={handleMouseMove}
       onFocus={onFocus}
       onDragStart={(e) => e.preventDefault()}
+      onMouseLeave={() => {
+        hoverClient.current = null;
+      }}
+      onDoubleClick={(e) => {
+        // A click picks the whole group; a double-click goes into one member to edit it.
+        if (readOnly || latest.current.toolMode !== "select") return;
+        const id = (e.target as Element).closest<HTMLElement>("[data-mb-card-id]")?.dataset
+          .mbCardId;
+        const item = id ? latest.current.items.find((i) => i.id === id) : undefined;
+        if (!item?.groupId || item.locked) return;
+        setSelection({ kind: "card", id: item.id });
+        setEditRequest({ id: item.id, nonce: Date.now() });
+      }}
+      onDragOver={(e) => {
+        if (readOnly || !hasFiles(e.dataTransfer)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+        if (!dropActive) setDropActive(true);
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropActive(false);
+      }}
+      onDrop={(e) => {
+        if (readOnly || !hasFiles(e.dataTransfer)) return;
+        e.preventDefault();
+        setDropActive(false);
+        latest.current.onAddFiles(Array.from(e.dataTransfer.files), toCanvas(e.clientX, e.clientY));
+      }}
     >
       <div
         ref={gridRef}
@@ -1491,12 +2098,31 @@ export function BoardCanvas({
             height={item.height}
             selected={selection?.kind === "card" && selection.id === item.id}
             inGroup={groupIds.has(item.id)}
-            bare={item.type === "NOTE" || item.type === "SHAPE" || item.type === "TEXT"}
+            bare={
+              item.type === "NOTE" ||
+              item.type === "SHAPE" ||
+              item.type === "TEXT" ||
+              item.type === "SECTION"
+            }
+            passThrough={item.type === "SECTION"}
+            locked={!!item.locked}
+            commentCount={commentCounts?.get(item.id) ?? 0}
+            onOpenComments={onOpenComments}
+            connectors={item.type !== "SECTION"}
             label={cardLabel(item)}
             registerCard={registerCard}
             toolbar={
               selection?.kind === "card" && selection.id === item.id ? (
-                <ObjectControls item={item} onUpdateItem={updateItem} />
+                <>
+                  <ObjectControls item={item} onUpdateItem={updateItem} />
+                  <OrderButtons
+                    ids={[item.id]}
+                    onReorder={reorder}
+                    divider={hasObjectControls(item)}
+                  />
+                  <LockButton ids={[item.id]} locked={!!item.locked} onSetLocked={setLocked} />
+                  {onOpenComments && <CommentButton onClick={() => onOpenComments(item.id)} />}
+                </>
               ) : undefined
             }
             hideToolbar={isPhone}
@@ -1508,6 +2134,7 @@ export function BoardCanvas({
               editRequest={editRequest?.id === item.id ? editRequest.nonce : 0}
               onUpdateItem={updateItem}
               onRemoveEmpty={removeEmpty}
+              readOnly={readOnly}
             />
           </CardWrapper>
         ))}
@@ -1542,6 +2169,32 @@ export function BoardCanvas({
           pendingTargetId={pendingTargetId}
         />
 
+        {guides.map((guide) => (
+          <div
+            key={`${guide.axis}-${guide.at}`}
+            aria-hidden
+            data-mb-guide
+            className="pointer-events-none absolute z-50 bg-[var(--av2-accent)]"
+            style={
+              guide.axis === "x"
+                ? {
+                    left: guide.at,
+                    top: guide.from,
+                    height: guide.to - guide.from,
+                    width: "calc(1px * var(--mb-inverse-zoom, 1))",
+                    translate: "-50% 0",
+                  }
+                : {
+                    top: guide.at,
+                    left: guide.from,
+                    width: guide.to - guide.from,
+                    height: "calc(1px * var(--mb-inverse-zoom, 1))",
+                    translate: "0 -50%",
+                  }
+            }
+          />
+        ))}
+
         {enrichedCardItems
           .filter((item) => item.id === arrowSourceId || item.id === pendingTargetId)
           .map((item) => (
@@ -1573,6 +2226,17 @@ export function BoardCanvas({
         </div>
       )}
 
+      {dropActive && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-3 z-40 flex items-center justify-center rounded-2xl border-2 border-dashed border-[var(--av2-accent)] bg-[var(--av2-accent)]/5"
+        >
+          <span className="rounded-full bg-[var(--av2-surface)] px-4 py-2 text-sm font-semibold shadow-md">
+            Drop to add to the board
+          </span>
+        </div>
+      )}
+
       <div
         ref={marqueeRef}
         aria-hidden
@@ -1589,6 +2253,30 @@ export function BoardCanvas({
             {selection.ids.length} selected
           </span>
           <div aria-hidden className="mx-1 h-5 w-px bg-[var(--av2-border)]" />
+          <OrderButtons ids={selection.ids} onReorder={reorder} divider={false} />
+          {(() => {
+            const chosen = items.filter((i) => selection.ids.includes(i.id));
+            const oneGroup =
+              !!chosen[0]?.groupId && chosen.every((i) => i.groupId === chosen[0].groupId);
+            const allLocked = chosen.every((i) => i.locked);
+            return (
+              <>
+                <LockButton ids={selection.ids} locked={allLocked} onSetLocked={setLocked} />
+                <button
+                  type="button"
+                  onClick={() =>
+                    oneGroup
+                      ? latest.current.onUngroup(selection.ids)
+                      : latest.current.onGroup(selection.ids)
+                  }
+                  title={oneGroup ? "Ungroup (Ctrl+Shift+G)" : "Group (Ctrl+G)"}
+                  className="flex h-9 items-center rounded-lg px-3 text-sm font-medium text-[var(--av2-text)] hover:bg-[var(--av2-bg)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
+                >
+                  {oneGroup ? "Ungroup" : "Group"}
+                </button>
+              </>
+            );
+          })()}
           <button
             type="button"
             onClick={() => latest.current.onDuplicateItems(selection.ids)}
@@ -1622,6 +2310,9 @@ export function BoardCanvas({
               className="absolute bottom-[calc(5rem+env(safe-area-inset-bottom))] left-1/2 z-30 flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-1 whitespace-nowrap shadow-md [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
               <ObjectControls item={item} onUpdateItem={updateItem} />
+              <OrderButtons ids={[item.id]} onReorder={reorder} divider={hasObjectControls(item)} />
+              <LockButton ids={[item.id]} locked={!!item.locked} onSetLocked={setLocked} />
+              {onOpenComments && <CommentButton onClick={() => onOpenComments(item.id)} />}
               <button
                 type="button"
                 onClick={() => duplicateCard(item.id)}

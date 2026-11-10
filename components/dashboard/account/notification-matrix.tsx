@@ -22,6 +22,7 @@ export type NotificationType =
   | "WITHDRAWAL_UPDATED"
   | "CREATIVE_SCHEDULE_UPDATED"
   | "MOODBOARD_SHARED"
+  | "MOODBOARD_COMMENT"
   | "SUPPORT_GUIDE_CHANGED";
 
 export type NotificationPreference = {
@@ -74,6 +75,10 @@ export const NOTIFICATION_LABELS: Record<NotificationType, { title: string; desc
       title: "Shared moodboards",
       description: "Your creative shared a moodboard on one of your requests.",
     },
+    MOODBOARD_COMMENT: {
+      title: "Moodboard comments",
+      description: "Someone commented on a moodboard you made, or replied in a thread you're in.",
+    },
     SUPPORT_GUIDE_CHANGED: {
       title: "Support guide changes",
       description: "A release changed or removed a Support guide that an admin had edited.",
@@ -105,6 +110,7 @@ export const NOTIFICATION_ORDER: NotificationType[] = [
   "WITHDRAWAL_UPDATED",
   "CREATIVE_SCHEDULE_UPDATED",
   "MOODBOARD_SHARED",
+  "MOODBOARD_COMMENT",
   "SUPPORT_GUIDE_CHANGED",
 ];
 

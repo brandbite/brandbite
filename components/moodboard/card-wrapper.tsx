@@ -31,6 +31,18 @@ type CardWrapperProps = {
   toolbar?: React.ReactNode;
   /** Phones show the toolbar pinned to the screen, since it wouldn't fit here. */
   hideToolbar?: boolean;
+  /**
+   * Clicks pass through the object's area to whatever is behind it; only its
+   * own handles (and parts marked pointer-events-auto) take the pointer.
+   */
+  passThrough?: boolean;
+  /** Edge dots for pulling arrows out of this object. */
+  connectors?: boolean;
+  /** Locked: no resize handles, and a lock badge while selected. */
+  locked?: boolean;
+  /** Comments in open threads on this object, shown as a badge. */
+  commentCount?: number;
+  onOpenComments?: (id: string) => void;
   onDelete: (id: string) => void;
   onDuplicate?: (id: string) => void;
   children: React.ReactNode;
@@ -72,6 +84,11 @@ function CardWrapperBase({
   registerCard,
   toolbar,
   hideToolbar = false,
+  passThrough = false,
+  connectors = true,
+  locked = false,
+  commentCount = 0,
+  onOpenComments,
   onDelete,
   onDuplicate,
   children,
@@ -83,7 +100,7 @@ function CardWrapperBase({
       role="group"
       aria-label={label}
       tabIndex={0}
-      className={`group absolute cursor-default outline-none ${selected || inGroup ? "z-30" : ""} ${bare ? "" : "rounded-2xl"}`}
+      className={`group absolute cursor-default outline-none ${selected || inGroup ? (passThrough ? "" : "z-30") : ""} ${bare ? "" : "rounded-2xl"} ${passThrough ? "pointer-events-none" : ""}`}
       style={{ left: x, top: y, width, ...(height > 0 ? { height } : {}) }}
     >
       <div
@@ -99,6 +116,19 @@ function CardWrapperBase({
       >
         {children}
       </div>
+
+      {commentCount > 0 && onOpenComments && (
+        <button
+          type="button"
+          data-mb-canvas-ui
+          onClick={() => onOpenComments(id)}
+          aria-label={`${commentCount} ${commentCount === 1 ? "comment" : "comments"} on ${label}`}
+          className="pointer-events-auto absolute top-0 right-0 z-20 flex h-7 min-w-7 items-center justify-center gap-1 rounded-full rounded-bl-sm border-2 border-[var(--av2-surface)] bg-[var(--av2-accent-strong)] px-1.5 text-xs font-semibold text-white shadow-md"
+          style={{ transform: `translate(40%, -60%) scale(${INVERSE})` }}
+        >
+          {commentCount}
+        </button>
+      )}
 
       {inGroup && (
         <div
@@ -122,34 +152,57 @@ function CardWrapperBase({
             }}
           />
 
-          {CORNERS.map(({ corner, className }) => (
-            <div key={corner} aria-hidden className={`absolute z-10 ${className}`}>
-              {/* The grab area is larger than what's drawn, for fingers. */}
-              <div
-                data-mb-handle={corner}
-                className="flex h-7 w-7 items-center justify-center"
-                style={{ touchAction: "none", transform: `scale(${INVERSE})` }}
-              >
-                <span className="h-3 w-3 rounded-[3px] border-2 border-[var(--av2-accent)] bg-[var(--av2-surface)]" />
-              </div>
-            </div>
-          ))}
-
-          {CONNECTORS.map(({ side, style, shift }) => (
+          {locked && (
             <div
-              key={side}
               aria-hidden
-              data-mb-connector={side}
-              className="absolute z-10 flex h-7 w-7 cursor-crosshair items-center justify-center"
-              style={{
-                ...style,
-                touchAction: "none",
-                transform: `translate(${shift}) scale(${INVERSE})`,
-              }}
+              className="pointer-events-none absolute top-0 left-0 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-[var(--av2-accent)] text-white"
+              style={{ transform: `translate(-50%, -50%) scale(${INVERSE})` }}
             >
-              <span className="h-2.5 w-2.5 rounded-full bg-[var(--av2-accent)] transition-transform hover:scale-150" />
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              >
+                <rect x="5" y="11" width="14" height="10" rx="2" />
+                <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+              </svg>
             </div>
-          ))}
+          )}
+
+          {!locked &&
+            CORNERS.map(({ corner, className }) => (
+              <div key={corner} aria-hidden className={`absolute z-10 ${className}`}>
+                {/* The grab area is larger than what's drawn, for fingers. */}
+                <div
+                  data-mb-handle={corner}
+                  className="pointer-events-auto flex h-7 w-7 items-center justify-center"
+                  style={{ touchAction: "none", transform: `scale(${INVERSE})` }}
+                >
+                  <span className="h-3 w-3 rounded-[3px] border-2 border-[var(--av2-accent)] bg-[var(--av2-surface)]" />
+                </div>
+              </div>
+            ))}
+
+          {connectors &&
+            CONNECTORS.map(({ side, style, shift }) => (
+              <div
+                key={side}
+                aria-hidden
+                data-mb-connector={side}
+                className="pointer-events-auto absolute z-10 flex h-7 w-7 cursor-crosshair items-center justify-center"
+                style={{
+                  ...style,
+                  touchAction: "none",
+                  transform: `translate(${shift}) scale(${INVERSE})`,
+                }}
+              >
+                <span className="h-2.5 w-2.5 rounded-full bg-[var(--av2-accent)] transition-transform hover:scale-150" />
+              </div>
+            ))}
 
           {!hideToolbar && (
             <div

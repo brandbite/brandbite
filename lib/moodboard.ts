@@ -34,6 +34,12 @@ export type TextCardData = {
   text: string;
 };
 
+/** A named area. `color` is one of SECTION_COLORS (6-digit hex). */
+export type SectionCardData = {
+  title: string;
+  color: string;
+};
+
 export type ImageCardData = {
   url: string;
   storageKey: string;
@@ -97,6 +103,7 @@ export type MoodboardItemData =
   | NoteCardData
   | ShapeCardData
   | TextCardData
+  | SectionCardData
   | ImageCardData
   | ColorCardData
   | LinkCardData
@@ -119,6 +126,10 @@ export function isShapeData(type: MoodboardItemType, data: unknown): data is Sha
 
 export function isTextData(type: MoodboardItemType, data: unknown): data is TextCardData {
   return type === "TEXT";
+}
+
+export function isSectionData(type: MoodboardItemType, data: unknown): data is SectionCardData {
+  return type === "SECTION";
 }
 
 export function isImageData(type: MoodboardItemType, data: unknown): data is ImageCardData {
@@ -157,6 +168,10 @@ export type MoodboardItemClient = {
   id: string;
   type: MoodboardItemType;
   position: number;
+  /** Can't be moved, resized or deleted until unlocked. */
+  locked?: boolean;
+  /** Objects sharing this are picked and moved as one. */
+  groupId?: string | null;
   colSpan: number;
   x: number;
   y: number;
@@ -288,6 +303,9 @@ export const STICKY_COLORS = [
   "#BDEBC8",
 ] as const;
 
+/** Section tints: the area shows each at 20%, the title tab in full. */
+export const SECTION_COLORS = ["#E4E2DD", "#FFE58A", "#FFC8A8", "#C9E7CF", "#C8DDFB", "#DCD3FF"];
+
 export const SHAPE_FILLS = [
   "#FFFFFF",
   "#FFE58A",
@@ -389,3 +407,25 @@ export const COLOR_PRESETS = [
   { hex: "#FF2E58", name: "Radical Red" },
   { hex: "#2576F4", name: "Dodger Blue" },
 ];
+
+// ---------------------------------------------------------------------------
+// Comments
+// ---------------------------------------------------------------------------
+
+export type CommentClient = {
+  id: string;
+  body: string;
+  author: { id: string; name: string };
+  createdAt: string;
+  /** Edited after posting. */
+  edited: boolean;
+};
+
+export type CommentThreadClient = CommentClient & {
+  itemId: string;
+  resolvedAt: string | null;
+  replies: CommentClient[];
+};
+
+/** Who is reading the comments: their own can be edited; admins can delete any. */
+export type CommentViewer = { id: string; canModerate: boolean };

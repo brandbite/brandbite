@@ -46,7 +46,39 @@ function note(id: string, x: number, y = 100, width = 200, height = 200) {
     y,
     width,
     height,
+    position: 0,
   } as unknown as MoodboardItemClient;
+}
+
+/** The handler props every canvas needs, as mocks. */
+function setupHandlers() {
+  return {
+    onSetToolMode: vi.fn(),
+    onPlace: vi.fn(),
+    onPick: vi.fn(),
+    onCancelPlacing: vi.fn(),
+    onRemoveEmpty: vi.fn(),
+    onUpdateItem: vi.fn(),
+    onDeleteItem: vi.fn(),
+    onMoveItem: vi.fn(),
+    onMoveItems: vi.fn(),
+    onDeleteItems: vi.fn(),
+    onDuplicateItems: vi.fn(),
+    onCopyItems: vi.fn(() => ""),
+    onPasteText: vi.fn(() => true),
+    onPasteLastCopy: vi.fn(),
+    onAddFiles: vi.fn(),
+    onReorderItems: vi.fn(),
+    onSetLocked: vi.fn(),
+    onGroup: vi.fn(),
+    onUngroup: vi.fn(),
+    onResizeItem: vi.fn(),
+    onAddConnection: vi.fn(),
+    onDeleteConnection: vi.fn(),
+    onAddDrawing: vi.fn(),
+    onUndo: vi.fn(),
+    onRedo: vi.fn(),
+  };
 }
 
 function setup(items = [note("a", 100), note("b", 400), note("c", 700)]) {
@@ -65,6 +97,11 @@ function setup(items = [note("a", 100), note("b", 400), note("c", 700)]) {
     onCopyItems: vi.fn((ids: string[]) => `copied:${ids.join()}`),
     onPasteText: vi.fn(() => true),
     onPasteLastCopy: vi.fn(),
+    onAddFiles: vi.fn(),
+    onReorderItems: vi.fn(),
+    onSetLocked: vi.fn(),
+    onGroup: vi.fn(),
+    onUngroup: vi.fn(),
     onResizeItem: vi.fn(),
     onAddConnection: vi.fn(),
     onDeleteConnection: vi.fn(),
@@ -140,12 +177,100 @@ describe("Selecting several objects", () => {
     expect(screen.getByRole("status")).toHaveTextContent("2 selected");
   });
 
+  it("still selects when the box is let go before a frame is drawn", () => {
+    setup();
+    press(viewport(), 1000, 800);
+    pointer("pointermove", 1500, 950);
+    pointer("pointerup", 1500, 950);
+    expect(screen.getByRole("status")).toHaveTextContent("2 selected");
+  });
+
   it("leaves a finger moving the canvas rather than drawing a box", async () => {
     setup();
     press(viewport(), 1000, 800, { pointerType: "touch" });
     pointer("pointermove", 1500, 950);
     await nextFrame();
     pointer("pointerup", 1500, 950);
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+});
+
+describe("Picking several objects on a phone", () => {
+  function touchDown(id: string) {
+    fireEvent.pointerDown(screen.getByText(`Body ${id}`), {
+      button: 0,
+      pointerId: 1,
+      clientX: 200,
+      clientY: 200,
+      pointerType: "touch",
+    });
+  }
+  function touchUp() {
+    act(() => {
+      window.dispatchEvent(
+        new PointerEvent("pointerup", {
+          pointerId: 1,
+          clientX: 200,
+          clientY: 200,
+          pointerType: "touch",
+        }),
+      );
+    });
+  }
+
+  afterEach(() => vi.useRealTimers());
+
+  it("starts with a long press, then adds and removes objects with taps", () => {
+    vi.useFakeTimers();
+    setup();
+    touchDown("a");
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    touchUp();
+    expect(screen.queryByRole("status")).toBeNull();
+
+    touchDown("b");
+    touchUp();
+    expect(screen.getByRole("status")).toHaveTextContent("2 selected");
+    touchDown("c");
+    touchUp();
+    expect(screen.getByRole("status")).toHaveTextContent("3 selected");
+
+    // A tap on a picked object takes it back out.
+    touchDown("b");
+    touchUp();
+    expect(screen.getByRole("status")).toHaveTextContent("2 selected");
+  });
+
+  it("doesn't start when the finger moves, which drags instead", () => {
+    vi.useFakeTimers();
+    const { onMoveItem } = setup();
+    touchDown("a");
+    act(() => {
+      window.dispatchEvent(
+        new PointerEvent("pointermove", {
+          pointerId: 1,
+          clientX: 240,
+          clientY: 260,
+          pointerType: "touch",
+        }),
+      );
+      vi.advanceTimersByTime(500);
+    });
+    act(() => {
+      window.dispatchEvent(
+        new PointerEvent("pointerup", {
+          pointerId: 1,
+          clientX: 240,
+          clientY: 260,
+          pointerType: "touch",
+        }),
+      );
+    });
+    expect(onMoveItem).toHaveBeenCalled();
+    touchDown("b");
+    touchUp();
     expect(screen.queryByRole("status")).toBeNull();
   });
 });
@@ -245,7 +370,340 @@ describe("Clipboard events", () => {
   });
 });
 
+describe("Stacking order", () => {
+  const order = () =>
+    [...document.querySelectorAll<HTMLElement>("[data-mb-card-id]")].map(
+      (el) => el.dataset.mbCardId,
+    );
+
+  it("draws objects by their stacking position, not list order", () => {
+    setup([
+      { ...note("a", 100), position: 2 },
+      { ...note("b", 400), position: 0 },
+      { ...note("c", 700), position: 1 },
+    ] as MoodboardItemClient[]);
+    expect(order()).toEqual(["b", "c", "a"]);
+  });
+
+  it("brings to front and sends to back from the toolbar and with ] and [", () => {
+    const { onReorderItems } = setup();
+    press(screen.getByText("Body b"), 200, 200);
+    pointer("pointerup", 200, 200);
+    // The browser's own click after a selecting press, which the canvas swallows.
+    fireEvent.click(screen.getByText("Body b"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Bring to front" }));
+    expect(onReorderItems).toHaveBeenLastCalledWith(["b"], "front");
+    fireEvent.click(screen.getByRole("button", { name: "Send to back" }));
+    expect(onReorderItems).toHaveBeenLastCalledWith(["b"], "back");
+
+    fireEvent.keyDown(window, { key: "]" });
+    expect(onReorderItems).toHaveBeenLastCalledWith(["b"], "front");
+    fireEvent.keyDown(window, { key: "[" });
+    expect(onReorderItems).toHaveBeenLastCalledWith(["b"], "back");
+  });
+
+  it("restacks a whole selection", () => {
+    const { onReorderItems } = setup();
+    fireEvent.keyDown(window, { key: "a", ctrlKey: true });
+    fireEvent.click(screen.getByRole("button", { name: "Send to back" }));
+    expect(onReorderItems).toHaveBeenCalledWith(["a", "b", "c"], "back");
+  });
+});
+
+describe("Comment badges", () => {
+  it("shows open comments on an object and opens them", () => {
+    const onOpenComments = vi.fn();
+    render(
+      <BoardCanvas
+        items={[note("a", 100), note("b", 400)]}
+        connections={[]}
+        toolMode="select"
+        placing={null}
+        drawOpacity={1}
+        drawColor="#000000"
+        drawSize={4}
+        commentCounts={new Map([["a", 3]])}
+        onOpenComments={onOpenComments}
+        {...(Object.fromEntries(
+          Object.keys(setupHandlers()).map((k) => [k, vi.fn()]),
+        ) as unknown as ReturnType<typeof setupHandlers>)}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "3 comments on Sticky note" }));
+    expect(onOpenComments).toHaveBeenCalledWith("a");
+    expect(screen.getAllByRole("button", { name: /comments? on/ })).toHaveLength(1);
+  });
+
+  it("lets a viewer pick an object to comment on while comments are open", () => {
+    const onOpenComments = vi.fn();
+    render(
+      <BoardCanvas
+        items={[note("a", 100)]}
+        connections={[]}
+        toolMode="select"
+        placing={null}
+        drawOpacity={1}
+        drawColor="#000000"
+        drawSize={4}
+        readOnly
+        commentsOpen
+        onOpenComments={onOpenComments}
+        {...(Object.fromEntries(
+          Object.keys(setupHandlers()).map((k) => [k, vi.fn()]),
+        ) as unknown as ReturnType<typeof setupHandlers>)}
+      />,
+    );
+    press(screen.getByText("Body a"), 200, 200);
+    pointer("pointerup", 200, 200);
+    expect(onOpenComments).toHaveBeenCalledWith("a");
+  });
+});
+
+describe("Groups", () => {
+  const grouped = () => [
+    { ...note("a", 100), groupId: "g1" },
+    { ...note("b", 400), groupId: "g1" },
+    note("c", 700),
+  ];
+
+  it("picks and moves the whole group from one member", () => {
+    const { onMoveItems } = setup(grouped() as MoodboardItemClient[]);
+    press(screen.getByText("Body a"), 200, 200);
+    expect(screen.getByRole("status")).toHaveTextContent("2 selected");
+    pointer("pointermove", 230, 260);
+    pointer("pointerup", 230, 260);
+    expect(onMoveItems.mock.calls[0][0].map((m: { id: string }) => m.id)).toEqual(["a", "b"]);
+  });
+
+  it("keeps the group selected on a second click", () => {
+    setup(grouped() as MoodboardItemClient[]);
+    press(screen.getByText("Body a"), 200, 200);
+    pointer("pointerup", 200, 200);
+    press(screen.getByText("Body b"), 200, 200);
+    pointer("pointerup", 200, 200);
+    expect(screen.getByRole("status")).toHaveTextContent("2 selected");
+  });
+
+  it("goes into one member with a double-click", () => {
+    setup(grouped() as MoodboardItemClient[]);
+    fireEvent.doubleClick(screen.getByText("Body a"));
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.getByRole("button", { name: "Delete Sticky note" })).toBeInTheDocument();
+  });
+
+  it("adds or removes the whole group with Shift", () => {
+    setup(grouped() as MoodboardItemClient[]);
+    shiftClick("c");
+    shiftClick("a");
+    expect(screen.getByRole("status")).toHaveTextContent("3 selected");
+    shiftClick("b");
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("groups and ungroups with Ctrl+G and Ctrl+Shift+G, and from the selection bar", () => {
+    const { onGroup, onUngroup } = setup();
+    fireEvent.keyDown(window, { key: "a", ctrlKey: true });
+    fireEvent.keyDown(window, { key: "g", ctrlKey: true });
+    expect(onGroup).toHaveBeenCalledWith(["a", "b", "c"]);
+    fireEvent.keyDown(window, { key: "G", ctrlKey: true, shiftKey: true });
+    expect(onUngroup).toHaveBeenCalledWith(["a", "b", "c"]);
+    fireEvent.click(screen.getByRole("button", { name: "Group" }));
+    expect(onGroup).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("Locked objects", () => {
+  const items = () =>
+    [{ ...note("a", 100), locked: true }, note("b", 400)] as MoodboardItemClient[];
+
+  it("don't move: a drag on them draws a selection box instead", async () => {
+    const { onMoveItem, onMoveItems } = setup(items());
+    press(screen.getByText("Body a"), 200, 200);
+    pointer("pointermove", 260, 280);
+    await nextFrame();
+    pointer("pointerup", 260, 280);
+    expect(onMoveItem).not.toHaveBeenCalled();
+    expect(onMoveItems).not.toHaveBeenCalled();
+    expect(card("a").style.translate).toBe("");
+  });
+
+  it("are selected by a click, can't be deleted, and unlock from the toolbar or Ctrl+Shift+L", () => {
+    const { onDeleteItem, onSetLocked } = setup(items());
+    press(screen.getByText("Body a"), 200, 200);
+    pointer("pointerup", 200, 200);
+    fireEvent.click(screen.getByText("Body a"));
+    expect(screen.getByRole("button", { name: "Unlock" })).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.keyDown(window, { key: "Delete" });
+    expect(onDeleteItem).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(window, { key: "L", ctrlKey: true, shiftKey: true });
+    expect(onSetLocked).toHaveBeenLastCalledWith(["a"], false);
+    fireEvent.click(screen.getByRole("button", { name: "Unlock" }));
+    expect(onSetLocked).toHaveBeenLastCalledWith(["a"], false);
+  });
+
+  it("show no resize handles", () => {
+    setup(items());
+    press(screen.getByText("Body a"), 200, 200);
+    pointer("pointerup", 200, 200);
+    expect(card("a").querySelector("[data-mb-handle]")).toBeNull();
+  });
+});
+
+describe("Sections", () => {
+  const section = {
+    id: "s",
+    type: "SECTION",
+    data: { title: "Ideas", color: "#E4E2DD" },
+    x: 50,
+    y: 50,
+    width: 500,
+    height: 300,
+    position: 9,
+  } as unknown as MoodboardItemClient;
+
+  it("sit behind everything else, whatever their stacking position", () => {
+    setup([note("a", 100), section, note("b", 400)]);
+    const order = [...document.querySelectorAll<HTMLElement>("[data-mb-card-id]")].map(
+      (el) => el.dataset.mbCardId,
+    );
+    expect(order[0]).toBe("s");
+  });
+
+  it("move with everything wholly inside them when dragged by the title", () => {
+    const { onMoveItems } = setup([note("a", 100), section, note("b", 400), note("c", 700)]);
+    press(screen.getByText("Ideas"), 200, 200);
+    pointer("pointermove", 230, 250);
+    pointer("pointerup", 230, 250);
+    expect(onMoveItems).toHaveBeenCalledWith([
+      { id: "s", x: 80, y: 100 },
+      { id: "a", x: 130, y: 150 },
+    ]);
+  });
+
+  it("let clicks through their area to the canvas", () => {
+    setup([section]);
+    expect(document.querySelector('[data-mb-card-id="s"]')).toHaveClass("pointer-events-none");
+  });
+
+  it("are added with F", () => {
+    const { onPick } = setup();
+    fireEvent.keyDown(window, { key: "f" });
+    expect(onPick).toHaveBeenCalledWith("section");
+  });
+});
+
+describe("Lining objects up while moving", () => {
+  const guides = () => document.querySelectorAll("[data-mb-guide]");
+
+  it("snaps to a neighbour's edge, shows a guide, and saves the lined-up spot", async () => {
+    const { onMoveItem } = setup();
+    press(screen.getByText("Body b"), 200, 200);
+    // 4px off the row's top edge: close enough to line up.
+    pointer("pointermove", 230, 204);
+    await nextFrame();
+    expect(card("b").style.translate).toBe("30px 0px");
+    expect(guides().length).toBeGreaterThan(0);
+
+    pointer("pointerup", 230, 204);
+    expect(onMoveItem).toHaveBeenCalledWith("b", 430, 100);
+    expect(guides()).toHaveLength(0);
+  });
+
+  it("leaves far-off positions alone", async () => {
+    const { onMoveItem } = setup();
+    press(screen.getByText("Body b"), 200, 200);
+    pointer("pointermove", 230, 260);
+    await nextFrame();
+    expect(guides()).toHaveLength(0);
+    pointer("pointerup", 230, 260);
+    expect(onMoveItem).toHaveBeenCalledWith("b", 430, 160);
+  });
+
+  it("moves freely while Ctrl is held", async () => {
+    const { onMoveItem } = setup();
+    press(screen.getByText("Body b"), 200, 200);
+    act(() => {
+      window.dispatchEvent(
+        new PointerEvent("pointermove", {
+          pointerId: 1,
+          clientX: 230,
+          clientY: 204,
+          ctrlKey: true,
+        }),
+      );
+    });
+    await nextFrame();
+    expect(guides()).toHaveLength(0);
+    act(() => {
+      window.dispatchEvent(
+        new PointerEvent("pointerup", { pointerId: 1, clientX: 230, clientY: 204, ctrlKey: true }),
+      );
+    });
+    expect(onMoveItem).toHaveBeenCalledWith("b", 430, 104);
+  });
+});
+
+describe("Adding files from the computer", () => {
+  const image = () => new File(["png"], "shot.png", { type: "image/png" });
+
+  it("adds a pasted screenshot", () => {
+    const handlers = setup();
+    handlers.onPasteText.mockReturnValue(false);
+    const file = image();
+    const event = new Event("paste", { bubbles: true, cancelable: true });
+    Object.assign(event, { clipboardData: { getData: () => "", setData: vi.fn(), files: [file] } });
+    window.dispatchEvent(event);
+    expect(handlers.onAddFiles).toHaveBeenCalledWith([file], null);
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it("pastes board objects rather than a file when the clipboard holds both", () => {
+    const handlers = setup();
+    const event = new Event("paste", { bubbles: true, cancelable: true });
+    Object.assign(event, {
+      clipboardData: { getData: () => "board", setData: vi.fn(), files: [image()] },
+    });
+    window.dispatchEvent(event);
+    expect(handlers.onAddFiles).not.toHaveBeenCalled();
+  });
+
+  it("shows where dropped files go and adds them at the drop point", () => {
+    const { onAddFiles } = setup();
+    const file = image();
+    const dataTransfer = { types: ["Files"], files: [file], dropEffect: "none" };
+    fireEvent.dragOver(viewport(), { dataTransfer });
+    expect(screen.getByText("Drop to add to the board")).toBeInTheDocument();
+
+    fireEvent.drop(viewport(), { dataTransfer, clientX: 1100, clientY: 900 });
+    expect(onAddFiles).toHaveBeenCalledWith([file], {
+      x: expect.any(Number),
+      y: expect.any(Number),
+    });
+    expect(screen.queryByText("Drop to add to the board")).toBeNull();
+  });
+
+  it("ignores text and links dragged in from elsewhere", () => {
+    const { onAddFiles } = setup();
+    const dataTransfer = { types: ["text/plain"], files: [] };
+    fireEvent.dragOver(viewport(), { dataTransfer });
+    expect(screen.queryByText("Drop to add to the board")).toBeNull();
+    fireEvent.drop(viewport(), { dataTransfer });
+    expect(onAddFiles).not.toHaveBeenCalled();
+  });
+});
+
 describe("board history", () => {
+  it("counts locking and grouping as changes, so undo brings them back", () => {
+    const before = { items: [note("a", 100)], connections: [] };
+    const locked = { items: [{ ...note("a", 100), locked: true }], connections: [] };
+    const grouped = { items: [{ ...note("a", 100), groupId: "g" }], connections: [] };
+    expect(diffBoards(locked, before).change.map((i) => i.id)).toEqual(["a"]);
+    expect(diffBoards(grouped, before).change.map((i) => i.id)).toEqual(["a"]);
+  });
+
   const board = {
     items: [note("a", 100), note("b", 400)],
     connections: [{ id: "c1", sourceItemId: "a", targetItemId: "b" }],

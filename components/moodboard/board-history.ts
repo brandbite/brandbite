@@ -29,6 +29,9 @@ function sameItem(a: MoodboardItemClient, b: MoodboardItemClient) {
     a.y === b.y &&
     a.width === b.width &&
     a.height === b.height &&
+    a.position === b.position &&
+    (a.locked ?? false) === (b.locked ?? false) &&
+    (a.groupId ?? null) === (b.groupId ?? null) &&
     JSON.stringify(a.data) === JSON.stringify(b.data)
   );
 }
@@ -66,7 +69,7 @@ const CLIPBOARD_MARKER = "brandbite-moodboard-v1:";
 
 export type CopiedItem = Pick<
   MoodboardItemClient,
-  "id" | "type" | "data" | "x" | "y" | "width" | "height"
+  "id" | "type" | "data" | "x" | "y" | "width" | "height" | "groupId"
 >;
 
 export type BoardClipboard = {
@@ -86,7 +89,16 @@ export function buildClipboard(
     moodboardId,
     items: board.items
       .filter((i) => chosen.has(i.id))
-      .map(({ id, type, data, x, y, width, height }) => ({ id, type, data, x, y, width, height })),
+      .map(({ id, type, data, x, y, width, height, groupId }) => ({
+        id,
+        type,
+        data,
+        x,
+        y,
+        width,
+        height,
+        groupId: groupId ?? null,
+      })),
     connections: board.connections.filter(
       (c) => chosen.has(c.sourceItemId) && chosen.has(c.targetItemId),
     ),

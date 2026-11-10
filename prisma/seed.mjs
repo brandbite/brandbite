@@ -31,6 +31,11 @@ async function main() {
   // Note: This block is for the dev DB. It deletes every record.
   // Must not be used in production.
 
+  // Moodboards (with their items and comments) name their makers, so they go
+  // before any user can. Creative boards belong to no company to cascade from.
+  await prisma.moodboardComment.deleteMany({});
+  await prisma.moodboard.deleteMany({});
+
   // Delete child tables related to tickets first (deepest children first)
   await prisma.assetPinComment.deleteMany({});
   await prisma.assetPin.deleteMany({});

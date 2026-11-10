@@ -816,7 +816,21 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
       "Collect references and develop ideas on a canvas, see the boards customers attach to your requests, and share yours when you're ready.",
     category: "Work",
     routes: ["/creative/moodboards"],
-    keywords: ["canvas", "references", "inspiration", "ideas", "share", "sticky note", "arrow"],
+    keywords: [
+      "canvas",
+      "references",
+      "inspiration",
+      "ideas",
+      "share",
+      "sticky note",
+      "arrow",
+      "screenshot",
+      "drag and drop",
+      "align",
+      "section",
+      "download",
+      "pdf",
+    ],
     related: ["ticket-details"],
     sections: [
       {
@@ -832,7 +846,19 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
           },
           {
             type: "p",
-            text: "Drag across the empty canvas to select several items, or **Shift**-click them, then move, duplicate or delete them together. **Ctrl/⌘ + Z** undoes and **Ctrl/⌘ + Shift + Z** redoes, or use the buttons at the top right. **Ctrl/⌘ + C**, **X**, **V** and **D** copy, cut, paste and duplicate.",
+            text: "You can also drag images and files from your computer onto the board, or paste a screenshot with **Ctrl/⌘ + V**. Images become pictures and everything else becomes a file, up to 10 at a time and 4 MB each. While you move or resize something, it lines up with the edges and centres of nearby items and an orange guide shows where. Hold **Ctrl** (**⌘** on a Mac) to move it freely.",
+          },
+          {
+            type: "p",
+            text: "A **Section** (**F**) is a named, tinted area for grouping things. Drag it by its name to move it together with everything inside it, double-click the name to rename it, and pick its color when it's selected. To put something on top of or behind the rest, select it and use **Bring to front** or **Send to back** in its toolbar, or press **]** or **[**. **More → Download as PNG** or **Download as PDF** saves the whole board as a picture. Videos show as empty boxes in the download.",
+          },
+          {
+            type: "p",
+            text: "Drag across the empty canvas to select several items, or **Shift**-click them, then move, duplicate or delete them together. On a phone, press and hold an item to start picking several, then tap others to add or remove them. Tap the empty canvas to stop. **Ctrl/⌘ + G** groups the selected items so a click picks them all and they move together; **Ctrl/⌘ + Shift + G** ungroups them. Double-click a grouped item to edit it on its own. **Lock** in the toolbar (**Ctrl/⌘ + Shift + L**) keeps an item from being moved, resized or deleted, handy for a background picture; dragging across it selects what's on top of it. **Ctrl/⌘ + Z** undoes and **Ctrl/⌘ + Shift + Z** redoes, or use the buttons at the top right. **Ctrl/⌘ + C**, **X**, **V** and **D** copy, cut, paste and duplicate.",
+          },
+          {
+            type: "p",
+            text: "Select an item and click **Comment** in its toolbar, or open **Comments** at the top of the board. Comments stay on that item, and anyone who can see the board can reply. Items with open comments show a number in their corner; click it to read them. **Resolve** closes a thread once it's sorted, and a reply opens it again. Tick **Show resolved** to see closed threads. The person who made the board, and everyone else in a thread, is notified about new comments. You can delete your own comments.",
           },
           {
             type: "warning",

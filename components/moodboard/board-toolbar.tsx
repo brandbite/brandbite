@@ -17,6 +17,7 @@ export type CreatableKind =
   | "note"
   | "shape"
   | "text"
+  | "section"
   | "color"
   | "todo"
   | "image"
@@ -92,6 +93,24 @@ function NoteIcon() {
         strokeWidth="1.5"
         strokeLinecap="round"
       />
+    </svg>
+  );
+}
+
+function SectionIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <rect
+        x="2.75"
+        y="5.75"
+        width="14.5"
+        height="11.5"
+        rx="2"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeDasharray="3 2"
+      />
+      <rect x="2.75" y="2" width="7" height="3" rx="1" fill="currentColor" />
     </svg>
   );
 }
@@ -340,6 +359,7 @@ function DragGhost({ kind, shapeKind }: { kind: CreatableKind; shapeKind: ShapeK
   }
   const labels: Partial<Record<CreatableKind, string>> = {
     text: "Text",
+    section: "Section",
     color: "Color",
     todo: "Checklist",
     image: "Image",
@@ -566,6 +586,7 @@ export function BoardToolbar({
             className="flex max-w-full items-center gap-0.5 overflow-x-auto rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-1 shadow-md [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             onClick={() => onSetMoreOpen?.(false)}
           >
+            {creator("section", "Section", <SectionIcon />)}
             {creator("image", "Image", <ImageIcon />)}
             {creator("color", "Color", <ColorIcon />)}
             {creator("todo", "Checklist", <TodoIcon />)}
@@ -597,6 +618,7 @@ export function BoardToolbar({
           {creator("note", "Sticky note", <NoteIcon />, "S")}
           {creator("shape", "Shape", <ShapeIcon kind={shapeKind} />, "R")}
           {creator("text", "Text", <TextIcon />, "T")}
+          {!isPhone && creator("section", "Section", <SectionIcon />, "F")}
           {tool("arrow", "Arrow", <ArrowIcon />, "L")}
           {isPhone ? (
             <button

@@ -17,7 +17,7 @@ type RouteParams = {
 };
 
 // -----------------------------------------------------------------------------
-// PATCH: update an item's data or colSpan
+// PATCH: update an item's data, size, place on the canvas or stacking order
 // -----------------------------------------------------------------------------
 
 export async function PATCH(req: NextRequest, { params }: RouteParams) {
@@ -108,6 +108,34 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       data.height = raw.height;
     }
 
+    // Stacking order: higher draws on top. Any integer, negatives included,
+    // so "send to back" needs no renumbering of the rest.
+    if (raw.position !== undefined) {
+      if (typeof raw.position !== "number" || !Number.isInteger(raw.position)) {
+        return NextResponse.json({ error: "position must be an integer" }, { status: 400 });
+      }
+      data.position = raw.position;
+    }
+
+    if (raw.locked !== undefined) {
+      if (typeof raw.locked !== "boolean") {
+        return NextResponse.json({ error: "locked must be true or false" }, { status: 400 });
+      }
+      data.locked = raw.locked;
+    }
+    if (raw.groupId !== undefined) {
+      const ok =
+        raw.groupId === null ||
+        (typeof raw.groupId === "string" && raw.groupId.length > 0 && raw.groupId.length <= 64);
+      if (!ok) {
+        return NextResponse.json(
+          { error: "groupId must be a short string or null" },
+          { status: 400 },
+        );
+      }
+      data.groupId = raw.groupId;
+    }
+
     // Undo of a delete.
     if (raw.restore === true) {
       data.deletedAt = null;
@@ -132,6 +160,8 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
         y: updated.y,
         width: updated.width,
         height: updated.height,
+        locked: updated.locked,
+        groupId: updated.groupId,
         data: updated.data,
         createdById: updated.createdById,
         createdAt: updated.createdAt.toISOString(),
