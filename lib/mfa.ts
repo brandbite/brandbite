@@ -26,6 +26,7 @@
 //               flow.
 // -----------------------------------------------------------------------------
 
+import { renderSecurityCodeEmail } from "@/lib/email-templates/account";
 import { createHash, randomInt } from "node:crypto";
 
 import { NextResponse } from "next/server";
@@ -181,27 +182,11 @@ export async function issueChallenge(
   // throws, but we still double-wrap in case of a deeper failure we want
   // to swallow.
   try {
-    const subject = `brandbite admin — security code ${code}`;
-    const minutesValid = Math.round(CHALLENGE_TTL_MS / 60_000);
-    const html = [
-      `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto;">`,
-      `<div style="background: #2a2a2b; padding: 16px 24px; border-radius: 10px 10px 0 0;">`,
-      `<span style="font-size: 16px; font-weight: 700; color: #fff;">brandbite · security code</span>`,
-      `</div>`,
-      `<div style="background: #fff; padding: 24px; border: 1px solid #e3e1dc; border-top: none;">`,
-      `<p style="margin: 0 0 12px; font-size: 14px; color: #424143;">Hi${userName ? " " + escapeHtml(userName) : ""},</p>`,
-      `<p style="margin: 0 0 16px; font-size: 14px; color: #424143;">Enter this code in the brandbite admin panel to confirm a money-moving action:</p>`,
-      `<div style="text-align: center; margin: 20px 0;">`,
-      `<span style="display: inline-block; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 32px; letter-spacing: 8px; font-weight: 700; color: #2a2a2b; background: #faf9f7; padding: 14px 24px; border-radius: 10px; border: 1px solid #e3e1dc;">${code}</span>`,
-      `</div>`,
-      `<p style="margin: 0 0 8px; font-size: 13px; color: #7a7a7a;">This code expires in ${minutesValid} minutes and can only be used once.</p>`,
-      `<p style="margin: 0; font-size: 13px; color: #b4232e;">If you did NOT just try to perform a money action, someone has your password. <a href="${process.env.NEXT_PUBLIC_APP_URL || ""}/admin/audit-log" style="color: #b4232e;">Review the audit log</a> and change your password immediately.</p>`,
-      `</div>`,
-      `<div style="background: #faf9f7; padding: 12px 24px; border-radius: 0 0 10px 10px; border: 1px solid #e3e1dc; border-top: none;">`,
-      `<p style="margin: 0; font-size: 11px; color: #9a9892; text-align: center;">brandbite security monitor</p>`,
-      `</div>`,
-      `</div>`,
-    ].join("\n");
+    const { subject, html } = await renderSecurityCodeEmail({
+      name: userName ?? null,
+      code,
+      minutesValid: Math.round(CHALLENGE_TTL_MS / 60_000),
+    });
     await sendNotificationEmail(userEmail, subject, html);
   } catch (err) {
     console.warn("[mfa] failed to email challenge code:", {
@@ -211,15 +196,6 @@ export async function issueChallenge(
   }
 
   return { challengeId: challenge.id, expiresAt: challenge.expiresAt };
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }
 
 // ---------------------------------------------------------------------------

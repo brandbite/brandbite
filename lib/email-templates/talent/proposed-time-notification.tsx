@@ -70,6 +70,8 @@ export function TalentProposedTimeNotificationEmailTemplate({
 
   return (
     <BaseLayout
+      role={"admin"}
+      reason={"You received this email because you're a brandbite site owner."}
       previewText={`${candidateName} proposed a custom interview time.`}
       hero={
         <HeroBand>
@@ -112,7 +114,7 @@ export async function renderTalentProposedTimeNotificationEmail(
 ): Promise<{ subject: string; html: string }> {
   const html = await render(<TalentProposedTimeNotificationEmailTemplate {...props} />);
   return {
-    subject: `${props.candidateName} proposed a custom interview time`,
+    subject: `[brandbite admin] ${props.candidateName} proposed a custom interview time`,
     html,
   };
 }

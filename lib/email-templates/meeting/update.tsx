@@ -8,7 +8,16 @@
 import * as React from "react";
 import { render } from "@react-email/render";
 
-import { BaseLayout, Button, Callout, Heading, HeroBand, Paragraph, Signoff } from "../layout";
+import {
+  BaseLayout,
+  Button,
+  Callout,
+  Heading,
+  HeroBand,
+  LinkText,
+  Paragraph,
+  Signoff,
+} from "../layout";
 import { formatConsultationTime } from "../consultation/update";
 
 export type MeetingEmailKind = "confirmed" | "rescheduled" | "canceled";
@@ -39,6 +48,12 @@ export function MeetingEmailTemplate(props: MeetingEmailProps) {
 
   return (
     <BaseLayout
+      role={props.audience === "host" ? "admin" : null}
+      reason={
+        props.audience === "host"
+          ? "You received this email because you host brandbite calls."
+          : "You received this email because you booked a call with brandbite."
+      }
       previewText={`${title}: ${when}`}
       hero={
         <HeroBand>
@@ -68,7 +83,8 @@ export function MeetingEmailTemplate(props: MeetingEmailProps) {
       ) : null}
       {props.audience === "visitor" && props.kind !== "canceled" && props.manageUrl ? (
         <Paragraph>
-          Need to change something? <a href={props.manageUrl}>Reschedule or cancel</a>.
+          Need to change something? <LinkText href={props.manageUrl}>Reschedule or cancel</LinkText>
+          .
         </Paragraph>
       ) : null}
       <Signoff />
@@ -80,7 +96,10 @@ export async function renderMeetingEmail(
   props: MeetingEmailProps,
 ): Promise<{ subject: string; html: string }> {
   return {
-    subject: TITLES[props.kind][props.audience],
+    subject:
+      props.audience === "host"
+        ? `[brandbite admin] ${TITLES[props.kind].host}`
+        : TITLES[props.kind].visitor,
     html: await render(<MeetingEmailTemplate {...props} />),
   };
 }

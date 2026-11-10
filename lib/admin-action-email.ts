@@ -19,6 +19,8 @@
 import type { AdminActionLog, AdminActionOutcome, AdminActionType, UserRole } from "@prisma/client";
 
 import { sendNotificationEmail } from "@/lib/email";
+import { ADMIN_SUBJECT_PREFIX } from "@/lib/email-templates";
+import { renderSimpleEmail, type SimpleEmailCard } from "@/lib/email-templates/simple";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 
@@ -85,16 +87,7 @@ function formatWhen(when: Date): string {
   });
 }
 
-function formatMetadata(meta: unknown): string {
-  if (meta == null) return "";
-  try {
-    return JSON.stringify(meta, null, 2);
-  } catch {
-    return "";
-  }
-}
-
-type EmailableLogEntry = {
+export type EmailableLogEntry = {
   actorEmail: string;
   actorRole: AdminActionLog["actorRole"];
   action: AdminActionType;
@@ -107,57 +100,151 @@ type EmailableLogEntry = {
   createdAt: Date;
 };
 
-function buildEmail(entry: EmailableLogEntry, appUrl: string) {
-  const actionLabel = ACTION_SUBJECT_FRAGMENT[entry.action] ?? entry.action;
-  const subject = `brandbite admin — ${actionLabel}`;
-  const when = formatWhen(entry.createdAt);
-  const metaJson = formatMetadata(entry.metadata);
+// Email titles: "<thing> <past tense>", like the design's "Company token
+// balance adjusted".
+const ACTION_TITLE: Record<AdminActionType, string> = {
+  WITHDRAWAL_APPROVE: "Withdrawal approved",
+  WITHDRAWAL_MARK_PAID: "Withdrawal marked as paid",
+  WITHDRAWAL_REJECT: "Withdrawal rejected",
+  PLAN_CREATE: "Plan created",
+  PLAN_EDIT: "Plan edited",
+  PLAN_DELETE: "Plan deleted",
+  PLAN_ASSIGN: "Plan assigned to a company",
+  COMPANY_TOKEN_GRANT: "Company token balance adjusted",
+  PAYOUT_RULE_EDIT: "Payout rule changed",
+  TICKET_FINANCIAL_OVERRIDE: "Request token cost overridden",
+  USER_PROMOTE_TO_ADMIN: "Admin role changed",
+  USER_HARD_DELETE: "User account hard-deleted",
+  AI_PRICING_EDIT: "AI tool pricing changed",
+  CONSULTATION_PRICING_EDIT: "Consultation pricing changed",
+  GOOGLE_OAUTH_CONFIG_EDIT: "Google Calendar connection changed",
+  COMPANY_AUTO_ASSIGN_EDIT: "Company auto-assign changed",
+  APP_SETTING_EDIT: "Platform setting changed",
+  TICKET_BULK_STATUS_CHANGE: "Request statuses changed in bulk",
+  ADMIN_MFA_DISABLE: "Authenticator two-factor turned off",
+  TALENT_APPLICATION_ACCEPTED: "Talent application accepted",
+  TALENT_APPLICATION_DECLINED: "Talent application declined",
+  TALENT_INTERVIEW_HELD: "Talent interview marked as held",
+  TALENT_INTERVIEW_MISSED: "Talent interview marked as missed",
+  TALENT_HIRED: "Talent applicant hired",
+  TALENT_REJECTED_AFTER_INTERVIEW: "Talent applicant declined after interview",
+  TALENT_ONBOARDED: "Talent applicant onboarded as a creative",
+};
 
-  const html = [
-    `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto;">`,
-    `<div style="background: #f15b2b; padding: 16px 24px; border-radius: 10px 10px 0 0;">`,
-    `<span style="font-size: 16px; font-weight: 700; color: #fff;">brandbite · security</span>`,
-    `</div>`,
-    `<div style="background: #fff; padding: 24px; border: 1px solid #e3e1dc; border-top: none;">`,
-    `<p style="margin: 0 0 12px; font-size: 14px; color: #424143;">An admin action just ran on brandbite:</p>`,
-    `<table role="presentation" cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: collapse; margin: 12px 0;">`,
-    `<tr><td style="padding: 6px 0; font-size: 12px; color: #7a7a7a; width: 120px; vertical-align: top;">Actor</td><td style="padding: 6px 0; font-size: 13px; color: #2a2a2b;"><strong>${escapeHtml(entry.actorEmail)}</strong> · ${escapeHtml(entry.actorRole)}</td></tr>`,
-    `<tr><td style="padding: 6px 0; font-size: 12px; color: #7a7a7a; vertical-align: top;">Action</td><td style="padding: 6px 0; font-size: 13px; color: #2a2a2b;">${escapeHtml(entry.action)} (${escapeHtml(entry.outcome)})</td></tr>`,
-    `<tr><td style="padding: 6px 0; font-size: 12px; color: #7a7a7a; vertical-align: top;">When</td><td style="padding: 6px 0; font-size: 13px; color: #2a2a2b;">${escapeHtml(when)}</td></tr>`,
-    entry.targetType && entry.targetId
-      ? `<tr><td style="padding: 6px 0; font-size: 12px; color: #7a7a7a; vertical-align: top;">Target</td><td style="padding: 6px 0; font-size: 13px; color: #2a2a2b; font-family: ui-monospace, SFMono-Regular, monospace;">${escapeHtml(entry.targetType)} ${escapeHtml(entry.targetId)}</td></tr>`
-      : "",
-    entry.ipAddress
-      ? `<tr><td style="padding: 6px 0; font-size: 12px; color: #7a7a7a; vertical-align: top;">IP</td><td style="padding: 6px 0; font-size: 13px; color: #2a2a2b; font-family: ui-monospace, SFMono-Regular, monospace;">${escapeHtml(entry.ipAddress)}</td></tr>`
-      : "",
-    `</table>`,
-    metaJson
-      ? `<details style="margin: 12px 0; font-size: 12px;"><summary style="cursor: pointer; color: #7a7a7a;">Details</summary><pre style="background: #faf9f7; padding: 10px; border-radius: 6px; overflow-x: auto; font-size: 11px; color: #424143; margin: 6px 0 0;">${escapeHtml(metaJson)}</pre></details>`
-      : "",
-    `<p style="margin: 18px 0 0; font-size: 13px; color: #424143;">If this wasn't expected, review the full log at <a href="${appUrl}/admin/audit-log" style="color: #f15b2b;">${appUrl}/admin/audit-log</a>.</p>`,
-    `</div>`,
-    `<div style="background: #faf9f7; padding: 12px 24px; border-radius: 0 0 10px 10px; border: 1px solid #e3e1dc; border-top: none;">`,
-    `<p style="margin: 0; font-size: 11px; color: #9a9892; text-align: center;">brandbite security monitor — you received this because you are a site owner.</p>`,
-    `</div>`,
-    `</div>`,
-  ]
-    .filter(Boolean)
-    .join("\n");
+const OWNER_REASON = "You received this email because you're a brandbite site owner.";
 
-  return { subject, html };
+function roleLabel(role: string): string {
+  return role
+    .toLowerCase()
+    .split("_")
+    .map((w, i) => (i === 0 ? w[0].toUpperCase() + w.slice(1) : w))
+    .join(" ");
 }
 
-// Minimal HTML escape for the fields we interpolate. Nothing fancy — emails
-// render in a separate client, and we're only guarding against subject-line
-// / table-cell HTML injection from user-provided data (IPs / emails are
-// controlled, but metadata can in theory contain anything).
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+function asRecord(meta: unknown): Record<string, unknown> {
+  return meta && typeof meta === "object" && !Array.isArray(meta)
+    ? (meta as Record<string, unknown>)
+    : {};
+}
+
+function tokens(n: number): string {
+  return `${n.toLocaleString("en-US")} ${n === 1 ? "token" : "tokens"}`;
+}
+
+/** Plain metadata values as rows ("balanceBefore" -> "Balance before"). */
+function metadataRows(
+  meta: Record<string, unknown>,
+  skip: string[],
+): { label: string; value: string }[] {
+  return Object.entries(meta)
+    .filter(([key, value]) => !skip.includes(key) && value != null && value !== "")
+    .slice(0, 10)
+    .map(([key, value]) => ({
+      label: key
+        .replace(/([a-z])([A-Z])/g, "$1 $2")
+        .replace(/_/g, " ")
+        .toLowerCase()
+        .replace(/^./, (c) => c.toUpperCase()),
+      value: typeof value === "object" ? JSON.stringify(value) : String(value),
+    }));
+}
+
+function auditRows(
+  entry: EmailableLogEntry,
+  actorLabel: string,
+): { label: string; value: string }[] {
+  return [
+    { label: actorLabel, value: `${entry.actorEmail} · ${roleLabel(entry.actorRole)}` },
+    { label: "Action", value: entry.action },
+    { label: "Recorded at", value: formatWhen(entry.createdAt) },
+    ...(entry.targetType && entry.targetId
+      ? [{ label: "Target", value: `${entry.targetType} ${entry.targetId}` }]
+      : []),
+    ...(entry.ipAddress ? [{ label: "IP address", value: entry.ipAddress }] : []),
+  ];
+}
+
+/** Exported for previews and tests. */
+export async function buildEmail(entry: EmailableLogEntry, appUrl: string) {
+  const actionLabel = ACTION_SUBJECT_FRAGMENT[entry.action] ?? entry.action;
+  const subject = `${ADMIN_SUBJECT_PREFIX} An admin ${actionLabel}`;
+  const title = ACTION_TITLE[entry.action] ?? "Admin action recorded";
+  const meta = asRecord(entry.metadata);
+  const cards: SimpleEmailCard[] = [];
+  let intro = `${entry.actorEmail} ${actionLabel}.`;
+  let skip: string[] = [];
+
+  if (entry.action === "COMPANY_TOKEN_GRANT" && typeof meta.amount === "number") {
+    const debit = meta.direction === "DEBIT";
+    const amount = meta.amount;
+    const before = typeof meta.balanceBefore === "number" ? meta.balanceBefore : null;
+    const after =
+      typeof meta.balanceAfter === "number"
+        ? meta.balanceAfter
+        : before != null
+          ? before + (debit ? -amount : amount)
+          : null;
+    const company = typeof meta.companyName === "string" ? meta.companyName : null;
+    intro = `${entry.actorEmail} ${debit ? "removed" : "added"} ${tokens(amount)}${
+      company ? ` ${debit ? "from" : "to"} ${company}` : ""
+    }.`;
+    cards.push({
+      icon: "coins",
+      label: "Balance change",
+      title: `${debit ? "-" : "+"}${tokens(amount)}`,
+      pill: "Success",
+      filled: true,
+      tiles:
+        before != null && after != null
+          ? [
+              { label: "Previous balance", value: tokens(before) },
+              { label: "New balance", value: tokens(after) },
+            ]
+          : [],
+    });
+    skip = ["amount", "direction", "balanceBefore", "balanceAfter", "companyName"];
+  }
+
+  cards.push({
+    icon: "file-text",
+    title: "Audit details",
+    tone: "neutral",
+    rows: [...auditRows(entry, "Actor"), ...metadataRows(meta, ["notes", ...skip])],
+  });
+
+  const notes = typeof meta.notes === "string" ? meta.notes.trim() : "";
+  const html = await renderSimpleEmail({
+    role: "admin",
+    previewText: intro,
+    reason: OWNER_REASON,
+    title,
+    intro: [intro],
+    cards,
+    note: notes ? { title: "Note", text: notes } : undefined,
+    action: { href: `${appUrl}/admin/audit-log`, label: "View audit log" },
+    footnote: "If you didn't expect this, review the full entry.",
+  });
+  return { subject, html };
 }
 
 // ---------------------------------------------------------------------------
@@ -185,7 +272,7 @@ export async function sendAdminActionReceipt(entry: EmailableLogEntry): Promise<
     if (owners.length === 0) return;
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://brandbite.studio";
-    const { subject, html } = buildEmail(entry, appUrl);
+    const { subject, html } = await buildEmail(entry, appUrl);
 
     // Fire per-recipient. sendNotificationEmail is itself best-effort; errors
     // are swallowed inside it. We still try/catch around the whole loop for
@@ -216,43 +303,34 @@ export async function sendAdminActionReceipt(entry: EmailableLogEntry): Promise<
 // from a brute-force tool shouldn't flood the inbox.
 // ---------------------------------------------------------------------------
 
-function buildBlockedEmail(entry: EmailableLogEntry, appUrl: string) {
+/** Exported for previews and tests. */
+export async function buildBlockedEmail(entry: EmailableLogEntry, appUrl: string) {
   const actionLabel = ACTION_SUBJECT_FRAGMENT[entry.action] ?? entry.action;
-  const subject = `⚠️ brandbite admin — blocked attempt: ${actionLabel}`;
-  const when = formatWhen(entry.createdAt);
-
-  const html = [
-    `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto;">`,
-    `<div style="background: #b4232e; padding: 16px 24px; border-radius: 10px 10px 0 0;">`,
-    `<span style="font-size: 16px; font-weight: 700; color: #fff;">brandbite · security alert</span>`,
-    `</div>`,
-    `<div style="background: #fff; padding: 24px; border: 1px solid #e3e1dc; border-top: none;">`,
-    `<p style="margin: 0 0 12px; font-size: 14px; color: #424143;"><strong>Someone with insufficient privileges tried to run a privileged action.</strong> The request was blocked; the action did NOT happen. Review below.</p>`,
-    `<table role="presentation" cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: collapse; margin: 12px 0;">`,
-    `<tr><td style="padding: 6px 0; font-size: 12px; color: #7a7a7a; width: 120px; vertical-align: top;">Who tried</td><td style="padding: 6px 0; font-size: 13px; color: #2a2a2b;"><strong>${escapeHtml(entry.actorEmail)}</strong> · ${escapeHtml(entry.actorRole)}</td></tr>`,
-    `<tr><td style="padding: 6px 0; font-size: 12px; color: #7a7a7a; vertical-align: top;">Tried to</td><td style="padding: 6px 0; font-size: 13px; color: #2a2a2b;">${escapeHtml(entry.action)} ${escapeHtml(actionLabel)}</td></tr>`,
-    `<tr><td style="padding: 6px 0; font-size: 12px; color: #7a7a7a; vertical-align: top;">When</td><td style="padding: 6px 0; font-size: 13px; color: #2a2a2b;">${escapeHtml(when)}</td></tr>`,
-    entry.targetType && entry.targetId
-      ? `<tr><td style="padding: 6px 0; font-size: 12px; color: #7a7a7a; vertical-align: top;">Target</td><td style="padding: 6px 0; font-size: 13px; color: #2a2a2b; font-family: ui-monospace, SFMono-Regular, monospace;">${escapeHtml(entry.targetType)} ${escapeHtml(entry.targetId)}</td></tr>`
-      : "",
-    entry.ipAddress
-      ? `<tr><td style="padding: 6px 0; font-size: 12px; color: #7a7a7a; vertical-align: top;">IP</td><td style="padding: 6px 0; font-size: 13px; color: #2a2a2b; font-family: ui-monospace, SFMono-Regular, monospace;">${escapeHtml(entry.ipAddress)}</td></tr>`
-      : "",
-    entry.errorMessage
-      ? `<tr><td style="padding: 6px 0; font-size: 12px; color: #7a7a7a; vertical-align: top;">Reason</td><td style="padding: 6px 0; font-size: 13px; color: #b4232e;">${escapeHtml(entry.errorMessage)}</td></tr>`
-      : "",
-    `</table>`,
-    `<p style="margin: 18px 0 8px; font-size: 13px; color: #424143;">If this actor shouldn't have tried this — rotate their session, revoke their admin role, or investigate further.</p>`,
-    `<p style="margin: 8px 0 0; font-size: 12px; color: #7a7a7a;">Future repeats of this same attempt are rate-limited to one alert per hour — review the full audit log at <a href="${appUrl}/admin/audit-log" style="color: #b4232e;">${appUrl}/admin/audit-log</a>.</p>`,
-    `</div>`,
-    `<div style="background: #faf9f7; padding: 12px 24px; border-radius: 0 0 10px 10px; border: 1px solid #e3e1dc; border-top: none;">`,
-    `<p style="margin: 0; font-size: 11px; color: #9a9892; text-align: center;">brandbite security monitor — you received this because you are a site owner.</p>`,
-    `</div>`,
-    `</div>`,
-  ]
-    .filter(Boolean)
-    .join("\n");
-
+  const subject = `${ADMIN_SUBJECT_PREFIX} Blocked attempt: ${actionLabel}`;
+  const html = await renderSimpleEmail({
+    role: "admin",
+    previewText: `${entry.actorEmail} tried to run a privileged action. It was blocked.`,
+    reason: OWNER_REASON,
+    title: "Blocked admin attempt",
+    warning:
+      "Someone without the right permissions tried a privileged action. It was blocked and did not happen.",
+    cards: [
+      {
+        icon: "lock",
+        title: "What was tried",
+        tone: "neutral",
+        rows: [
+          ...auditRows(entry, "Who tried"),
+          { label: "Tried to", value: actionLabel },
+          ...(entry.errorMessage ? [{ label: "Reason", value: entry.errorMessage }] : []),
+        ],
+      },
+    ],
+    note: {
+      text: "If this person shouldn't have tried this, end their session, remove their admin role, or look into it further. Repeats of the same attempt send at most one alert per hour.",
+    },
+    action: { href: `${appUrl}/admin/audit-log`, label: "View audit log" },
+  });
   return { subject, html };
 }
 
@@ -286,7 +364,7 @@ export async function sendAdminActionBlockedAlert(
     if (owners.length === 0) return;
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://brandbite.studio";
-    const { subject, html } = buildBlockedEmail(entry, appUrl);
+    const { subject, html } = await buildBlockedEmail(entry, appUrl);
 
     await Promise.all(owners.map((o) => sendNotificationEmail(o.email, subject, html)));
   } catch (err) {
@@ -331,34 +409,33 @@ export async function sendCoApprovalRequest(input: CoApprovalRequestInput): Prom
     if (owners.length === 0) return;
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://brandbite.studio";
-    const subject = `⏳ brandbite admin — withdrawal awaiting your co-approval`;
-
-    const html = [
-      `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto;">`,
-      `<div style="background: #f5b82d; padding: 16px 24px; border-radius: 10px 10px 0 0;">`,
-      `<span style="font-size: 16px; font-weight: 700; color: #2a2a2b;">brandbite · co-approval needed</span>`,
-      `</div>`,
-      `<div style="background: #fff; padding: 24px; border: 1px solid #e3e1dc; border-top: none;">`,
-      `<p style="margin: 0 0 12px; font-size: 14px; color: #424143;"><strong>${escapeHtml(input.firstApproverEmail)}</strong> approved a large withdrawal and needs a second site owner to co-sign before it pays out.</p>`,
-      `<table role="presentation" cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: collapse; margin: 12px 0;">`,
-      `<tr><td style="padding: 6px 0; font-size: 12px; color: #7a7a7a; width: 120px; vertical-align: top;">Amount</td><td style="padding: 6px 0; font-size: 13px; color: #2a2a2b;"><strong>${input.amountTokens.toLocaleString()} tokens</strong></td></tr>`,
-      input.creativeEmail
-        ? `<tr><td style="padding: 6px 0; font-size: 12px; color: #7a7a7a; vertical-align: top;">Creative</td><td style="padding: 6px 0; font-size: 13px; color: #2a2a2b;">${escapeHtml(input.creativeEmail)}</td></tr>`
-        : "",
-      `<tr><td style="padding: 6px 0; font-size: 12px; color: #7a7a7a; vertical-align: top;">Withdrawal</td><td style="padding: 6px 0; font-size: 12px; color: #2a2a2b; font-family: ui-monospace, SFMono-Regular, monospace;">${escapeHtml(input.withdrawalId)}</td></tr>`,
-      `<tr><td style="padding: 6px 0; font-size: 12px; color: #7a7a7a; vertical-align: top;">Already signed</td><td style="padding: 6px 0; font-size: 13px; color: #2a2a2b;">${escapeHtml(input.firstApproverEmail)}</td></tr>`,
-      `</table>`,
-      `<p style="margin: 18px 0 0; font-size: 13px; color: #424143;">If you agree this withdrawal should pay out, open the admin panel and click Approve:</p>`,
-      `<p style="margin: 12px 0 0; font-size: 14px;"><a href="${appUrl}/admin/withdrawals" style="display: inline-block; padding: 10px 20px; background: #f15b2b; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600;">Review withdrawals</a></p>`,
-      `<p style="margin: 18px 0 0; font-size: 12px; color: #7a7a7a;">If this wasn't expected — for example if ${escapeHtml(input.firstApproverEmail)} should not be approving withdrawals — do NOT approve. Investigate via <a href="${appUrl}/admin/audit-log" style="color: #f15b2b;">the audit log</a> first.</p>`,
-      `</div>`,
-      `<div style="background: #faf9f7; padding: 12px 24px; border-radius: 0 0 10px 10px; border: 1px solid #e3e1dc; border-top: none;">`,
-      `<p style="margin: 0; font-size: 11px; color: #9a9892; text-align: center;">brandbite security monitor</p>`,
-      `</div>`,
-      `</div>`,
-    ]
-      .filter(Boolean)
-      .join("\n");
+    const subject = `${ADMIN_SUBJECT_PREFIX} Withdrawal awaiting your co-approval`;
+    const html = await renderSimpleEmail({
+      role: "admin",
+      previewText: `A ${tokens(input.amountTokens)} withdrawal needs a second site owner.`,
+      reason: OWNER_REASON,
+      title: "Withdrawal awaiting your co-approval",
+      intro: [
+        `${input.firstApproverEmail} approved a large withdrawal. A second site owner has to approve it before it's paid out.`,
+      ],
+      cards: [
+        {
+          icon: "coins",
+          label: "Withdrawal",
+          title: tokens(input.amountTokens),
+          filled: true,
+          tiles: [
+            ...(input.creativeEmail ? [{ label: "Creative", value: input.creativeEmail }] : []),
+            { label: "Already approved by", value: input.firstApproverEmail },
+          ],
+        },
+      ],
+      note: {
+        text: `If this wasn't expected, for example if ${input.firstApproverEmail} shouldn't be approving withdrawals, don't approve it. Check the audit log first.`,
+      },
+      action: { href: `${appUrl}/admin/withdrawals`, label: "Review withdrawals" },
+      secondary: { href: `${appUrl}/admin/audit-log`, label: "Open the audit log" },
+    });
 
     await Promise.all(owners.map((o) => sendNotificationEmail(o.email, subject, html)));
   } catch (err) {

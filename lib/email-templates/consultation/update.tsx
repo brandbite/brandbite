@@ -70,6 +70,8 @@ export function ConsultationUpdateEmailTemplate(props: ConsultationUpdateEmailPr
   if (kind === "canceled") {
     return (
       <BaseLayout
+        role={"customer"}
+        reason={"You received this email because you booked a consultation with brandbite."}
         previewText="Your brandbite consultation was cancelled."
         hero={
           <HeroBand>
@@ -100,6 +102,8 @@ export function ConsultationUpdateEmailTemplate(props: ConsultationUpdateEmailPr
 
   return (
     <BaseLayout
+      role={"customer"}
+      reason={"You received this email because you booked a consultation with brandbite."}
       previewText={when ? `${title}: ${when}` : title}
       hero={
         <HeroBand>

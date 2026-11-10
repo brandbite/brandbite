@@ -64,6 +64,8 @@ export function TalentOnboardedEmailTemplate({
 
   return (
     <BaseLayout
+      role={"creative"}
+      reason={"You received this email because you joined brandbite as a creative."}
       previewText="Welcome to brandbite. Your sign-in link is on its way separately."
       hero={
         <HeroBand>

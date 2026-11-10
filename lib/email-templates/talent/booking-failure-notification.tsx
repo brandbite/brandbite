@@ -24,7 +24,16 @@
 import * as React from "react";
 import { render } from "@react-email/render";
 
-import { BaseLayout, Button, Callout, Heading, HeroBand, Paragraph, Signoff } from "../layout";
+import {
+  BaseLayout,
+  Button,
+  Callout,
+  Heading,
+  HeroBand,
+  LinkText,
+  Paragraph,
+  Signoff,
+} from "../layout";
 
 export type TalentBookingFailureStage =
   | "GOOGLE_NOT_CONNECTED"
@@ -102,6 +111,8 @@ export function TalentBookingFailureNotificationEmailTemplate({
 
   return (
     <BaseLayout
+      role={"admin"}
+      reason={"You received this email because you're a brandbite site owner."}
       previewText={`Interview booking failed for ${candidateName} — action needed.`}
       hero={
         <HeroBand>
@@ -132,7 +143,7 @@ export function TalentBookingFailureNotificationEmailTemplate({
       <Button href={settingsUrl}>Open consultation settings</Button>
 
       <Paragraph>
-        The application itself is in the <a href={adminUrl}>talent queue</a>, still at
+        The application itself is in the <LinkText href={adminUrl}>talent queue</LinkText>, still at
         &ldquo;awaiting candidate&rdquo;. If the booking link expires before the candidate can
         retry, re-offer slots from there.
       </Paragraph>
@@ -150,7 +161,7 @@ export async function renderTalentBookingFailureNotificationEmail(
 ): Promise<{ subject: string; html: string }> {
   const html = await render(<TalentBookingFailureNotificationEmailTemplate {...props} />);
   return {
-    subject: `Interview booking FAILED for ${props.candidateName} — action needed`,
+    subject: `[brandbite admin] Interview booking failed for ${props.candidateName}: action needed`,
     html,
   };
 }
