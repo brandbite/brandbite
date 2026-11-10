@@ -55,6 +55,7 @@ import {
   IconDocument,
 } from "@/components/admin/v2/icons";
 import { TicketActivityPanel } from "@/components/dashboard/ticket-activity-panel";
+import { SourceFilesPanel } from "@/components/tickets/source-files-panel";
 
 // ---------------------------------------------------------------------------
 // Types — narrow mirrors of the API shape, kept colocated so the page
@@ -485,7 +486,7 @@ export default function AdminTicketDetailPage() {
 
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_400px] xl:grid-rows-[auto_1fr]">
         {/* ---------------- Left column ---------------- */}
-        <div className="min-w-0 xl:col-start-1 xl:row-start-1">
+        <div className="min-w-0 space-y-6 xl:col-start-1 xl:row-start-1">
           <Card>
             <Tabs<TabKey>
               label="Request content"
@@ -657,6 +658,8 @@ export default function AdminTicketDetailPage() {
               </TabPanel>
             )}
           </Card>
+
+          <SourceFilesPanel ticketId={ticketId} viewer="admin" />
         </div>
 
         {/* ---------------- Ticket details ---------------- */}

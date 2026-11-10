@@ -75,6 +75,7 @@ import {
 import { RevisionCompare } from "@/components/ui/revision-compare";
 import { AiTicketControls } from "@/components/ui/ai-ticket-controls";
 import { TicketActivityPanel } from "@/components/dashboard/ticket-activity-panel";
+import { SourceFilesPanel } from "@/components/tickets/source-files-panel";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -1191,6 +1192,8 @@ export default function CustomerTicketDetailPage() {
                   ) : (
                     noVersions
                   ))}
+
+                <SourceFilesPanel ticketId={ticket.id} viewer="customer" />
               </div>
             </TabPanel>
           ) : null}
@@ -1295,6 +1298,10 @@ export default function CustomerTicketDetailPage() {
                   <Callout tone="info" title="Handoff">
                     Waiting for creative work to begin.
                   </Callout>
+                ) : null}
+
+                {!showCurrentTab ? (
+                  <SourceFilesPanel ticketId={ticket.id} viewer="customer" />
                 ) : null}
               </div>
             </TabPanel>

@@ -298,6 +298,7 @@ model UserAccount {
   submittedRevisions    TicketRevision[]     @relation("TicketRevisionSubmittedBy")
   feedbackRevisions     TicketRevision[]     @relation("TicketRevisionFeedbackBy")
   connectedIntegrations CompanyIntegration[] @relation("CompanyIntegrationConnectedBy")
+  uploadedSourceFiles   TicketSourceFile[]   @relation("TicketSourceFileUploadedBy")
 
   // Assets & annotations
   createdAssets     Asset[]
@@ -435,7 +436,9 @@ model Company {
   consultations Consultation[]
 
   /// Connected Google Drive / Dropbox / Slack accounts (one per provider).
-  integrations CompanyIntegration[]
+  integrations       CompanyIntegration[]
+  /// Folders brandbite created in the company's Drive / Dropbox.
+  integrationFolders IntegrationFolder[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -988,6 +991,9 @@ model Ticket {
   tagAssignments TicketTagAssignment[]
 
   aiGenerations AiGeneration[]
+
+  /// Source files (PSD, AI, print files) delivered by the creative.
+  sourceFiles TicketSourceFile[]
 
   moodboards Moodboard[]
 
@@ -2920,4 +2926,83 @@ model CompanyIntegration {
 
   @@unique([companyId, provider])
   @@index([provider, status])
+}
+
+// -----------------------------------------------------------------------------
+// Source-file delivery
+// -----------------------------------------------------------------------------
+
+enum SourceFileStorage {
+  /// The customer's connected Google Drive (we store only its file id).
+  GOOGLE_DRIVE
+  /// The customer's connected Dropbox.
+  DROPBOX
+  /// Our own R2 bucket: the fallback when no drive is connected. Deleted
+  /// 90 days after the request is done.
+  R2
+}
+
+enum SourceFileStatus {
+  /// Upload session started; the browser is sending the bytes.
+  UPLOADING
+  /// Verified with the storage provider and shown to people.
+  READY
+  /// The upload never finished or couldn't be verified.
+  FAILED
+}
+
+/// A source file a creative delivered on a request. Bytes never pass through
+/// our servers: the browser uploads straight to the customer's Drive or to R2.
+model TicketSourceFile {
+  id String @id @default(cuid())
+
+  ticketId String
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  uploadedById String?
+  uploadedBy   UserAccount? @relation("TicketSourceFileUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  name      String
+  sizeBytes BigInt
+  mimeType  String?
+
+  storage SourceFileStorage
+  status  SourceFileStatus  @default(UPLOADING)
+
+  /// Drive / Dropbox file id and the link to open it there.
+  externalId  String?
+  externalUrl String?
+
+  /// Object key when stored in R2.
+  r2Key String?
+
+  /// R2 files only: when the retention job may delete it (request done + 90 days).
+  deleteAfter DateTime?
+  /// Set when the file was removed (by the uploader, an admin or retention).
+  deletedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ticketId, status])
+  @@index([storage, deleteAfter])
+}
+
+/// Folder ids brandbite created in a company's Drive / Dropbox, so uploads go
+/// into brandbite/<Project>/<CODE Title>/ without looking folders up by name.
+/// key: "project:<projectId>", "project:none" or "ticket:<ticketId>".
+model IntegrationFolder {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  provider IntegrationProvider
+  key      String
+  folderId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, provider, key])
 }
