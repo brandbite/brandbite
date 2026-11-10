@@ -13,6 +13,7 @@ import { createNotification } from "@/lib/notifications";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { isSiteAdminRole } from "@/lib/roles";
 import { autoStopTimersOnTicket } from "@/lib/tickets/auto-timer";
+import { notifyCompanySlack } from "@/lib/integrations/slack";
 
 /**
  * Usage:
@@ -76,6 +77,7 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
       select: { title: true, createdById: true, creativeId: true },
     });
     if (ticketMeta) {
+      void notifyCompanySlack(ticketId, "DONE");
       if (ticketMeta.creativeId) {
         createNotification({
           userId: ticketMeta.creativeId,

@@ -19,6 +19,7 @@ import {
 import { completeTicketAndApplyTokens } from "@/lib/token-engine";
 import { createNotification } from "@/lib/notifications";
 import { autoStopTimersOnTicket } from "@/lib/tickets/auto-timer";
+import { notifyCompanySlack } from "@/lib/integrations/slack";
 
 type PatchPayload = {
   ticketId?: string;
@@ -290,6 +291,7 @@ export async function PATCH(req: NextRequest) {
       // email, honoring their preferences). Fire-and-forget so the response
       // isn't blocked on the email pipeline. Previously the board-approve path
       // sent nothing, so creatives never heard their ticket was accepted.
+      void notifyCompanySlack(ticket.id, "DONE");
       if (ticket.creativeId) {
         void createNotification({
           userId: ticket.creativeId,

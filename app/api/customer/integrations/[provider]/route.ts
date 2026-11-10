@@ -18,6 +18,7 @@ import {
   providerFromSlug,
 } from "@/lib/integrations/company-integrations";
 import { canManageIntegrations, normalizeCompanyRole } from "@/lib/permissions/companyRoles";
+import { revokeSlackToken } from "@/lib/integrations/slack";
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ provider: string }> }) {
   try {
@@ -53,6 +54,12 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ provi
         new URL(req.url).origin,
       ).catch(() => null);
       if (token) await revokeDropboxToken(token);
+    }
+    if (provider === "SLACK") {
+      const secrets = await getCompanyIntegrationSecrets(user.activeCompanyId, provider).catch(
+        () => null,
+      );
+      if (secrets?.accessToken) await revokeSlackToken(secrets.accessToken);
     }
     const removed = await deleteCompanyIntegration(user.activeCompanyId, provider);
     if (!removed) {
