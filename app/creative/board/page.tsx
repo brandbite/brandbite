@@ -870,7 +870,6 @@ export default function CreativeBoardPage() {
     if (match) openTicketDetails(match);
     url.searchParams.delete("open");
     window.history.replaceState(null, "", url.pathname + url.search + url.hash);
-     
   }, [data]);
 
   const closeTicketDetails = () => {
