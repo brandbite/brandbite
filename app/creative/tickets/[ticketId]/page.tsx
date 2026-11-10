@@ -463,7 +463,10 @@ export default function CreativeTicketDetailPage() {
     return <DetailSkeleton label="Loading request" />;
   }
 
-  const backHref = fromBoard ? "/creative/board" : "/creative/tickets";
+  // Back to the board reopens this request's window there.
+  const backHref = fromBoard
+    ? `/creative/board?open=${encodeURIComponent(ticketIdFromParams ?? "")}`
+    : "/creative/tickets";
   const backLabel = fromBoard ? "Back to board" : "Back to requests";
 
   if (error || !ticket) {

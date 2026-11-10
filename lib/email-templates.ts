@@ -38,6 +38,7 @@ const SUBJECT_MAP: Record<NotificationType, string> = {
   MOODBOARD_SHARED: "Your creative shared a moodboard",
   MOODBOARD_COMMENT: "New moodboard comment",
   SUPPORT_GUIDE_CHANGED: "A Support guide you edited changed in code",
+  SOURCE_FILES_EXPIRING: "Your source files will be deleted soon",
 };
 
 export function getSubjectForType(type: NotificationType, title: string): string {
@@ -102,6 +103,7 @@ const CTA_LABELS: Record<NotificationType, string> = {
   MOODBOARD_SHARED: "View Request",
   MOODBOARD_COMMENT: "View the comment",
   SUPPORT_GUIDE_CHANGED: "Review the guide",
+  SOURCE_FILES_EXPIRING: "Download your files",
 };
 
 // ---------------------------------------------------------------------------
@@ -120,6 +122,7 @@ const TYPE_EMOJI: Record<NotificationType, string> = {
   MOODBOARD_SHARED: "\u{1F3A8}",
   MOODBOARD_COMMENT: "\u{1F4AC}",
   SUPPORT_GUIDE_CHANGED: "\u{1F4D8}",
+  SOURCE_FILES_EXPIRING: "\u{23F3}",
 };
 
 // ---------------------------------------------------------------------------

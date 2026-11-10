@@ -7,6 +7,7 @@
 
 import { LedgerDirection, Prisma, TicketStatus } from "@prisma/client";
 import { prisma } from "./prisma";
+import { scheduleSourceFileRetention } from "@/lib/source-files/retention";
 
 /**
  * Human-readable reason codes for token movements.
@@ -416,7 +417,7 @@ export interface TicketCompletionResult {
 export async function completeTicketAndApplyTokens(
   ticketId: string,
 ): Promise<TicketCompletionResult> {
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const ticket = await tx.ticket.findUnique({
       where: { id: ticketId },
       include: {
@@ -574,4 +575,19 @@ export async function completeTicketAndApplyTokens(
       alreadyCompleted: false,
     };
   });
+
+  // Done starts the 90-day clock on source files kept on brandbite (R2).
+  // Outside the transaction and best effort: it must never undo a payout.
+  if (!result.alreadyCompleted) {
+    try {
+      const done = await prisma.ticket.findUnique({
+        where: { id: ticketId },
+        select: { completedAt: true },
+      });
+      await scheduleSourceFileRetention(ticketId, done?.completedAt ?? new Date());
+    } catch (error) {
+      console.error("[token-engine] source file retention scheduling failed", error);
+    }
+  }
+  return result;
 }

@@ -451,6 +451,29 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
         ],
       },
       {
+        heading: "Source files",
+        blocks: [
+          {
+            type: "p",
+            text: "Deliver layered and print-ready files (PSD, AI, INDD, video projects and more) under **Source files** on the **Delivery & feedback** tab, with **Upload source files** or by dropping them in. You can do it while the request is In progress, In review or Done.",
+          },
+          {
+            type: "list",
+            items: [
+              {
+                term: "Customer's Google Drive connected",
+                text: "files go straight into their Drive, with no size limit.",
+              },
+              {
+                term: "No Drive connected",
+                text: "files are stored on brandbite, up to 5 GB each, and deleted 90 days after the request is done.",
+              },
+              "You can remove a file you uploaded until the request is done.",
+            ],
+          },
+        ],
+      },
+      {
         heading: "Changed your mind?",
         blocks: [
           {

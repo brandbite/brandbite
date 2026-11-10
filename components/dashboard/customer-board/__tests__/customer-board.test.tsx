@@ -190,7 +190,7 @@ describe("Customer board", () => {
     expect(within(dialog).getByRole("tab", { name: "Current version" })).toBeInTheDocument();
     expect(within(dialog).getByRole("link", { name: /Open full page/ })).toHaveAttribute(
       "href",
-      "/customer/tickets/r",
+      "/customer/tickets/r?from=board",
     );
   });
 

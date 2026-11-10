@@ -43,6 +43,7 @@ import { IconUpload } from "./icons";
 import { formatPayout, isTicketOverdue, ticketCode } from "./job-card";
 import { TicketComments } from "./ticket-comments";
 import type { BriefAsset, CreativeTicket, DetailTab, TicketRevisionEntry } from "./types";
+import { TimeStrip, useTimeTracking } from "@/components/dashboard/tickets/time-tracking";
 
 /** Which tab a ticket opens on: its latest delivery, or the brief if there is none. */
 export function initialDetailTab(ticket: Pick<CreativeTicket, "revisionCount">): DetailTab {
@@ -188,7 +189,19 @@ export function TicketDetailDialog({
   const overdue = ticket ? isTicketOverdue(ticket) : false;
   const countdown =
     ticket && ticket.status !== "DONE" ? formatDueDateCountdown(ticket.dueDate) : null;
-  const fullPageHref = ticket ? `/creative/tickets/${ticket.id}` : "";
+  // from=board: the full page's back link returns here and reopens this request.
+  const fullPageHref = ticket ? `/creative/tickets/${ticket.id}?from=board` : "";
+  const tracking = useTimeTracking(
+    ticket && ticket.status !== "DONE" ? ticket.id : null,
+    ticket?.jobType?.estimatedHours ?? null,
+  );
+  const ticketStatus = ticket?.status;
+  // A drag or Pull back changes the status (and the server starts/stops the
+  // timer): reload the strip so it shows what really happened.
+  useEffect(() => {
+    if (ticketStatus) void tracking.reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ticketStatus]);
 
   return (
     <Modal
@@ -234,6 +247,12 @@ export function TicketDetailDialog({
                 </Badge>
               )}
             </div>
+
+            {ticket.status !== "DONE" ? (
+              <div className="mt-4">
+                <TimeStrip tracking={tracking} status={ticket.status} />
+              </div>
+            ) : null}
 
             <div className="mt-4 [&_[role=tab]]:min-h-10">
               <Tabs<DetailTab>

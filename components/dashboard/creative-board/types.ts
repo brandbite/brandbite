@@ -31,6 +31,8 @@ export type CreativeTicket = {
     name: string;
     tokenCost: number;
     creativePayoutTokens: number;
+    /** Service estimate, shown next to the timer. */
+    estimatedHours?: number | null;
   } | null;
   revisionCount: number;
   /** Payout at the creative's current rate (server: computeCreativePayout). */
