@@ -81,7 +81,8 @@ function putFile(
       xhr.status >= 200 && xhr.status < 300
         ? resolve(xhr.responseText)
         : reject(new Error(`Upload failed (${xhr.status}).`));
-    xhr.onerror = () => reject(new Error("The connection dropped during the upload."));
+    xhr.onerror = () =>
+      reject(new Error("The upload didn't go through. Check your connection and try again."));
     xhr.send(file);
   });
 }
@@ -136,11 +137,20 @@ export function SourceFilesPanel({
       const start = await startRes.json().catch(() => null);
       if (!startRes.ok) throw new Error(start?.error || "Could not start the upload.");
 
-      const responseText = await putFile(start.uploadUrl, file, start.contentType, (p) =>
-        patchUpload(key, { progress: p }),
-      );
+      let responseText = "";
+      let putError: Error | null = null;
+      try {
+        responseText = await putFile(start.uploadUrl, file, start.contentType, (p) =>
+          patchUpload(key, { progress: p }),
+        );
+      } catch (error) {
+        // The bytes may still have arrived (e.g. only the answer was blocked):
+        // let the server check with the storage either way, so a real upload
+        // is kept and a failed one is marked failed instead of left hanging.
+        putError = error instanceof Error ? error : new Error("Upload failed.");
+      }
       let externalId: string | undefined;
-      if (start.storage === "GOOGLE_DRIVE") {
+      if (start.storage === "GOOGLE_DRIVE" && responseText) {
         try {
           externalId = (JSON.parse(responseText) as { id?: string }).id;
         } catch {
@@ -153,7 +163,9 @@ export function SourceFilesPanel({
         body: JSON.stringify({ externalId }),
       });
       const done = await doneRes.json().catch(() => null);
-      if (!doneRes.ok) throw new Error(done?.error || "Could not finish the upload.");
+      if (!doneRes.ok) {
+        throw putError ?? new Error(done?.error || "Could not finish the upload.");
+      }
       setUploads((list) => list.filter((u) => u.key !== key));
       await load();
     } catch (error) {
