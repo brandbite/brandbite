@@ -76,6 +76,7 @@ import { RevisionCompare } from "@/components/ui/revision-compare";
 import { AiTicketControls } from "@/components/ui/ai-ticket-controls";
 import { TicketActivityPanel } from "@/components/dashboard/ticket-activity-panel";
 import { SourceFilesPanel } from "@/components/tickets/source-files-panel";
+import { SourceFilesRetentionNote } from "@/components/tickets/source-files-retention-note";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -1461,6 +1462,7 @@ export default function CustomerTicketDetailPage() {
             <p className="mt-0.5 text-[var(--av2-text-2)]">Service: {ticket.jobType.name}</p>
           ) : null}
         </div>
+        {showDoneModal ? <SourceFilesRetentionNote ticketId={ticket.id} /> : null}
 
         {latest && latest.assets.length > 0 ? (
           <div className="mt-3">

@@ -645,6 +645,30 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         ],
       },
       {
+        heading: "Source files",
+        blocks: [
+          {
+            type: "p",
+            text: "Layered and print-ready files (PSD, AI, INDD, video projects and more) are under **Source files** on the request page.",
+          },
+          {
+            type: "list",
+            items: [
+              {
+                term: "Google Drive connected",
+                text: "they go straight into your Drive, in **brandbite › project › request**, and stay yours for good. **Open in Drive** opens one.",
+              },
+              {
+                term: "No Drive connected",
+                text: "they're kept on brandbite for **90 days after the request is done**, then deleted. **Download** saves one; each file shows the date it's kept until.",
+              },
+              "We remind you by email and in the bell 14 days and 3 days before files are deleted.",
+              "Connect Google Drive under **Settings › Integrations** so new source files land in your own Drive.",
+            ],
+          },
+        ],
+      },
+      {
         heading: "Editing, cancelling and comments",
         blocks: [
           {
@@ -1552,6 +1576,24 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           {
             type: "p",
             text: "Turn each notification type on or off for **In-app** and **Email**. Changes save instantly.",
+          },
+        ],
+      },
+      {
+        heading: "Integrations",
+        blocks: [
+          {
+            type: "list",
+            items: [
+              {
+                term: "Google Drive",
+                text: "**Connect Google Drive** so creatives deliver source files straight into a **brandbite** folder in your Drive. brandbite only sees the folder it creates, nothing else in your Drive. Without it, source files are kept on brandbite for 90 days after a request is done.",
+              },
+              "Owners and Project managers connect and disconnect; everyone else sees what's connected.",
+              "If a connection shows **Needs reconnecting**, click **Reconnect** so files keep arriving. Until then, new files go to brandbite storage.",
+              "**Disconnect** keeps the files already in your Drive.",
+              "Dropbox and Slack are coming soon.",
+            ],
           },
         ],
       },

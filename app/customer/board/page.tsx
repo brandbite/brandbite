@@ -73,6 +73,7 @@ import NewTicketForm from "@/app/customer/tickets/new/NewTicketForm";
 import { DraftsLink } from "@/components/dashboard/tickets/drafts-link";
 import { RateCreativeModal } from "@/components/ratings/rate-creative-modal";
 import { useLiveRefresh } from "@/lib/hooks/use-live-refresh";
+import { SourceFilesRetentionNote } from "@/components/tickets/source-files-retention-note";
 
 type BoardStats = {
   total: number;
@@ -2433,6 +2434,7 @@ export default function CustomerBoardPage() {
             </p>
           ) : null}
         </div>
+        {pendingDoneTicket ? <SourceFilesRetentionNote ticketId={pendingDoneTicket.id} /> : null}
 
         {pendingDoneRevisionsLoading ? (
           <Skeleton className="mt-4 h-40" />

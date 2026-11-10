@@ -25,6 +25,7 @@ const ALL_TYPES: NotificationType[] = [
   "MOODBOARD_SHARED",
   "MOODBOARD_COMMENT",
   "SUPPORT_GUIDE_CHANGED",
+  "SOURCE_FILES_EXPIRING",
 ];
 
 // ---------------------------------------------------------------------------

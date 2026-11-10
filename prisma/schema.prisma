@@ -121,6 +121,7 @@ enum NotificationType {
   MOODBOARD_SHARED // A creative shared a moodboard with the customer
   MOODBOARD_COMMENT // Someone commented on a moodboard you made or a thread you're in
   SUPPORT_GUIDE_CHANGED // Code changed or removed a guide an admin had edited
+  SOURCE_FILES_EXPIRING // Source files on brandbite storage are about to be deleted
 }
 
 // --- CMS Content ---
@@ -2977,9 +2978,12 @@ model TicketSourceFile {
   r2Key String?
 
   /// R2 files only: when the retention job may delete it (request done + 90 days).
-  deleteAfter DateTime?
+  deleteAfter      DateTime?
   /// Set when the file was removed (by the uploader, an admin or retention).
-  deletedAt   DateTime?
+  deletedAt        DateTime?
+  /// When the "deleted in 14 days" / "in 3 days" reminders went out.
+  reminder14SentAt DateTime?
+  reminder3SentAt  DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
