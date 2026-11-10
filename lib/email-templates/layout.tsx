@@ -264,7 +264,7 @@ export function StepsList({ steps }: { steps: Step[] }) {
   );
 }
 
-type SignoffProps = { preamble?: string; from?: string };
+type SignoffProps = { preamble?: React.ReactNode; from?: string };
 
 export function Signoff({ preamble, from = "The brandbite team" }: SignoffProps) {
   return (
