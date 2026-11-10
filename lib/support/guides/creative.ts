@@ -383,7 +383,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
           },
           {
             type: "tip",
-            text: "The brand guide and time tracking are on the full request page. Use **Open full page** in the request window.",
+            text: "The brand guide and time tracking are on the full request page. Use the **expand** icon (top right of the request window) to open it. On the full page, the **shrink** icon takes you back to the board with the window open, and **×** closes it.",
           },
         ],
       },

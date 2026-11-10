@@ -387,7 +387,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Click a card to open it in a large window with **Current version**, **Brief & files**, **Versions** and **Comments** tabs. There you can look at every version the creative sent, add pin notes on images, download files and, while it is In review, approve it or request a revision. **Open full page** takes you to the request page. When work is waiting, **Needs your review** at the top of the Board has a **Review request** button.",
+            text: "Click a card to open it in a large window with **Current version**, **Brief & files**, **Versions** and **Comments** tabs. There you can look at every version the creative sent, add pin notes on images, download files and, while it is In review, approve it or request a revision. The **expand** icon at the top right opens the full request page. There, the **shrink** icon brings you back to the board with the window open, and **×** returns you to where you came from (the board or your request list). When work is waiting, **Needs your review** at the top of the Board has a **Review request** button.",
           },
         ],
       },
@@ -671,7 +671,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
                 text: "they're kept on brandbite for **90 days after the request is done**, then deleted. **Download** saves one; each file shows the date it's kept until.",
               },
               "We remind you by email and in the bell 14 days and 3 days before files are deleted.",
-              "Connect Google Drive or Dropbox under **Settings › Integrations** so new source files land in your own storage. When both are connected, Google Drive is used.",
+              "Connect Google Drive or Dropbox under **Settings › Integrations** so new source files land in your own storage. Files we were already keeping on brandbite move there too, and lose their deletion date. When both are connected, Google Drive is used.",
             ],
           },
         ],
@@ -1603,6 +1603,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
                 term: "Dropbox",
                 text: "**Connect Dropbox** so files up to 150 MB land in **Apps › brandbite** in your Dropbox; brandbite only sees that folder. Bigger files are kept on brandbite for 90 days, or go to Google Drive if you connect it too.",
               },
+              "When you connect, source files we were keeping on brandbite move into it automatically (big ones can take a few minutes) and are no longer deleted after 90 days.",
               "**Disconnect** keeps the files already in your Drive or Dropbox.",
               "Slack is coming soon.",
             ],

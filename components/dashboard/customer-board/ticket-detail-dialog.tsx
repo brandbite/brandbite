@@ -14,7 +14,6 @@ import {
   Badge,
   Button,
   buttonClass,
-  ButtonLink,
   Callout,
   DASH,
   EmptyState,
@@ -52,7 +51,7 @@ import type { TagColorKey } from "@/lib/tag-colors";
 import { BRIEF_ACCEPT_ATTR } from "@/lib/upload-helpers";
 
 import { BoardDialog } from "./board-dialog";
-import { IconCheck, IconDownload, IconExternal, IconPencil, IconTrash } from "./board-icons";
+import { IconCheck, IconDownload, IconPencil, IconTrash } from "./board-icons";
 import type {
   BriefAsset,
   CustomerBoardTicket,
@@ -61,6 +60,7 @@ import type {
   TicketRevisionEntry,
 } from "./board-types";
 import { TicketComments } from "./ticket-comments";
+import { ExpandLink } from "@/components/dashboard/tickets/view-switch";
 
 type DetailTab = "current" | "brief" | "versions" | "comments";
 
@@ -414,15 +414,7 @@ export function TicketDetailDialog({
           {ticket.title}
         </>
       }
-      headerActions={
-        <ButtonLink
-          href={`/customer/tickets/${ticket.id}?from=board`}
-          className="max-sm:!w-10 max-sm:!px-0"
-        >
-          <IconExternal />
-          <span className="max-sm:sr-only">Open full page</span>
-        </ButtonLink>
-      }
+      headerActions={<ExpandLink href={`/customer/tickets/${ticket.id}?from=board`} />}
       headerExtra={
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone={status.tone} dot>

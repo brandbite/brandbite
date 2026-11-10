@@ -10,8 +10,8 @@
 import { useId, type ReactNode } from "react";
 
 import { Eyebrow } from "@/components/admin/v2/ui";
-import { IconX } from "@/components/navigation/nav-icons";
 import { Modal } from "@/components/ui/modal";
+import { CloseButton } from "@/components/dashboard/tickets/view-switch";
 
 const WIDTH = {
   sm: "!max-w-md",
@@ -79,14 +79,7 @@ export function BoardDialog({
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {headerActions}
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close"
-              className="flex h-10 w-10 items-center justify-center rounded-lg text-[var(--av2-text-2)] hover:bg-[var(--av2-bg)] hover:text-[var(--av2-text)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
-            >
-              <IconX width={18} height={18} />
-            </button>
+            <CloseButton onClick={onClose} />
           </div>
         </div>
         {headerExtra ? <div className="mt-3">{headerExtra}</div> : null}

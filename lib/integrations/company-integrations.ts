@@ -52,7 +52,9 @@ export function isProviderAvailable(
         env.DROPBOX_APP_KEY && env.DROPBOX_APP_SECRET && env.DROPBOX_ENABLED === "true",
       );
     case "SLACK":
-      return Boolean(env.SLACK_CLIENT_ID && env.SLACK_CLIENT_SECRET);
+      return Boolean(
+        env.SLACK_CLIENT_ID && env.SLACK_CLIENT_SECRET && env.SLACK_ENABLED === "true",
+      );
   }
 }
 

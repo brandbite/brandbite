@@ -22,7 +22,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode, type SVGProps } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 import {
@@ -56,6 +56,7 @@ import {
 } from "@/components/admin/v2/icons";
 import { TicketActivityPanel } from "@/components/dashboard/ticket-activity-panel";
 import { SourceFilesPanel } from "@/components/tickets/source-files-panel";
+import { FullPageViewControls } from "@/components/dashboard/tickets/view-switch";
 
 // ---------------------------------------------------------------------------
 // Types — narrow mirrors of the API shape, kept colocated so the page
@@ -358,12 +359,12 @@ function LoadingSkeleton() {
   );
 }
 
-const BackLink = () => (
+const BackLink = ({ fromBoard = false }: { fromBoard?: boolean }) => (
   <Link
-    href="/admin/tickets"
+    href={fromBoard ? "/admin/board" : "/admin/tickets"}
     className="mb-4 inline-flex items-center gap-1.5 rounded text-sm font-medium text-[var(--av2-text-2)] hover:text-[var(--av2-text)] focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:outline-none"
   >
-    <span aria-hidden>←</span> Back to requests
+    <span aria-hidden>←</span> {fromBoard ? "Back to board" : "Back to requests"}
   </Link>
 );
 
@@ -373,6 +374,7 @@ const BackLink = () => (
 
 export default function AdminTicketDetailPage() {
   const { ticketId } = useParams<{ ticketId: string }>();
+  const fromBoard = useSearchParams().get("from") === "board";
   const [data, setData] = useState<DetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -409,7 +411,7 @@ export default function AdminTicketDetailPage() {
   if (error)
     return (
       <div>
-        <BackLink />
+        <BackLink fromBoard={fromBoard} />
         <Callout tone="error" title="Couldn't load request">
           {error}
         </Callout>
@@ -418,7 +420,7 @@ export default function AdminTicketDetailPage() {
   if (!data)
     return (
       <div>
-        <BackLink />
+        <BackLink fromBoard={fromBoard} />
         <Card>
           <EmptyState
             icon={<IconDocument width={28} height={28} />}
@@ -437,7 +439,7 @@ export default function AdminTicketDetailPage() {
 
   return (
     <div>
-      <BackLink />
+      <BackLink fromBoard={fromBoard} />
 
       {/* ---------------- Header card ---------------- */}
       <Card className="mb-6">
@@ -480,6 +482,8 @@ export default function AdminTicketDetailPage() {
               Manage in request list
               <IconArrowUpRight />
             </ButtonLink>
+            {/* No board window for admins yet, so only Close (back where you came from). */}
+            <FullPageViewControls closeHref={fromBoard ? "/admin/board" : "/admin/tickets"} />
           </div>
         </div>
       </Card>

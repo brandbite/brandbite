@@ -39,7 +39,8 @@ const DESCRIPTIONS: Record<IntegrationView["provider"], string> = {
     "Creatives deliver source files (PSD, AI, print files) into a brandbite folder in your Drive. They stay yours for good. brandbite only sees the folder it creates, nothing else in your Drive.",
   DROPBOX:
     "Creatives deliver source files up to 150 MB into Apps/brandbite in your Dropbox, where they stay yours for good. brandbite only sees that folder. Bigger files are kept on brandbite for 90 days; connect Google Drive too for those.",
-  SLACK: "Get request updates in a Slack channel of your choice.",
+  SLACK:
+    "Get request updates in a Slack channel you pick: work ready for review, work started, requests done, and source files about to be deleted. brandbite can only post to that channel; it can't read anything in your Slack.",
 };
 
 const formatDate = (iso: string) =>
@@ -53,6 +54,7 @@ export function IntegrationsCard({
   const { showToast } = useToast();
   const [items, setItems] = useState<IntegrationView[] | null>(null);
   const [canManage, setCanManage] = useState(false);
+  const [filesToMove, setFilesToMove] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<IntegrationView | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
@@ -66,6 +68,7 @@ export function IntegrationsCard({
       if (!res.ok) throw new Error(json?.error || "Could not load integrations.");
       setItems(json.integrations);
       setCanManage(Boolean(json.canManage));
+      setFilesToMove(typeof json.filesToMove === "number" ? json.filesToMove : 0);
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : "Could not load integrations.");
     }
@@ -200,6 +203,16 @@ export function IntegrationsCard({
             </li>
           ))}
         </ul>
+      ) : null}
+
+      {items &&
+      filesToMove > 0 &&
+      items.some((i) => i.status === "CONNECTED" && i.provider !== "SLACK") ? (
+        <p className="mt-4 text-sm text-[var(--av2-text-2)]">
+          Moving {filesToMove === 1 ? "1 source file" : `${filesToMove} source files`} from
+          brandbite storage into your connected storage. Once moved, they&apos;re yours for good and
+          no longer have a deletion date.
+        </p>
       ) : null}
 
       {items && !canManage && (

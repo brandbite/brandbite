@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { GET as googleCalendarHealth } from "@/app/api/cron/google-calendar-health/route";
+import { moveFilesForAllCompanies } from "@/lib/source-files/move-to-connected-storage";
 import { runSourceFileRetention } from "@/lib/source-files/retention";
 
 export const runtime = "nodejs";
@@ -43,6 +44,18 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error("[cron/daily-maintenance] source file retention failed", error);
     results.sourceFiles = { error: "failed" };
+  }
+
+  try {
+    // Files kept on brandbite storage for companies that have since
+    // connected a drive (whatever the post-connect run didn't finish).
+    results.movedToDrives = await moveFilesForAllCompanies(
+      new URL(req.url).origin,
+      Date.now() + 3 * 60_000,
+    );
+  } catch (error) {
+    console.error("[cron/daily-maintenance] moving files to drives failed", error);
+    results.movedToDrives = { error: "failed" };
   }
 
   return NextResponse.json(results);

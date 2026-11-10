@@ -728,7 +728,7 @@ function BoardCard({
       className={`${canDrag ? "cursor-grab active:cursor-grabbing" : ""} ${dragging ? "opacity-50" : ""}`}
     >
       <Link
-        href={`/admin/tickets/${t.id}`}
+        href={`/admin/tickets/${t.id}?from=board`}
         draggable={false}
         title={canDrag ? "Open request detail, or drag to change status" : "Open request detail"}
         className="group block cursor-[inherit] rounded-xl border border-[var(--av2-border)] bg-[var(--av2-surface)] p-4 transition-colors hover:border-[var(--av2-accent)]/50 focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:ring-offset-1 focus-visible:outline-none"

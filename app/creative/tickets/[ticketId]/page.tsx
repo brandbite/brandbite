@@ -58,6 +58,10 @@ import type { AssetEntry } from "@/components/ui/revision-image";
 import { RevisionCompare } from "@/components/ui/revision-compare";
 import { TicketActivityPanel } from "@/components/dashboard/ticket-activity-panel";
 import { SourceFilesPanel } from "@/components/tickets/source-files-panel";
+import {
+  FullPageViewControls,
+  fullPageViewLinks,
+} from "@/components/dashboard/tickets/view-switch";
 
 type JobTab = "delivery" | "brief" | "time" | "comments" | "activity";
 
@@ -542,15 +546,18 @@ export default function CreativeTicketDetailPage() {
           </>
         }
         actions={
-          ticket.status === "TODO" ? (
-            <Button onClick={() => moveStatus("IN_PROGRESS")} disabled={statusBusy}>
-              {statusBusy ? "Starting…" : "Start work"}
-            </Button>
-          ) : ticket.status === "IN_REVIEW" ? (
-            <Button onClick={() => moveStatus("IN_PROGRESS")} disabled={statusBusy}>
-              {statusBusy ? "Moving…" : "Pull back to In progress"}
-            </Button>
-          ) : null
+          <>
+            {ticket.status === "TODO" ? (
+              <Button onClick={() => moveStatus("IN_PROGRESS")} disabled={statusBusy}>
+                {statusBusy ? "Starting…" : "Start work"}
+              </Button>
+            ) : ticket.status === "IN_REVIEW" ? (
+              <Button onClick={() => moveStatus("IN_PROGRESS")} disabled={statusBusy}>
+                {statusBusy ? "Moving…" : "Pull back to In progress"}
+              </Button>
+            ) : null}
+            <FullPageViewControls {...fullPageViewLinks("creative", ticket.id, fromBoard)} />
+          </>
         }
       />
 

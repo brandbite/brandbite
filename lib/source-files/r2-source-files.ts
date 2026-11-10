@@ -51,3 +51,19 @@ export async function presignSourceFileDownload(key: string, name: string): Prom
   });
   return getSignedUrl(createR2Client(), cmd, { expiresIn: DOWNLOAD_URL_SECONDS });
 }
+
+/** The stored object as a web stream, for copying it elsewhere server-side. */
+export async function openSourceFileStream(
+  key: string,
+): Promise<{ stream: ReadableStream<Uint8Array>; size: number } | null> {
+  try {
+    const obj = await createR2Client().send(
+      new GetObjectCommand({ Bucket: getR2BucketName(), Key: key }),
+    );
+    if (!obj.Body || typeof obj.ContentLength !== "number") return null;
+    const body = obj.Body as { transformToWebStream: () => ReadableStream<Uint8Array> };
+    return { stream: body.transformToWebStream(), size: obj.ContentLength };
+  } catch {
+    return null;
+  }
+}

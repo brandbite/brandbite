@@ -157,6 +157,15 @@ export function IconExpand(p: Props) {
   );
 }
 
+/** Arrows pointing in: shrink a full page back to a window. */
+export function IconCollapse(p: Props) {
+  return (
+    <svg {...base} width={18} height={18} {...p}>
+      <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7" />
+    </svg>
+  );
+}
+
 export function IconArrowRight(p: Props) {
   return (
     <svg {...base} width={18} height={18} {...p}>

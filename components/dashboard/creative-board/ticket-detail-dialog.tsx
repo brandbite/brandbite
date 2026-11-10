@@ -28,7 +28,6 @@ import {
   TICKET_STATUS,
   type Tone,
 } from "@/components/admin/v2/ui";
-import { IconX } from "@/components/navigation/nav-icons";
 import { Modal } from "@/components/ui/modal";
 import {
   BriefThumbnailRow,
@@ -44,6 +43,7 @@ import { formatPayout, isTicketOverdue, ticketCode } from "./job-card";
 import { TicketComments } from "./ticket-comments";
 import type { BriefAsset, CreativeTicket, DetailTab, TicketRevisionEntry } from "./types";
 import { TimeStrip, useTimeTracking } from "@/components/dashboard/tickets/time-tracking";
+import { CloseButton, ExpandLink } from "@/components/dashboard/tickets/view-switch";
 
 /** Which tab a ticket opens on: its latest delivery, or the brief if there is none. */
 export function initialDetailTab(ticket: Pick<CreativeTicket, "revisionCount">): DetailTab {
@@ -224,13 +224,8 @@ export function TicketDetailDialog({
                 </h2>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                <ButtonLink href={fullPageHref} className="max-sm:px-3">
-                  <span className="max-sm:sr-only">Open full page</span>
-                  <IconArrowUpRight />
-                </ButtonLink>
-                <Button aria-label="Close details" onClick={onClose} className="w-10 px-0!">
-                  <IconX width={18} height={18} />
-                </Button>
+                <ExpandLink href={fullPageHref} />
+                <CloseButton onClick={onClose} label="Close details" />
               </div>
             </div>
 
