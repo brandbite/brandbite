@@ -172,7 +172,7 @@ export function Button({ href, children }: { href: string; children: React.React
       <table role="presentation" cellPadding={0} cellSpacing={0}>
         <tbody>
           <tr>
-            <td style={{ borderRadius: "8px", backgroundColor: frame.action }}>
+            <td style={{ borderRadius: "8px", backgroundColor: frame.cta }}>
               <Link
                 href={href}
                 className="bb-btn"

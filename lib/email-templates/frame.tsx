@@ -49,7 +49,9 @@ export const frame = {
   muted: "#5F5B55",
   /** Top bar: the brand orange. */
   accent: "#F15B2B",
-  /** Buttons and links: a darker orange so white text passes AA (5.2:1). */
+  /** Button fill: the site's primary button colour (--av2-accent-strong). */
+  cta: "#FE5000",
+  /** Links and highlighted text on white: a darker orange that stays readable. */
   action: "#C2410C",
   footerBg: "#F7F5F2",
   info: { bg: "#EAF2FE", border: "#C9DCF5", title: "#1E3A8A", text: "#2B2A29" },
@@ -682,7 +684,7 @@ export function Actions({ href, label, secondary, note }: ActionsProps) {
       <table role="presentation" cellPadding={0} cellSpacing={0}>
         <tbody>
           <tr>
-            <td style={{ borderRadius: "8px", backgroundColor: frame.action }}>
+            <td style={{ borderRadius: "8px", backgroundColor: frame.cta }}>
               <Link
                 href={href}
                 className="bb-btn"
