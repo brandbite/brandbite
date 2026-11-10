@@ -818,13 +818,6 @@ export default function AdminDocsPage() {
                           {catForm.description.trim()}
                         </p>
                       )}
-                      {editingCat && (
-                        <div className="mt-2">
-                          <TextLink href={`/documentation/${editingCat.slug}`} external>
-                            View in help centre
-                          </TextLink>
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>

@@ -93,7 +93,6 @@ const LEGAL_KEYS = new Set(["privacy", "terms", "cookies", "accessibility"]);
 const PUBLIC_PATHS: Record<string, string> = {
   about: "/about",
   contact: "/contact",
-  documentation: "/documentation",
   privacy: "/privacy",
   terms: "/terms",
   accessibility: "/accessibility",

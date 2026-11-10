@@ -140,8 +140,8 @@ export function WelcomeEmailTemplate({
         preamble={
           <>
             Reply to this email anytime. It lands in a real inbox and I read every one. If
-            you&apos;d rather skim first, the docs and FAQ are at{" "}
-            <LinkText href={docsUrl}>brandbite.studio/documentation</LinkText>.
+            you&apos;d rather skim first, our guides are at{" "}
+            <LinkText href={docsUrl}>brandbite.studio/guides</LinkText>.
           </>
         }
         from="Alper, brandbite"
@@ -177,7 +177,7 @@ export default function WelcomeEmailPreview() {
       planName="Brand"
       ctaUrl="https://brandbite.studio/customer/board"
       showcaseUrl="https://brandbite.studio/showcase"
-      docsUrl="https://brandbite.studio/documentation"
+      docsUrl="https://brandbite.studio/guides"
     />
   );
 }

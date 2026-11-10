@@ -190,7 +190,7 @@ export const DEFAULT_SITE_FOOTER_DATA: SiteFooterData = {
     {
       title: "Resources",
       links: [
-        { label: "Documentation", href: "/documentation" },
+        { label: "Guides", href: "/guides" },
         { label: "FAQs", href: "/faq" },
         { label: "News", href: "/news" },
       ],

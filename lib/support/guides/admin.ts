@@ -1192,7 +1192,10 @@ export const ADMIN_GUIDES: SupportGuide[] = [
                 term: "Showcase",
                 text: "not shown on the public site for now; entries are kept here.",
               },
-              { term: "Docs", text: "the help centre at /documentation." },
+              {
+                term: "Docs",
+                text: "not shown on the public site; /documentation now sends people to /guides.",
+              },
               { term: "Palette Ideas", text: "/colors/color-palette-ideas." },
               { term: "Color Meanings", text: "/colors/color-meanings and each colour." },
               {
