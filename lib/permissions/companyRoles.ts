@@ -177,3 +177,11 @@ export function canMarkTicketsDoneForCompany(
   // Within a company, only OWNER + PM can mark tickets as DONE
   return companyRole === "OWNER" || companyRole === "PM";
 }
+
+/**
+ * Connected accounts (Google Drive, Dropbox, Slack): OWNER + PM, the people
+ * who run requests day to day. Every member can see what is connected.
+ */
+export function canManageIntegrations(role: CompanyRole | null | undefined): boolean {
+  return isCompanyAdminRole(role);
+}
