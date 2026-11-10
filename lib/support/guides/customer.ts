@@ -387,7 +387,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Click a card to open it in a large window with **Current version**, **Brief & files**, **Versions** and **Comments** tabs. There you can look at every version the creative sent, add pin notes on images, download files and, while it is In review, approve it or request a revision. **Open full page** takes you to the request page. When work is waiting, **Needs your review** at the top of the Board has a **Review request** button.",
+            text: "Click a card to open it in a large window with **Current version**, **Brief & files**, **Versions** and **Comments** tabs. There you can look at every version the creative sent, add pin notes on images, download files and, while it is In review, approve it or request a revision. The **expand** icon at the top right opens the full request page. There, the **shrink** icon brings you back to the board with the window open, and **×** returns you to where you came from (the board or your request list). When work is waiting, **Needs your review** at the top of the Board has a **Review request** button.",
           },
         ],
       },

@@ -77,6 +77,10 @@ import { AiTicketControls } from "@/components/ui/ai-ticket-controls";
 import { TicketActivityPanel } from "@/components/dashboard/ticket-activity-panel";
 import { SourceFilesPanel } from "@/components/tickets/source-files-panel";
 import { SourceFilesRetentionNote } from "@/components/tickets/source-files-retention-note";
+import {
+  FullPageViewControls,
+  fullPageViewLinks,
+} from "@/components/dashboard/tickets/view-switch";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -861,7 +865,7 @@ export default function CustomerTicketDetailPage() {
                 Cancel
               </Button>
             </>
-          ) : userCanEdit || userCanCancel ? (
+          ) : (
             <>
               {userCanEdit ? <Button onClick={startEditing}>Edit request</Button> : null}
               {userCanCancel ? (
@@ -869,8 +873,9 @@ export default function CustomerTicketDetailPage() {
                   Cancel & refund
                 </Button>
               ) : null}
+              <FullPageViewControls {...fullPageViewLinks("customer", ticket.id, fromBoard)} />
             </>
-          ) : null
+          )
         }
       />
 
