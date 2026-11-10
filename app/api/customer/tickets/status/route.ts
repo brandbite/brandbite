@@ -18,6 +18,7 @@ import {
 } from "@/lib/permissions/companyRoles";
 import { completeTicketAndApplyTokens } from "@/lib/token-engine";
 import { createNotification } from "@/lib/notifications";
+import { autoStopTimersOnTicket } from "@/lib/tickets/auto-timer";
 
 type PatchPayload = {
   ticketId?: string;
@@ -350,6 +351,10 @@ export async function PATCH(req: NextRequest) {
 
       return updatedTicket;
     });
+
+    // Approving (Done) or any move out of In progress stops a running timer.
+    // Asking for changes (back to In progress) doesn't start one.
+    if (nextStatus !== TicketStatus.IN_PROGRESS) await autoStopTimersOnTicket(ticket.id);
 
     return NextResponse.json(updated, { status: 200 });
   } catch (error: any) {

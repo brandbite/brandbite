@@ -40,6 +40,7 @@ export type TransitionStatusSuccess = {
   result: {
     ticketId: string;
     status: TicketStatus;
+    previousStatus: TicketStatus;
     updatedAt: Date;
     revisionId?: string;
   };
@@ -232,6 +233,7 @@ export async function transitionCreativeTicketStatus(
     result: {
       ticketId: updated.id,
       status: updated.status,
+      previousStatus: ticket.status,
       updatedAt: updated.updatedAt,
       revisionId: updated.revisionId,
     },

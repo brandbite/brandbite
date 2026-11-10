@@ -12,6 +12,7 @@ import { recordTicketEvent } from "@/lib/tickets/ticket-events";
 import { createNotification } from "@/lib/notifications";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { isSiteAdminRole } from "@/lib/roles";
+import { autoStopTimersOnTicket } from "@/lib/tickets/auto-timer";
 
 /**
  * Usage:
@@ -58,6 +59,8 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
         { status: 409 },
       );
     }
+
+    await autoStopTimersOnTicket(ticketId);
 
     // This path doesn't stamp completedAt, so the Activity tab needs its own record.
     await recordTicketEvent({

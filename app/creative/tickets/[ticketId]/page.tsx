@@ -47,6 +47,7 @@ import {
 import {
   TimeEntriesPanel,
   TimeStrip,
+  autoTimerMessage,
   useTimeTracking,
 } from "@/components/dashboard/tickets/time-tracking";
 import { buildTicketCode } from "@/lib/ticket-code";
@@ -403,8 +404,13 @@ export default function CreativeTicketDetailPage() {
         setStatusError(json?.error || `Request failed with status ${res.status}`);
         return;
       }
-      showToast({ type: "success", title: "Request status updated." });
+      showToast({
+        type: "success",
+        title: status === "IN_PROGRESS" ? "Work started" : "Request status updated.",
+        description: autoTimerMessage(json?.timer) ?? undefined,
+      });
       setRefreshCounter((c) => c + 1);
+      void tracking.reload();
     } catch (err) {
       console.error("Creative ticket status error:", err);
       setStatusError("Failed to update this request. Please try again.");
@@ -559,7 +565,7 @@ export default function CreativeTicketDetailPage() {
           </Callout>
         ) : null}
 
-        <TimeStrip tracking={tracking} />
+        <TimeStrip tracking={tracking} status={ticket.status} />
 
         <Tabs
           label="Request sections"
@@ -689,7 +695,10 @@ export default function CreativeTicketDetailPage() {
                 {ticket.status === "IN_PROGRESS" ? (
                   <DeliveryForm
                     ticketId={ticket.id}
-                    onSent={() => setRefreshCounter((c) => c + 1)}
+                    onSent={() => {
+                      setRefreshCounter((c) => c + 1);
+                      void tracking.reload();
+                    }}
                   />
                 ) : ticket.status === "TODO" ? (
                   <Callout tone="info" title="Start work to send a version">

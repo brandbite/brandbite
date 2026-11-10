@@ -18,6 +18,7 @@ import {
   updateTicketFieldsSchema,
 } from "@/lib/schemas/ticket-update.schemas";
 import { isTagsEnabled } from "@/lib/feature-flags";
+import { autoStopTimersOnTicket } from "@/lib/tickets/auto-timer";
 
 type RouteContext = {
   params: Promise<{
@@ -346,6 +347,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
       });
 
       if (existing.status !== targetStatus) {
+        if (targetStatus !== TicketStatus.IN_PROGRESS) await autoStopTimersOnTicket(existing.id);
         await recordTicketEvent({
           ticketId: existing.id,
           actorId: user.id,

@@ -23,6 +23,7 @@ import { completeTicketAndApplyTokens } from "@/lib/token-engine";
 import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 import { createNotification } from "@/lib/notifications";
 import { AdminActionType } from "@prisma/client";
+import { autoStopTimersOnTicket } from "@/lib/tickets/auto-timer";
 
 const STATUS_LABEL: Record<string, string> = {
   TODO: "To do",
@@ -162,6 +163,8 @@ export async function POST(req: NextRequest) {
             });
           }
           transitions.push({ id, from: existing.status, to: data.status });
+          // A request leaving In progress stops the creative's running timer.
+          if (data.status !== TicketStatus.IN_PROGRESS) await autoStopTimersOnTicket(id);
         } else if (data.op === "priority") {
           await prisma.ticket.update({
             where: { id },
