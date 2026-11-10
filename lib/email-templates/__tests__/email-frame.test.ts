@@ -11,6 +11,7 @@ import {
   renderSecurityCodeEmail,
   renderTeamInviteEmail,
 } from "@/lib/email-templates/account";
+import { renderWelcomeEmail } from "@/lib/email-templates/onboarding/welcome";
 import { renderTalentDeclineEmail } from "@/lib/email-templates/talent/decline";
 import { ROLE_COLORS } from "@/lib/role-colors";
 
@@ -220,5 +221,31 @@ describe("account emails", () => {
     for (const { html } of [reset, decline]) {
       for (const role of Object.values(ROLE_COLORS)) expect(html).not.toContain(role.bg);
     }
+  });
+});
+
+describe("welcome email", () => {
+  it("only promises what the FAQ backs", async () => {
+    const { html } = await renderWelcomeEmail({
+      name: "Sam",
+      planName: "Full",
+      ctaUrl: "https://brandbite.test/customer/tickets/new",
+      docsUrl: "https://brandbite.test/guides",
+    });
+    const t = text(html);
+    for (const claim of [
+      /asset library/i,
+      /direct messag/i,
+      /chat directly/i,
+      /within a few hours/i,
+      /showcase/i,
+      /real inbox/i,
+    ]) {
+      expect(t).not.toMatch(claim);
+    }
+    expect(t).toContain("token cost");
+    expect(t).toContain("24 to 48 hours");
+    expect(t).toContain("Unlimited revisions");
+    expect(t).toContain("Google Drive or Dropbox");
   });
 });

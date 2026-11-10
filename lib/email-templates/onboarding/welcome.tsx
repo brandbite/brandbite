@@ -1,11 +1,15 @@
 // -----------------------------------------------------------------------------
 // @file: lib/email-templates/onboarding/welcome.tsx
-// @purpose: First "hello" email after a customer subscribes. This is a
-//           celebratory moment — they just paid us $495–$1,895/month — so
-//           the email needs to feel like a moment, not a generic
-//           transactional ping. Uses the polished hero band, framed
-//           "what you unlocked" feature box, and a personal founder
-//           sign-off.
+// @purpose: First "hello" email after a customer subscribes. It should feel
+//           like a moment, not a generic transactional ping: a short
+//           "what you get" box, three steps to the first delivery and a
+//           personal sign-off.
+//
+//           Every promise here must match the public FAQ (2026-11-10):
+//           tokens with an up-front cost per service, most requests in
+//           24 to 48 hours, unlimited revisions, full ownership, source
+//           files into Google Drive or Dropbox. No asset library, no
+//           direct chat, no "starts within hours".
 //
 //           Sets brand voice for the rest of the customer email
 //           lifecycle: warm but never cheesy, celebratory without
@@ -35,10 +39,10 @@ export type WelcomeEmailProps = {
   /** Plan they just signed up to ("Starter" | "Brand" | "Full"); used in
    *  the hero subhead so the moment feels personalised. */
   planName?: string | null;
-  /** Where the primary CTA points — usually `/customer/board`. */
+  /** Where the primary CTA points, usually `/customer/tickets/new`. */
   ctaUrl: string;
-  /** Showcase page URL for the "see example work" tertiary link. */
-  showcaseUrl: string;
+  /** Unused: there's no public showcase page yet. Kept so callers don't break. */
+  showcaseUrl?: string;
   /** Documentation index for the help link in the footer area. */
   docsUrl: string;
 };
@@ -58,13 +62,7 @@ export type WelcomeEmailProps = {
  *   - Avoid "unlock", "empower", "journey", "leverage", "game-changer",
  *     "we're so excited", "get ready to..."
  */
-export function WelcomeEmailTemplate({
-  name,
-  planName,
-  ctaUrl,
-  showcaseUrl,
-  docsUrl,
-}: WelcomeEmailProps) {
+export function WelcomeEmailTemplate({ name, planName, ctaUrl, docsUrl }: WelcomeEmailProps) {
   const greeting = name ? `Hi ${name},` : "Hi,";
   const planLine = planName
     ? `You're on the ${planName} plan and your design team is ready when you are.`
@@ -74,7 +72,7 @@ export function WelcomeEmailTemplate({
     <BaseLayout
       role={"customer"}
       reason={"You received this email because you created a brandbite account."}
-      previewText="You're in. Your first design request takes about a minute."
+      previewText="You're in. Here's how to send your first request."
       hero={
         <HeroBand>
           <Heading>Welcome aboard 🎉</Heading>
@@ -85,23 +83,25 @@ export function WelcomeEmailTemplate({
       }
     >
       <Paragraph>
-        We&apos;re really glad you went with us. brandbite isn&apos;t a marketplace and it
-        isn&apos;t a freelancer roulette. You get a small, vetted team that learns your brand and
-        gets faster every project.
+        We&apos;re really glad you went with us. brandbite isn&apos;t a marketplace. Vetted
+        creatives take on your requests, and everything lives in one workspace your team shares.
       </Paragraph>
 
-      <FeatureList title="What you just got:">
+      <FeatureList title="What you get:">
         <FeatureItem>
-          <strong>1 to 2 day turnaround</strong> on every request
+          <strong>Tokens, not surprises.</strong> Every service shows its token cost before you send
+          a request
         </FeatureItem>
         <FeatureItem>
-          <strong>Unlimited revisions</strong> until it&apos;s exactly what you want
+          <strong>Most requests done in 24 to 48 hours.</strong> Bigger projects take 3 to 5
+          business days
         </FeatureItem>
         <FeatureItem>
-          <strong>Direct messaging</strong> with the designer working on your project
+          <strong>Unlimited revisions</strong> until it&apos;s right
         </FeatureItem>
         <FeatureItem>
-          <strong>Brand asset library.</strong> Every file, organised, always yours
+          <strong>Your files, for good.</strong> Full ownership, and source files can go straight
+          into your Google Drive or Dropbox
         </FeatureItem>
       </FeatureList>
 
@@ -110,40 +110,33 @@ export function WelcomeEmailTemplate({
       <StepsList
         steps={[
           {
-            title: "Submit your first request",
-            body: "Logo, landing page, ad set, deck. Whatever's on your plate. Your designer starts within a few hours.",
+            title: "Send your first request",
+            body: "Pick a service, check its token cost, and add your brief with any references or brand files.",
           },
           {
-            title: "Chat directly with your designer",
-            body: "Share references, brand guidelines, the rough idea you have. The clearer the brief, the faster the turnaround.",
+            title: "Follow it and give feedback",
+            body: "Watch it move on your board. When work is ready for review, leave notes right on it or ask for changes.",
           },
           {
-            title: "Get the file within 2 business days",
-            body: "Revise as many times as you want. When it's perfect, the file is yours. Full ownership, no extra fees.",
+            title: "Download your files",
+            body: "Approve it when it's right. The files are yours to keep, even if you cancel.",
           },
         ]}
       />
 
-      <Button href={ctaUrl}>Submit your first design request</Button>
+      <Button href={ctaUrl}>Send your first request</Button>
 
       <Callout tone="info">
-        <strong>Pro tip:</strong> Don&apos;t worry about over-explaining your brief. Specifics save
-        rounds. Drop links, screenshots, even a rough sketch. Your designer turns ambiguity into
-        clarity.
+        <strong>Tip:</strong> Don&apos;t worry about over-explaining your brief. Specifics save
+        rounds. Add links, screenshots, even a rough sketch.
       </Callout>
-
-      <Paragraph>
-        Want to see what we&apos;ve made for others first?{" "}
-        <LinkText href={showcaseUrl}>Browse the showcase</LinkText>. A small sample of real client
-        work. Every piece there is something we shipped end to end.
-      </Paragraph>
 
       <Signoff
         preamble={
           <>
-            Reply to this email anytime. It lands in a real inbox and I read every one. If
-            you&apos;d rather skim first, our guides are at{" "}
-            <LinkText href={docsUrl}>brandbite.studio/guides</LinkText>.
+            Questions? Write to us at{" "}
+            <LinkText href="mailto:hello@brandbite.studio">hello@brandbite.studio</LinkText>, or
+            skim our guides at <LinkText href={docsUrl}>brandbite.studio/guides</LinkText>.
           </>
         }
         from="Alper, brandbite"
@@ -177,7 +170,7 @@ export default function WelcomeEmailPreview() {
     <WelcomeEmailTemplate
       name="Alper"
       planName="Brand"
-      ctaUrl="https://brandbite.studio/customer/board"
+      ctaUrl="https://brandbite.studio/customer/tickets/new"
       showcaseUrl="https://brandbite.studio/showcase"
       docsUrl="https://brandbite.studio/guides"
     />
