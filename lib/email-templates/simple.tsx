@@ -135,7 +135,7 @@ export function SimpleEmail(spec: SimpleEmailSpec) {
             <Body16>
               <Link
                 href={spec.secondary.href}
-                style={{ color: frame.action, fontWeight: 600, textDecoration: "underline" }}
+                style={{ color: frame.cta, fontWeight: 600, textDecoration: "underline" }}
               >
                 {spec.secondary.label}
               </Link>

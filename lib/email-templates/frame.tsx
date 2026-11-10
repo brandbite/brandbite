@@ -49,9 +49,10 @@ export const frame = {
   muted: "#5F5B55",
   /** Top bar: the brand orange. */
   accent: "#F15B2B",
-  /** Button fill: the site's primary button colour (--av2-accent-strong). */
+  /** Brand orange (the site's --av2-accent-strong): buttons and bold text
+   *  such as the secondary link and highlighted values. Decided 2026-11-10. */
   cta: "#FE5000",
-  /** Links and highlighted text on white: a darker orange that stays readable. */
+  /** Thin links inside body text keep a darker orange that stays readable. */
   action: "#C2410C",
   footerBg: "#F7F5F2",
   info: { bg: "#EAF2FE", border: "#C9DCF5", title: "#1E3A8A", text: "#2B2A29" },
@@ -474,7 +475,7 @@ export function Tiles({ tiles }: { tiles: Tile[] }) {
                       fontSize: "18px",
                       lineHeight: "26px",
                       fontWeight: 600,
-                      color: tile.highlight ? frame.action : frame.ink,
+                      color: tile.highlight ? frame.cta : frame.ink,
                     }}
                   >
                     {tile.value}
@@ -709,7 +710,7 @@ export function Actions({ href, label, secondary, note }: ActionsProps) {
         <Text style={{ margin: "14px 0 0", fontSize: "16px", lineHeight: "22px" }}>
           <Link
             href={secondary.href}
-            style={{ color: frame.action, fontWeight: 600, textDecoration: "underline" }}
+            style={{ color: frame.cta, fontWeight: 600, textDecoration: "underline" }}
           >
             {secondary.label}
           </Link>
