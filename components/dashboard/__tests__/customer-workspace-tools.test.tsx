@@ -348,7 +348,7 @@ describe("Onboarding", () => {
       return undefined;
     });
     render(<OnboardingPage />);
-    expect(screen.getByText("Step 1 of 4")).toBeInTheDocument();
+    expect(screen.getByText("Step 1 of 5")).toBeInTheDocument();
 
     // Company name is required before anything is sent.
     fireEvent.click(screen.getByRole("button", { name: "Create Company" }));
@@ -362,8 +362,9 @@ describe("Onboarding", () => {
     fireEvent.click(screen.getByRole("button", { name: "Skip" }));
     expect(screen.getByRole("heading", { name: "Create your first project" })).toBeInTheDocument();
 
+    // No storage on offer (the integrations call isn't answered): the files step is skipped.
     fireEvent.click(screen.getByRole("button", { name: "Skip" }));
-    expect(screen.getByRole("heading", { name: /You're all set/ })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /You're all set/ })).toBeInTheDocument();
     expect(screen.getByText("Nova Labs")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Go to Dashboard" }));
@@ -373,6 +374,57 @@ describe("Onboarding", () => {
         ([u, init]) => String(u).includes("onboarding") && init?.method === "PATCH",
       ),
     ).toBe(true);
+  });
+
+  it("asks where source files go, and can keep them on brandbite for now", async () => {
+    mockFetch((url) => {
+      if (url.includes("/api/customer/onboarding")) return Response.json({ ok: true });
+      if (url.includes("/api/customer/integrations")) {
+        return Response.json({
+          canManage: true,
+          integrations: [
+            {
+              provider: "GOOGLE_DRIVE",
+              label: "Google Drive",
+              slug: "google-drive",
+              available: true,
+              status: "NOT_CONNECTED",
+            },
+            {
+              provider: "DROPBOX",
+              label: "Dropbox",
+              slug: "dropbox",
+              available: true,
+              status: "NOT_CONNECTED",
+            },
+            {
+              provider: "SLACK",
+              label: "Slack",
+              slug: "slack",
+              available: false,
+              status: "NOT_CONNECTED",
+            },
+          ],
+        });
+      }
+      return undefined;
+    });
+    render(<OnboardingPage />);
+    fireEvent.change(screen.getByLabelText(/Company Name/), { target: { value: "Nova" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create Company" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Skip" }));
+    fireEvent.click(screen.getByRole("button", { name: "Skip" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Where should we deliver source files?" }),
+    ).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Connect Google Drive" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Connect Dropbox" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Connect Slack" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Keep them on brandbite for now" }));
+    expect(await screen.findByRole("heading", { name: /You're all set/ })).toBeInTheDocument();
+    expect(screen.getByText("Source files on brandbite")).toBeInTheDocument();
   });
 
   it("suggests a project code from the name and sends invites with the chosen role", async () => {
