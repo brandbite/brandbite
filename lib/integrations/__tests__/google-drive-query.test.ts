@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+// google-drive.ts reaches Prisma through company-integrations; never start a
+// real client in unit tests (no database: the engine can abort on teardown).
+vi.mock("@/lib/prisma", () => ({ prisma: {} }));
+
 import { findDriveFileInFolder } from "../google-drive";
 
 afterEach(() => vi.unstubAllGlobals());
