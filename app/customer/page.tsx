@@ -7,7 +7,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import {
   IconAlertCircle,
@@ -50,6 +50,7 @@ import {
   type CompanyRole,
 } from "@/lib/permissions/companyRoles";
 import { buildTicketCode } from "@/lib/ticket-code";
+import { useLiveRefresh } from "@/lib/hooks/use-live-refresh";
 
 /** Matches the admin dashboard's definition of a low-balance company. */
 const LOW_BALANCE_TOKENS = 5;
@@ -182,6 +183,9 @@ function StatTile({ icon, value, label }: { icon: ReactNode; value: ReactNode; l
 export default function CustomerOverviewPage() {
   const [state, setState] = useState<DashboardState>({ status: "loading" });
 
+  const [liveTick, setLiveTick] = useState(0);
+  const liveRef = useRef(false);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -193,6 +197,7 @@ export default function CustomerOverviewPage() {
         ]);
         if (!cancelled) setState({ status: "ready", data: { settings, tokens, board } });
       } catch (err) {
+        if (liveRef.current) return; // background refresh: keep what's on screen
         console.error("[CustomerOverview] load error", err);
         if (!cancelled) {
           setState({
@@ -205,7 +210,13 @@ export default function CustomerOverviewPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [liveTick]);
+
+  // Stay current without a reload: on return to the tab and every 30s while visible.
+  useLiveRefresh(() => {
+    liveRef.current = true;
+    setLiveTick((t) => t + 1);
+  });
 
   const data = state.status === "ready" ? state.data : null;
   const tickets = useMemo(() => data?.board.tickets ?? [], [data]);

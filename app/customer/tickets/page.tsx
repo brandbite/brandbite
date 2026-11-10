@@ -42,6 +42,7 @@ import {
 import type { CompanyRole as CompanyRoleString } from "@/lib/permissions/companyRoles";
 import { canCreateTickets } from "@/lib/permissions/companyRoles";
 import { formatBoardDate } from "@/lib/board";
+import { useLiveRefresh } from "@/lib/hooks/use-live-refresh";
 
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -148,59 +149,70 @@ export default function CustomerTicketsPage() {
   }, [statusFilter, projectFilter, priorityFilter, tagFilter]);
 
   // ---- Fetch tickets ----
-  const fetchTickets = useCallback(async () => {
-    const id = ++fetchIdRef.current;
-    setLoading(true);
-    setError(null);
-
-    try {
-      const params = new URLSearchParams();
-      if (debouncedSearch) params.set("search", debouncedSearch);
-      if (statusFilter !== "ALL") params.set("status", statusFilter);
-      if (projectFilter !== "ALL") params.set("project", projectFilter);
-      if (priorityFilter !== "ALL") params.set("priority", priorityFilter);
-      if (tagFilter !== "ALL") params.set("tag", tagFilter);
-      params.set("sortBy", sortField);
-      params.set("sortDir", sortDir);
-      params.set("limit", String(PAGE_SIZE));
-      params.set("offset", String(page * PAGE_SIZE));
-
-      const res = await fetch(`/api/customer/tickets?${params.toString()}`, { cache: "no-store" });
-      const json = await res.json().catch(() => null);
-
-      if (id !== fetchIdRef.current) return; // stale
-
-      if (!res.ok) {
-        throw new Error(json?.error || `Request failed with status ${res.status}`);
+  const fetchTickets = useCallback(
+    async ({ silent = false }: { silent?: boolean } = {}) => {
+      const id = ++fetchIdRef.current;
+      if (!silent) {
+        setLoading(true);
+        setError(null);
       }
 
-      const data = json as CustomerTicketsResponse;
-      setCompany(data.company);
-      setTickets(data.tickets);
-      setPagination(data.pagination);
-    } catch (err: any) {
-      if (id !== fetchIdRef.current) return;
-      console.error("Customer tickets fetch error:", err);
-      setError(err?.message || "Failed to load requests.");
-    } finally {
-      if (id === fetchIdRef.current) {
-        setLoading(false);
+      try {
+        const params = new URLSearchParams();
+        if (debouncedSearch) params.set("search", debouncedSearch);
+        if (statusFilter !== "ALL") params.set("status", statusFilter);
+        if (projectFilter !== "ALL") params.set("project", projectFilter);
+        if (priorityFilter !== "ALL") params.set("priority", priorityFilter);
+        if (tagFilter !== "ALL") params.set("tag", tagFilter);
+        params.set("sortBy", sortField);
+        params.set("sortDir", sortDir);
+        params.set("limit", String(PAGE_SIZE));
+        params.set("offset", String(page * PAGE_SIZE));
+
+        const res = await fetch(`/api/customer/tickets?${params.toString()}`, {
+          cache: "no-store",
+        });
+        const json = await res.json().catch(() => null);
+
+        if (id !== fetchIdRef.current) return; // stale
+
+        if (!res.ok) {
+          throw new Error(json?.error || `Request failed with status ${res.status}`);
+        }
+
+        const data = json as CustomerTicketsResponse;
+        setCompany(data.company);
+        setTickets(data.tickets);
+        setPagination(data.pagination);
+      } catch (err: any) {
+        if (id !== fetchIdRef.current) return;
+        if (silent) return; // background refresh: keep what's on screen
+        console.error("Customer tickets fetch error:", err);
+        setError(err?.message || "Failed to load requests.");
+      } finally {
+        if (id === fetchIdRef.current) {
+          setLoading(false);
+        }
       }
-    }
-  }, [
-    debouncedSearch,
-    statusFilter,
-    projectFilter,
-    priorityFilter,
-    tagFilter,
-    sortField,
-    sortDir,
-    page,
-  ]);
+    },
+    [
+      debouncedSearch,
+      statusFilter,
+      projectFilter,
+      priorityFilter,
+      tagFilter,
+      sortField,
+      sortDir,
+      page,
+    ],
+  );
 
   useEffect(() => {
     fetchTickets();
   }, [fetchTickets]);
+
+  // Stay current without a reload: on return to the tab and every 30s while visible.
+  useLiveRefresh(() => fetchTickets({ silent: true }));
 
   // ---- Load company role ----
   useEffect(() => {

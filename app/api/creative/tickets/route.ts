@@ -13,6 +13,7 @@ import { getCurrentUserOrThrow } from "@/lib/auth";
 import { createNotification } from "@/lib/notifications";
 import { transitionCreativeTicketStatus } from "@/lib/tickets/transition-status";
 import { computeCreativePayout, evaluateCreativePayoutPercent } from "@/lib/token-engine";
+import { syncTimerWithStatus } from "@/lib/tickets/auto-timer";
 
 type TicketStatusString = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 
@@ -408,6 +409,16 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
+    // The creative's own move into In progress starts their timer; leaving
+    // In progress (sent for review) stops it.
+    const timer = await syncTimerWithStatus({
+      ticketId: outcome.result.ticketId,
+      previousStatus: outcome.result.previousStatus,
+      nextStatus: outcome.result.status,
+      creativeId: user.id,
+      startForCreative: true,
+    });
+
     // Fire-and-forget notification. Kept in the route so the service
     // stays free of I/O side-effects beyond the DB transaction.
     createNotification({
@@ -425,6 +436,7 @@ export async function PATCH(req: NextRequest) {
         status: toTicketStatusString(outcome.result.status),
         updatedAt: outcome.result.updatedAt.toISOString(),
         ...(outcome.result.revisionId ? { revisionId: outcome.result.revisionId } : {}),
+        timer,
       },
       { status: 200 },
     );

@@ -16,12 +16,14 @@ import { TicketStatus } from "@prisma/client";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { recordTicketEvent } from "@/lib/tickets/ticket-events";
+import { notifyCreativeAssigned } from "@/lib/tickets/assignment-notification";
 import { parseBody } from "@/lib/schemas/helpers";
 import { bulkTicketsSchema, type BulkTicketsInput } from "@/lib/schemas/bulk-tickets.schemas";
 import { completeTicketAndApplyTokens } from "@/lib/token-engine";
 import { extractAuditContext, logAdminAction } from "@/lib/admin-audit";
 import { createNotification } from "@/lib/notifications";
 import { AdminActionType } from "@prisma/client";
+import { autoStopTimersOnTicket } from "@/lib/tickets/auto-timer";
 
 const STATUS_LABEL: Record<string, string> = {
   TODO: "To do",
@@ -101,6 +103,13 @@ export async function POST(req: NextRequest) {
               type: "CREATIVE_CHANGED",
               metadata: { toCreativeId: data.creativeId },
             });
+            if (data.creativeId) {
+              await notifyCreativeAssigned({
+                ticketId: id,
+                creativeId: data.creativeId,
+                actorId: user.id,
+              });
+            }
           }
         } else if (data.op === "status") {
           // Admin override — no transition guards here by design. If the
@@ -154,6 +163,8 @@ export async function POST(req: NextRequest) {
             });
           }
           transitions.push({ id, from: existing.status, to: data.status });
+          // A request leaving In progress stops the creative's running timer.
+          if (data.status !== TicketStatus.IN_PROGRESS) await autoStopTimersOnTicket(id);
         } else if (data.op === "priority") {
           await prisma.ticket.update({
             where: { id },

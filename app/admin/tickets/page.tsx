@@ -48,6 +48,7 @@ import {
 import { IconTicket } from "@/components/admin/v2/icons";
 import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useLiveRefresh } from "@/lib/hooks/use-live-refresh";
 
 type TicketStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -238,8 +239,8 @@ export default function AdminTicketsPage() {
   };
   const clearSelection = () => setSelectedIds(new Set());
 
-  const load = async () => {
-    setLoading(true);
+  const load = async ({ silent = false }: { silent?: boolean } = {}) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
       // All pages — see lib/fetch-all-tickets (the API pages at 50).
@@ -257,6 +258,7 @@ export default function AdminTicketsPage() {
       setTickets(json.tickets);
       setCreatives(json.creatives);
     } catch (err) {
+      if (silent) return; // background refresh: keep what's on screen
       console.error("[AdminTicketsPage] load error", err);
       setError(err instanceof Error ? err.message : "Failed to load requests. Please try again.");
     } finally {
@@ -267,6 +269,13 @@ export default function AdminTicketsPage() {
   useEffect(() => {
     load();
   }, []);
+
+  // Stay current without a reload: on return to the tab and every 30s while visible.
+  useLiveRefresh(() => load({ silent: true }), {
+    paused:
+      Boolean(savingTicketId || bulkSaving || confirmBulkStatus) ||
+      Object.keys(editingOverrides).length > 0,
+  });
 
   const handleAssignCreative = async (ticketId: string, creativeId: string | null) => {
     setError(null);

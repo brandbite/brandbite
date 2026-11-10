@@ -49,6 +49,11 @@ import {
   isOutputMimeAllowed,
   validateFileSize,
 } from "@/lib/upload-helpers";
+import { useLiveRefresh } from "@/lib/hooks/use-live-refresh";
+import {
+  MULTI_START_TIMER_HINT,
+  autoTimerMessage,
+} from "@/components/dashboard/tickets/time-tracking";
 
 const VIEW_OPTIONS = [
   { value: "board", label: "Kanban", href: "/creative/board" },
@@ -138,8 +143,8 @@ export default function CreativeBoardPage() {
   // Data load
   // ---------------------------------------------------------------------------
 
-  const load = async () => {
-    setLoading(true);
+  const load = async ({ silent = false }: { silent?: boolean } = {}) => {
+    if (!silent) setLoading(true);
     setError(null);
 
     try {
@@ -153,6 +158,7 @@ export default function CreativeBoardPage() {
       );
       setData(json);
     } catch (err: unknown) {
+      if (silent) return; // background refresh: keep what's on screen
       console.error("[CreativeBoard] load error", err);
       const message = err instanceof Error ? err.message : "Failed to load your requests.";
       setError(message);
@@ -182,6 +188,11 @@ export default function CreativeBoardPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Stay current without a reload: on return to the tab and every 30s while visible.
+  useLiveRefresh(() => load({ silent: true }), {
+    paused: Boolean(draggingTicketId || updatingTicketId || reviewModal || reviewUploading),
+  });
 
   // ---------------------------------------------------------------------------
   // "/" keyboard shortcut — focus the search bar
@@ -427,10 +438,13 @@ export default function CreativeBoardPage() {
         };
       });
 
+      const timerNote = autoTimerMessage(json?.timer);
       showToast({
         type: "success",
         title: "Request updated",
-        description: getStatusSuccessMessage(status),
+        description: timerNote
+          ? `${getStatusSuccessMessage(status)} ${timerNote}`
+          : getStatusSuccessMessage(status),
       });
 
       return { revisionId: json?.revisionId ?? undefined };
@@ -702,7 +716,12 @@ export default function CreativeBoardPage() {
               ? `${successCount} request${successCount > 1 ? "s" : ""} moved, ${failCount} failed`
               : `${successCount} request${successCount > 1 ? "s" : ""} moved to ${statusLabel}`,
           description:
-            failCount > 0 ? "Some requests could not be updated due to restrictions." : undefined,
+            failCount > 0
+              ? "Some requests could not be updated due to restrictions."
+              : targetStatus === "IN_PROGRESS"
+                ? (autoTimerMessage((json as any).timer) ??
+                  (successCount > 1 ? MULTI_START_TIMER_HINT : undefined))
+                : undefined,
         });
       } else {
         showToast({

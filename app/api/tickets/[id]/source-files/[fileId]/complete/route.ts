@@ -10,7 +10,11 @@ export const runtime = "nodejs";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getCurrentUserOrThrow } from "@/lib/auth";
-import { getDriveAccessToken, getDriveFile } from "@/lib/integrations/google-drive";
+import {
+  findDriveFileInFolder,
+  getDriveAccessToken,
+  getDriveFile,
+} from "@/lib/integrations/google-drive";
 import { prisma } from "@/lib/prisma";
 import { sourceFileObjectSize } from "@/lib/source-files/r2-source-files";
 import {
@@ -46,9 +50,24 @@ export async function POST(
 
     if (file.storage === "GOOGLE_DRIVE") {
       const externalId = typeof body?.externalId === "string" ? body.externalId : "";
-      if (!externalId) return fail("Google Drive didn't confirm the upload.");
       const { accessToken } = await getDriveAccessToken(ticket.companyId, new URL(req.url).origin);
-      const info = await getDriveFile(accessToken, externalId);
+      // The browser may not have been able to read Drive's answer: look the
+      // file up in the request's folder by name instead.
+      let info = externalId ? await getDriveFile(accessToken, externalId) : null;
+      if (!info) {
+        const folders = await prisma.integrationFolder.findMany({
+          where: {
+            companyId: ticket.companyId,
+            provider: "GOOGLE_DRIVE",
+            key: { startsWith: `ticket:${ticket.id}:` },
+          },
+          select: { folderId: true },
+        });
+        for (const folder of folders) {
+          info = await findDriveFileInFolder(accessToken, folder.folderId, file.name);
+          if (info) break;
+        }
+      }
       if (!info || info.trashed || (info.size !== null && info.size !== expected)) {
         return fail("The file didn't arrive complete in Google Drive. Please upload it again.");
       }

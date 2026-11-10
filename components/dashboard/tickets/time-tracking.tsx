@@ -162,14 +162,41 @@ export function useTimeTracking(ticketId: string | null, estimatedHours: number 
     start,
     stop,
     remove,
+    reload: load,
   };
 }
 
 export type TimeTracking = ReturnType<typeof useTimeTracking>;
 
+/** What the server did with the timer on a status change (see lib/tickets/auto-timer.ts). */
+export type AutoTimerResult = { started: boolean; stoppedOtherTicketId: string | null };
+
+/** Extra toast text after a status change that started the timer, or null. */
+export function autoTimerMessage(timer: AutoTimerResult | null | undefined): string | null {
+  if (!timer?.started) return null;
+  return timer.stoppedOtherTicketId
+    ? "Your timer moved to this request. Stop it if you're not working on it yet."
+    : "Your timer started on this request. Stop it if you're not working on it yet.";
+}
+
+/** Shown when several requests were started at once: no timer starts. */
+export const MULTI_START_TIMER_HINT = "Start the timer on the request you're working on first.";
+
+type StripStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE" | string;
+
+function stripHint(status: StripStatus | undefined, running: boolean): string | null {
+  if (status === "TODO") return "Your timer starts on its own when you press Start work.";
+  if (status === "IN_PROGRESS" && running)
+    return "Started with the work. Stop it whenever you take a break.";
+  if (status === "IN_PROGRESS") return "Start it again when you get back to this request.";
+  if (status === "IN_REVIEW") return "Stopped when you sent the version for review.";
+  return null;
+}
+
 /** One-line timer. Hidden until the first load, and where tracking is unavailable. */
-export function TimeStrip({ tracking }: { tracking: TimeTracking }) {
+export function TimeStrip({ tracking, status }: { tracking: TimeTracking; status?: StripStatus }) {
   const { summary, loading, error, migrationPending, actionError, pending, running } = tracking;
+  const hint = stripHint(status, Boolean(running));
   if (loading) return <Skeleton className="h-[74px]" />;
   if (migrationPending || error || !summary) return null;
 
@@ -210,6 +237,7 @@ export function TimeStrip({ tracking }: { tracking: TimeTracking }) {
           </Button>
         )}
       </div>
+      {hint ? <p className="mt-2 text-xs text-[var(--av2-text-2)]">{hint}</p> : null}
       {actionError ? (
         <div className="mt-3">
           <Callout tone="error" title="Time tracking">

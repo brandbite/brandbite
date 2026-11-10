@@ -13,6 +13,7 @@ import { recordTicketEvent } from "@/lib/tickets/ticket-events";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { createNotification } from "@/lib/notifications";
 import { creativeTransitionError } from "@/lib/tickets/creative-transitions";
+import { autoStartTimer, autoStopTimersOnTicket } from "@/lib/tickets/auto-timer";
 
 type TicketStatusString = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 
@@ -153,6 +154,7 @@ export async function PATCH(req: NextRequest) {
 
     // Process each ticket
     const results: BatchResult[] = [];
+    const movedIntoProgress: string[] = [];
 
     for (const ticketId of ticketIds) {
       const ticket = ticketMap.get(ticketId);
@@ -231,6 +233,15 @@ export async function PATCH(req: NextRequest) {
 
         results.push({ ticketId, success: true });
 
+        // Leaving In progress stops a running timer; moving several in at
+        // once can't start several (one timer at a time), see below.
+        if (ticket.status === TicketStatus.IN_PROGRESS && nextStatus !== TicketStatus.IN_PROGRESS) {
+          await autoStopTimersOnTicket(ticket.id);
+        }
+        if (nextStatus === TicketStatus.IN_PROGRESS && ticket.status !== TicketStatus.IN_PROGRESS) {
+          movedIntoProgress.push(ticket.id);
+        }
+
         // Fire notification (fire-and-forget)
         createNotification({
           userId: ticket.createdById,
@@ -253,7 +264,13 @@ export async function PATCH(req: NextRequest) {
     const successCount = results.filter((r) => r.success).length;
     const failCount = results.filter((r) => !r.success).length;
 
-    return NextResponse.json({ results, successCount, failCount }, { status: 200 });
+    // One request started: its timer starts too. Several: the creative picks.
+    const timer =
+      movedIntoProgress.length === 1
+        ? await autoStartTimer(movedIntoProgress[0], user.id)
+        : { started: false, stoppedOtherTicketId: null };
+
+    return NextResponse.json({ results, successCount, failCount, timer }, { status: 200 });
   } catch (error: any) {
     if ((error as any)?.code === "UNAUTHENTICATED") {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });

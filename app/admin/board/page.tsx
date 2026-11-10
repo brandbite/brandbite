@@ -38,6 +38,7 @@ import {
   type Tone,
 } from "@/components/admin/v2/ui";
 import { IconAlertCircle, IconArrowUpRight, IconClock } from "@/components/admin/v2/icons";
+import { useLiveRefresh } from "@/lib/hooks/use-live-refresh";
 
 type AdminTicket = {
   id: string;
@@ -135,8 +136,8 @@ export default function AdminBoardPage() {
   // Data load
   // ---------------------------------------------------------------------------
 
-  const load = async () => {
-    setLoading(true);
+  const load = async ({ silent = false }: { silent?: boolean } = {}) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
       // All pages — the API returns the 50 newest by default, which capped
@@ -144,6 +145,7 @@ export default function AdminBoardPage() {
       const json = await fetchAllTickets<AdminTicketsResponse>("/api/admin/tickets");
       setTickets(json.tickets);
     } catch (err) {
+      if (silent) return; // background refresh: keep what's on screen
       console.error("[AdminBoardPage] load error", err);
       const message =
         err instanceof Error ? err.message : "Failed to load requests. Please try again.";
@@ -173,6 +175,11 @@ export default function AdminBoardPage() {
   const [dragOver, setDragOver] = useState<TicketStatus | null>(null);
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
   const [moving, setMoving] = useState<boolean>(false);
+
+  // Stay current without a reload: on return to the tab and every 30s while visible.
+  useLiveRefresh(() => load({ silent: true }), {
+    paused: Boolean(draggingId || pendingMove || moving),
+  });
 
   const canDropOn = (status: TicketStatus) => {
     const ticket = tickets.find((t) => t.id === draggingId);
@@ -454,7 +461,7 @@ export default function AdminBoardPage() {
             tone="error"
             title="Something went wrong"
             action={
-              <Button size="sm" onClick={load}>
+              <Button size="sm" onClick={() => load()}>
                 Retry
               </Button>
             }
