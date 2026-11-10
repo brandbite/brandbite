@@ -49,6 +49,7 @@ let drive: {
   folders: { name: string; parent?: string }[];
   sessions: RequestInit[];
   trashed: string[];
+  queries: string[];
 };
 
 const as = (id: string, role: string) => mockGetUser.mockResolvedValue({ id, role });
@@ -62,7 +63,7 @@ const json = (body: unknown, status = 200, headers: Record<string, string> = {})
   });
 
 function fakeDrive() {
-  drive = { folders: [], sessions: [], trashed: [] };
+  drive = { folders: [], sessions: [], trashed: [], queries: [] };
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -79,6 +80,19 @@ function fakeDrive() {
         const body = JSON.parse(String(init?.body));
         drive.folders.push({ name: body.name, parent: body.parents?.[0] });
         return json({ id: `folder-${drive.folders.length}` });
+      }
+      if (url.includes("/drive/v3/files?q=")) {
+        drive.queries.push(decodeURIComponent(new URL(url).searchParams.get("q") ?? ""));
+        return json({
+          files: [
+            {
+              id: "drive-file-1",
+              name: "poster.psd",
+              size: String(3 * GB),
+              webViewLink: "https://drive.google.test/file/drive-file-1",
+            },
+          ],
+        });
       }
       const fileMatch = /\/drive\/v3\/files\/([^?]+)/.exec(url);
       if (fileMatch && method === "PATCH") {
@@ -294,6 +308,19 @@ describe("Google Drive delivery", () => {
     });
     const open = await download(new NextRequest(`${ORIGIN}/x`), p({ fileId }));
     expect(open.headers.get("Location")).toBe("https://drive.google.test/file/drive-file-1");
+  });
+
+  it("finds the file in the request's folder when the browser couldn't read Drive's answer", async () => {
+    await connectDrive();
+    as(creativeId, "DESIGNER");
+    const { fileId } = await (await start(startReq("poster.psd", 3 * GB), p())).json();
+    const done = await complete(completeReq({}), p({ fileId }));
+    expect(done.status).toBe(200);
+    expect(drive.queries).toEqual([
+      "'folder-2' in parents and name = 'poster.psd' and trashed = false",
+    ]);
+    const row = await prisma.ticketSourceFile.findUniqueOrThrow({ where: { id: fileId } });
+    expect(row).toMatchObject({ status: "READY", externalId: "drive-file-1" });
   });
 
   it("falls back to R2 when the Drive needs reconnecting", async () => {

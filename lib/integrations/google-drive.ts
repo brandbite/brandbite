@@ -252,3 +252,42 @@ export async function trashDriveFile(accessToken: string, fileId: string): Promi
   });
   return res.ok || res.status === 404;
 }
+
+/**
+ * Find a file brandbite uploaded into a folder by its exact name, newest
+ * first. Used when the browser couldn't read Drive's answer to the upload.
+ */
+export async function findDriveFileInFolder(
+  accessToken: string,
+  folderId: string,
+  name: string,
+): Promise<DriveFileInfo | null> {
+  // Drive query strings escape backslashes and single quotes with a backslash.
+  const escaped = driveSafeName(name).replace(/[\\']/g, (ch) => `\\${ch}`);
+  const q = `'${folderId}' in parents and name = '${escaped}' and trashed = false`;
+  const res = await driveFetch(
+    accessToken,
+    `/files?q=${encodeURIComponent(q)}&orderBy=createdTime desc&pageSize=5&fields=files(id,name,size,webViewLink,parents,trashed)`,
+  );
+  if (!res.ok) return null;
+  const json = (await res.json()) as {
+    files?: {
+      id: string;
+      name: string;
+      size?: string;
+      webViewLink?: string;
+      parents?: string[];
+      trashed?: boolean;
+    }[];
+  };
+  const file = json.files?.[0];
+  if (!file) return null;
+  return {
+    id: file.id,
+    name: file.name,
+    size: file.size ? Number(file.size) : null,
+    webViewLink: file.webViewLink ?? null,
+    parents: file.parents ?? [],
+    trashed: Boolean(file.trashed),
+  };
+}
