@@ -38,12 +38,16 @@ export function readGoogleOauthConfig(): GoogleOauthConfig | { error: string } {
 
 /** Build the consent-screen redirect URL. Uses access_type=offline + prompt=consent
  *  so we always receive a refresh_token (even on re-auth). */
-export function buildAuthorizeUrl(config: GoogleOauthConfig, state: string): string {
+export function buildAuthorizeUrl(
+  config: GoogleOauthConfig,
+  state: string,
+  scopes: readonly string[] = GOOGLE_CALENDAR_SCOPES,
+): string {
   const params = new URLSearchParams({
     response_type: "code",
     client_id: config.clientId,
     redirect_uri: config.redirectUri,
-    scope: GOOGLE_CALENDAR_SCOPES.join(" "),
+    scope: scopes.join(" "),
     access_type: "offline",
     prompt: "consent",
     include_granted_scopes: "true",
