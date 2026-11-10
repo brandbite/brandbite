@@ -415,7 +415,10 @@ export function TicketDetailDialog({
         </>
       }
       headerActions={
-        <ButtonLink href={`/customer/tickets/${ticket.id}`} className="max-sm:!w-10 max-sm:!px-0">
+        <ButtonLink
+          href={`/customer/tickets/${ticket.id}?from=board`}
+          className="max-sm:!w-10 max-sm:!px-0"
+        >
           <IconExternal />
           <span className="max-sm:sr-only">Open full page</span>
         </ButtonLink>

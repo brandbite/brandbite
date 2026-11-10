@@ -69,6 +69,11 @@ export function useTimeTracking(ticketId: string | null, estimatedHours: number 
         setError(json?.error ?? "Failed to load time entries.");
         return;
       }
+      if (!Array.isArray(json?.entries)) {
+        // An unexpected answer: show nothing rather than break the page.
+        setError("Failed to load time entries.");
+        return;
+      }
       setSummary(json as Summary);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load time entries.");

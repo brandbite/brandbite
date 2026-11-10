@@ -758,7 +758,10 @@ export default function CustomerTicketDetailPage() {
   // Render
   // -------------------------------------------------------------------------
 
-  const backHref = fromBoard ? "/customer/board" : "/customer/tickets";
+  // Back to the board reopens this request's window there.
+  const backHref = fromBoard
+    ? `/customer/board?open=${encodeURIComponent(typeof ticketIdFromParams === "string" ? ticketIdFromParams : "")}`
+    : "/customer/tickets";
   const backLabel = fromBoard ? "Back to board" : "Back to requests";
 
   if (error || !ticket) {

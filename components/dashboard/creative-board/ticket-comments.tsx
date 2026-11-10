@@ -53,7 +53,9 @@ export function TicketComments({ ticketId }: { ticketId: string }) {
   }, [ticketId]);
 
   const addLink = (
-    <TextLink href={`/creative/tickets/${ticketId}`}>Add a comment on the full page</TextLink>
+    <TextLink href={`/creative/tickets/${ticketId}?from=board`}>
+      Add a comment on the full page
+    </TextLink>
   );
 
   if (state.status === "loading") {

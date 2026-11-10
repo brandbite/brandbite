@@ -249,6 +249,8 @@ export default function CustomerBoardPage() {
   const [updatingTicketId, setUpdatingTicketId] = useState<string | null>(null);
 
   const [detailTicketId, setDetailTicketId] = useState<string | null>(null);
+  // Coming back from a request's full page (?open=<id>): reopen its window once.
+  const reopenedRef = useRef(false);
 
   const [detailRevisions, setDetailRevisions] = useState<TicketRevisionEntry[] | null>(null);
   const [detailRevisionsLoading, setDetailRevisionsLoading] = useState<boolean>(false);
@@ -671,6 +673,17 @@ export default function CustomerBoardPage() {
       setDeleteProjectSaving(false);
     }
   };
+
+  useEffect(() => {
+    if (reopenedRef.current || !data) return;
+    const url = new URL(window.location.href);
+    const openId = url.searchParams.get("open");
+    if (!openId) return;
+    reopenedRef.current = true;
+    if (data.tickets.some((t) => t.id === openId)) setDetailTicketId(openId);
+    url.searchParams.delete("open");
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+  }, [data]);
 
   useEffect(() => {
     let cancelled = false;
