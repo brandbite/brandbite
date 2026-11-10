@@ -295,8 +295,9 @@ model UserAccount {
   assignmentLogs TicketAssignmentLog[]
   ticketEvents   TicketEvent[]         @relation("TicketEventActor")
 
-  submittedRevisions TicketRevision[] @relation("TicketRevisionSubmittedBy")
-  feedbackRevisions  TicketRevision[] @relation("TicketRevisionFeedbackBy")
+  submittedRevisions    TicketRevision[]     @relation("TicketRevisionSubmittedBy")
+  feedbackRevisions     TicketRevision[]     @relation("TicketRevisionFeedbackBy")
+  connectedIntegrations CompanyIntegration[] @relation("CompanyIntegrationConnectedBy")
 
   // Assets & annotations
   createdAssets     Asset[]
@@ -432,6 +433,9 @@ model Company {
   creativeRatings CreativeRating[]
 
   consultations Consultation[]
+
+  /// Connected Google Drive / Dropbox / Slack accounts (one per provider).
+  integrations CompanyIntegration[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2852,4 +2856,68 @@ model GuideEntry {
 
   @@unique([audience, slug])
   @@index([codeStatus])
+}
+
+// -----------------------------------------------------------------------------
+// Company integrations (Google Drive / Dropbox source-file delivery, Slack)
+// -----------------------------------------------------------------------------
+
+enum IntegrationProvider {
+  GOOGLE_DRIVE
+  DROPBOX
+  SLACK
+}
+
+enum IntegrationStatus {
+  /// Working: tokens refresh and calls succeed.
+  CONNECTED
+  /// The provider rejected our tokens (revoked access, deleted app...).
+  /// Kept so the customer sees "Reconnect" instead of silently losing it.
+  BROKEN
+}
+
+/// One connected external account per company and provider. Secrets are
+/// stored encrypted (lib/crypto/secret-box.ts), never in plain text, and are
+/// never sent to the browser.
+model CompanyIntegration {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  provider IntegrationProvider
+  status   IntegrationStatus   @default(CONNECTED)
+
+  /// Shown to people: the connected account ("design@acme.com") or Slack
+  /// workspace + channel ("Acme · #design").
+  accountLabel String?
+
+  /// Encrypted OAuth refresh token (Drive, Dropbox).
+  refreshTokenEnc      String?
+  /// Encrypted short-lived access token and its expiry, cached to save a
+  /// refresh round trip.
+  accessTokenEnc       String?
+  accessTokenExpiresAt DateTime?
+  /// Encrypted Slack incoming-webhook URL.
+  webhookUrlEnc        String?
+
+  /// Granted scopes, space separated, as the provider returned them.
+  scopes String?
+
+  /// Provider-side id of the root "brandbite" folder (Drive/Dropbox) or the
+  /// Slack channel id.
+  externalRootId String?
+
+  /// Last error from the provider, for admins and the "Reconnect" hint.
+  lastError   String?
+  lastErrorAt DateTime?
+
+  connectedByUserId String?
+  connectedBy       UserAccount? @relation("CompanyIntegrationConnectedBy", fields: [connectedByUserId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, provider])
+  @@index([provider, status])
 }
