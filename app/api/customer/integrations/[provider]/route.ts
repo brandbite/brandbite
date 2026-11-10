@@ -1,15 +1,19 @@
 // -----------------------------------------------------------------------------
 // @file: app/api/customer/integrations/[provider]/route.ts
 // @purpose: Disconnect one provider for the active company (OWNER / PM).
-//           Connecting happens through each provider's OAuth flow.
+//           Tells the provider to drop our access too (best effort), then
+//           forgets the tokens. Connecting happens through each provider's
+//           OAuth flow.
 // -----------------------------------------------------------------------------
 
 import { NextResponse } from "next/server";
 
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { revokeToken } from "@/lib/google/oauth";
 import {
   PROVIDER_LABELS,
   deleteCompanyIntegration,
+  getCompanyIntegrationSecrets,
   providerFromSlug,
 } from "@/lib/integrations/company-integrations";
 import { canManageIntegrations, normalizeCompanyRole } from "@/lib/permissions/companyRoles";
@@ -35,6 +39,12 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ prov
     const provider = providerFromSlug((await params).provider);
     if (!provider) {
       return NextResponse.json({ error: "Unknown integration." }, { status: 404 });
+    }
+    if (provider === "GOOGLE_DRIVE") {
+      const secrets = await getCompanyIntegrationSecrets(user.activeCompanyId, provider).catch(
+        () => null,
+      );
+      if (secrets?.refreshToken) await revokeToken(secrets.refreshToken);
     }
     const removed = await deleteCompanyIntegration(user.activeCompanyId, provider);
     if (!removed) {

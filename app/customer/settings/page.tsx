@@ -42,6 +42,7 @@ import {
 import { KeptTabPanel, useTabFromUrl } from "@/components/dashboard/account/account-ui";
 import { CompanyTagsCard } from "@/components/dashboard/account/company-tags";
 import { DeleteAccountCard } from "@/components/dashboard/account/delete-account";
+import { IntegrationsCard } from "@/components/dashboard/account/integrations-card";
 import {
   NotificationPreferencesBody,
   useNotificationPreferences,
@@ -105,9 +106,9 @@ type SubscriptionPlan = {
   priceCents: number | null;
 };
 
-type SettingsTab = "company" | "plan" | "notifications" | "access";
+type SettingsTab = "company" | "plan" | "notifications" | "integrations" | "access";
 
-const TABS: readonly SettingsTab[] = ["company", "plan", "notifications", "access"];
+const TABS: readonly SettingsTab[] = ["company", "plan", "notifications", "integrations", "access"];
 const TAB_PREFIX = "customer-settings";
 
 function hasPlanManagementAccess(role: CompanyRole | null | undefined): boolean {
@@ -250,6 +251,15 @@ export default function CustomerSettingsPage() {
   const searchParams = useSearchParams();
   const billingStatusParam = searchParams.get("billing");
   const returnDraftId = searchParams.get("draft");
+  // Set by the integration OAuth callbacks: ?tab=integrations&integration=google-drive&result=connected
+  const integrationSlug = searchParams.get("integration");
+  const integrationResult = integrationSlug
+    ? {
+        slug: integrationSlug,
+        ok: searchParams.get("result") === "connected",
+        message: searchParams.get("message"),
+      }
+    : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -647,6 +657,7 @@ export default function CustomerSettingsPage() {
                 { value: "company", label: "Company" },
                 { value: "plan", label: "Plan & billing" },
                 { value: "notifications", label: "Notifications" },
+                { value: "integrations", label: "Integrations" },
                 { value: "access", label: "Workspace access" },
               ]}
             />
@@ -967,6 +978,11 @@ export default function CustomerSettingsPage() {
                   <NotificationPreferencesBody role="CUSTOMER" state={notifications} />
                 </div>
               </Card>
+            </KeptTabPanel>
+
+            {/* ====================== Integrations ====================== */}
+            <KeptTabPanel value="integrations" {...panel}>
+              <IntegrationsCard result={integrationResult} />
             </KeptTabPanel>
 
             {/* ==================== Workspace access ==================== */}
