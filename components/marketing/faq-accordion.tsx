@@ -10,6 +10,8 @@
 
 "use client";
 
+import { linkifyFaqAnswer } from "@/components/faq/faq-answer-text";
+
 import Image from "next/image";
 import { useState } from "react";
 
@@ -42,8 +44,10 @@ export function FaqAccordion({ faqs }: { faqs: FaqAccordionItem[] }) {
               <span className="flex size-[30px] shrink-0 flex-col items-center justify-center rounded-full bg-[#E0D2FF] text-center text-base leading-5 font-bold text-[#3600B2]">
                 {i + 1}
               </span>
-              <span className="text-base leading-5 font-bold text-[#2B2D33]">{faq.question}</span>
-              <span className="flex min-w-px flex-1 items-end justify-end">
+              <span className="min-w-0 flex-1 text-base leading-5 font-bold text-[#2B2D33]">
+                {faq.question}
+              </span>
+              <span className="flex shrink-0 items-center justify-end">
                 <Image
                   src={open ? "/home/faq-minus.svg" : "/home/faq-plus.svg"}
                   alt=""
@@ -54,9 +58,12 @@ export function FaqAccordion({ faqs }: { faqs: FaqAccordionItem[] }) {
               </span>
             </button>
             {open && (
-              <div className="flex w-full items-center justify-center rounded-b-xl bg-white px-[60px] py-5">
+              <div className="flex w-full items-center justify-center rounded-b-xl bg-white px-[60px] py-5 max-[767px]:px-5">
                 <p className="min-w-px flex-1 text-base leading-6 whitespace-pre-line text-[#5E616E]">
-                  {faq.answer}
+                  {linkifyFaqAnswer(
+                    faq.answer,
+                    "font-medium text-[#C2410C] underline underline-offset-2 hover:text-[#FF6426]",
+                  )}
                 </p>
               </div>
             )}
