@@ -304,6 +304,10 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
                 text: "appears when work is In review. **Review request** opens the first one.",
               },
               {
+                term: "Keep your source files in your own storage",
+                text: "appears until your company connects Google Drive or Dropbox, so source files land in your own storage instead of being deleted from brandbite 90 days after a request is done. Owners and Project managers can connect from it; **Not now** hides it for 30 days. If a connection breaks, it asks you to reconnect.",
+              },
+              {
                 term: "Upcoming requests",
                 text: "the five most urgent open requests that have a due date. Overdue ones are red. Click a title to open it.",
               },
