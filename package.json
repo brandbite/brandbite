@@ -60,7 +60,6 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@axe-core/react": "^4.11.2",
     "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
     "@react-email/ui": "^6.0.0",
     "@tailwindcss/postcss": "^4.1.17",

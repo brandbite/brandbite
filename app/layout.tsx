@@ -17,7 +17,6 @@ import { ToastProvider } from "@/components/ui/toast-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthGuard } from "@/components/auth-guard";
 import { SessionStaleDetector } from "@/components/auth/session-stale-detector";
-import { A11yDevMonitor } from "@/components/a11y-dev-monitor";
 import { GoogleAnalytics } from "@/components/analytics/google-analytics";
 import { CookieConsentBanner } from "@/components/analytics/cookie-consent-banner";
 
@@ -96,9 +95,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 in another tab. Surfaces a persistent toast prompting the
                 user to refresh — see component header for details. */}
             <SessionStaleDetector />
-            {/* Dev-only: logs axe-core WCAG violations to the browser
-                console as pages render. Dead-code-eliminated in prod. */}
-            <A11yDevMonitor />
             {/*
               Skip link — first tabbable element on every page. Hidden
               off-screen until focused, at which point it moves into view.

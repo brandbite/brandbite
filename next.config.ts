@@ -135,6 +135,13 @@ const nextConfig: NextConfig = {
       destination: "/#how-it-works",
       permanent: true,
     },
+    {
+      // Retired: it never had content and used the old header/footer. Public
+      // guides and the in-app Support pages cover the same ground.
+      source: "/documentation/:path*",
+      destination: "/guides",
+      permanent: true,
+    },
     // Temporary, so browsers don't cache them: both paths are expected to return
     // with redesigned pages. Pricing waits on Stripe.
     {
