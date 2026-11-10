@@ -28,7 +28,7 @@ const fileRow = (overrides: Partial<FileRow> = {}): FileRow => ({
   ...overrides,
 });
 
-let puts: { url: string; contentType: string | null }[];
+let puts: { url: string; contentType: string | null; method?: string }[];
 
 class FakeXhr {
   status = 200;
@@ -41,15 +41,21 @@ class FakeXhr {
   onload: (() => void) | null = null;
   onerror: (() => void) | null = null;
   private url = "";
+  private method = "";
   private headers: Record<string, string> = {};
-  open(_method: string, url: string) {
+  open(method: string, url: string) {
+    this.method = method;
     this.url = url;
   }
   setRequestHeader(name: string, value: string) {
     this.headers[name] = value;
   }
   send() {
-    puts.push({ url: this.url, contentType: this.headers["Content-Type"] ?? null });
+    puts.push({
+      url: this.url,
+      contentType: this.headers["Content-Type"] ?? null,
+      ...(this.method !== "PUT" ? { method: this.method } : {}),
+    });
     this.upload.onprogress?.({ lengthComputable: true, loaded: 50, total: 100 });
     this.responseText = JSON.stringify({ id: "drive-file-1" });
     setTimeout(() => this.onload?.(), 0);
@@ -131,6 +137,46 @@ describe("SourceFilesPanel", () => {
     expect(calls.find((c) => c.url.endsWith("/new/complete"))?.body).toEqual({
       externalId: "drive-file-1",
     });
+  });
+
+  it("posts to Dropbox's one-time link as raw bytes and says what goes where", async () => {
+    const calls = mockApi({ files: [], canUpload: true, destination: "DROPBOX" as never });
+    vi.mocked(globalThis.fetch).mockImplementation(async (input, init) => {
+      const method = init?.method ?? "GET";
+      const url = String(input);
+      calls.push({ method, url, body: init?.body ? JSON.parse(String(init.body)) : null });
+      if (method === "POST" && url.endsWith("/source-files")) {
+        return Response.json({
+          fileId: "new",
+          storage: "DROPBOX",
+          uploadUrl: "https://content.dropboxapi.com/apitul/1/link",
+          method: "POST",
+          contentType: "application/octet-stream",
+        });
+      }
+      if (method === "POST" && url.endsWith("/complete")) return Response.json({ file: {} });
+      return Response.json({
+        files: [],
+        canUpload: true,
+        destination: "DROPBOX",
+        retentionDays: 90,
+      });
+    });
+    render(<SourceFilesPanel ticketId="t1" viewer="creative" />);
+    expect(
+      await screen.findByText(/Files up to 150 MB go straight into the customer's Dropbox/),
+    ).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Choose source files"), {
+      target: { files: [new File(["x"], "logo.ai")] },
+    });
+    await waitFor(() => expect(calls.some((c) => c.url.endsWith("/new/complete"))).toBe(true));
+    expect(puts).toEqual([
+      {
+        url: "https://content.dropboxapi.com/apitul/1/link",
+        contentType: "application/octet-stream",
+        method: "POST",
+      },
+    ]);
   });
 
   it("tells the creative when files go to brandbite storage instead", async () => {

@@ -67,7 +67,9 @@ const securityHeaders = [
       // - www.googleapis.com: source files upload straight from the browser
       //   into the customer's Google Drive (resumable session PUT). Without it
       //   the upload is CSP-blocked and looks like a dropped connection.
-      "connect-src 'self' https://api.stripe.com https://*.ingest.sentry.io https://challenges.cloudflare.com https://*.r2.cloudflarestorage.com https://media.brandbite.studio https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://www.googleapis.com",
+      // - content.dropboxapi.com: source files POSTed straight to a Dropbox
+      //   temporary upload link.
+      "connect-src 'self' https://api.stripe.com https://*.ingest.sentry.io https://challenges.cloudflare.com https://*.r2.cloudflarestorage.com https://media.brandbite.studio https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://www.googleapis.com https://content.dropboxapi.com",
       // - js.stripe.com: Stripe checkout iframe
       // - challenges.cloudflare.com: Turnstile renders inside an iframe, must be allowed here
       // - youtube/vimeo/loom: embedded media

@@ -51,6 +51,7 @@ import {
 } from "@/lib/permissions/companyRoles";
 import { buildTicketCode } from "@/lib/ticket-code";
 import { useLiveRefresh } from "@/lib/hooks/use-live-refresh";
+import { IntegrationsPrompt } from "@/components/dashboard/integrations-prompt";
 
 /** Matches the admin dashboard's definition of a low-balance company. */
 const LOW_BALANCE_TOKENS = 5;
@@ -453,6 +454,8 @@ export default function CustomerOverviewPage() {
               </ButtonLink>
             </section>
           ) : null}
+
+          <IntegrationsPrompt />
 
           <Card padding="none">
             <div className="px-6 pt-6 pb-4">

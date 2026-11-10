@@ -12,6 +12,11 @@ export const runtime = "nodejs";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import {
+  dropboxFilePath,
+  getDropboxAccessToken,
+  getDropboxUploadLink,
+} from "@/lib/integrations/dropbox";
 import { startDriveUpload } from "@/lib/integrations/google-drive";
 import { prisma } from "@/lib/prisma";
 import { presignSourceFileUpload } from "@/lib/source-files/r2-source-files";
@@ -24,6 +29,7 @@ import {
   canViewSourceFiles,
   chooseSourceFileStorage,
   ensureDriveTicketFolder,
+  ticketFolderName,
   loadSourceFileTicket,
   r2SourceFileKey,
   sourceFileView,
@@ -97,7 +103,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     const origin = new URL(req.url).origin;
-    let storage = await chooseSourceFileStorage(ticket.companyId);
+    let storage = await chooseSourceFileStorage(ticket.companyId, sizeBytes);
 
     if (storage === "GOOGLE_DRIVE") {
       try {
@@ -119,9 +125,50 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             storage: "GOOGLE_DRIVE",
           },
         });
-        return NextResponse.json({ fileId: file.id, storage, uploadUrl, contentType: mimeType });
+        return NextResponse.json({
+          fileId: file.id,
+          storage,
+          uploadUrl,
+          method: "PUT",
+          contentType: mimeType,
+        });
       } catch (error) {
         // A Drive that stopped working must not block delivery: fall back to R2.
+        if (!(error instanceof IntegrationBrokenError)) throw error;
+        storage = "R2";
+      }
+    }
+
+    if (storage === "DROPBOX") {
+      try {
+        const accessToken = await getDropboxAccessToken(ticket.companyId, origin);
+        const path = dropboxFilePath(
+          ticket.project?.name ?? "Other requests",
+          ticketFolderName(ticket),
+          name,
+        );
+        const uploadUrl = await getDropboxUploadLink(accessToken, path);
+        const file = await prisma.ticketSourceFile.create({
+          data: {
+            ticketId: ticket.id,
+            uploadedById: user.id,
+            name,
+            sizeBytes: BigInt(sizeBytes),
+            mimeType,
+            storage: "DROPBOX",
+            // The intended path until the upload is confirmed; then Dropbox's file id.
+            externalId: path,
+          },
+        });
+        // Temporary upload links take a POST of the raw bytes.
+        return NextResponse.json({
+          fileId: file.id,
+          storage,
+          uploadUrl,
+          method: "POST",
+          contentType: "application/octet-stream",
+        });
+      } catch (error) {
         if (!(error instanceof IntegrationBrokenError)) throw error;
         storage = "R2";
       }
@@ -149,7 +196,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const r2Key = r2SourceFileKey(ticket.id, file.id, name);
     await prisma.ticketSourceFile.update({ where: { id: file.id }, data: { r2Key } });
     const uploadUrl = await presignSourceFileUpload(r2Key, mimeType);
-    return NextResponse.json({ fileId: file.id, storage: "R2", uploadUrl, contentType: mimeType });
+    return NextResponse.json({
+      fileId: file.id,
+      storage: "R2",
+      uploadUrl,
+      method: "PUT",
+      contentType: mimeType,
+    });
   } catch (error) {
     const handled = errorStatus(error);
     if (handled) return handled;

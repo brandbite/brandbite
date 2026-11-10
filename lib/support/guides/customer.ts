@@ -304,6 +304,10 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
                 text: "appears when work is In review. **Review request** opens the first one.",
               },
               {
+                term: "Keep your source files in your own storage",
+                text: "appears until your company connects Google Drive or Dropbox, so source files land in your own storage instead of being deleted from brandbite 90 days after a request is done. Owners and Project managers can connect from it; **Not now** hides it for 30 days. If a connection breaks, it asks you to reconnect.",
+              },
+              {
                 term: "Upcoming requests",
                 text: "the five most urgent open requests that have a due date. Overdue ones are red. Click a title to open it.",
               },
@@ -659,11 +663,15 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
                 text: "they go straight into your Drive, in **brandbite › project › request**, and stay yours for good. **Open in Drive** opens one.",
               },
               {
-                term: "No Drive connected",
+                term: "Dropbox connected",
+                text: "files up to 150 MB go straight into **Apps › brandbite › project › request** in your Dropbox. **Open in Dropbox** opens one. Bigger files are kept on brandbite (below).",
+              },
+              {
+                term: "Neither connected",
                 text: "they're kept on brandbite for **90 days after the request is done**, then deleted. **Download** saves one; each file shows the date it's kept until.",
               },
               "We remind you by email and in the bell 14 days and 3 days before files are deleted.",
-              "Connect Google Drive under **Settings › Integrations** so new source files land in your own Drive.",
+              "Connect Google Drive or Dropbox under **Settings › Integrations** so new source files land in your own storage. When both are connected, Google Drive is used.",
             ],
           },
         ],
@@ -1591,8 +1599,12 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
               },
               "Owners and Project managers connect and disconnect; everyone else sees what's connected.",
               "If a connection shows **Needs reconnecting**, click **Reconnect** so files keep arriving. Until then, new files go to brandbite storage.",
-              "**Disconnect** keeps the files already in your Drive.",
-              "Dropbox and Slack are coming soon.",
+              {
+                term: "Dropbox",
+                text: "**Connect Dropbox** so files up to 150 MB land in **Apps › brandbite** in your Dropbox; brandbite only sees that folder. Bigger files are kept on brandbite for 90 days, or go to Google Drive if you connect it too.",
+              },
+              "**Disconnect** keeps the files already in your Drive or Dropbox.",
+              "Slack is coming soon.",
             ],
           },
         ],

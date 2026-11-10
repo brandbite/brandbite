@@ -21,6 +21,10 @@ describe("CSP allows direct uploads", () => {
     expect(await connectSrc()).toContain("https://www.googleapis.com");
   });
 
+  it("lets the browser POST source files to a Dropbox upload link", async () => {
+    expect(await connectSrc()).toContain("https://content.dropboxapi.com");
+  });
+
   it("lets the browser PUT source files to R2", async () => {
     expect(await connectSrc()).toContain("https://*.r2.cloudflarestorage.com");
   });

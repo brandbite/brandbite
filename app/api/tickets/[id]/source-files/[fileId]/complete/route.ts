@@ -16,6 +16,11 @@ import {
   getDriveFile,
 } from "@/lib/integrations/google-drive";
 import { prisma } from "@/lib/prisma";
+import {
+  dropboxWebUrl,
+  findDropboxUpload,
+  getDropboxAccessToken,
+} from "@/lib/integrations/dropbox";
 import { sourceFileObjectSize } from "@/lib/source-files/r2-source-files";
 import {
   loadSourceFileTicket,
@@ -74,6 +79,26 @@ export async function POST(
       const saved = await prisma.ticketSourceFile.update({
         where: { id: file.id },
         data: { status: "READY", externalId: info.id, externalUrl: info.webViewLink },
+        include: { uploadedBy: { select: { name: true, email: true } } },
+      });
+      return NextResponse.json({ file: sourceFileView(saved) });
+    }
+
+    if (file.storage === "DROPBOX" && file.externalId) {
+      const accessToken = await getDropboxAccessToken(ticket.companyId, new URL(req.url).origin);
+      // Dropbox may have renamed it on a clash ("logo (1).ai"): look in its folder.
+      const info = await findDropboxUpload(accessToken, file.externalId, expected);
+      if (!info) {
+        return fail("The file didn't arrive complete in Dropbox. Please upload it again.");
+      }
+      const saved = await prisma.ticketSourceFile.update({
+        where: { id: file.id },
+        data: {
+          status: "READY",
+          name: info.name,
+          externalId: info.id,
+          externalUrl: dropboxWebUrl(info.pathDisplay),
+        },
         include: { uploadedBy: { select: { name: true, email: true } } },
       });
       return NextResponse.json({ file: sourceFileView(saved) });

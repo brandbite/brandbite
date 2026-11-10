@@ -38,7 +38,7 @@ const DESCRIPTIONS: Record<IntegrationView["provider"], string> = {
   GOOGLE_DRIVE:
     "Creatives deliver source files (PSD, AI, print files) into a brandbite folder in your Drive. They stay yours for good. brandbite only sees the folder it creates, nothing else in your Drive.",
   DROPBOX:
-    "Creatives deliver source files into a brandbite folder in your Dropbox. They stay yours for good.",
+    "Creatives deliver source files up to 150 MB into Apps/brandbite in your Dropbox, where they stay yours for good. brandbite only sees that folder. Bigger files are kept on brandbite for 90 days; connect Google Drive too for those.",
   SLACK: "Get request updates in a Slack channel of your choice.",
 };
 

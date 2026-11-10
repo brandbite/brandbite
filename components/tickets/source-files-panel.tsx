@@ -63,16 +63,18 @@ export function formatBytes(bytes: number): string {
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 
-/** PUT the file to the URL the server handed out, reporting progress. */
+/** Send the file to the URL the server handed out, reporting progress.
+ *  Drive and R2 take a PUT; Dropbox's temporary upload links take a POST. */
 function putFile(
   url: string,
   file: File,
   contentType: string,
   onProgress: (fraction: number) => void,
+  method: "PUT" | "POST" = "PUT",
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("PUT", url);
+    xhr.open(method, url);
     xhr.setRequestHeader("Content-Type", contentType);
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) onProgress(event.loaded / event.total);
@@ -140,8 +142,12 @@ export function SourceFilesPanel({
       let responseText = "";
       let putError: Error | null = null;
       try {
-        responseText = await putFile(start.uploadUrl, file, start.contentType, (p) =>
-          patchUpload(key, { progress: p }),
+        responseText = await putFile(
+          start.uploadUrl,
+          file,
+          start.contentType,
+          (p) => patchUpload(key, { progress: p }),
+          start.method === "POST" ? "POST" : "PUT",
         );
       } catch (error) {
         // The bytes may still have arrived (e.g. only the answer was blocked):
@@ -196,10 +202,15 @@ export function SourceFilesPanel({
 
   const files = listing?.files ?? [];
   const onBrandbite = files.some((f) => f.storage === "R2");
+  const retentionDays = listing?.retentionDays ?? 90;
   const destinationText =
     listing?.destination === "GOOGLE_DRIVE"
       ? "Files go straight into the customer's Google Drive."
-      : `The customer hasn't connected a Google Drive, so files are stored on brandbite and kept for ${listing?.retentionDays ?? 90} days after the request is done.`;
+      : listing?.destination === "DROPBOX"
+        ? `Files up to 150 MB go straight into the customer's Dropbox. Bigger files are stored on brandbite and kept for ${retentionDays} days after the request is done.`
+        : `The customer hasn't connected Google Drive or Dropbox, so files are stored on brandbite and kept for ${retentionDays} days after the request is done.`;
+  const sizeHint =
+    listing?.destination === "GOOGLE_DRIVE" ? "No size limit." : "Up to 5 GB per file.";
 
   return (
     <Card>
@@ -245,10 +256,7 @@ export function SourceFilesPanel({
               onChange={(e) => onFiles(e.target.files)}
             />
           </div>
-          <p className="mt-2 text-xs text-[var(--av2-text-2)]">
-            Or drop files here.{" "}
-            {listing.destination === "GOOGLE_DRIVE" ? "No size limit." : "Up to 5 GB per file."}
-          </p>
+          <p className="mt-2 text-xs text-[var(--av2-text-2)]">Or drop files here. {sizeHint}</p>
         </div>
       )}
 
@@ -325,6 +333,8 @@ export function SourceFilesPanel({
                 <div className="mt-1">
                   {file.storage === "GOOGLE_DRIVE" ? (
                     <Badge tone="green">In Google Drive</Badge>
+                  ) : file.storage === "DROPBOX" ? (
+                    <Badge tone="green">In Dropbox</Badge>
                   ) : file.deleteAfter ? (
                     <Badge tone="amber">On brandbite until {formatDate(file.deleteAfter)}</Badge>
                   ) : (
@@ -347,7 +357,7 @@ export function SourceFilesPanel({
                     rel="noopener noreferrer"
                     className={buttonClass("secondary", "sm")}
                   >
-                    Open in Drive
+                    {file.storage === "DROPBOX" ? "Open in Dropbox" : "Open in Drive"}
                   </a>
                 ) : null}
                 {file.canRemove && (
@@ -369,8 +379,10 @@ export function SourceFilesPanel({
       {viewer === "customer" && onBrandbite && listing?.destination !== "GOOGLE_DRIVE" && (
         <div className="mt-4">
           <Callout tone="info" title="Keep your source files for good">
-            Files on brandbite are kept for {listing?.retentionDays ?? 90} days after the request is
-            done. Connect your Google Drive and new source files land in your own Drive instead.{" "}
+            Files on brandbite are kept for {retentionDays} days after the request is done.{" "}
+            {listing?.destination === "DROPBOX"
+              ? "Dropbox takes files up to 150 MB; connect Google Drive too and even the biggest files land in your own Drive."
+              : "Connect Google Drive and new source files land in your own Drive instead."}{" "}
             <Link href="/customer/settings?tab=integrations" className="font-medium underline">
               Connect Google Drive
             </Link>

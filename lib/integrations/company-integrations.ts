@@ -48,7 +48,9 @@ export function isProviderAvailable(
         env.GOOGLE_DRIVE_ENABLED === "true",
       );
     case "DROPBOX":
-      return Boolean(env.DROPBOX_APP_KEY && env.DROPBOX_APP_SECRET);
+      return Boolean(
+        env.DROPBOX_APP_KEY && env.DROPBOX_APP_SECRET && env.DROPBOX_ENABLED === "true",
+      );
     case "SLACK":
       return Boolean(env.SLACK_CLIENT_ID && env.SLACK_CLIENT_SECRET);
   }
