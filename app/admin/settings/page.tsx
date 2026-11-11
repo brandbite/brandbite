@@ -227,7 +227,7 @@ const SETTING_META: Record<string, SettingMeta> = {
   ENGAGEMENT_PLAYLIST_TOOL: {
     label: "Brand playlist generator (public tool)",
     description:
-      "The free public tool that suggests a playlist for a brand's mood. When off, the page and its footer link are hidden.",
+      "The free public page /brand-playlist: visitors pick words for their brand and get a playlist from the mood lists above. When off, or while no mood has a playlist, the page shows Not found.",
     type: "boolean",
     section: "engagement",
   },

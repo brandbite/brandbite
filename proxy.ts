@@ -111,6 +111,8 @@ const PUBLIC_PATHS = [
   "/brand-kit",
   // Free design cost calculator (client-side, no API).
   "/design-cost-calculator",
+  // Free brand playlist generator (404s until the site owner switches it on).
+  "/brand-playlist",
   // Public guides (/guides and /guides/[slug]).
   "/guides",
   // Public CMS reads for the color tools (published content only; admin
