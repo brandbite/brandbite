@@ -194,7 +194,7 @@ describe("getUserPreferences", () => {
 
     const prefs = await getUserPreferences("user-1");
 
-    expect(prefs).toHaveLength(12); // Every notification type
+    expect(prefs).toHaveLength(13); // Every notification type
     prefs.forEach((p) => {
       expect(p.enabled).toBe(true);
       expect(p.emailEnabled).toBe(true);
