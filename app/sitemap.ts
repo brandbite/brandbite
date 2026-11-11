@@ -28,7 +28,7 @@ export const revalidate = 3600;
 
 type Entry = MetadataRoute.Sitemap[number];
 
-const MARKETING_PATHS = ["/about", "/faq", "/contact", "/meet", "/blog"];
+const MARKETING_PATHS = ["/about", "/faq", "/contact", "/meet", "/blog", "/talent"];
 const LEGAL_PATHS = ["/terms", "/privacy", "/accessibility"];
 const COLOR_TOOL_PATHS = [
   "/colors",
