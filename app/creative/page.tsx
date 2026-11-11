@@ -38,6 +38,7 @@ import {
   TICKET_STATUS,
 } from "@/components/admin/v2/ui";
 import { PauseBanner } from "@/components/creative/pause-banner";
+import { FirstPassStreakCard } from "@/components/engagement/first-pass-streak-card";
 import {
   formatDate,
   formatTokens,
@@ -161,6 +162,7 @@ type CreativeDashboardData = {
   tickets: CreativeTicketsResponse;
   withdrawals: CreativeWithdrawalsResponse;
   payoutTier: PayoutTierResponse | null;
+  firstPassStreak: number | null;
   skillCount: number;
 };
 
@@ -232,13 +234,15 @@ export default function CreativeDashboardPage() {
       if (!liveRef.current) setState({ status: "loading" });
 
       try {
-        const [balanceRes, ticketsRes, withdrawalsRes, payoutTierRes, skillsRes] =
+        const [balanceRes, ticketsRes, withdrawalsRes, payoutTierRes, skillsRes, progressRes] =
           await Promise.all([
             fetch("/api/creative/balance"),
             fetch("/api/creative/tickets"),
             fetch("/api/creative/withdrawals"),
             fetch("/api/creative/payout-tier"),
             fetch("/api/creative/skills"),
+            // Optional extra: the overview must load without it.
+            fetch("/api/creative/progress").catch(() => null),
           ]);
 
         const [balanceJson, ticketsJson, withdrawalsJson, payoutTierJson, skillsJson] =
@@ -249,6 +253,7 @@ export default function CreativeDashboardPage() {
             payoutTierRes.json().catch(() => null),
             skillsRes.json().catch(() => null),
           ]);
+        const progressJson = progressRes?.ok ? await progressRes.json().catch(() => null) : null;
 
         if (!balanceRes.ok) {
           const message =
@@ -282,6 +287,10 @@ export default function CreativeDashboardPage() {
             withdrawals: withdrawalsJson as CreativeWithdrawalsResponse,
             payoutTier: payoutTierRes.ok ? (payoutTierJson as PayoutTierResponse) : null,
             skillCount: selectedSkills.length,
+            firstPassStreak:
+              (progressJson as any)?.enabled === true
+                ? Number((progressJson as any).firstPassStreak ?? 0)
+                : null,
           },
         });
       } catch (err: any) {
@@ -339,6 +348,8 @@ export default function CreativeDashboardPage() {
     .slice(0, NEXT_JOBS_LIMIT);
 
   const payoutTier = data?.payoutTier ?? null;
+  // null while the owner's "Creative progress" switch is off.
+  const firstPassStreak = data?.firstPassStreak ?? null;
   const nextTier = payoutTier?.tiers.find((t) => !t.qualified) ?? null;
   const nextTierProgress =
     nextTier && nextTier.minCompletedTickets > 0
@@ -527,9 +538,22 @@ export default function CreativeDashboardPage() {
                           style={{ width: `${nextTierProgress}%` }}
                         />
                       </span>
-                      <p className="mt-2 text-xs text-[var(--av2-text-2)] tabular-nums">
-                        {fmt(nextTier.completedInWindow)}/{fmt(nextTier.minCompletedTickets)}{" "}
-                        requests
+                      <p className="mt-2 flex flex-wrap justify-between gap-x-3 text-xs text-[var(--av2-text-2)] tabular-nums">
+                        <span>
+                          {fmt(nextTier.completedInWindow)} / {fmt(nextTier.minCompletedTickets)}{" "}
+                          approved requests
+                        </span>
+                        {firstPassStreak !== null ? (
+                          <span>
+                            {fmt(
+                              Math.max(
+                                nextTier.minCompletedTickets - nextTier.completedInWindow,
+                                0,
+                              ),
+                            )}{" "}
+                            to go · {nextTierProgress}%
+                          </span>
+                        ) : null}
                       </p>
                     </>
                   ) : (
@@ -542,7 +566,13 @@ export default function CreativeDashboardPage() {
 
           {/* Workload breakdowns */}
           {ticketStats && totalTickets > 0 ? (
-            <div className="grid gap-6 lg:grid-cols-2">
+            <div
+              className={`grid gap-6 ${
+                firstPassStreak !== null
+                  ? "lg:grid-cols-2 2xl:grid-cols-[1fr_1fr_minmax(280px,0.8fr)]"
+                  : "lg:grid-cols-2"
+              }`}
+            >
               <Card>
                 <CardTitle description="All your requests by workflow stage.">Workflow</CardTitle>
                 <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -571,7 +601,14 @@ export default function CreativeDashboardPage() {
                   ))}
                 </dl>
               </Card>
+              {firstPassStreak !== null ? (
+                <div className="lg:col-span-2 2xl:col-span-1 [&>section]:h-full">
+                  <FirstPassStreakCard streak={firstPassStreak} />
+                </div>
+              ) : null}
             </div>
+          ) : firstPassStreak !== null ? (
+            <FirstPassStreakCard streak={firstPassStreak} />
           ) : null}
 
           {/* Upcoming deadlines */}

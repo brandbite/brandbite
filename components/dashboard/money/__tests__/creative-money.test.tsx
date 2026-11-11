@@ -78,6 +78,8 @@ type Options = {
   failExport?: boolean;
   failWithdrawals?: number;
   failPayoutTier?: boolean;
+  /** First-pass streak; undefined = the owner's "Creative progress" switch is off. */
+  streak?: number;
   portfolioItems?: unknown[];
   post?: () => Response;
 };
@@ -93,6 +95,7 @@ function mockApi({
   failExport = false,
   failWithdrawals,
   failPayoutTier = false,
+  streak,
   portfolioItems = [],
   post,
 }: Options = {}) {
@@ -124,6 +127,11 @@ function mockApi({
         },
         tickets,
       });
+    }
+    if (url.includes("/creative/progress")) {
+      return Response.json(
+        streak === undefined ? { enabled: false } : { enabled: true, firstPassStreak: streak },
+      );
     }
     if (url.includes("/payout-tier")) {
       if (failPayoutTier) return Response.json({ error: "x" }, { status: 500 });
@@ -188,6 +196,21 @@ describe("Creative overview", () => {
     const recent = screen.getByText("Recent withdrawals").closest("section")!;
     expect(within(recent).getByText("Approved")).toBeInTheDocument();
     expect(within(recent).queryByText("Paid")).toBeNull();
+  });
+
+  it("shows the first-pass streak only when the owner switched it on", async () => {
+    mockApi({ streak: 4 });
+    const { unmount } = render(<CreativeDashboardPage />);
+    expect(await screen.findByText("First-pass streak")).toBeInTheDocument();
+    expect(screen.getByText("4 in a row")).toBeInTheDocument();
+    expect(screen.getByText(/50 to go/)).toBeInTheDocument();
+    unmount();
+
+    vi.restoreAllMocks();
+    mockApi();
+    render(<CreativeDashboardPage />);
+    expect(await screen.findByText("Priority breakdown")).toBeInTheDocument();
+    expect(screen.queryByText("First-pass streak")).toBeNull();
   });
 
   it("filters next jobs by status and leaves done work out", async () => {
