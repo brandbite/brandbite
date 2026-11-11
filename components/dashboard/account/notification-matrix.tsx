@@ -24,7 +24,8 @@ export type NotificationType =
   | "MOODBOARD_SHARED"
   | "MOODBOARD_COMMENT"
   | "SUPPORT_GUIDE_CHANGED"
-  | "SOURCE_FILES_EXPIRING";
+  | "SOURCE_FILES_EXPIRING"
+  | "THANKS_RECEIVED";
 
 export type NotificationPreference = {
   type: NotificationType;
@@ -88,6 +89,10 @@ export const NOTIFICATION_LABELS: Record<NotificationType, { title: string; desc
       title: "Source files expiring",
       description: "Source files kept on brandbite are about to be deleted (14 and 3 days before).",
     },
+    THANKS_RECEIVED: {
+      title: "Customer thank-yous",
+      description: "A customer thanked you when approving your work.",
+    },
   };
 
 /** Types that only make sense for one role; others are shown to everyone. */
@@ -97,6 +102,7 @@ const NOTIFICATION_ROLE_ONLY: Partial<Record<NotificationType, AccountRole[]>> =
   MOODBOARD_SHARED: ["CUSTOMER"],
   SUPPORT_GUIDE_CHANGED: ["SITE_OWNER", "SITE_ADMIN"],
   SOURCE_FILES_EXPIRING: ["CUSTOMER"],
+  THANKS_RECEIVED: ["DESIGNER"],
 };
 
 export function notificationAppliesTo(type: NotificationType, role: AccountRole): boolean {
@@ -119,6 +125,7 @@ export const NOTIFICATION_ORDER: NotificationType[] = [
   "MOODBOARD_COMMENT",
   "SUPPORT_GUIDE_CHANGED",
   "SOURCE_FILES_EXPIRING",
+  "THANKS_RECEIVED",
 ];
 
 export function notificationEventsFor(role: AccountRole): NotificationType[] {

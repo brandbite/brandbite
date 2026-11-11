@@ -71,7 +71,7 @@ import { TicketDetailDialog } from "@/components/dashboard/customer-board/ticket
 
 import NewTicketForm from "@/app/customer/tickets/new/NewTicketForm";
 import { DraftsLink } from "@/components/dashboard/tickets/drafts-link";
-import { RateCreativeModal } from "@/components/ratings/rate-creative-modal";
+import { ApprovalFeedbackModal } from "@/components/engagement/thank-creative-modal";
 import { useLiveRefresh } from "@/lib/hooks/use-live-refresh";
 import { SourceFilesRetentionNote } from "@/components/tickets/source-files-retention-note";
 
@@ -2535,7 +2535,7 @@ export default function CustomerBoardPage() {
           when the ticket had a creative assigned. Creatives never see these
           ratings; they're an admin-only signal used as an auto-assign tie-breaker. */}
       {ratingForTicket && (
-        <RateCreativeModal
+        <ApprovalFeedbackModal
           open={true}
           ticketId={ratingForTicket.id}
           ticketTitle={ratingForTicket.title}

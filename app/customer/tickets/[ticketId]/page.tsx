@@ -57,7 +57,7 @@ import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { SafeHtml } from "@/components/ui/safe-html";
 import { Modal, ModalHeader, ModalFooter } from "@/components/ui/modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { RateCreativeModal } from "@/components/ratings/rate-creative-modal";
+import { ApprovalFeedbackModal } from "@/components/engagement/thank-creative-modal";
 import { TagBadge } from "@/components/ui/tag-badge";
 import { TagMultiSelect, type TagOption } from "@/components/ui/tag-multi-select";
 import type { TagColorKey } from "@/lib/tag-colors";
@@ -1543,7 +1543,7 @@ export default function CustomerTicketDetailPage() {
       )}
 
       {/* Creative rating modal — opens when the customer marks the ticket DONE */}
-      <RateCreativeModal
+      <ApprovalFeedbackModal
         open={showRatingModal}
         ticketId={ticket.id}
         ticketTitle={ticket.title}
