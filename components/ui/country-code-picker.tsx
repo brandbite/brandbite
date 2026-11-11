@@ -140,7 +140,7 @@ export function CountryCodePicker({ value, onChange, id, ariaLabel, disabled }: 
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={ariaLabel ?? "Select country code"}
-        className="flex h-10 items-center gap-1.5 rounded-l-xl border border-r-0 border-[var(--bb-border)] bg-white px-3 text-sm text-[var(--bb-secondary)] transition-colors hover:bg-[var(--bb-bg-warm)] disabled:opacity-50"
+        className="flex h-11 items-center gap-2 rounded-l-lg border border-r-0 border-[#D7D8DD] bg-white px-3.5 text-base text-[#2B2D33] transition-colors hover:bg-[#F7F4F1] focus-visible:ring-2 focus-visible:ring-[#FF6426] focus-visible:outline-none disabled:opacity-50"
       >
         <span aria-hidden className="text-base leading-none">
           {flag}
