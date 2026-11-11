@@ -17,10 +17,9 @@ export function comboKey(moods: readonly Mood[]): string {
   return MOODS.filter((m) => moods.includes(m)).join("+");
 }
 
-/** "Minimal · Calm" for one mood, "Minimal + Bold" for a mix (in the order given). */
+/** "Minimal" for one mood, "Minimal + Bold" for a mix (in the order given). */
 export function comboLabel(moods: readonly Mood[]): string {
   const unique = moods.filter((m, i) => moods.indexOf(m) === i);
-  if (unique.length === 1) return MOOD_LABELS[unique[0]!];
   return unique.map((m) => MOOD_LABELS[m].split(" · ")[0]).join(" + ");
 }
 
