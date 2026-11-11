@@ -54,7 +54,7 @@ const securityHeaders = [
       // media.brandbite.studio: R2 public asset domain (R2_PUBLIC_BASE_URL).
       // Must be listed here or the browser CSP-blocks avatars/assets served
       // from it, even though images.remotePatterns already allows it.
-      "img-src 'self' data: blob: https://*.r2.cloudflarestorage.com https://media.brandbite.studio https://placehold.co https://img.youtube.com https://i.ytimg.com https://i3.ytimg.com https://i.vimeocdn.com https://*.google-analytics.com https://*.googletagmanager.com",
+      "img-src 'self' data: blob: https://*.r2.cloudflarestorage.com https://media.brandbite.studio https://placehold.co https://img.youtube.com https://i.ytimg.com https://i3.ytimg.com https://i.vimeocdn.com https://*.scdn.co https://*.spotifycdn.com https://*.google-analytics.com https://*.googletagmanager.com",
       // - api.stripe.com: Stripe.js calls home from the browser during checkout
       // - sentry: error reporting
       // - challenges.cloudflare.com: Turnstile widget posts the token here for verification
@@ -73,9 +73,10 @@ const securityHeaders = [
       // - js.stripe.com: Stripe checkout iframe
       // - challenges.cloudflare.com: Turnstile renders inside an iframe, must be allowed here
       // - youtube/vimeo/loom: embedded media
+      // - open.spotify.com: Spotify's embedded player (soundtracks, moodboard embeds)
       // - media.brandbite.studio + r2 endpoint: inline PDF deliverable preview
       //   in the revision lightbox (public URL or presigned GET fallback)
-      "frame-src https://js.stripe.com https://challenges.cloudflare.com https://www.youtube.com https://player.vimeo.com https://www.loom.com https://media.brandbite.studio https://*.r2.cloudflarestorage.com",
+      "frame-src https://js.stripe.com https://challenges.cloudflare.com https://www.youtube.com https://player.vimeo.com https://www.loom.com https://open.spotify.com https://media.brandbite.studio https://*.r2.cloudflarestorage.com",
       "worker-src 'self' blob:",
       "object-src 'none'",
       "base-uri 'self'",

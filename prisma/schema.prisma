@@ -239,6 +239,10 @@ model UserAccount {
   name                String?
   role                UserRole
 
+  /// Creatives: suggest a focus playlist when they start work. They can
+  /// turn it off for themselves ("Don't suggest music").
+  soundtrackSuggestions Boolean @default(true)
+
   /// Soft-delete timestamp. When set, the account is considered anonymized
   /// (email rewritten to a placeholder, name cleared) and auth is refused.
   /// Ledger + ticket rows are retained for financial / audit compliance.
@@ -393,6 +397,10 @@ model Company {
   slug String @unique
 
   website String? // Company website URL (optional)
+
+  /// The brand's soundtrack: a Spotify playlist or album link the customer
+  /// picked, shown to creatives on the company's requests.
+  soundtrackUrl String?
 
   planId String?
   plan   Plan?   @relation(fields: [planId], references: [id])

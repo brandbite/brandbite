@@ -43,6 +43,7 @@ import { formatPayout, isTicketOverdue, ticketCode } from "./job-card";
 import { TicketComments } from "./ticket-comments";
 import type { BriefAsset, CreativeTicket, DetailTab, TicketRevisionEntry } from "./types";
 import { TimeStrip, useTimeTracking } from "@/components/dashboard/tickets/time-tracking";
+import { SoundtrackCard } from "@/components/engagement/soundtrack-card";
 import { CloseButton, ExpandLink } from "@/components/dashboard/tickets/view-switch";
 
 /** Which tab a ticket opens on: its latest delivery, or the brief if there is none. */
@@ -248,6 +249,11 @@ export function TicketDetailDialog({
                 <TimeStrip tracking={tracking} status={ticket.status} />
               </div>
             ) : null}
+
+            {/* Owner switches ENGAGEMENT_BRAND_SOUNDTRACK / _FOCUS_PLAYLIST; nothing when off. */}
+            <div className="mt-4 empty:hidden">
+              <SoundtrackCard ticketId={ticket.id} status={ticket.status} />
+            </div>
 
             <div className="mt-4 [&_[role=tab]]:min-h-10">
               <Tabs<DetailTab>

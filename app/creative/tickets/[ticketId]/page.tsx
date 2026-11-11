@@ -50,6 +50,7 @@ import {
   autoTimerMessage,
   useTimeTracking,
 } from "@/components/dashboard/tickets/time-tracking";
+import { SoundtrackCard } from "@/components/engagement/soundtrack-card";
 import { buildTicketCode } from "@/lib/ticket-code";
 import { SafeHtml } from "@/components/ui/safe-html";
 import { useToast } from "@/components/ui/toast-provider";
@@ -576,6 +577,9 @@ export default function CreativeTicketDetailPage() {
         ) : null}
 
         <TimeStrip tracking={tracking} status={ticket.status} />
+
+        {/* Owner switches ENGAGEMENT_BRAND_SOUNDTRACK / _FOCUS_PLAYLIST; nothing when off. */}
+        <SoundtrackCard ticketId={ticket.id} status={ticket.status} />
 
         <Tabs
           label="Request sections"

@@ -176,6 +176,54 @@ const SETTING_META: Record<string, SettingMeta> = {
     type: "boolean",
     section: "engagement",
   },
+  SOUNDTRACK_PLAYLISTS_ENERGETIC: {
+    label: "Playlists: Energetic · Upbeat",
+    description:
+      "Spotify playlist or album links suggested to creatives for energetic requests. Separate several with commas; the first is suggested first. Leave empty to suggest nothing for this mood.",
+    type: "text",
+    section: "engagement",
+    inputClassName: "max-w-none",
+  },
+  SOUNDTRACK_PLAYLISTS_MINIMAL: {
+    label: "Playlists: Minimal · Calm",
+    description:
+      "Spotify playlist or album links suggested to creatives for minimal requests. Separate several with commas; the first is suggested first. Leave empty to suggest nothing for this mood.",
+    type: "text",
+    section: "engagement",
+    inputClassName: "max-w-none",
+  },
+  SOUNDTRACK_PLAYLISTS_LUXURY: {
+    label: "Playlists: Luxury · Elegant",
+    description:
+      "Spotify playlist or album links suggested to creatives for luxury requests. Separate several with commas; the first is suggested first. Leave empty to suggest nothing for this mood.",
+    type: "text",
+    section: "engagement",
+    inputClassName: "max-w-none",
+  },
+  SOUNDTRACK_PLAYLISTS_PLAYFUL: {
+    label: "Playlists: Playful · Fun",
+    description:
+      "Spotify playlist or album links suggested to creatives for playful requests. Separate several with commas; the first is suggested first. Leave empty to suggest nothing for this mood.",
+    type: "text",
+    section: "engagement",
+    inputClassName: "max-w-none",
+  },
+  SOUNDTRACK_PLAYLISTS_WARM: {
+    label: "Playlists: Warm · Friendly",
+    description:
+      "Spotify playlist or album links suggested to creatives for warm requests. Separate several with commas; the first is suggested first. Leave empty to suggest nothing for this mood.",
+    type: "text",
+    section: "engagement",
+    inputClassName: "max-w-none",
+  },
+  SOUNDTRACK_PLAYLISTS_BOLD: {
+    label: "Playlists: Bold · Confident",
+    description:
+      "Spotify playlist or album links suggested to creatives for bold requests. Separate several with commas; the first is suggested first. Leave empty to suggest nothing for this mood.",
+    type: "text",
+    section: "engagement",
+    inputClassName: "max-w-none",
+  },
   ENGAGEMENT_PLAYLIST_TOOL: {
     label: "Brand playlist generator (public tool)",
     description:
@@ -437,7 +485,8 @@ export default function AdminSettingsPage() {
   // ---- Save a single setting ----
   const handleSave = async (key: string) => {
     const value = drafts[key]?.trim();
-    if (!value) return;
+    // Soundtrack lists may be saved empty: that clears the mood.
+    if (value === undefined || (!value && !key.startsWith("SOUNDTRACK_PLAYLISTS_"))) return;
 
     // Skip if nothing changed
     if (value === (settings[key] ?? "")) {

@@ -101,11 +101,11 @@ export async function PATCH(req: NextRequest) {
         targetType: "AppSetting",
         targetId: key,
         metadata: { key, attemptedValue: value },
-        errorMessage: "Only site owners can change payout settings.",
+        errorMessage: "Only site owners can change this setting.",
         context: auditCtx,
       });
       return NextResponse.json(
-        { error: "Only site owners can change payout settings." },
+        { error: "Only site owners can change this setting." },
         { status: 403 },
       );
     }

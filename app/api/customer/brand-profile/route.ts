@@ -21,7 +21,7 @@ export async function GET() {
     if (!switches.brandProfile) return NextResponse.json({ enabled: false });
 
     const companyId = user.activeCompanyId;
-    const [palettes, moodboards, storage] = await Promise.all([
+    const [palettes, moodboards, storage, company] = await Promise.all([
       // A palette saved by anyone on the team counts as the brand's colors.
       prisma.savedPalette.count({
         where: { createdBy: { companies: { some: { companyId } } } },
@@ -32,13 +32,21 @@ export async function GET() {
         where: { companyId, status: "CONNECTED", provider: { in: ["GOOGLE_DRIVE", "DROPBOX"] } },
         take: 1,
       }),
+      prisma.company.findUnique({ where: { id: companyId }, select: { soundtrackUrl: true } }),
     ]);
 
+    // The soundtrack step only counts while that feature is switched on.
     const keys: BrandProfileStepKey[] = ["colors", "moodboard", "storage"];
+    if (switches.brandSoundtrack) keys.push("soundtrack");
     return NextResponse.json({
       enabled: true,
       profile: buildBrandProfile(
-        { colors: palettes > 0, moodboard: moodboards > 0, storage: storage > 0 },
+        {
+          colors: palettes > 0,
+          moodboard: moodboards > 0,
+          storage: storage > 0,
+          soundtrack: !!company?.soundtrackUrl,
+        },
         keys,
       ),
     });

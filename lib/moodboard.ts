@@ -3,6 +3,7 @@
 // @purpose: Shared TypeScript types and helpers for the Moodboard feature
 // -----------------------------------------------------------------------------
 
+import { parseSpotifyUrl, spotifyEmbedUrl } from "@/lib/soundtrack/spotify";
 import type { MoodboardItemType } from "@prisma/client";
 
 /** A unique id made in the browser. randomUUID only exists on https and localhost. */
@@ -87,7 +88,7 @@ export type EmbedCardData = {
   url: string;
   embedUrl: string;
   title?: string;
-  provider: "youtube" | "vimeo" | "loom" | "generic";
+  provider: "youtube" | "vimeo" | "loom" | "spotify" | "generic";
   thumbnailUrl?: string;
 };
 
@@ -376,6 +377,12 @@ export function parseVideoUrl(
           provider: "loom",
         };
       }
+    }
+
+    // Spotify: a playlist or album plays in Spotify's own embedded player.
+    const spotify = parseSpotifyUrl(url);
+    if (spotify) {
+      return { embedUrl: spotifyEmbedUrl(spotify), provider: "spotify" };
     }
 
     // Generic — any other valid URL, try as iframe
