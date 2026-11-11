@@ -1,27 +1,41 @@
 // -----------------------------------------------------------------------------
 // @file: components/soundtrack/brand-playlist-tool.tsx
 // @purpose: The public "Brand playlist generator": pick up to three words
-//           that describe a brand, get the mood they add up to and a
-//           playlist for it in Spotify's embedded player. Runs in the
-//           browser; the playlists per mood come from the page (the site
-//           owner's lists). Styled with the Color Studio (--cs-*) tokens.
+//           that describe a brand and get the playlist made for that mix of
+//           moods in Spotify's embedded player ("Bold" + "Calm" gives the
+//           Minimal + Bold playlist, not just one of the two). "Try another"
+//           steps through the site owner's own lists for the picked moods.
+//           Runs in the browser. Styled with the Color Studio (--cs-*) tokens.
 // -----------------------------------------------------------------------------
 
 "use client";
 
 import { useMemo, useState } from "react";
 
+import { comboKey, comboLabel } from "@/lib/soundtrack/combos";
+import { isMood, type Mood } from "@/lib/soundtrack/moods";
+
+export type ToolPlaylist = { url: string; embedUrl: string; title: string };
+
 export type ToolMood = {
   value: string;
   label: string;
   /** Words a visitor can pick that point at this mood. */
   words: string[];
-  playlists: { url: string; embedUrl: string; title: string }[];
+  /** The site owner's own lists for this mood (extras). */
+  playlists: ToolPlaylist[];
 };
 
 const MAX_WORDS = 3;
 
-export function BrandPlaylistTool({ moods }: { moods: ToolMood[] }) {
+export function BrandPlaylistTool({
+  moods,
+  mixes,
+}: {
+  moods: ToolMood[];
+  /** The playlist made for each mix of moods, by comboKey ("MINIMAL+BOLD"). */
+  mixes: Record<string, ToolPlaylist>;
+}) {
   const [picked, setPicked] = useState<string[]>([]);
   const [index, setIndex] = useState(0);
 
@@ -37,21 +51,23 @@ export function BrandPlaylistTool({ moods }: { moods: ToolMood[] }) {
     return out;
   }, [moods]);
 
-  // The mood most of the picked words belong to; the first pick breaks ties.
+  // The moods behind the picked words, in pick order, and every playlist that
+  // fits: the one made for the mix first, then the owner's lists per mood.
   const result = useMemo(() => {
-    if (picked.length === 0) return null;
-    const score = new Map<string, number>();
+    const pickedMoods: Mood[] = [];
     for (const word of picked) {
       const mood = words.find((w) => w.word === word)?.mood;
-      if (mood) score.set(mood, (score.get(mood) ?? 0) + 1);
+      if (isMood(mood) && !pickedMoods.includes(mood)) pickedMoods.push(mood);
     }
-    let best: string | null = null;
-    for (const word of picked) {
-      const mood = words.find((w) => w.word === word)?.mood;
-      if (mood && (best === null || (score.get(mood) ?? 0) > (score.get(best) ?? 0))) best = mood;
+    if (pickedMoods.length === 0) return null;
+    const playlists: ToolPlaylist[] = [];
+    const mix = mixes[comboKey(pickedMoods)];
+    if (mix) playlists.push(mix);
+    for (const mood of pickedMoods) {
+      playlists.push(...(moods.find((m) => m.value === mood)?.playlists ?? []));
     }
-    return moods.find((m) => m.value === best) ?? null;
-  }, [picked, words, moods]);
+    return { label: comboLabel(pickedMoods), playlists };
+  }, [picked, words, moods, mixes]);
 
   const toggle = (word: string) => {
     setIndex(0);
@@ -64,7 +80,10 @@ export function BrandPlaylistTool({ moods }: { moods: ToolMood[] }) {
     );
   };
 
-  const playlist = result ? result.playlists[index % result.playlists.length]! : null;
+  const playlist =
+    result && result.playlists.length > 0
+      ? result.playlists[index % result.playlists.length]!
+      : null;
   const full = picked.length >= MAX_WORDS;
 
   return (
@@ -123,7 +142,11 @@ export function BrandPlaylistTool({ moods }: { moods: ToolMood[] }) {
         <h2 id="bp-result" className="text-2xl leading-8 font-semibold">
           {result ? "Your brand sounds like" : "Your brand's playlist"}
         </h2>
-        {result && playlist ? (
+        {result && !playlist ? (
+          <p className="mt-2 text-base text-[#5E616E]">
+            We don&rsquo;t have a playlist for {result.label} yet. Try a different word.
+          </p>
+        ) : result && playlist ? (
           <>
             <p className="mt-2 inline-flex rounded-lg bg-[#dcd4fb] px-3 py-1 text-base font-semibold text-[#49368D]">
               {result.label}

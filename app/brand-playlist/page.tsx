@@ -1,10 +1,11 @@
 // -----------------------------------------------------------------------------
 // @file: app/brand-playlist/page.tsx
 // @purpose: Free public tool: "Brand playlist generator". Pick words that
-//           describe a brand, get its mood and a playlist to match. The
-//           playlists are the site owner's lists per mood (/admin/settings →
-//           Engagement). The page 404s while the owner's switch
-//           ENGAGEMENT_PLAYLIST_TOOL is off or no playlists are filled in.
+//           describe a brand, get the mix of moods they add up to and the
+//           playlist made for that mix (lib/soundtrack/combos.ts). The site
+//           owner's own lists per mood (/admin/settings → Engagement) are
+//           offered as extra picks. The page 404s while the owner's switch
+//           ENGAGEMENT_PLAYLIST_TOOL is off or there are no playlists at all.
 // -----------------------------------------------------------------------------
 
 import type { Metadata } from "next";
@@ -12,10 +13,15 @@ import { notFound } from "next/navigation";
 
 import { StudioShell } from "@/components/colors/studio/studio-shell";
 import { JsonLd } from "@/components/seo/json-ld";
-import { BrandPlaylistTool, type ToolMood } from "@/components/soundtrack/brand-playlist-tool";
+import {
+  BrandPlaylistTool,
+  type ToolMood,
+  type ToolPlaylist,
+} from "@/components/soundtrack/brand-playlist-tool";
 import { isEngagementOn } from "@/lib/engagement/switches.server";
 import { pageMetadata } from "@/lib/seo/metadata";
 import { breadcrumbJsonLd, webApplicationJsonLd } from "@/lib/seo/structured-data";
+import { generatedPlaylists } from "@/lib/soundtrack/combos";
 import { MOOD_LABELS, MOODS, type Mood } from "@/lib/soundtrack/moods";
 import { getMoodPlaylistLinks, getPlaylistInfo } from "@/lib/soundtrack/playlists.server";
 
@@ -49,10 +55,12 @@ export default async function BrandPlaylistPage() {
   if (!(await isEngagementOn("playlistTool"))) notFound();
 
   const links = await getMoodPlaylistLinks();
+  const combos = generatedPlaylists();
   const moods: ToolMood[] = [];
   for (const mood of MOODS) {
     const infos = (await Promise.all(links[mood].map(getPlaylistInfo))).filter((p) => p !== null);
-    if (infos.length === 0) continue;
+    // A mood can be picked when it has its own playlist or the owner filled one in.
+    if (infos.length === 0 && !combos[mood]) continue;
     moods.push({
       value: mood,
       label: MOOD_LABELS[mood],
@@ -61,6 +69,12 @@ export default async function BrandPlaylistPage() {
     });
   }
   if (moods.length === 0) notFound();
+  const mixes: Record<string, ToolPlaylist> = Object.fromEntries(
+    Object.entries(combos).map(([key, p]) => [
+      key,
+      { url: p.url, embedUrl: p.embedUrl, title: p.title },
+    ]),
+  );
 
   return (
     <StudioShell
@@ -80,7 +94,7 @@ export default async function BrandPlaylistPage() {
         ]}
       />
 
-      <BrandPlaylistTool moods={moods} />
+      <BrandPlaylistTool moods={moods} mixes={mixes} />
 
       <section
         aria-labelledby="bp-why"

@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { getEngagementSwitches } from "@/lib/engagement/switches.server";
 import { prisma } from "@/lib/prisma";
+import { generatedPlaylists } from "@/lib/soundtrack/combos";
 import { detectMood, isMood, MOOD_LABELS, MOODS } from "@/lib/soundtrack/moods";
 import {
   getMoodPlaylistLinks,
@@ -72,14 +73,19 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
 
     if (suggestionsOn) {
       const links = await getMoodPlaylistLinks();
-      // Only moods the owner has filled in can be picked.
-      moods = MOODS.filter((m) => links[m].length > 0).map((m) => ({
+      const generated = generatedPlaylists();
+      // Only moods with a playlist (brandbite's own or the owner's) can be picked.
+      moods = MOODS.filter((m) => generated[m] || links[m].length > 0).map((m) => ({
         value: m,
         label: MOOD_LABELS[m],
       }));
-      suggestions = (await Promise.all(links[mood].map(getPlaylistInfo))).filter(
-        (p): p is PlaylistInfo => p !== null,
-      );
+      const own = generated[mood];
+      suggestions = [
+        ...(own ? [own] : []),
+        ...(await Promise.all(links[mood].map(getPlaylistInfo))).filter(
+          (p): p is PlaylistInfo => p !== null,
+        ),
+      ];
     }
 
     if (!brand && suggestions.length === 0 && moods.length === 0) {

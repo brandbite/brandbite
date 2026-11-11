@@ -251,7 +251,7 @@ describe("soundtracks", () => {
     expect(res.status).toBe(403);
   });
 
-  it("suggests the owner's playlists for the mood unless the creative turned them off", async () => {
+  it("suggests playlists for the mood unless the creative turned them off", async () => {
     await switchOn("focusPlaylist");
     await prisma.appSetting.create({
       data: { key: "SOUNDTRACK_PLAYLISTS_MINIMAL", value: PLAYLIST },
@@ -269,7 +269,11 @@ describe("soundtracks", () => {
 
     const on = await get();
     expect(on.mood.value).toBe("MINIMAL");
-    expect(on.suggestions.map((s: { url: string }) => s.url)).toEqual([PLAYLIST]);
+    // brandbite's own playlist for the mood comes first, then the owner's.
+    const urls = on.suggestions.map((s: { url: string }) => s.url);
+    expect(urls).toHaveLength(2);
+    expect(urls[1]).toBe(PLAYLIST);
+    expect(on.suggestions[0].title).toBe("brandbite · Minimal");
 
     await prisma.userAccount.update({
       where: { id: w.creative.id },
