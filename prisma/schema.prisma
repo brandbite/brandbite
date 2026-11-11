@@ -122,6 +122,7 @@ enum NotificationType {
   MOODBOARD_COMMENT // Someone commented on a moodboard you made or a thread you're in
   SUPPORT_GUIDE_CHANGED // Code changed or removed a guide an admin had edited
   SOURCE_FILES_EXPIRING // Source files on brandbite storage are about to be deleted
+  THANKS_RECEIVED // A customer thanked the creative when approving a request
 }
 
 // --- CMS Content ---
@@ -238,6 +239,10 @@ model UserAccount {
   name                String?
   role                UserRole
 
+  /// Creatives: suggest a focus playlist when they start work. They can
+  /// turn it off for themselves ("Don't suggest music").
+  soundtrackSuggestions Boolean @default(true)
+
   /// Soft-delete timestamp. When set, the account is considered anonymized
   /// (email rewritten to a placeholder, name cleared) and auth is refused.
   /// Ledger + ticket rows are retained for financial / audit compliance.
@@ -329,6 +334,8 @@ model UserAccount {
   // Creative ratings (admin-only signal; creative does NOT see their own ratings)
   receivedRatings  CreativeRating[] @relation("CreativeRatingsReceived")
   submittedRatings CreativeRating[] @relation("CreativeRatingsGiven")
+  thanksReceived   TicketThanks[]   @relation("ThanksReceived")
+  thanksGiven      TicketThanks[]   @relation("ThanksGiven")
 
   // Consultations requested by this user
   requestedConsultations Consultation[] @relation("ConsultationsRequested")
@@ -391,6 +398,10 @@ model Company {
 
   website String? // Company website URL (optional)
 
+  /// The brand's soundtrack: a Spotify playlist or album link the customer
+  /// picked, shown to creatives on the company's requests.
+  soundtrackUrl String?
+
   planId String?
   plan   Plan?   @relation(fields: [planId], references: [id])
 
@@ -433,6 +444,7 @@ model Company {
   ticketDrafts TicketDraft[]
 
   creativeRatings CreativeRating[]
+  ticketThanks    TicketThanks[]
 
   consultations Consultation[]
 
@@ -1000,6 +1012,7 @@ model Ticket {
 
   // Creative rating (one per ticket, submitted by the customer on ticket DONE)
   creativeRating CreativeRating?
+  thanks         TicketThanks?
 
   // Time-tracking entries (D7). One ticket can have many entries from its
   // assigned creative; exactly zero or one of those is "running" (endedAt is
@@ -1084,6 +1097,37 @@ model CreativeRating {
 
   @@index([creativeId, createdAt])
   @@index([companyId, createdAt])
+}
+
+// -----------------------------------------------------------------------------
+// Thank-yous (client appreciation)
+//
+// One-tap tags a customer can add when approving a delivery ("Nailed the
+// brief", "Quick turnaround", "Great communication"). Unlike CreativeRating
+// these ARE shown to the creative: on their profile and portfolio. One row per
+// request. Tag values live in lib/engagement/thanks.ts.
+// -----------------------------------------------------------------------------
+
+model TicketThanks {
+  id String @id @default(cuid())
+
+  ticketId String @unique
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  creativeId String
+  creative   UserAccount @relation("ThanksReceived", fields: [creativeId], references: [id])
+
+  givenByUserId String
+  givenBy       UserAccount @relation("ThanksGiven", fields: [givenByUserId], references: [id])
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  tags String[]
+
+  createdAt DateTime @default(now())
+
+  @@index([creativeId, createdAt])
 }
 
 // -----------------------------------------------------------------------------

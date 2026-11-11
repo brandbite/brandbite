@@ -12,6 +12,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { LiveProgressCard } from "@/components/engagement/live-progress-card";
 import { IconClock } from "@/components/admin/v2/icons";
 import {
   Button,
@@ -56,7 +57,7 @@ import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { SafeHtml } from "@/components/ui/safe-html";
 import { Modal, ModalHeader, ModalFooter } from "@/components/ui/modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { RateCreativeModal } from "@/components/ratings/rate-creative-modal";
+import { ApprovalFeedbackModal } from "@/components/engagement/thank-creative-modal";
 import { TagBadge } from "@/components/ui/tag-badge";
 import { TagMultiSelect, type TagOption } from "@/components/ui/tag-multi-select";
 import type { TagColorKey } from "@/lib/tag-colors";
@@ -886,6 +887,13 @@ export default function CustomerTicketDetailPage() {
           </Callout>
         ) : null}
 
+        {/* Owner switch ENGAGEMENT_LIVE_PROGRESS; renders nothing when off. */}
+        <LiveProgressCard
+          ticketId={ticket.id}
+          status={ticket.status}
+          onStatusChange={() => setRefreshCounter((c) => c + 1)}
+        />
+
         {inReview ? (
           <section className="flex items-start gap-4 rounded-2xl border border-[var(--av2-attention-border)] bg-gradient-to-r from-[var(--av2-attention-from)] to-[var(--av2-attention-to)] p-5">
             <IconTile tone="peach" round size={44}>
@@ -1535,7 +1543,7 @@ export default function CustomerTicketDetailPage() {
       )}
 
       {/* Creative rating modal — opens when the customer marks the ticket DONE */}
-      <RateCreativeModal
+      <ApprovalFeedbackModal
         open={showRatingModal}
         ticketId={ticket.id}
         ticketTitle={ticket.title}

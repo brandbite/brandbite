@@ -12,6 +12,7 @@ function ProviderBadge({ provider }: { provider: EmbedCardData["provider"] }) {
     youtube: "YouTube",
     vimeo: "Vimeo",
     loom: "Loom",
+    spotify: "Spotify",
     generic: "Embed",
   };
 
@@ -70,6 +71,20 @@ export function EmbedCard({ data }: EmbedCardProps) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     });
+  }
+
+  // Spotify's player is its own cover and controls: show it straight away.
+  if (data.provider === "spotify") {
+    return (
+      <iframe
+        src={data.embedUrl}
+        title={data.title ?? "Spotify player"}
+        height={152}
+        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+        loading="lazy"
+        className="block w-full border-0"
+      />
+    );
   }
 
   if (playing) {

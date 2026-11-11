@@ -45,7 +45,7 @@ import { useToast } from "@/components/ui/toast-provider";
 
 type SettingsMap = Record<string, string | null>;
 
-type SectionKey = "finance" | "talent" | "notifications" | "features";
+type SectionKey = "finance" | "talent" | "notifications" | "features" | "engagement";
 
 type SettingMeta = {
   label: string;
@@ -120,6 +120,117 @@ const SETTING_META: Record<string, SettingMeta> = {
       { value: "on", label: "On — all customers" },
     ],
   },
+  ENGAGEMENT_LIVE_PROGRESS: {
+    label: "Live progress on requests",
+    description:
+      "Customers see a step tracker on each request (Queued, In progress, In review, Done) and a note with a running clock while their creative's timer is on.",
+    type: "boolean",
+    section: "engagement",
+  },
+  ENGAGEMENT_CREATIVE_PROGRESS: {
+    label: "Creative progress",
+    description:
+      "Creatives see how close they are to the next payout tier and their streak of requests approved first time, on their overview.",
+    type: "boolean",
+    section: "engagement",
+  },
+  ENGAGEMENT_THANK_YOUS: {
+    label: "Customer thank-yous",
+    description:
+      "When approving a delivery, customers can add one-tap thank-you tags. The creative gets a notification and the tags collect on their profile. Tags already given are kept when this is off.",
+    type: "boolean",
+    section: "engagement",
+  },
+  ENGAGEMENT_BRIEF_STRENGTH: {
+    label: "Brief strength meter",
+    description:
+      "The new-request form shows a meter that fills as the customer adds a reference, dimensions and a moodboard.",
+    type: "boolean",
+    section: "engagement",
+  },
+  ENGAGEMENT_BRAND_PROFILE: {
+    label: "Brand profile progress",
+    description:
+      "Customers see a card on their overview showing how complete their brand setup is, with the next step to take.",
+    type: "boolean",
+    section: "engagement",
+  },
+  ENGAGEMENT_BRAND_SOUNDTRACK: {
+    label: "Brand soundtrack (Spotify)",
+    description:
+      "Customers can add a Spotify playlist to their brand, shown to the creative on each request. Spotify links on moodboards play in place.",
+    type: "boolean",
+    section: "engagement",
+  },
+  ENGAGEMENT_FOCUS_PLAYLIST: {
+    label: "Focus playlist for creatives (Spotify)",
+    description:
+      "When a creative starts work, a card suggests a playlist that fits the request's mood. Each creative can turn the suggestions off for themselves.",
+    type: "boolean",
+    section: "engagement",
+  },
+  ENGAGEMENT_MONTHLY_RECAP: {
+    label: "Monthly recap",
+    description:
+      "On the first of each month customers get an email and an overview card summing up the month: requests delivered, tokens used and turnaround.",
+    type: "boolean",
+    section: "engagement",
+  },
+  SOUNDTRACK_PLAYLISTS_ENERGETIC: {
+    label: "Playlists: Energetic · Upbeat",
+    description:
+      "Spotify playlist or album links suggested to creatives for energetic requests. Separate several with commas; the first is suggested first. Leave empty to suggest nothing for this mood.",
+    type: "text",
+    section: "engagement",
+    inputClassName: "max-w-none",
+  },
+  SOUNDTRACK_PLAYLISTS_MINIMAL: {
+    label: "Playlists: Minimal · Calm",
+    description:
+      "Spotify playlist or album links suggested to creatives for minimal requests. Separate several with commas; the first is suggested first. Leave empty to suggest nothing for this mood.",
+    type: "text",
+    section: "engagement",
+    inputClassName: "max-w-none",
+  },
+  SOUNDTRACK_PLAYLISTS_LUXURY: {
+    label: "Playlists: Luxury · Elegant",
+    description:
+      "Spotify playlist or album links suggested to creatives for luxury requests. Separate several with commas; the first is suggested first. Leave empty to suggest nothing for this mood.",
+    type: "text",
+    section: "engagement",
+    inputClassName: "max-w-none",
+  },
+  SOUNDTRACK_PLAYLISTS_PLAYFUL: {
+    label: "Playlists: Playful · Fun",
+    description:
+      "Spotify playlist or album links suggested to creatives for playful requests. Separate several with commas; the first is suggested first. Leave empty to suggest nothing for this mood.",
+    type: "text",
+    section: "engagement",
+    inputClassName: "max-w-none",
+  },
+  SOUNDTRACK_PLAYLISTS_WARM: {
+    label: "Playlists: Warm · Friendly",
+    description:
+      "Spotify playlist or album links suggested to creatives for warm requests. Separate several with commas; the first is suggested first. Leave empty to suggest nothing for this mood.",
+    type: "text",
+    section: "engagement",
+    inputClassName: "max-w-none",
+  },
+  SOUNDTRACK_PLAYLISTS_BOLD: {
+    label: "Playlists: Bold · Confident",
+    description:
+      "Spotify playlist or album links suggested to creatives for bold requests. Separate several with commas; the first is suggested first. Leave empty to suggest nothing for this mood.",
+    type: "text",
+    section: "engagement",
+    inputClassName: "max-w-none",
+  },
+  ENGAGEMENT_PLAYLIST_TOOL: {
+    label: "Brand playlist generator (public tool)",
+    description:
+      "The free public page /brand-playlist: visitors pick words for their brand and get a playlist from the mood lists above. When off, or while no mood has a playlist, the page shows Not found.",
+    type: "boolean",
+    section: "engagement",
+  },
 };
 
 const SECTION_TITLES: Record<SectionKey, { title: string; description: string }> = {
@@ -141,6 +252,11 @@ const SECTION_TITLES: Record<SectionKey, { title: string; description: string }>
     title: "Features",
     description:
       "Product capabilities that can be toggled on/off without a code change. Existing data is preserved when a feature is disabled — flipping back on restores the surface instantly.",
+  },
+  engagement: {
+    title: "Engagement",
+    description:
+      "The extras that set brandbite apart: progress, thank-yous and soundtracks. Each one is off until you switch it on, and switching it off hides it without deleting anything.",
   },
 };
 
@@ -369,7 +485,8 @@ export default function AdminSettingsPage() {
   // ---- Save a single setting ----
   const handleSave = async (key: string) => {
     const value = drafts[key]?.trim();
-    if (!value) return;
+    // Soundtrack lists may be saved empty: that clears the mood.
+    if (value === undefined || (!value && !key.startsWith("SOUNDTRACK_PLAYLISTS_"))) return;
 
     // Skip if nothing changed
     if (value === (settings[key] ?? "")) {

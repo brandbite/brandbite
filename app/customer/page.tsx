@@ -52,6 +52,8 @@ import {
 import { buildTicketCode } from "@/lib/ticket-code";
 import { useLiveRefresh } from "@/lib/hooks/use-live-refresh";
 import { IntegrationsPrompt } from "@/components/dashboard/integrations-prompt";
+import { BrandProfileCard } from "@/components/engagement/brand-profile-card";
+import { MonthlyRecapCard } from "@/components/engagement/monthly-recap-card";
 
 /** Matches the admin dashboard's definition of a low-balance company. */
 const LOW_BALANCE_TOKENS = 5;
@@ -454,6 +456,12 @@ export default function CustomerOverviewPage() {
               </ButtonLink>
             </section>
           ) : null}
+
+          {/* Engagement cards; each renders nothing while its owner switch is off. */}
+          <div className="grid gap-6 empty:hidden lg:grid-cols-2 [&>*:only-child]:lg:col-span-2">
+            <MonthlyRecapCard />
+            <BrandProfileCard />
+          </div>
 
           <IntegrationsPrompt />
 

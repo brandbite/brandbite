@@ -45,7 +45,11 @@ describe("updateAdminSettingSchema", () => {
 
 describe("OWNER_ONLY_SETTING_KEYS", () => {
   it("covers the settings that move money", () => {
-    expect([...OWNER_ONLY_SETTING_KEYS].sort()).toEqual([
+    // The engagement switches and soundtrack lists are owner-only too; their own tests cover them.
+    const money = [...OWNER_ONLY_SETTING_KEYS].filter(
+      (k) => !k.startsWith("ENGAGEMENT_") && !k.startsWith("SOUNDTRACK_"),
+    );
+    expect(money.sort()).toEqual([
       "AUTO_PAYOUT_ENABLED",
       "AUTO_PAYOUT_THRESHOLD_TOKENS",
       "MIN_WITHDRAWAL_TOKENS",

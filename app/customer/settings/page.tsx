@@ -39,6 +39,7 @@ import {
   TextLink,
   type Tone,
 } from "@/components/admin/v2/ui";
+import { BrandSoundtrackSetting } from "@/components/engagement/brand-soundtrack-setting";
 import { KeptTabPanel, useTabFromUrl } from "@/components/dashboard/account/account-ui";
 import { CompanyTagsCard } from "@/components/dashboard/account/company-tags";
 import { DeleteAccountCard } from "@/components/dashboard/account/delete-account";
@@ -774,6 +775,8 @@ export default function CustomerSettingsPage() {
                   )}
                 </Card>
                 <CompanyTagsCard canManage={canEditCompany} />
+                {/* Owner switch ENGAGEMENT_BRAND_SOUNDTRACK; renders nothing when off. */}
+                <BrandSoundtrackSetting />
               </div>
             </KeptTabPanel>
 

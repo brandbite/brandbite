@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { GET as googleCalendarHealth } from "@/app/api/cron/google-calendar-health/route";
 import { moveFilesForAllCompanies } from "@/lib/source-files/move-to-connected-storage";
+import { sendMonthlyRecaps } from "@/lib/engagement/monthly-recap.server";
 import { runSourceFileRetention } from "@/lib/source-files/retention";
 
 export const runtime = "nodejs";
@@ -56,6 +57,15 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error("[cron/daily-maintenance] moving files to drives failed", error);
     results.movedToDrives = { error: "failed" };
+  }
+
+  try {
+    // Last month's recap to customers; sends once per month and only while
+    // the owner's "Monthly recap" switch is on.
+    results.monthlyRecap = await sendMonthlyRecaps();
+  } catch (error) {
+    console.error("[cron/daily-maintenance] monthly recap failed", error);
+    results.monthlyRecap = { error: "failed" };
   }
 
   return NextResponse.json(results);

@@ -54,6 +54,7 @@ const SUBJECT_MAP: Record<NotificationType, string> = {
   MOODBOARD_COMMENT: "New moodboard comment",
   SUPPORT_GUIDE_CHANGED: "A Support guide you edited changed in code",
   SOURCE_FILES_EXPIRING: "Your source files will be deleted soon",
+  THANKS_RECEIVED: "A customer thanked you",
 };
 
 const HEADINGS: Partial<Record<NotificationType, string>> = {
@@ -121,6 +122,7 @@ const CTA_LABELS: Record<NotificationType, string> = {
   MOODBOARD_COMMENT: "View the comment",
   SUPPORT_GUIDE_CHANGED: "Review the guide",
   SOURCE_FILES_EXPIRING: "Download your files",
+  THANKS_RECEIVED: "View request",
 };
 
 function getSecondaryLink(

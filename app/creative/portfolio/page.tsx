@@ -8,6 +8,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+
+import {
+  ClientAppreciationPanel,
+  ThanksChips,
+  useAppreciation,
+} from "@/components/engagement/client-appreciation";
+import type { ThanksTag } from "@/lib/engagement/thanks";
 import Link from "next/link";
 
 import { IconArrowUpRight, IconDocument } from "@/components/admin/v2/icons";
@@ -76,6 +83,8 @@ export default function CreativePortfolioPage() {
   const [category, setCategory] = useState<string>(ALL_CATEGORY);
   const [search, setSearch] = useState("");
   const [view, setView] = useState<ViewMode>("grid");
+  // null while the owner's "Customer thank-yous" switch is off.
+  const appreciation = useAppreciation();
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -238,9 +247,14 @@ export default function CreativePortfolioPage() {
           {view === "grid" ? (
             <div className="grid gap-6 xl:grid-cols-2">
               {paged.rows.map((item) => (
-                <PortfolioCard key={item.ticketId} item={item} />
+                <PortfolioCard
+                  key={item.ticketId}
+                  item={item}
+                  thanks={appreciation?.byTicket[item.ticketId]}
+                />
               ))}
               <AboutPortfolio />
+              <ClientAppreciationPanel appreciation={appreciation} />
             </div>
           ) : (
             <div className="space-y-6">
@@ -248,6 +262,7 @@ export default function CreativePortfolioPage() {
                 <PortfolioTable items={paged.rows} />
               </Card>
               <AboutPortfolio />
+              <ClientAppreciationPanel appreciation={appreciation} />
             </div>
           )}
           <div className="mt-2 [&>div]:border-t-0 [&>div]:px-0">
@@ -282,7 +297,7 @@ function AboutPortfolio() {
   );
 }
 
-function PortfolioCard({ item }: { item: PortfolioItem }) {
+function PortfolioCard({ item, thanks }: { item: PortfolioItem; thanks?: ThanksTag[] }) {
   const cover = item.thumbnails[0];
   const extras = item.thumbnails.slice(1);
 
@@ -337,6 +352,11 @@ function PortfolioCard({ item }: { item: PortfolioItem }) {
             Done
           </Badge>
         </div>
+        {thanks && thanks.length > 0 ? (
+          <div className="mt-2">
+            <ThanksChips tags={thanks} />
+          </div>
+        ) : null}
         <span className={`${buttonClass("primary")} mt-auto self-start max-sm:mt-4 sm:mt-4`}>
           Open request
           <IconArrowUpRight />

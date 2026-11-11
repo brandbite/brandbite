@@ -6,6 +6,7 @@
 
 "use client";
 
+import { SoundtrackPreferenceCard } from "@/components/engagement/soundtrack-preference";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Card, CardTitle, PageHeader, Skeleton, Tabs } from "@/components/admin/v2/ui";
@@ -241,6 +242,10 @@ export default function CreativeSettingsPage() {
                   <NotificationPreferencesBody role="DESIGNER" state={notifications} />
                 </div>
               </Card>
+              {/* Owner switch ENGAGEMENT_FOCUS_PLAYLIST; renders nothing when off. */}
+              <div className="mt-6 empty:hidden">
+                <SoundtrackPreferenceCard />
+              </div>
             </KeptTabPanel>
 
             <KeptTabPanel value="account" {...panel}>

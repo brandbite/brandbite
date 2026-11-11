@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+import { ENGAGEMENT_SETTING_KEYS } from "@/lib/engagement/switches";
+import { SOUNDTRACK_SETTING_KEYS } from "@/lib/soundtrack/moods";
+import { invalidSpotifyEntries } from "@/lib/soundtrack/spotify";
+
 // Single source of truth for admin-writable AppSetting keys. The settings
 // route imports this for both GET filtering and PATCH validation — previously
 // the route kept its own longer list while this enum lagged behind, so the
@@ -15,15 +19,22 @@ export const ADMIN_SETTING_KEYS = [
   // AI ticket mode: "off" | "on". Default off — there's no working AI
   // generation API yet.
   "AI_TICKETS_MODE",
+  // Engagement features (lib/engagement/switches.ts). All default off.
+  ...ENGAGEMENT_SETTING_KEYS,
+  // Spotify playlist links per mood for the creatives' focus playlist.
+  ...SOUNDTRACK_SETTING_KEYS,
 ] as const;
 
 export type AdminSettingKey = (typeof ADMIN_SETTING_KEYS)[number];
 
-/** Settings that move money — owner-only, like other money actions (lib/roles.ts). */
+/** Owner-only settings: the ones that move money (lib/roles.ts) and the engagement switches. */
 export const OWNER_ONLY_SETTING_KEYS: ReadonlySet<AdminSettingKey> = new Set([
   "MIN_WITHDRAWAL_TOKENS",
   "AUTO_PAYOUT_ENABLED",
   "AUTO_PAYOUT_THRESHOLD_TOKENS",
+  // Which engagement features run is the site owner's call.
+  ...ENGAGEMENT_SETTING_KEYS,
+  ...SOUNDTRACK_SETTING_KEYS,
 ]);
 
 const BOOLEAN_KEYS: ReadonlySet<AdminSettingKey> = new Set([
@@ -31,7 +42,10 @@ const BOOLEAN_KEYS: ReadonlySet<AdminSettingKey> = new Set([
   "TALENT_APPLICATIONS_OPEN",
   "ADMIN_EVENT_EMAILS_ENABLED",
   "TAGS_ENABLED",
+  ...ENGAGEMENT_SETTING_KEYS,
 ]);
+
+const SOUNDTRACK_KEYS: ReadonlySet<string> = new Set(SOUNDTRACK_SETTING_KEYS);
 
 const POSITIVE_INT_KEYS: ReadonlySet<AdminSettingKey> = new Set([
   "MIN_WITHDRAWAL_TOKENS",
@@ -46,9 +60,29 @@ export const updateAdminSettingSchema = z
     key: z.enum(ADMIN_SETTING_KEYS, {
       error: "Invalid or unknown setting key.",
     }),
-    value: z.string().trim().min(1, "Setting value must be a non-empty string."),
+    value: z.string().trim(),
   })
   .superRefine(({ key, value }, ctx) => {
+    if (SOUNDTRACK_KEYS.has(key)) {
+      // Empty is allowed: it clears the mood's playlists.
+      const bad = invalidSpotifyEntries(value);
+      if (bad.length > 0) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["value"],
+          message: `Not a Spotify playlist or album link: ${bad[0]}`,
+        });
+      }
+      return;
+    }
+    if (value.length === 0) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["value"],
+        message: "Setting value must be a non-empty string.",
+      });
+      return;
+    }
     if (POSITIVE_INT_KEYS.has(key)) {
       const n = Number(value);
       if (!/^\d+$/.test(value) || !Number.isSafeInteger(n) || n < 1 || n > 1_000_000) {

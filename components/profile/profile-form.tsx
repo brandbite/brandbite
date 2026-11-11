@@ -43,6 +43,10 @@
 "use client";
 
 import {
+  ClientAppreciationCard,
+  useAppreciation,
+} from "@/components/engagement/client-appreciation";
+import {
   createContext,
   useCallback,
   useContext,
@@ -1464,16 +1468,19 @@ function ProfileFormBody({ layout, dashboard }: { layout: ProfileFormLayout; das
       aside={
         dashboard ? (
           user.role === "DESIGNER" ? (
-            <CreativeSetupChecklist
-              name={user.name}
-              workingHoursSummary={
-                user.workSchedule
-                  ? `${describeWorkSchedule(user.workSchedule)} (${formatTimeZone(user.workSchedule.timezone)})`
-                  : null
-              }
-              skillCount={skillCount ?? null}
-              onOpenWorkload={() => openTab("workload")}
-            />
+            <div className="min-w-0 space-y-6">
+              <CreativeSetupChecklist
+                name={user.name}
+                workingHoursSummary={
+                  user.workSchedule
+                    ? `${describeWorkSchedule(user.workSchedule)} (${formatTimeZone(user.workSchedule.timezone)})`
+                    : null
+                }
+                skillCount={skillCount ?? null}
+                onOpenWorkload={() => openTab("workload")}
+              />
+              <CreativeAppreciation />
+            </div>
           ) : (
             <CustomerAccountSummary roleLabel={ROLE_LABELS[user.role]} />
           )
@@ -2477,4 +2484,9 @@ function AccountSummary({
       </ul>
     </aside>
   );
+}
+
+/** A creative's thank-yous from customers; nothing while the owner's switch is off. */
+function CreativeAppreciation() {
+  return <ClientAppreciationCard appreciation={useAppreciation()} />;
 }

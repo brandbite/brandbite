@@ -8,6 +8,8 @@
 
 "use client";
 
+import { BriefStrengthCard } from "@/components/engagement/brief-strength-card";
+import { briefStrength } from "@/lib/engagement/brief-strength";
 import {
   useCallback,
   useEffect,
@@ -1339,6 +1341,23 @@ export default function NewTicketForm({
 
           {/* Right: service and planning */}
           <div className="min-w-0 space-y-6">
+            {/* Owner switch ENGAGEMENT_BRIEF_STRENGTH; renders nothing when off. */}
+            <BriefStrengthCard
+              strength={briefStrength({
+                briefHtml: description,
+                attachmentCount: briefFiles.length + savedFiles.length,
+                moodboardLinked: moodboardId !== "",
+              })}
+              onLinkMoodboard={
+                moodboards.length > 0
+                  ? () => {
+                      const picker = document.getElementById(`${ids}-moodboard`);
+                      picker?.scrollIntoView({ behavior: "smooth", block: "center" });
+                      picker?.focus({ preventScroll: true });
+                    }
+                  : undefined
+              }
+            />
             <Section title="Request details">
               <div className="space-y-4">
                 <Field label={<RequiredLabel>Service</RequiredLabel>}>
