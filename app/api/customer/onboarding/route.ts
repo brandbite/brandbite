@@ -3,13 +3,17 @@
 // @purpose: Customer self-service onboarding — create company + mark complete
 // @version: v1.0.0
 // @status: active
-// @lastUpdate: 2025-12-15
+// @lastUpdate: 2026-11-11
 // -----------------------------------------------------------------------------
 
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { notifySiteOwnersOfEvent } from "@/lib/admin-event-email";
 import { getCurrentUserOrThrow } from "@/lib/auth";
+import { sendNotificationEmail } from "@/lib/email";
+import { renderWelcomeEmail } from "@/lib/email-templates/onboarding/welcome";
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://brandbite.studio";
 
 // ---------------------------------------------------------------------------
 // POST — Create a new company and make the current user the OWNER
@@ -112,11 +116,33 @@ export async function PATCH() {
       return NextResponse.json({ error: "No active company found." }, { status: 400 });
     }
 
-    const updated = await prisma.company.update({
-      where: { id: user.activeCompanyId },
+    // Only the first completion counts, so the welcome email goes out once.
+    const firstTime = await prisma.company.updateMany({
+      where: { id: user.activeCompanyId, onboardingCompletedAt: null },
       data: { onboardingCompletedAt: new Date() },
-      select: { id: true, name: true },
     });
+    const updated = await prisma.company.findUniqueOrThrow({
+      where: { id: user.activeCompanyId },
+      select: { id: true, name: true, plan: { select: { name: true } } },
+    });
+
+    if (firstTime.count > 0 && user.email) {
+      const to = user.email;
+      // After the response, so the wizard's redirect never waits on Resend.
+      after(async () => {
+        try {
+          const { subject, html } = await renderWelcomeEmail({
+            name: user.name,
+            planName: updated.plan?.name ?? null,
+            ctaUrl: `${APP_URL}/customer/tickets/new`,
+            docsUrl: `${APP_URL}/guides`,
+          });
+          await sendNotificationEmail(to, subject, html);
+        } catch (err) {
+          console.error("[Onboarding] welcome email failed:", err);
+        }
+      });
+    }
 
     // Best-effort site-owner notification — "$company finished onboarding".
     // Fire-and-forget so a slow Resend call doesn't block the wizard's

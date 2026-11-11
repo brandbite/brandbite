@@ -129,6 +129,21 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
     (id: string) => serverIds.current.get(id) ?? Promise.resolve(id),
     [],
   );
+  // The other way round: comments come back with server ids, the screen uses temporary ones.
+  const clientIds = useRef(new Map<string, string>());
+  const [clientIdsVersion, setClientIdsVersion] = useState(0);
+  /** Remembers the save of a new object, so its temporary id can be resolved both ways. */
+  const trackSave = useCallback((id: string, saved: Promise<string>) => {
+    serverIds.current.set(id, saved);
+    saved.then(
+      (sid) => {
+        if (sid === id) return;
+        clientIds.current.set(sid, id);
+        setClientIdsVersion((v) => v + 1);
+      },
+      () => {},
+    );
+  }, []);
   /**
    * Writes to one object go out in order, so an undo right after a delete can't
    * reach the server first. The arrows have a line of their own.
@@ -171,6 +186,8 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
 
       const json = await res.json();
       serverIds.current.clear();
+      clientIds.current.clear();
+      setClientIdsVersion((v) => v + 1);
       clearHistory();
       setMoodboard(json.moodboard);
     } catch (err) {
@@ -188,7 +205,15 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
   // Comments
   // ---------------------------------------------------------------------------
 
-  const [threads, setThreads] = useState<CommentThreadClient[]>([]);
+  const [serverThreads, setThreads] = useState<CommentThreadClient[]>([]);
+  /** Threads on the ids the board shows, which may still be temporary for new objects. */
+  const threads = React.useMemo(() => {
+    void clientIdsVersion;
+    return serverThreads.map((t) => {
+      const local = clientIds.current.get(t.itemId);
+      return local ? { ...t, itemId: local } : t;
+    });
+  }, [serverThreads, clientIdsVersion]);
   const [commentViewer, setCommentViewer] = useState<CommentViewer | null>(null);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -507,7 +532,7 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
         if (!res.ok) throw new Error("Failed to add copy");
         return (await res.json()).item.id as string;
       });
-      serverIds.current.set(copy.id, saved);
+      trackSave(copy.id, saved);
       saved.catch((err) => {
         console.error("[moodboard-view] copy error:", err);
         showToast({ type: "error", title: "We couldn't save that copy. Please try again." });
@@ -596,7 +621,7 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
       if (!res.ok) throw new Error("Failed to add item");
       return (await res.json()).item.id as string;
     });
-    serverIds.current.set(id, saved);
+    trackSave(id, saved);
 
     saved.catch((err) => {
       console.error("[moodboard-view] add item error:", err);
@@ -1113,7 +1138,7 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
       if (!res.ok) throw new Error("Failed to save drawing");
       return (await res.json()).item.id as string;
     });
-    serverIds.current.set(id, saved);
+    trackSave(id, saved);
     saved.catch((err) => {
       console.error("[moodboard-view] add drawing error:", err);
       showToast({ type: "error", title: "We couldn't save that drawing. Please try again." });
@@ -1342,7 +1367,15 @@ export function MoodboardView({ moodboardId, basePath }: MoodboardViewProps) {
             if (canEdit) canvasHandle.current?.selectCard(itemId);
           }}
           onStart={(itemId, body) =>
-            commentRequest("", { method: "POST", body: JSON.stringify({ itemId, body }) })
+            // A new object may still be saving; comment on the id the server gave it.
+            serverId(itemId).then(
+              (sid) =>
+                commentRequest("", {
+                  method: "POST",
+                  body: JSON.stringify({ itemId: sid, body }),
+                }),
+              () => false,
+            )
           }
           onReply={(threadId, body) =>
             commentRequest("", { method: "POST", body: JSON.stringify({ threadId, body }) })
