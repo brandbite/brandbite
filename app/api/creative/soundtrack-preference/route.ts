@@ -10,22 +10,22 @@ import { getCurrentUserOrThrow } from "@/lib/auth";
 import { isEngagementOn } from "@/lib/engagement/switches.server";
 import { prisma } from "@/lib/prisma";
 
-async function creativeOrError() {
+/** The signed-in creative's id, or null when the caller isn't a creative. */
+async function creativeId(): Promise<string | null> {
   const user = await getCurrentUserOrThrow();
-  if (user.role !== "DESIGNER") {
-    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) } as const;
-  }
-  return { user } as const;
+  return user.role === "DESIGNER" ? user.id : null;
 }
+
+const forbidden = () => NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
 export async function GET() {
   try {
-    const auth = await creativeOrError();
-    if ("error" in auth) return auth.error;
+    const id = await creativeId();
+    if (!id) return forbidden();
     // The switch in Settings only shows while the owner has the feature on.
     if (!(await isEngagementOn("focusPlaylist"))) return NextResponse.json({ enabled: false });
     const account = await prisma.userAccount.findUnique({
-      where: { id: auth.user.id },
+      where: { id },
       select: { soundtrackSuggestions: true },
     });
     return NextResponse.json({
@@ -43,14 +43,14 @@ export async function GET() {
 
 export async function PATCH(req: NextRequest) {
   try {
-    const auth = await creativeOrError();
-    if ("error" in auth) return auth.error;
+    const id = await creativeId();
+    if (!id) return forbidden();
     const body = (await req.json().catch(() => null)) as { suggestions?: unknown } | null;
     if (typeof body?.suggestions !== "boolean") {
       return NextResponse.json({ error: "suggestions must be true or false" }, { status: 400 });
     }
     await prisma.userAccount.update({
-      where: { id: auth.user.id },
+      where: { id },
       data: { soundtrackSuggestions: body.suggestions },
     });
     return NextResponse.json({ suggestions: body.suggestions });

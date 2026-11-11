@@ -15,22 +15,27 @@ import { prisma } from "@/lib/prisma";
 import { getPlaylistInfo } from "@/lib/soundtrack/playlists.server";
 import { parseSpotifyUrl, spotifyOpenUrl } from "@/lib/soundtrack/spotify";
 
-async function context() {
+type Context =
+  | { ok: false; response: NextResponse }
+  | { ok: true; companyId: string; canEdit: boolean };
+
+async function context(): Promise<Context> {
   const user = await getCurrentUserOrThrow();
   if (user.role !== "CUSTOMER" || !user.activeCompanyId) {
-    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) } as const;
+    return { ok: false, response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
   }
   const membership = await prisma.companyMember.findFirst({
     where: { companyId: user.activeCompanyId, userId: user.id },
     select: { roleInCompany: true },
   });
   return {
+    ok: true,
     companyId: user.activeCompanyId,
     canEdit: isCompanyAdminRole(membership?.roleInCompany),
-  } as const;
+  };
 }
 
-function fail(err: any, what: string) {
+function fail(err: any, what: string): NextResponse {
   if (err?.code === "UNAUTHENTICATED") {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
   }
@@ -41,7 +46,7 @@ function fail(err: any, what: string) {
 export async function GET() {
   try {
     const ctx = await context();
-    if ("error" in ctx) return ctx.error;
+    if (!ctx.ok) return ctx.response;
     if (!(await isEngagementOn("brandSoundtrack"))) return NextResponse.json({ enabled: false });
     const company = await prisma.company.findUnique({
       where: { id: ctx.companyId },
@@ -60,7 +65,7 @@ export async function GET() {
 export async function PUT(req: NextRequest) {
   try {
     const ctx = await context();
-    if ("error" in ctx) return ctx.error;
+    if (!ctx.ok) return ctx.response;
     if (!(await isEngagementOn("brandSoundtrack"))) {
       return NextResponse.json({ error: "Brand soundtracks are switched off" }, { status: 404 });
     }
