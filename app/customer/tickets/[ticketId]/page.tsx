@@ -12,6 +12,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { LiveProgressCard } from "@/components/engagement/live-progress-card";
 import { IconClock } from "@/components/admin/v2/icons";
 import {
   Button,
@@ -885,6 +886,13 @@ export default function CustomerTicketDetailPage() {
             {statusError}
           </Callout>
         ) : null}
+
+        {/* Owner switch ENGAGEMENT_LIVE_PROGRESS; renders nothing when off. */}
+        <LiveProgressCard
+          ticketId={ticket.id}
+          status={ticket.status}
+          onStatusChange={() => setRefreshCounter((c) => c + 1)}
+        />
 
         {inReview ? (
           <section className="flex items-start gap-4 rounded-2xl border border-[var(--av2-attention-border)] bg-gradient-to-r from-[var(--av2-attention-from)] to-[var(--av2-attention-to)] p-5">
