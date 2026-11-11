@@ -41,14 +41,21 @@ export const metadata: Metadata = pageMetadata({
   path: TOOL.path,
 });
 
-/** The words a visitor picks from, per mood. */
+/**
+ * The words a visitor picks from: one per mood, so every pick changes the
+ * playlist (two words for the same mood would give the same one).
+ */
 const WORDS: Record<Mood, string[]> = {
-  ENERGETIC: ["Energetic", "Dynamic", "Vibrant"],
-  MINIMAL: ["Minimal", "Calm", "Modern"],
-  LUXURY: ["Luxurious", "Elegant", "Refined"],
-  PLAYFUL: ["Playful", "Fun", "Quirky"],
-  WARM: ["Warm", "Friendly", "Natural"],
-  BOLD: ["Bold", "Confident", "Striking"],
+  ENERGETIC: ["Energetic"],
+  MINIMAL: ["Minimal"],
+  LUXURY: ["Luxurious"],
+  PLAYFUL: ["Playful"],
+  WARM: ["Warm"],
+  BOLD: ["Bold"],
+  NOSTALGIC: ["Nostalgic"],
+  FUTURISTIC: ["Futuristic"],
+  EARTHY: ["Earthy"],
+  DREAMY: ["Dreamy"],
 };
 
 export default async function BrandPlaylistPage() {

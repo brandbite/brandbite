@@ -177,49 +177,81 @@ const SETTING_META: Record<string, SettingMeta> = {
     section: "engagement",
   },
   SOUNDTRACK_PLAYLISTS_ENERGETIC: {
-    label: "Playlists: Energetic · Upbeat",
+    label: "Extra playlists: Energetic · Upbeat",
     description:
-      "Spotify playlist or album links suggested to creatives for energetic requests. Separate several with commas; the first is suggested first. Leave empty to suggest nothing for this mood.",
+      "Optional. brandbite already has its own playlist for energetic requests, so this can stay empty. Add Spotify playlist or album links here only if you want more choices for this mood; separate several with commas.",
     type: "text",
     section: "engagement",
     inputClassName: "max-w-none",
   },
   SOUNDTRACK_PLAYLISTS_MINIMAL: {
-    label: "Playlists: Minimal · Calm",
+    label: "Extra playlists: Minimal · Calm",
     description:
-      "Spotify playlist or album links suggested to creatives for minimal requests. Separate several with commas; the first is suggested first. Leave empty to suggest nothing for this mood.",
+      "Optional. brandbite already has its own playlist for minimal requests, so this can stay empty. Add Spotify playlist or album links here only if you want more choices for this mood; separate several with commas.",
     type: "text",
     section: "engagement",
     inputClassName: "max-w-none",
   },
   SOUNDTRACK_PLAYLISTS_LUXURY: {
-    label: "Playlists: Luxury · Elegant",
+    label: "Extra playlists: Luxury · Elegant",
     description:
-      "Spotify playlist or album links suggested to creatives for luxury requests. Separate several with commas; the first is suggested first. Leave empty to suggest nothing for this mood.",
+      "Optional. brandbite already has its own playlist for luxury requests, so this can stay empty. Add Spotify playlist or album links here only if you want more choices for this mood; separate several with commas.",
     type: "text",
     section: "engagement",
     inputClassName: "max-w-none",
   },
   SOUNDTRACK_PLAYLISTS_PLAYFUL: {
-    label: "Playlists: Playful · Fun",
+    label: "Extra playlists: Playful · Fun",
     description:
-      "Spotify playlist or album links suggested to creatives for playful requests. Separate several with commas; the first is suggested first. Leave empty to suggest nothing for this mood.",
+      "Optional. brandbite already has its own playlist for playful requests, so this can stay empty. Add Spotify playlist or album links here only if you want more choices for this mood; separate several with commas.",
     type: "text",
     section: "engagement",
     inputClassName: "max-w-none",
   },
   SOUNDTRACK_PLAYLISTS_WARM: {
-    label: "Playlists: Warm · Friendly",
+    label: "Extra playlists: Warm · Friendly",
     description:
-      "Spotify playlist or album links suggested to creatives for warm requests. Separate several with commas; the first is suggested first. Leave empty to suggest nothing for this mood.",
+      "Optional. brandbite already has its own playlist for warm requests, so this can stay empty. Add Spotify playlist or album links here only if you want more choices for this mood; separate several with commas.",
     type: "text",
     section: "engagement",
     inputClassName: "max-w-none",
   },
   SOUNDTRACK_PLAYLISTS_BOLD: {
-    label: "Playlists: Bold · Confident",
+    label: "Extra playlists: Bold · Confident",
     description:
-      "Spotify playlist or album links suggested to creatives for bold requests. Separate several with commas; the first is suggested first. Leave empty to suggest nothing for this mood.",
+      "Optional. brandbite already has its own playlist for bold requests, so this can stay empty. Add Spotify playlist or album links here only if you want more choices for this mood; separate several with commas.",
+    type: "text",
+    section: "engagement",
+    inputClassName: "max-w-none",
+  },
+  SOUNDTRACK_PLAYLISTS_NOSTALGIC: {
+    label: "Extra playlists: Nostalgic · Retro",
+    description:
+      "Optional. brandbite already has its own playlist for nostalgic requests, so this can stay empty. Add Spotify playlist or album links here only if you want more choices for this mood; separate several with commas.",
+    type: "text",
+    section: "engagement",
+    inputClassName: "max-w-none",
+  },
+  SOUNDTRACK_PLAYLISTS_FUTURISTIC: {
+    label: "Extra playlists: Futuristic · Tech",
+    description:
+      "Optional. brandbite already has its own playlist for futuristic requests, so this can stay empty. Add Spotify playlist or album links here only if you want more choices for this mood; separate several with commas.",
+    type: "text",
+    section: "engagement",
+    inputClassName: "max-w-none",
+  },
+  SOUNDTRACK_PLAYLISTS_EARTHY: {
+    label: "Extra playlists: Earthy · Organic",
+    description:
+      "Optional. brandbite already has its own playlist for earthy requests, so this can stay empty. Add Spotify playlist or album links here only if you want more choices for this mood; separate several with commas.",
+    type: "text",
+    section: "engagement",
+    inputClassName: "max-w-none",
+  },
+  SOUNDTRACK_PLAYLISTS_DREAMY: {
+    label: "Extra playlists: Dreamy · Soft",
+    description:
+      "Optional. brandbite already has its own playlist for dreamy requests, so this can stay empty. Add Spotify playlist or album links here only if you want more choices for this mood; separate several with commas.",
     type: "text",
     section: "engagement",
     inputClassName: "max-w-none",
@@ -227,7 +259,7 @@ const SETTING_META: Record<string, SettingMeta> = {
   ENGAGEMENT_PLAYLIST_TOOL: {
     label: "Brand playlist generator (public tool)",
     description:
-      "The free public page /brand-playlist: visitors pick words for their brand and get a playlist from the mood lists above. When off, or while no mood has a playlist, the page shows Not found.",
+      "The free public page /brand-playlist: visitors pick words for their brand and get the brandbite playlist for that mix of moods (ready-made playlists; nothing to fill in). When off, the page shows Not found.",
     type: "boolean",
     section: "engagement",
   },

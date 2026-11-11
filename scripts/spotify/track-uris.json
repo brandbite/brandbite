@@ -1010,5 +1010,733 @@
       "artist": "Run The Jewels",
       "title": "Legend Has It - Instrumental"
     }
+  ],
+  "NOSTALGIC": [
+    {
+      "uri": "spotify:track:1prZ0pr6XoRCxcrC3MCL0M",
+      "artist": "Fleetwood Mac",
+      "title": "Everywhere"
+    },
+    {
+      "uri": "spotify:track:0GjEhVFGZW8afUYGChu3Rr",
+      "artist": "ABBA",
+      "title": "Dancing Queen"
+    },
+    {
+      "uri": "spotify:track:5ubvP9oKmxLUVq506fgLhk",
+      "artist": "Bee Gees",
+      "title": "Stayin Alive"
+    },
+    {
+      "uri": "spotify:track:4o6BgsqLIBViaGVbx5rbRk",
+      "artist": "Daryl Hall & John Oates",
+      "title": "You Make My Dreams (Come True)"
+    },
+    {
+      "uri": "spotify:track:0lNudhCTfcGBQVvSO22g4r",
+      "artist": "The Cure",
+      "title": "Just Like Heaven"
+    },
+    {
+      "uri": "spotify:track:4RvWPyQ5RL0ao9LPZeSouE",
+      "artist": "Tears For Fears",
+      "title": "Everybody Wants To Rule The World"
+    },
+    {
+      "uri": "spotify:track:2WfaOiMkCvy7F5fcp2zZ8L",
+      "artist": "a-ha",
+      "title": "Take on Me"
+    },
+    {
+      "uri": "spotify:track:4v2rkl1mC3zVAz0nXMx9r4",
+      "artist": "Blondie",
+      "title": "Heart Of Glass"
+    },
+    {
+      "uri": "spotify:track:1OppEieGNdItZbE14gLBEv",
+      "artist": "The Supremes",
+      "title": "You Can't Hurry Love"
+    },
+    {
+      "uri": "spotify:track:2G2YzndIA6jeWFPBXhUjh5",
+      "artist": "The Ronettes",
+      "title": "Be My Baby"
+    },
+    {
+      "uri": "spotify:track:2RlgNHKcydI9sayD2Df2xp",
+      "artist": "Electric Light Orchestra",
+      "title": "Mr. Blue Sky"
+    },
+    {
+      "uri": "spotify:track:1ZEOIhSn6BKErV59bIgn76",
+      "artist": "The Mamas & The Papas",
+      "title": "California Dreamin'"
+    },
+    {
+      "uri": "spotify:track:6ek9SiEj5a65WIs2EV7qiM",
+      "artist": "Dusty Springfield",
+      "title": "Son Of A Preacher Man"
+    },
+    {
+      "uri": "spotify:track:745H5CctFr12Mo7cqa1BMH",
+      "artist": "The Temptations",
+      "title": "My Girl"
+    },
+    {
+      "uri": "spotify:track:2TVxnKdb3tqe1nhQWwwZCO",
+      "artist": "Elton John",
+      "title": "Tiny Dancer"
+    },
+    {
+      "uri": "spotify:track:7o9uu2GDtVDr9nsR7ZRN73",
+      "artist": "Cyndi Lauper",
+      "title": "Time After Time"
+    },
+    {
+      "uri": "spotify:track:2374M0fQpWi3dLnB54qaLX",
+      "artist": "TOTO",
+      "title": "Africa"
+    },
+    {
+      "uri": "spotify:track:1PtQJZVZIdWIYdARpZRDFO",
+      "artist": "Kate Bush",
+      "title": "Running Up That Hill (A Deal With God)"
+    },
+    {
+      "uri": "spotify:track:4qL9VYPB4XwJKAOq4xn2Mh",
+      "artist": "CHIC",
+      "title": "Le Freak"
+    },
+    {
+      "uri": "spotify:track:1vCBk33l9HaWp5FOnhSGxk",
+      "artist": "Donna Summer",
+      "title": "I Feel Love"
+    },
+    {
+      "uri": "spotify:track:1FvDJ9KGxcqwv1utyPL3JZ",
+      "artist": "The Smiths",
+      "title": "This Charming Man - 2011 Remaster"
+    },
+    {
+      "uri": "spotify:track:6hHc7Pks7wtBIW8Z6A0iFq",
+      "artist": "New Order",
+      "title": "Blue Monday"
+    },
+    {
+      "uri": "spotify:track:3fH4KjXFYMmljxrcGrbPj9",
+      "artist": "Simple Minds",
+      "title": "Don't You (Forget About Me)"
+    },
+    {
+      "uri": "spotify:track:1TfqLAPs4K3s2rJMoCokcS",
+      "artist": "Eurythmics",
+      "title": "Sweet Dreams (Are Made of This) - 2005 Remaster"
+    },
+    {
+      "uri": "spotify:track:0ObrXLrfrqJUNc8RfmIBHP",
+      "artist": "The Beach Boys",
+      "title": "God Only Knows"
+    },
+    {
+      "uri": "spotify:track:6lx1n63qJmhzPpirxxksbI",
+      "artist": "The Zombies",
+      "title": "Time of the Season - Mono Remastered"
+    },
+    {
+      "uri": "spotify:track:4EyzhvYqC5uDA8iYTZNKiw",
+      "artist": "Sam Cooke",
+      "title": "Wonderful World"
+    },
+    {
+      "uri": "spotify:track:3SdTKo2uVsxFblQjpScoHy",
+      "artist": "Ben E. King",
+      "title": "Stand By Me"
+    },
+    {
+      "uri": "spotify:track:3G0EALIIp5DAeIERxXBHmo",
+      "artist": "The Kinks",
+      "title": "Waterloo Sunset"
+    },
+    {
+      "uri": "spotify:track:5jSz894ljfWE0IcHBSM39i",
+      "artist": "Prince",
+      "title": "Raspberry Beret"
+    },
+    {
+      "uri": "spotify:track:2tUBqZG2AbRi7Q0BIrVrEj",
+      "artist": "Whitney Houston",
+      "title": "I Wanna Dance with Somebody (Who Loves Me)"
+    },
+    {
+      "uri": "spotify:track:2v7ywbUzCgcVohHaKUcacV",
+      "artist": "Madonna",
+      "title": "Like a Prayer"
+    },
+    {
+      "uri": "spotify:track:1Tr4K5MU5XYE44umXGDndd",
+      "artist": "Talking Heads",
+      "title": "Once in a Lifetime"
+    },
+    {
+      "uri": "spotify:track:43eBgYRTmu5BJnCJDBU5Hb",
+      "artist": "Duran Duran",
+      "title": "Rio - 2009 Remaster"
+    }
+  ],
+  "FUTURISTIC": [
+    {
+      "uri": "spotify:track:5eqZWYQ5tbIehx00NeKXz7",
+      "artist": "Kraftwerk",
+      "title": "The Robots - 2009 Remaster"
+    },
+    {
+      "uri": "spotify:track:1pKYYY0dkg23sQQXi0Q5zN",
+      "artist": "Daft Punk",
+      "title": "Around the World"
+    },
+    {
+      "uri": "spotify:track:7hqlHZIXhwAzpWQxm9KzBd",
+      "artist": "Daft Punk",
+      "title": "Derezzed"
+    },
+    {
+      "uri": "spotify:track:575blCgesVtCu0HEYaIcas",
+      "artist": "Vangelis",
+      "title": "Blade Runner Blues"
+    },
+    {
+      "uri": "spotify:track:4pbzF8W8RnqlN5epqkI1Qf",
+      "artist": "Jean-Michel Jarre",
+      "title": "Oxygène, Pt. 4"
+    },
+    {
+      "uri": "spotify:track:2jJIxT6WAIVWzDo3Ou53Q0",
+      "artist": "Gesaffelstein",
+      "title": "Pursuit"
+    },
+    {
+      "uri": "spotify:track:5pqbHlHaVbkHJQlsAxhcZM",
+      "artist": "Justice",
+      "title": "Safe and Sound"
+    },
+    {
+      "uri": "spotify:track:7pbEKdMWHGwPQSDGfcNycM",
+      "artist": "Röyksopp",
+      "title": "Eple"
+    },
+    {
+      "uri": "spotify:track:7o2AeQZzfCERsRmOM86EcB",
+      "artist": "Aphex Twin",
+      "title": "Xtal"
+    },
+    {
+      "uri": "spotify:track:4s5652m7A8iuDQsZ0UWNcO",
+      "artist": "Flume",
+      "title": "Holdin On"
+    },
+    {
+      "uri": "spotify:track:59wlTaYOL5tDUgXnbBQ3my",
+      "artist": "ODESZA",
+      "title": "A Moment Apart"
+    },
+    {
+      "uri": "spotify:track:1JY6B9ILvmRla2IKKRZvnH",
+      "artist": "Porter Robinson",
+      "title": "Sad Machine"
+    },
+    {
+      "uri": "spotify:track:0yljUudXzjVcGEoYmLB17X",
+      "artist": "Grimes",
+      "title": "Genesis"
+    },
+    {
+      "uri": "spotify:track:1CGcjFiuBkIyM7te58lgJt",
+      "artist": "Björk",
+      "title": "Hyperballad - Live"
+    },
+    {
+      "uri": "spotify:track:2kRFrWaLWiKq48YYVdGcm8",
+      "artist": "Radiohead",
+      "title": "Everything In Its Right Place"
+    },
+    {
+      "uri": "spotify:track:2X485T9Z5Ly0xyaghN73ed",
+      "artist": "Tame Impala",
+      "title": "Let It Happen"
+    },
+    {
+      "uri": "spotify:track:1s9i7W8zx7Nxx78MUIsvjV",
+      "artist": "M83",
+      "title": "Outro"
+    },
+    {
+      "uri": "spotify:track:3T1CEAG5ukgdqGvQuXWzqI",
+      "artist": "Kavinsky",
+      "title": "Odd Look"
+    },
+    {
+      "uri": "spotify:track:0XcY2bB4lectIINykHYYDa",
+      "artist": "Com Truise",
+      "title": "Brokendate"
+    },
+    {
+      "uri": "spotify:track:4Cy6hgJGkLsOD1S8x4ysFF",
+      "artist": "Tycho",
+      "title": "Dive"
+    },
+    {
+      "uri": "spotify:track:5lFNqg3eMNMuJsnFRKB460",
+      "artist": "Jon Hopkins",
+      "title": "Open Eye Signal (under the fabric)"
+    },
+    {
+      "uri": "spotify:track:3iwH1DfB0Yq2uKhCv7SMxp",
+      "artist": "Caribou",
+      "title": "Odessa"
+    },
+    {
+      "uri": "spotify:track:1fmoCZ6mtMiqA5GHWPcZz9",
+      "artist": "Moderat",
+      "title": "A New Error"
+    },
+    {
+      "uri": "spotify:track:7Cg3F9ZsZ2TYUnlza49NYh",
+      "artist": "Bonobo",
+      "title": "Kong"
+    },
+    {
+      "uri": "spotify:track:6CGMZijOAZvTXG21T8t6R0",
+      "artist": "RÜFÜS DU SOL",
+      "title": "Innerbloom"
+    },
+    {
+      "uri": "spotify:track:19mC6xktT1JyyycK6cQaXA",
+      "artist": "The Chemical Brothers",
+      "title": "Star Guitar"
+    },
+    {
+      "uri": "spotify:track:6INLpBxo9F5QMer04VXEnd",
+      "artist": "Air",
+      "title": "Sexy Boy"
+    },
+    {
+      "uri": "spotify:track:0q6LuUqGLUiCPP1cbdwFs3",
+      "artist": "Gorillaz",
+      "title": "On Melancholy Hill"
+    },
+    {
+      "uri": "spotify:track:7uv632EkfwYhXoqf8rhYrg",
+      "artist": "Massive Attack",
+      "title": "Angel"
+    },
+    {
+      "uri": "spotify:track:7ub14NqqyR1MDUTXyFBTzO",
+      "artist": "SOPHIE",
+      "title": "Immaterial"
+    },
+    {
+      "uri": "spotify:track:6pWgRkpqVfxnj3WuIcJ7WP",
+      "artist": "Hans Zimmer",
+      "title": "Cornfield Chase"
+    },
+    {
+      "uri": "spotify:track:4zlbKky2yA657Sk5rekZoR",
+      "artist": "Fred again..",
+      "title": "Baby again.."
+    },
+    {
+      "uri": "spotify:track:5Hf2h59YLInKlic7ooWZVd",
+      "artist": "Boards of Canada",
+      "title": "Roygbiv"
+    },
+    {
+      "uri": "spotify:track:1JekRMGQ8iN4G1AAdh0SBa",
+      "artist": "Depeche Mode",
+      "title": "Enjoy the Silence"
+    },
+    {
+      "uri": "spotify:track:4QQEzkxcONBthDLfzqIh9S",
+      "artist": "Gary Numan",
+      "title": "Cars"
+    },
+    {
+      "uri": "spotify:track:3CgonfeyRh23O9F4aKiIbW",
+      "artist": "Giorgio Moroder",
+      "title": "Chase"
+    }
+  ],
+  "EARTHY": [
+    {
+      "uri": "spotify:track:3Ck96jIZdVzpWbbZ6mojsE",
+      "artist": "Fleet Foxes",
+      "title": "Mykonos"
+    },
+    {
+      "uri": "spotify:track:7pdmBld4yW3WIUkrxHyb5r",
+      "artist": "Nick Drake",
+      "title": "Northern Sky"
+    },
+    {
+      "uri": "spotify:track:3B3eOgLJSqPEA0RfboIQVM",
+      "artist": "Bon Iver",
+      "title": "Skinny Love"
+    },
+    {
+      "uri": "spotify:track:1PzpE3BKEKTRa5uDKjXuom",
+      "artist": "José González",
+      "title": "Crosses"
+    },
+    {
+      "uri": "spotify:track:1fEGtTZjrjJW8eUeewnNJR",
+      "artist": "Iron & Wine",
+      "title": "Flightless Bird, American Mouth"
+    },
+    {
+      "uri": "spotify:track:5ewQvWOpYJ60zpy9Ap8aK0",
+      "artist": "The Tallest Man On Earth",
+      "title": "The Gardener"
+    },
+    {
+      "uri": "spotify:track:5fpEDGQX0Ah3utGnFYulQZ",
+      "artist": "Ben Howard",
+      "title": "Keep Your Head Up"
+    },
+    {
+      "uri": "spotify:track:3G9ETaH55bMQx8hwNhAgbU",
+      "artist": "Gregory Alan Isakov",
+      "title": "The Stable Song"
+    },
+    {
+      "uri": "spotify:track:0v1EehgMH3fmDxgE0IqmDx",
+      "artist": "Mumford & Sons",
+      "title": "Awake My Soul"
+    },
+    {
+      "uri": "spotify:track:44alNkXsYnTyPnkMdohBcx",
+      "artist": "The Paper Kites",
+      "title": "Bloom (Online Bonus Track)"
+    },
+    {
+      "uri": "spotify:track:7qH9Z4dJEN0l9bidizW7fq",
+      "artist": "Novo Amor",
+      "title": "Anchor"
+    },
+    {
+      "uri": "spotify:track:4Q66chx9WzqWcLItXoZ5r4",
+      "artist": "Hozier",
+      "title": "Cherry Wine - Live"
+    },
+    {
+      "uri": "spotify:track:22auw1DYQlYh5XgKv5FtNx",
+      "artist": "First Aid Kit",
+      "title": "Emmylou"
+    },
+    {
+      "uri": "spotify:track:5qgyfyptP3pLeWs9maKPkg",
+      "artist": "Laura Marling",
+      "title": "Rambling Man"
+    },
+    {
+      "uri": "spotify:track:7sCHy8QQUz3CRvUMp53Cbm",
+      "artist": "Neil Young",
+      "title": "Harvest Moon"
+    },
+    {
+      "uri": "spotify:track:6UkMcAA19lTdjs22jtB7o2",
+      "artist": "Joni Mitchell",
+      "title": "Big Yellow Taxi"
+    },
+    {
+      "uri": "spotify:track:3g2fYZW5v2od8KIF7VktT0",
+      "artist": "Simon & Garfunkel",
+      "title": "Scarborough Fair / Canticle"
+    },
+    {
+      "uri": "spotify:track:3bxZhauuIU4ubctdRZwPYW",
+      "artist": "Buena Vista Social Club",
+      "title": "Chan Chan"
+    },
+    {
+      "uri": "spotify:track:5FmPigqSIfk8zr2kx0H4vz",
+      "artist": "Tinariwen",
+      "title": "Sastanàqqàm"
+    },
+    {
+      "uri": "spotify:track:7g18n5nxV5ep8ugBR3BmHD",
+      "artist": "Khruangbin",
+      "title": "White Gloves"
+    },
+    {
+      "uri": "spotify:track:2BXezi1CdjCzz5VGSd8rla",
+      "artist": "Rodrigo y Gabriela",
+      "title": "Tamacun"
+    },
+    {
+      "uri": "spotify:track:1iqYC125PBJt4MoDO5sMV9",
+      "artist": "Gustavo Santaolalla",
+      "title": "De Ushuaia a la Quiaca"
+    },
+    {
+      "uri": "spotify:track:0iMt8ZMe2BsNvsF9LFDOAn",
+      "artist": "Lord Huron",
+      "title": "Ends of the Earth"
+    },
+    {
+      "uri": "spotify:track:5g7rJvWYVrloJZwKiShqlS",
+      "artist": "Of Monsters and Men",
+      "title": "Dirty Paws"
+    },
+    {
+      "uri": "spotify:track:18GiV1BaXzPVYpp9rmOg0E",
+      "artist": "Bob Dylan",
+      "title": "Blowin' in the Wind"
+    },
+    {
+      "uri": "spotify:track:5y8d8RHvxb0KiTa9Nq0xWp",
+      "artist": "Yusuf / Cat Stevens",
+      "title": "Morning Has Broken - Remastered 2021"
+    },
+    {
+      "uri": "spotify:track:1YYhDizHx7PnDhAhko6cDS",
+      "artist": "John Denver",
+      "title": "Take Me Home, Country Roads - Original Version"
+    },
+    {
+      "uri": "spotify:track:2M9ro2krNb7nr7HSprkEgo",
+      "artist": "Tracy Chapman",
+      "title": "Fast Car"
+    },
+    {
+      "uri": "spotify:track:1tQtURCQmQnY5ZxJNTgXKR",
+      "artist": "Angus & Julia Stone",
+      "title": "Chateau"
+    },
+    {
+      "uri": "spotify:track:5GbVzc6Ex5LYlLJqzRQhuy",
+      "artist": "Sufjan Stevens",
+      "title": "Mystery of Love"
+    },
+    {
+      "uri": "spotify:track:0BgbobvykXxEvxo2HhCuvM",
+      "artist": "Jack Johnson",
+      "title": "Banana Pancakes"
+    },
+    {
+      "uri": "spotify:track:47Hv8xflvAKs7y5vwY6Pox",
+      "artist": "Xavier Rudd",
+      "title": "Follow The Sun"
+    },
+    {
+      "uri": "spotify:track:39dnj8G8DK6I1JmNOZKeZO",
+      "artist": "City and Colour",
+      "title": "The Girl"
+    },
+    {
+      "uri": "spotify:track:5EaaGNkpMqAd2Zs4Knq3sH",
+      "artist": "Ray LaMontagne",
+      "title": "Trouble"
+    },
+    {
+      "uri": "spotify:track:4X6aeSW2bhlbm7YyEstj6Y",
+      "artist": "The Head And The Heart",
+      "title": "Rivers and Roads"
+    },
+    {
+      "uri": "spotify:track:4mNpNexjoGmhehWvFg4P1k",
+      "artist": "Caamp",
+      "title": "Vagabond"
+    },
+    {
+      "uri": "spotify:track:1QJnDJuYOGj05iSc4eWGr5",
+      "artist": "Nick Mulvey",
+      "title": "Fever To The Form"
+    }
+  ],
+  "DREAMY": [
+    {
+      "uri": "spotify:track:1ZgMsA55GIY7ICkQh5MILA",
+      "artist": "Beach House",
+      "title": "Space Song"
+    },
+    {
+      "uri": "spotify:track:1LzNfuep1bnAUR9skqdHCK",
+      "artist": "Mazzy Star",
+      "title": "Fade Into You"
+    },
+    {
+      "uri": "spotify:track:0AxZUYeQ9bZwSdt1LmZuok",
+      "artist": "Cocteau Twins",
+      "title": "Heaven or Las Vegas"
+    },
+    {
+      "uri": "spotify:track:2xGjfbXZnI8uQDhukoQURQ",
+      "artist": "Cigarettes After Sex",
+      "title": "K."
+    },
+    {
+      "uri": "spotify:track:33HRECrmuelZxOpid6XTNX",
+      "artist": "Slowdive",
+      "title": "Alison"
+    },
+    {
+      "uri": "spotify:track:75IQVo8hqI1iwVZyvkN2VT",
+      "artist": "Men I Trust",
+      "title": "Show Me How"
+    },
+    {
+      "uri": "spotify:track:1wicceeNVtcnym2YjiOmyj",
+      "artist": "Clairo",
+      "title": "Bags"
+    },
+    {
+      "uri": "spotify:track:0fBSs3fRoh1yJcne77fdu9",
+      "artist": "Lana Del Rey",
+      "title": "Video Games"
+    },
+    {
+      "uri": "spotify:track:3zsRP8rH1kaIAo9fmiP4El",
+      "artist": "The xx",
+      "title": "Angels"
+    },
+    {
+      "uri": "spotify:track:31CYUJj5f9lbQ0Qqm9PzK5",
+      "artist": "Julee Cruise",
+      "title": "Falling"
+    },
+    {
+      "uri": "spotify:track:6L5RI9isQPvFyl1yCxnFFb",
+      "artist": "Air",
+      "title": "Playground Love (with Gordon Tracks)"
+    },
+    {
+      "uri": "spotify:track:01Q3OyB05mLgH01fpdAMPP",
+      "artist": "M83",
+      "title": "Wait"
+    },
+    {
+      "uri": "spotify:track:07eGxuz8bL6QMsRqEe1Adu",
+      "artist": "Sigur Rós",
+      "title": "Svefn-g-englar"
+    },
+    {
+      "uri": "spotify:track:6TcxxINfeaBEQ35sHMldTD",
+      "artist": "Alvvays",
+      "title": "Dreams Tonite"
+    },
+    {
+      "uri": "spotify:track:4urzTwD9Ewbi0qIqKWDne1",
+      "artist": "Wild Nothing",
+      "title": "Shadow"
+    },
+    {
+      "uri": "spotify:track:1YM3cVri0CmSX7c71gwALR",
+      "artist": "Still Corners",
+      "title": "The Trip - 2023 Remaster"
+    },
+    {
+      "uri": "spotify:track:4V0x90QcMh4ZxwHzEWOdtK",
+      "artist": "Washed Out",
+      "title": "Feel It All Around"
+    },
+    {
+      "uri": "spotify:track:2Zw3HNjaNV42LnQ2uY5JQs",
+      "artist": "Beach House",
+      "title": "Myth"
+    },
+    {
+      "uri": "spotify:track:1Snko28yJOihcRVXs9dAo9",
+      "artist": "Mac DeMarco",
+      "title": "Chamber Of Reflection"
+    },
+    {
+      "uri": "spotify:track:3JsA2sWDNR9oQogGAzqqtH",
+      "artist": "Rhye",
+      "title": "Open"
+    },
+    {
+      "uri": "spotify:track:16gJmoOqRt2lKmlXtDpWgH",
+      "artist": "The Marías",
+      "title": "Cariño"
+    },
+    {
+      "uri": "spotify:track:51EMSRpNm9Rg5rGViVCczv",
+      "artist": "Weyes Blood",
+      "title": "Andromeda"
+    },
+    {
+      "uri": "spotify:track:46RNrAkGsqWTDrv2ZPOAbx",
+      "artist": "Phoebe Bridgers",
+      "title": "Moon Song"
+    },
+    {
+      "uri": "spotify:track:0SUDiaR0qm30fXVGPjPvRp",
+      "artist": "Sufjan Stevens",
+      "title": "Visions of Gideon"
+    },
+    {
+      "uri": "spotify:track:2enPRFda84VE2wtI8c86Uf",
+      "artist": "Cults",
+      "title": "Always Forever"
+    },
+    {
+      "uri": "spotify:track:2Ck6gblyk3UFCVPTh8o3TN",
+      "artist": "Daughter",
+      "title": "Youth"
+    },
+    {
+      "uri": "spotify:track:6k1I9gABiasGZiWWAosAEb",
+      "artist": "London Grammar",
+      "title": "Strong"
+    },
+    {
+      "uri": "spotify:track:2uIX8YMNjGMD7441kqyyNU",
+      "artist": "Billie Eilish",
+      "title": "ocean eyes"
+    },
+    {
+      "uri": "spotify:track:2MvvoeRt8NcOXWESkxWn3g",
+      "artist": "Lorde",
+      "title": "Ribs"
+    },
+    {
+      "uri": "spotify:track:3xKsf9qdS1CyvXSMEid6g8",
+      "artist": "Frank Ocean",
+      "title": "Pink + White"
+    },
+    {
+      "uri": "spotify:track:35YyxFpE0ZTOoqFx5bADW8",
+      "artist": "Radiohead",
+      "title": "Nude"
+    },
+    {
+      "uri": "spotify:track:7GRMSK8jCD7zTNM9vGFaBi",
+      "artist": "Kate Bush",
+      "title": "This Woman's Work"
+    },
+    {
+      "uri": "spotify:track:5gSHlT2SI0dtjeHrjj96A1",
+      "artist": "The Sundays",
+      "title": "Here's Where the Story Ends"
+    },
+    {
+      "uri": "spotify:track:3W486X36Id1ChRaLhseMBj",
+      "artist": "The Cranberries",
+      "title": "Dreams"
+    },
+    {
+      "uri": "spotify:track:6FLwmdmW77N1Pxb1aWsZmO",
+      "artist": "Enya",
+      "title": "Only Time"
+    },
+    {
+      "uri": "spotify:track:7H3ojI1BsVy0dEJENqMt1k",
+      "artist": "Sade",
+      "title": "By Your Side"
+    },
+    {
+      "uri": "spotify:track:2IqjKEBiz0CdLKdkXhxw84",
+      "artist": "James Blake",
+      "title": "Retrograde"
+    }
   ]
 }

@@ -35,7 +35,7 @@ describe("combo keys", () => {
   it("ignore pick order and repeats", () => {
     expect(comboKey(["BOLD", "MINIMAL", "BOLD"])).toBe("MINIMAL+BOLD");
     expect(comboLabel(["BOLD", "MINIMAL"])).toBe("Bold + Minimal");
-    expect(comboLabel(["BOLD"])).toBe("Bold · Confident");
+    expect(comboLabel(["BOLD"])).toBe("Bold");
   });
 });
 
@@ -56,7 +56,7 @@ describe("BrandPlaylistTool", () => {
     pick("Calm");
     pick("Modern");
     expect(playing()).toContain("/minimal");
-    expect(screen.getByText("Minimal · Calm")).toBeTruthy();
+    expect(screen.getByText("Minimal")).toBeTruthy();
   });
 
   it("offers the owner's lists for the picked moods under Try another", () => {
@@ -69,7 +69,7 @@ describe("BrandPlaylistTool", () => {
   it("says so when a mix has no playlist", () => {
     render(<BrandPlaylistTool moods={moods} mixes={mixes} />);
     pick("Elegant");
-    expect(screen.getByText(/don.t have a playlist for Luxury · Elegant yet/)).toBeTruthy();
+    expect(screen.getByText(/don.t have a playlist for Luxury yet/)).toBeTruthy();
     expect(playing()).toBeUndefined();
   });
 });
