@@ -69,6 +69,7 @@ export class TimeEntryError extends Error {
   code:
     | "TICKET_NOT_FOUND"
     | "NOT_ASSIGNED_TO_CREATIVE"
+    | "TICKET_NOT_IN_PROGRESS"
     | "ENTRY_NOT_FOUND"
     | "ENTRY_ALREADY_STOPPED"
     | "ENTRY_NOT_OWNED"
@@ -141,6 +142,21 @@ export async function startTicketTimer(args: {
 
   return prisma.$transaction(async (tx) => {
     await assertCreativeOwnsTicket(tx, args.ticketId, args.creativeId);
+
+    // Time is only logged on work in progress: not before it starts, and not
+    // while a version is with the customer or after the request is done.
+    const ticket = await tx.ticket.findUnique({
+      where: { id: args.ticketId },
+      select: { status: true },
+    });
+    if (ticket?.status !== "IN_PROGRESS") {
+      throw new TimeEntryError(
+        "TICKET_NOT_IN_PROGRESS",
+        ticket?.status === "IN_REVIEW"
+          ? "This version is with the customer. Pull it back to In progress to keep working on it."
+          : "The timer only runs on requests that are in progress.",
+      );
+    }
 
     const existing = await tx.ticketTimeEntry.findFirst({
       where: { creativeId: args.creativeId, endedAt: null },

@@ -214,4 +214,11 @@ describe("Creative job detail", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Time tracking" }));
     expect(screen.getByRole("heading", { name: "Time entries" })).toBeInTheDocument();
   });
+
+  it("doesn't offer Start timer while the version is with the customer", async () => {
+    mockDetail("IN_REVIEW");
+    render(<CreativeTicketDetailPage />);
+    expect(await screen.findByRole("timer")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Start timer" })).not.toBeInTheDocument();
+  });
 });

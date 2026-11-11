@@ -198,7 +198,10 @@ function stripHint(status: StripStatus | undefined, running: boolean): string | 
   return null;
 }
 
-/** One-line timer. Hidden until the first load, and where tracking is unavailable. */
+/**
+ * One-line timer. Hidden until the first load, and where tracking is
+ * unavailable. Start timer is only offered while the request is in progress.
+ */
 export function TimeStrip({ tracking, status }: { tracking: TimeTracking; status?: StripStatus }) {
   const { summary, loading, error, migrationPending, actionError, pending, running } = tracking;
   const hint = stripHint(status, Boolean(running));
@@ -236,11 +239,11 @@ export function TimeStrip({ tracking, status }: { tracking: TimeTracking; status
           <Button onClick={() => tracking.stop(running.id)} disabled={pending !== null}>
             {pending === `stop:${running.id}` ? "Stopping…" : "Stop timer"}
           </Button>
-        ) : (
+        ) : status === undefined || status === "IN_PROGRESS" ? (
           <Button variant="primary" onClick={tracking.start} disabled={pending !== null}>
             {pending === "start" ? "Starting…" : "Start timer"}
           </Button>
-        )}
+        ) : null}
       </div>
       {hint ? <p className="mt-2 text-xs text-[var(--av2-text-2)]">{hint}</p> : null}
       {actionError ? (
