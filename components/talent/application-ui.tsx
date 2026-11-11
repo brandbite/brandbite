@@ -28,9 +28,9 @@ export const TALENT_DISPLAY_FONT = "font-[family-name:var(--font-jakarta)]";
 export const TALENT_INPUT_CLASS =
   "h-11 w-full rounded-lg border border-[#D7D8DD] bg-white px-4 text-base text-[#2B2D33] outline-none placeholder:text-[#9A9CA5] focus:border-[#FF6426] focus:ring-1 focus:ring-[#FF6426] disabled:cursor-not-allowed disabled:bg-[#F4F2EF] disabled:text-[#9A9CA5] aria-[invalid=true]:border-red-500";
 
-/** The orange action button. Darker than the brand orange so white text passes AA (5.2:1). */
+/** The orange action button, in the site's CTA colours (same as AUTH_PRIMARY_BUTTON_CLASS). */
 export const TALENT_PRIMARY_BUTTON_CLASS =
-  "inline-flex h-12 items-center justify-center gap-2.5 rounded-lg bg-[#C2410C] px-6 text-base font-bold text-white transition-colors hover:bg-[#A8370A] focus-visible:ring-2 focus-visible:ring-[#C2410C] focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex h-12 items-center justify-center gap-2.5 rounded-lg bg-[#FF6426] px-6 text-base font-bold text-white transition-colors hover:bg-[#E8561C] focus-visible:ring-2 focus-visible:ring-[#FF6426] focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60";
 
 export const TALENT_SECONDARY_BUTTON_CLASS =
   "inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#D7D8DD] bg-white px-4 text-sm font-semibold text-[#2B2D33] transition-colors hover:border-[#2B2D33] focus-visible:ring-2 focus-visible:ring-[#FF6426] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60";
@@ -463,7 +463,7 @@ export function ChoiceGroup({
                 value={opt.value}
                 checked={checked}
                 onChange={() => onToggle(opt.value)}
-                className="h-4 w-4 shrink-0 accent-[#C2410C]"
+                className="h-4 w-4 shrink-0 accent-[#FF6426]"
               />
               <span>{opt.label}</span>
             </label>

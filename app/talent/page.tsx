@@ -1116,7 +1116,7 @@ export default function TalentApplicationPage() {
                           type="checkbox"
                           checked={communicationConfirmed}
                           onChange={(e) => setCommunicationConfirmed(e.target.checked)}
-                          className="mt-1 h-4 w-4 shrink-0 accent-[#C2410C]"
+                          className="mt-1 h-4 w-4 shrink-0 accent-[#FF6426]"
                           {...invalidProps(3, "t-communication")}
                         />
                         <span>
