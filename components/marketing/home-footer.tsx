@@ -74,6 +74,7 @@ export const FOOTER_COLUMNS: { title: string; links: FooterLink[] }[] = [
     links: [
       { label: "About", href: "/about" },
       { label: "Contact", href: "/contact" },
+      { label: "Become a creative", href: "/talent" },
       { label: "Meet brandbite", href: "/meet", arrow: true },
       { label: "FAQ", href: "/faq" },
     ],

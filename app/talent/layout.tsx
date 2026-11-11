@@ -18,10 +18,6 @@ export const metadata: Metadata = {
       "Tell us about your work and how you'd like to collaborate. We review every application and reply within a few days.",
     type: "website",
   },
-  // Keep the form out of search results until we've validated the funnel
-  // (admin queue lands in PR2). Re-enable once the team is staffed to
-  // respond.
-  robots: { index: false, follow: false },
 };
 
 export default function TalentLayout({ children }: { children: React.ReactNode }) {
