@@ -146,9 +146,8 @@ export function WelcomeEmailTemplate({ name, planName, ctaUrl, docsUrl }: Welcom
 }
 
 /**
- * Renders the template to a `{ subject, html }` pair. Not yet wired to
- * a sender — will hook into the post-checkout flow once the Stripe
- * webhook handler grows a "subscription_created" branch (separate PR).
+ * Renders the template to a `{ subject, html }` pair. Sent once per company
+ * when the customer finishes onboarding (PATCH /api/customer/onboarding).
  */
 export async function renderWelcomeEmail(props: WelcomeEmailProps): Promise<{
   subject: string;
