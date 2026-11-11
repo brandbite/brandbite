@@ -224,10 +224,42 @@ const SETTING_META: Record<string, SettingMeta> = {
     section: "engagement",
     inputClassName: "max-w-none",
   },
+  SOUNDTRACK_PLAYLISTS_NOSTALGIC: {
+    label: "Extra playlists: Nostalgic · Retro",
+    description:
+      "Optional. brandbite already has its own playlist for nostalgic requests, so this can stay empty. Add Spotify playlist or album links here only if you want more choices for this mood; separate several with commas.",
+    type: "text",
+    section: "engagement",
+    inputClassName: "max-w-none",
+  },
+  SOUNDTRACK_PLAYLISTS_FUTURISTIC: {
+    label: "Extra playlists: Futuristic · Tech",
+    description:
+      "Optional. brandbite already has its own playlist for futuristic requests, so this can stay empty. Add Spotify playlist or album links here only if you want more choices for this mood; separate several with commas.",
+    type: "text",
+    section: "engagement",
+    inputClassName: "max-w-none",
+  },
+  SOUNDTRACK_PLAYLISTS_EARTHY: {
+    label: "Extra playlists: Earthy · Organic",
+    description:
+      "Optional. brandbite already has its own playlist for earthy requests, so this can stay empty. Add Spotify playlist or album links here only if you want more choices for this mood; separate several with commas.",
+    type: "text",
+    section: "engagement",
+    inputClassName: "max-w-none",
+  },
+  SOUNDTRACK_PLAYLISTS_DREAMY: {
+    label: "Extra playlists: Dreamy · Soft",
+    description:
+      "Optional. brandbite already has its own playlist for dreamy requests, so this can stay empty. Add Spotify playlist or album links here only if you want more choices for this mood; separate several with commas.",
+    type: "text",
+    section: "engagement",
+    inputClassName: "max-w-none",
+  },
   ENGAGEMENT_PLAYLIST_TOOL: {
     label: "Brand playlist generator (public tool)",
     description:
-      "The free public page /brand-playlist: visitors pick words for their brand and get the brandbite playlist for that mix of moods (41 ready-made playlists; nothing to fill in). When off, the page shows Not found.",
+      "The free public page /brand-playlist: visitors pick words for their brand and get the brandbite playlist for that mix of moods (ready-made playlists; nothing to fill in). When off, the page shows Not found.",
     type: "boolean",
     section: "engagement",
   },

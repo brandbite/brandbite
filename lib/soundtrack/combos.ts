@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // @file: lib/soundtrack/combos.ts
 // @purpose: brandbite's own playlists: one for every mix of one, two or three
-//           moods (41 in all), made once on brandbite's Spotify account by
+//           moods (175 in all), made once on brandbite's Spotify account by
 //           scripts/spotify/generate-playlists.mjs and kept as plain links in
 //           generated-playlists.json. Nothing here talks to Spotify; the app
 //           only embeds the links. No server imports, so client components

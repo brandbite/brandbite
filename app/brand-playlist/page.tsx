@@ -52,6 +52,10 @@ const WORDS: Record<Mood, string[]> = {
   PLAYFUL: ["Playful"],
   WARM: ["Warm"],
   BOLD: ["Bold"],
+  NOSTALGIC: ["Nostalgic"],
+  FUTURISTIC: ["Futuristic"],
+  EARTHY: ["Earthy"],
+  DREAMY: ["Dreamy"],
 };
 
 export default async function BrandPlaylistPage() {

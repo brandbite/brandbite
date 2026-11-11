@@ -1,12 +1,23 @@
 // -----------------------------------------------------------------------------
 // @file: lib/soundtrack/moods.ts
-// @purpose: The six moods a request's soundtrack can have, and the simple
+// @purpose: The ten moods a request's soundtrack can have, and the simple
 //           rules that pick one from the brief (service + keywords). The
 //           creative can always change it. No AI yet, on purpose.
 //           No server imports, so client components can share it.
 // -----------------------------------------------------------------------------
 
-export const MOODS = ["ENERGETIC", "MINIMAL", "LUXURY", "PLAYFUL", "WARM", "BOLD"] as const;
+export const MOODS = [
+  "ENERGETIC",
+  "MINIMAL",
+  "LUXURY",
+  "PLAYFUL",
+  "WARM",
+  "BOLD",
+  "NOSTALGIC",
+  "FUTURISTIC",
+  "EARTHY",
+  "DREAMY",
+] as const;
 
 export type Mood = (typeof MOODS)[number];
 
@@ -17,6 +28,10 @@ export const MOOD_LABELS: Record<Mood, string> = {
   PLAYFUL: "Playful · Fun",
   WARM: "Warm · Friendly",
   BOLD: "Bold · Confident",
+  NOSTALGIC: "Nostalgic · Retro",
+  FUTURISTIC: "Futuristic · Tech",
+  EARTHY: "Earthy · Organic",
+  DREAMY: "Dreamy · Soft",
 };
 
 export function isMood(value: unknown): value is Mood {
@@ -103,8 +118,6 @@ const KEYWORDS: Record<Mood, string[]> = {
     "cosy",
     "family",
     "community",
-    "organic",
-    "natural",
     "handmade",
     "cafe",
     "coffee",
@@ -127,6 +140,63 @@ const KEYWORDS: Record<Mood, string[]> = {
     "poster",
     "headline",
     "edgy",
+  ],
+  NOSTALGIC: [
+    "nostalgic",
+    "nostalgia",
+    "retro",
+    "vintage",
+    "classic",
+    "heritage",
+    "throwback",
+    "old-school",
+    "70s",
+    "80s",
+    "90s",
+  ],
+  FUTURISTIC: [
+    "futuristic",
+    "future",
+    "innovative",
+    "innovation",
+    "ai",
+    "robot",
+    "robotics",
+    "crypto",
+    "web3",
+    "neon",
+    "cyber",
+    "sci-fi",
+    "space",
+  ],
+  EARTHY: [
+    "earthy",
+    "organic",
+    "natural",
+    "nature",
+    "eco",
+    "sustainable",
+    "sustainability",
+    "botanical",
+    "outdoor",
+    "farm",
+    "rustic",
+    "vegan",
+    "plant",
+  ],
+  DREAMY: [
+    "dreamy",
+    "dream",
+    "soft",
+    "romantic",
+    "pastel",
+    "ethereal",
+    "delicate",
+    "gentle",
+    "wedding",
+    "bridal",
+    "floral",
+    "whimsical",
   ],
 };
 

@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // @file: scripts/spotify/generate-playlists.mjs
 // @purpose: One-time generator for the brand playlists: one Spotify playlist
-//           for every combination of one, two or three moods (41 in all),
+//           for every combination of one, two or three moods (175 in all),
 //           created on brandbite's own Spotify account. The app never calls
 //           Spotify's API; it only embeds the links this writes to
 //           lib/soundtrack/generated-playlists.json.
@@ -36,7 +36,18 @@ const TOKEN_FILE = path.join(os.tmpdir(), "brandbite-spotify-token.json");
 const REDIRECT = "http://127.0.0.1:8888/callback";
 const SCOPES = "playlist-modify-public playlist-modify-private";
 
-const MOODS = ["ENERGETIC", "MINIMAL", "LUXURY", "PLAYFUL", "WARM", "BOLD"];
+const MOODS = [
+  "ENERGETIC",
+  "MINIMAL",
+  "LUXURY",
+  "PLAYFUL",
+  "WARM",
+  "BOLD",
+  "NOSTALGIC",
+  "FUTURISTIC",
+  "EARTHY",
+  "DREAMY",
+];
 const NAMES = {
   ENERGETIC: "Energetic",
   MINIMAL: "Minimal",
@@ -44,6 +55,10 @@ const NAMES = {
   PLAYFUL: "Playful",
   WARM: "Warm",
   BOLD: "Bold",
+  NOSTALGIC: "Nostalgic",
+  FUTURISTIC: "Futuristic",
+  EARTHY: "Earthy",
+  DREAMY: "Dreamy",
 };
 /** Tracks per playlist. */
 const SIZE = 30;
