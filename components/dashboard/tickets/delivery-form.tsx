@@ -12,6 +12,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 
 import { Button, Callout, Card, Field, TextArea } from "@/components/admin/v2/ui";
+import { offerReviewUndo } from "@/components/dashboard/tickets/review-undo";
 import { useToast } from "@/components/ui/toast-provider";
 import {
   formatBytes,
@@ -105,6 +106,7 @@ export function DeliveryForm({ ticketId, onSent }: { ticketId: string; onSent: (
         return;
       }
 
+      const sentAtMs = Date.now();
       let failed = 0;
       if (json?.revisionId) {
         for (let i = 0; i < files.length; i += 1) {
@@ -128,7 +130,8 @@ export function DeliveryForm({ ticketId, onSent }: { ticketId: string; onSent: (
       }
 
       if (failed === 0) {
-        showToast({ type: "success", title: "Version sent for review" });
+        // "Undo" for what's left of the minute before the customer is told.
+        offerReviewUndo({ showToast, ticketId, sentAtMs, onUndone: onSent });
       } else if (failed < files.length) {
         showToast({
           type: "warning",

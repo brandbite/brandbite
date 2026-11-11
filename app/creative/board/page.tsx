@@ -54,6 +54,10 @@ import {
   MULTI_START_TIMER_HINT,
   autoTimerMessage,
 } from "@/components/dashboard/tickets/time-tracking";
+import {
+  offerReviewUndo,
+  VERSION_WITHDRAWN_TOAST,
+} from "@/components/dashboard/tickets/review-undo";
 
 const VIEW_OPTIONS = [
   { value: "board", label: "Kanban", href: "/creative/board" },
@@ -396,8 +400,8 @@ export default function CreativeBoardPage() {
   const persistTicketStatus = async (
     ticketId: string,
     status: TicketStatus,
-    options?: { creativeMessage?: string | null },
-  ): Promise<{ revisionId?: string } | null> => {
+    options?: { creativeMessage?: string | null; quiet?: boolean },
+  ): Promise<{ revisionId?: string; sentAtMs: number } | null> => {
     setMutationError(null);
     setUpdatingTicketId(ticketId);
     try {
@@ -439,15 +443,20 @@ export default function CreativeBoardPage() {
       });
 
       const timerNote = autoTimerMessage(json?.timer);
-      showToast({
-        type: "success",
-        title: "Request updated",
-        description: timerNote
-          ? `${getStatusSuccessMessage(status)} ${timerNote}`
-          : getStatusSuccessMessage(status),
-      });
+      if (json?.undone) {
+        // Pulled back inside the minute: the version was withdrawn.
+        showToast(VERSION_WITHDRAWN_TOAST);
+      } else if (!options?.quiet) {
+        showToast({
+          type: "success",
+          title: "Request updated",
+          description: timerNote
+            ? `${getStatusSuccessMessage(status)} ${timerNote}`
+            : getStatusSuccessMessage(status),
+        });
+      }
 
-      return { revisionId: json?.revisionId ?? undefined };
+      return { revisionId: json?.revisionId ?? undefined, sentAtMs: Date.now() };
     } catch (err: unknown) {
       console.error("[CreativeBoard] status update error", err);
       const message = err instanceof Error ? err.message : "Failed to update request status.";
@@ -933,10 +942,34 @@ export default function CreativeBoardPage() {
     // Step 1: Persist status transition (creates revision, returns revisionId)
     const result = await persistTicketStatus(ticket.id, targetStatus, {
       creativeMessage: data?.revisionNotesEnabled ? creativeNote.trim() || null : null,
+      quiet: true,
     });
+
+    // "Undo" for what's left of the minute before the customer is told.
+    const offerUndo = () => {
+      if (!result) return;
+      offerReviewUndo({
+        showToast,
+        ticketId: ticket.id,
+        sentAtMs: result.sentAtMs,
+        onUndone: () =>
+          setData((prev) => {
+            if (!prev) return prev;
+            const nextTickets = prev.tickets.map((t) =>
+              t.id === ticket.id ? { ...t, status: "IN_PROGRESS" as TicketStatus } : t,
+            );
+            return {
+              ...prev,
+              tickets: nextTickets,
+              stats: recomputeStats(nextTickets, prev.stats),
+            };
+          }),
+      });
+    };
 
     // If PATCH failed or no files to upload, just close
     if (!result?.revisionId || reviewFiles.length === 0) {
+      offerUndo();
       closeReviewModal();
       return;
     }
@@ -990,6 +1023,8 @@ export default function CreativeBoardPage() {
         title: "Upload failed",
         description: "Files could not be uploaded, but the revision was created.",
       });
+    } else {
+      offerUndo();
     }
 
     // Force-reset upload state, then close

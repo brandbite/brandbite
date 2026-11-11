@@ -17,6 +17,7 @@ vi.mock("@/lib/notifications", () => ({
   createNotification: vi.fn(),
 }));
 
+import { createNotification } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { PATCH as patchTicket } from "@/app/api/creative/tickets/route";
 import { PATCH as patchBatch } from "@/app/api/creative/tickets/batch/route";
@@ -77,6 +78,73 @@ describe("PATCH /api/creative/tickets", () => {
     const res = await patchTicket(jsonReq({ id: ticket.id, status: "IN_REVIEW" }));
     expect(res.status).toBe(200);
     expect(await statusOf(ticket.id)).toBe("IN_REVIEW");
+    expect(await prisma.ticketRevision.count({ where: { ticketId: ticket.id } })).toBe(1);
+  });
+});
+
+describe("undoing a version sent for review", () => {
+  const send = (id: string) => patchTicket(jsonReq({ id, status: "IN_REVIEW" }));
+  const pullBack = (id: string) => patchTicket(jsonReq({ id, status: "IN_PROGRESS" }));
+
+  it("withdraws the version when pulled back within a minute, without telling the customer", async () => {
+    vi.mocked(createNotification).mockClear();
+    const { ticket } = await seed("IN_PROGRESS");
+    const sent = await (await send(ticket.id)).json();
+    expect(sent.undoSeconds).toBe(60);
+    const asset = await prisma.asset.create({
+      data: {
+        ticketId: ticket.id,
+        revisionId: sent.revisionId,
+        kind: "OUTPUT_IMAGE",
+        storageKey: "k",
+        mimeType: "image/png",
+        bytes: 1,
+        createdById: ticket.creativeId!,
+      },
+    });
+
+    const res = await pullBack(ticket.id);
+    expect((await res.json()).undone).toBe(true);
+    const after = await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } });
+    expect(after.status).toBe("IN_PROGRESS");
+    expect(after.revisionCount).toBe(0);
+    expect(await prisma.ticketRevision.count({ where: { ticketId: ticket.id } })).toBe(0);
+    const gone = await prisma.asset.findUniqueOrThrow({ where: { id: asset.id } });
+    expect(gone.deletedAt).not.toBeNull();
+    expect(gone.revisionId).toBeNull();
+    expect(createNotification).not.toHaveBeenCalled();
+
+    // Sending again starts from the same version number.
+    await send(ticket.id);
+    const again = await prisma.ticketRevision.findMany({ where: { ticketId: ticket.id } });
+    expect(again.map((r) => r.version)).toEqual([1]);
+  });
+
+  it("keeps the version and tells the customer once the minute has passed", async () => {
+    const { ticket } = await seed("IN_PROGRESS");
+    const sent = await (await send(ticket.id)).json();
+    await prisma.ticketRevision.update({
+      where: { id: sent.revisionId },
+      data: { submittedAt: new Date(Date.now() - 120_000) },
+    });
+    vi.mocked(createNotification).mockClear();
+
+    const body = await (await pullBack(ticket.id)).json();
+    expect(body.undone).toBeUndefined();
+    expect(await prisma.ticketRevision.count({ where: { ticketId: ticket.id } })).toBe(1);
+    expect(createNotification).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(createNotification).mock.calls[0]![0].type).toBe("TICKET_STATUS_CHANGED");
+  });
+
+  it("doesn't undo a version the customer already answered", async () => {
+    const { ticket } = await seed("IN_PROGRESS");
+    const sent = await (await send(ticket.id)).json();
+    await prisma.ticketRevision.update({
+      where: { id: sent.revisionId },
+      data: { feedbackAt: new Date() },
+    });
+    const body = await (await pullBack(ticket.id)).json();
+    expect(body.undone).toBeUndefined();
     expect(await prisma.ticketRevision.count({ where: { ticketId: ticket.id } })).toBe(1);
   });
 });

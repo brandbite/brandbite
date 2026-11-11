@@ -24,6 +24,7 @@ import {
   Tabs,
 } from "@/components/admin/v2/ui";
 import { DeliveryForm } from "@/components/dashboard/tickets/delivery-form";
+import { VERSION_WITHDRAWN_TOAST } from "@/components/dashboard/tickets/review-undo";
 import { JobMoodboards } from "@/components/dashboard/tickets/job-moodboards";
 import {
   BackLink,
@@ -409,11 +410,15 @@ export default function CreativeTicketDetailPage() {
         setStatusError(json?.error || `Request failed with status ${res.status}`);
         return;
       }
-      showToast({
-        type: "success",
-        title: status === "IN_PROGRESS" ? "Work started" : "Request status updated.",
-        description: autoTimerMessage(json?.timer) ?? undefined,
-      });
+      showToast(
+        json?.undone
+          ? VERSION_WITHDRAWN_TOAST
+          : {
+              type: "success",
+              title: status === "IN_PROGRESS" ? "Work started" : "Request status updated.",
+              description: autoTimerMessage(json?.timer) ?? undefined,
+            },
+      );
       setRefreshCounter((c) => c + 1);
       void tracking.reload();
     } catch (err) {
