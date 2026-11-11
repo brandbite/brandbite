@@ -45,7 +45,7 @@ import { useToast } from "@/components/ui/toast-provider";
 
 type SettingsMap = Record<string, string | null>;
 
-type SectionKey = "finance" | "talent" | "notifications" | "features";
+type SectionKey = "finance" | "talent" | "notifications" | "features" | "engagement";
 
 type SettingMeta = {
   label: string;
@@ -120,6 +120,69 @@ const SETTING_META: Record<string, SettingMeta> = {
       { value: "on", label: "On — all customers" },
     ],
   },
+  ENGAGEMENT_LIVE_PROGRESS: {
+    label: "Live progress on requests",
+    description:
+      "Customers see a step tracker on each request (Queued, In progress, In review, Done) and a note with a running clock while their creative's timer is on.",
+    type: "boolean",
+    section: "engagement",
+  },
+  ENGAGEMENT_CREATIVE_PROGRESS: {
+    label: "Creative progress",
+    description:
+      "Creatives see how close they are to the next payout tier and their streak of requests approved first time, on their overview.",
+    type: "boolean",
+    section: "engagement",
+  },
+  ENGAGEMENT_THANK_YOUS: {
+    label: "Customer thank-yous",
+    description:
+      "When approving a delivery, customers can add one-tap thank-you tags. The creative gets a notification and the tags collect on their profile. Tags already given are kept when this is off.",
+    type: "boolean",
+    section: "engagement",
+  },
+  ENGAGEMENT_BRIEF_STRENGTH: {
+    label: "Brief strength meter",
+    description:
+      "The new-request form shows a meter that fills as the customer adds a reference, dimensions and a moodboard.",
+    type: "boolean",
+    section: "engagement",
+  },
+  ENGAGEMENT_BRAND_PROFILE: {
+    label: "Brand profile progress",
+    description:
+      "Customers see a card on their overview showing how complete their brand setup is, with the next step to take.",
+    type: "boolean",
+    section: "engagement",
+  },
+  ENGAGEMENT_BRAND_SOUNDTRACK: {
+    label: "Brand soundtrack (Spotify)",
+    description:
+      "Customers can add a Spotify playlist to their brand, shown to the creative on each request. Spotify links on moodboards play in place.",
+    type: "boolean",
+    section: "engagement",
+  },
+  ENGAGEMENT_FOCUS_PLAYLIST: {
+    label: "Focus playlist for creatives (Spotify)",
+    description:
+      "When a creative starts work, a card suggests a playlist that fits the request's mood. Each creative can turn the suggestions off for themselves.",
+    type: "boolean",
+    section: "engagement",
+  },
+  ENGAGEMENT_MONTHLY_RECAP: {
+    label: "Monthly recap",
+    description:
+      "On the first of each month customers get an email and an overview card summing up the month: requests delivered, tokens used and turnaround.",
+    type: "boolean",
+    section: "engagement",
+  },
+  ENGAGEMENT_PLAYLIST_TOOL: {
+    label: "Brand playlist generator (public tool)",
+    description:
+      "The free public tool that suggests a playlist for a brand's mood. When off, the page and its footer link are hidden.",
+    type: "boolean",
+    section: "engagement",
+  },
 };
 
 const SECTION_TITLES: Record<SectionKey, { title: string; description: string }> = {
@@ -141,6 +204,11 @@ const SECTION_TITLES: Record<SectionKey, { title: string; description: string }>
     title: "Features",
     description:
       "Product capabilities that can be toggled on/off without a code change. Existing data is preserved when a feature is disabled — flipping back on restores the surface instantly.",
+  },
+  engagement: {
+    title: "Engagement",
+    description:
+      "The extras that set brandbite apart: progress, thank-yous and soundtracks. Each one is off until you switch it on, and switching it off hides it without deleting anything.",
   },
 };
 

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { ENGAGEMENT_SETTING_KEYS } from "@/lib/engagement/switches";
+
 // Single source of truth for admin-writable AppSetting keys. The settings
 // route imports this for both GET filtering and PATCH validation — previously
 // the route kept its own longer list while this enum lagged behind, so the
@@ -15,15 +17,19 @@ export const ADMIN_SETTING_KEYS = [
   // AI ticket mode: "off" | "on". Default off — there's no working AI
   // generation API yet.
   "AI_TICKETS_MODE",
+  // Engagement features (lib/engagement/switches.ts). All default off.
+  ...ENGAGEMENT_SETTING_KEYS,
 ] as const;
 
 export type AdminSettingKey = (typeof ADMIN_SETTING_KEYS)[number];
 
-/** Settings that move money — owner-only, like other money actions (lib/roles.ts). */
+/** Owner-only settings: the ones that move money (lib/roles.ts) and the engagement switches. */
 export const OWNER_ONLY_SETTING_KEYS: ReadonlySet<AdminSettingKey> = new Set([
   "MIN_WITHDRAWAL_TOKENS",
   "AUTO_PAYOUT_ENABLED",
   "AUTO_PAYOUT_THRESHOLD_TOKENS",
+  // Which engagement features run is the site owner's call.
+  ...ENGAGEMENT_SETTING_KEYS,
 ]);
 
 const BOOLEAN_KEYS: ReadonlySet<AdminSettingKey> = new Set([
@@ -31,6 +37,7 @@ const BOOLEAN_KEYS: ReadonlySet<AdminSettingKey> = new Set([
   "TALENT_APPLICATIONS_OPEN",
   "ADMIN_EVENT_EMAILS_ENABLED",
   "TAGS_ENABLED",
+  ...ENGAGEMENT_SETTING_KEYS,
 ]);
 
 const POSITIVE_INT_KEYS: ReadonlySet<AdminSettingKey> = new Set([
