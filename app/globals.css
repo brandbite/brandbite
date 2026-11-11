@@ -153,6 +153,17 @@ body {
   color: var(--bb-secondary);
 }
 
+/* iPhone Safari zooms the page in when a field under 16px gets focus, and the
+   zoom stays after in-app navigation, so pages look cut off on the right.
+   On touch screens every text field is at least 16px. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"]),
+  select,
+  textarea {
+    font-size: max(16px, 1em) !important;
+  }
+}
+
 /* ─────────────────────────────────────────────────────────────────────────
    Accessibility (Phase 1)
 

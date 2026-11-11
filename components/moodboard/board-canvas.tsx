@@ -79,6 +79,10 @@ const LONG_PRESS_MS = 450;
 
 /** Pointer travel before a press becomes a drag, in screen pixels. */
 const DRAG_THRESHOLD = 4;
+/** A finger held still still drifts a few pixels, so touch needs more room before a drag starts. */
+const TOUCH_SLOP = 10;
+/** How far a pointer may move before a press becomes a drag. */
+const dragSlop = (e: PointerEvent) => (e.pointerType === "touch" ? TOUCH_SLOP : DRAG_THRESHOLD);
 const NUDGE_PX = 10;
 const NUDGE_LARGE_PX = 50;
 /** How long to wait for the browser's own paste event before using the last copy. */
@@ -1509,36 +1513,35 @@ export function BoardCanvas({
       pointer.current = { x: e.clientX, y: e.clientY, free: e.ctrlKey || e.metaKey };
       if (
         longPress.current &&
-        Math.hypot(e.clientX - longPress.current.x, e.clientY - longPress.current.y) >=
-          DRAG_THRESHOLD
+        Math.hypot(e.clientX - longPress.current.x, e.clientY - longPress.current.y) >= dragSlop(e)
       ) {
         cancelLongPress();
       }
 
       if (g.kind === "connect" && !g.moved) {
-        if (Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < DRAG_THRESHOLD) return;
+        if (Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < dragSlop(e)) return;
         g.moved = true;
       }
 
       if (g.kind === "card" && !g.moved) {
-        if (Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < DRAG_THRESHOLD) return;
+        if (Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < dragSlop(e)) return;
         g.moved = true;
         g.el.style.zIndex = "50";
         setCursor("grabbing");
       }
       if (g.kind === "group" && !g.moved) {
-        if (Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < DRAG_THRESHOLD) return;
+        if (Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < dragSlop(e)) return;
         g.moved = true;
         setCursor("grabbing");
       }
       if (g.kind === "marquee" && !g.moved) {
-        if (Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < DRAG_THRESHOLD) return;
+        if (Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < dragSlop(e)) return;
         g.moved = true;
         suppressClick.current = true;
       }
       if (
         g.kind === "pan" &&
-        Math.hypot(e.clientX - g.startX, e.clientY - g.startY) >= DRAG_THRESHOLD
+        Math.hypot(e.clientX - g.startX, e.clientY - g.startY) >= dragSlop(e)
       ) {
         suppressClick.current = true;
         setCursor("grabbing");
@@ -1610,7 +1613,7 @@ export function BoardCanvas({
       }
 
       if (g.kind === "pan") {
-        const tapped = Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < DRAG_THRESHOLD;
+        const tapped = Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < dragSlop(e);
         if (tapped && g.lockedId) {
           selectIds([g.lockedId]);
           suppressClick.current = true;
@@ -2037,7 +2040,8 @@ export function BoardCanvas({
           ? "[&_input]:text-base! [&_textarea]:text-base!"
           : "rounded-2xl border border-[var(--av2-border)]"
       }`}
-      style={{ touchAction: "none" }}
+      // No iOS "Save image" / text callout on a long press: it would cancel the press.
+      style={{ touchAction: "none", WebkitTouchCallout: "none" }}
       onPointerDownCapture={onPointerDownCapture}
       onPointerDown={onPointerDown}
       onClickCapture={onClickCapture}
