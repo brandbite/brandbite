@@ -668,15 +668,11 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "The **Live progress** card at the top of the request page shows where the request is (**Queued**, **In progress**, **In review** or **Done**), with a line saying what's happening now.",
+            text: "The **Live progress** card at the top of a request, on its page and in the Board's request window, shows where the request is (**Queued**, **In progress**, **In review** or **Done**), with a line saying what's happening now.",
           },
           {
             type: "p",
             text: "While your creative's timer is on, the card shows **Timer running** and a clock for their current sitting. The clock restarts with each sitting; the total time spent isn't shown. The card updates by itself about every 30 seconds.",
-          },
-          {
-            type: "p",
-            text: "The card is on the full request page, not in the Board's request window.",
           },
         ],
       },

@@ -1602,7 +1602,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
             items: [
               {
                 term: "Live progress on requests",
-                text: "customers see a step tracker on the request page (Queued, In progress, In review, Done), and a clock for the current sitting while their creative's timer is on. Total time stays private.",
+                text: "customers see a step tracker on each request, on its page and in the Board's request window (Queued, In progress, In review, Done), and a clock for the current sitting while their creative's timer is on. Total time stays private.",
               },
               {
                 term: "Creative progress",

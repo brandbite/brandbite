@@ -1,6 +1,7 @@
 // -----------------------------------------------------------------------------
 // @file: components/engagement/live-progress-card.tsx
-// @purpose: "Live progress" on the customer's request page: a four-step
+// @purpose: "Live progress" on the customer's request page and in the Board's
+//           request window: a four-step
 //           tracker (Queued → In progress → In review → Done) and, while the
 //           creative's timer is on, a "Timer running" pill with a clock that
 //           counts up from the start of this sitting.
