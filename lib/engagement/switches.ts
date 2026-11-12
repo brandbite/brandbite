@@ -27,6 +27,23 @@ export const ENGAGEMENT_SWITCHES = {
 } as const;
 
 export type EngagementFeature = keyof typeof ENGAGEMENT_SWITCHES;
+
+/** The name of each switch as the owner sees it in /admin/settings, Engagement. */
+export const ENGAGEMENT_LABELS: Record<EngagementFeature, string> = {
+  liveProgress: "Live progress on requests",
+  creativeProgress: "Creative progress",
+  thankYous: "Customer thank-yous",
+  briefStrength: "Brief strength meter",
+  brandProfile: "Brand profile progress",
+  brandSoundtrack: "Brand soundtrack (Spotify)",
+  focusPlaylist: "Focus playlist for creatives (Spotify)",
+  monthlyRecap: "Monthly recap",
+  playlistTool: "Brand playlist generator (public tool)",
+};
+
+export function isEngagementFeature(value: unknown): value is EngagementFeature {
+  return typeof value === "string" && Object.hasOwn(ENGAGEMENT_SWITCHES, value);
+}
 export type EngagementSwitches = Record<EngagementFeature, boolean>;
 
 export const ENGAGEMENT_SETTING_KEYS = Object.values(ENGAGEMENT_SWITCHES);

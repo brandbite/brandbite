@@ -117,6 +117,8 @@ export function findGuideForPath(
 ): SupportGuide | undefined {
   let best: { guide: SupportGuide; score: number } | undefined;
   for (const guide of getGuides(role, opts)) {
+    // A feature guide may be switched off, and its page has its own guide.
+    if (guide.feature) continue;
     for (const r of guide.routes) {
       const score = routeScore(r, pathname, role);
       if (score >= 0 && (!best || score > best.score)) best = { guide, score };

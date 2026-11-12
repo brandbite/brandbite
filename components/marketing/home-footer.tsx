@@ -59,6 +59,8 @@ export const FOOTER_COLUMNS: { title: string; links: FooterLink[] }[] = [
       { label: "Brief Generator", href: "/brief-generator" },
       { label: "Brand Kit", href: "/brand-kit" },
       { label: "Cost Calculator", href: "/design-cost-calculator" },
+      // Shows Not found while the owner's "Brand playlist generator" switch is off.
+      { label: "Brand Playlist", href: "/brand-playlist" },
     ],
   },
   {

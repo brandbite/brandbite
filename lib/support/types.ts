@@ -6,9 +6,24 @@
 //           Text fields accept **bold** only — no HTML, no Markdown links.
 // -----------------------------------------------------------------------------
 
+import type { EngagementFeature } from "@/lib/engagement/switches";
+
 export type SupportRole = "customer" | "creative" | "admin";
 
-export type GuideBlock =
+/**
+ * An owner switch (/admin/settings, Engagement) that a guide, section or
+ * block describes. Text marked with one is written ahead of time and only
+ * shows while that switch is on, so guides never describe a feature people
+ * can't see. Unmarked text always shows.
+ */
+export type GuideFeature = EngagementFeature;
+
+export type GuideBlock = GuideBlockBody & {
+  /** Only shown while this feature is switched on. */
+  feature?: GuideFeature;
+};
+
+type GuideBlockBody =
   /** Plain paragraph. */
   | { type: "p"; text: string }
   /** Numbered how-to steps. */
@@ -31,6 +46,8 @@ export type GuideBlock =
 
 export type GuideSection = {
   heading: string;
+  /** Only shown while this feature is switched on. */
+  feature?: GuideFeature;
   blocks: GuideBlock[];
 };
 
@@ -59,5 +76,10 @@ export type SupportGuide = {
   keywords?: string[];
   /** Admin only: hide from SITE_ADMIN (mirrors ownerOnly nav items). */
   ownerOnly?: boolean;
+  /**
+   * The whole guide is about this feature and only shows while it is switched
+   * on. Such a guide is a topic guide: the per-page "?" link never picks it.
+   */
+  feature?: GuideFeature;
   sections: GuideSection[];
 };

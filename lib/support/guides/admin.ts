@@ -1113,6 +1113,11 @@ export const ADMIN_GUIDES: SupportGuide[] = [
           },
           {
             type: "p",
+            feature: "thankYous",
+            text: "Thank-you tags are separate from ratings: customers send them to the creative when approving, and they show on the creative's own profile and portfolio, not here.",
+          },
+          {
+            type: "p",
             text: "**Load score** adds up priority × token cost over the creative's active requests; **Relative load** compares it with the busiest creative.",
           },
         ],
@@ -1319,6 +1324,10 @@ export const ADMIN_GUIDES: SupportGuide[] = [
             type: "p",
             text: "A **Screenshot** block has a caption, the picture, an optional **Phone screenshot** and optional alt text. People reading on a phone see the phone screenshot first and can switch to the desktop one with the **Phone / Desktop** buttons under it; wider screens always show the desktop one. Until a picture is added, admin guides show an empty slot with an **Add it** link, and customer and creative guides show nothing. Guides with at least one picture get a **Visual guide** badge in the Support list.",
           },
+          {
+            type: "p",
+            text: "**Show this section** lets a section wait for a feature: choose **Only while “…” is on** and the section appears by itself when that feature is switched on in **Settings → Engagement**. A note under it says whether it's showing now, and the guide list shows a badge for each feature a guide waits for, with **on** or **off**.",
+          },
         ],
       },
       {
@@ -1515,7 +1524,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
     slug: "settings",
     title: "Settings",
     summary:
-      "Platform-wide switches: withdrawals, auto-payouts, talent form, owner emails and features.",
+      "Platform-wide switches: withdrawals, auto-payouts, talent form, owner emails, features and engagement extras.",
     category: "System",
     routes: ["/admin/settings"],
     keywords: [
@@ -1527,8 +1536,17 @@ export const ADMIN_GUIDES: SupportGuide[] = [
       "emails",
       "tags",
       "ai tickets",
+      "engagement",
+      "live progress",
+      "thank-yous",
+      "brief strength",
+      "brand profile",
+      "soundtrack",
+      "spotify",
+      "playlist",
+      "monthly recap",
     ],
-    related: ["withdrawals", "talent-applications", "ai-settings"],
+    related: ["withdrawals", "talent-applications", "ai-settings", "support-content"],
     sections: [
       {
         heading: "The settings",
@@ -1568,7 +1586,65 @@ export const ADMIN_GUIDES: SupportGuide[] = [
           },
           {
             type: "p",
-            text: "Each setting has its own **Save** button and takes effect immediately. The withdrawal minimum and the two auto-payout settings are site owner only. Every change is recorded in the Audit Log.",
+            text: "Each setting has its own **Save** button and takes effect immediately. The withdrawal minimum, the two auto-payout settings and everything on the **Engagement** tab are site owner only. Every change is recorded in the Audit Log.",
+          },
+        ],
+      },
+      {
+        heading: "Engagement",
+        blocks: [
+          {
+            type: "p",
+            text: "The **Engagement** tab holds the extras: progress, thank-yous and soundtracks. Each one is off until the site owner switches it on, and switching it off hides it without deleting anything.",
+          },
+          {
+            type: "list",
+            items: [
+              {
+                term: "Live progress on requests",
+                text: "customers see a step tracker on the request page (Queued, In progress, In review, Done), and a clock for the current sitting while their creative's timer is on. Total time stays private.",
+              },
+              {
+                term: "Creative progress",
+                text: "creatives see their streak of requests approved without a revision on their Overview, and how many requests are left to the next payout tier.",
+              },
+              {
+                term: "Customer thank-yous",
+                text: "when approving, customers can send one-tap thank-you tags. The creative is notified and the tags collect on their profile and portfolio. The star rating stays in the same window and stays private to admins. While it's off, customers get the rating window only.",
+              },
+              {
+                term: "Brief strength meter",
+                text: "the new-request form shows a card that counts a reference, dimensions and a linked moodboard. It only nudges; nothing is required.",
+              },
+              {
+                term: "Brand profile progress",
+                text: "customers see a card on their Overview with how complete their brand setup is and the next step.",
+              },
+              {
+                term: "Brand soundtrack (Spotify)",
+                text: "Owners and Project managers can add one Spotify playlist or album to their company. The assigned creative sees it on a request while it's In progress.",
+              },
+              {
+                term: "Focus playlist for creatives (Spotify)",
+                text: "while a request is In progress, a card suggests a playlist that fits its mood. Each creative can turn the suggestions off for themselves.",
+              },
+              {
+                term: "Monthly recap",
+                text: "customers see last month's summary on their Overview (requests delivered, tokens used, estimated agency equivalent), and Owners and Project managers get it by email. It's sent once a month by the daily job; a company with nothing delivered gets nothing. Switched on mid-month, last month's recap goes out the next morning.",
+              },
+              {
+                term: "Brand playlist generator (public tool)",
+                text: "the free public page /brand-playlist. While it's off, the page shows Not found and it leaves the sitemap; the footer link stays.",
+              },
+              {
+                term: "Extra playlists",
+                text: "one optional field per mood. brandbite already has its own playlist for every mood; add Spotify playlist or album links, separated by commas, only to offer more choices on the creative's soundtrack card and on /brand-playlist. Save an empty field to clear a mood.",
+              },
+            ],
+          },
+          {
+            type: "tip",
+            text: "Support guides follow these switches: text about a feature shows in the customer, creative and admin guides only while that feature is switched on.",
           },
         ],
       },

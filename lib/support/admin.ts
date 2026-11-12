@@ -19,6 +19,7 @@ import {
   isGuideOwner,
   type GuideOwner,
 } from "./code-sources";
+import { guideFeatures } from "./features";
 import { guideCodeHash } from "./hash";
 import {
   codeStatusFor,
@@ -27,7 +28,7 @@ import {
   type GuideCodeStatus,
   type GuideContent,
 } from "./merge";
-import type { SupportGuide } from "./types";
+import type { GuideFeature, SupportGuide } from "./types";
 
 export { isGuideOwner, type GuideOwner };
 
@@ -44,6 +45,8 @@ export type GuideRow = {
   /** Waiting for an admin: code changed or removed the guide after an edit. */
   status: GuideCodeStatus;
   ownerOnly: boolean;
+  /** Owner switches this guide's text waits for (the guide, a section or a block). */
+  features: GuideFeature[];
   updatedAt: string | null;
 };
 
@@ -99,6 +102,7 @@ export async function listGuideRows(isSiteOwner: boolean): Promise<GuideRow[]> {
         state: stateOf(entry),
         status: entry ? codeStatusFor(entry, guideCodeHash(guide)) : "IN_SYNC",
         ownerOnly: !!guide.ownerOnly,
+        features: guideFeatures(content ? { ...guide, ...content } : guide),
         updatedAt: entry?.updatedAt.toISOString() ?? null,
       });
       bySlug.delete(guide.slug);
@@ -114,6 +118,7 @@ export async function listGuideRows(isSiteOwner: boolean): Promise<GuideRow[]> {
         state: entry.hidden ? "hidden" : entry.fromCode ? "edited" : "cms",
         status: codeStatusFor(entry, null),
         ownerOnly: false,
+        features: content ? guideFeatures({ slug: entry.slug, routes: [], ...content }) : [],
         updatedAt: entry.updatedAt.toISOString(),
       });
     }
@@ -132,6 +137,8 @@ export type GuideDetail = {
   edit: GuideContent | null;
   hidden: boolean;
   ownerOnly: boolean;
+  /** The whole guide only shows while this feature is switched on. */
+  feature: GuideFeature | null;
 };
 
 async function findEntry(role: GuideOwner, slug: string): Promise<EntryRow | null> {
@@ -154,6 +161,7 @@ export async function getGuideDetail(role: GuideOwner, slug: string): Promise<Gu
     edit: entry ? parseGuideContent(entry.content) : null,
     hidden: !!entry?.hidden,
     ownerOnly: !!code?.ownerOnly,
+    feature: code?.feature ?? null,
   };
 }
 

@@ -281,6 +281,11 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
             ],
           },
           {
+            type: "p",
+            feature: "creativeProgress",
+            text: "**First-pass streak** counts how many of your latest completed requests in a row were approved without the customer asking for changes. It starts again when a request needs a revision. The **Current payout rate** card also shows how many requests are left to the next tier.",
+          },
+          {
             type: "tip",
             text: "If you haven't picked any skills yet, the page starts with a **Welcome to brandbite!** checklist. Select your skills first so requests can be assigned to you.",
           },
@@ -611,6 +616,31 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
               "Only one timer runs at a time. Starting one on another request stops this one.",
               "On the **Time tracking** tab, **Delete** removes an entry after you confirm. This can't be undone.",
             ],
+          },
+        ],
+      },
+      {
+        heading: "Music while you work",
+        blocks: [
+          {
+            type: "p",
+            feature: "focusPlaylist",
+            text: "While a request is **In progress**, a soundtrack card under the timer suggests a playlist that fits the request's mood. The mood is guessed from the title, the brief and the service; pick another from the mood menu on the card. **Play** opens the Spotify player in place: press play inside it to start the music. **Open in Spotify** opens the playlist in Spotify instead. **Try another** appears when the mood has more than one playlist.",
+          },
+          {
+            type: "p",
+            feature: "brandSoundtrack",
+            text: "While a request is **In progress** and the customer has picked a playlist for their brand, the soundtrack card under the timer shows it as **The brand's soundtrack**, marked **Picked by the customer**. **Play** opens the Spotify player in place; press play inside it.",
+          },
+          {
+            type: "p",
+            feature: "focusPlaylist",
+            text: "**Don't suggest music**, at the bottom of the mood menu, turns the suggestions off for you on every request. Turn them back on in **Settings → Notifications → Music while you work**. A playlist the customer picked for their brand still shows.",
+          },
+          {
+            type: "p",
+            feature: "focusPlaylist",
+            text: "The card is also in the Board's request window. **×** hides it for that request until you close the browser tab.",
           },
         ],
       },
@@ -953,6 +983,28 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
           },
         ],
       },
+      {
+        heading: "Client appreciation",
+        feature: "thankYous",
+        blocks: [
+          {
+            type: "p",
+            text: "When a customer approves your work, they can thank you with one-tap tags: **Nailed the brief**, **Quick turnaround** and **Great communication**. You get a **A customer thanked you** notification that names the tags and the request.",
+          },
+          {
+            type: "list",
+            items: [
+              "**Client appreciation** on this page counts each tag you've received, most-given first.",
+              "In **Grid** view, a request's card shows the tags it earned.",
+              "The same counts are on your **Profile**.",
+            ],
+          },
+          {
+            type: "p",
+            text: "Customers can also rate a request with stars. Those ratings go to the brandbite team and aren't shown to you. To stop the thank-you notifications, switch off **Customer thank-yous** in your notification settings.",
+          },
+        ],
+      },
     ],
   },
 
@@ -1121,6 +1173,16 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
           {
             type: "p",
             text: "Turn each notification type on or off for **In-app** and **Email**. Changes save instantly, and they're the same choices as under your **Profile**.",
+          },
+        ],
+      },
+      {
+        heading: "Music while you work",
+        feature: "focusPlaylist",
+        blocks: [
+          {
+            type: "p",
+            text: "On the **Notifications** tab, **Suggest a playlist when I start work** turns the soundtrack card's suggestions on or off for you. It saves instantly. A playlist the customer picked for their brand still shows when it's off.",
           },
         ],
       },

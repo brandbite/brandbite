@@ -6,6 +6,8 @@
 //           CMS. Pure, so it runs anywhere and is tested without a database.
 // -----------------------------------------------------------------------------
 
+import { isEngagementFeature } from "@/lib/engagement/switches";
+
 import type { GuideBlock, GuideSection, SupportGuide } from "./types";
 
 /** The parts of a guide an admin can edit. Routes and links stay in code. */
@@ -49,7 +51,15 @@ function isString(value: unknown): value is string {
   return typeof value === "string";
 }
 
+/** Reads one block and keeps its feature mark, if it has a valid one. */
 function parseBlock(raw: unknown): GuideBlock | null {
+  const block = parseBlockBody(raw);
+  if (!block) return null;
+  const { feature } = raw as Record<string, unknown>;
+  return isEngagementFeature(feature) ? { ...block, feature } : block;
+}
+
+function parseBlockBody(raw: unknown): GuideBlock | null {
   if (!raw || typeof raw !== "object") return null;
   const block = raw as Record<string, unknown>;
   if (!isString(block.type) || !BLOCK_TYPES.has(block.type)) return null;
@@ -97,10 +107,13 @@ export function parseGuideContent(raw: unknown): GuideContent | null {
     ? data.sections
         .map((section) => {
           if (!section || typeof section !== "object") return null;
-          const { heading, blocks } = section as Record<string, unknown>;
+          const { heading, blocks, feature } = section as Record<string, unknown>;
           if (!isString(heading) || !Array.isArray(blocks)) return null;
           const parsed = blocks.map(parseBlock).filter((b): b is GuideBlock => b !== null);
-          return parsed.length ? { heading, blocks: parsed } : null;
+          if (!parsed.length) return null;
+          const out: GuideSection = { heading, blocks: parsed };
+          if (isEngagementFeature(feature)) out.feature = feature;
+          return out;
         })
         .filter((s): s is GuideSection => s !== null)
     : [];

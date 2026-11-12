@@ -21,6 +21,7 @@ import { absoluteUrl } from "@/lib/seo/structured-data";
 import { SIZE_PLATFORMS } from "@/lib/sizes";
 import { TEMPLATES } from "@/lib/templates";
 import { guideMeta } from "@/lib/guides";
+import { isEngagementOn } from "@/lib/engagement/switches.server";
 import { getEffectiveGuides } from "@/lib/support/effective";
 
 // Rebuilt at most hourly, so newly published posts show up without a deploy.
@@ -64,10 +65,12 @@ async function publishedPosts() {
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [paletteIdeas, posts, guides] = await Promise.all([
+  const [paletteIdeas, posts, guides, playlistToolOn] = await Promise.all([
     getPaletteIdeas(),
     publishedPosts(),
     getEffectiveGuides("public"),
+    // The tool's page shows Not found while its owner switch is off.
+    isEngagementOn("playlistTool"),
   ]);
 
   return [
@@ -82,6 +85,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     entry("/brief-generator", 0.8),
     entry("/brand-kit", 0.8),
     entry("/design-cost-calculator", 0.8),
+    ...(playlistToolOn ? [entry("/brand-playlist", 0.8)] : []),
     entry("/brand-kit/font-pairings", 0.8),
     ...FONT_PAIRINGS.map((pairing) => entry(`/brand-kit/font-pairings/${pairing.slug}`, 0.6)),
     ...SIZE_PLATFORMS.map((platform) => entry(`/sizes/${platform.slug}`, 0.8)),
