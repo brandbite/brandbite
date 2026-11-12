@@ -47,9 +47,11 @@ function mapTimeEntryError(err: unknown): NextResponse | null {
       ? 404
       : err.code === "NOT_ASSIGNED_TO_CREATIVE"
         ? 403
-        : err.code === "INVALID_NOTES"
-          ? 400
-          : 400;
+        : err.code === "TICKET_NOT_IN_PROGRESS"
+          ? 409
+          : err.code === "INVALID_NOTES"
+            ? 400
+            : 400;
   return NextResponse.json({ error: err.message, code: err.code }, { status });
 }
 

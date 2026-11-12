@@ -6,7 +6,7 @@
 // @lastUpdate: 2025-12-25
 // -----------------------------------------------------------------------------
 
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { TicketStatus, TicketPriority } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/auth";
@@ -14,6 +14,7 @@ import { createNotification } from "@/lib/notifications";
 import { transitionCreativeTicketStatus } from "@/lib/tickets/transition-status";
 import { computeCreativePayout, evaluateCreativePayoutPercent } from "@/lib/token-engine";
 import { syncTimerWithStatus } from "@/lib/tickets/auto-timer";
+import { REVIEW_NOTICE_DELAY_MS, REVIEW_UNDO_SECONDS } from "@/lib/tickets/review-undo";
 import { notifyCompanySlack, slackEventForStatusChange } from "@/lib/integrations/slack";
 
 type TicketStatusString = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
@@ -361,6 +362,25 @@ export async function GET(req: NextRequest) {
 // - When the flag is false, any creativeMessage in the payload is ignored.
 // -----------------------------------------------------------------------------
 
+/** Resolves after `ms`; doesn't keep a test process alive. */
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    if (typeof timer === "object") timer.unref?.();
+  });
+}
+
+/** Runs `task` once the response is sent (falls back to "now" outside a request). */
+function runAfterResponse(task: () => Promise<void>) {
+  const safe = () =>
+    task().catch((err) => console.error("[creative.tickets] deferred notice", err));
+  try {
+    after(safe);
+  } catch {
+    void safe();
+  }
+}
+
 export async function PATCH(req: NextRequest) {
   try {
     const user = await getCurrentUserOrThrow();
@@ -423,28 +443,53 @@ export async function PATCH(req: NextRequest) {
       startForCreative: true,
     });
 
-    // Fire-and-forget notification. Kept in the route so the service
-    // stays free of I/O side-effects beyond the DB transaction.
-    createNotification({
-      userId: outcome.notify.recipientUserId,
-      type: outcome.notify.notificationType,
-      title: outcome.notify.title,
-      message: outcome.notify.message,
-      ticketId: outcome.notify.ticketId,
-      actorId: outcome.notify.actorId,
-    });
+    // Telling the customer is kept in the route so the service stays free
+    // of I/O side-effects beyond the DB transaction.
+    const notify = outcome.notify;
     const slackEvent = slackEventForStatusChange(
       outcome.result.previousStatus,
       outcome.result.status,
     );
-    if (slackEvent) void notifyCompanySlack(outcome.result.ticketId, slackEvent);
+    const tellCustomer = async () => {
+      if (notify) {
+        await createNotification({
+          userId: notify.recipientUserId,
+          type: notify.notificationType,
+          title: notify.title,
+          message: notify.message,
+          ticketId: notify.ticketId,
+          actorId: notify.actorId,
+        });
+      }
+      if (slackEvent) void notifyCompanySlack(outcome.result.ticketId, slackEvent);
+    };
+
+    const sentRevisionId = outcome.result.revisionId;
+    if (outcome.result.undone) {
+      // A version sent under a minute ago was withdrawn: the customer was
+      // never told about it, so there is nothing to tell them now.
+    } else if (sentRevisionId) {
+      // A new version: the customer hears about it once the creative's
+      // one-minute undo has passed, and only if it wasn't undone.
+      runAfterResponse(async () => {
+        await wait(REVIEW_NOTICE_DELAY_MS);
+        const stillSent = await prisma.ticketRevision.findFirst({
+          where: { id: sentRevisionId, ticket: { status: TicketStatus.IN_REVIEW } },
+          select: { id: true },
+        });
+        if (stillSent) await tellCustomer();
+      });
+    } else {
+      void tellCustomer();
+    }
 
     return NextResponse.json(
       {
         ticketId: outcome.result.ticketId,
         status: toTicketStatusString(outcome.result.status),
         updatedAt: outcome.result.updatedAt.toISOString(),
-        ...(outcome.result.revisionId ? { revisionId: outcome.result.revisionId } : {}),
+        ...(sentRevisionId ? { revisionId: sentRevisionId, undoSeconds: REVIEW_UNDO_SECONDS } : {}),
+        ...(outcome.result.undone ? { undone: true } : {}),
         timer,
       },
       { status: 200 },

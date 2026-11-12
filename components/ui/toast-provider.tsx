@@ -18,6 +18,8 @@ export type ToastInput = {
   title: string;
   description?: string;
   durationMs?: number;
+  /** One button inside the toast (e.g. "Undo"). Clicking it closes the toast. */
+  action?: { label: string; onClick: () => void };
 };
 
 export type Toast = Omit<ToastInput, "type"> & {
@@ -81,6 +83,7 @@ export function ToastProvider({ children }: ToastProviderProps) {
         title: input.title,
         description: input.description,
         durationMs: input.durationMs ?? 4500,
+        action: input.action,
       };
 
       setToasts((prev) => [...prev, toast]);
@@ -167,7 +170,7 @@ type ToastItemProps = {
 };
 
 function ToastItem({ toast, onClose }: ToastItemProps) {
-  const { id, type, title, description } = toast;
+  const { id, type, title, description, action } = toast;
 
   const { bgClass, borderClass, titleClass, iconChar } = getToastStyle(type);
 
@@ -184,6 +187,18 @@ function ToastItem({ toast, onClose }: ToastItemProps) {
       <div className="flex-1">
         <div className={`text-[11px] font-semibold ${titleClass}`}>{title}</div>
         {description && <p className="mt-1 text-[11px] text-slate-200 opacity-90">{description}</p>}
+        {action && (
+          <button
+            type="button"
+            onClick={() => {
+              onClose(id);
+              action.onClick();
+            }}
+            className="mt-2 inline-flex min-h-8 items-center rounded-md bg-white/15 px-3 text-xs font-semibold text-white underline-offset-2 hover:bg-white/25 focus:ring-2 focus:ring-white/70 focus:outline-none"
+          >
+            {action.label}
+          </button>
+        )}
       </div>
       <button
         type="button"

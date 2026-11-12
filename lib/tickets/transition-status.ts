@@ -3,7 +3,8 @@
 // @purpose: Domain service — creative-side ticket status transition
 //           (IN_PROGRESS ↔ IN_REVIEW ↔ TODO, excluding DONE). Enforces
 //           ownership, plan concurrency limits, and creates a new
-//           TicketRevision row on IN_PROGRESS → IN_REVIEW.
+//           TicketRevision row on IN_PROGRESS → IN_REVIEW. Pulling that
+//           version back within a minute withdraws it (review-undo.ts).
 //
 // Extracted from app/api/creative/tickets/route.ts to keep the route a
 // thin I/O shell. All structured failures are represented as a tagged
@@ -15,6 +16,7 @@ import { TicketStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { creativeTransitionError } from "@/lib/tickets/creative-transitions";
+import { canUndoReview } from "@/lib/tickets/review-undo";
 import { recordTicketEvent } from "@/lib/tickets/ticket-events";
 
 export type TransitionStatusInput = {
@@ -43,8 +45,11 @@ export type TransitionStatusSuccess = {
     previousStatus: TicketStatus;
     updatedAt: Date;
     revisionId?: string;
+    /** A version sent under a minute ago was withdrawn (see review-undo.ts). */
+    undone?: boolean;
   };
-  notify: NotificationIntent;
+  /** Null when a just-sent version was undone: the customer was never told. */
+  notify: NotificationIntent | null;
 };
 
 export type TransitionStatusFailure =
@@ -147,6 +152,42 @@ export async function transitionCreativeTicketStatus(
           maxConcurrentInProgress: maxConcurrent,
           currentInProgress: currentInProgressCount,
         },
+      };
+    }
+  }
+
+  // Pulling back a version sent less than a minute ago is an undo: the
+  // customer hasn't been told yet, so the version is withdrawn as if it was
+  // never sent (not counted, files removed, no notification).
+  if (ticket.status === TicketStatus.IN_REVIEW && nextStatus === TicketStatus.IN_PROGRESS) {
+    const latest = await prisma.ticketRevision.findFirst({
+      where: { ticketId: ticket.id },
+      orderBy: { version: "desc" },
+      select: { id: true, submittedAt: true, feedbackAt: true, submittedByCreativeId: true },
+    });
+    if (latest && latest.submittedByCreativeId === creativeUserId && canUndoReview(latest)) {
+      const undone = await prisma.$transaction(async (tx) => {
+        await tx.asset.updateMany({
+          where: { revisionId: latest.id },
+          data: { revisionId: null, deletedAt: new Date() },
+        });
+        await tx.ticketRevision.delete({ where: { id: latest.id } });
+        return tx.ticket.update({
+          where: { id: ticket.id },
+          data: { status: nextStatus, revisionCount: { decrement: 1 } },
+          select: { id: true, status: true, updatedAt: true },
+        });
+      });
+      return {
+        success: true,
+        result: {
+          ticketId: undone.id,
+          status: undone.status,
+          previousStatus: ticket.status,
+          updatedAt: undone.updatedAt,
+          undone: true,
+        },
+        notify: null,
       };
     }
   }

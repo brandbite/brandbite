@@ -426,7 +426,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
           { type: "figure", caption: "Sending a new version from the request page" },
           {
             type: "p",
-            text: "Either way, the request moves to **In review**, a new version is added, and the customer is notified.",
+            text: "Either way, the request moves to **In review** and a new version is added. Your customer is notified one minute later. For that minute you can click **Undo** on the message that appears: the version is withdrawn as if you never sent it, it isn't counted, its files are removed and the customer isn't told. After a minute **Undo** goes away and the customer is notified.",
           },
         ],
       },
@@ -482,7 +482,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "While the request is **In review**, click **Pull back to In progress** on the request page or in the Board's request window, or drag it back on the Board. You can then send a new version.",
+            text: "While the request is **In review**, click **Pull back to In progress** on the request page or in the Board's request window, or drag it back on the Board. You can then send a new version. If you pull it back within a minute of sending, it counts as an undo: the version is withdrawn and the customer isn't notified. After that, the version stays in the history and the customer is told the request moved back.",
           },
         ],
       },

@@ -172,4 +172,16 @@ describe("time-tracking service (integration)", () => {
     expect(sums.get(ticketA)).toBeGreaterThanOrEqual(2);
     expect(sums.get(ticketB)).toBeGreaterThanOrEqual(1);
   });
+
+  it("only starts on a request that is in progress", async () => {
+    const creative = await createUser({ role: "DESIGNER" });
+    const { ticketId } = await createTicketForCreative(creative.id);
+    for (const status of ["TODO", "IN_REVIEW", "DONE"] as const) {
+      await prisma.ticket.update({ where: { id: ticketId }, data: { status } });
+      await expect(startTicketTimer({ ticketId, creativeId: creative.id })).rejects.toMatchObject({
+        code: "TICKET_NOT_IN_PROGRESS",
+      });
+    }
+    expect(await prisma.ticketTimeEntry.count({ where: { ticketId } })).toBe(0);
+  });
 });
