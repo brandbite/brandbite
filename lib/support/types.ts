@@ -23,9 +23,11 @@ export type GuideBlock =
    * A screenshot or picture. Without `image` it is a slot waiting for one:
    * admin guides show a placeholder (so admins can see where a screenshot
    * goes), other pages show nothing until an admin adds the image in
-   * Support content.
+   * Support content. `mobileImage` is the same screen on a phone: phones show
+   * it instead of `image` (with a switch back), wider screens never do. It
+   * only shows when `image` is set too.
    */
-  | { type: "figure"; caption: string; image?: string; alt?: string };
+  | { type: "figure"; caption: string; image?: string; mobileImage?: string; alt?: string };
 
 export type GuideSection = {
   heading: string;

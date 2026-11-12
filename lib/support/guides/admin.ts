@@ -1317,7 +1317,7 @@ export const ADMIN_GUIDES: SupportGuide[] = [
           },
           {
             type: "p",
-            text: "A **Screenshot** block has a caption, the picture and optional alt text. Until a picture is added, admin guides show an empty slot with an **Add it** link, and customer and creative guides show nothing. Guides with at least one picture get a **Visual guide** badge in the Support list.",
+            text: "A **Screenshot** block has a caption, the picture, an optional **Phone screenshot** and optional alt text. People reading on a phone see the phone screenshot first and can switch to the desktop one with the **Phone / Desktop** buttons under it; wider screens always show the desktop one. Until a picture is added, admin guides show an empty slot with an **Add it** link, and customer and creative guides show nothing. Guides with at least one picture get a **Visual guide** badge in the Support list.",
           },
         ],
       },

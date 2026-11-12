@@ -4,6 +4,7 @@
 //           first HTML. Same block format as the Support guides.
 // -----------------------------------------------------------------------------
 
+import { ScreenshotView } from "@/components/support/screenshot-view";
 import { RichText } from "@/components/support/support-ui";
 import { sectionAnchor } from "@/lib/guides";
 import type { GuideBlock, SupportGuide } from "@/lib/support/types";
@@ -66,12 +67,13 @@ function Block({ block }: { block: GuideBlock }) {
       if (!block.image) return null;
       return (
         <figure className="flex flex-col gap-2">
-          {/* eslint-disable-next-line @next/next/no-img-element -- CMS uploads, sizes vary */}
-          <img
-            src={block.image}
+          <ScreenshotView
+            image={block.image}
+            mobileImage={block.mobileImage}
             alt={block.alt ?? block.caption}
-            loading="lazy"
-            className="w-full rounded-xl border border-[var(--cs-border)]"
+            caption={block.caption}
+            tone="public"
+            frameClassName="rounded-xl border border-[var(--cs-border)]"
           />
           <figcaption className="text-sm leading-6 text-[var(--cs-muted)]">
             {block.caption}

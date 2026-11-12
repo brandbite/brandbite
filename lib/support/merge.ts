@@ -64,6 +64,9 @@ function parseBlock(raw: unknown): GuideBlock | null {
     if (isString(block.image) && isFigureImage(block.image.trim())) {
       figure.image = block.image.trim();
     }
+    if (isString(block.mobileImage) && isFigureImage(block.mobileImage.trim())) {
+      figure.mobileImage = block.mobileImage.trim();
+    }
     if (isString(block.alt) && block.alt.trim()) figure.alt = block.alt.trim();
     return figure;
   }

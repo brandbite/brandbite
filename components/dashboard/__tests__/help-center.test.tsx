@@ -274,6 +274,43 @@ describe("Guide view", () => {
       expect(screen.getByRole("img", { name: "Two columns" })).toHaveAttribute("src", "/b.png");
     });
 
+    it("offers the phone screenshot to phones, with a switch to the desktop one", () => {
+      const { container } = render(
+        <GuideView
+          role="customer"
+          guide={withBlocks([
+            { type: "figure", caption: "Board", image: "/a.png", mobileImage: "/a-phone.png" },
+          ])}
+        />,
+      );
+      const phoneSource = () => container.querySelector("picture source");
+      expect(screen.getByRole("img", { name: "Board" })).toHaveAttribute("src", "/a.png");
+      expect(phoneSource()).toHaveAttribute("srcset", "/a-phone.png");
+      expect(phoneSource()).toHaveAttribute("media", "(max-width: 639.98px)");
+      expect(screen.getByRole("button", { name: "Phone" })).toHaveAttribute("aria-pressed", "true");
+
+      fireEvent.click(screen.getByRole("button", { name: "Desktop" }));
+      expect(phoneSource()).toBeNull();
+      expect(screen.getByRole("button", { name: "Desktop" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Phone" }));
+      expect(phoneSource()).toHaveAttribute("srcset", "/a-phone.png");
+    });
+
+    it("shows no switch when a screenshot has no phone version", () => {
+      const { container } = render(
+        <GuideView
+          role="customer"
+          guide={withBlocks([{ type: "figure", caption: "Board", image: "/a.png" }])}
+        />,
+      );
+      expect(screen.queryByRole("button", { name: "Desktop" })).toBeNull();
+      expect(container.querySelector("picture source")).toBeNull();
+    });
+
     it("hides empty screenshot slots from customers and creatives", () => {
       render(
         <GuideView role="customer" guide={withBlocks([{ type: "figure", caption: "Gap" }])} />,
