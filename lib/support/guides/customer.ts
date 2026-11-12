@@ -323,6 +323,69 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           },
         ],
       },
+      {
+        heading: "Brand profile",
+        feature: "brandProfile",
+        blocks: [
+          {
+            type: "p",
+            text: "The **Brand profile** card shows how complete your brand setup is, as a percentage, with a short checklist.",
+          },
+          {
+            type: "list",
+            items: [
+              {
+                term: "Brand colors",
+                text: "done once anyone in your company has saved a palette in Color Studio. **Save a palette** opens it.",
+              },
+              {
+                term: "Moodboard",
+                text: "done once your company has a moodboard. **Create moodboard** opens Moodboards.",
+              },
+              {
+                term: "Google Drive or Dropbox",
+                text: "done once your storage is connected. **Connect storage** opens **Settings → Integrations**.",
+              },
+            ],
+          },
+          {
+            type: "p",
+            feature: "brandSoundtrack",
+            text: "**Brand soundtrack** is one more step: it's done once your company has a Spotify playlist. **Add a playlist** opens **Settings → Company**.",
+          },
+          {
+            type: "p",
+            text: "Only the next step that isn't done shows its button. When every step is done, the card says **All set**.",
+          },
+        ],
+      },
+      {
+        heading: "Monthly recap",
+        feature: "monthlyRecap",
+        blocks: [
+          {
+            type: "p",
+            text: "The **Monthly recap** card sums up last month: requests delivered, tokens used and an estimated agency equivalent. It stays for the whole month, and it doesn't appear if nothing was delivered last month.",
+          },
+          {
+            type: "list",
+            items: [
+              {
+                term: "Est. agency equivalent",
+                text: "roughly what the delivered work would cost at a typical US agency rate of $150 an hour, using the same figures as the cost calculator. It's an estimate, not a quote. **How it's estimated** explains it.",
+              },
+              {
+                term: "Share recap",
+                text: "opens your device's share options, or copies a short summary you can paste anywhere.",
+              },
+            ],
+          },
+          {
+            type: "p",
+            text: "Owners and Project managers also get the recap by email once a month.",
+          },
+        ],
+      },
     ],
   },
   {
@@ -516,6 +579,37 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         ],
       },
       {
+        heading: "Brief strength",
+        feature: "briefStrength",
+        blocks: [
+          {
+            type: "p",
+            text: "The **Brief strength** card on the form counts three details that help your creative get started. It updates as you write.",
+          },
+          {
+            type: "list",
+            items: [
+              {
+                term: "Reference attached",
+                text: "attach a file, or paste a link in the brief.",
+              },
+              {
+                term: "Dimensions specified",
+                text: "mention a size in the brief, such as 1080 × 1350 px, a ratio like 16:9 or a paper size like A4.",
+              },
+              {
+                term: "Moodboard linked",
+                text: "choose a moodboard under **Attach moodboard**. **Link moodboard** takes you to that field. If your company has no moodboard yet, **Create moodboard** opens Moodboards in a new tab, so your brief isn't lost.",
+              },
+            ],
+          },
+          {
+            type: "tip",
+            text: "The card is only a guide. You can create the request with any number of details added.",
+          },
+        ],
+      },
+      {
         heading: "Cost and balance",
         blocks: [
           {
@@ -568,6 +662,20 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
     ],
     related: ["how-requests-work", "board"],
     sections: [
+      {
+        heading: "Live progress",
+        feature: "liveProgress",
+        blocks: [
+          {
+            type: "p",
+            text: "The **Live progress** card at the top of a request, on its page and in the Board's request window, shows where the request is (**Queued**, **In progress**, **In review** or **Done**), with a line saying what's happening now.",
+          },
+          {
+            type: "p",
+            text: "While your creative's timer is on, the card shows **Timer running** and a clock for their current sitting. The clock restarts with each sitting; the total time spent isn't shown. The card updates by itself about every 30 seconds.",
+          },
+        ],
+      },
       {
         heading: "When work is ready",
         blocks: [
@@ -626,8 +734,13 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
               "Click **Approve & complete**, or drag the card to **Done** on the Board.",
               "Check the final files in the window. You can download them from here.",
               "Confirm in the window. Your creative is paid for the request and it moves to **Done**.",
-              "Rate the request on Quality, Communication and Speed, or **Skip**. Notes in the rating are for our team, not shared with the creative.",
+              "Rate the request on Quality, Communication and Speed, or **Skip**. The rating is for our team and isn't shared with the creative.",
             ],
+          },
+          {
+            type: "p",
+            feature: "thankYous",
+            text: "In the same window you can thank your creative: tap **Nailed the brief**, **Quick turnaround** or **Great communication**, then **Send thanks**. Your creative is notified and sees the tags; the star rating stays private to our team. Thanks can be sent once per request.",
           },
           {
             type: "warning",
@@ -1454,6 +1567,11 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             type: "p",
             text: "You're also told when your creative shares a moodboard on one of your requests, and when someone comments on a moodboard you made or replies in a comment thread you're in.",
           },
+          {
+            type: "p",
+            feature: "monthlyRecap",
+            text: "Owners and Project managers get a **monthly recap** email early each month, if anything was delivered the month before. It isn't one of the notification types you can switch off.",
+          },
         ],
       },
       {
@@ -1566,6 +1684,27 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           {
             type: "p",
             text: "Your company's name and its member, project and request counts are at the top of every tab. Owners and Project managers can click **Edit company** to change the **Name** and **Website** on the **Company** tab.",
+          },
+        ],
+      },
+      {
+        heading: "Brand soundtrack",
+        feature: "brandSoundtrack",
+        blocks: [
+          {
+            type: "p",
+            text: "On the **Company** tab, **Brand soundtrack** holds one Spotify playlist or album that sounds like your brand. Your creative sees it on your requests while they work on them, and can listen along.",
+          },
+          {
+            type: "steps",
+            items: [
+              "In Spotify, open the playlist, choose **Share**, then **Copy link to playlist**.",
+              "Paste it into **Spotify link** and click **Add soundtrack**.",
+            ],
+          },
+          {
+            type: "p",
+            text: "Only Owners and Project managers can add or change it; **Remove soundtrack** takes it away. Only Spotify playlist and album links work.",
           },
         ],
       },

@@ -38,12 +38,14 @@ function mockApi({
   revisions = [],
   comments = [],
   failBoard = false,
+  liveProgress = { enabled: false },
 }: {
   role?: string | null;
   tickets?: ReturnType<typeof ticket>[];
   revisions?: object[];
   comments?: object[];
   failBoard?: boolean;
+  liveProgress?: object;
 } = {}): Calls {
   const calls: Calls = [];
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
@@ -59,6 +61,7 @@ function mockApi({
         ],
       });
     }
+    if (url.includes("/live-progress")) return Response.json(liveProgress);
     if (url.includes("/revisions")) return Response.json({ revisions });
     if (url.includes("/comments")) {
       if (method === "POST") {
@@ -334,6 +337,28 @@ describe("Customer board", () => {
     });
     fireEvent.click(within(dialog).getByRole("button", { name: "Add comment" }));
     expect(await within(dialog).findByText("Thanks")).toBeInTheDocument();
+  });
+
+  it("shows live progress in the card detail only while the owner has it switched on", async () => {
+    mockApi({ liveProgress: { enabled: true, status: "TODO", isAssigned: false } });
+    const { unmount } = render(<CustomerBoardPage />);
+    await screen.findByText("Logo redesign");
+    openCard(/Logo redesign/);
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText("Live progress")).toBeInTheDocument();
+    expect(
+      within(dialog).getByText("In the queue, waiting for a creative to pick it up."),
+    ).toBeInTheDocument();
+    unmount();
+    vi.restoreAllMocks();
+
+    const calls = mockApi();
+    render(<CustomerBoardPage />);
+    await screen.findByText("Logo redesign");
+    openCard(/Logo redesign/);
+    const offDialog = await screen.findByRole("dialog");
+    await waitFor(() => expect(calls.some((c) => c.url.includes("/live-progress"))).toBe(true));
+    expect(within(offDialog).queryByText("Live progress")).toBeNull();
   });
 
   it("gates edit and cancel on status and role, and confirms a cancel", async () => {

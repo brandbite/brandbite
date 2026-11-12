@@ -31,6 +31,8 @@ import {
   type Tone,
 } from "@/components/admin/v2/ui";
 import { IconFaq } from "@/components/navigation/nav-icons";
+import { ENGAGEMENT_LABELS, type EngagementFeature } from "@/lib/engagement/switches";
+import { useEngagementSwitches } from "@/lib/hooks/use-engagement-switches";
 
 type Role = "customer" | "creative" | "admin" | "public";
 type State = "code" | "edited" | "cms" | "hidden";
@@ -44,6 +46,8 @@ type Row = {
   state: State;
   status: Status;
   ownerOnly: boolean;
+  /** Owner switches this guide's text waits for. */
+  features?: EngagementFeature[];
   updatedAt: string | null;
 };
 
@@ -85,6 +89,7 @@ export default function SupportContentPage() {
   const [role, setRole] = useState<Role>((params.get("role") as Role | null) ?? "customer");
   const [filter, setFilter] = useState<Filter>(initialFilter);
   const [query, setQuery] = useState("");
+  const switches = useEngagementSwitches();
 
   const load = useCallback(async () => {
     setError(null);
@@ -261,6 +266,11 @@ export default function SupportContentPage() {
                           </Badge>
                         ) : null}
                         {row.ownerOnly ? <Badge tone="neutral">Owner only</Badge> : null}
+                        {(row.features ?? []).map((feature) => (
+                          <Badge key={feature} tone={switches[feature] ? "green" : "amber"}>
+                            {ENGAGEMENT_LABELS[feature]}: {switches[feature] ? "on" : "off"}
+                          </Badge>
+                        ))}
                       </div>
                     </Td>
                   </Tr>

@@ -42,6 +42,7 @@ import {
 import { IconArrowUpRight } from "@/components/admin/v2/icons";
 import { useUnsavedChanges } from "@/components/admin/v2/unsaved-changes";
 import { useToast } from "@/components/ui/toast-provider";
+import { ENGAGEMENT_LABELS } from "@/lib/engagement/switches";
 
 type SettingsMap = Record<string, string | null>;
 
@@ -121,58 +122,58 @@ const SETTING_META: Record<string, SettingMeta> = {
     ],
   },
   ENGAGEMENT_LIVE_PROGRESS: {
-    label: "Live progress on requests",
+    label: ENGAGEMENT_LABELS.liveProgress,
     description:
       "Customers see a step tracker on each request (Queued, In progress, In review, Done) and a note with a running clock while their creative's timer is on.",
     type: "boolean",
     section: "engagement",
   },
   ENGAGEMENT_CREATIVE_PROGRESS: {
-    label: "Creative progress",
+    label: ENGAGEMENT_LABELS.creativeProgress,
     description:
-      "Creatives see how close they are to the next payout tier and their streak of requests approved first time, on their overview.",
+      "Creatives see their streak of requests approved without a revision on their overview, and how many requests are left to the next payout tier.",
     type: "boolean",
     section: "engagement",
   },
   ENGAGEMENT_THANK_YOUS: {
-    label: "Customer thank-yous",
+    label: ENGAGEMENT_LABELS.thankYous,
     description:
       "When approving a delivery, customers can add one-tap thank-you tags. The creative gets a notification and the tags collect on their profile. Tags already given are kept when this is off.",
     type: "boolean",
     section: "engagement",
   },
   ENGAGEMENT_BRIEF_STRENGTH: {
-    label: "Brief strength meter",
+    label: ENGAGEMENT_LABELS.briefStrength,
     description:
       "The new-request form shows a meter that fills as the customer adds a reference, dimensions and a moodboard.",
     type: "boolean",
     section: "engagement",
   },
   ENGAGEMENT_BRAND_PROFILE: {
-    label: "Brand profile progress",
+    label: ENGAGEMENT_LABELS.brandProfile,
     description:
       "Customers see a card on their overview showing how complete their brand setup is, with the next step to take.",
     type: "boolean",
     section: "engagement",
   },
   ENGAGEMENT_BRAND_SOUNDTRACK: {
-    label: "Brand soundtrack (Spotify)",
+    label: ENGAGEMENT_LABELS.brandSoundtrack,
     description:
-      "Customers can add a Spotify playlist to their brand, shown to the creative on each request. Spotify links on moodboards play in place.",
+      "Owners and project managers can add a Spotify playlist or album to their company. The assigned creative sees it on a request while it is in progress.",
     type: "boolean",
     section: "engagement",
   },
   ENGAGEMENT_FOCUS_PLAYLIST: {
-    label: "Focus playlist for creatives (Spotify)",
+    label: ENGAGEMENT_LABELS.focusPlaylist,
     description:
-      "When a creative starts work, a card suggests a playlist that fits the request's mood. Each creative can turn the suggestions off for themselves.",
+      "While a request is in progress, a card suggests a playlist that fits the request's mood. Each creative can turn the suggestions off for themselves.",
     type: "boolean",
     section: "engagement",
   },
   ENGAGEMENT_MONTHLY_RECAP: {
-    label: "Monthly recap",
+    label: ENGAGEMENT_LABELS.monthlyRecap,
     description:
-      "On the first of each month customers get an email and an overview card summing up the month: requests delivered, tokens used and turnaround.",
+      "Early each month customers see an overview card summing up last month (requests delivered, tokens used and an estimated agency equivalent), and owners and project managers get it by email. A company with nothing delivered gets nothing.",
     type: "boolean",
     section: "engagement",
   },
@@ -257,7 +258,7 @@ const SETTING_META: Record<string, SettingMeta> = {
     inputClassName: "max-w-none",
   },
   ENGAGEMENT_PLAYLIST_TOOL: {
-    label: "Brand playlist generator (public tool)",
+    label: ENGAGEMENT_LABELS.playlistTool,
     description:
       "The free public page /brand-playlist: visitors pick words for their brand and get the brandbite playlist for that mix of moods (ready-made playlists; nothing to fill in). When off, the page shows Not found.",
     type: "boolean",
@@ -748,7 +749,11 @@ export default function AdminSettingsPage() {
                           <Button
                             variant={edited ? "primary" : "secondary"}
                             size="sm"
-                            disabled={isSaving || !hasChanged || !draftValue.trim()}
+                            disabled={
+                              isSaving ||
+                              !hasChanged ||
+                              (!draftValue.trim() && !key.startsWith("SOUNDTRACK_PLAYLISTS_"))
+                            }
                             onClick={() => handleSave(key)}
                             aria-label={`Save ${meta.label}`}
                           >

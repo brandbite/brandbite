@@ -61,6 +61,7 @@ import type {
 } from "./board-types";
 import { TicketComments } from "./ticket-comments";
 import { ExpandLink } from "@/components/dashboard/tickets/view-switch";
+import { LiveProgressCard } from "@/components/engagement/live-progress-card";
 
 type DetailTab = "current" | "brief" | "versions" | "comments";
 
@@ -449,6 +450,12 @@ export function TicketDetailDialog({
           </Callout>
         </div>
       ) : null}
+
+      {/* Owner switch ENGAGEMENT_LIVE_PROGRESS; renders nothing when off. The
+          Board refreshes itself, so the card doesn't need to ask for a reload. */}
+      <div className="mb-6 empty:hidden">
+        <LiveProgressCard ticketId={ticket.id} status={ticket.status} />
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="min-w-0">

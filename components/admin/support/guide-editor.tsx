@@ -33,8 +33,14 @@ import { RichText } from "@/components/support/support-ui";
 import { CmsImageUpload } from "@/components/ui/cms-image-upload";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast-provider";
+import {
+  ENGAGEMENT_LABELS,
+  type EngagementFeature,
+  type EngagementSwitches,
+} from "@/lib/engagement/switches";
+import { useEngagementSwitches } from "@/lib/hooks/use-engagement-switches";
 import type { GuideContent } from "@/lib/support/merge";
-import type { GuideBlock, GuideSection } from "@/lib/support/types";
+import type { GuideBlock, GuideFeature, GuideSection } from "@/lib/support/types";
 
 type Role = "customer" | "creative" | "admin" | "public";
 type Status = "IN_SYNC" | "CODE_CHANGED" | "CODE_REMOVED";
@@ -49,6 +55,8 @@ type Detail = {
   edit: GuideContent | null;
   hidden: boolean;
   ownerOnly: boolean;
+  /** The whole guide only shows while this feature is switched on. */
+  feature: GuideFeature | null;
 };
 
 const ROLE_LABEL: Record<Role, string> = {
@@ -86,7 +94,12 @@ function blockToText(block: GuideBlock): string {
     .join("\n");
 }
 
-function textToBlock({ type, text, image, mobileImage, alt }: DraftBlock): GuideBlock {
+function textToBlock({ feature, ...draft }: DraftBlock): GuideBlock {
+  const block = bodyOf(draft);
+  return feature ? { ...block, feature } : block;
+}
+
+function bodyOf({ type, text, image, mobileImage, alt }: DraftBlock): GuideBlock {
   if (type === "figure") {
     const figure: GuideBlock = { type, caption: text.trim() };
     if (image) figure.image = image;
@@ -118,8 +131,9 @@ type DraftBlock = {
   image?: string;
   mobileImage?: string;
   alt?: string;
+  feature?: GuideFeature;
 };
-type DraftSection = { heading: string; blocks: DraftBlock[] };
+type DraftSection = { heading: string; feature?: GuideFeature; blocks: DraftBlock[] };
 type Draft = {
   title: string;
   summary: string;
@@ -136,6 +150,7 @@ function toDraft(content: GuideContent): Draft {
     keywords: content.keywords.join(", "),
     sections: content.sections.map((section) => ({
       heading: section.heading,
+      feature: section.feature,
       blocks: section.blocks.map(
         (block): DraftBlock =>
           block.type === "figure"
@@ -145,8 +160,9 @@ function toDraft(content: GuideContent): Draft {
                 image: block.image,
                 mobileImage: block.mobileImage,
                 alt: block.alt,
+                feature: block.feature,
               }
-            : { type: block.type, text: blockToText(block) },
+            : { type: block.type, text: blockToText(block), feature: block.feature },
       ),
     })),
   };
@@ -165,6 +181,7 @@ function fromDraft(draft: Draft): GuideContent {
       .map(
         (section): GuideSection => ({
           heading: section.heading.trim(),
+          ...(section.feature ? { feature: section.feature } : {}),
           blocks: section.blocks.filter((block) => block.text.trim()).map(textToBlock),
         }),
       )
@@ -179,6 +196,30 @@ const EMPTY_DRAFT: Draft = {
   keywords: "",
   sections: [{ heading: "", blocks: [{ type: "p", text: "" }] }],
 };
+
+// --- Text that depends on a feature switch -------------------------------------
+
+/** Says which owner switch a piece of text waits for, and whether it shows now. */
+function FeatureNote({
+  feature,
+  switches,
+  what,
+}: {
+  feature: GuideFeature;
+  switches: EngagementSwitches;
+  what: "guide" | "section" | "block";
+}) {
+  const on = switches[feature];
+  return (
+    <p className="flex flex-wrap items-center gap-2 text-xs text-[var(--av2-text-2)]">
+      <Badge tone={on ? "green" : "amber"}>{on ? "Showing" : "Not showing"}</Badge>
+      <span>
+        This {what} only shows while <strong>{ENGAGEMENT_LABELS[feature]}</strong> is switched on in
+        Settings (it is {on ? "on" : "off"} now).
+      </span>
+    </p>
+  );
+}
 
 // --- Screenshot block ---------------------------------------------------------
 
@@ -253,7 +294,15 @@ function ContentPreview({ content }: { content: GuideContent }) {
       </div>
       {content.sections.map((section, i) => (
         <section key={i}>
-          <p className="font-semibold">{section.heading}</p>
+          <p className="font-semibold">
+            {section.heading}
+            {section.feature ? (
+              <span className="font-normal text-[var(--av2-text-2)]">
+                {" "}
+                (only while {ENGAGEMENT_LABELS[section.feature]} is on)
+              </span>
+            ) : null}
+          </p>
           {section.blocks.map((block, j) => (
             <div key={j} className="mt-1">
               {block.type === "steps" ? (
@@ -317,6 +366,7 @@ export function GuideEditor({ role, slug }: { role: Role; slug: string | null })
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<null | "revert" | "delete">(null);
+  const switches = useEngagementSwitches();
 
   const dirty = JSON.stringify(draft) !== saved;
   useUnsavedChanges(dirty, "Support guide editor");
@@ -463,6 +513,10 @@ export function GuideEditor({ role, slug }: { role: Role; slug: string | null })
           ) : null
         }
       />
+
+      {detail?.feature ? (
+        <FeatureNote feature={detail.feature} switches={switches} what="guide" />
+      ) : null}
 
       {detail?.status === "CODE_CHANGED" && detail.code && detail.edit ? (
         <Card>
@@ -658,6 +712,31 @@ export function GuideEditor({ role, slug }: { role: Role; slug: string | null })
                 Remove section
               </Button>
             </div>
+            <Field
+              label="Show this section"
+              htmlFor={`section-${si}-feature`}
+              hint="Text about a feature can wait for its switch: it shows by itself when the feature is switched on in Settings."
+            >
+              <Select
+                id={`section-${si}-feature`}
+                value={section.feature ?? ""}
+                onChange={(e) =>
+                  updateSection(si, {
+                    feature: (e.target.value || undefined) as EngagementFeature | undefined,
+                  })
+                }
+              >
+                <option value="">Always</option>
+                {(Object.keys(ENGAGEMENT_LABELS) as EngagementFeature[]).map((feature) => (
+                  <option key={feature} value={feature}>
+                    Only while “{ENGAGEMENT_LABELS[feature]}” is on
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            {section.feature ? (
+              <FeatureNote feature={section.feature} switches={switches} what="section" />
+            ) : null}
             {section.blocks.map((block, bi) => (
               <div
                 key={bi}
@@ -692,6 +771,9 @@ export function GuideEditor({ role, slug }: { role: Role; slug: string | null })
                     Remove block
                   </Button>
                 </div>
+                {block.feature ? (
+                  <FeatureNote feature={block.feature} switches={switches} what="block" />
+                ) : null}
                 {block.type === "figure" ? (
                   <FigureFields
                     id={`block-${si}-${bi}`}
