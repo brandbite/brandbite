@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import CreativeSettingsPage from "@/app/creative/settings/page";
+import { resetEngagementSwitchesCache } from "@/lib/hooks/use-engagement-switches";
 
 vi.mock("@/components/ui/toast-provider", () => ({
   useToast: () => ({ showToast: vi.fn() }),
@@ -19,6 +20,7 @@ function mockApi({
   failTiers = false,
   availability = { isPaused: false, activeTicketCount: 0 } as object,
   failAvailability = false,
+  thankYous = false,
 } = {}) {
   const writes: { method: string; url: string; body: unknown }[] = [];
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
@@ -34,6 +36,7 @@ function mockApi({
     }
     if (url.includes("/session")) return Response.json({ user: { email: "ada@demo.test" } });
     if (url.includes("/preferences")) return Response.json({ preferences: [] });
+    if (url.includes("/engagement/switches")) return Response.json({ switches: { thankYous } });
     if (url.includes("/skills")) {
       return Response.json({ jobTypes: skills, selectedJobTypeIds: selected });
     }
@@ -68,7 +71,10 @@ function mockApi({
 
 const skillBoxes = () => screen.getAllByRole("checkbox") as HTMLInputElement[];
 
-beforeEach(() => window.history.replaceState(null, "", "/creative/settings"));
+beforeEach(() => {
+  window.history.replaceState(null, "", "/creative/settings");
+  resetEngagementSwitchesCache();
+});
 afterEach(() => vi.restoreAllMocks());
 
 describe("Creative settings: skills", () => {
@@ -207,5 +213,22 @@ describe("Creative settings: notifications", () => {
         },
       ]),
     );
+  });
+
+  it("leaves out the thank-you row while the owner has thank-yous switched off", async () => {
+    mockApi();
+    render(<CreativeSettingsPage />);
+    fireEvent.click(await screen.findByRole("tab", { name: "Notifications" }));
+    await screen.findByRole("switch", { name: "Withdrawal updates Email" });
+    expect(screen.queryByText("Customer thank-yous")).not.toBeInTheDocument();
+  });
+
+  it("shows the thank-you row once thank-yous are switched on", async () => {
+    mockApi({ thankYous: true });
+    render(<CreativeSettingsPage />);
+    fireEvent.click(await screen.findByRole("tab", { name: "Notifications" }));
+    expect(
+      await screen.findByRole("switch", { name: "Customer thank-yous Email" }),
+    ).toBeInTheDocument();
   });
 });

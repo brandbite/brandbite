@@ -90,10 +90,11 @@ import {
   sameWorkSchedule,
   type WorkSchedule,
 } from "@/lib/work-schedule";
+import { useEngagementSwitches } from "@/lib/hooks/use-engagement-switches";
 import {
   NOTIFICATION_LABELS,
   NOTIFICATION_ORDER,
-  notificationAppliesTo,
+  notificationEventsFor,
   NotificationMatrix,
   type NotificationChannel,
   type NotificationPreference,
@@ -512,6 +513,7 @@ export function ProfileForm({
 }
 
 function ProfileFormBody({ layout, dashboard }: { layout: ProfileFormLayout; dashboard: boolean }) {
+  const engagementSwitches = useEngagementSwitches();
   const { showToast } = useToast();
   const v2 = layout === "tabs";
   const T = v2 ? T_TABS : T_STACKED;
@@ -1824,36 +1826,34 @@ function ProfileFormBody({ layout, dashboard }: { layout: ProfileFormLayout; das
             />
           ) : (
             <ul className={T.divide}>
-              {NOTIFICATION_ORDER.filter((type) => notificationAppliesTo(type, user.role)).map(
-                (type) => {
-                  const pref = prefs[type];
-                  const meta = NOTIFICATION_LABELS[type];
-                  const inAppKey = `${type}:enabled`;
-                  const emailKey = `${type}:emailEnabled`;
-                  return (
-                    <li key={type} className="flex flex-wrap items-start gap-3 py-3">
-                      <div className="min-w-0 flex-1">
-                        <p className={T.rowTitle}>{meta.title}</p>
-                        <p className={T.desc}>{meta.description}</p>
-                      </div>
-                      <div className="flex items-center gap-3 text-xs text-[var(--bb-text-secondary)]">
-                        <ToggleSwitch
-                          label="In-app"
-                          checked={pref.enabled}
-                          disabled={prefsSaving.has(inAppKey)}
-                          onChange={(next) => void handleTogglePref(type, "enabled", next)}
-                        />
-                        <ToggleSwitch
-                          label="Email"
-                          checked={pref.emailEnabled}
-                          disabled={prefsSaving.has(emailKey)}
-                          onChange={(next) => void handleTogglePref(type, "emailEnabled", next)}
-                        />
-                      </div>
-                    </li>
-                  );
-                },
-              )}
+              {notificationEventsFor(user.role, engagementSwitches).map((type) => {
+                const pref = prefs[type];
+                const meta = NOTIFICATION_LABELS[type];
+                const inAppKey = `${type}:enabled`;
+                const emailKey = `${type}:emailEnabled`;
+                return (
+                  <li key={type} className="flex flex-wrap items-start gap-3 py-3">
+                    <div className="min-w-0 flex-1">
+                      <p className={T.rowTitle}>{meta.title}</p>
+                      <p className={T.desc}>{meta.description}</p>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-[var(--bb-text-secondary)]">
+                      <ToggleSwitch
+                        label="In-app"
+                        checked={pref.enabled}
+                        disabled={prefsSaving.has(inAppKey)}
+                        onChange={(next) => void handleTogglePref(type, "enabled", next)}
+                      />
+                      <ToggleSwitch
+                        label="Email"
+                        checked={pref.emailEnabled}
+                        disabled={prefsSaving.has(emailKey)}
+                        onChange={(next) => void handleTogglePref(type, "emailEnabled", next)}
+                      />
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </section>

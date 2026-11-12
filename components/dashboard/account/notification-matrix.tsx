@@ -11,6 +11,8 @@ import { useCallback, useEffect, useId, useState } from "react";
 
 import { Callout, Skeleton, Switch } from "@/components/admin/v2/ui";
 import { useToast } from "@/components/ui/toast-provider";
+import type { EngagementFeature, EngagementSwitches } from "@/lib/engagement/switches";
+import { useEngagementSwitches } from "@/lib/hooks/use-engagement-switches";
 
 export type NotificationType =
   | "REVISION_SUBMITTED"
@@ -128,8 +130,20 @@ export const NOTIFICATION_ORDER: NotificationType[] = [
   "THANKS_RECEIVED",
 ];
 
-export function notificationEventsFor(role: AccountRole): NotificationType[] {
-  return NOTIFICATION_ORDER.filter((type) => notificationAppliesTo(type, role));
+/** Types that belong to a feature the site owner can switch off. */
+const NOTIFICATION_FEATURE: Partial<Record<NotificationType, EngagementFeature>> = {
+  THANKS_RECEIVED: "thankYous",
+};
+
+/** The rows to show: right for the role, and not about a switched-off feature. */
+export function notificationEventsFor(
+  role: AccountRole,
+  switches: EngagementSwitches,
+): NotificationType[] {
+  return NOTIFICATION_ORDER.filter((type) => {
+    const feature = NOTIFICATION_FEATURE[type];
+    return notificationAppliesTo(type, role) && (!feature || switches[feature]);
+  });
 }
 
 /**
@@ -156,6 +170,7 @@ export function NotificationMatrix({
   onToggle: (type: NotificationType, channel: NotificationChannel, next: boolean) => void;
 }) {
   const id = useId();
+  const switches = useEngagementSwitches();
   const inAppId = `${id}-in-app`;
   const emailId = `${id}-email`;
   return (
@@ -185,7 +200,7 @@ export function NotificationMatrix({
         </tr>
       </thead>
       <tbody>
-        {notificationEventsFor(role).map((type) => {
+        {notificationEventsFor(role, switches).map((type) => {
           const meta = NOTIFICATION_LABELS[type];
           const pref = prefs[type];
           const titleId = `${id}-${type}`;
