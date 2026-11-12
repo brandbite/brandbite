@@ -18,12 +18,12 @@ import {
   IconArrowUpRight,
   IconChevronDown,
   IconChevronRight,
-  IconExpand,
   IconImage,
 } from "@/components/admin/v2/icons";
 import { buttonClass, Callout, Eyebrow, IconTile } from "@/components/admin/v2/ui";
 import { BreadcrumbDetail } from "@/components/navigation/breadcrumb-detail";
 import { GuideVote } from "@/components/support/guide-vote";
+import { ScreenshotView } from "@/components/support/screenshot-view";
 import { RichText } from "@/components/support/support-ui";
 import {
   guideHref,
@@ -72,24 +72,15 @@ function GuideFigure({
   if (block.image) {
     return (
       <figure className="flex flex-col gap-2">
-        <div className="relative overflow-hidden rounded-2xl border border-[var(--av2-border)] bg-[var(--av2-bg)]">
-          {/* eslint-disable-next-line @next/next/no-img-element -- CMS uploads, sizes vary */}
-          <img
-            src={block.image}
-            alt={block.alt ?? block.caption}
-            loading="lazy"
-            className="block h-auto w-full"
-          />
-          <a
-            href={block.image}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={`Open full size: ${block.caption}`}
-            className={`absolute top-3 right-3 flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--av2-border)] bg-[var(--av2-surface)] text-[var(--av2-text)] shadow-sm hover:bg-[var(--av2-bg)] ${FOCUS}`}
-          >
-            <IconExpand />
-          </a>
-        </div>
+        <ScreenshotView
+          image={block.image}
+          mobileImage={block.mobileImage}
+          alt={block.alt ?? block.caption}
+          caption={block.caption}
+          tone="dashboard"
+          frameClassName="rounded-2xl border border-[var(--av2-border)] bg-[var(--av2-bg)]"
+          expandable
+        />
         <figcaption className="text-sm text-[var(--av2-text-2)] italic">
           {number !== null ? `Figure ${number}. ` : ""}
           {block.caption}

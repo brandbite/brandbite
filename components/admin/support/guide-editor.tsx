@@ -86,10 +86,11 @@ function blockToText(block: GuideBlock): string {
     .join("\n");
 }
 
-function textToBlock({ type, text, image, alt }: DraftBlock): GuideBlock {
+function textToBlock({ type, text, image, mobileImage, alt }: DraftBlock): GuideBlock {
   if (type === "figure") {
     const figure: GuideBlock = { type, caption: text.trim() };
     if (image) figure.image = image;
+    if (mobileImage) figure.mobileImage = mobileImage;
     if (alt?.trim()) figure.alt = alt.trim();
     return figure;
   }
@@ -111,7 +112,13 @@ function textToBlock({ type, text, image, alt }: DraftBlock): GuideBlock {
 }
 
 /** `text` is the block's text, or a screenshot's caption. */
-type DraftBlock = { type: GuideBlock["type"]; text: string; image?: string; alt?: string };
+type DraftBlock = {
+  type: GuideBlock["type"];
+  text: string;
+  image?: string;
+  mobileImage?: string;
+  alt?: string;
+};
 type DraftSection = { heading: string; blocks: DraftBlock[] };
 type Draft = {
   title: string;
@@ -132,7 +139,13 @@ function toDraft(content: GuideContent): Draft {
       blocks: section.blocks.map(
         (block): DraftBlock =>
           block.type === "figure"
-            ? { type: block.type, text: block.caption, image: block.image, alt: block.alt }
+            ? {
+                type: block.type,
+                text: block.caption,
+                image: block.image,
+                mobileImage: block.mobileImage,
+                alt: block.alt,
+              }
             : { type: block.type, text: blockToText(block) },
       ),
     })),
@@ -197,6 +210,18 @@ function FigureFields({
         value={block.image ? { storageKey: "", url: block.image } : null}
         onChange={(value) => onChange({ image: value?.url })}
       />
+      <div className="flex flex-col gap-1">
+        <CmsImageUpload
+          type="support"
+          label="Phone screenshot (optional)"
+          value={block.mobileImage ? { storageKey: "", url: block.mobileImage } : null}
+          onChange={(value) => onChange({ mobileImage: value?.url })}
+        />
+        <p className="text-xs text-[var(--av2-text-2)]">
+          The same screen on a phone. People reading on a phone see this one first and can switch to
+          the desktop screenshot. It only shows once the main screenshot is added.
+        </p>
+      </div>
       <Field
         label="Alt text"
         htmlFor={`${id}-alt`}
@@ -256,7 +281,12 @@ function ContentPreview({ content }: { content: GuideContent }) {
               ) : block.type === "figure" ? (
                 <p>
                   <strong>{BLOCK_LABEL.figure}: </strong>
-                  {block.caption} {block.image ? "(image added)" : "(no image yet)"}
+                  {block.caption}{" "}
+                  {block.image
+                    ? block.mobileImage
+                      ? "(image and phone image added)"
+                      : "(image added)"
+                    : "(no image yet)"}
                 </p>
               ) : (
                 <p>

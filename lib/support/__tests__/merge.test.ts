@@ -139,6 +139,25 @@ describe("parseGuideContent", () => {
     ]);
   });
 
+  it("keeps a safe phone screenshot and drops an unsafe one", () => {
+    const parsed = parseGuideContent({
+      title: "T",
+      sections: [
+        {
+          heading: "One",
+          blocks: [
+            { type: "figure", caption: "Both", image: "/a.png", mobileImage: " /a-phone.png " },
+            { type: "figure", caption: "Unsafe", image: "/b.png", mobileImage: "//evil.example/b" },
+          ],
+        },
+      ],
+    });
+    expect(parsed?.sections[0].blocks).toEqual([
+      { type: "figure", caption: "Both", image: "/a.png", mobileImage: "/a-phone.png" },
+      { type: "figure", caption: "Unsafe", image: "/b.png" },
+    ]);
+  });
+
   it("rejects content with no title or no sections", () => {
     expect(parseGuideContent(null)).toBeNull();
     expect(parseGuideContent({ title: "", sections: [] })).toBeNull();
