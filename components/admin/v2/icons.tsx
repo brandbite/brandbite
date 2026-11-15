@@ -173,3 +173,44 @@ export function IconArrowRight(p: Props) {
     </svg>
   );
 }
+
+export function IconLayers(p: Props) {
+  return (
+    <svg {...base} {...p}>
+      <path d="m12 3 9 5-9 5-9-5z" />
+      <path d="m3 12.5 9 5 9-5M3 17l9 5 9-5" />
+    </svg>
+  );
+}
+
+export function IconCheck(p: Props) {
+  return (
+    <svg {...base} {...p}>
+      <path d="m5 12.5 4.5 4.5L19 7.5" />
+    </svg>
+  );
+}
+
+export function IconPlus(p: Props) {
+  return (
+    <svg {...base} width={16} height={16} {...p}>
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+export function IconTrash(p: Props) {
+  return (
+    <svg {...base} width={18} height={18} {...p}>
+      <path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" />
+    </svg>
+  );
+}
+
+export function IconPencil(p: Props) {
+  return (
+    <svg {...base} width={16} height={16} {...p}>
+      <path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" />
+    </svg>
+  );
+}

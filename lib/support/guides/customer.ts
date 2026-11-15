@@ -973,22 +973,22 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
                 text: "tone words, voice notes, lines to write like and never write like, words to use and avoid, and a sample of copy that sounds right.",
               },
               {
-                term: "Colors",
-                text: "click **Add color**, pick the color or type its hex code, and give it a name and a role if you have them.",
+                term: "Visual identity",
+                text: "your colors, fonts and imagery. Click **Add color**, click the swatch to pick the color or type its hex code, and give it a name and a role if you have them. Click **Add font**, type the font's name, choose what it's used for, and click **Add link** to say where it can be found. Under **Imagery**, describe the kind of photos and illustrations that fit, and what to stay away from.",
               },
               {
-                term: "Fonts",
-                text: "click **Add font**, type the font's name, choose what it's used for and add a link to where it can be found.",
-              },
-              {
-                term: "Imagery",
-                text: "the kind of photos and illustrations that fit, and what to stay away from.",
+                term: "Files & collaboration",
+                text: "your logo files and guidelines document, and the form you can send to a colleague. Both are described below.",
               },
             ],
           },
           {
             type: "p",
-            text: "Lists such as **Values** and **Tone words** take one entry per line. Nothing is saved until you click **Save brand guide** at the bottom. **Discard** puts back what was last saved.",
+            text: "Lists such as **Values** and **Tone words** take one entry per line. Nothing is saved until you click **Save brand guide** at the bottom. You can move between tabs before saving: one save covers all of them. **Discard** puts back what was last saved.",
+          },
+          {
+            type: "p",
+            text: "The band at the top counts five essentials: what you do, tone words, a color, a font and a primary logo. While one is missing, the link in the band opens the tab where you add it.",
           },
         ],
       },
@@ -997,7 +997,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Under **Brand files**, choose what the file is (for example **Primary logo** or **Brand guidelines**) and click **Upload files**. You can pick several files at once. Files are saved straight away, without the Save button.",
+            text: "On the **Files & collaboration** tab, under **Brand files**, choose what the file is (for example **Primary logo** or **Brand guidelines**) and click **Upload files**. You can pick several files at once. Files are saved straight away, without the Save button.",
           },
           {
             type: "p",
@@ -1018,7 +1018,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         blocks: [
           {
             type: "p",
-            text: "Someone else may know the brand better than you, such as a founder or your marketing lead. Under **Ask a colleague**, click **Create form link**, then send them the link. They answer a short form about the brand and don't need a brandbite account.",
+            text: "Someone else may know the brand better than you, such as a founder or your marketing lead. On the **Files & collaboration** tab, under **Ask a colleague**, click **Create form link**, then send them the link. They answer a short form about the brand and don't need a brandbite account.",
           },
           {
             type: "p",

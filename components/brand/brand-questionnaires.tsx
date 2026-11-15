@@ -71,6 +71,7 @@ export function BrandQuestionnaires({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [copyFailed, setCopyFailed] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [applying, setApplying] = useState<Form | null>(null);
 
@@ -94,9 +95,11 @@ export function BrandQuestionnaires({
     try {
       await navigator.clipboard.writeText(form.url);
       setCopied(form.id);
+      setCopyFailed(null);
       window.setTimeout(() => setCopied((current) => (current === form.id ? null : current)), 2000);
     } catch {
-      // Clipboard blocked: the link is on screen to copy by hand.
+      // Clipboard blocked: show the link so it can be copied by hand.
+      setCopyFailed(form.id);
     }
   };
 
@@ -151,16 +154,15 @@ export function BrandQuestionnaires({
 
   return (
     <Card>
-      <CardTitle description="Send a short form to someone who knows the brand, like a founder or your marketing lead. They don't need an account. You read their answers here before anything changes in the guide.">
+      <CardTitle description="Send a short form to someone who knows the brand, like a founder or your marketing lead. They don't need an account. You read their answers before anything changes in the guide.">
         Ask a colleague
       </CardTitle>
 
-      <div className="mt-5 flex flex-wrap items-end gap-3">
+      <div className="mt-4 space-y-3">
         <Field
           label="Who is it for? (optional)"
           htmlFor={`${id}-note`}
           hint={`Only you see this. Each link takes one set of answers and works for ${QUESTIONNAIRE_LINK_DAYS} days.`}
-          className="min-w-56 flex-1"
         >
           <TextInput
             id={`${id}-note`}
@@ -171,7 +173,12 @@ export function BrandQuestionnaires({
             placeholder="e.g. Dana, Head of Marketing"
           />
         </Field>
-        <Button variant="primary" disabled={busy !== null} onClick={() => void create()}>
+        <Button
+          variant="primary"
+          className="w-full"
+          disabled={busy !== null}
+          onClick={() => void create()}
+        >
           {busy === "create" ? "Making link…" : "Create form link"}
         </Button>
       </div>
@@ -185,7 +192,7 @@ export function BrandQuestionnaires({
       )}
 
       {forms && forms.length > 0 && (
-        <ul className="mt-5 space-y-3">
+        <ul className="mt-5 space-y-3 border-t border-[var(--av2-border)] pt-5">
           {forms.map((form) => {
             const status = STATUS[form.status];
             const who =
@@ -196,60 +203,53 @@ export function BrandQuestionnaires({
             const expanded = open === form.id;
             return (
               <li key={form.id} className="rounded-xl border border-[var(--av2-border)] p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="flex flex-wrap items-center gap-2 text-sm font-semibold">
-                      <span className="break-words">
-                        {who}
-                        {form.respondentRole ? `, ${form.respondentRole}` : ""}
-                      </span>
-                      <Badge tone={status.tone}>{status.label}</Badge>
-                    </p>
-                    <p className="mt-0.5 text-xs text-[var(--av2-text-2)]">
-                      {form.submittedAt
-                        ? `Answered ${day(form.submittedAt)} · ${answered.length} of ${QUESTIONS.length} questions`
-                        : form.status === "OPEN"
-                          ? `Created ${day(form.createdAt)} · works until ${day(form.expiresAt)}`
-                          : `Created ${day(form.createdAt)}`}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {form.url && (
-                      <Button size="sm" onClick={() => void copy(form)}>
-                        {copied === form.id ? "Link copied" : "Copy link"}
-                      </Button>
-                    )}
-                    {answered.length > 0 && (
-                      <Button
-                        size="sm"
-                        aria-expanded={expanded}
-                        onClick={() => setOpen(expanded ? null : form.id)}
-                      >
-                        {expanded ? "Hide answers" : "Read answers"}
-                      </Button>
-                    )}
-                    {form.status === "SUBMITTED" && (
-                      <Button
-                        size="sm"
-                        variant="primary"
-                        disabled={busy !== null || guideDirty}
-                        onClick={() => setApplying(form)}
-                      >
-                        Add to brand guide
-                      </Button>
-                    )}
+                <p className="text-base font-semibold break-words">
+                  {who}
+                  {form.respondentRole ? `, ${form.respondentRole}` : ""}
+                </p>
+                <div className="mt-2">
+                  <Badge tone={status.tone}>{status.label}</Badge>
+                </div>
+                <p className="mt-2 text-sm text-[var(--av2-text-2)]">
+                  {form.submittedAt
+                    ? `Answered ${day(form.submittedAt)} · ${answered.length} of ${QUESTIONS.length} questions`
+                    : form.status === "OPEN"
+                      ? `Expires ${day(form.expiresAt)}`
+                      : `Created ${day(form.createdAt)}`}
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {form.url && (
+                    <Button size="sm" onClick={() => void copy(form)}>
+                      {copied === form.id ? "Link copied" : "Copy link"}
+                    </Button>
+                  )}
+                  {answered.length > 0 && (
                     <Button
                       size="sm"
-                      variant="ghost"
-                      disabled={busy !== null}
-                      onClick={() => void close(form)}
+                      aria-expanded={expanded}
+                      onClick={() => setOpen(expanded ? null : form.id)}
                     >
-                      {form.status === "OPEN" ? "Close link" : "Remove"}
+                      {expanded ? "Hide answers" : "Read answers"}
                     </Button>
-                  </div>
+                  )}
+                  <Button size="sm" disabled={busy !== null} onClick={() => void close(form)}>
+                    {form.status === "OPEN" ? "Close link" : "Remove"}
+                  </Button>
+                  {form.status === "SUBMITTED" && (
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      className="col-span-2"
+                      disabled={busy !== null || guideDirty}
+                      onClick={() => setApplying(form)}
+                    >
+                      Add to brand guide
+                    </Button>
+                  )}
                 </div>
 
-                {form.url && (
+                {/* Only when copying didn't work: the link, to copy by hand. */}
+                {form.url && copyFailed === form.id && (
                   <p className="mt-2 font-mono text-xs break-all text-[var(--av2-text-2)]">
                     {form.url}
                   </p>
