@@ -335,8 +335,16 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             type: "list",
             items: [
               {
+                term: "Logo files",
+                text: "done once your brand guide has a logo file. **Upload your logo** opens the Brand guide.",
+              },
+              {
+                term: "Brand language",
+                text: "done once your brand guide says what you do or how you sound. **Describe your brand** opens the Brand guide.",
+              },
+              {
                 term: "Brand colors",
-                text: "done once anyone in your company has saved a palette in Color Studio. **Save a palette** opens it.",
+                text: "done once your brand guide has colors, or anyone in your company has saved a palette in Color Studio. **Save a palette** opens Color Studio.",
               },
               {
                 term: "Moodboard",

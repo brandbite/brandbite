@@ -53,6 +53,7 @@ import {
   type BrandAssetKindValue,
 } from "@/lib/brand/brand-files";
 import { BRAND_LIMITS } from "@/lib/brand/brand-schema";
+import { uploadBrandFile } from "@/lib/brand/upload-brand-file";
 import { parseOpaqueHex } from "@/lib/colors/convert";
 
 // ---------------------------------------------------------------------------
@@ -259,26 +260,7 @@ export function BrandGuideEditor() {
       }
       setUploading(file.name);
       try {
-        const start = await fetch("/api/customer/brand/assets", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: file.name, sizeBytes: file.size, kind: uploadKind }),
-        });
-        if (!start.ok) throw new Error(await readError(start, "Could not start the upload."));
-        const { assetId, uploadUrl, contentType } = await start.json();
-
-        const put = await fetch(uploadUrl, {
-          method: "PUT",
-          headers: { "Content-Type": contentType },
-          body: file,
-        });
-        if (!put.ok) throw new Error("The upload didn't go through. Please try again.");
-
-        const done = await fetch(`/api/customer/brand/assets/${assetId}/complete`, {
-          method: "POST",
-        });
-        if (!done.ok) throw new Error(await readError(done, "Could not finish the upload."));
-        const { asset } = await done.json();
+        const asset = await uploadBrandFile<BrandFile>(file, uploadKind);
         setFiles((prev) => [...prev, asset]);
       } catch (error) {
         setFileError(
