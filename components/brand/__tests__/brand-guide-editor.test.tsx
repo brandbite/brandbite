@@ -224,6 +224,10 @@ describe("BrandGuideEditor", () => {
     expect(await screen.findByText("3 of 5 essentials complete")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Brand guide progress" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Describe what you do" })).toBeInTheDocument();
+    // The band says why the next one is worth adding.
+    expect(screen.getByText(/Every brief starts from this/)).toBeInTheDocument();
+    expect(screen.getByText("Language").closest("li")).toHaveTextContent("Language: done");
+    expect(screen.getByText("Logo").closest("li")).toHaveTextContent("Logo: to do");
   });
 
   it("points at the primary logo when that is all that's missing", async () => {
@@ -261,6 +265,7 @@ describe("BrandGuideEditor", () => {
 
     expect(await screen.findByText("5 of 5 essentials complete")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Your brand guide is ready" })).toBeInTheDocument();
+    expect(screen.getByText(/now work from this guide/)).toBeInTheDocument();
   });
 
   it("opens the tab that holds the problem when a save is refused", async () => {

@@ -988,7 +988,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           },
           {
             type: "p",
-            text: "The band at the top counts five essentials: what you do, tone words, a color, a font and a primary logo. While one is missing, the link in the band opens the tab where you add it.",
+            text: "The band at the top counts five essentials: what you do, tone words, a color, a font and a primary logo. While one is missing, the band says what to add next and why it helps, and its link opens the tab where you add it.",
           },
         ],
       },
