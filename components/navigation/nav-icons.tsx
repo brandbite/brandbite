@@ -186,6 +186,16 @@ export function IconColorStudio(p: Props) {
   );
 }
 
+export function IconBrandGuide(p: Props) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4z" />
+      <path d="M5 17a3 3 0 0 1 3-3h11" />
+      <circle cx="12" cy="9" r="2" />
+    </svg>
+  );
+}
+
 export function IconConsultation(p: Props) {
   return (
     <svg {...base} {...p}>

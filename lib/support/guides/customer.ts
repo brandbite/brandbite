@@ -938,6 +938,106 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
     ],
   },
   {
+    slug: "brand-guide",
+    title: "Brand guide",
+    summary:
+      "Keep your logo files, colors, fonts and the way your brand talks in one place for creatives and AI tools.",
+    category: "Workspace",
+    routes: ["/customer/brand"],
+    keywords: [
+      "brand",
+      "logo",
+      "vector",
+      "svg",
+      "colors",
+      "fonts",
+      "tone of voice",
+      "brand language",
+      "guidelines",
+      "style guide",
+    ],
+    related: ["create-request", "moodboards"],
+    sections: [
+      {
+        heading: "What it's for",
+        blocks: [
+          {
+            type: "p",
+            text: "The Brand guide holds what anyone needs to make work that looks and sounds like you: who you are, how you write, your colors and fonts, and your logo files. Fill it in once instead of repeating it on every request.",
+          },
+          {
+            type: "p",
+            text: "Everyone in your company can read it and download the files. Owners and Project managers can change it.",
+          },
+        ],
+      },
+      {
+        heading: "Filling it in",
+        blocks: [
+          {
+            type: "list",
+            items: [
+              {
+                term: "About the brand",
+                text: "your name, tagline, what you do, who it's for, your values, and competitors or brands you like.",
+              },
+              {
+                term: "Brand language",
+                text: "tone words, voice notes, lines to write like and never write like, words to use and avoid, and a sample of copy that sounds right.",
+              },
+              {
+                term: "Colors",
+                text: "click **Add color**, pick the color or type its hex code, and give it a name and a role if you have them.",
+              },
+              {
+                term: "Fonts",
+                text: "click **Add font**, type the font's name, choose what it's used for and add a link to where it can be found.",
+              },
+              {
+                term: "Imagery",
+                text: "the kind of photos and illustrations that fit, and what to stay away from.",
+              },
+            ],
+          },
+          {
+            type: "p",
+            text: "Lists such as **Values** and **Tone words** take one entry per line. Nothing is saved until you click **Save brand guide** at the bottom. **Discard** puts back what was last saved.",
+          },
+        ],
+      },
+      {
+        heading: "Brand files",
+        blocks: [
+          {
+            type: "p",
+            text: "Under **Brand files**, choose what the file is (for example **Primary logo** or **Brand guidelines**) and click **Upload files**. You can pick several files at once. Files are saved straight away, without the Save button.",
+          },
+          {
+            type: "p",
+            text: "Accepted types are SVG, AI, EPS, PDF, PNG, JPG, WebP, PSD, Fig, Sketch, INDD and ZIP, up to 200 MB each. Add vector files (SVG, AI or EPS) when you have them, because creatives need those for print and large formats.",
+          },
+          {
+            type: "p",
+            text: "On each file you can change what it is and whether it's made for light or dark backgrounds. **Download** saves the original file. **Remove** deletes it from the guide after you confirm.",
+          },
+          {
+            type: "p",
+            text: "Brand files stay for as long as your brand guide exists.",
+          },
+        ],
+      },
+      {
+        heading: "How it's used",
+        blocks: [
+          {
+            type: "p",
+            text: "When you turn a description into a request with AI, and when an AI request generates an image, the brand guide is added automatically so the result follows your colors, fonts and voice.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     slug: "moodboards",
     title: "Moodboards",
     summary:
