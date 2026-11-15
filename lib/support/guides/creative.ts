@@ -565,7 +565,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
               },
               {
                 term: "Brief & files",
-                text: "what the customer asked for, their reference files and their **Brand guide**: colors (click one to copy its hex code), fonts, how the brand talks, and the brand files. **Download** saves one file, and **Download all (.zip)** saves them together.",
+                text: "what the customer asked for, their reference files and their **Brand guide**: colors (click one to copy its hex code), fonts, how the brand talks, and the brand files. **Download** saves one file, and **Download all (.zip)** saves them together. **Copy for AI** copies the whole guide as text you can paste into an AI assistant, and **Download JSON** saves it as a file.",
               },
               { term: "Time tracking", text: "your time entries for this request." },
               { term: "Comments", text: "your conversation with the customer." },

@@ -11,7 +11,11 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 
-import type { BrandContextSource } from "./brand-context";
+import {
+  buildBrandContext,
+  type BrandContextPurpose,
+  type BrandContextSource,
+} from "./brand-context";
 import { readBrandColors, readBrandFonts } from "./brand-data";
 
 const BRAND_SELECT = {
@@ -98,4 +102,20 @@ export async function loadBrandContextSource(args: {
     imageryNotes: brand?.imageryNotes,
     legacy: hasLegacy ? legacy : undefined,
   };
+}
+
+/**
+ * Brand context for a company's AI prompt, or null when the caller switched
+ * it off (`useBrand: false`) or the guide has nothing for that purpose.
+ */
+export async function brandContextFor(
+  companyId: string,
+  purpose: BrandContextPurpose,
+  options: { projectId?: string | null; useBrand?: unknown } = {},
+): Promise<string | null> {
+  if (options.useBrand === false) return null;
+  return buildBrandContext(
+    await loadBrandContextSource({ companyId, projectId: options.projectId }),
+    purpose,
+  );
 }

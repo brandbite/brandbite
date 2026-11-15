@@ -28,6 +28,7 @@ import {
   TextArea,
   TextInput,
 } from "@/components/admin/v2/ui";
+import { BrandExportButtons } from "@/components/brand/brand-export-buttons";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast-provider";
 import {
@@ -38,6 +39,7 @@ import {
   type BrandFont,
   type BrandFontRole,
 } from "@/lib/brand/brand-data";
+import type { BrandExport } from "@/lib/brand/brand-export";
 import {
   BRAND_ASSET_BACKGROUND_LABELS,
   BRAND_ASSET_BACKGROUNDS,
@@ -333,6 +335,11 @@ export function BrandGuideEditor() {
     <PageHeader
       title="Brand guide"
       description="Your logo files, colors, fonts and the way your brand talks. Your creatives and our AI tools work from this."
+      actions={
+        guide ? (
+          <BrandExportButtons brand={toPayload(guide) as BrandExport} files={files} />
+        ) : undefined
+      }
     />
   );
 

@@ -4,6 +4,7 @@
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from "next/server";
+import { brandContextFor } from "@/lib/brand/load-brand-context";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
@@ -29,8 +30,10 @@ export async function POST(req: NextRequest) {
     const idempotencyKey = readIdempotencyKey(req.headers);
 
     const body = await req.json();
-    const { brief, includeColors, includeFonts, includeLayout } = body as {
+    const { brief, includeColors, includeFonts, includeLayout, useBrand } = body as {
       brief?: string;
+      /** false leaves the brand guide out of the prompt. */
+      useBrand?: boolean;
       includeColors?: boolean;
       includeFonts?: boolean;
       includeLayout?: boolean;
@@ -75,7 +78,9 @@ export async function POST(req: NextRequest) {
 
     // Create AiGeneration record + debit tokens atomically. A retry with the
     // same Idempotency-Key returns the existing record instead of debiting again.
-    const fullPrompt = buildSuggestionPrompt(brief);
+    const brandContext = await brandContextFor(user.activeCompanyId, "brief", { useBrand });
+    const suggestionPrompt = buildSuggestionPrompt(brief);
+    const fullPrompt = brandContext ? `${brandContext}\n\n${suggestionPrompt}` : suggestionPrompt;
     const { generation, reused } = await claimAiGeneration({
       idempotencyKey,
       userId: user.id,

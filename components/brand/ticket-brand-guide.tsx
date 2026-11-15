@@ -15,6 +15,7 @@ import JSZip from "jszip";
 import { useEffect, useState } from "react";
 
 import { Button, Callout, Card, KeyValueList, Skeleton } from "@/components/admin/v2/ui";
+import { BrandExportButtons } from "@/components/brand/brand-export-buttons";
 import type { BrandColor, BrandFont } from "@/lib/brand/brand-data";
 import {
   BRAND_ASSET_BACKGROUND_LABELS,
@@ -288,8 +289,15 @@ export function TicketBrandGuide({ ticketId }: { ticketId: string }) {
 
   return (
     <Card>
-      <h2 className="mb-1 text-xl leading-7 font-semibold">Brand guide</h2>
-      <p className="mb-4 text-sm text-[var(--av2-text-2)]">{brand.name}</p>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="mb-1 text-xl leading-7 font-semibold">Brand guide</h2>
+          <p className="text-sm text-[var(--av2-text-2)]">{brand.name}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <BrandExportButtons brand={brand} files={assets} size="sm" />
+        </div>
+      </div>
 
       {rows.length > 0 && <KeyValueList rows={rows} />}
 

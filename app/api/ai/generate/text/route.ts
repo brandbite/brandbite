@@ -13,6 +13,7 @@ import {
   refundAiTokens,
   checkRateLimit,
 } from "@/lib/ai/cost-calculator";
+import { brandContextFor } from "@/lib/brand/load-brand-context";
 import { generateText } from "@/lib/ai/provider-router";
 import { insufficientTokensResponse } from "@/lib/errors/insufficient-tokens";
 import {
@@ -34,8 +35,10 @@ export async function POST(req: NextRequest) {
     const idempotencyKey = readIdempotencyKey(req.headers);
 
     const body = await req.json();
-    const { prompt, format, tone, variations, wordCount } = body as {
+    const { prompt, format, tone, variations, wordCount, useBrand } = body as {
       prompt?: string;
+      /** false leaves the brand guide out of the prompt. */
+      useBrand?: boolean;
       format?: CopyFormat;
       tone?: CopyTone;
       variations?: number;
@@ -81,7 +84,9 @@ export async function POST(req: NextRequest) {
     const copyTone = tone ?? "professional";
     const numVariations = Math.min(variations ?? 3, 5);
     const systemPrompt = buildCopySystemPrompt(copyFormat, copyTone, numVariations);
-    const userPrompt = buildCopyPrompt(prompt, { wordCount });
+    const brandContext = await brandContextFor(user.activeCompanyId, "text", { useBrand });
+    const copyPrompt = buildCopyPrompt(prompt, { wordCount });
+    const userPrompt = brandContext ? `${brandContext}\n\n${copyPrompt}` : copyPrompt;
 
     // Create AiGeneration record + debit tokens atomically. A retry with the
     // same Idempotency-Key returns the existing record instead of debiting again.

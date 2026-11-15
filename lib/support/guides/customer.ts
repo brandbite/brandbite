@@ -1016,6 +1016,14 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             type: "p",
             text: "When you turn a description into a request with AI, and when an AI request generates an image, the brand guide is added automatically so the result follows your colors, fonts and voice.",
           },
+          {
+            type: "p",
+            text: "In **AI Tools**, image generation, copy and design suggestions follow the brand guide too. Untick **Use my brand guide** on a tool when you want a result that ignores it.",
+          },
+          {
+            type: "p",
+            text: "To use your brand in another AI assistant, click **Copy for AI** at the top of the page and paste it into the chat. **Download JSON** saves the same details as a file.",
+          },
         ],
       },
     ],
