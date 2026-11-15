@@ -121,6 +121,10 @@ const PUBLIC_PATHS = [
   "/api/color-meanings",
   // Anonymous share-link creation; the route enforces rate and size limits.
   "/api/colors/shares",
+  // Brand form sent by link to someone without an account. The unguessable
+  // token in the link is the key; the route checks it and rate-limits.
+  "/brand-form",
+  "/api/brand-form",
   // pdf.js web worker for the in-app PDF viewer/pin overlay. It's a vendored,
   // non-sensitive static library file loaded via `new Worker(...)`. The matcher
   // below only excludes image extensions, so without this entry the proxy 307s

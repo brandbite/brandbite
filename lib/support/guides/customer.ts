@@ -1014,6 +1014,23 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         ],
       },
       {
+        heading: "Ask a colleague",
+        blocks: [
+          {
+            type: "p",
+            text: "Someone else may know the brand better than you, such as a founder or your marketing lead. Under **Ask a colleague**, click **Create form link**, then send them the link. They answer a short form about the brand and don't need a brandbite account.",
+          },
+          {
+            type: "p",
+            text: "Each link takes one set of answers and works for 30 days. **Close link** stops it working. Only Owners and Project managers see this section.",
+          },
+          {
+            type: "p",
+            text: "When the form comes back it shows **Answered**. Click **Read answers** to see what they wrote. **Add to brand guide** puts their answers into the guide after you confirm: each question they answered replaces that part of the guide, and parts they left blank stay as they are. Save or discard your own unsaved changes first.",
+          },
+        ],
+      },
+      {
         heading: "How it's used",
         blocks: [
           {

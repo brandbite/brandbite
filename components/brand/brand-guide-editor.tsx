@@ -29,6 +29,7 @@ import {
   TextInput,
 } from "@/components/admin/v2/ui";
 import { BrandExportButtons } from "@/components/brand/brand-export-buttons";
+import { BrandQuestionnaires } from "@/components/brand/brand-questionnaires";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast-provider";
 import {
@@ -664,6 +665,8 @@ export function BrandGuideEditor() {
             </Field>
           </div>
         </Card>
+
+        {canEdit && <BrandQuestionnaires guideDirty={dirty} onApplied={() => void load()} />}
 
         {/* Files */}
         <Card>

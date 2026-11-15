@@ -385,7 +385,8 @@ model UserAccount {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  brandAssetsUploaded BrandAsset[] @relation("BrandAssetUploadedBy")
+  brandAssetsUploaded        BrandAsset[]         @relation("BrandAssetUploadedBy")
+  brandQuestionnairesCreated BrandQuestionnaire[] @relation("BrandQuestionnaireCreatedBy")
 }
 
 // -----------------------------------------------------------------------------
@@ -3144,8 +3145,9 @@ model Brand {
   /// Photo / illustration style notes.
   imageryNotes String?
 
-  assets   BrandAsset[]
-  projects Project[]
+  assets         BrandAsset[]
+  projects       Project[]
+  questionnaires BrandQuestionnaire[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3179,6 +3181,53 @@ model BrandAsset {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
+
+  @@index([brandId, status])
+}
+
+enum BrandQuestionnaireStatus {
+  /// The link works and is waiting for answers.
+  OPEN
+  /// Answered; waiting for the company to look at it.
+  SUBMITTED
+  /// The answers were put into the brand guide.
+  APPLIED
+  /// Closed without using the answers (or before anyone answered).
+  DISMISSED
+}
+
+/// A brand form sent by link to someone at the company (a founder, a
+/// marketing lead) who may have no brandbite account. Their answers wait
+/// here until an owner or project manager adds them to the brand guide.
+model BrandQuestionnaire {
+  id String @id @default(cuid())
+
+  /// Unguessable token in the public link. The link is the only key.
+  token String @unique
+
+  brandId String
+  brand   Brand  @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  createdById String?
+  createdBy   UserAccount? @relation("BrandQuestionnaireCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  /// Who the link is for, as the sender noted it. Shown in the list only.
+  recipientNote String?
+
+  status BrandQuestionnaireStatus @default(OPEN)
+
+  /// Filled in by the person answering.
+  respondentName String?
+  respondentRole String?
+  /// The answers, in the shape lib/brand/questionnaire.ts reads.
+  answers        Json?
+  submittedAt    DateTime?
+
+  /// The link stops working after this.
+  expiresAt DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([brandId, status])
 }
