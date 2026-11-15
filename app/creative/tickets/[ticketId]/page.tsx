@@ -23,6 +23,7 @@ import {
   TabPanel,
   Tabs,
 } from "@/components/admin/v2/ui";
+import { TicketBrandGuide } from "@/components/brand/ticket-brand-guide";
 import { DeliveryForm } from "@/components/dashboard/tickets/delivery-form";
 import { VERSION_WITHDRAWN_TOAST } from "@/components/dashboard/tickets/review-undo";
 import { JobMoodboards } from "@/components/dashboard/tickets/job-moodboards";
@@ -96,10 +97,6 @@ type TicketDetailResponse = {
       id: string;
       name: string;
       code: string | null;
-      brandLogoUrl: string | null;
-      brandColors: string | null;
-      brandFonts: string | null;
-      brandVoice: string | null;
     } | null;
     jobType: {
       id: string;
@@ -500,9 +497,6 @@ export default function CreativeTicketDetailPage() {
   const pinMode = ticket.status === "IN_PROGRESS" ? "resolve" : "view";
   const zipFor = (version: number) => `${ticketCode || ticket.id}-v${version}`;
   const project = ticket.project;
-  const hasBrandGuide =
-    !!project &&
-    !!(project.brandLogoUrl || project.brandColors || project.brandFonts || project.brandVoice);
 
   const versionCopy = {
     feedbackLabel: "Customer feedback",
@@ -770,77 +764,8 @@ export default function CreativeTicketDetailPage() {
                   </div>
                 </Card>
 
-                {/* Brand guide: pulled from the project so creatives see the
-                    customer's brand without hunting. */}
-                {project && hasBrandGuide ? (
-                  <Card>
-                    <h2 className="mb-4 text-xl leading-7 font-semibold">Brand guide</h2>
-                    <KeyValueList
-                      rows={[
-                        ...(project.brandLogoUrl
-                          ? [
-                              {
-                                label: "Logo",
-                                value: (
-                                  <a
-                                    href={project.brandLogoUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="break-all text-[var(--av2-link)] hover:underline"
-                                  >
-                                    {project.brandLogoUrl}
-                                  </a>
-                                ),
-                              },
-                            ]
-                          : []),
-                        ...(project.brandColors
-                          ? [
-                              {
-                                label: "Colors",
-                                value: (
-                                  <span className="flex flex-wrap gap-1.5">
-                                    {project.brandColors
-                                      .split(",")
-                                      .map((c) => c.trim())
-                                      .filter(Boolean)
-                                      .map((c) => (
-                                        <span
-                                          key={c}
-                                          className="inline-flex items-center gap-1.5 rounded-full border border-[var(--av2-border)] px-2 py-0.5 font-mono text-xs font-normal"
-                                        >
-                                          <span
-                                            aria-hidden
-                                            className="h-3 w-3 rounded-full border border-[var(--av2-border)]"
-                                            style={{ backgroundColor: c }}
-                                          />
-                                          {c}
-                                        </span>
-                                      ))}
-                                  </span>
-                                ),
-                              },
-                            ]
-                          : []),
-                        ...(project.brandFonts
-                          ? [{ label: "Fonts", value: project.brandFonts }]
-                          : []),
-                        ...(project.brandVoice
-                          ? [
-                              {
-                                label: "Voice / tone",
-                                value: (
-                                  <span className="font-normal whitespace-pre-wrap">
-                                    {project.brandVoice}
-                                  </span>
-                                ),
-                              },
-                            ]
-                          : []),
-                      ]}
-                    />
-                  </Card>
-                ) : null}
+                {/* The customer's brand guide, with its files to download. */}
+                <TicketBrandGuide ticketId={ticket.id} />
               </div>
             </TabPanel>
           ) : null}

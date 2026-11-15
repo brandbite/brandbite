@@ -152,3 +152,26 @@ export async function listBrandAssets(brandId: string): Promise<BrandAssetView[]
   });
   return Promise.all(assets.map(brandAssetView));
 }
+
+/**
+ * The brand guide that applies to a request: the brand its project names,
+ * else the company's default brand. Also returns the project's older logo
+ * link, which has no place in the guide itself.
+ */
+export async function brandForProject(args: {
+  companyId: string;
+  projectId?: string | null;
+}): Promise<{ brand: Brand; logoLink: string | null }> {
+  const project = args.projectId
+    ? await prisma.project.findFirst({
+        where: { id: args.projectId, companyId: args.companyId },
+        select: { brandLogoUrl: true, brand: true },
+      })
+    : null;
+  const projectBrand = project?.brand?.companyId === args.companyId ? project.brand : null;
+  const logo = project?.brandLogoUrl?.trim() ?? "";
+  return {
+    brand: projectBrand ?? (await getOrCreateDefaultBrand(args.companyId)),
+    logoLink: /^https?:\/\//i.test(logo) ? logo : null,
+  };
+}

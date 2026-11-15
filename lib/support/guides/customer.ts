@@ -235,7 +235,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
                 text: "Owner, Project manager (only in Backlog, before a creative is assigned).",
               },
               {
-                term: "Create, rename and delete projects; edit a project's brand guide",
+                term: "Create, rename and delete projects; edit the brand guide",
                 text: "Owner, Project manager.",
               },
               {
@@ -423,7 +423,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
               },
               {
                 term: "All projects",
-                text: "pick a project in this dropdown to show only its requests. The **…** button beside it holds the project actions: see **Projects and brand guides**.",
+                text: "pick a project in this dropdown to show only its requests. The **…** button beside it holds the project actions: see **Projects**.",
               },
               {
                 term: "All priorities",
@@ -877,12 +877,12 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
   },
   {
     slug: "projects",
-    title: "Projects and brand guides",
-    summary: "Group requests into projects and give creatives your brand details once per project.",
+    title: "Projects",
+    summary: "Group requests into projects so the Board and your creatives can tell them apart.",
     category: "Workspace",
     routes: [],
-    keywords: ["project", "brand guide", "logo", "colors", "fonts", "tone", "rename", "delete"],
-    related: ["board", "create-request"],
+    keywords: ["project", "rename", "delete", "project code"],
+    related: ["board", "create-request", "brand-guide"],
     sections: [
       {
         heading: "Creating and using projects",
@@ -898,27 +898,6 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           {
             type: "p",
             text: "Only Owners and Project managers can create, rename or delete projects, so only they see the **…** button.",
-          },
-        ],
-      },
-      {
-        heading: "Brand guide",
-        blocks: [
-          {
-            type: "p",
-            text: "Choose the project in the Board's project filter, open the **…** menu and choose **Brand guide**. Fill it once, click **Save brand guide**, and it is shown to creatives on every request in that project:",
-          },
-          {
-            type: "list",
-            items: [
-              { term: "Logo URL", text: "a link to your logo." },
-              { term: "Brand colors", text: "hex values separated by commas." },
-              { term: "Fonts", text: "the typefaces you use." },
-              {
-                term: "Voice / tone notes",
-                text: "how your brand sounds (up to 2000 characters).",
-              },
-            ],
           },
         ],
       },
@@ -1029,6 +1008,10 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
       {
         heading: "How it's used",
         blocks: [
+          {
+            type: "p",
+            text: "Your creative sees the brand guide on every request, under **Brief & files**, and can download your brand files from there.",
+          },
           {
             type: "p",
             text: "When you turn a description into a request with AI, and when an AI request generates an image, the brand guide is added automatically so the result follows your colors, fonts and voice.",

@@ -402,7 +402,6 @@ describe("Customer board", () => {
 
     fireEvent.change(screen.getByLabelText("Filter by project"), { target: { value: "Web" } });
     expect(screen.getByRole("button", { name: "Rename" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Brand guide" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Delete project" }));
     expect(await screen.findByText(/will be moved to/)).toBeInTheDocument();
   });

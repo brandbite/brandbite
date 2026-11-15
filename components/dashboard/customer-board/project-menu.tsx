@@ -39,14 +39,12 @@ export function ProjectMenu({
   project,
   onCreate,
   onRename,
-  onBrandGuide,
   onDelete,
 }: {
   /** The project chosen in the filter, if any. */
   project: BoardProject | null;
   onCreate: () => void;
   onRename: (project: BoardProject) => void;
-  onBrandGuide: (project: BoardProject) => void;
   onDelete: (project: BoardProject) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -104,10 +102,6 @@ export function ProjectMenu({
               <MenuItem onClick={() => run(() => onRename(project))}>
                 <IconPencil />
                 Rename
-              </MenuItem>
-              <MenuItem onClick={() => run(() => onBrandGuide(project))}>
-                <IconPencil />
-                Brand guide
               </MenuItem>
               <MenuItem danger onClick={() => run(() => onDelete(project))}>
                 <IconTrash />
