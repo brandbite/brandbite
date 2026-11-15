@@ -63,6 +63,7 @@ const ICONS: Partial<Record<NotificationType, IconName>> = {
   SUPPORT_GUIDE_CHANGED: "file-text",
   SOURCE_FILES_EXPIRING: "file",
   THANKS_RECEIVED: "check",
+  BRAND_FORM_ANSWERED: "file-text",
 };
 
 const REASONS: Record<NotificationType, string> = {
@@ -79,6 +80,7 @@ const REASONS: Record<NotificationType, string> = {
   SUPPORT_GUIDE_CHANGED: "a Support guide you edited changed in code",
   SOURCE_FILES_EXPIRING: "your request includes source files",
   THANKS_RECEIVED: "a customer thanked you for your work",
+  BRAND_FORM_ANSWERED: "someone answered a brand form you sent",
 };
 
 export function formatEmailDate(date: Date): string {

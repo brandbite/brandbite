@@ -123,6 +123,7 @@ enum NotificationType {
   SUPPORT_GUIDE_CHANGED // Code changed or removed a guide an admin had edited
   SOURCE_FILES_EXPIRING // Source files on brandbite storage are about to be deleted
   THANKS_RECEIVED // A customer thanked the creative when approving a request
+  BRAND_FORM_ANSWERED // Someone answered a brand form the customer sent by link
 }
 
 // --- CMS Content ---

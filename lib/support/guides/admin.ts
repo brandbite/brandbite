@@ -282,6 +282,19 @@ export const ADMIN_GUIDES: SupportGuide[] = [
           },
         ],
       },
+      {
+        heading: "Brand guide",
+        blocks: [
+          {
+            type: "p",
+            text: "Select the company and click **Brand guide** at the bottom of its panel. You see what the customer has told us about their brand: colors, fonts, how the brand talks, and the brand files, which you can download one by one or with **Download all (.zip)**. Only the customer can change it.",
+          },
+          {
+            type: "p",
+            text: "The same brand guide is shown on each of the company's requests, below the source files.",
+          },
+        ],
+      },
     ],
   },
   {

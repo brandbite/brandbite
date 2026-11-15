@@ -1026,7 +1026,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           },
           {
             type: "p",
-            text: "When the form comes back it shows **Answered**. Click **Read answers** to see what they wrote. **Add to brand guide** puts their answers into the guide after you confirm: each question they answered replaces that part of the guide, and parts they left blank stay as they are. Save or discard your own unsaved changes first.",
+            text: "When the form comes back, the person who made the link gets a notification and an email, and the form shows **Answered**. Click **Read answers** to see what they wrote. **Add to brand guide** puts their answers into the guide after you confirm: each question they answered replaces that part of the guide, and parts they left blank stay as they are. Save or discard your own unsaved changes first.",
           },
         ],
       },

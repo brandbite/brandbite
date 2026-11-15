@@ -96,7 +96,16 @@ const bullets = (values: string[]) => (
   </ul>
 );
 
+/** The brand guide that applies to a request. */
 export function TicketBrandGuide({ ticketId }: { ticketId: string }) {
+  return <BrandGuidePanel apiBase={`/api/tickets/${ticketId}/brand`} />;
+}
+
+/**
+ * Read-only brand guide loaded from `apiBase`, which answers GET with the
+ * guide and `GET {apiBase}/assets/{id}/download` with a download link.
+ */
+export function BrandGuidePanel({ apiBase }: { apiBase: string }) {
   const [data, setData] = useState<Loaded | null>(null);
   const [failed, setFailed] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
@@ -107,7 +116,7 @@ export function TicketBrandGuide({ ticketId }: { ticketId: string }) {
     let cancelled = false;
     setData(null);
     setFailed(false);
-    fetch(`/api/tickets/${ticketId}/brand`, { cache: "no-store" })
+    fetch(apiBase, { cache: "no-store" })
       .then(async (res) => {
         if (!res.ok) throw new Error();
         const json = (await res.json()) as Loaded;
@@ -119,10 +128,10 @@ export function TicketBrandGuide({ ticketId }: { ticketId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [ticketId]);
+  }, [apiBase]);
 
   const downloadUrl = async (file: BrandFile): Promise<string> => {
-    const res = await fetch(`/api/tickets/${ticketId}/brand/assets/${file.id}/download`, {
+    const res = await fetch(`${apiBase}/assets/${file.id}/download`, {
       cache: "no-store",
     });
     const json = (await res.json().catch(() => null)) as { url?: string } | null;

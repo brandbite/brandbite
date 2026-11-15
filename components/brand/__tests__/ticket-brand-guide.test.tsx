@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { TicketBrandGuide } from "@/components/brand/ticket-brand-guide";
+import { BrandGuidePanel, TicketBrandGuide } from "@/components/brand/ticket-brand-guide";
 
 const EMPTY_BRAND = {
   name: "Northwind",
@@ -116,5 +116,20 @@ describe("TicketBrandGuide", () => {
     mockApi({ error: "Request not found." }, 404);
     const { container } = render(<TicketBrandGuide ticketId="t1" />);
     await waitFor(() => expect(container).toBeEmptyDOMElement());
+  });
+
+  it("loads and downloads from whichever brand API it is given", async () => {
+    const calls = mockApi({ brand: EMPTY_BRAND, assets: [FILE], logoLink: null });
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, assign });
+    render(<BrandGuidePanel apiBase="/api/admin/companies/c1/brand" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Download logo.ai" }));
+    await waitFor(() => expect(assign).toHaveBeenCalled());
+    expect(calls).toEqual([
+      "/api/admin/companies/c1/brand",
+      "/api/admin/companies/c1/brand/assets/a1/download",
+    ]);
+    vi.unstubAllGlobals();
   });
 });

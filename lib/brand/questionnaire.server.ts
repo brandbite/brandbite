@@ -25,7 +25,13 @@ export function questionnaireExpiry(from: Date = new Date()): Date {
   return new Date(from.getTime() + QUESTIONNAIRE_LINK_DAYS * 24 * 60 * 60 * 1000);
 }
 
-export type OpenQuestionnaire = { id: string; brandName: string; companyName: string };
+export type OpenQuestionnaire = {
+  id: string;
+  brandName: string;
+  companyName: string;
+  companyId: string;
+  createdById: string | null;
+};
 
 /**
  * The form behind a link, when the link can still be answered. "closed"
@@ -44,15 +50,37 @@ export async function findQuestionnaireByToken(
       id: true,
       status: true,
       expiresAt: true,
-      brand: { select: { name: true, company: { select: { name: true } } } },
+      createdById: true,
+      brand: { select: { name: true, company: { select: { id: true, name: true } } } },
     },
   });
   if (!form) return { state: "missing" };
   if (form.status !== "OPEN" || form.expiresAt.getTime() <= Date.now()) return { state: "closed" };
   return {
     state: "open",
-    form: { id: form.id, brandName: form.brand.name, companyName: form.brand.company.name },
+    form: {
+      id: form.id,
+      brandName: form.brand.name,
+      companyName: form.brand.company.name,
+      companyId: form.brand.company.id,
+      createdById: form.createdById,
+    },
   };
+}
+
+/**
+ * Who hears that a form was answered: the person who made the link, if they
+ * can still edit the brand guide; otherwise the company's owners.
+ */
+export async function questionnaireRecipients(form: OpenQuestionnaire): Promise<string[]> {
+  const editors = await prisma.companyMember.findMany({
+    where: { companyId: form.companyId, roleInCompany: { in: ["OWNER", "PM"] } },
+    select: { userId: true, roleInCompany: true },
+  });
+  if (form.createdById && editors.some((member) => member.userId === form.createdById)) {
+    return [form.createdById];
+  }
+  return editors.filter((member) => member.roleInCompany === "OWNER").map((m) => m.userId);
 }
 
 export function questionnaireView(form: BrandQuestionnaire, origin: string) {
