@@ -14,6 +14,8 @@ import { generateImage } from "@/lib/ai/provider-router";
 import { buildImagePrompt } from "@/lib/ai/prompts";
 import { saveAiImageToR2 } from "@/lib/ai/asset-pipeline";
 import { readIdempotencyKey } from "@/lib/ai/idempotency";
+import { buildBrandContext } from "@/lib/brand/brand-context";
+import { loadBrandContextSource } from "@/lib/brand/load-brand-context";
 import { getAiTicketsMode, isAiTicketsAllowed } from "@/lib/feature-flags";
 import { Prisma } from "@prisma/client";
 
@@ -83,14 +85,6 @@ export async function POST(
       },
       include: {
         jobType: { select: { name: true, aiPromptTemplate: true } },
-        project: {
-          select: {
-            brandLogoUrl: true,
-            brandColors: true,
-            brandFonts: true,
-            brandVoice: true,
-          },
-        },
       },
     });
 
@@ -104,14 +98,17 @@ export async function POST(
       size?: string;
     };
 
-    // Build prompt from ticket title + description, with the project's brand
-    // guide appended when any field is set so the AI picks up colors / fonts
-    // / voice automatically.
-    const brandParts: string[] = [];
-    if (ticket.project?.brandColors) brandParts.push(`Brand colors: ${ticket.project.brandColors}`);
-    if (ticket.project?.brandFonts) brandParts.push(`Fonts: ${ticket.project.brandFonts}`);
-    if (ticket.project?.brandVoice) brandParts.push(`Voice/tone: ${ticket.project.brandVoice}`);
-    const brandSuffix = brandParts.length > 0 ? `\n\nBrand guide — ${brandParts.join("; ")}.` : "";
+    // Build prompt from ticket title + description, with the brand guide
+    // (the project's brand, else the company default) appended when it has
+    // anything on colors / fonts / voice.
+    const brandContext = buildBrandContext(
+      await loadBrandContextSource({
+        companyId: user.activeCompanyId,
+        projectId: ticket.projectId,
+      }),
+      "image",
+    );
+    const brandSuffix = brandContext ? `\n\n${brandContext}` : "";
 
     const prompt = buildImagePrompt(
       `${ticket.title}${ticket.description ? `. ${ticket.description}` : ""}${brandSuffix}`,
