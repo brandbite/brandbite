@@ -282,6 +282,19 @@ export const ADMIN_GUIDES: SupportGuide[] = [
           },
         ],
       },
+      {
+        heading: "Brand guide",
+        blocks: [
+          {
+            type: "p",
+            text: "Select the company and click **Brand guide** at the bottom of its panel. You see what the customer has told us about their brand in four tabs: **About the brand**, **Brand language**, **Visual identity** and **Brand files**. Click a color to copy its hex code. Files download one by one or with **Download all (.zip)**. **Copy for AI** and **Download JSON** hand the guide to an AI assistant or tool. Only the customer can change it.",
+          },
+          {
+            type: "p",
+            text: "The same brand guide is shown on each of the company's requests, below the source files.",
+          },
+        ],
+      },
     ],
   },
   {

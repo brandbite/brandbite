@@ -44,6 +44,8 @@ const PUBLIC_PATHS = [
   "/api/plugins",
   "/talent",
   "/api/talent",
+  "/brand-form",
+  "/api/brand-form",
   "/privacy",
   "/terms",
   "/cookies",

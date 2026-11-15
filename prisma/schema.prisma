@@ -123,6 +123,7 @@ enum NotificationType {
   SUPPORT_GUIDE_CHANGED // Code changed or removed a guide an admin had edited
   SOURCE_FILES_EXPIRING // Source files on brandbite storage are about to be deleted
   THANKS_RECEIVED // A customer thanked the creative when approving a request
+  BRAND_FORM_ANSWERED // Someone answered a brand form the customer sent by link
 }
 
 // --- CMS Content ---
@@ -384,6 +385,9 @@ model UserAccount {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  brandAssetsUploaded        BrandAsset[]         @relation("BrandAssetUploadedBy")
+  brandQuestionnairesCreated BrandQuestionnaire[] @relation("BrandQuestionnaireCreatedBy")
 }
 
 // -----------------------------------------------------------------------------
@@ -440,6 +444,9 @@ model Company {
   aiGenerations AiGeneration[]
 
   moodboards Moodboard[]
+
+  /// Brand guides. One is the default; a project can point at another.
+  brands Brand[]
 
   ticketDrafts TicketDraft[]
 
@@ -578,6 +585,10 @@ model Project {
   brandFonts   String? /// Comma-separated font names, e.g. "Inter, Source Serif 4".
   brandVoice   String? /// Free-form tone / voice notes (max 2000 chars at the API level).
 
+  /// Which brand guide this project uses. Null = the company's default brand.
+  brandId String?
+  brand   Brand?  @relation(fields: [brandId], references: [id], onDelete: SetNull)
+
   members ProjectMember[]
   tickets Ticket[]
 
@@ -588,6 +599,7 @@ model Project {
 
   @@unique([companyId, code])
   @@index([companyId])
+  @@index([brandId])
 }
 
 model ProjectMember {
@@ -3056,4 +3068,167 @@ model IntegrationFolder {
   updatedAt DateTime @updatedAt
 
   @@unique([companyId, provider, key])
+}
+
+// -----------------------------------------------------------------------------
+// Brand guides
+// -----------------------------------------------------------------------------
+
+/// What a brand file is, so creatives find the right one fast.
+enum BrandAssetKind {
+  LOGO_PRIMARY
+  LOGO_SECONDARY
+  LOGO_ICON
+  LOGO_WORDMARK
+  /// The brand's own guidelines document (usually a PDF).
+  GUIDELINES
+  OTHER
+}
+
+/// Which background a logo version is made for.
+enum BrandAssetBackground {
+  ANY
+  LIGHT
+  DARK
+}
+
+enum BrandAssetStatus {
+  /// Upload session started; the browser is sending the bytes.
+  UPLOADING
+  /// Verified in storage and shown to people.
+  READY
+  /// The upload never finished or couldn't be verified.
+  FAILED
+}
+
+/// A customer's brand guide: who the brand is, how it sounds and how it looks.
+/// Creatives read it on requests, and every AI feature takes its brand context
+/// from here (lib/brand/brand-context.ts).
+model Brand {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  name String
+
+  /// The brand used when a project names none. One per company, kept by the
+  /// partial unique index in the migration.
+  isDefault Boolean @default(false)
+
+  // Identity
+  tagline     String?
+  /// What the company does, in a few sentences.
+  description String?
+  audience    String?
+  values      String[] @default([])
+  /// Competitors and brands they look up to, free-form.
+  references  String?
+
+  // Language
+  /// Tone adjectives, e.g. ["warm", "direct", "playful"].
+  toneWords    String[] @default([])
+  /// Free-form voice notes.
+  voiceNotes   String?
+  /// "Write like this" / "never write like this" lines.
+  voiceDo      String[] @default([])
+  voiceDont    String[] @default([])
+  wordsToUse   String[] @default([])
+  wordsToAvoid String[] @default([])
+  /// A short piece of copy that sounds right.
+  sampleCopy   String?
+
+  // Look
+  /// [{ id, hex, name?, role?, cmyk?, pantone? }] — read through lib/brand/brand-data.ts.
+  colors       Json    @default("[]")
+  /// [{ id, name, role?, url? }] — read through lib/brand/brand-data.ts.
+  fonts        Json    @default("[]")
+  /// Photo / illustration style notes.
+  imageryNotes String?
+
+  assets         BrandAsset[]
+  projects       Project[]
+  questionnaires BrandQuestionnaire[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+}
+
+/// A file in a brand guide (logo versions, guidelines PDF). Kept in R2 for as
+/// long as the brand exists; the 90-day source-file retention does not apply.
+model BrandAsset {
+  id String @id @default(cuid())
+
+  brandId String
+  brand   Brand  @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  kind       BrandAssetKind
+  background BrandAssetBackground @default(ANY)
+  /// Optional note shown next to the file, e.g. "Horizontal, for headers".
+  label      String?
+
+  name      String
+  sizeBytes BigInt
+  mimeType  String?
+  r2Key     String
+
+  status BrandAssetStatus @default(UPLOADING)
+
+  uploadedById String?
+  uploadedBy   UserAccount? @relation("BrandAssetUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([brandId, status])
+}
+
+enum BrandQuestionnaireStatus {
+  /// The link works and is waiting for answers.
+  OPEN
+  /// Answered; waiting for the company to look at it.
+  SUBMITTED
+  /// The answers were put into the brand guide.
+  APPLIED
+  /// Closed without using the answers (or before anyone answered).
+  DISMISSED
+}
+
+/// A brand form sent by link to someone at the company (a founder, a
+/// marketing lead) who may have no brandbite account. Their answers wait
+/// here until an owner or project manager adds them to the brand guide.
+model BrandQuestionnaire {
+  id String @id @default(cuid())
+
+  /// Unguessable token in the public link. The link is the only key.
+  token String @unique
+
+  brandId String
+  brand   Brand  @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  createdById String?
+  createdBy   UserAccount? @relation("BrandQuestionnaireCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  /// Who the link is for, as the sender noted it. Shown in the list only.
+  recipientNote String?
+
+  status BrandQuestionnaireStatus @default(OPEN)
+
+  /// Filled in by the person answering.
+  respondentName String?
+  respondentRole String?
+  /// The answers, in the shape lib/brand/questionnaire.ts reads.
+  answers        Json?
+  submittedAt    DateTime?
+
+  /// The link stops working after this.
+  expiresAt DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([brandId, status])
 }

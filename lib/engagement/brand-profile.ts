@@ -2,12 +2,19 @@
 // @file: lib/engagement/brand-profile.ts
 // @purpose: What makes up a company's brand profile on the customer overview,
 //           and how ready it is. Each step is something a creative can use:
-//           saved brand colors, a moodboard, file storage for source files,
-//           and (when that feature is on) a brand soundtrack.
+//           logo files and brand language in the brand guide, brand colors,
+//           a moodboard, file storage for source files, and (when that
+//           feature is on) a brand soundtrack.
 //           No server imports, so the card shares the types.
 // -----------------------------------------------------------------------------
 
-export type BrandProfileStepKey = "colors" | "moodboard" | "storage" | "soundtrack";
+export type BrandProfileStepKey =
+  | "logo"
+  | "language"
+  | "colors"
+  | "moodboard"
+  | "storage"
+  | "soundtrack";
 
 export type BrandProfileStep = {
   key: BrandProfileStepKey;
@@ -24,6 +31,14 @@ export type BrandProfile = {
 };
 
 const STEP_COPY: Record<BrandProfileStepKey, Omit<BrandProfileStep, "key" | "done">> = {
+  logo: {
+    label: "Logo files",
+    action: { label: "Upload your logo", href: "/customer/brand" },
+  },
+  language: {
+    label: "Brand language",
+    action: { label: "Describe your brand", href: "/customer/brand" },
+  },
   colors: {
     label: "Brand colors",
     action: { label: "Save a palette", href: "/colors" },

@@ -55,6 +55,7 @@ import {
   IconDocument,
 } from "@/components/admin/v2/icons";
 import { TicketActivityPanel } from "@/components/dashboard/ticket-activity-panel";
+import { TicketBrandGuide } from "@/components/brand/ticket-brand-guide";
 import { SourceFilesPanel } from "@/components/tickets/source-files-panel";
 import { FullPageViewControls } from "@/components/dashboard/tickets/view-switch";
 
@@ -664,6 +665,7 @@ export default function AdminTicketDetailPage() {
           </Card>
 
           <SourceFilesPanel ticketId={ticketId} viewer="admin" />
+          <TicketBrandGuide ticketId={ticketId} />
         </div>
 
         {/* ---------------- Ticket details ---------------- */}

@@ -248,6 +248,7 @@ function ImageGenerationPanel({
   const id = useId();
   const [prompt, setPrompt] = useState("");
   const [style, setStyle] = useState("vivid");
+  const [useBrand, setUseBrand] = useState(true);
   const [size, setSize] = useState("1024x1024");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ imageUrl: string; revisedPrompt?: string } | null>(null);
@@ -265,7 +266,7 @@ function ImageGenerationPanel({
           "Content-Type": "application/json",
           "Idempotency-Key": idempotencyKey,
         },
-        body: JSON.stringify({ prompt, style, size }),
+        body: JSON.stringify({ prompt, style, size, useBrand }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -324,6 +325,7 @@ function ImageGenerationPanel({
           </Select>
         </Field>
       </div>
+      <CheckOption label="Use my brand guide" checked={useBrand} onChange={setUseBrand} />
       {error && <Callout tone="error" title={error} />}
       <SubmitButton
         onClick={generate}
@@ -432,6 +434,7 @@ function TextGenerationPanel({
   const [format, setFormat] = useState("tagline");
   const [tone, setTone] = useState("professional");
   const [variations, setVariations] = useState(3);
+  const [useBrand, setUseBrand] = useState(true);
   const [loading, setLoading] = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const [results, setResults] = useState<string[]>([]);
@@ -454,7 +457,7 @@ function TextGenerationPanel({
           "Content-Type": "application/json",
           "Idempotency-Key": idempotencyKey,
         },
-        body: JSON.stringify({ prompt, format, tone, variations }),
+        body: JSON.stringify({ prompt, format, tone, variations, useBrand }),
       });
 
       // Pre-stream errors arrive as JSON, not SSE.
@@ -582,6 +585,7 @@ function TextGenerationPanel({
           />
         </Field>
       </div>
+      <CheckOption label="Use my brand guide" checked={useBrand} onChange={setUseBrand} />
       {error && <Callout tone="error" title={error} />}
       <SubmitButton
         onClick={generate}
@@ -724,6 +728,7 @@ function DesignSuggestionsPanel({
   const [includeColors, setIncludeColors] = useState(true);
   const [includeFonts, setIncludeFonts] = useState(true);
   const [includeLayout, setIncludeLayout] = useState(true);
+  const [useBrand, setUseBrand] = useState(true);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{
     colors: { hex: string; name: string; usage: string }[];
@@ -745,7 +750,7 @@ function DesignSuggestionsPanel({
           "Content-Type": "application/json",
           "Idempotency-Key": idempotencyKey,
         },
-        body: JSON.stringify({ brief, includeColors, includeFonts, includeLayout }),
+        body: JSON.stringify({ brief, includeColors, includeFonts, includeLayout, useBrand }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -785,6 +790,7 @@ function DesignSuggestionsPanel({
           <CheckOption key={opt.label} label={opt.label} checked={opt.checked} onChange={opt.set} />
         ))}
       </div>
+      <CheckOption label="Use my brand guide" checked={useBrand} onChange={setUseBrand} />
       {error && <Callout tone="error" title={error} />}
       <SubmitButton
         onClick={generate}

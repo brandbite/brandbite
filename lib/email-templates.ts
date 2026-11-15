@@ -55,6 +55,7 @@ const SUBJECT_MAP: Record<NotificationType, string> = {
   SUPPORT_GUIDE_CHANGED: "A Support guide you edited changed in code",
   SOURCE_FILES_EXPIRING: "Your source files will be deleted soon",
   THANKS_RECEIVED: "A customer thanked you",
+  BRAND_FORM_ANSWERED: "Your brand form was answered",
 };
 
 const HEADINGS: Partial<Record<NotificationType, string>> = {
@@ -92,6 +93,9 @@ function getCTAUrl(
   if (type === "MOODBOARD_SHARED" && moodboardId) {
     return `${baseUrl}/${recipientRole}/moodboards/${moodboardId}`;
   }
+  if (type === "BRAND_FORM_ANSWERED") {
+    return `${baseUrl}/customer/brand`;
+  }
   if (type === "WITHDRAWAL_UPDATED" && recipientRole === "creative") {
     return `${baseUrl}/creative/withdrawals`;
   }
@@ -123,6 +127,7 @@ const CTA_LABELS: Record<NotificationType, string> = {
   SUPPORT_GUIDE_CHANGED: "Review the guide",
   SOURCE_FILES_EXPIRING: "Download your files",
   THANKS_RECEIVED: "View request",
+  BRAND_FORM_ANSWERED: "Read the answers",
 };
 
 function getSecondaryLink(

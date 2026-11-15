@@ -16,6 +16,7 @@ import {
   refundAiTokens,
   checkRateLimit,
 } from "@/lib/ai/cost-calculator";
+import { brandContextFor } from "@/lib/brand/load-brand-context";
 import { generateTextStream } from "@/lib/ai/provider-router";
 import {
   insufficientTokensBody,
@@ -101,6 +102,8 @@ export async function POST(req: NextRequest) {
     tone?: CopyTone;
     variations?: number;
     wordCount?: number;
+    /** false leaves the brand guide out of the prompt. */
+    useBrand?: boolean;
   };
   try {
     body = await req.json();
@@ -147,7 +150,11 @@ export async function POST(req: NextRequest) {
   const copyTone = body.tone ?? "professional";
   const numVariations = Math.min(Math.max(body.variations ?? 3, 1), 5);
   const systemPrompt = buildStreamingCopySystemPrompt(copyFormat, copyTone, numVariations);
-  const userPrompt = buildCopyPrompt(rawPrompt, { wordCount: body.wordCount });
+  const brandContext = await brandContextFor(user.activeCompanyId, "text", {
+    useBrand: body.useBrand,
+  });
+  const copyPrompt = buildCopyPrompt(rawPrompt, { wordCount: body.wordCount });
+  const userPrompt = brandContext ? `${brandContext}\n\n${copyPrompt}` : copyPrompt;
 
   // Claim the generation + debit tokens in one transaction. Retries with the
   // same Idempotency-Key return the existing record without a second debit.

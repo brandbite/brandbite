@@ -13,6 +13,7 @@ import {
   refundAiTokens,
   checkRateLimit,
 } from "@/lib/ai/cost-calculator";
+import { brandContextFor } from "@/lib/brand/load-brand-context";
 import { generateImage } from "@/lib/ai/provider-router";
 import { buildImagePrompt } from "@/lib/ai/prompts";
 import { readIdempotencyKey } from "@/lib/ai/idempotency";
@@ -29,8 +30,10 @@ export async function POST(req: NextRequest) {
     const idempotencyKey = readIdempotencyKey(req.headers);
 
     const body = await req.json();
-    const { prompt, style, size, jobType, preferProvider } = body as {
+    const { prompt, style, size, jobType, preferProvider, useBrand } = body as {
       prompt?: string;
+      /** false leaves the brand guide out of the prompt. */
+      useBrand?: boolean;
       style?: string;
       size?: string;
       jobType?: string;
@@ -76,7 +79,11 @@ export async function POST(req: NextRequest) {
 
     // Create AiGeneration record + debit tokens atomically. A retry with the
     // same Idempotency-Key returns the existing record instead of debiting again.
-    const fullPrompt = buildImagePrompt(prompt, { jobType, style });
+    const brandContext = await brandContextFor(user.activeCompanyId, "image", { useBrand });
+    const fullPrompt = buildImagePrompt(brandContext ? `${prompt}\n\n${brandContext}` : prompt, {
+      jobType,
+      style,
+    });
     const { generation, reused } = await claimAiGeneration({
       idempotencyKey,
       userId: user.id,

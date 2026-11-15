@@ -28,6 +28,7 @@ const UNTRACKED_PREFIXES = [
   "/debug",
   "/onboarding",
   "/invite",
+  "/brand-form",
   "/reset-password",
   "/verify-email",
   "/talent/schedule",

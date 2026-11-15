@@ -308,18 +308,6 @@ export default function CustomerBoardPage() {
   const [renameProjectSaving, setRenameProjectSaving] = useState(false);
   const [renameProjectError, setRenameProjectError] = useState<string | null>(null);
 
-  // Brand-guide modal (D19) — keyed off the project being edited.
-  const [brandGuideProject, setBrandGuideProject] = useState<BoardProject | null>(null);
-  const [brandGuideDraft, setBrandGuideDraft] = useState({
-    brandLogoUrl: "",
-    brandColors: "",
-    brandFonts: "",
-    brandVoice: "",
-  });
-  const [brandGuideLoading, setBrandGuideLoading] = useState(false);
-  const [brandGuideSaving, setBrandGuideSaving] = useState(false);
-  const [brandGuideError, setBrandGuideError] = useState<string | null>(null);
-
   // Delete project confirmation
   const [deleteProject, setDeleteProject] = useState<BoardProject | null>(null);
   const [deleteProjectSaving, setDeleteProjectSaving] = useState(false);
@@ -542,59 +530,6 @@ export default function CustomerBoardPage() {
   const closeRenameProject = () => {
     setRenameProject(null);
     setRenameProjectError(null);
-  };
-
-  // ---- Brand guide modal -----------------------------------------------
-  const openBrandGuide = async (proj: BoardProject) => {
-    setBrandGuideProject(proj);
-    setBrandGuideError(null);
-    setBrandGuideDraft({ brandLogoUrl: "", brandColors: "", brandFonts: "", brandVoice: "" });
-    setBrandGuideLoading(true);
-    try {
-      const res = await fetch(`/api/customer/projects/${proj.id}`, { cache: "no-store" });
-      const json = await res.json().catch(() => null);
-      if (res.ok && json?.project) {
-        setBrandGuideDraft({
-          brandLogoUrl: json.project.brandLogoUrl ?? "",
-          brandColors: json.project.brandColors ?? "",
-          brandFonts: json.project.brandFonts ?? "",
-          brandVoice: json.project.brandVoice ?? "",
-        });
-      }
-    } catch {
-      // Leave draft empty — user can fill and save.
-    } finally {
-      setBrandGuideLoading(false);
-    }
-  };
-
-  const closeBrandGuide = () => {
-    setBrandGuideProject(null);
-    setBrandGuideError(null);
-  };
-
-  const handleSaveBrandGuide = async () => {
-    if (!brandGuideProject) return;
-    setBrandGuideSaving(true);
-    setBrandGuideError(null);
-    try {
-      const res = await fetch(`/api/customer/projects/${brandGuideProject.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(brandGuideDraft),
-      });
-      const json = await res.json().catch(() => null);
-      if (!res.ok) {
-        setBrandGuideError(json?.error || "Failed to save brand guide.");
-        return;
-      }
-      closeBrandGuide();
-      showToast({ type: "success", title: "Brand guide saved" });
-    } catch {
-      setBrandGuideError("Unexpected error saving brand guide.");
-    } finally {
-      setBrandGuideSaving(false);
-    }
   };
 
   const handleRenameProject = async () => {
@@ -1774,7 +1709,6 @@ export default function CustomerBoardPage() {
               project={selectedProject}
               onCreate={openNewProjectModal}
               onRename={openRenameProject}
-              onBrandGuide={openBrandGuide}
               onDelete={openDeleteProject}
             />
           ) : null}
@@ -2179,92 +2113,6 @@ export default function CustomerBoardPage() {
                   handleRenameProject();
                 }
               }}
-            />
-          </Field>
-        </div>
-      </BoardDialog>
-
-      {/* Project brand guide (D19) */}
-      <BoardDialog
-        open={!!brandGuideProject}
-        onClose={closeBrandGuide}
-        width="md"
-        eyebrow="Brand guide"
-        title={brandGuideProject?.name ?? ""}
-        subtitle="Fill these once per project. They show up on every request for creatives and feed AI prompts automatically."
-        footer={
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            <Button onClick={closeBrandGuide} disabled={brandGuideSaving}>
-              Cancel
-            </Button>
-            <Button variant="primary" onClick={handleSaveBrandGuide} disabled={brandGuideSaving}>
-              {brandGuideSaving ? "Saving…" : "Save brand guide"}
-            </Button>
-          </div>
-        }
-      >
-        <div className="space-y-4">
-          {brandGuideError ? <Callout tone="error" title={brandGuideError} /> : null}
-          {brandGuideLoading ? (
-            <p role="status" className="text-sm text-[var(--av2-text-2)]">
-              Loading current values…
-            </p>
-          ) : null}
-          <Field label="Logo URL" htmlFor="customer-board-brand-logo">
-            <TextInput
-              id="customer-board-brand-logo"
-              type="url"
-              value={brandGuideDraft.brandLogoUrl}
-              onChange={(event) => {
-                const brandLogoUrl = event.target.value;
-                setBrandGuideDraft((prev) => ({ ...prev, brandLogoUrl }));
-              }}
-              placeholder="https://… (public image link)"
-              disabled={brandGuideSaving}
-            />
-          </Field>
-          <Field
-            label="Brand colors"
-            htmlFor="customer-board-brand-colors"
-            hint="Comma-separated hex values."
-          >
-            <TextInput
-              id="customer-board-brand-colors"
-              type="text"
-              value={brandGuideDraft.brandColors}
-              onChange={(event) => {
-                const brandColors = event.target.value;
-                setBrandGuideDraft((prev) => ({ ...prev, brandColors }));
-              }}
-              placeholder="#ff6600, #1e293b, #ffffff"
-              disabled={brandGuideSaving}
-            />
-          </Field>
-          <Field label="Fonts" htmlFor="customer-board-brand-fonts">
-            <TextInput
-              id="customer-board-brand-fonts"
-              type="text"
-              value={brandGuideDraft.brandFonts}
-              onChange={(event) => {
-                const brandFonts = event.target.value;
-                setBrandGuideDraft((prev) => ({ ...prev, brandFonts }));
-              }}
-              placeholder="Inter, Source Serif 4"
-              disabled={brandGuideSaving}
-            />
-          </Field>
-          <Field label="Voice / tone notes" htmlFor="customer-board-brand-voice">
-            <TextArea
-              id="customer-board-brand-voice"
-              value={brandGuideDraft.brandVoice}
-              onChange={(event) => {
-                const brandVoice = event.target.value;
-                setBrandGuideDraft((prev) => ({ ...prev, brandVoice }));
-              }}
-              placeholder="e.g. Warm, confident, lightly playful. We say ‘folks’ not ‘customers’. Avoid corporate jargon."
-              rows={4}
-              maxLength={2000}
-              disabled={brandGuideSaving}
             />
           </Field>
         </div>

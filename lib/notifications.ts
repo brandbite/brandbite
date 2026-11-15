@@ -38,6 +38,7 @@ const ALL_TYPES: NotificationType[] = [
   "SUPPORT_GUIDE_CHANGED",
   "SOURCE_FILES_EXPIRING",
   "THANKS_RECEIVED",
+  "BRAND_FORM_ANSWERED",
 ];
 
 // ---------------------------------------------------------------------------

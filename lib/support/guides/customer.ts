@@ -235,7 +235,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
                 text: "Owner, Project manager (only in Backlog, before a creative is assigned).",
               },
               {
-                term: "Create, rename and delete projects; edit a project's brand guide",
+                term: "Create, rename and delete projects; edit the brand guide",
                 text: "Owner, Project manager.",
               },
               {
@@ -335,8 +335,16 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
             type: "list",
             items: [
               {
+                term: "Logo files",
+                text: "done once your brand guide has a logo file. **Upload your logo** opens the Brand guide.",
+              },
+              {
+                term: "Brand language",
+                text: "done once your brand guide says what you do or how you sound. **Describe your brand** opens the Brand guide.",
+              },
+              {
                 term: "Brand colors",
-                text: "done once anyone in your company has saved a palette in Color Studio. **Save a palette** opens it.",
+                text: "done once your brand guide has colors, or anyone in your company has saved a palette in Color Studio. **Save a palette** opens Color Studio.",
               },
               {
                 term: "Moodboard",
@@ -423,7 +431,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
               },
               {
                 term: "All projects",
-                text: "pick a project in this dropdown to show only its requests. The **…** button beside it holds the project actions: see **Projects and brand guides**.",
+                text: "pick a project in this dropdown to show only its requests. The **…** button beside it holds the project actions: see **Projects**.",
               },
               {
                 term: "All priorities",
@@ -877,12 +885,12 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
   },
   {
     slug: "projects",
-    title: "Projects and brand guides",
-    summary: "Group requests into projects and give creatives your brand details once per project.",
+    title: "Projects",
+    summary: "Group requests into projects so the Board and your creatives can tell them apart.",
     category: "Workspace",
     routes: [],
-    keywords: ["project", "brand guide", "logo", "colors", "fonts", "tone", "rename", "delete"],
-    related: ["board", "create-request"],
+    keywords: ["project", "rename", "delete", "project code"],
+    related: ["board", "create-request", "brand-guide"],
     sections: [
       {
         heading: "Creating and using projects",
@@ -902,27 +910,6 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
         ],
       },
       {
-        heading: "Brand guide",
-        blocks: [
-          {
-            type: "p",
-            text: "Choose the project in the Board's project filter, open the **…** menu and choose **Brand guide**. Fill it once, click **Save brand guide**, and it is shown to creatives on every request in that project:",
-          },
-          {
-            type: "list",
-            items: [
-              { term: "Logo URL", text: "a link to your logo." },
-              { term: "Brand colors", text: "hex values separated by commas." },
-              { term: "Fonts", text: "the typefaces you use." },
-              {
-                term: "Voice / tone notes",
-                text: "how your brand sounds (up to 2000 characters).",
-              },
-            ],
-          },
-        ],
-      },
-      {
         heading: "Renaming and deleting",
         blocks: [
           {
@@ -932,6 +919,135 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           {
             type: "warning",
             text: "Deleting a project can't be undone. Its requests are not deleted. They move to **No project**.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    slug: "brand-guide",
+    title: "Brand guide",
+    summary:
+      "Keep your logo files, colors, fonts and the way your brand talks in one place for creatives and AI tools.",
+    category: "Workspace",
+    routes: ["/customer/brand"],
+    keywords: [
+      "brand",
+      "logo",
+      "vector",
+      "svg",
+      "colors",
+      "fonts",
+      "tone of voice",
+      "brand language",
+      "guidelines",
+      "style guide",
+    ],
+    related: ["create-request", "moodboards"],
+    sections: [
+      {
+        heading: "What it's for",
+        blocks: [
+          {
+            type: "p",
+            text: "The Brand guide holds what anyone needs to make work that looks and sounds like you: who you are, how you write, your colors and fonts, and your logo files. Fill it in once instead of repeating it on every request.",
+          },
+          {
+            type: "p",
+            text: "Everyone in your company can read it and download the files. Owners and Project managers can change it.",
+          },
+        ],
+      },
+      {
+        heading: "Filling it in",
+        blocks: [
+          {
+            type: "list",
+            items: [
+              {
+                term: "About the brand",
+                text: "your name, tagline, what you do, who it's for, your values, and competitors or brands you like.",
+              },
+              {
+                term: "Brand language",
+                text: "tone words, voice notes, lines to write like and never write like, words to use and avoid, and a sample of copy that sounds right.",
+              },
+              {
+                term: "Visual identity",
+                text: "your colors, fonts and imagery. Click **Add color**, click the swatch to pick the color or type its hex code, and give it a name and a role if you have them. Click **Add font**, type the font's name, choose what it's used for, and click **Add link** to say where it can be found. Under **Imagery**, describe the kind of photos and illustrations that fit, and what to stay away from.",
+              },
+              {
+                term: "Files & collaboration",
+                text: "your logo files and guidelines document, and the form you can send to a colleague. Both are described below.",
+              },
+            ],
+          },
+          {
+            type: "p",
+            text: "Lists such as **Values** and **Tone words** take one entry per line. Nothing is saved until you click **Save brand guide** at the bottom. You can move between tabs before saving: one save covers all of them. **Discard** puts back what was last saved.",
+          },
+          {
+            type: "p",
+            text: "The band at the top counts five essentials: what you do, tone words, a color, a font and a primary logo. While one is missing, the band says what to add next and why it helps, and its link opens the tab where you add it.",
+          },
+        ],
+      },
+      {
+        heading: "Brand files",
+        blocks: [
+          {
+            type: "p",
+            text: "On the **Files & collaboration** tab, under **Brand files**, choose what the file is (for example **Primary logo** or **Brand guidelines**) and click **Upload files**. You can pick several files at once. Files are saved straight away, without the Save button.",
+          },
+          {
+            type: "p",
+            text: "Accepted types are SVG, AI, EPS, PDF, PNG, JPG, WebP, PSD, Fig, Sketch, INDD and ZIP, up to 200 MB each. Add vector files (SVG, AI or EPS) when you have them, because creatives need those for print and large formats.",
+          },
+          {
+            type: "p",
+            text: "On each file you can change what it is and whether it's made for light or dark backgrounds. **Download** saves the original file. **Remove** deletes it from the guide after you confirm.",
+          },
+          {
+            type: "p",
+            text: "Brand files stay for as long as your brand guide exists.",
+          },
+        ],
+      },
+      {
+        heading: "Ask a colleague",
+        blocks: [
+          {
+            type: "p",
+            text: "Someone else may know the brand better than you, such as a founder or your marketing lead. On the **Files & collaboration** tab, under **Ask a colleague**, click **Create form link**, then send them the link. They answer a short form about the brand and don't need a brandbite account.",
+          },
+          {
+            type: "p",
+            text: "Each link takes one set of answers and works for 30 days. **Close link** stops it working. Only Owners and Project managers see this section.",
+          },
+          {
+            type: "p",
+            text: "When the form comes back, the person who made the link gets a notification and an email, and the form shows **Answered**. Click **Read answers** to see what they wrote. **Add to brand guide** puts their answers into the guide after you confirm: each question they answered replaces that part of the guide, and parts they left blank stay as they are. Save or discard your own unsaved changes first.",
+          },
+        ],
+      },
+      {
+        heading: "How it's used",
+        blocks: [
+          {
+            type: "p",
+            text: "Your creative sees the brand guide on every request, under **Brief & files**, and can download your brand files from there.",
+          },
+          {
+            type: "p",
+            text: "When you turn a description into a request with AI, and when an AI request generates an image, the brand guide is added automatically so the result follows your colors, fonts and voice.",
+          },
+          {
+            type: "p",
+            text: "In **AI Tools**, image generation, copy and design suggestions follow the brand guide too. Untick **Use my brand guide** on a tool when you want a result that ignores it.",
+          },
+          {
+            type: "p",
+            text: "To use your brand in another AI assistant, click **Copy for AI** at the top of the page and paste it into the chat. **Download JSON** saves the same details as a file.",
           },
         ],
       },

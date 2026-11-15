@@ -54,6 +54,7 @@ const TYPE_ICONS: Record<string, string> = {
   MOODBOARD_COMMENT: "\u{1F4AC}",
   THANKS_RECEIVED: "\u{1F49C}",
   SUPPORT_GUIDE_CHANGED: "\u{1F4D8}",
+  BRAND_FORM_ANSWERED: "\u{1F4DD}",
 };
 
 // ---------------------------------------------------------------------------
@@ -191,6 +192,13 @@ export function NotificationBell({
       if (notif.type === "WITHDRAWAL_UPDATED" && role === "creative") {
         setOpen(false);
         router.push("/creative/withdrawals");
+        return;
+      }
+
+      // Brand form answers are read on the brand guide page.
+      if (notif.type === "BRAND_FORM_ANSWERED" && role === "customer") {
+        setOpen(false);
+        router.push("/customer/brand");
         return;
       }
 

@@ -23,6 +23,8 @@ import {
   type BriefParseJobType,
 } from "@/lib/ai/prompts";
 import { generateText } from "@/lib/ai/provider-router";
+import { buildBrandContext } from "@/lib/brand/brand-context";
+import { loadBrandContextSource } from "@/lib/brand/load-brand-context";
 import { insufficientTokensResponse } from "@/lib/errors/insufficient-tokens";
 import { prisma } from "@/lib/prisma";
 
@@ -137,32 +139,13 @@ export async function POST(req: NextRequest) {
     }));
     const validJobTypeIds = new Set(jobTypesRaw.map((j) => j.id));
 
-    // Optional project brand guide — spliced into the user prompt so the
-    // model knows the customer's colors / fonts / voice when describing
-    // what the ticket should deliver. Silently ignored when projectId is
-    // absent or the project has no brand fields filled.
-    let brandContext: string | null = null;
-    if (projectId) {
-      const project = await prisma.project.findFirst({
-        where: { id: projectId, companyId: user.activeCompanyId },
-        select: {
-          brandLogoUrl: true,
-          brandColors: true,
-          brandFonts: true,
-          brandVoice: true,
-        },
-      });
-      if (project) {
-        const parts: string[] = [];
-        if (project.brandLogoUrl) parts.push(`Logo URL: ${project.brandLogoUrl}`);
-        if (project.brandColors) parts.push(`Brand colors: ${project.brandColors}`);
-        if (project.brandFonts) parts.push(`Brand fonts: ${project.brandFonts}`);
-        if (project.brandVoice) parts.push(`Voice / tone: ${project.brandVoice}`);
-        if (parts.length > 0) {
-          brandContext = `Project brand guide (apply when describing deliverables):\n${parts.join("\n")}`;
-        }
-      }
-    }
+    // The brand guide for this project (or the company's default brand), so
+    // the model knows the customer's colors / fonts / voice when describing
+    // what the request should deliver. Null when nothing is filled in.
+    const brandContext = buildBrandContext(
+      await loadBrandContextSource({ companyId: user.activeCompanyId, projectId }),
+      "brief",
+    );
 
     const systemPrompt = buildBriefParsingSystemPrompt(jobTypesForPrompt);
     const userPromptBase = buildBriefParsingPrompt(brief);

@@ -27,7 +27,8 @@ import {
   TextLink,
   type Tone,
 } from "@/components/admin/v2/ui";
-import { IconMoodboards } from "@/components/navigation/nav-icons";
+import { OnboardingBrandStep } from "@/components/brand/onboarding-brand-step";
+import { IconBrandGuide, IconMoodboards } from "@/components/navigation/nav-icons";
 
 const CHECK_PATH =
   "M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z";
@@ -46,6 +47,12 @@ const SETUP_ITEMS: { title: string; text: string; tone: Tone; icon: ReactNode }[
     text: "Set up your workspace with your company details.",
     tone: "peach",
     icon: <IconBuilding />,
+  },
+  {
+    title: "Tell us about your brand",
+    text: "A few lines and your logo, so creatives know who they're designing for.",
+    tone: "amber",
+    icon: <IconBrandGuide width={24} height={24} />,
   },
   {
     title: "Invite your team",
@@ -90,10 +97,10 @@ function SummaryRow({ title, detail }: { title: string; detail: string }) {
 export default function OnboardingPage() {
   const router = useRouter();
 
-  // Step state — 1: company, 2: invite team, 3: create project,
-  // 4: where source files go, 5: done
+  // Step state — 1: company, 2: brand, 3: invite team, 4: create project,
+  // 5: where source files go, 6: done
   const [step, setStep] = useState(1);
-  const TOTAL_STEPS = 5;
+  const TOTAL_STEPS = 6;
 
   // Step 1 — Company
   const [companyName, setCompanyName] = useState("");
@@ -102,14 +109,17 @@ export default function OnboardingPage() {
   const [companyLoading, setCompanyLoading] = useState(false);
   const [companyCreated, setCompanyCreated] = useState(false);
 
-  // Step 2 — Invite team
+  // Step 2 — Brand
+  const [brandSaved, setBrandSaved] = useState(false);
+
+  // Step 3 — Invite team
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("MEMBER");
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteLoading, setInviteLoading] = useState(false);
   const [invitedEmails, setInvitedEmails] = useState<string[]>([]);
 
-  // Step 3 — Project
+  // Step 4 — Project
   const [projectName, setProjectName] = useState("");
   const [projectCode, setProjectCode] = useState("");
   const [projectCodeEdited, setProjectCodeEdited] = useState(false);
@@ -117,16 +127,16 @@ export default function OnboardingPage() {
   const [projectLoading, setProjectLoading] = useState(false);
   const [projectCreated, setProjectCreated] = useState<string | null>(null);
 
-  // Step 4 — source files (Google Drive / Dropbox, when we offer them)
+  // Step 5 — source files (Google Drive / Dropbox, when we offer them)
   const [storageOptions, setStorageOptions] = useState<StorageOption[] | null>(null);
   const [connecting, setConnecting] = useState<string | null>(null);
   const [keptOnBrandbite, setKeptOnBrandbite] = useState(false);
 
-  // Step 5 — finishing
+  // Step 6 — finishing
   const [finishLoading, setFinishLoading] = useState(false);
 
   useEffect(() => {
-    if (step !== 4 || storageOptions) return;
+    if (step !== 5 || storageOptions) return;
     let cancelled = false;
     fetch("/api/customer/integrations", { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
@@ -138,10 +148,10 @@ export default function OnboardingPage() {
         );
         setStorageOptions(options);
         // Nothing to offer: skip the step.
-        if (options.length === 0) setStep(5);
+        if (options.length === 0) setStep(6);
       })
       .catch(() => {
-        if (!cancelled) setStep(5);
+        if (!cancelled) setStep(6);
       });
     return () => {
       cancelled = true;
@@ -229,7 +239,7 @@ export default function OnboardingPage() {
         return;
       }
       setProjectCreated(json.project?.name || projectName.trim());
-      setStep(4);
+      setStep(5);
     } catch {
       setProjectError("Something went wrong.");
     } finally {
@@ -263,7 +273,7 @@ export default function OnboardingPage() {
   // Stepper
   // ---------------------------------------------------------------------------
 
-  const stepLabels = ["Company", "Team", "Project", "Files", "Done"];
+  const stepLabels = ["Company", "Brand", "Team", "Project", "Files", "Done"];
 
   // ---------------------------------------------------------------------------
   // Render
@@ -421,8 +431,19 @@ export default function OnboardingPage() {
               </div>
             )}
 
-            {/* ----- Step 2: Invite Team ----- */}
+            {/* ----- Step 2: Brand ----- */}
             {step === 2 && (
+              <OnboardingBrandStep
+                renderActions={stepActions}
+                onDone={(saved) => {
+                  setBrandSaved(saved);
+                  setStep(3);
+                }}
+              />
+            )}
+
+            {/* ----- Step 3: Invite Team ----- */}
+            {step === 3 && (
               <div className="flex flex-col">
                 <h1 className="text-[32px] leading-10 font-bold tracking-tight">
                   Invite your team
@@ -492,15 +513,15 @@ export default function OnboardingPage() {
                 </div>
 
                 {stepActions(
-                  <Button variant="primary" onClick={() => setStep(3)}>
+                  <Button variant="primary" onClick={() => setStep(4)}>
                     {invitedEmails.length > 0 ? "Next" : "Skip"}
                   </Button>,
                 )}
               </div>
             )}
 
-            {/* ----- Step 3: Create Project ----- */}
-            {step === 3 && (
+            {/* ----- Step 4: Create Project ----- */}
+            {step === 4 && (
               <div className="flex flex-col">
                 <h1 className="text-[32px] leading-10 font-bold tracking-tight">
                   Create your first project
@@ -557,7 +578,7 @@ export default function OnboardingPage() {
 
                 {stepActions(
                   <>
-                    <Button onClick={() => setStep(4)}>Skip</Button>
+                    <Button onClick={() => setStep(5)}>Skip</Button>
                     <Button
                       variant="primary"
                       disabled={projectLoading}
@@ -571,8 +592,8 @@ export default function OnboardingPage() {
               </div>
             )}
 
-            {/* ----- Step 4: Source files ----- */}
-            {step === 4 && (
+            {/* ----- Step 5: Source files ----- */}
+            {step === 5 && (
               <div className="flex flex-col">
                 <h1 className="text-[32px] leading-10 font-bold tracking-tight">
                   Where should we deliver source files?
@@ -623,7 +644,7 @@ export default function OnboardingPage() {
                     disabled={connecting !== null}
                     onClick={() => {
                       setKeptOnBrandbite(true);
-                      setStep(5);
+                      setStep(6);
                     }}
                   >
                     Keep them on brandbite for now
@@ -632,8 +653,8 @@ export default function OnboardingPage() {
               </div>
             )}
 
-            {/* ----- Step 5: All Set ----- */}
-            {step === 5 && (
+            {/* ----- Step 6: All Set ----- */}
+            {step === 6 && (
               <div className="flex flex-col">
                 <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--av2-success-bg)]">
                   <CheckGlyph className="h-7 w-7" />
@@ -648,6 +669,12 @@ export default function OnboardingPage() {
 
                 <div className="mt-6 space-y-2.5">
                   {companyCreated && <SummaryRow title="Company created" detail={companyName} />}
+                  {brandSaved && (
+                    <SummaryRow
+                      title="Brand guide started"
+                      detail="Add colors, fonts and more under Brand guide."
+                    />
+                  )}
                   {invitedEmails.length > 0 && (
                     <SummaryRow
                       title={`${invitedEmails.length} team member${

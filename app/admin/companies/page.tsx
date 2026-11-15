@@ -528,7 +528,10 @@ export default function AdminCompaniesPage() {
             <span className="text-[var(--av2-text-2)]">
               Created {formatDate(selected.createdAt)}
             </span>
-            <TextLink href="/admin/ledger">Token ledger</TextLink>
+            <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              <TextLink href={`/admin/companies/${selected.id}/brand`}>Brand guide</TextLink>
+              <TextLink href="/admin/ledger">Token ledger</TextLink>
+            </span>
           </div>
         </PanelSection>
       </div>

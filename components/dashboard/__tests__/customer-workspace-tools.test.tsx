@@ -348,7 +348,7 @@ describe("Onboarding", () => {
       return undefined;
     });
     render(<OnboardingPage />);
-    expect(screen.getByText("Step 1 of 5")).toBeInTheDocument();
+    expect(screen.getByText("Step 1 of 6")).toBeInTheDocument();
 
     // Company name is required before anything is sent.
     fireEvent.click(screen.getByRole("button", { name: "Create Company" }));
@@ -357,7 +357,13 @@ describe("Onboarding", () => {
 
     fireEvent.change(screen.getByLabelText(/Company Name/), { target: { value: "Nova Labs" } });
     fireEvent.click(screen.getByRole("button", { name: "Create Company" }));
-    expect(await screen.findByRole("heading", { name: "Invite your team" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Tell us about your brand" }),
+    ).toBeInTheDocument();
+
+    // The brand step can be skipped; nothing is saved to the brand guide.
+    fireEvent.click(screen.getByRole("button", { name: "Skip" }));
+    expect(screen.getByRole("heading", { name: "Invite your team" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Skip" }));
     expect(screen.getByRole("heading", { name: "Create your first project" })).toBeInTheDocument();
@@ -414,6 +420,7 @@ describe("Onboarding", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create Company" }));
     fireEvent.click(await screen.findByRole("button", { name: "Skip" }));
     fireEvent.click(screen.getByRole("button", { name: "Skip" }));
+    fireEvent.click(screen.getByRole("button", { name: "Skip" }));
 
     expect(
       await screen.findByRole("heading", { name: "Where should we deliver source files?" }),
@@ -439,6 +446,7 @@ describe("Onboarding", () => {
     render(<OnboardingPage />);
     fireEvent.change(screen.getByLabelText(/Company Name/), { target: { value: "Nova" } });
     fireEvent.click(screen.getByRole("button", { name: "Create Company" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Skip" }));
 
     fireEvent.change(await screen.findByLabelText("Email address"), {
       target: { value: "pm@nova.test" },
