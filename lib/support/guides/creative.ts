@@ -388,7 +388,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
           },
           {
             type: "tip",
-            text: "The brand guide and time tracking are on the full request page. Use the **expand** icon (top right of the request window) to open it. On the full page, the **shrink** icon takes you back to the board with the window open, and **×** closes it.",
+            text: "Under **Brief & files**, the request window shows the customer's **Brand guide** in short: their colors (click one to copy its hex code), fonts and tone words, with **Download all (.zip)** for their brand files. **Open full brand guide** takes you to the whole guide on the full request page. Time tracking is on the full page too. Use the **expand** icon (top right of the request window) to open it. On the full page, the **shrink** icon takes you back to the board with the window open, and **×** closes it.",
           },
         ],
       },
@@ -565,7 +565,7 @@ export const CREATIVE_GUIDES: SupportGuide[] = [
               },
               {
                 term: "Brief & files",
-                text: "what the customer asked for, their reference files and their **Brand guide**: colors (click one to copy its hex code), fonts, how the brand talks, and the brand files. **Download** saves one file, and **Download all (.zip)** saves them together. **Copy for AI** copies the whole guide as text you can paste into an AI assistant, and **Download JSON** saves it as a file.",
+                text: "what the customer asked for, their reference files and their **Brand guide**, in four tabs: **About the brand**, **Brand language**, **Visual identity** (colors, fonts and imagery; click a color to copy its hex code) and **Brand files**. On **Brand files**, **Download** saves one file, and **Download all (.zip)** saves them together. **Copy for AI** copies the whole guide as text you can paste into an AI assistant, and **Download JSON** saves it as a file.",
               },
               { term: "Time tracking", text: "your time entries for this request." },
               { term: "Comments", text: "your conversation with the customer." },

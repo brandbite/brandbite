@@ -28,6 +28,7 @@ import {
   TICKET_STATUS,
   type Tone,
 } from "@/components/admin/v2/ui";
+import { BrandGuideSummary } from "@/components/brand/ticket-brand-guide";
 import { Modal } from "@/components/ui/modal";
 import {
   BriefThumbnailRow,
@@ -427,6 +428,15 @@ export function TicketDetailDialog({
                       </>
                     )}
                   </Card>
+                  {/* The customer's brand at a glance; the whole guide is on the full page. */}
+                  {tab === "brief" && (
+                    <div className="mt-4 empty:hidden">
+                      <BrandGuideSummary
+                        ticketId={ticket.id}
+                        fullHref={`${fullPageHref}&tab=brief&focus=brand`}
+                      />
+                    </div>
+                  )}
                 </TabPanel>
               </div>
 

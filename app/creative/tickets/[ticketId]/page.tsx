@@ -161,7 +161,11 @@ export default function CreativeTicketDetailPage() {
 
   const [state, setState] = useState<ViewState>({ status: "loading" });
   const [refreshCounter, setRefreshCounter] = useState(0);
-  const [tab, setTab] = useState<JobTab>("delivery");
+  // "Open full brand guide" in the board window lands on the brief tab, at the guide.
+  const [tab, setTab] = useState<JobTab>(
+    searchParams.get("tab") === "brief" ? "brief" : "delivery",
+  );
+  const [brandFocus, setBrandFocus] = useState(searchParams.get("focus") === "brand" ? 1 : 0);
   const [statusBusy, setStatusBusy] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
 
@@ -653,6 +657,16 @@ export default function CreativeTicketDetailPage() {
                   >
                     Reference files ({briefAssets.length})
                   </Button>
+                  <Button
+                    variant="ghost"
+                    className="!justify-start"
+                    onClick={() => {
+                      setTab("brief");
+                      setBrandFocus((n) => n + 1);
+                    }}
+                  >
+                    Brand guide
+                  </Button>
                 </div>
               </Card>
             </>
@@ -765,7 +779,7 @@ export default function CreativeTicketDetailPage() {
                 </Card>
 
                 {/* The customer's brand guide, with its files to download. */}
-                <TicketBrandGuide ticketId={ticket.id} />
+                <TicketBrandGuide ticketId={ticket.id} focus={brandFocus} />
               </div>
             </TabPanel>
           ) : null}
