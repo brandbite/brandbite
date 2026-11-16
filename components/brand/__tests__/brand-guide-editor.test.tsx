@@ -200,6 +200,32 @@ describe("BrandGuideEditor", () => {
     expect(calls.some((c) => c.method === "POST")).toBe(false);
   });
 
+  it("saves a file's short name when the field is left", async () => {
+    const calls = mockApi({ assets: [LOGO] });
+    render(<BrandGuideEditor />);
+    await screen.findByLabelText("Brand name");
+    openTab("Files & collaboration");
+
+    const field = screen.getByLabelText("Short name for logo.svg");
+    expect(field).toHaveValue("");
+    // Leaving it untouched saves nothing.
+    fireEvent.blur(field);
+    expect(calls.some((c) => c.url.endsWith("/assets/a1"))).toBe(false);
+
+    fireEvent.change(field, { target: { value: "  Ink logo " } });
+    fireEvent.blur(field);
+
+    await waitFor(() =>
+      expect(calls.find((c) => c.method === "PATCH" && c.url.endsWith("/assets/a1"))?.body).toEqual(
+        { label: "Ink logo" },
+      ),
+    );
+    // The short name leads; the file name stays underneath.
+    expect(await screen.findByText("Ink logo")).toBeInTheDocument();
+    expect(screen.getByText(/logo\.svg · /)).toBeInTheDocument();
+    expect(screen.getByLabelText("Short name for logo.svg")).toHaveValue("Ink logo");
+  });
+
   it("asks before removing a file", async () => {
     const calls = mockApi({ assets: [LOGO] });
     render(<BrandGuideEditor />);

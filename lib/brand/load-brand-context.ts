@@ -39,9 +39,8 @@ const BRAND_SELECT = {
 
 /**
  * The brand guide for a project: the brand the project names, else the
- * company's default brand. The project's older brand fields ride along and
- * fill in what the guide leaves empty. A project of another company is
- * ignored. Null when there is neither a brand nor any project field.
+ * company's default brand. A project of another company is ignored. Null
+ * when the company has no brand guide yet.
  */
 export async function loadBrandContextSource(args: {
   companyId: string;
@@ -52,13 +51,7 @@ export async function loadBrandContextSource(args: {
   const project = projectId
     ? await prisma.project.findFirst({
         where: { id: projectId, companyId },
-        select: {
-          brandLogoUrl: true,
-          brandColors: true,
-          brandFonts: true,
-          brandVoice: true,
-          brand: { select: { ...BRAND_SELECT, companyId: true } },
-        },
+        select: { brand: { select: { ...BRAND_SELECT, companyId: true } } },
       })
     : null;
 
@@ -71,36 +64,25 @@ export async function loadBrandContextSource(args: {
       select: BRAND_SELECT,
     }));
 
-  const legacy = project
-    ? {
-        logoUrl: project.brandLogoUrl,
-        colors: project.brandColors,
-        fonts: project.brandFonts,
-        voice: project.brandVoice,
-      }
-    : undefined;
-  const hasLegacy = !!legacy && Object.values(legacy).some(Boolean);
-
-  if (!brand && !hasLegacy) return null;
+  if (!brand) return null;
 
   return {
-    name: brand?.name,
-    tagline: brand?.tagline,
-    description: brand?.description,
-    audience: brand?.audience,
-    values: brand?.values,
-    references: brand?.references,
-    toneWords: brand?.toneWords,
-    voiceNotes: brand?.voiceNotes,
-    voiceDo: brand?.voiceDo,
-    voiceDont: brand?.voiceDont,
-    wordsToUse: brand?.wordsToUse,
-    wordsToAvoid: brand?.wordsToAvoid,
-    sampleCopy: brand?.sampleCopy,
-    colors: readBrandColors(brand?.colors),
-    fonts: readBrandFonts(brand?.fonts),
-    imageryNotes: brand?.imageryNotes,
-    legacy: hasLegacy ? legacy : undefined,
+    name: brand.name,
+    tagline: brand.tagline,
+    description: brand.description,
+    audience: brand.audience,
+    values: brand.values,
+    references: brand.references,
+    toneWords: brand.toneWords,
+    voiceNotes: brand.voiceNotes,
+    voiceDo: brand.voiceDo,
+    voiceDont: brand.voiceDont,
+    wordsToUse: brand.wordsToUse,
+    wordsToAvoid: brand.wordsToAvoid,
+    sampleCopy: brand.sampleCopy,
+    colors: readBrandColors(brand.colors),
+    fonts: readBrandFonts(brand.fonts),
+    imageryNotes: brand.imageryNotes,
   };
 }
 

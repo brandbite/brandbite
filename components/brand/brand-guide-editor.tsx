@@ -68,7 +68,7 @@ import {
   type BrandAssetBackgroundValue,
   type BrandAssetKindValue,
 } from "@/lib/brand/brand-files";
-import { BRAND_LIMITS } from "@/lib/brand/brand-schema";
+import { BRAND_FILE_LABEL_MAX, BRAND_LIMITS } from "@/lib/brand/brand-schema";
 import { uploadBrandFile } from "@/lib/brand/upload-brand-file";
 import { parseOpaqueHex } from "@/lib/colors/convert";
 
@@ -306,8 +306,9 @@ export function BrandGuideEditor() {
 
   const updateFile = async (
     file: BrandFile,
-    change: Partial<Pick<BrandFile, "kind" | "background">>,
+    change: Partial<Pick<BrandFile, "kind" | "background" | "label">>,
   ) => {
+    setFileError(null);
     setFiles((prev) => prev.map((f) => (f.id === file.id ? { ...f, ...change } : f)));
     const res = await fetch(`/api/customer/brand/assets/${file.id}`, {
       method: "PATCH",
@@ -318,6 +319,12 @@ export function BrandGuideEditor() {
       setFiles((prev) => prev.map((f) => (f.id === file.id ? file : f)));
       setFileError(await readError(res, "Could not update the file."));
     }
+  };
+
+  /** Saves a file's short name when the field is left; an empty field clears it. */
+  const renameFile = (file: BrandFile, typed: string) => {
+    const label = typed.trim() || null;
+    if (label !== file.label) void updateFile(file, { label });
   };
 
   const download = async (file: BrandFile) => {
@@ -928,6 +935,19 @@ export function BrandGuideEditor() {
                           </div>
                           {canEdit && (
                             <div className="grid gap-1.5">
+                              <TextInput
+                                // Remounts with the saved value, so a failed save shows the old name again.
+                                key={file.label ?? ""}
+                                aria-label={`Short name for ${file.name}`}
+                                placeholder="Short name (optional)"
+                                className="h-8! text-xs!"
+                                maxLength={BRAND_FILE_LABEL_MAX}
+                                defaultValue={file.label ?? ""}
+                                onBlur={(event) => renameFile(file, event.target.value)}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter") event.currentTarget.blur();
+                                }}
+                              />
                               <Select
                                 aria-label={`What ${file.name} is`}
                                 className="h-8! text-xs!"

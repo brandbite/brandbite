@@ -62,7 +62,6 @@ describe("TicketBrandGuide", () => {
         fonts: [{ id: "f1", name: "Inter", url: "https://fonts.google.com/specimen/Inter" }],
       },
       assets: [FILE],
-      logoLink: null,
     });
     render(<TicketBrandGuide ticketId="t1" />);
 
@@ -89,7 +88,7 @@ describe("TicketBrandGuide", () => {
   });
 
   it("asks this request's download route for a file", async () => {
-    const calls = mockApi({ brand: EMPTY_BRAND, assets: [FILE], logoLink: null });
+    const calls = mockApi({ brand: EMPTY_BRAND, assets: [FILE] });
     const assign = vi.fn();
     vi.stubGlobal("location", { ...window.location, assign });
     render(<TicketBrandGuide ticketId="t1" />);
@@ -105,7 +104,6 @@ describe("TicketBrandGuide", () => {
     mockApi({
       brand: EMPTY_BRAND,
       assets: [FILE, { ...FILE, id: "a2", name: "logo.svg" }],
-      logoLink: null,
     });
     render(<TicketBrandGuide ticketId="t1" />);
     openTab(await screen.findByText("Brand files").then(() => "Brand files"));
@@ -113,19 +111,10 @@ describe("TicketBrandGuide", () => {
   });
 
   it("says so when the customer hasn't filled the guide in", async () => {
-    mockApi({ brand: EMPTY_BRAND, assets: [], logoLink: null });
+    mockApi({ brand: EMPTY_BRAND, assets: [] });
     render(<TicketBrandGuide ticketId="t1" />);
     expect(
       await screen.findByText("The customer hasn't filled in their brand guide yet."),
-    ).toBeInTheDocument();
-  });
-
-  it("keeps the older logo link when a project has one", async () => {
-    mockApi({ brand: EMPTY_BRAND, assets: [], logoLink: "https://cdn.example.com/logo.svg" });
-    render(<TicketBrandGuide ticketId="t1" />);
-    openTab(await screen.findByText("Brand files").then(() => "Brand files"));
-    expect(
-      screen.getByRole("link", { name: "https://cdn.example.com/logo.svg" }),
     ).toBeInTheDocument();
   });
 
@@ -136,7 +125,7 @@ describe("TicketBrandGuide", () => {
   });
 
   it("loads and downloads from whichever brand API it is given", async () => {
-    const calls = mockApi({ brand: EMPTY_BRAND, assets: [FILE], logoLink: null });
+    const calls = mockApi({ brand: EMPTY_BRAND, assets: [FILE] });
     const assign = vi.fn();
     vi.stubGlobal("location", { ...window.location, assign });
     render(<BrandGuidePanel apiBase="/api/admin/companies/c1/brand" layout="page" />);
@@ -152,8 +141,21 @@ describe("TicketBrandGuide", () => {
     vi.unstubAllGlobals();
   });
 
+  it("says whose guide it is when the API names the company", async () => {
+    mockApi({ brand: EMPTY_BRAND, assets: [FILE], companyName: "Acme Studio" });
+    const onCompanyName = vi.fn();
+    render(
+      <BrandGuidePanel
+        apiBase="/api/admin/companies/c1/brand"
+        layout="page"
+        onCompanyName={onCompanyName}
+      />,
+    );
+    await waitFor(() => expect(onCompanyName).toHaveBeenCalledWith("Acme Studio"));
+  });
+
   it("names a file by its short name when it has one", async () => {
-    mockApi({ brand: EMPTY_BRAND, assets: [{ ...FILE, label: "Ink logo" }], logoLink: null });
+    mockApi({ brand: EMPTY_BRAND, assets: [{ ...FILE, label: "Ink logo" }] });
     render(<TicketBrandGuide ticketId="t1" />);
     openTab(await screen.findByText("Brand files").then(() => "Brand files"));
     expect(screen.getByText("Ink logo")).toBeInTheDocument();
@@ -176,7 +178,6 @@ describe("BrandGuideSummary", () => {
         ],
       },
       assets: [FILE, { ...FILE, id: "a2", name: "logo.svg" }],
-      logoLink: null,
     });
     render(<BrandGuideSummary ticketId="t1" fullHref={FULL} />);
 
@@ -193,7 +194,7 @@ describe("BrandGuideSummary", () => {
   });
 
   it("says so when the guide is empty, and hides when it can't load", async () => {
-    mockApi({ brand: EMPTY_BRAND, assets: [], logoLink: null });
+    mockApi({ brand: EMPTY_BRAND, assets: [] });
     const first = render(<BrandGuideSummary ticketId="t1" fullHref={FULL} />);
     expect(
       await screen.findByText("The customer hasn't filled in their brand guide yet."),

@@ -16,7 +16,7 @@ import { updateProjectSchema } from "@/lib/schemas/project.schemas";
 type RouteContext = { params: Promise<{ projectId: string }> };
 
 // ---------------------------------------------------------------------------
-// GET — Full project detail (used by the brand-guide modal to pre-populate).
+// GET — A project's name and code.
 // ---------------------------------------------------------------------------
 
 export async function GET(_req: NextRequest, ctx: RouteContext) {
@@ -29,15 +29,7 @@ export async function GET(_req: NextRequest, ctx: RouteContext) {
     const { projectId } = await ctx.params;
     const project = await prisma.project.findFirst({
       where: { id: projectId, companyId: user.activeCompanyId },
-      select: {
-        id: true,
-        name: true,
-        code: true,
-        brandLogoUrl: true,
-        brandColors: true,
-        brandFonts: true,
-        brandVoice: true,
-      },
+      select: { id: true, name: true, code: true },
     });
 
     if (!project) {
@@ -94,7 +86,7 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
 
     const parsed = await parseBody(req, updateProjectSchema);
     if (!parsed.success) return parsed.response;
-    const { name, code, brandLogoUrl, brandColors, brandFonts, brandVoice } = parsed.data;
+    const { name, code } = parsed.data;
 
     // If code is being changed, check per-company uniqueness
     if (code && code !== existing.code) {
@@ -109,33 +101,14 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
       }
     }
 
-    const data: {
-      name?: string;
-      code?: string;
-      brandLogoUrl?: string | null;
-      brandColors?: string | null;
-      brandFonts?: string | null;
-      brandVoice?: string | null;
-    } = {};
+    const data: { name?: string; code?: string } = {};
     if (name) data.name = name;
     if (code) data.code = code;
-    if (brandLogoUrl !== undefined) data.brandLogoUrl = brandLogoUrl;
-    if (brandColors !== undefined) data.brandColors = brandColors;
-    if (brandFonts !== undefined) data.brandFonts = brandFonts;
-    if (brandVoice !== undefined) data.brandVoice = brandVoice;
 
     const project = await prisma.project.update({
       where: { id: projectId },
       data,
-      select: {
-        id: true,
-        name: true,
-        code: true,
-        brandLogoUrl: true,
-        brandColors: true,
-        brandFonts: true,
-        brandVoice: true,
-      },
+      select: { id: true, name: true, code: true },
     });
 
     return NextResponse.json({ project }, { status: 200 });

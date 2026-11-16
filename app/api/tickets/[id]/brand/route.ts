@@ -25,14 +25,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     if (!ticket || !(await canViewSourceFiles(user, ticket))) {
       return NextResponse.json({ error: "Request not found." }, { status: 404 });
     }
-    const { brand, logoLink } = await brandForProject({
+    const { brand } = await brandForProject({
       companyId: ticket.companyId,
       projectId: ticket.project?.id,
     });
     return NextResponse.json({
       brand: brandView(brand),
       assets: await listBrandAssets(brand.id),
-      logoLink,
     });
   } catch (error) {
     return brandRouteError(error, "ticket brand GET");

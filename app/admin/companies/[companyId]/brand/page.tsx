@@ -9,10 +9,11 @@
 
 "use client";
 
-import { use } from "react";
+import { use, useState } from "react";
 
 import { PageHeader, TextLink } from "@/components/admin/v2/ui";
 import { BrandGuidePanel } from "@/components/brand/ticket-brand-guide";
+import { BreadcrumbDetail } from "@/components/navigation/breadcrumb-detail";
 
 export default function AdminCompanyBrandPage({
   params,
@@ -20,8 +21,10 @@ export default function AdminCompanyBrandPage({
   params: Promise<{ companyId: string }>;
 }) {
   const { companyId } = use(params);
+  const [companyName, setCompanyName] = useState<string | null>(null);
   return (
     <>
+      {companyName && <BreadcrumbDetail label={companyName} />}
       <PageHeader
         title="Brand guide"
         actions={
@@ -30,7 +33,11 @@ export default function AdminCompanyBrandPage({
           </TextLink>
         }
       />
-      <BrandGuidePanel apiBase={`/api/admin/companies/${companyId}/brand`} layout="page" />
+      <BrandGuidePanel
+        apiBase={`/api/admin/companies/${companyId}/brand`}
+        layout="page"
+        onCompanyName={setCompanyName}
+      />
     </>
   );
 }

@@ -82,7 +82,7 @@ type BrandFile = {
   previewUrl: string | null;
 };
 
-type Loaded = { brand: Brand; assets: BrandFile[]; logoLink: string | null };
+type Loaded = { brand: Brand; assets: BrandFile[]; companyName: string | null };
 
 type Layout = "card" | "page";
 type GuideTab = "about" | "language" | "visual" | "files";
@@ -113,7 +113,7 @@ function formatBytes(bytes: number): string {
 }
 
 /** True when the guide has nothing a creative could use. */
-function isEmpty({ brand, assets, logoLink }: Loaded): boolean {
+function isEmpty({ brand, assets }: Loaded): boolean {
   const texts = [
     brand.tagline,
     brand.description,
@@ -134,7 +134,7 @@ function isEmpty({ brand, assets, logoLink }: Loaded): boolean {
     brand.fonts,
     assets,
   ];
-  return !logoLink && texts.every((t) => !t) && lists.every((l) => l.length === 0);
+  return texts.every((t) => !t) && lists.every((l) => l.length === 0);
 }
 
 /**
@@ -162,7 +162,7 @@ function useBrandGuide(apiBase: string) {
           setData({
             brand: json.brand,
             assets: json.assets ?? [],
-            logoLink: json.logoLink ?? null,
+            companyName: json.companyName ?? null,
           });
         }
       })
@@ -384,10 +384,13 @@ export function BrandGuidePanel({
   apiBase,
   layout = "card",
   focus = 0,
+  onCompanyName,
 }: {
   apiBase: string;
   layout?: Layout;
   focus?: number;
+  /** Told whose guide this is, when the API says (the admin one does). */
+  onCompanyName?: (name: string) => void;
 }) {
   const id = useId();
   const guide = useBrandGuide(apiBase);
@@ -399,6 +402,11 @@ export function BrandGuidePanel({
   useEffect(() => {
     if (focus > 0 && loaded) root.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [focus, loaded]);
+
+  const companyName = data?.companyName ?? null;
+  useEffect(() => {
+    if (companyName) onCompanyName?.(companyName);
+  }, [companyName, onCompanyName]);
 
   if (failed) return null;
   if (!data) {
@@ -418,7 +426,7 @@ export function BrandGuidePanel({
     );
   }
 
-  const { brand, assets, logoLink } = data;
+  const { brand, assets } = data;
   const page = layout === "page";
 
   const about = [
@@ -683,7 +691,7 @@ export function BrandGuidePanel({
                 </Callout>
               </div>
             )}
-            {assets.length === 0 && !logoLink && <Nothing>No brand files yet.</Nothing>}
+            {assets.length === 0 && <Nothing>No brand files yet.</Nothing>}
             {assets.length > 1 && (
               <div className="mb-3">
                 <Button
@@ -759,19 +767,6 @@ export function BrandGuidePanel({
                   </li>
                 ))}
               </ul>
-            )}
-            {logoLink && (
-              <p className="mt-4 text-sm">
-                <span className="font-semibold">Logo link: </span>
-                <a
-                  href={logoLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="break-all text-[var(--av2-link)] hover:underline"
-                >
-                  {logoLink}
-                </a>
-              </p>
             )}
           </Section>
         </TabPanel>
