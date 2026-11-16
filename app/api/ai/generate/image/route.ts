@@ -14,7 +14,9 @@ import {
   checkRateLimit,
 } from "@/lib/ai/cost-calculator";
 import { brandContextFor } from "@/lib/brand/load-brand-context";
-import { generateImage } from "@/lib/ai/provider-router";
+import { generateImage, isAiToolAvailable } from "@/lib/ai/provider-router";
+import { aiGenerationImageUrl, saveAiGenerationImage } from "@/lib/ai/asset-pipeline";
+import { aiToolUnavailableResponse } from "@/lib/ai/unavailable-response";
 import { buildImagePrompt } from "@/lib/ai/prompts";
 import { readIdempotencyKey } from "@/lib/ai/idempotency";
 import { insufficientTokensResponse } from "@/lib/errors/insufficient-tokens";
@@ -30,14 +32,13 @@ export async function POST(req: NextRequest) {
     const idempotencyKey = readIdempotencyKey(req.headers);
 
     const body = await req.json();
-    const { prompt, style, size, jobType, preferProvider, useBrand } = body as {
+    const { prompt, style, size, jobType, useBrand } = body as {
       prompt?: string;
       /** false leaves the brand guide out of the prompt. */
       useBrand?: boolean;
       style?: string;
       size?: string;
       jobType?: string;
-      preferProvider?: "openai" | "replicate";
     };
 
     if (!prompt || prompt.trim().length === 0) {
@@ -52,6 +53,9 @@ export async function POST(req: NextRequest) {
         { status: 403 },
       );
     }
+
+    // No provider key: say so before any tokens move.
+    if (!isAiToolAvailable("IMAGE_GENERATION")) return aiToolUnavailableResponse();
 
     // Rate limit check
     const rateLimit = await checkRateLimit(user.activeCompanyId, "IMAGE_GENERATION");
@@ -90,7 +94,7 @@ export async function POST(req: NextRequest) {
       companyId: user.activeCompanyId,
       toolType: "IMAGE_GENERATION",
       prompt: fullPrompt,
-      inputParams: { style, size, jobType, preferProvider },
+      inputParams: { style, size, jobType },
       cost,
     });
 
@@ -103,7 +107,7 @@ export async function POST(req: NextRequest) {
             toolType: generation.toolType,
             provider: generation.provider,
             model: generation.model,
-            imageUrl: generation.outputImageUrl,
+            imageUrl: await aiGenerationImageUrl(generation),
             tokenCost: generation.tokenCost,
             createdAt: generation.createdAt.toISOString(),
           },
@@ -120,10 +124,14 @@ export async function POST(req: NextRequest) {
         data: { status: "PROCESSING", startedAt: new Date() },
       });
 
-      const result = await generateImage(fullPrompt, {
-        size,
-        style: style as "vivid" | "natural" | undefined,
-        preferProvider,
+      const result = await generateImage(fullPrompt, { size });
+
+      // The model hands back the file itself; keep it in our storage.
+      const stored = await saveAiGenerationImage({
+        bytes: result.bytes,
+        contentType: result.contentType,
+        companyId: user.activeCompanyId,
+        generationId: generation.id,
       });
 
       // Update generation with result
@@ -133,8 +141,8 @@ export async function POST(req: NextRequest) {
           status: "COMPLETED",
           provider: result.provider,
           model: result.model,
-          outputImageUrl: result.url,
-          outputParams: { revisedPrompt: result.revisedPrompt },
+          outputImageUrl: stored.url,
+          outputParams: { revisedPrompt: result.revisedPrompt, storageKey: stored.storageKey },
           completedAt: new Date(),
         },
       });
@@ -147,7 +155,7 @@ export async function POST(req: NextRequest) {
             toolType: completed.toolType,
             provider: completed.provider,
             model: completed.model,
-            imageUrl: result.url,
+            imageUrl: stored.url,
             revisedPrompt: result.revisedPrompt,
             tokenCost: cost,
             createdAt: completed.createdAt.toISOString(),

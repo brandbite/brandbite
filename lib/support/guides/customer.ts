@@ -1233,7 +1233,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
       "background removal",
       "upscale",
       "design suggestions",
-      "dall-e",
+      "coming soon",
     ],
     related: ["tokens"],
     sections: [
@@ -1284,7 +1284,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           },
           {
             type: "p",
-            text: "Background Removal and Image Upscaling work from a link to the image, not a file upload.",
+            text: "Background Removal and Image Upscaling work from a link to the image, not a file upload. A tool marked **Coming soon** can't be opened yet.",
           },
         ],
       },

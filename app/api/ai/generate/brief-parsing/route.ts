@@ -22,7 +22,8 @@ import {
   buildBriefParsingPrompt,
   type BriefParseJobType,
 } from "@/lib/ai/prompts";
-import { generateText } from "@/lib/ai/provider-router";
+import { generateText, isAiToolAvailable } from "@/lib/ai/provider-router";
+import { aiToolUnavailableResponse } from "@/lib/ai/unavailable-response";
 import { buildBrandContext } from "@/lib/brand/brand-context";
 import { loadBrandContextSource } from "@/lib/brand/load-brand-context";
 import { insufficientTokensResponse } from "@/lib/errors/insufficient-tokens";
@@ -92,6 +93,9 @@ export async function POST(req: NextRequest) {
     if (!toolConfig.enabled) {
       return NextResponse.json({ error: "Brief parsing is currently disabled" }, { status: 403 });
     }
+
+    // No provider key: say so before any tokens move.
+    if (!isAiToolAvailable("BRIEF_PARSING")) return aiToolUnavailableResponse();
 
     const rateLimit = await checkRateLimit(user.activeCompanyId, "BRIEF_PARSING");
     if (!rateLimit.allowed) {
@@ -187,10 +191,7 @@ export async function POST(req: NextRequest) {
         data: { status: "PROCESSING", startedAt: new Date() },
       });
 
-      const result = await generateText(userPrompt, systemPrompt, {
-        maxTokens: 400,
-        temperature: 0.3,
-      });
+      const result = await generateText(userPrompt, systemPrompt);
 
       let parsed: ParsedBrief | null = null;
       try {

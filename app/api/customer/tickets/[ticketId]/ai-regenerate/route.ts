@@ -6,7 +6,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { generateImage } from "@/lib/ai/provider-router";
+import { generateImage, isAiToolAvailable } from "@/lib/ai/provider-router";
+import { aiToolUnavailableResponse } from "@/lib/ai/unavailable-response";
 import { buildRefinementPrompt } from "@/lib/ai/prompts";
 import { saveAiImageToR2 } from "@/lib/ai/asset-pipeline";
 import {
@@ -43,6 +44,7 @@ export async function POST(
     if (!isAiTicketsAllowed(aiMode)) {
       return NextResponse.json({ error: "AI generation isn't available yet." }, { status: 403 });
     }
+    if (!isAiToolAvailable("IMAGE_GENERATION")) return aiToolUnavailableResponse();
 
     const idempotencyKey = readIdempotencyKey(req.headers);
 
@@ -136,10 +138,7 @@ export async function POST(
     });
 
     try {
-      const result = await generateImage(refinedPrompt, {
-        size,
-        style: style as "vivid" | "natural" | undefined,
-      });
+      const result = await generateImage(refinedPrompt, { size });
 
       const revisionCount = await prisma.ticketRevision.count({
         where: { ticketId },
@@ -155,7 +154,8 @@ export async function POST(
       });
 
       const asset = await saveAiImageToR2({
-        imageUrl: result.url,
+        bytes: result.bytes,
+        contentType: result.contentType,
         ticketId,
         revisionId: revision.id,
         userId: user.id,
@@ -168,7 +168,7 @@ export async function POST(
           status: "COMPLETED",
           provider: result.provider,
           model: result.model,
-          outputImageUrl: asset.url || result.url,
+          outputImageUrl: asset.url,
           outputParams: {
             revisedPrompt: result.revisedPrompt,
             assetId: asset.assetId,
@@ -183,7 +183,7 @@ export async function POST(
           generation: {
             id: generation.id,
             status: "COMPLETED",
-            imageUrl: asset.url || result.url,
+            imageUrl: asset.url,
             revisedPrompt: result.revisedPrompt,
             provider: result.provider,
             model: result.model,

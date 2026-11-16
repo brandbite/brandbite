@@ -14,7 +14,8 @@ import {
   checkRateLimit,
 } from "@/lib/ai/cost-calculator";
 import { brandContextFor } from "@/lib/brand/load-brand-context";
-import { generateText } from "@/lib/ai/provider-router";
+import { generateText, isAiToolAvailable } from "@/lib/ai/provider-router";
+import { aiToolUnavailableResponse } from "@/lib/ai/unavailable-response";
 import { insufficientTokensResponse } from "@/lib/errors/insufficient-tokens";
 import {
   buildCopySystemPrompt,
@@ -54,6 +55,9 @@ export async function POST(req: NextRequest) {
     if (!toolConfig.enabled) {
       return NextResponse.json({ error: "Text generation is currently disabled" }, { status: 403 });
     }
+
+    // No provider key: say so before any tokens move.
+    if (!isAiToolAvailable("TEXT_GENERATION")) return aiToolUnavailableResponse();
 
     // Rate limit check
     const rateLimit = await checkRateLimit(user.activeCompanyId, "TEXT_GENERATION");
@@ -127,10 +131,7 @@ export async function POST(req: NextRequest) {
         data: { status: "PROCESSING", startedAt: new Date() },
       });
 
-      const result = await generateText(userPrompt, systemPrompt, {
-        maxTokens: 1024,
-        temperature: 0.8,
-      });
+      const result = await generateText(userPrompt, systemPrompt);
 
       // Parse variations from JSON array response
       let textVariations: string[] = [];

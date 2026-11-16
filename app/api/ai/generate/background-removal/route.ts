@@ -13,7 +13,8 @@ import {
   refundAiTokens,
   checkRateLimit,
 } from "@/lib/ai/cost-calculator";
-import { removeBackground } from "@/lib/ai/provider-router";
+import { isAiToolAvailable, removeBackground } from "@/lib/ai/provider-router";
+import { aiToolUnavailableResponse } from "@/lib/ai/unavailable-response";
 import { readIdempotencyKey } from "@/lib/ai/idempotency";
 import { insufficientTokensResponse } from "@/lib/errors/insufficient-tokens";
 
@@ -42,6 +43,9 @@ export async function POST(req: NextRequest) {
         { status: 403 },
       );
     }
+
+    // No provider key: say so before any tokens move.
+    if (!isAiToolAvailable("BACKGROUND_REMOVAL")) return aiToolUnavailableResponse();
 
     // Rate limit check
     const rateLimit = await checkRateLimit(user.activeCompanyId, "BACKGROUND_REMOVAL");

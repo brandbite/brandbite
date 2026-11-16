@@ -42,15 +42,34 @@ beforeEach(() => push.mockClear());
 afterEach(() => vi.restoreAllMocks());
 
 describe("AI tools", () => {
-  function mockAi(generations = [generation("a")], total = generations.length) {
+  function mockAi(
+    generations = [generation("a")],
+    total = generations.length,
+    tools: Record<string, { available: boolean }> = {},
+  ) {
     return mockFetch((url) => {
       if (url.includes("/api/customer/tokens")) {
         return Response.json({ company: { tokenBalance: 3 }, stats: {} });
       }
+      if (url.includes("/api/ai/tools")) return Response.json({ tools });
       if (url.includes("/api/ai/generations")) return Response.json({ generations, total });
       return undefined;
     });
   }
+
+  it("holds back a tool that isn't set up yet", async () => {
+    mockAi([], 0, {
+      IMAGE_GENERATION: { available: true },
+      BACKGROUND_REMOVAL: { available: false },
+    });
+    render(<AiToolsPage />);
+
+    const removal = await screen.findByRole("button", { name: /Background Removal.*Coming soon/ });
+    expect(removal).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Image Generation.*Open tool/ })).toBeEnabled();
+    // A tool the server didn't mention stays open.
+    expect(screen.getByRole("button", { name: /Copy Generation.*Open tool/ })).toBeEnabled();
+  });
 
   it("shows the company balance from the tokens response", async () => {
     mockAi();

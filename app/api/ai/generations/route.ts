@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { aiGenerationImageUrl } from "@/lib/ai/asset-pipeline";
 
 export async function GET(req: NextRequest) {
   try {
@@ -60,11 +61,14 @@ export async function GET(req: NextRequest) {
     ]);
 
     return NextResponse.json({
-      generations: generations.map((g) => ({
-        ...g,
-        createdAt: g.createdAt.toISOString(),
-        completedAt: g.completedAt?.toISOString() ?? null,
-      })),
+      generations: await Promise.all(
+        generations.map(async (g) => ({
+          ...g,
+          outputImageUrl: await aiGenerationImageUrl(g),
+          createdAt: g.createdAt.toISOString(),
+          completedAt: g.completedAt?.toISOString() ?? null,
+        })),
+      ),
       total,
       limit,
       offset,

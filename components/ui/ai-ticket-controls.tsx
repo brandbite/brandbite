@@ -103,8 +103,8 @@ export function AiTicketControls({
               </label>
               <FormSelect value={size} onChange={(e) => setSize(e.target.value)} size="sm">
                 <option value="1024x1024">Square (1024x1024)</option>
-                <option value="1024x1792">Portrait (1024x1792)</option>
-                <option value="1792x1024">Landscape (1792x1024)</option>
+                <option value="1024x1536">Portrait (1024x1536)</option>
+                <option value="1536x1024">Landscape (1536x1024)</option>
               </FormSelect>
             </div>
           </div>
@@ -130,8 +130,8 @@ export function AiTicketControls({
             <div className="flex-1">
               <FormSelect value={size} onChange={(e) => setSize(e.target.value)} size="sm">
                 <option value="1024x1024">Square</option>
-                <option value="1024x1792">Portrait</option>
-                <option value="1792x1024">Landscape</option>
+                <option value="1024x1536">Portrait</option>
+                <option value="1536x1024">Landscape</option>
               </FormSelect>
             </div>
           </div>

@@ -17,7 +17,11 @@ import {
   checkRateLimit,
 } from "@/lib/ai/cost-calculator";
 import { brandContextFor } from "@/lib/brand/load-brand-context";
-import { generateTextStream } from "@/lib/ai/provider-router";
+import {
+  AI_TOOL_UNAVAILABLE,
+  generateTextStream,
+  isAiToolAvailable,
+} from "@/lib/ai/provider-router";
 import {
   insufficientTokensBody,
   INSUFFICIENT_TOKENS_STATUS,
@@ -119,6 +123,11 @@ export async function POST(req: NextRequest) {
   const toolConfig = await getAiToolConfig("TEXT_GENERATION");
   if (!toolConfig.enabled) {
     return jsonError({ error: "Text generation is currently disabled" }, 403);
+  }
+
+  // No provider key: say so before any tokens move.
+  if (!isAiToolAvailable("TEXT_GENERATION")) {
+    return jsonError(AI_TOOL_UNAVAILABLE.body, AI_TOOL_UNAVAILABLE.status);
   }
 
   const rateLimit = await checkRateLimit(user.activeCompanyId, "TEXT_GENERATION");
@@ -231,7 +240,7 @@ export async function POST(req: NextRequest) {
         return;
       }
 
-      // Fresh generation — flip to PROCESSING, open the OpenAI stream, and
+      // Fresh generation — flip to PROCESSING, open the model's stream, and
       // forward deltas.
       try {
         await prisma.aiGeneration.update({
@@ -239,10 +248,7 @@ export async function POST(req: NextRequest) {
           data: { status: "PROCESSING", startedAt: new Date() },
         });
 
-        const { meta, chunks } = generateTextStream(userPrompt, systemPrompt, {
-          maxTokens: 1024,
-          temperature: 0.8,
-        });
+        const { meta, chunks } = generateTextStream(userPrompt, systemPrompt);
 
         safeEnqueue("meta", {
           id: generation.id,

@@ -151,7 +151,7 @@ const TOOLS: ToolCard[] = [
     type: "UPSCALE_IMAGE",
     title: "Image Upscaling",
     shortTitle: "Upscale",
-    description: "Upscale an existing image 2x or 4x with Real-ESRGAN",
+    description: "Upscale an existing image 2x or 4x",
     icon: <IconArrowUpRight width={24} height={24} />,
     tone: "lavender",
   },
@@ -320,8 +320,8 @@ function ImageGenerationPanel({
             className={SELECT_THEME}
           >
             <option value="1024x1024">Square (1024×1024)</option>
-            <option value="1024x1792">Portrait (1024×1792)</option>
-            <option value="1792x1024">Landscape (1792×1024)</option>
+            <option value="1024x1536">Portrait (1024×1536)</option>
+            <option value="1536x1024">Landscape (1536×1024)</option>
           </Select>
         </Field>
       </div>
@@ -1015,6 +1015,8 @@ export default function AiToolsPage() {
   const [page, setPage] = useState(1);
   const [tokenBalance, setTokenBalance] = useState<number | null>(null);
   const [tokenError, setTokenError] = useState<InsufficientTokensInfo | null>(null);
+  // Tools the server says can't be used yet. Until it answers, none are held back.
+  const [unavailable, setUnavailable] = useState<ReadonlySet<string>>(new Set());
   const panelRef = useRef<HTMLDivElement>(null);
   const latestHistoryRequest = useRef(0);
 
@@ -1064,6 +1066,28 @@ export default function AiToolsPage() {
   useEffect(() => {
     loadBalance();
   }, [loadBalance]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/ai/tools")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { tools?: Record<string, { available?: boolean }> } | null) => {
+        if (cancelled || !data?.tools) return;
+        setUnavailable(
+          new Set(
+            Object.entries(data.tools)
+              .filter(([, tool]) => tool.available === false)
+              .map(([type]) => type),
+          ),
+        );
+      })
+      .catch(() => {
+        // The tools stay open; each one still checks on the server.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // The panel opens below all five cards: on small screens that's off-screen.
   useEffect(() => {
@@ -1121,17 +1145,21 @@ export default function AiToolsPage() {
         <section aria-label="AI tools" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {TOOLS.map((tool) => {
             const active = activeTool === tool.type;
+            const comingSoon = unavailable.has(tool.type);
             return (
               <button
                 key={tool.type}
                 type="button"
+                disabled={comingSoon}
                 aria-expanded={active}
                 aria-controls="ai-tool-panel"
                 onClick={() => setActiveTool(active ? null : tool.type)}
-                className={`flex gap-4 rounded-2xl border p-5 text-left transition-colors focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:ring-offset-1 focus-visible:outline-none ${
+                className={`flex gap-4 rounded-2xl border p-5 text-left transition-colors focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:ring-offset-1 focus-visible:outline-none disabled:cursor-not-allowed ${
                   active
                     ? "border-[var(--av2-accent)] bg-[var(--av2-selected)]"
-                    : "border-[var(--av2-border)] bg-[var(--av2-surface)] hover:border-[var(--av2-accent)]/50"
+                    : comingSoon
+                      ? "border-[var(--av2-border)] bg-[var(--av2-surface)]"
+                      : "border-[var(--av2-border)] bg-[var(--av2-surface)] hover:border-[var(--av2-accent)]/50"
                 }`}
               >
                 <IconTile tone={tool.tone} round>
@@ -1142,10 +1170,16 @@ export default function AiToolsPage() {
                   <span className="mt-1.5 flex-1 text-sm leading-5 text-[var(--av2-text-2)]">
                     {tool.description}
                   </span>
-                  <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-[var(--av2-link)]">
-                    <span>{active ? "Close tool" : "Open tool"}</span>
-                    <IconArrowUpRight aria-hidden />
-                  </span>
+                  {comingSoon ? (
+                    <span className="mt-3">
+                      <Badge tone="neutral">Coming soon</Badge>
+                    </span>
+                  ) : (
+                    <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-[var(--av2-link)]">
+                      <span>{active ? "Close tool" : "Open tool"}</span>
+                      <IconArrowUpRight aria-hidden />
+                    </span>
+                  )}
                 </span>
               </button>
             );
