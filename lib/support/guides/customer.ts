@@ -1005,7 +1005,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
           },
           {
             type: "p",
-            text: "On each file you can change what it is and whether it's made for light or dark backgrounds. **Download** saves the original file. **Remove** deletes it from the guide after you confirm.",
+            text: "On each file you can give it a **short name** (for example \"Horizontal logo, for headers\"), change what it is and say whether it's made for light or dark backgrounds. The short name is saved when you click outside the field, and it's what your creative sees first; the file name stays underneath. **Download** saves the original file. **Remove** deletes it from the guide after you confirm.",
           },
           {
             type: "p",

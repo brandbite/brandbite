@@ -56,26 +56,10 @@ describe("buildBrandContext", () => {
     expect(context).not.toContain("Brand colors");
   });
 
-  it("gives briefs everything, including the logo link", () => {
-    const context = buildBrandContext(
-      { ...FULL, legacy: { logoUrl: "https://cdn.example.com/logo.svg" } },
-      "brief",
-    )!;
+  it("gives briefs everything", () => {
+    const context = buildBrandContext(FULL, "brief")!;
     expect(context).toContain("Brand colors: Harbor #1f3a5f (primary), #3ddc97");
     expect(context).toContain("Sample copy: Your beans land Monday.");
-    expect(context).toContain("Logo: https://cdn.example.com/logo.svg");
-  });
-
-  it("uses the older project fields where the guide is empty", () => {
-    const legacy = { colors: "#ff6600, navy", fonts: "Inter, Source Serif 4", voice: "Bold." };
-    expect(buildBrandContext({ legacy }, "image")).toBe(
-      "Brand guide — Brand colors: #ff6600, navy; Fonts: Inter, Source Serif 4; Voice: Bold..",
-    );
-    // The guide wins as soon as it has its own value.
-    const mixed = buildBrandContext({ ...FULL, legacy }, "image")!;
-    expect(mixed).toContain("Harbor #1f3a5f");
-    expect(mixed).not.toContain("navy");
-    expect(mixed).not.toContain("Bold.");
   });
 
   it("skips blank entries and collapses whitespace", () => {

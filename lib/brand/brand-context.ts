@@ -10,10 +10,7 @@
 
 import type { BrandColor, BrandFont } from "./brand-data";
 
-/**
- * What the builder reads. Mirrors the Brand row, plus the four older
- * per-project fields, which fill in whatever the brand guide leaves empty.
- */
+/** What the builder reads. Mirrors the Brand row. */
 export type BrandContextSource = {
   name?: string | null;
   tagline?: string | null;
@@ -31,13 +28,6 @@ export type BrandContextSource = {
   colors?: BrandColor[];
   fonts?: BrandFont[];
   imageryNotes?: string | null;
-  /** Project.brandLogoUrl / brandColors / brandFonts / brandVoice, as typed. */
-  legacy?: {
-    logoUrl?: string | null;
-    colors?: string | null;
-    fonts?: string | null;
-    voice?: string | null;
-  };
 };
 
 /**
@@ -77,12 +67,9 @@ function describeFont(font: BrandFont): string {
 type Line = { label: string; value: string };
 
 function lookLines(source: BrandContextSource): Line[] {
-  const colors =
-    (source.colors ?? []).map(describeColor).join(", ") || clean(source.legacy?.colors);
-  const fonts = (source.fonts ?? []).map(describeFont).join(", ") || clean(source.legacy?.fonts);
   return [
-    { label: "Brand colors", value: colors },
-    { label: "Fonts", value: fonts },
+    { label: "Brand colors", value: (source.colors ?? []).map(describeColor).join(", ") },
+    { label: "Fonts", value: (source.fonts ?? []).map(describeFont).join(", ") },
     { label: "Imagery", value: clean(source.imageryNotes) },
   ];
 }
@@ -90,7 +77,7 @@ function lookLines(source: BrandContextSource): Line[] {
 function voiceLines(source: BrandContextSource): Line[] {
   return [
     { label: "Tone", value: list(source.toneWords) },
-    { label: "Voice", value: clean(source.voiceNotes) || clean(source.legacy?.voice) },
+    { label: "Voice", value: clean(source.voiceNotes) },
   ];
 }
 
@@ -140,12 +127,7 @@ export function buildBrandContext(
   const lines =
     purpose === "text"
       ? [...identityLines(source), ...languageLines(source)]
-      : [
-          ...identityLines(source),
-          ...languageLines(source),
-          ...lookLines(source),
-          { label: "Logo", value: clean(source.legacy?.logoUrl) },
-        ];
+      : [...identityLines(source), ...languageLines(source), ...lookLines(source)];
   if (!hasSubstance(lines)) return null;
 
   const header =

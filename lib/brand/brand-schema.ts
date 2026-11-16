@@ -21,6 +21,9 @@ export const BRAND_LIMITS = {
   fonts: 12,
 } as const;
 
+/** Longest short name a brand file can carry. */
+export const BRAND_FILE_LABEL_MAX = 120;
+
 /** Trimmed text; an empty string clears the field. */
 const optionalText = (max: number, label: string) =>
   z
@@ -94,5 +97,5 @@ export const startBrandAssetSchema = z.object({
 export const updateBrandAssetSchema = z.object({
   kind: z.enum(BRAND_ASSET_KINDS).optional(),
   background: z.enum(BRAND_ASSET_BACKGROUNDS).optional(),
-  label: optionalText(120, "Note"),
+  label: optionalText(BRAND_FILE_LABEL_MAX, "The short name"),
 });

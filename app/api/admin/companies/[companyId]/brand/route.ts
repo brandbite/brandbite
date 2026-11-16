@@ -57,13 +57,13 @@ export async function GET(
           imageryNotes: null,
         },
         assets: [],
-        logoLink: null,
+        companyName: company.name,
       });
     }
     return NextResponse.json({
       brand: brandView(brand),
       assets: await listBrandAssets(brand.id),
-      logoLink: null,
+      companyName: company.name,
     });
   } catch (error) {
     return brandRouteError(error, "admin brand GET");

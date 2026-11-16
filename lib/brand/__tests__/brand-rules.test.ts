@@ -10,7 +10,6 @@ import {
   isBrandFilePreviewable,
 } from "@/lib/brand/brand-files";
 import { updateBrandAssetSchema, updateBrandSchema } from "@/lib/brand/brand-schema";
-import { colorsFromLegacy, fontsFromLegacy } from "@/lib/brand/brand.server";
 
 describe("brand files", () => {
   it("accepts vector and design files, whatever the case", () => {
@@ -85,22 +84,10 @@ describe("brand edits", () => {
     expect(updateBrandAssetSchema.safeParse({ kind: "LOGO_ICON" }).success).toBe(true);
     expect(updateBrandAssetSchema.safeParse({ kind: "VIRUS" }).success).toBe(false);
   });
-});
 
-describe("older project fields", () => {
-  it("reads hex colors and skips anything else", () => {
-    expect(colorsFromLegacy("#ff6600, #1E293B,navy, #ff6600")).toEqual([
-      { id: "color-0", hex: "#ff6600" },
-      { id: "color-1", hex: "#1e293b" },
-    ]);
-    expect(colorsFromLegacy(null)).toEqual([]);
-  });
-
-  it("reads font names", () => {
-    expect(fontsFromLegacy("Inter, Source Serif 4, Inter")).toEqual([
-      { id: "font-0", name: "Inter" },
-      { id: "font-1", name: "Source Serif 4" },
-    ]);
-    expect(fontsFromLegacy("")).toEqual([]);
+  it("trims a file's short name and clears it when left empty", () => {
+    expect(updateBrandAssetSchema.parse({ label: "  Ink logo " })).toEqual({ label: "Ink logo" });
+    expect(updateBrandAssetSchema.parse({ label: "   " })).toEqual({ label: null });
+    expect(updateBrandAssetSchema.safeParse({ label: "x".repeat(121) }).success).toBe(false);
   });
 });
