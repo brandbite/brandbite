@@ -102,10 +102,13 @@ export async function upscaleImage(
 // Helpers
 // ---------------------------------------------------------------------------
 
-function extractUrl(output: unknown): string | null {
+export function extractUrl(output: unknown): string | null {
   if (typeof output === "string") return output;
   if (output && typeof output === "object" && "url" in output) {
-    return String((output as { url: unknown }).url);
+    // The SDK's FileOutput exposes the link as a method, url(), returning a URL.
+    const url = (output as { url: unknown }).url;
+    const value = typeof url === "function" ? (url as () => unknown).call(output) : url;
+    return value ? String(value) : null;
   }
   if (Array.isArray(output)) {
     for (const item of output) {

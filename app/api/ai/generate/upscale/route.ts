@@ -18,6 +18,7 @@ import {
 } from "@/lib/ai/cost-calculator";
 import { isAiToolAvailable, upscaleImage } from "@/lib/ai/provider-router";
 import { aiToolUnavailableResponse } from "@/lib/ai/unavailable-response";
+import { aiGenerationImageUrl, storeAiGenerationImageFromUrl } from "@/lib/ai/asset-pipeline";
 import { readIdempotencyKey } from "@/lib/ai/idempotency";
 import { insufficientTokensResponse } from "@/lib/errors/insufficient-tokens";
 
@@ -108,7 +109,7 @@ export async function POST(req: NextRequest) {
             toolType: generation.toolType,
             provider: generation.provider,
             model: generation.model,
-            imageUrl: generation.outputImageUrl,
+            imageUrl: await aiGenerationImageUrl(generation),
             scale: priorScale,
             tokenCost: generation.tokenCost,
             createdAt: generation.createdAt.toISOString(),
@@ -129,6 +130,11 @@ export async function POST(req: NextRequest) {
         scale: chosenScale,
         faceEnhance: Boolean(faceEnhance),
       });
+      const stored = await storeAiGenerationImageFromUrl({
+        url: result.url,
+        companyId: user.activeCompanyId,
+        generationId: generation.id,
+      });
 
       const completed = await prisma.aiGeneration.update({
         where: { id: generation.id },
@@ -136,10 +142,11 @@ export async function POST(req: NextRequest) {
           status: "COMPLETED",
           provider: result.provider,
           model: result.model,
-          outputImageUrl: result.url,
+          outputImageUrl: stored.url,
           outputParams: {
             scale: result.scale,
             faceEnhance: Boolean(faceEnhance),
+            storageKey: stored.storageKey,
           },
           completedAt: new Date(),
         },
@@ -153,7 +160,7 @@ export async function POST(req: NextRequest) {
             toolType: completed.toolType,
             provider: completed.provider,
             model: completed.model,
-            imageUrl: result.url,
+            imageUrl: stored.url,
             scale: result.scale,
             tokenCost: cost,
             createdAt: completed.createdAt.toISOString(),

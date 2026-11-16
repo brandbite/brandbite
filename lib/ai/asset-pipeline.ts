@@ -41,6 +41,25 @@ export async function saveAiGenerationImage(options: {
 }
 
 /**
+ * Copies a provider's result (Replicate hands out a link that expires) into
+ * our storage, so the customer's result doesn't disappear.
+ */
+export async function storeAiGenerationImageFromUrl(options: {
+  url: string;
+  companyId: string;
+  generationId: string;
+}): Promise<{ storageKey: string; url: string | null }> {
+  const response = await fetch(options.url);
+  if (!response.ok) throw new Error(`Failed to download the AI result: ${response.status}`);
+  return saveAiGenerationImage({
+    bytes: Buffer.from(await response.arrayBuffer()),
+    contentType: response.headers.get("content-type") || "image/png",
+    companyId: options.companyId,
+    generationId: options.generationId,
+  });
+}
+
+/**
  * A link to a generation's image that works now. Images we stored get a fresh
  * link every time (a saved one may have expired); older rows keep what they have.
  */

@@ -81,3 +81,17 @@ describe("image sizes", () => {
     expect(normalizeImageSize(undefined)).toBe("1024x1024");
   });
 });
+
+describe("Replicate output", () => {
+  it("reads the link from a plain string, a list, and the SDK's file object", async () => {
+    const { extractUrl } = await import("@/lib/ai/replicate");
+    expect(extractUrl("https://r.example/a.png")).toBe("https://r.example/a.png");
+    expect(extractUrl(["https://r.example/b.png"])).toBe("https://r.example/b.png");
+    // FileOutput: url is a method that returns a URL object.
+    const file = { url: () => new URL("https://r.example/c.png") };
+    expect(extractUrl(file)).toBe("https://r.example/c.png");
+    expect(extractUrl([file])).toBe("https://r.example/c.png");
+    expect(extractUrl({ url: "https://r.example/d.png" })).toBe("https://r.example/d.png");
+    expect(extractUrl(null)).toBeNull();
+  });
+});
