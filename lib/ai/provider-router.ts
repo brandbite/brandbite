@@ -1,255 +1,153 @@
 // -----------------------------------------------------------------------------
 // @file: lib/ai/provider-router.ts
-// @purpose: Routes AI requests to the best available provider with fallback
+// @purpose: Which provider does which AI job, and whether that provider is set
+//           up. Text (copy, design suggestions, brief parsing) is Claude,
+//           image generation is OpenAI, background removal and upscaling are
+//           Replicate.
 // -----------------------------------------------------------------------------
 
 import type { AiToolType } from "@prisma/client";
+
 import {
-  generateImage as dalleGenerateImage,
-  generateText as openaiGenerateText,
-  generateTextStream as openaiGenerateTextStream,
-  getDesignSuggestions as openaiGetDesignSuggestions,
-  type ImageSize,
-  type ImageStyle,
-  type ImageGenerationResult,
+  generateText as claudeGenerateText,
+  generateTextStream as claudeGenerateTextStream,
+  getDesignSuggestions as claudeGetDesignSuggestions,
+  textModel,
+  type DesignSuggestion,
   type TextGenerationResult,
   type TextStreamChunk,
-  type DesignSuggestion,
-} from "./openai";
+} from "./anthropic";
+import { generateImage as openaiGenerateImage, imageModel } from "./openai";
 import {
-  generateImageFlux,
   removeBackground as replicateRemoveBackground,
   upscaleImage as replicateUpscaleImage,
-  type FluxImageSize,
-  type FluxImageResult,
   type BackgroundRemovalResult,
   type UpscaleImageResult,
   type UpscaleScale,
 } from "./replicate";
 
 // ---------------------------------------------------------------------------
-// Provider availability check
+// Which provider a tool needs, and whether its key is there
 // ---------------------------------------------------------------------------
 
-const providerStatus: Record<string, { available: boolean; checkedAt: number }> = {};
+export type AiProvider = "anthropic" | "openai" | "replicate";
 
-const HEALTH_CACHE_MS = 60_000; // 1 minute
-
-export function isProviderAvailable(provider: "openai" | "replicate"): boolean {
-  const envKey = provider === "openai" ? "OPENAI_API_KEY" : "REPLICATE_API_TOKEN";
-  if (!process.env[envKey]) return false;
-
-  const cached = providerStatus[provider];
-  if (cached && Date.now() - cached.checkedAt < HEALTH_CACHE_MS) {
-    return cached.available;
-  }
-
-  // Default to available if we have the API key
-  return true;
-}
-
-function markProviderDown(provider: "openai" | "replicate") {
-  providerStatus[provider] = { available: false, checkedAt: Date.now() };
-}
-
-function markProviderUp(provider: "openai" | "replicate") {
-  providerStatus[provider] = { available: true, checkedAt: Date.now() };
-}
-
-// ---------------------------------------------------------------------------
-// Image Generation (routes to DALL-E 3 or Flux Pro)
-// ---------------------------------------------------------------------------
-
-export type GenerateImageOptions = {
-  size?: string;
-  style?: ImageStyle;
-  preferProvider?: "openai" | "replicate";
+const PROVIDER_ENV: Record<AiProvider, string> = {
+  anthropic: "ANTHROPIC_API_KEY",
+  openai: "OPENAI_API_KEY",
+  replicate: "REPLICATE_API_TOKEN",
 };
 
+const TOOL_PROVIDER: Record<AiToolType, AiProvider> = {
+  IMAGE_GENERATION: "openai",
+  TEXT_GENERATION: "anthropic",
+  DESIGN_SUGGESTION: "anthropic",
+  BRIEF_PARSING: "anthropic",
+  BACKGROUND_REMOVAL: "replicate",
+  UPSCALE_IMAGE: "replicate",
+};
+
+export const AI_TOOL_TYPES = Object.keys(TOOL_PROVIDER) as AiToolType[];
+
+export function isProviderAvailable(provider: AiProvider): boolean {
+  return Boolean(process.env[PROVIDER_ENV[provider]]);
+}
+
+/** True when the provider this tool runs on has its key. */
+export function isAiToolAvailable(toolType: AiToolType): boolean {
+  return isProviderAvailable(TOOL_PROVIDER[toolType]);
+}
+
+/** What a tool's API answers when it isn't set up. Nothing is charged. */
+export const AI_TOOL_UNAVAILABLE = {
+  status: 503,
+  body: { error: "This AI tool isn't available yet.", code: "AI_TOOL_UNAVAILABLE" },
+} as const;
+
+export function getProviderForTool(toolType: AiToolType): { provider: AiProvider; model: string } {
+  switch (toolType) {
+    case "IMAGE_GENERATION":
+      return { provider: "openai", model: imageModel() };
+    case "BACKGROUND_REMOVAL":
+      return { provider: "replicate", model: "rembg" };
+    case "UPSCALE_IMAGE":
+      return { provider: "replicate", model: "real-esrgan" };
+    case "TEXT_GENERATION":
+    case "DESIGN_SUGGESTION":
+    case "BRIEF_PARSING":
+      return { provider: "anthropic", model: textModel() };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Image generation (OpenAI)
+// ---------------------------------------------------------------------------
+
 export type GenerateImageResult = {
-  url: string;
-  provider: "openai" | "replicate";
+  /** The image itself; store it (lib/ai/asset-pipeline.ts) before answering. */
+  bytes: Buffer;
+  contentType: string;
+  provider: "openai";
   model: string;
   revisedPrompt?: string;
 };
 
 export async function generateImage(
   prompt: string,
-  options: GenerateImageOptions = {},
+  options: { size?: string | null } = {},
 ): Promise<GenerateImageResult> {
-  const { preferProvider, size = "1024x1024", style = "vivid" } = options;
-
-  // Try preferred provider first, then fallback
-  const providers: ("openai" | "replicate")[] =
-    preferProvider === "replicate" ? ["replicate", "openai"] : ["openai", "replicate"];
-
-  for (const provider of providers) {
-    if (!isProviderAvailable(provider)) continue;
-
-    try {
-      if (provider === "openai") {
-        const result = await dalleGenerateImage(prompt, {
-          size: size as ImageSize,
-          style,
-        });
-        markProviderUp("openai");
-        return {
-          url: result.url,
-          provider: "openai",
-          model: "dall-e-3",
-          revisedPrompt: result.revisedPrompt,
-        };
-      } else {
-        const result = await generateImageFlux(prompt, {
-          size: size as FluxImageSize,
-        });
-        markProviderUp("replicate");
-        return {
-          url: result.url,
-          provider: "replicate",
-          model: "flux-pro",
-        };
-      }
-    } catch (error) {
-      console.error(`[ai:${provider}] image generation failed`, error);
-      markProviderDown(provider);
-      continue;
-    }
-  }
-
-  throw new Error("All image generation providers are unavailable");
+  const result = await openaiGenerateImage(prompt, options);
+  return { ...result, provider: "openai", model: imageModel() };
 }
 
 // ---------------------------------------------------------------------------
-// Text / Copy Generation (routes to GPT-4o)
+// Text (Claude)
 // ---------------------------------------------------------------------------
 
 export async function generateText(
   prompt: string,
   systemPrompt: string,
-  options: { maxTokens?: number; temperature?: number } = {},
-): Promise<TextGenerationResult & { provider: string; model: string }> {
-  if (!isProviderAvailable("openai")) {
-    throw new Error("OpenAI is not available for text generation");
-  }
-
-  const result = await openaiGenerateText(prompt, systemPrompt, options);
-  markProviderUp("openai");
-  return { ...result, provider: "openai", model: "gpt-4o" };
+): Promise<TextGenerationResult & { provider: "anthropic" }> {
+  const result = await claudeGenerateText(prompt, systemPrompt);
+  return { ...result, provider: "anthropic" };
 }
 
-export type TextStreamMeta = { provider: "openai"; model: "gpt-4o" };
+export type TextStreamMeta = { provider: "anthropic"; model: string };
 
-/**
- * Streaming variant of {@link generateText}. Returns an async generator of
- * text deltas plus a meta object the caller can forward to the browser.
- */
+/** Streaming variant of {@link generateText}: text as it is written. */
 export function generateTextStream(
   prompt: string,
   systemPrompt: string,
-  options: { maxTokens?: number; temperature?: number } = {},
 ): { meta: TextStreamMeta; chunks: AsyncGenerator<TextStreamChunk, void, unknown> } {
-  if (!isProviderAvailable("openai")) {
-    throw new Error("OpenAI is not available for text generation");
-  }
+  return {
+    meta: { provider: "anthropic", model: textModel() },
+    chunks: claudeGenerateTextStream(prompt, systemPrompt),
+  };
+}
 
-  const meta: TextStreamMeta = { provider: "openai", model: "gpt-4o" };
-  // Defer `markProviderUp` until the stream actually yields its first chunk so
-  // a failure before the first token still marks the provider down via the
-  // route's catch.
-  const chunks = (async function* () {
-    let markedUp = false;
-    for await (const chunk of openaiGenerateTextStream(prompt, systemPrompt, options)) {
-      if (!markedUp) {
-        markProviderUp("openai");
-        markedUp = true;
-      }
-      yield chunk;
-    }
-  })();
-
-  return { meta, chunks };
+export async function getDesignSuggestions(
+  brief: string,
+  options: { includeColors?: boolean; includeFonts?: boolean; includeLayout?: boolean } = {},
+): Promise<DesignSuggestion & { provider: "anthropic"; model: string }> {
+  const result = await claudeGetDesignSuggestions(brief, options);
+  return { ...result, provider: "anthropic" };
 }
 
 // ---------------------------------------------------------------------------
-// Background Removal (routes to Replicate RMBG)
+// Background removal and upscaling (Replicate)
 // ---------------------------------------------------------------------------
 
 export async function removeBackground(
   imageUrl: string,
-): Promise<BackgroundRemovalResult & { provider: string; model: string }> {
-  if (!isProviderAvailable("replicate")) {
-    throw new Error("Replicate is not available for background removal");
-  }
-
+): Promise<BackgroundRemovalResult & { provider: "replicate"; model: string }> {
   const result = await replicateRemoveBackground(imageUrl);
-  markProviderUp("replicate");
-  return { ...result, provider: "replicate", model: "rmbg-2.0" };
+  return { ...result, provider: "replicate", model: "rembg" };
 }
-
-// ---------------------------------------------------------------------------
-// Image Upscaling (routes to Replicate Real-ESRGAN)
-// ---------------------------------------------------------------------------
 
 export async function upscaleImage(
   imageUrl: string,
   options: { scale?: UpscaleScale; faceEnhance?: boolean } = {},
-): Promise<UpscaleImageResult & { provider: string; model: string }> {
-  if (!isProviderAvailable("replicate")) {
-    throw new Error("Replicate is not available for image upscaling");
-  }
-
-  try {
-    const result = await replicateUpscaleImage(imageUrl, options);
-    markProviderUp("replicate");
-    return { ...result, provider: "replicate", model: "real-esrgan" };
-  } catch (error) {
-    console.error("[ai:replicate] image upscaling failed", error);
-    markProviderDown("replicate");
-    throw error;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Design Suggestions (routes to GPT-4o)
-// ---------------------------------------------------------------------------
-
-export async function getDesignSuggestions(
-  brief: string,
-  options: {
-    includeColors?: boolean;
-    includeFonts?: boolean;
-    includeLayout?: boolean;
-  } = {},
-): Promise<DesignSuggestion & { provider: string; model: string }> {
-  if (!isProviderAvailable("openai")) {
-    throw new Error("OpenAI is not available for design suggestions");
-  }
-
-  const result = await openaiGetDesignSuggestions(brief, options);
-  markProviderUp("openai");
-  return { ...result, provider: "openai", model: "gpt-4o" };
-}
-
-// ---------------------------------------------------------------------------
-// Tool type to function mapping
-// ---------------------------------------------------------------------------
-
-export function getProviderForTool(toolType: AiToolType): { provider: string; model: string } {
-  switch (toolType) {
-    case "IMAGE_GENERATION":
-      return isProviderAvailable("openai")
-        ? { provider: "openai", model: "dall-e-3" }
-        : { provider: "replicate", model: "flux-pro" };
-    case "BACKGROUND_REMOVAL":
-      return { provider: "replicate", model: "rmbg-2.0" };
-    case "TEXT_GENERATION":
-      return { provider: "openai", model: "gpt-4o" };
-    case "DESIGN_SUGGESTION":
-      return { provider: "openai", model: "gpt-4o" };
-    case "BRIEF_PARSING":
-      return { provider: "openai", model: "gpt-4o-mini" };
-    case "UPSCALE_IMAGE":
-      return { provider: "replicate", model: "real-esrgan" };
-  }
+): Promise<UpscaleImageResult & { provider: "replicate"; model: string }> {
+  const result = await replicateUpscaleImage(imageUrl, options);
+  return { ...result, provider: "replicate", model: "real-esrgan" };
 }

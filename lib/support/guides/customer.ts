@@ -1233,7 +1233,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
       "background removal",
       "upscale",
       "design suggestions",
-      "dall-e",
+      "coming soon",
     ],
     related: ["tokens"],
     sections: [
@@ -1270,7 +1270,7 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
               },
               {
                 term: "Background Removal",
-                text: "paste an image URL and download the result as a PNG. 1 token by default.",
+                text: "upload an image (or paste a link to one) and download the result as a PNG. 1 token by default.",
               },
               {
                 term: "Design Suggestions",
@@ -1278,13 +1278,13 @@ export const CUSTOMER_GUIDES: SupportGuide[] = [
               },
               {
                 term: "Image Upscaling",
-                text: "paste an image URL and enlarge it 2× or 4×, optionally enhancing faces. 2 tokens by default.",
+                text: "upload an image (or paste a link to one) and enlarge it 2× or 4×, optionally enhancing faces. 2 tokens by default.",
               },
             ],
           },
           {
             type: "p",
-            text: "Background Removal and Image Upscaling work from a link to the image, not a file upload.",
+            text: "For Background Removal and Image Upscaling, click **Upload an image** and choose a PNG, JPG or WebP file of up to 20 MB, or paste a link to an image that is already online. A tool marked **Coming soon** can't be opened yet.",
           },
         ],
       },

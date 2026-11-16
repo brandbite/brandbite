@@ -14,7 +14,8 @@ import {
   refundAiTokens,
   checkRateLimit,
 } from "@/lib/ai/cost-calculator";
-import { getDesignSuggestions } from "@/lib/ai/provider-router";
+import { getDesignSuggestions, isAiToolAvailable } from "@/lib/ai/provider-router";
+import { aiToolUnavailableResponse } from "@/lib/ai/unavailable-response";
 import { buildSuggestionPrompt } from "@/lib/ai/prompts";
 import { readIdempotencyKey } from "@/lib/ai/idempotency";
 import { insufficientTokensResponse } from "@/lib/errors/insufficient-tokens";
@@ -64,6 +65,9 @@ export async function POST(req: NextRequest) {
         { status: 429 },
       );
     }
+
+    // No provider key: say so before any tokens move.
+    if (!isAiToolAvailable("DESIGN_SUGGESTION")) return aiToolUnavailableResponse();
 
     // Token balance check
     const cost = toolConfig.tokenCost;

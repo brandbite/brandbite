@@ -32,6 +32,7 @@ import {
   InsufficientTokensModal,
   type InsufficientTokensInfo,
 } from "@/components/tokens/insufficient-tokens-modal";
+import { AI_INPUT_IMAGE_ACCEPT, aiInputImageProblem } from "@/lib/ai/input-images";
 import { isInsufficientTokensBody } from "@/lib/errors/insufficient-tokens";
 import { useIdempotencyKey } from "@/lib/hooks/use-idempotency-key";
 
@@ -151,7 +152,7 @@ const TOOLS: ToolCard[] = [
     type: "UPSCALE_IMAGE",
     title: "Image Upscaling",
     shortTitle: "Upscale",
-    description: "Upscale an existing image 2x or 4x with Real-ESRGAN",
+    description: "Upscale an existing image 2x or 4x",
     icon: <IconArrowUpRight width={24} height={24} />,
     tone: "lavender",
   },
@@ -230,6 +231,151 @@ function ResultImage({ label, src, checker }: { label: string; src: string; chec
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={src} alt={label} className="w-full" />
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// The image a tool works on: an uploaded file, or a link
+// ---------------------------------------------------------------------------
+
+type ImageSource = {
+  imageUrl: string;
+  upload: { key: string; name: string; previewUrl: string | null } | null;
+};
+
+const EMPTY_SOURCE: ImageSource = { imageUrl: "", upload: null };
+
+const sourceReady = (source: ImageSource) => !!source.upload || !!source.imageUrl.trim();
+
+/** What the tool's API is sent. */
+const sourceBody = (source: ImageSource) =>
+  source.upload
+    ? { imageKey: source.upload.key, imageName: source.upload.name }
+    : { imageUrl: source.imageUrl.trim() };
+
+/** Uploads straight to storage and answers with the key the tool takes. */
+async function uploadAiInputImage(file: File): Promise<NonNullable<ImageSource["upload"]>> {
+  const problem = aiInputImageProblem(file);
+  if (problem) throw new Error(problem);
+
+  const start = await fetch("/api/ai/uploads", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ contentType: file.type, sizeBytes: file.size }),
+  });
+  const data = (await start.json().catch(() => null)) as {
+    uploadUrl?: string;
+    storageKey?: string;
+    previewUrl?: string | null;
+    error?: string;
+  } | null;
+  if (!start.ok || !data?.uploadUrl || !data.storageKey) {
+    throw new Error(data?.error || "Could not start the upload.");
+  }
+
+  const put = await fetch(data.uploadUrl, {
+    method: "PUT",
+    headers: { "Content-Type": file.type },
+    body: file,
+  });
+  if (!put.ok) throw new Error("The upload failed. Please try again.");
+
+  return { key: data.storageKey, name: file.name, previewUrl: data.previewUrl ?? null };
+}
+
+function ImageSourceField({
+  id,
+  value,
+  onChange,
+  linkPlaceholder,
+}: {
+  id: string;
+  value: ImageSource;
+  onChange: (next: ImageSource) => void;
+  linkPlaceholder: string;
+}) {
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+
+  const pick = async (file: File | undefined) => {
+    if (!file) return;
+    setError("");
+    setUploading(true);
+    try {
+      onChange({ imageUrl: "", upload: await uploadAiInputImage(file) });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "The upload failed. Please try again.");
+    } finally {
+      setUploading(false);
+      if (fileInput.current) fileInput.current.value = "";
+    }
+  };
+
+  if (value.upload) {
+    return (
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--av2-border)] px-4 py-3">
+        <p className="min-w-0 flex-1 truncate text-sm font-semibold" title={value.upload.name}>
+          {value.upload.name}
+        </p>
+        <Button size="sm" onClick={() => onChange(EMPTY_SOURCE)}>
+          Remove
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <input
+          ref={fileInput}
+          type="file"
+          accept={AI_INPUT_IMAGE_ACCEPT}
+          className="sr-only"
+          tabIndex={-1}
+          aria-hidden
+          onChange={(e) => void pick(e.target.files?.[0])}
+        />
+        <Button disabled={uploading} onClick={() => fileInput.current?.click()}>
+          {uploading ? "Uploading…" : "Upload an image"}
+        </Button>
+        <p className="mt-1.5 text-xs text-[var(--av2-text-2)]">PNG, JPG or WebP, up to 20 MB.</p>
+      </div>
+      <p role="status" className="sr-only">
+        {uploading ? "Uploading the image" : ""}
+      </p>
+      {error && <Callout tone="error" title={error} />}
+      <Field htmlFor={`${id}-url`} label="Or paste an image link">
+        <TextInput
+          id={`${id}-url`}
+          placeholder={linkPlaceholder}
+          value={value.imageUrl}
+          onChange={(e) => onChange({ imageUrl: e.target.value, upload: null })}
+        />
+      </Field>
+    </div>
+  );
+}
+
+/** The before / after pair. A pasted link can't be shown here, so it's left out. */
+function BeforeAfter({
+  source,
+  resultLabel,
+  resultSrc,
+  checker,
+}: {
+  source: ImageSource;
+  resultLabel: string;
+  resultSrc: string;
+  checker?: boolean;
+}) {
+  const original = source.upload?.previewUrl;
+  return (
+    <div className={original ? "grid grid-cols-2 gap-3" : "max-w-xl"}>
+      {original && <ResultImage label="Original" src={original} />}
+      <ResultImage label={resultLabel} src={resultSrc} checker={checker} />
     </div>
   );
 }
@@ -320,8 +466,8 @@ function ImageGenerationPanel({
             className={SELECT_THEME}
           >
             <option value="1024x1024">Square (1024×1024)</option>
-            <option value="1024x1792">Portrait (1024×1792)</option>
-            <option value="1792x1024">Landscape (1792×1024)</option>
+            <option value="1024x1536">Portrait (1024×1536)</option>
+            <option value="1536x1024">Landscape (1536×1024)</option>
           </Select>
         </Field>
       </div>
@@ -640,7 +786,7 @@ function BackgroundRemovalPanel({
   onInsufficient: OnInsufficient;
 }) {
   const id = useId();
-  const [imageUrl, setImageUrl] = useState("");
+  const [source, setSource] = useState<ImageSource>(EMPTY_SOURCE);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -657,7 +803,7 @@ function BackgroundRemovalPanel({
           "Content-Type": "application/json",
           "Idempotency-Key": idempotencyKey,
         },
-        body: JSON.stringify({ imageUrl }),
+        body: JSON.stringify(sourceBody(source)),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -679,29 +825,19 @@ function BackgroundRemovalPanel({
 
   return (
     <div className="space-y-4">
-      <Field htmlFor={`${id}-url`} label="Image URL">
-        <TextInput
-          id={`${id}-url`}
-          placeholder="Paste the URL of the image..."
-          value={imageUrl}
-          onChange={(e) => setImageUrl(e.target.value)}
-        />
-      </Field>
+      <ImageSourceField id={id} value={source} onChange={setSource} linkPlaceholder="https://…" />
       {error && <Callout tone="error" title={error} />}
       <SubmitButton
         onClick={generate}
         loading={loading}
         loadingText="Processing..."
-        disabled={!imageUrl.trim()}
+        disabled={!sourceReady(source)}
       >
         Remove Background
       </SubmitButton>
       {result && (
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <ResultImage label="Original" src={imageUrl} />
-            <ResultImage label="Result" src={result} checker />
-          </div>
+          <BeforeAfter source={source} resultLabel="Result" resultSrc={result} checker />
           <a
             href={result}
             target="_blank"
@@ -886,7 +1022,7 @@ function UpscaleImagePanel({
   onInsufficient: OnInsufficient;
 }) {
   const id = useId();
-  const [imageUrl, setImageUrl] = useState("");
+  const [source, setSource] = useState<ImageSource>(EMPTY_SOURCE);
   const [scale, setScale] = useState<2 | 4>(4);
   const [faceEnhance, setFaceEnhance] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -905,7 +1041,7 @@ function UpscaleImagePanel({
           "Content-Type": "application/json",
           "Idempotency-Key": idempotencyKey,
         },
-        body: JSON.stringify({ imageUrl, scale, faceEnhance }),
+        body: JSON.stringify({ ...sourceBody(source), scale, faceEnhance }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -927,14 +1063,7 @@ function UpscaleImagePanel({
 
   return (
     <div className="space-y-4">
-      <Field htmlFor={`${id}-url`} label="Image URL">
-        <TextInput
-          id={`${id}-url`}
-          placeholder="Paste the URL of the image you want to upscale..."
-          value={imageUrl}
-          onChange={(e) => setImageUrl(e.target.value)}
-        />
-      </Field>
+      <ImageSourceField id={id} value={source} onChange={setSource} linkPlaceholder="https://…" />
       <div className="flex flex-wrap items-end gap-x-5 gap-y-3">
         <Field htmlFor={`${id}-scale`} label="Scale" className="w-32">
           <Select
@@ -954,16 +1083,17 @@ function UpscaleImagePanel({
         onClick={generate}
         loading={loading}
         loadingText="Upscaling..."
-        disabled={!imageUrl.trim()}
+        disabled={!sourceReady(source)}
       >
         Upscale Image
       </SubmitButton>
       {result && (
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <ResultImage label="Original" src={imageUrl} />
-            <ResultImage label={`Upscaled (${result.scale}x)`} src={result.imageUrl} />
-          </div>
+          <BeforeAfter
+            source={source}
+            resultLabel={`Upscaled (${result.scale}x)`}
+            resultSrc={result.imageUrl}
+          />
           <a
             href={result.imageUrl}
             target="_blank"
@@ -1015,6 +1145,8 @@ export default function AiToolsPage() {
   const [page, setPage] = useState(1);
   const [tokenBalance, setTokenBalance] = useState<number | null>(null);
   const [tokenError, setTokenError] = useState<InsufficientTokensInfo | null>(null);
+  // Tools the server says can't be used yet. Until it answers, none are held back.
+  const [unavailable, setUnavailable] = useState<ReadonlySet<string>>(new Set());
   const panelRef = useRef<HTMLDivElement>(null);
   const latestHistoryRequest = useRef(0);
 
@@ -1064,6 +1196,28 @@ export default function AiToolsPage() {
   useEffect(() => {
     loadBalance();
   }, [loadBalance]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/ai/tools")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { tools?: Record<string, { available?: boolean }> } | null) => {
+        if (cancelled || !data?.tools) return;
+        setUnavailable(
+          new Set(
+            Object.entries(data.tools)
+              .filter(([, tool]) => tool.available === false)
+              .map(([type]) => type),
+          ),
+        );
+      })
+      .catch(() => {
+        // The tools stay open; each one still checks on the server.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // The panel opens below all five cards: on small screens that's off-screen.
   useEffect(() => {
@@ -1121,17 +1275,21 @@ export default function AiToolsPage() {
         <section aria-label="AI tools" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {TOOLS.map((tool) => {
             const active = activeTool === tool.type;
+            const comingSoon = unavailable.has(tool.type);
             return (
               <button
                 key={tool.type}
                 type="button"
+                disabled={comingSoon}
                 aria-expanded={active}
                 aria-controls="ai-tool-panel"
                 onClick={() => setActiveTool(active ? null : tool.type)}
-                className={`flex gap-4 rounded-2xl border p-5 text-left transition-colors focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:ring-offset-1 focus-visible:outline-none ${
+                className={`flex gap-4 rounded-2xl border p-5 text-left transition-colors focus-visible:ring-2 focus-visible:ring-[var(--av2-accent)] focus-visible:ring-offset-1 focus-visible:outline-none disabled:cursor-not-allowed ${
                   active
                     ? "border-[var(--av2-accent)] bg-[var(--av2-selected)]"
-                    : "border-[var(--av2-border)] bg-[var(--av2-surface)] hover:border-[var(--av2-accent)]/50"
+                    : comingSoon
+                      ? "border-[var(--av2-border)] bg-[var(--av2-surface)]"
+                      : "border-[var(--av2-border)] bg-[var(--av2-surface)] hover:border-[var(--av2-accent)]/50"
                 }`}
               >
                 <IconTile tone={tool.tone} round>
@@ -1142,10 +1300,16 @@ export default function AiToolsPage() {
                   <span className="mt-1.5 flex-1 text-sm leading-5 text-[var(--av2-text-2)]">
                     {tool.description}
                   </span>
-                  <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-[var(--av2-link)]">
-                    <span>{active ? "Close tool" : "Open tool"}</span>
-                    <IconArrowUpRight aria-hidden />
-                  </span>
+                  {comingSoon ? (
+                    <span className="mt-3">
+                      <Badge tone="neutral">Coming soon</Badge>
+                    </span>
+                  ) : (
+                    <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-[var(--av2-link)]">
+                      <span>{active ? "Close tool" : "Open tool"}</span>
+                      <IconArrowUpRight aria-hidden />
+                    </span>
+                  )}
                 </span>
               </button>
             );

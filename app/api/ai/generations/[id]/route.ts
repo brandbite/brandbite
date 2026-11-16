@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { aiGenerationImageUrl } from "@/lib/ai/asset-pipeline";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -49,6 +50,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({
       generation: {
         ...generation,
+        outputImageUrl: await aiGenerationImageUrl(generation),
         startedAt: generation.startedAt?.toISOString() ?? null,
         completedAt: generation.completedAt?.toISOString() ?? null,
         createdAt: generation.createdAt.toISOString(),

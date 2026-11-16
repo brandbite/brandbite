@@ -16,8 +16,11 @@ import {
   refundAiTokens,
   checkRateLimit,
 } from "@/lib/ai/cost-calculator";
-import { upscaleImage } from "@/lib/ai/provider-router";
+import { isAiToolAvailable, upscaleImage } from "@/lib/ai/provider-router";
+import { aiToolUnavailableResponse } from "@/lib/ai/unavailable-response";
+import { aiGenerationImageUrl, storeAiGenerationImageFromUrl } from "@/lib/ai/asset-pipeline";
 import { readIdempotencyKey } from "@/lib/ai/idempotency";
+import { resolveAiInputImage } from "@/lib/ai/input-images.server";
 import { insufficientTokensResponse } from "@/lib/errors/insufficient-tokens";
 
 const ALLOWED_SCALES = [2, 4] as const;
@@ -38,15 +41,14 @@ export async function POST(req: NextRequest) {
     const idempotencyKey = readIdempotencyKey(req.headers);
 
     const body = await req.json();
-    const { imageUrl, scale, faceEnhance } = body as {
-      imageUrl?: string;
+    const { scale, faceEnhance } = body as {
       scale?: number;
       faceEnhance?: boolean;
     };
 
-    if (!imageUrl || imageUrl.trim().length === 0) {
-      return NextResponse.json({ error: "imageUrl is required" }, { status: 400 });
-    }
+    // An uploaded file (imageKey) or a link (imageUrl).
+    const input = await resolveAiInputImage({ ...body, companyId: user.activeCompanyId });
+    if (!input.ok) return NextResponse.json({ error: input.error }, { status: 400 });
 
     const chosenScale: AllowedScale = isAllowedScale(scale) ? scale : 4;
 
@@ -55,6 +57,9 @@ export async function POST(req: NextRequest) {
     if (!toolConfig.enabled) {
       return NextResponse.json({ error: "Image upscaling is currently disabled" }, { status: 403 });
     }
+
+    // No provider key: say so before any tokens move.
+    if (!isAiToolAvailable("UPSCALE_IMAGE")) return aiToolUnavailableResponse();
 
     // Rate limit check
     const rateLimit = await checkRateLimit(user.activeCompanyId, "UPSCALE_IMAGE");
@@ -88,8 +93,8 @@ export async function POST(req: NextRequest) {
       userId: user.id,
       companyId: user.activeCompanyId,
       toolType: "UPSCALE_IMAGE",
-      prompt: `Upscale ${chosenScale}x: ${imageUrl}`,
-      inputParams: { imageUrl, scale: chosenScale, faceEnhance: Boolean(faceEnhance) },
+      prompt: `Upscale ${chosenScale}x: ${input.label}`,
+      inputParams: { ...input.params, scale: chosenScale, faceEnhance: Boolean(faceEnhance) },
       cost,
     });
 
@@ -104,7 +109,7 @@ export async function POST(req: NextRequest) {
             toolType: generation.toolType,
             provider: generation.provider,
             model: generation.model,
-            imageUrl: generation.outputImageUrl,
+            imageUrl: await aiGenerationImageUrl(generation),
             scale: priorScale,
             tokenCost: generation.tokenCost,
             createdAt: generation.createdAt.toISOString(),
@@ -121,9 +126,14 @@ export async function POST(req: NextRequest) {
         data: { status: "PROCESSING", startedAt: new Date() },
       });
 
-      const result = await upscaleImage(imageUrl, {
+      const result = await upscaleImage(input.url, {
         scale: chosenScale,
         faceEnhance: Boolean(faceEnhance),
+      });
+      const stored = await storeAiGenerationImageFromUrl({
+        url: result.url,
+        companyId: user.activeCompanyId,
+        generationId: generation.id,
       });
 
       const completed = await prisma.aiGeneration.update({
@@ -132,10 +142,11 @@ export async function POST(req: NextRequest) {
           status: "COMPLETED",
           provider: result.provider,
           model: result.model,
-          outputImageUrl: result.url,
+          outputImageUrl: stored.url,
           outputParams: {
             scale: result.scale,
             faceEnhance: Boolean(faceEnhance),
+            storageKey: stored.storageKey,
           },
           completedAt: new Date(),
         },
@@ -149,7 +160,7 @@ export async function POST(req: NextRequest) {
             toolType: completed.toolType,
             provider: completed.provider,
             model: completed.model,
-            imageUrl: result.url,
+            imageUrl: stored.url,
             scale: result.scale,
             tokenCost: cost,
             createdAt: completed.createdAt.toISOString(),

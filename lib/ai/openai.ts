@@ -1,221 +1,72 @@
 // -----------------------------------------------------------------------------
 // @file: lib/ai/openai.ts
-// @purpose: OpenAI service client (GPT-4o + DALL-E 3)
+// @purpose: OpenAI client for image generation (GPT Image). Text tools use
+//           Claude, see lib/ai/anthropic.ts.
 // -----------------------------------------------------------------------------
 
 import OpenAI from "openai";
 
-function requireEnv(name: string): string {
-  const v = process.env[name];
-  if (!v) {
-    const error: Error & { code?: string } = new Error(`MISSING_ENV:${name}`);
-    error.code = "MISSING_ENV";
-    throw error;
-  }
-  return v;
+/** The image model. Override with OPENAI_IMAGE_MODEL. */
+export function imageModel(): string {
+  return process.env.OPENAI_IMAGE_MODEL || "gpt-image-2.6-flare";
 }
 
 let _client: OpenAI | null = null;
 
 export function getOpenAIClient(): OpenAI {
   if (!_client) {
+    if (!process.env.OPENAI_API_KEY) {
+      const error: Error & { code?: string } = new Error("MISSING_ENV:OPENAI_API_KEY");
+      error.code = "MISSING_ENV";
+      throw error;
+    }
     _client = new OpenAI({
-      apiKey: requireEnv("OPENAI_API_KEY"),
+      apiKey: process.env.OPENAI_API_KEY,
       organization: process.env.OPENAI_ORG_ID || undefined,
     });
   }
   return _client;
 }
 
-// ---------------------------------------------------------------------------
-// Image Generation (DALL-E 3)
-// ---------------------------------------------------------------------------
+export const IMAGE_SIZES = ["1024x1024", "1024x1536", "1536x1024"] as const;
+export type ImageSize = (typeof IMAGE_SIZES)[number];
 
-export type ImageSize = "1024x1024" | "1024x1792" | "1792x1024";
-export type ImageStyle = "vivid" | "natural";
+/**
+ * The size to ask for. Sizes saved before the move to GPT Image (the old
+ * portrait and landscape) map to today's portrait and landscape.
+ */
+export function normalizeImageSize(size: string | null | undefined): ImageSize {
+  if ((IMAGE_SIZES as readonly string[]).includes(size ?? "")) return size as ImageSize;
+  if (size === "1024x1792") return "1024x1536";
+  if (size === "1792x1024") return "1536x1024";
+  return "1024x1024";
+}
 
 export type ImageGenerationResult = {
-  url: string;
-  revisedPrompt: string;
+  /** The image itself. GPT Image returns the file, not a link. */
+  bytes: Buffer;
+  contentType: "image/png";
+  revisedPrompt?: string;
 };
 
 export async function generateImage(
   prompt: string,
-  options: { size?: ImageSize; style?: ImageStyle } = {},
+  options: { size?: string | null } = {},
 ): Promise<ImageGenerationResult> {
-  const client = getOpenAIClient();
-  const { size = "1024x1024", style = "vivid" } = options;
-
-  const response = await client.images.generate({
-    model: "dall-e-3",
+  const response = await getOpenAIClient().images.generate({
+    model: imageModel(),
     prompt,
     n: 1,
-    size,
-    style,
-    response_format: "url",
+    size: normalizeImageSize(options.size),
+    output_format: "png",
   });
 
   const image = response.data?.[0];
-  if (!image?.url) {
-    throw new Error("No image returned from DALL-E 3");
-  }
+  if (!image?.b64_json) throw new Error("The image model returned no image.");
 
   return {
-    url: image.url,
-    revisedPrompt: image.revised_prompt ?? prompt,
+    bytes: Buffer.from(image.b64_json, "base64"),
+    contentType: "image/png",
+    revisedPrompt: image.revised_prompt ?? undefined,
   };
-}
-
-// ---------------------------------------------------------------------------
-// Text / Copy Generation (GPT-4o)
-// ---------------------------------------------------------------------------
-
-export type TextGenerationResult = {
-  text: string;
-  usage: { promptTokens: number; completionTokens: number };
-};
-
-export async function generateText(
-  prompt: string,
-  systemPrompt: string,
-  options: { maxTokens?: number; temperature?: number } = {},
-): Promise<TextGenerationResult> {
-  const client = getOpenAIClient();
-  const { maxTokens = 1024, temperature = 0.8 } = options;
-
-  const response = await client.chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: prompt },
-    ],
-    max_tokens: maxTokens,
-    temperature,
-  });
-
-  const text = response.choices[0]?.message?.content ?? "";
-
-  return {
-    text,
-    usage: {
-      promptTokens: response.usage?.prompt_tokens ?? 0,
-      completionTokens: response.usage?.completion_tokens ?? 0,
-    },
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Streaming Text Generation (GPT-4o, Server-Sent Events friendly)
-// ---------------------------------------------------------------------------
-
-export type TextStreamChunk = {
-  /** Incremental text delta from the model. Empty string on usage-only chunks. */
-  text: string;
-  /** Present only on the final chunk once OpenAI reports token usage. */
-  usage?: { promptTokens: number; completionTokens: number };
-  /** True on the final chunk (either usage chunk or `finish_reason` present). */
-  done: boolean;
-};
-
-/**
- * Streaming variant of {@link generateText}. Consumes OpenAI's SSE chunks and
- * yields plain objects so callers (e.g. Next.js route handlers) can forward
- * them to the browser without depending on the OpenAI SDK shape.
- */
-export async function* generateTextStream(
-  prompt: string,
-  systemPrompt: string,
-  options: { maxTokens?: number; temperature?: number } = {},
-): AsyncGenerator<TextStreamChunk, void, unknown> {
-  const client = getOpenAIClient();
-  const { maxTokens = 1024, temperature = 0.8 } = options;
-
-  const stream = await client.chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: prompt },
-    ],
-    max_tokens: maxTokens,
-    temperature,
-    stream: true,
-    stream_options: { include_usage: true },
-  });
-
-  for await (const part of stream) {
-    const choice = part.choices?.[0];
-    const delta = choice?.delta?.content ?? "";
-    const finishReason = choice?.finish_reason ?? null;
-    const usage = part.usage
-      ? {
-          promptTokens: part.usage.prompt_tokens ?? 0,
-          completionTokens: part.usage.completion_tokens ?? 0,
-        }
-      : undefined;
-
-    if (delta) {
-      yield { text: delta, done: false };
-    }
-
-    if (usage || finishReason) {
-      yield { text: "", usage, done: true };
-    }
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Design Suggestions (GPT-4o with structured JSON output)
-// ---------------------------------------------------------------------------
-
-export type DesignSuggestion = {
-  colors: { hex: string; name: string; usage: string }[];
-  fonts: { heading: string; body: string; rationale: string };
-  layoutTips: string[];
-  overallDirection: string;
-};
-
-export async function getDesignSuggestions(
-  brief: string,
-  options: {
-    includeColors?: boolean;
-    includeFonts?: boolean;
-    includeLayout?: boolean;
-  } = {},
-): Promise<DesignSuggestion> {
-  const { includeColors = true, includeFonts = true, includeLayout = true } = options;
-
-  const parts = [];
-  if (includeColors) parts.push("color palette (5 colors with hex codes, names, and usage)");
-  if (includeFonts) parts.push("font pairing (heading and body fonts with rationale)");
-  if (includeLayout) parts.push("layout tips (3-5 actionable suggestions)");
-
-  const systemPrompt = `You are a professional graphic designer. Analyze the project brief and provide design suggestions. Return valid JSON with this structure:
-{
-  "colors": [{"hex": "#XXXXXX", "name": "Color Name", "usage": "Where to use it"}],
-  "fonts": {"heading": "Font Name", "body": "Font Name", "rationale": "Why these fonts work"},
-  "layoutTips": ["tip1", "tip2"],
-  "overallDirection": "A brief creative direction summary"
-}
-Only include the sections requested: ${parts.join(", ")}.
-For omitted sections, use empty arrays or empty strings.`;
-
-  const result = await generateText(brief, systemPrompt, {
-    maxTokens: 1024,
-    temperature: 0.7,
-  });
-
-  try {
-    // Extract JSON from the response (handle markdown code blocks)
-    let jsonStr = result.text;
-    const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (jsonMatch) jsonStr = jsonMatch[1];
-    return JSON.parse(jsonStr.trim());
-  } catch {
-    return {
-      colors: [],
-      fonts: { heading: "", body: "", rationale: "" },
-      layoutTips: [],
-      overallDirection: result.text,
-    };
-  }
 }

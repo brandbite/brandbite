@@ -1,6 +1,6 @@
 // -----------------------------------------------------------------------------
 // @file: lib/ai/replicate.ts
-// @purpose: Replicate service client (Flux Pro image gen + RMBG background removal)
+// @purpose: Replicate service client (background removal + image upscaling)
 // -----------------------------------------------------------------------------
 
 import Replicate from "replicate";
@@ -27,46 +27,7 @@ export function getReplicateClient(): Replicate {
 }
 
 // ---------------------------------------------------------------------------
-// Image Generation (Flux Pro)
-// ---------------------------------------------------------------------------
-
-export type FluxImageSize = "1024x1024" | "1024x768" | "768x1024" | "1440x1024" | "1024x1440";
-
-export type FluxImageResult = {
-  url: string;
-};
-
-export async function generateImageFlux(
-  prompt: string,
-  options: { size?: FluxImageSize } = {},
-): Promise<FluxImageResult> {
-  const client = getReplicateClient();
-  const { size = "1024x1024" } = options;
-
-  const [width, height] = size.split("x").map(Number);
-
-  const output = await client.run("black-forest-labs/flux-pro", {
-    input: {
-      prompt,
-      width,
-      height,
-      num_outputs: 1,
-      guidance_scale: 3.5,
-      num_inference_steps: 28,
-    },
-  });
-
-  // Replicate returns an array of URLs or a FileOutput
-  const url = extractUrl(output);
-  if (!url) {
-    throw new Error("No image returned from Flux Pro");
-  }
-
-  return { url };
-}
-
-// ---------------------------------------------------------------------------
-// Background Removal (RMBG 2.0)
+// Background Removal (rembg)
 // ---------------------------------------------------------------------------
 
 export type BackgroundRemovalResult = {
@@ -141,10 +102,13 @@ export async function upscaleImage(
 // Helpers
 // ---------------------------------------------------------------------------
 
-function extractUrl(output: unknown): string | null {
+export function extractUrl(output: unknown): string | null {
   if (typeof output === "string") return output;
   if (output && typeof output === "object" && "url" in output) {
-    return String((output as { url: unknown }).url);
+    // The SDK's FileOutput exposes the link as a method, url(), returning a URL.
+    const url = (output as { url: unknown }).url;
+    const value = typeof url === "function" ? (url as () => unknown).call(output) : url;
+    return value ? String(value) : null;
   }
   if (Array.isArray(output)) {
     for (const item of output) {

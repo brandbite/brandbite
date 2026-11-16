@@ -1,6 +1,7 @@
 // -----------------------------------------------------------------------------
 // @file: lib/ai/asset-pipeline.ts
-// @purpose: Save AI-generated images to R2 and register as Assets
+// @purpose: Keep AI-generated images in R2: as a request's output Asset, or
+//           under the company's own AI folder for the standalone tools.
 // -----------------------------------------------------------------------------
 
 import { PutObjectCommand } from "@aws-sdk/client-s3";
@@ -8,12 +9,78 @@ import { createR2Client, getR2BucketName, resolveAssetUrl } from "../r2";
 import { prisma } from "../prisma";
 import { randomBytes } from "crypto";
 
+function extensionFor(contentType: string): string {
+  if (contentType.includes("jpeg") || contentType.includes("jpg")) return "jpg";
+  if (contentType.includes("webp")) return "webp";
+  return "png";
+}
+
 // ---------------------------------------------------------------------------
-// Download image from provider URL and upload to R2
+// A standalone tool's image (AI Tools page), kept under the company's folder
+// ---------------------------------------------------------------------------
+
+export async function saveAiGenerationImage(options: {
+  bytes: Buffer;
+  contentType: string;
+  companyId: string;
+  generationId: string;
+}): Promise<{ storageKey: string; url: string | null }> {
+  const { bytes, contentType, companyId, generationId } = options;
+  const storageKey = `ai/${companyId}/${generationId}.${extensionFor(contentType)}`;
+
+  await createR2Client().send(
+    new PutObjectCommand({
+      Bucket: getR2BucketName(),
+      Key: storageKey,
+      Body: bytes,
+      ContentType: contentType,
+    }),
+  );
+
+  return { storageKey, url: await resolveAssetUrl(storageKey, null) };
+}
+
+/**
+ * Copies a provider's result (Replicate hands out a link that expires) into
+ * our storage, so the customer's result doesn't disappear.
+ */
+export async function storeAiGenerationImageFromUrl(options: {
+  url: string;
+  companyId: string;
+  generationId: string;
+}): Promise<{ storageKey: string; url: string | null }> {
+  const response = await fetch(options.url);
+  if (!response.ok) throw new Error(`Failed to download the AI result: ${response.status}`);
+  return saveAiGenerationImage({
+    bytes: Buffer.from(await response.arrayBuffer()),
+    contentType: response.headers.get("content-type") || "image/png",
+    companyId: options.companyId,
+    generationId: options.generationId,
+  });
+}
+
+/**
+ * A link to a generation's image that works now. Images we stored get a fresh
+ * link every time (a saved one may have expired); older rows keep what they have.
+ */
+export async function aiGenerationImageUrl(generation: {
+  outputImageUrl: string | null;
+  outputParams: unknown;
+}): Promise<string | null> {
+  const storageKey = (generation.outputParams as { storageKey?: unknown } | null)?.storageKey;
+  if (typeof storageKey === "string" && storageKey) {
+    return (await resolveAssetUrl(storageKey, null)) ?? generation.outputImageUrl;
+  }
+  return generation.outputImageUrl;
+}
+
+// ---------------------------------------------------------------------------
+// A request's AI output: upload to R2 and register the Asset
 // ---------------------------------------------------------------------------
 
 export async function saveAiImageToR2(options: {
-  imageUrl: string;
+  bytes: Buffer;
+  contentType: string;
   ticketId: string;
   revisionId: string;
   userId: string;
@@ -23,21 +90,13 @@ export async function saveAiImageToR2(options: {
   storageKey: string;
   url: string | null;
 }> {
-  const { imageUrl, ticketId, revisionId, userId } = options;
+  const { bytes: buffer, contentType, ticketId, revisionId, userId } = options;
 
-  // 1. Download the image from the provider URL
-  const response = await fetch(imageUrl);
-  if (!response.ok) {
-    throw new Error(`Failed to download AI image: ${response.status}`);
-  }
-
-  const buffer = Buffer.from(await response.arrayBuffer());
-  const contentType = response.headers.get("content-type") || "image/png";
-  const ext = contentType.includes("jpeg") || contentType.includes("jpg") ? "jpg" : "png";
+  const ext = extensionFor(contentType);
   const rand = randomBytes(4).toString("hex");
   const safeName = options.originalName || `ai-generated-${rand}.${ext}`;
 
-  // 2. Upload to R2
+  // 1. Upload to R2
   const storageKey = `tickets/${ticketId}/outputs/${Date.now()}_${rand}_${safeName}`;
   const r2 = createR2Client();
   const bucket = getR2BucketName();
@@ -51,10 +110,10 @@ export async function saveAiImageToR2(options: {
     }),
   );
 
-  // 3. Resolve the public URL
+  // 2. Resolve the link
   const url = await resolveAssetUrl(storageKey, null);
 
-  // 4. Register the Asset in the database
+  // 3. Register the Asset in the database
   const asset = await prisma.asset.create({
     data: {
       ticketId,
