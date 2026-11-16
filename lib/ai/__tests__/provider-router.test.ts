@@ -95,3 +95,30 @@ describe("Replicate output", () => {
     expect(extractUrl(null)).toBeNull();
   });
 });
+
+describe("images a customer hands to a tool", () => {
+  it("accepts PNG, JPG and WebP up to 20 MB", async () => {
+    const { aiInputImageProblem } = await import("@/lib/ai/input-images");
+    expect(aiInputImageProblem({ type: "image/png", size: 10 })).toBeNull();
+    expect(aiInputImageProblem({ type: "image/webp", size: 20 * 1024 * 1024 })).toBeNull();
+    expect(aiInputImageProblem({ type: "image/svg+xml", size: 10 })).toMatch(/PNG, JPG or WebP/);
+    expect(aiInputImageProblem({ type: "image/jpeg", size: 20 * 1024 * 1024 + 1 })).toMatch(
+      /20 MB/,
+    );
+    expect(aiInputImageProblem({ type: "image/png", size: 0 })).toMatch(/empty/);
+  });
+
+  it("only reads a company's own uploads", async () => {
+    const { aiInputKey, isAiInputKeyOf } = await import("@/lib/ai/input-images");
+    const id = "123e4567-e89b-42d3-a456-426614174000";
+    const key = aiInputKey("c1", id, "image/jpeg");
+    expect(key).toBe(`ai-inputs/c1/${id}.jpg`);
+    expect(isAiInputKeyOf(key, "c1")).toBe(true);
+    // Another company's file, another folder, or a path that climbs out.
+    expect(isAiInputKeyOf(key, "c2")).toBe(false);
+    expect(isAiInputKeyOf(`brand/c1/${id}.jpg`, "c1")).toBe(false);
+    expect(isAiInputKeyOf(`ai-inputs/c1/../c2/${id}.jpg`, "c1")).toBe(false);
+    expect(isAiInputKeyOf(`ai-inputs/c1/${id}.svg`, "c1")).toBe(false);
+    expect(isAiInputKeyOf(key, "")).toBe(false);
+  });
+});

@@ -20,6 +20,7 @@ import { isAiToolAvailable, upscaleImage } from "@/lib/ai/provider-router";
 import { aiToolUnavailableResponse } from "@/lib/ai/unavailable-response";
 import { aiGenerationImageUrl, storeAiGenerationImageFromUrl } from "@/lib/ai/asset-pipeline";
 import { readIdempotencyKey } from "@/lib/ai/idempotency";
+import { resolveAiInputImage } from "@/lib/ai/input-images.server";
 import { insufficientTokensResponse } from "@/lib/errors/insufficient-tokens";
 
 const ALLOWED_SCALES = [2, 4] as const;
@@ -40,15 +41,14 @@ export async function POST(req: NextRequest) {
     const idempotencyKey = readIdempotencyKey(req.headers);
 
     const body = await req.json();
-    const { imageUrl, scale, faceEnhance } = body as {
-      imageUrl?: string;
+    const { scale, faceEnhance } = body as {
       scale?: number;
       faceEnhance?: boolean;
     };
 
-    if (!imageUrl || imageUrl.trim().length === 0) {
-      return NextResponse.json({ error: "imageUrl is required" }, { status: 400 });
-    }
+    // An uploaded file (imageKey) or a link (imageUrl).
+    const input = await resolveAiInputImage({ ...body, companyId: user.activeCompanyId });
+    if (!input.ok) return NextResponse.json({ error: input.error }, { status: 400 });
 
     const chosenScale: AllowedScale = isAllowedScale(scale) ? scale : 4;
 
@@ -93,8 +93,8 @@ export async function POST(req: NextRequest) {
       userId: user.id,
       companyId: user.activeCompanyId,
       toolType: "UPSCALE_IMAGE",
-      prompt: `Upscale ${chosenScale}x: ${imageUrl}`,
-      inputParams: { imageUrl, scale: chosenScale, faceEnhance: Boolean(faceEnhance) },
+      prompt: `Upscale ${chosenScale}x: ${input.label}`,
+      inputParams: { ...input.params, scale: chosenScale, faceEnhance: Boolean(faceEnhance) },
       cost,
     });
 
@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
         data: { status: "PROCESSING", startedAt: new Date() },
       });
 
-      const result = await upscaleImage(imageUrl, {
+      const result = await upscaleImage(input.url, {
         scale: chosenScale,
         faceEnhance: Boolean(faceEnhance),
       });

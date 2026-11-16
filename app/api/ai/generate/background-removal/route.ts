@@ -17,6 +17,7 @@ import { isAiToolAvailable, removeBackground } from "@/lib/ai/provider-router";
 import { aiToolUnavailableResponse } from "@/lib/ai/unavailable-response";
 import { aiGenerationImageUrl, storeAiGenerationImageFromUrl } from "@/lib/ai/asset-pipeline";
 import { readIdempotencyKey } from "@/lib/ai/idempotency";
+import { resolveAiInputImage } from "@/lib/ai/input-images.server";
 import { insufficientTokensResponse } from "@/lib/errors/insufficient-tokens";
 
 export async function POST(req: NextRequest) {
@@ -30,11 +31,9 @@ export async function POST(req: NextRequest) {
     const idempotencyKey = readIdempotencyKey(req.headers);
 
     const body = await req.json();
-    const { imageUrl } = body as { imageUrl?: string };
-
-    if (!imageUrl || imageUrl.trim().length === 0) {
-      return NextResponse.json({ error: "imageUrl is required" }, { status: 400 });
-    }
+    // An uploaded file (imageKey) or a link (imageUrl).
+    const input = await resolveAiInputImage({ ...body, companyId: user.activeCompanyId });
+    if (!input.ok) return NextResponse.json({ error: input.error }, { status: 400 });
 
     // Check tool is enabled
     const toolConfig = await getAiToolConfig("BACKGROUND_REMOVAL");
@@ -79,8 +78,8 @@ export async function POST(req: NextRequest) {
       userId: user.id,
       companyId: user.activeCompanyId,
       toolType: "BACKGROUND_REMOVAL",
-      prompt: `Remove background from: ${imageUrl}`,
-      inputParams: { imageUrl },
+      prompt: `Remove background from: ${input.label}`,
+      inputParams: input.params,
       cost,
     });
 
@@ -110,7 +109,7 @@ export async function POST(req: NextRequest) {
         data: { status: "PROCESSING", startedAt: new Date() },
       });
 
-      const result = await removeBackground(imageUrl);
+      const result = await removeBackground(input.url);
       const stored = await storeAiGenerationImageFromUrl({
         url: result.url,
         companyId: user.activeCompanyId,
